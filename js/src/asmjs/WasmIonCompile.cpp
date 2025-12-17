@@ -31,6 +31,8 @@ using namespace js::wasm;
 
 using mozilla::DebugOnly;
 using mozilla::Maybe;
+using mozilla::Nothing;
+using mozilla::Some;
 
 namespace {
 
@@ -164,7 +166,7 @@ class FunctionCompiler
                      MIRGenerator& mirGen,
                      FuncCompileResults& compileResults)
       : mg_(mg),
-        iter_(decoder),
+        iter_(decoder, func.lineOrBytecode()),
         func_(func),
         locals_(locals),
         lastReadCallSite_(0),
@@ -186,6 +188,13 @@ class FunctionCompiler
     TempAllocator&             alloc() const { return alloc_; }
     MacroAssembler&            masm() const  { return compileResults_.masm(); }
     const Sig&                 sig() const   { return func_.sig(); }
+
+    TrapOffset trapOffset() const {
+        return iter_.trapOffset();
+    }
+    Maybe<TrapOffset> trapIfNotAsmJS() const {
+        return mg_.isAsmJS() ? Nothing() : Some(iter_.trapOffset());
+    }
 
     bool init()
     {
@@ -556,7 +565,7 @@ class FunctionCompiler
             return nullptr;
 
         MOZ_ASSERT(IsSimdType(from) && IsSimdType(to) && from != to);
-        return MSimdConvert::AddLegalized(alloc(), curBlock_, vec, to, sign);
+        return MSimdConvert::AddLegalized(alloc(), curBlock_, vec, to, sign, trapOffset());
     }
 
     MDefinition* splatSimd(MDefinition* v, MIRType type)
@@ -603,7 +612,7 @@ class FunctionCompiler
     {
         if (inDeadCode())
             return nullptr;
-        auto* ins = MDiv::NewAsmJS(alloc(), lhs, rhs, type, unsignd, trapOnError,
+        auto* ins = MDiv::NewAsmJS(alloc(), lhs, rhs, type, unsignd, trapOnError, trapOffset(),
                                    mustPreserveNaN(type));
         curBlock_->add(ins);
         return ins;
@@ -614,7 +623,7 @@ class FunctionCompiler
     {
         if (inDeadCode())
             return nullptr;
-        MMod* ins = MMod::NewAsmJS(alloc(), lhs, rhs, type, unsignd, trapOnError);
+        MMod* ins = MMod::NewAsmJS(alloc(), lhs, rhs, type, unsignd, trapOnError, trapOffset());
         curBlock_->add(ins);
         return ins;
     }
@@ -676,11 +685,21 @@ class FunctionCompiler
     }
 
     template <class T>
-    MDefinition* truncate(MDefinition* op, bool isUnsigned)
+    MDefinition* asmJSTruncate(MDefinition* op, bool isUnsigned)
     {
         if (inDeadCode())
             return nullptr;
         T* ins = T::NewAsmJS(alloc(), op, isUnsigned);
+        curBlock_->add(ins);
+        return ins;
+    }
+
+    template <class T>
+    MDefinition* truncate(MDefinition* op, bool isUnsigned)
+    {
+        if (inDeadCode())
+            return nullptr;
+        T* ins = T::NewAsmJS(alloc(), op, isUnsigned, trapOffset());
         curBlock_->add(ins);
         return ins;
     }
@@ -707,7 +726,7 @@ class FunctionCompiler
         // If the offset is bigger than the guard region, a separate instruction
         // is necessary to add the offset to the base and check for overflow.
         if (access->offset() >= OffsetGuardLimit || !JitOptions.wasmFoldOffsets) {
-            auto* ins = MWasmAddOffset::New(alloc(), *base, access->offset());
+            auto* ins = MWasmAddOffset::New(alloc(), *base, access->offset(), trapOffset());
             curBlock_->add(ins);
 
             *base = ins;
@@ -715,15 +734,8 @@ class FunctionCompiler
         }
 
 #ifndef WASM_HUGE_MEMORY
-        curBlock_->add(MWasmBoundsCheck::New(alloc(), *base));
+        curBlock_->add(MWasmBoundsCheck::New(alloc(), *base, trapOffset()));
 #endif
-    }
-
-    // Return true only for real asm.js (HEAP[i>>2]|0) accesses which have the
-    // peculiar property of not throwing on out-of-bounds. Everything else
-    // (wasm, SIMD.js, Atomics) throws on out-of-bounds.
-    bool isAsmJSAccess(const MemoryAccessDesc& access) {
-        return mg().isAsmJS() && !access.isSimd() && !access.isAtomic();
     }
 
   public:
@@ -733,7 +745,7 @@ class FunctionCompiler
             return nullptr;
 
         MInstruction* load = nullptr;
-        if (isAsmJSAccess(access)) {
+        if (access.isPlainAsmJS()) {
             MOZ_ASSERT(access.offset() == 0);
             load = MAsmJSLoadHeap::New(alloc(), base, access.type());
         } else {
@@ -751,7 +763,7 @@ class FunctionCompiler
             return;
 
         MInstruction* store = nullptr;
-        if (isAsmJSAccess(access)) {
+        if (access.isPlainAsmJS()) {
             MOZ_ASSERT(access.offset() == 0);
             store = MAsmJSStoreHeap::New(alloc(), base, access.type(), v);
         } else {
@@ -1135,7 +1147,7 @@ class FunctionCompiler
         if (inDeadCode())
             return;
 
-        auto* ins = MWasmTrap::New(alloc(), wasm::Trap::Unreachable);
+        auto* ins = MWasmTrap::New(alloc(), wasm::Trap::Unreachable, trapOffset());
         curBlock_->end(ins);
         curBlock_ = nullptr;
     }
@@ -1549,10 +1561,10 @@ class FunctionCompiler
 
     /************************************************************ DECODING ***/
 
-    uint32_t readCallSiteLineOrBytecode(uint32_t callOffset) {
+    uint32_t readCallSiteLineOrBytecode() {
         if (!func_.callSiteLineNums().empty())
             return func_.callSiteLineNums()[lastReadCallSite_++];
-        return callOffset;
+        return iter_.trapOffset().bytecodeOffset;
     }
 
     bool done() const { return iter_.done(); }
@@ -1896,9 +1908,9 @@ EmitCallImportCommon(FunctionCompiler& f, uint32_t lineOrBytecode, uint32_t func
 }
 
 static bool
-EmitCall(FunctionCompiler& f, uint32_t callOffset)
+EmitCall(FunctionCompiler& f)
 {
-    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode(callOffset);
+    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode();
 
     uint32_t calleeIndex;
     if (!f.iter().readCall(&calleeIndex))
@@ -1935,11 +1947,11 @@ EmitCall(FunctionCompiler& f, uint32_t callOffset)
 }
 
 static bool
-EmitCallImport(FunctionCompiler& f, uint32_t callOffset)
+EmitCallImport(FunctionCompiler& f)
 {
     MOZ_ASSERT(!f.mg().firstFuncDefIndex);
 
-    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode(callOffset);
+    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode();
 
     uint32_t funcImportIndex;
     if (!f.iter().readCallImport(&funcImportIndex))
@@ -1952,9 +1964,9 @@ EmitCallImport(FunctionCompiler& f, uint32_t callOffset)
 }
 
 static bool
-EmitCallIndirect(FunctionCompiler& f, uint32_t callOffset, bool oldStyle)
+EmitCallIndirect(FunctionCompiler& f, bool oldStyle)
 {
-    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode(callOffset);
+    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode();
 
     uint32_t sigIndex;
     MDefinition* callee;
@@ -2171,7 +2183,7 @@ EmitTruncate(FunctionCompiler& f, ValType operandType, ValType resultType,
 
     if (resultType == ValType::I32) {
         if (f.mg().isAsmJS())
-            f.iter().setResult(f.truncate<MTruncateToInt32>(input, isUnsigned));
+            f.iter().setResult(f.asmJSTruncate<MTruncateToInt32>(input, isUnsigned));
         else
             f.iter().setResult(f.truncate<MWasmTruncateToInt32>(input, isUnsigned));
     } else {
@@ -2375,7 +2387,7 @@ EmitLoad(FunctionCompiler& f, ValType type, Scalar::Type viewType)
     if (!f.iter().readLoad(type, Scalar::byteSize(viewType), &addr))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, f.trapIfNotAsmJS());
     f.iter().setResult(f.load(addr.base, access, type));
     return true;
 }
@@ -2388,7 +2400,8 @@ EmitStore(FunctionCompiler& f, ValType resultType, Scalar::Type viewType)
     if (!f.iter().readStore(resultType, Scalar::byteSize(viewType), &addr, &value))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, f.trapIfNotAsmJS());
+
     f.store(addr.base, access, value);
     return true;
 }
@@ -2401,7 +2414,8 @@ EmitTeeStore(FunctionCompiler& f, ValType resultType, Scalar::Type viewType)
     if (!f.iter().readTeeStore(resultType, Scalar::byteSize(viewType), &addr, &value))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, f.trapIfNotAsmJS());
+
     f.store(addr.base, access, value);
     return true;
 }
@@ -2421,16 +2435,16 @@ EmitTeeStoreWithCoercion(FunctionCompiler& f, ValType resultType, Scalar::Type v
     else
         MOZ_CRASH("unexpected coerced store");
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, f.trapIfNotAsmJS());
+
     f.store(addr.base, access, value);
     return true;
 }
 
 static bool
-EmitUnaryMathBuiltinCall(FunctionCompiler& f, uint32_t callOffset, SymbolicAddress callee,
-                         ValType operandType)
+EmitUnaryMathBuiltinCall(FunctionCompiler& f, SymbolicAddress callee, ValType operandType)
 {
-    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode(callOffset);
+    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode();
 
     CallCompileState call(f, lineOrBytecode);
     if (!f.startCall(&call))
@@ -2455,10 +2469,9 @@ EmitUnaryMathBuiltinCall(FunctionCompiler& f, uint32_t callOffset, SymbolicAddre
 }
 
 static bool
-EmitBinaryMathBuiltinCall(FunctionCompiler& f, uint32_t callOffset, SymbolicAddress callee,
-                          ValType operandType)
+EmitBinaryMathBuiltinCall(FunctionCompiler& f, SymbolicAddress callee, ValType operandType)
 {
-    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode(callOffset);
+    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode();
 
     CallCompileState call(f, lineOrBytecode);
     if (!f.startCall(&call))
@@ -2494,8 +2507,9 @@ EmitAtomicsLoad(FunctionCompiler& f)
     if (!f.iter().readAtomicLoad(&addr, &viewType))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset, 0,
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, Some(f.trapOffset()), 0,
                             MembarBeforeLoad, MembarAfterLoad);
+
     f.iter().setResult(f.load(addr.base, access, ValType::I32));
     return true;
 }
@@ -2509,8 +2523,9 @@ EmitAtomicsStore(FunctionCompiler& f)
     if (!f.iter().readAtomicStore(&addr, &viewType, &value))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset, 0,
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, Some(f.trapOffset()), 0,
                             MembarBeforeStore, MembarAfterStore);
+
     f.store(addr.base, access, value);
     f.iter().setResult(value);
     return true;
@@ -2526,7 +2541,8 @@ EmitAtomicsBinOp(FunctionCompiler& f)
     if (!f.iter().readAtomicBinOp(&addr, &viewType, &op, &value))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, Some(f.trapOffset()));
+
     f.iter().setResult(f.atomicBinopHeap(op, addr.base, access, value));
     return true;
 }
@@ -2541,7 +2557,8 @@ EmitAtomicsCompareExchange(FunctionCompiler& f)
     if (!f.iter().readAtomicCompareExchange(&addr, &viewType, &oldValue, &newValue))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, Some(f.trapOffset()));
+
     f.iter().setResult(f.atomicCompareExchangeHeap(addr.base, access, oldValue, newValue));
     return true;
 }
@@ -2555,7 +2572,8 @@ EmitAtomicsExchange(FunctionCompiler& f)
     if (!f.iter().readAtomicExchange(&addr, &viewType, &value))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, Some(f.trapOffset()));
+
     f.iter().setResult(f.atomicExchangeHeap(addr.base, access, value));
     return true;
 }
@@ -2777,7 +2795,8 @@ EmitSimdLoad(FunctionCompiler& f, ValType resultType, unsigned numElems)
     if (!f.iter().readLoad(resultType, Scalar::byteSize(viewType), &addr))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset, numElems);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, Some(f.trapOffset()), numElems);
+
     f.iter().setResult(f.load(addr.base, access, resultType));
     return true;
 }
@@ -2796,7 +2815,8 @@ EmitSimdStore(FunctionCompiler& f, ValType resultType, unsigned numElems)
     if (!f.iter().readTeeStore(resultType, Scalar::byteSize(viewType), &addr, &value))
         return false;
 
-    MemoryAccessDesc access(viewType, addr.align, addr.offset, numElems);
+    MemoryAccessDesc access(viewType, addr.align, addr.offset, Some(f.trapOffset()), numElems);
+
     f.store(addr.base, access, value);
     return true;
 }
@@ -3045,9 +3065,9 @@ EmitSimdOp(FunctionCompiler& f, ValType type, SimdOperation op, SimdSign sign)
 }
 
 static bool
-EmitGrowMemory(FunctionCompiler& f, uint32_t callOffset)
+EmitGrowMemory(FunctionCompiler& f)
 {
-    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode(callOffset);
+    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode();
 
     CallCompileState args(f, lineOrBytecode);
     if (!f.startCall(&args))
@@ -3077,9 +3097,9 @@ EmitGrowMemory(FunctionCompiler& f, uint32_t callOffset)
 }
 
 static bool
-EmitCurrentMemory(FunctionCompiler& f, uint32_t callOffset)
+EmitCurrentMemory(FunctionCompiler& f)
 {
-    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode(callOffset);
+    uint32_t lineOrBytecode = f.readCallSiteLineOrBytecode();
 
     CallCompileState args(f, lineOrBytecode);
 
@@ -3107,8 +3127,6 @@ EmitExpr(FunctionCompiler& f)
 {
     if (!f.mirGen().ensureBallast())
         return false;
-
-    uint32_t exprOffset = f.iter().currentOffset();
 
     Expr expr;
     if (!f.iter().readExpr(&expr))
@@ -3146,13 +3164,13 @@ EmitExpr(FunctionCompiler& f)
 
       // Calls
       case Expr::Call:
-        return EmitCall(f, exprOffset);
+        return EmitCall(f);
       case Expr::CallIndirect:
-        return EmitCallIndirect(f, exprOffset, /* oldStyle = */ false);
+        return EmitCallIndirect(f, /* oldStyle = */ false);
       case Expr::OldCallIndirect:
-        return EmitCallIndirect(f, exprOffset, /* oldStyle = */ true);
+        return EmitCallIndirect(f, /* oldStyle = */ true);
       case Expr::CallImport:
-        return EmitCallImport(f, exprOffset);
+        return EmitCallImport(f);
 
       // Locals and globals
       case Expr::GetLocal:
@@ -3373,13 +3391,13 @@ EmitExpr(FunctionCompiler& f)
       case Expr::F32Sqrt:
         return EmitUnaryWithType<MSqrt>(f, ValType::F32, MIRType::Float32);
       case Expr::F32Ceil:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::CeilF, ValType::F32);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::CeilF, ValType::F32);
       case Expr::F32Floor:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::FloorF, ValType::F32);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::FloorF, ValType::F32);
       case Expr::F32Trunc:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::TruncF, ValType::F32);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::TruncF, ValType::F32);
       case Expr::F32Nearest:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::NearbyIntF, ValType::F32);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::NearbyIntF, ValType::F32);
       case Expr::F32DemoteF64:
         return EmitConversion<MToFloat32>(f, ValType::F64, ValType::F32);
       case Expr::F32ConvertSI32:
@@ -3433,34 +3451,33 @@ EmitExpr(FunctionCompiler& f)
       case Expr::F64Sqrt:
         return EmitUnaryWithType<MSqrt>(f, ValType::F64, MIRType::Double);
       case Expr::F64Ceil:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::CeilD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::CeilD, ValType::F64);
       case Expr::F64Floor:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::FloorD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::FloorD, ValType::F64);
       case Expr::F64Trunc:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::TruncD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::TruncD, ValType::F64);
       case Expr::F64Nearest:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::NearbyIntD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::NearbyIntD, ValType::F64);
       case Expr::F64Sin:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::SinD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::SinD, ValType::F64);
       case Expr::F64Cos:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::CosD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::CosD, ValType::F64);
       case Expr::F64Tan:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::TanD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::TanD, ValType::F64);
       case Expr::F64Asin:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::ASinD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::ASinD, ValType::F64);
       case Expr::F64Acos:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::ACosD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::ACosD, ValType::F64);
       case Expr::F64Atan:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::ATanD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::ATanD, ValType::F64);
       case Expr::F64Exp:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::ExpD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::ExpD, ValType::F64);
       case Expr::F64Log:
-        return EmitUnaryMathBuiltinCall(f, exprOffset, SymbolicAddress::LogD, ValType::F64);
+        return EmitUnaryMathBuiltinCall(f, SymbolicAddress::LogD, ValType::F64);
       case Expr::F64Pow:
-        return EmitBinaryMathBuiltinCall(f, exprOffset, SymbolicAddress::PowD, ValType::F64);
+        return EmitBinaryMathBuiltinCall(f, SymbolicAddress::PowD, ValType::F64);
       case Expr::F64Atan2:
-        return EmitBinaryMathBuiltinCall(f, exprOffset, SymbolicAddress::ATan2D,
-                                         ValType::F64);
+        return EmitBinaryMathBuiltinCall(f, SymbolicAddress::ATan2D, ValType::F64);
       case Expr::F64PromoteF32:
         return EmitConversion<MToDouble>(f, ValType::F32, ValType::F64);
       case Expr::F64ConvertSI32:
@@ -3700,9 +3717,9 @@ EmitExpr(FunctionCompiler& f)
         return EmitAtomicsExchange(f);
       // Memory Operators
       case Expr::GrowMemory:
-        return EmitGrowMemory(f, exprOffset);
+        return EmitGrowMemory(f);
       case Expr::CurrentMemory:
-        return EmitCurrentMemory(f, exprOffset);
+        return EmitCurrentMemory(f);
       case Expr::Limit:;
     }
 
@@ -3737,11 +3754,17 @@ wasm::IonCompileFunction(IonCompileTask* task)
                      IonOptimizations.get(OptimizationLevel::AsmJS));
     mir.initMinAsmJSHeapLength(task->mg().minMemoryLength);
 
+    // Capture the prologue's trap site before decoding the function.
+
+    TrapOffset prologueTrapOffset;
+
     // Build MIR graph
     {
         FunctionCompiler f(task->mg(), d, func, locals, mir, results);
         if (!f.init())
             return false;
+
+        prologueTrapOffset = f.iter().trapOffset();
 
         if (!f.startBlock())
             return false;
@@ -3780,7 +3803,7 @@ wasm::IonCompileFunction(IonCompileTask* task)
         SigIdDesc sigId = task->mg().funcDefSigs[func.defIndex()]->id;
 
         CodeGenerator codegen(&mir, lir, &results.masm());
-        if (!codegen.generateWasm(sigId, &results.offsets()))
+        if (!codegen.generateWasm(sigId, prologueTrapOffset, &results.offsets()))
             return false;
     }
 
