@@ -141,7 +141,7 @@ wasm::DecodeGlobalType(Decoder& d, ValType* type, uint32_t* flags)
 }
 
 bool
-wasm::DecodeResizable(Decoder& d, ResizableLimits* limits)
+wasm::DecodeLimits(Decoder& d, Limits* limits)
 {
     uint32_t flags;
     if (!d.readVarU32(&flags))
