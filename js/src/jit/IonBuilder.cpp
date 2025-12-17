@@ -9039,7 +9039,7 @@ IonBuilder::getElemTryTypedObject(bool* emitted, MDefinition* obj, MDefinition* 
     if (elemPrediction.isUseless())
         return true;
 
-    int32_t elemSize;
+    uint32_t elemSize;
     if (!elemPrediction.hasKnownSize(&elemSize))
         return true;
 
@@ -9077,7 +9077,7 @@ IonBuilder::getElemTryTypedObject(bool* emitted, MDefinition* obj, MDefinition* 
 }
 
 bool
-IonBuilder::checkTypedObjectIndexInBounds(int32_t elemSize,
+IonBuilder::checkTypedObjectIndexInBounds(uint32_t elemSize,
                                           MDefinition* obj,
                                           MDefinition* index,
                                           TypedObjectPrediction objPrediction,
@@ -9110,7 +9110,7 @@ IonBuilder::checkTypedObjectIndexInBounds(int32_t elemSize,
 
     index = addBoundsCheck(idInt32, length);
 
-    return indexAsByteOffset->add(index, elemSize);
+    return indexAsByteOffset->add(index, AssertedCast<int32_t>(elemSize));
 }
 
 bool
@@ -9119,7 +9119,7 @@ IonBuilder::getElemTryScalarElemOfTypedObject(bool* emitted,
                                               MDefinition* index,
                                               TypedObjectPrediction objPrediction,
                                               TypedObjectPrediction elemPrediction,
-                                              int32_t elemSize)
+                                              uint32_t elemSize)
 {
     MOZ_ASSERT(objPrediction.ofArrayKind());
 
@@ -9147,7 +9147,7 @@ IonBuilder::getElemTryReferenceElemOfTypedObject(bool* emitted,
     MOZ_ASSERT(objPrediction.ofArrayKind());
 
     ReferenceTypeDescr::Type elemType = elemPrediction.referenceType();
-    size_t elemSize = ReferenceTypeDescr::size(elemType);
+    uint32_t elemSize = ReferenceTypeDescr::size(elemType);
 
     LinearSum indexAsByteOffset(alloc());
     if (!checkTypedObjectIndexInBounds(elemSize, obj, index, objPrediction, &indexAsByteOffset))
@@ -9164,7 +9164,7 @@ IonBuilder::pushScalarLoadFromTypedObject(MDefinition* obj,
                                           const LinearSum& byteOffset,
                                           ScalarTypeDescr::Type elemType)
 {
-    int32_t size = ScalarTypeDescr::size(elemType);
+    uint32_t size = ScalarTypeDescr::size(elemType);
     MOZ_ASSERT(size == ScalarTypeDescr::alignment(elemType));
 
     // Find location within the owner object.
@@ -9211,7 +9211,7 @@ IonBuilder::pushReferenceLoadFromTypedObject(MDefinition* typedObj,
     MDefinition* elements;
     MDefinition* scaledOffset;
     int32_t adjustment;
-    size_t alignment = ReferenceTypeDescr::alignment(type);
+    uint32_t alignment = ReferenceTypeDescr::alignment(type);
     loadTypedObjectElements(typedObj, byteOffset, alignment, &elements, &scaledOffset, &adjustment);
 
     TemporaryTypeSet* observedTypes = bytecodeTypes(pc);
@@ -9263,7 +9263,7 @@ IonBuilder::getElemTryComplexElemOfTypedObject(bool* emitted,
                                                MDefinition* index,
                                                TypedObjectPrediction objPrediction,
                                                TypedObjectPrediction elemPrediction,
-                                               int32_t elemSize)
+                                               uint32_t elemSize)
 {
     MOZ_ASSERT(objPrediction.ofArrayKind());
 
@@ -10153,7 +10153,7 @@ IonBuilder::setElemTryTypedObject(bool* emitted, MDefinition* obj,
     if (elemPrediction.isUseless())
         return true;
 
-    int32_t elemSize;
+    uint32_t elemSize;
     if (!elemPrediction.hasKnownSize(&elemSize))
         return true;
 
@@ -10195,7 +10195,7 @@ IonBuilder::setElemTryReferenceElemOfTypedObject(bool* emitted,
                                                  TypedObjectPrediction elemPrediction)
 {
     ReferenceTypeDescr::Type elemType = elemPrediction.referenceType();
-    size_t elemSize = ReferenceTypeDescr::size(elemType);
+    uint32_t elemSize = ReferenceTypeDescr::size(elemType);
 
     LinearSum indexAsByteOffset(alloc());
     if (!checkTypedObjectIndexInBounds(elemSize, obj, index, objPrediction, &indexAsByteOffset))
@@ -10218,7 +10218,7 @@ IonBuilder::setElemTryScalarElemOfTypedObject(bool* emitted,
                                               TypedObjectPrediction objPrediction,
                                               MDefinition* value,
                                               TypedObjectPrediction elemPrediction,
-                                              int32_t elemSize)
+                                              uint32_t elemSize)
 {
     // Must always be loading the same scalar type
     ScalarTypeDescr::Type elemType = elemPrediction.scalarType();
@@ -14274,7 +14274,7 @@ IonBuilder::loadTypedObjectData(MDefinition* typedObj,
 void
 IonBuilder::loadTypedObjectElements(MDefinition* typedObj,
                                     const LinearSum& baseByteOffset,
-                                    int32_t scale,
+                                    uint32_t scale,
                                     MDefinition** ownerElements,
                                     MDefinition** ownerScaledOffset,
                                     int32_t* ownerByteAdjustment)
@@ -14407,7 +14407,7 @@ IonBuilder::storeScalarTypedObjectValue(MDefinition* typedObj,
     MDefinition* elements;
     MDefinition* scaledOffset;
     int32_t adjustment;
-    size_t alignment = ScalarTypeDescr::alignment(type);
+    uint32_t alignment = ScalarTypeDescr::alignment(type);
     loadTypedObjectElements(typedObj, byteOffset, alignment, &elements, &scaledOffset, &adjustment);
 
     // Clamp value to [0, 255] when type is Uint8Clamped
@@ -14453,7 +14453,7 @@ IonBuilder::storeReferenceTypedObjectValue(MDefinition* typedObj,
     MDefinition* elements;
     MDefinition* scaledOffset;
     int32_t adjustment;
-    size_t alignment = ReferenceTypeDescr::alignment(type);
+    uint32_t alignment = ReferenceTypeDescr::alignment(type);
     loadTypedObjectElements(typedObj, byteOffset, alignment, &elements, &scaledOffset, &adjustment);
 
     MInstruction* store = nullptr;  // initialize to silence GCC warning
