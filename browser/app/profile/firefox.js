@@ -1079,7 +1079,7 @@ pref("browser.tabs.remote.autostart", false);
 //
 // This setting may not be required anymore once we decide to permanently
 // enable the content sandbox.
-pref("security.sandbox.content.level", 1);
+pref("security.sandbox.content.level", 2);
 #endif
 
 #if defined(XP_MACOSX) || defined(XP_WIN)
