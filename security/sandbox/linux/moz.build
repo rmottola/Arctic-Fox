@@ -67,11 +67,6 @@ SOURCES += [
     'SandboxUtil.cpp',
 ]
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
-    SOURCES += [
-        'SandboxHooks.cpp',
-    ]
-
 # This copy of SafeSPrintf doesn't need to avoid the Chromium logging
 # dependency like the one in libxul does, but this way the behavior is
 # consistent.  See also the comment in SandboxLogging.h.
@@ -112,6 +107,7 @@ DIRS += [
     'broker',
     'common',
     'glue',
+    'interpose',
 ]
 
 TEST_DIRS += [
