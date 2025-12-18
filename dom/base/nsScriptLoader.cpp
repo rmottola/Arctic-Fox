@@ -1182,6 +1182,7 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
                           bool aScriptFromHead)
 {
   MOZ_ASSERT(aRequest->IsLoading());
+  NS_ENSURE_TRUE(mDocument, NS_ERROR_NULL_POINTER);
 
   // If this document is sandboxed without 'allow-scripts', abort.
   if (mDocument->HasScriptsBlockedBySandbox()) {
@@ -1290,7 +1291,7 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
   nsAutoPtr<mozilla::dom::SRICheckDataVerifier> sriDataVerifier;
   if (!aRequest->mIntegrity.IsEmpty()) {
     nsAutoCString sourceUri;
-    if (mDocument && mDocument->GetDocumentURI()) {
+    if (mDocument->GetDocumentURI()) {
       mDocument->GetDocumentURI()->GetAsciiSpec(sourceUri);
     }
     sriDataVerifier = new SRICheckDataVerifier(aRequest->mIntegrity, sourceUri,
@@ -1521,7 +1522,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
                  ("nsScriptLoader::ProcessScriptElement, integrity=%s",
                   NS_ConvertUTF16toUTF8(integrity).get()));
           nsAutoCString sourceUri;
-          if (mDocument && mDocument->GetDocumentURI()) {
+          if (mDocument->GetDocumentURI()) {
             mDocument->GetDocumentURI()->GetAsciiSpec(sourceUri);
           }
           SRICheck::IntegrityMetadata(integrity, sourceUri, mReporter,
