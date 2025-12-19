@@ -1800,12 +1800,7 @@ public:
      * This getter clears the gray bit before handing out the JSObject which
      * means that the object is guaranteed to be kept alive past the next CC.
      */
-    JSObject*
-    GetFlatJSObject() const
-    {
-        JS::ExposeObjectToActiveJS(mFlatJSObject);
-        return mFlatJSObject;
-    }
+    JSObject* GetFlatJSObject() const { return mFlatJSObject; }
 
     /**
      * This getter does not change the color of the JSObject meaning that the
@@ -1816,7 +1811,9 @@ public:
      * being rooted (or otherwise signaling the stored value to the CC).
      */
     JSObject*
-    GetFlatJSObjectPreserveColor() const {return mFlatJSObject;}
+    GetFlatJSObjectPreserveColor() const {
+        return mFlatJSObject.unbarrieredGetPtr();
+    }
 
     XPCNativeSet*
     GetSet() const {return mSet;}
@@ -1904,9 +1901,10 @@ public:
             GetProto()->TraceSelf(trc);
         else
             GetScope()->TraceSelf(trc);
-        if (mFlatJSObject && JS_IsGlobalObject(mFlatJSObject))
-        {
-            xpc::TraceXPCGlobal(trc, mFlatJSObject);
+
+        JSObject* obj = mFlatJSObject.unbarrieredGetPtr();
+        if (obj && JS_IsGlobalObject(obj)) {
+            xpc::TraceXPCGlobal(trc, obj);
         }
     }
 
