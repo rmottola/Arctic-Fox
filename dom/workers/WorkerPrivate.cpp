@@ -2876,7 +2876,7 @@ WorkerPrivateParent<Derived>::PostMessageInternal(
       MarkerTracingType::START);
   }
 
-  runnable->Write(aCx, aMessage, transferable, aRv);
+  runnable->Write(aCx, aMessage, transferable, JS::CloneDataPolicy(), aRv);
 
   if (isTimelineRecording) {
     end = MakeUnique<WorkerTimelineMarker>(NS_IsMainThread()
@@ -5602,7 +5602,7 @@ WorkerPrivate::PostMessageToParentInternal(
       MarkerTracingType::START);
   }
 
-  runnable->Write(aCx, aMessage, transferable, aRv);
+  runnable->Write(aCx, aMessage, transferable, JS::CloneDataPolicy(), aRv);
 
   if (isTimelineRecording) {
     end = MakeUnique<WorkerTimelineMarker>(NS_IsMainThread()
