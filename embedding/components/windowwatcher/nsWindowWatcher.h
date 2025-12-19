@@ -84,7 +84,8 @@ protected:
                               bool aDialog,
                               bool aNavigate,
                               nsIArray* aArgv,
-			      nsIDocShellLoadInfo* aLoadInfo,
+                              bool aIsPopupSpam,
+                              nsIDocShellLoadInfo* aLoadInfo,
                               mozIDOMWindowProxy** aResult);
 
   static nsresult URIfromURL(const char* aURL,

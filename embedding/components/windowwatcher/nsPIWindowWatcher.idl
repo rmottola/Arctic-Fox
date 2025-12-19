@@ -55,13 +55,15 @@ interface nsPIWindowWatcher : nsISupports
       @param aDialog use dialog defaults (see nsIDOMWindow::openDialog)
       @param aNavigate true if we should navigate the new window to the
              specified URL.
+      @param aArgs Window argument
+      @param aIsPopupSpam true if the window is a popup spam window; used for
+                          popup blocker internals.
       @param aLoadInfo if aNavigate is true, this allows the caller to pass in
                        an nsIDocShellLoadInfo to use for the navigation.
                        Callers can pass in null if they want the windowwatcher
                        to just construct a loadinfo itself.  If aNavigate is
                        false, this argument is ignored.
 
-      @param aArgs Window argument
       @return the new window
 
       @note This method may examine the JS context stack for purposes of
@@ -78,6 +80,7 @@ interface nsPIWindowWatcher : nsISupports
                                  in boolean aDialog,
                                  in boolean aNavigate,
                                  in nsISupports aArgs,
+                                 in boolean aIsPopupSpam,
                                  in nsIDocShellLoadInfo aLoadInfo);
 
   /**

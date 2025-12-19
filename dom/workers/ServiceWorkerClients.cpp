@@ -606,7 +606,10 @@ private:
                            spec.get(),
                            nullptr,
                            nullptr,
-                           false, false, true, nullptr, nullptr,
+                           false, false, true, nullptr,
+                           // Not a spammy popup; we got permission, we swear!
+                           /* aIsPopupSpam = */ false,
+                           /* aLoadInfp = */ nullptr,
                            getter_AddRefs(newWindow));
       nsCOMPtr<nsPIDOMWindowOuter> pwindow = nsPIDOMWindowOuter::From(newWindow);
       pwindow.forget(aWindow);
@@ -751,7 +754,7 @@ ServiceWorkerClients::OpenWindow(const nsAString& aUrl,
   mWorkerScope->GetScope(scope);
 
   RefPtr<OpenWindowRunnable> r = new OpenWindowRunnable(promiseProxy,
-                                                          aUrl, scope);
+                                                        aUrl, scope);
   MOZ_ALWAYS_SUCCEEDS(workerPrivate->DispatchToMainThread(r.forget()));
 
   return promise.forget();

@@ -954,7 +954,7 @@ public:
   nsresult Open(const nsAString& aUrl, const nsAString& aName,
                 const nsAString& aOptions,
                 nsIDocShellLoadInfo* aLoadInfo,
-     	        bool aForceNoOpener,
+                bool aForceNoOpener,
                 nsPIDOMWindowOuter **_retval) override;
   mozilla::dom::Navigator* GetNavigator(mozilla::ErrorResult& aError);
   nsIDOMNavigator* GetNavigator() override;
@@ -1409,6 +1409,7 @@ protected:
   // Get the parent, returns null if this is a toplevel window
   nsPIDOMWindowOuter* GetParentInternal();
 
+public:
   // popup tracking
   bool IsPopupSpamWindow()
   {
@@ -1419,17 +1420,10 @@ protected:
     return GetOuterWindowInternal()->mIsPopupSpam;
   }
 
-  void SetPopupSpamWindow(bool aPopup)
-  {
-    if (IsInnerWindow() && !mOuterWindow) {
-      NS_ERROR("SetPopupSpamWindow() called on inner window w/o an outer!");
+  // Outer windows only.
+  void SetIsPopupSpamWindow(bool aIsPopupSpam);
 
-      return;
-    }
-
-    GetOuterWindowInternal()->mIsPopupSpam = aPopup;
-  }
-
+protected:
   // Window Control Functions
 
   // Outer windows only.
