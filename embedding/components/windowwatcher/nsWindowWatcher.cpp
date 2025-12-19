@@ -374,6 +374,7 @@ nsWindowWatcher::OpenWindow(mozIDOMWindowProxy* aParent,
                             /* calledFromJS = */ false, dialog,
                             /* navigate = */ true, argv,
                             /* aIsPopupSpam = */ false,
+                            /* aForceNoOpener = */ false,
                             /* aLoadInfo = */ nullptr,
                             aResult);
 }
@@ -439,6 +440,7 @@ nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
                              bool aNavigate,
                              nsISupports* aArguments,
                              bool aIsPopupSpam,
+                             bool aForceNoOpener,
                              nsIDocShellLoadInfo* aLoadInfo,
                              mozIDOMWindowProxy** aResult)
 {
@@ -460,7 +462,7 @@ nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
   return OpenWindowInternal(aParent, aUrl, aName, aFeatures,
                             aCalledFromScript, dialog,
                             aNavigate, argv, aIsPopupSpam,
-                            aLoadInfo, aResult);
+                            aForceNoOpener, aLoadInfo, aResult);
 }
 
 // This static function checks if the aDocShell uses an UserContextId equal to
@@ -697,6 +699,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
                                     bool aNavigate,
                                     nsIArray* aArgv,
                                     bool aIsPopupSpam,
+                                    bool aForceNoOpener,
                                     nsIDocShellLoadInfo* aLoadInfo,
                                     mozIDOMWindowProxy** aResult)
 {
@@ -755,7 +758,8 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
   }
 
   // try to find an extant window with the given name
-  nsCOMPtr<nsPIDOMWindowOuter> foundWindow = SafeGetWindowByName(name, aParent);
+  nsCOMPtr<nsPIDOMWindowOuter> foundWindow =
+    SafeGetWindowByName(name, aForceNoOpener, aParent);
   GetWindowTreeItem(foundWindow, getter_AddRefs(newDocShellItem));
 
   // Do sandbox checks here, instead of waiting until nsIDocShell::LoadURI.
@@ -1068,7 +1072,8 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
     }
   }
 
-  rv = ReadyOpenedDocShellItem(newDocShellItem, parentWindow, windowIsNew, aResult);
+  rv = ReadyOpenedDocShellItem(newDocShellItem, parentWindow, windowIsNew,
+                               aForceNoOpener, aResult);
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -1313,6 +1318,10 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
 
       newChrome->ShowAsModal();
     }
+  }
+
+  if (aForceNoOpener && windowIsNew) {
+    NS_RELEASE(*aResult);
   }
 
   return NS_OK;
@@ -2142,8 +2151,18 @@ nsWindowWatcher::GetCallerTreeItem(nsIDocShellTreeItem* aParentItem)
 
 nsPIDOMWindowOuter*
 nsWindowWatcher::SafeGetWindowByName(const nsAString& aName,
+                                     bool aForceNoOpener,
                                      mozIDOMWindowProxy* aCurrentWindow)
 {
+  if (aForceNoOpener) {
+    if (!aName.LowerCaseEqualsLiteral("_self") &&
+        !aName.LowerCaseEqualsLiteral("_top") &&
+        !aName.LowerCaseEqualsLiteral("_parent")) {
+      // Ignore all other names in the noopener case.
+      return nullptr;
+    }
+  }
+
   nsCOMPtr<nsIDocShellTreeItem> startItem;
   GetWindowTreeItem(aCurrentWindow, getter_AddRefs(startItem));
 
@@ -2172,6 +2191,7 @@ nsresult
 nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem* aOpenedItem,
                                          nsPIDOMWindowOuter* aParent,
                                          bool aWindowIsNew,
+                                         bool aForceNoOpener,
                                          mozIDOMWindowProxy** aOpenedWindow)
 {
   nsresult rv = NS_ERROR_FAILURE;
@@ -2182,7 +2202,9 @@ nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem* aOpenedItem,
   nsCOMPtr<nsPIDOMWindowOuter> piOpenedWindow = aOpenedItem->GetWindow();
   if (piOpenedWindow) {
     if (aParent) {
-      piOpenedWindow->SetOpenerWindow(aParent, aWindowIsNew); // damnit
+      if (!aForceNoOpener) {
+        piOpenedWindow->SetOpenerWindow(aParent, aWindowIsNew); // damnit
+      }
 
       if (aWindowIsNew) {
 #ifdef DEBUG

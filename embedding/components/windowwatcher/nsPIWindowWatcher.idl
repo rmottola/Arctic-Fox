@@ -58,6 +58,10 @@ interface nsPIWindowWatcher : nsISupports
       @param aArgs Window argument
       @param aIsPopupSpam true if the window is a popup spam window; used for
                           popup blocker internals.
+      @param aForceNoOpener If true, force noopener behavior.  This means not
+                            looking for existing windows with the given name,
+                            not setting an opener on the newly opened window,
+                            and returning null from this method.
       @param aLoadInfo if aNavigate is true, this allows the caller to pass in
                        an nsIDocShellLoadInfo to use for the navigation.
                        Callers can pass in null if they want the windowwatcher
@@ -81,6 +85,7 @@ interface nsPIWindowWatcher : nsISupports
                                  in boolean aNavigate,
                                  in nsISupports aArgs,
                                  in boolean aIsPopupSpam,
+                                 in boolean aForceNoOpener,
                                  in nsIDocShellLoadInfo aLoadInfo);
 
   /**
