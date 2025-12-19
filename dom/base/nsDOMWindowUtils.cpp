@@ -2283,7 +2283,7 @@ nsDOMWindowUtils::SuspendTimeouts()
   nsCOMPtr<nsPIDOMWindowInner> inner = window->GetCurrentInnerWindow();
   NS_ENSURE_TRUE(inner, NS_ERROR_FAILURE);
 
-  inner->NewSuspend();
+  inner->Suspend();
 
   return NS_OK;
 }
@@ -2297,7 +2297,7 @@ nsDOMWindowUtils::ResumeTimeouts()
   nsCOMPtr<nsPIDOMWindowInner> inner = window->GetCurrentInnerWindow();
   NS_ENSURE_TRUE(inner, NS_ERROR_FAILURE);
 
-  inner->NewResume();
+  inner->Resume();
 
   return NS_OK;
 }
