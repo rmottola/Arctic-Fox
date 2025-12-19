@@ -373,7 +373,7 @@ nsWindowWatcher::OpenWindow(mozIDOMWindowProxy* aParent,
                             /* calledFromJS = */ false, dialog,
                             /* navigate = */ true, argv,
                             /* aLoadInfo */ nullptr,
-                            /* openerFullZoom = */ nullptr, aResult);
+                            aResult);
 }
 
 struct SizeSpec
@@ -437,8 +437,6 @@ nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
                              bool aNavigate,
                              nsISupports* aArguments,
                              nsIDocShellLoadInfo* aLoadInfo,
-                             float aOpenerFullZoom,
-                             uint8_t aOptionalArgc,
                              mozIDOMWindowProxy** aResult)
 {
   nsCOMPtr<nsIArray> argv = ConvertArgsToArray(aArguments);
@@ -459,9 +457,7 @@ nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
   return OpenWindowInternal(aParent, aUrl, aName, aFeatures,
                             aCalledFromScript, dialog,
                             aNavigate, argv,
-                            aLoadInfo,
-                            aOptionalArgc >= 1 ? &aOpenerFullZoom : nullptr,
-                            aResult);
+                            aLoadInfo, aResult);
 }
 
 // This static function checks if the aDocShell uses an UserContextId equal to
@@ -676,7 +672,7 @@ nsWindowWatcher::OpenWindowWithTabParent(nsITabParent* aOpeningTabParent,
   SizeSpec sizeSpec;
   CalcSizeSpec(aFeatures, sizeSpec);
   SizeOpenedWindow(chromeTreeOwner, parentWindowOuter, false, sizeSpec,
-                   &aOpenerFullZoom);
+                   Some(aOpenerFullZoom));
 
   nsCOMPtr<nsITabParent> newTabParent;
   chromeTreeOwner->GetPrimaryTabParent(getter_AddRefs(newTabParent));
@@ -698,7 +694,6 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
                                     bool aNavigate,
                                     nsIArray* aArgv,
                                     nsIDocShellLoadInfo* aLoadInfo,
-                                    float* aOpenerFullZoom,
                                     mozIDOMWindowProxy** aResult)
 {
   nsresult rv = NS_OK;
@@ -900,8 +895,8 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
         rv = provider->ProvideWindow(aParent, chromeFlags, aCalledFromJS,
                                      sizeSpec.PositionSpecified(),
                                      sizeSpec.SizeSpecified(),
-                                     uriToLoad, name, features, &windowIsNew,
-                                     getter_AddRefs(newWindow));
+                                     uriToLoad, name, features,
+                                     &windowIsNew, getter_AddRefs(newWindow));
 
         if (NS_SUCCEEDED(rv)) {
           GetWindowTreeItem(newWindow, getter_AddRefs(newDocShellItem));
@@ -1254,8 +1249,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
   if (isNewToplevelWindow) {
     nsCOMPtr<nsIDocShellTreeOwner> newTreeOwner;
     newDocShellItem->GetTreeOwner(getter_AddRefs(newTreeOwner));
-    SizeOpenedWindow(newTreeOwner, aParent, isCallerChrome, sizeSpec,
-                     aOpenerFullZoom);
+    SizeOpenedWindow(newTreeOwner, aParent, isCallerChrome, sizeSpec);
   }
 
   // XXXbz isn't windowIsModal always true when windowIsModalContentDialog?
@@ -2273,21 +2267,20 @@ nsWindowWatcher::CalcSizeSpec(const nsACString& aFeatures, SizeSpec& aResult)
           The top-level nsIDocShellTreeOwner of the newly opened window.
    @param aParent (optional)
           The parent window from which to inherit zoom factors from if
-          aOpenerFullZoom isn't passed.
+          aOpenerFullZoom is none.
    @param aIsCallerChrome
           True if the code requesting the new window is privileged.
    @param aSizeSpec
           The size that the new window should be.
    @param aOpenerFullZoom
-          An optional pointer to a zoom factor to scale the content
-          to.
+          If not nothing, a zoom factor to scale the content to.
 */
 void
 nsWindowWatcher::SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
                                   mozIDOMWindowProxy* aParent,
                                   bool aIsCallerChrome,
                                   const SizeSpec& aSizeSpec,
-                                  float* aOpenerFullZoom)
+                                  Maybe<float> aOpenerFullZoom)
 {
   // We should only be sizing top-level windows if we're in the parent
   // process.
@@ -2306,8 +2299,8 @@ nsWindowWatcher::SizeOpenedWindow(nsIDocShellTreeOwner* aTreeOwner,
     return;
   }
 
-  double openerZoom = aOpenerFullZoom ? *aOpenerFullZoom : 1.0;
-  if (aParent && !aOpenerFullZoom) {
+  double openerZoom = aOpenerFullZoom.valueOr(1.0);
+  if (aParent && aOpenerFullZoom.isNothing()) {
     nsCOMPtr<nsPIDOMWindowOuter> piWindow = nsPIDOMWindowOuter::From(aParent);
     if (nsIDocument* doc = piWindow->GetDoc()) {
       if (nsIPresShell* shell = doc->GetShell()) {

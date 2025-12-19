@@ -62,9 +62,6 @@ interface nsPIWindowWatcher : nsISupports
                        false, this argument is ignored.
 
       @param aArgs Window argument
-      @param aOpenerFullZoom the full zoom multiplier for the opener window.
-                             this can be null in the single process case where
-                             the opener full zoom is obtained from aParent.
       @return the new window
 
       @note This method may examine the JS context stack for purposes of
@@ -75,15 +72,13 @@ interface nsPIWindowWatcher : nsISupports
             (which is determined based on the JS stack and the value of
             aParent).  This is not guaranteed, however.
   */
-  [optional_argc]
   mozIDOMWindowProxy openWindow2(in mozIDOMWindowProxy aParent, in string aUrl,
                                  in string aName, in string aFeatures,
                                  in boolean aCalledFromScript,
                                  in boolean aDialog,
                                  in boolean aNavigate,
                                  in nsISupports aArgs,
-			         in nsIDocShellLoadInfo aLoadInfo,
-                                 [optional] in float aOpenerFullZoom);
+                                 in nsIDocShellLoadInfo aLoadInfo);
 
   /**
    * Opens a new window using the most recent non-private browser

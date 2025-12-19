@@ -13,6 +13,7 @@
 
 #include "nsCOMPtr.h"
 #include "mozilla/Mutex.h"
+#include "mozilla/Maybe.h"
 #include "nsIWindowCreator.h" // for stupid compilers
 #include "nsIWindowWatcher.h"
 #include "nsIPromptFactory.h"
@@ -84,7 +85,6 @@ protected:
                               bool aNavigate,
                               nsIArray* aArgv,
 			      nsIDocShellLoadInfo* aLoadInfo,
-                              float* aOpenerFullZoom,
                               mozIDOMWindowProxy** aResult);
 
   static nsresult URIfromURL(const char* aURL,
@@ -112,7 +112,8 @@ protected:
                                mozIDOMWindowProxy* aParent,
                                bool aIsCallerChrome,
                                const SizeSpec& aSizeSpec,
-                               float* aOpenerFullZoom);
+                               mozilla::Maybe<float> aOpenerFullZoom =
+                                 mozilla::Nothing());
   static void GetWindowTreeItem(mozIDOMWindowProxy* aWindow,
                                 nsIDocShellTreeItem** aResult);
   static void GetWindowTreeOwner(nsPIDOMWindowOuter* aWindow,

@@ -11938,8 +11938,8 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
       rv = pwwatch->OpenWindow2(AsOuter(), url.get(), name_ptr,
                                 options_ptr, /* aCalledFromScript = */ true,
                                 aDialog, aNavigate, argv,
-				aLoadInfo,
-                                1.0f, 0, getter_AddRefs(domReturn));
+                                aLoadInfo,
+                                getter_AddRefs(domReturn));
     } else {
       // Force a system caller here so that the window watcher won't screw us
       // up.  We do NOT want this case looking at the JS context on the stack
@@ -11955,12 +11955,11 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
         nojsapi.emplace();
       }
 
-
       rv = pwwatch->OpenWindow2(AsOuter(), url.get(), name_ptr,
                                 options_ptr, /* aCalledFromScript = */ false,
                                 aDialog, aNavigate, aExtraArgument,
-				aLoadInfo,
-                                1.0f, 0, getter_AddRefs(domReturn));
+                                aLoadInfo,
+                                getter_AddRefs(domReturn));
 
     }
   }
