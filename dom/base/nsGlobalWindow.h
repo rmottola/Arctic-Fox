@@ -1472,11 +1472,14 @@ private:
    *        exclusive with the argv/argc approach.
    *
    * @param aLoadInfo to be passed on along to the windowwatcher.
+   *
    * @param aForceNoOpener if true, will act as if "noopener" were passed in
    *                       aOptions, but without affecting any other window
    *                       features.
    *
-   * @param aReturn [out] The window that was opened, if any.
+   * @param aReturn [out] The window that was opened, if any.  Will be null if
+   *                      aForceNoOpener is true of if aOptions contains
+   *                      "noopener".
    *
    * Outer windows only.
    */
