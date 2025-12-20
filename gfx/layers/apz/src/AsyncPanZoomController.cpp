@@ -828,8 +828,8 @@ AsyncPanZoomController::ArePointerEventsConsumable(TouchBlockState* aBlock, uint
   return true;
 }
 
-template <typename T>
-static float GetAxisStart(AsyncDragMetrics::DragDirection aDir, T aValue) {
+template <typename Units>
+static CoordTyped<Units> GetAxisStart(AsyncDragMetrics::DragDirection aDir, const PointTyped<Units>& aValue) {
   if (aDir == AsyncDragMetrics::HORIZONTAL) {
     return aValue.x;
   } else {
@@ -837,8 +837,26 @@ static float GetAxisStart(AsyncDragMetrics::DragDirection aDir, T aValue) {
   }
 }
 
-template <typename T>
-static float GetAxisEnd(AsyncDragMetrics::DragDirection aDir, T aValue) {
+template <typename Units>
+static CoordTyped<Units> GetAxisStart(AsyncDragMetrics::DragDirection aDir, const RectTyped<Units>& aValue) {
+  if (aDir == AsyncDragMetrics::HORIZONTAL) {
+    return aValue.x;
+  } else {
+    return aValue.y;
+  }
+}
+
+template <typename Units>
+static IntCoordTyped<Units> GetAxisStart(AsyncDragMetrics::DragDirection aDir, const IntRectTyped<Units>& aValue) {
+  if (aDir == AsyncDragMetrics::HORIZONTAL) {
+    return aValue.x;
+  } else {
+    return aValue.y;
+  }
+}
+
+template <typename Units>
+static IntCoordTyped<Units> GetAxisEnd(AsyncDragMetrics::DragDirection aDir, const IntRectTyped<Units>& aValue) {
   if (aDir == AsyncDragMetrics::HORIZONTAL) {
     return aValue.x + aValue.width;
   } else {
@@ -846,8 +864,8 @@ static float GetAxisEnd(AsyncDragMetrics::DragDirection aDir, T aValue) {
   }
 }
 
-template <typename T>
-static float GetAxisSize(AsyncDragMetrics::DragDirection aDir, T aValue) {
+template <typename Units>
+static CoordTyped<Units> GetAxisSize(AsyncDragMetrics::DragDirection aDir, const RectTyped<Units>& aValue) {
   if (aDir == AsyncDragMetrics::HORIZONTAL) {
     return aValue.width;
   } else {
@@ -855,8 +873,8 @@ static float GetAxisSize(AsyncDragMetrics::DragDirection aDir, T aValue) {
   }
 }
 
-template <typename T>
-static float GetAxisScale(AsyncDragMetrics::DragDirection aDir, T aValue) {
+template <typename FromUnits, typename ToUnits>
+static float GetAxisScale(AsyncDragMetrics::DragDirection aDir, const ScaleFactors2D<FromUnits, ToUnits>& aValue) {
   if (aDir == AsyncDragMetrics::HORIZONTAL) {
     return aValue.xScale;
   } else {
@@ -891,24 +909,24 @@ nsEventStatus AsyncPanZoomController::HandleDragEvent(const MouseInput& aEvent,
   CSSPoint scrollbarPoint = scrollFramePoint * mFrameMetrics.GetPresShellResolution();
   CSSRect cssCompositionBound = mFrameMetrics.CalculateCompositedRectInCssPixels();
 
-  float mousePosition = GetAxisStart(aDragMetrics.mDirection, scrollbarPoint) -
-                        aDragMetrics.mScrollbarDragOffset -
+  CSSCoord mousePosition = GetAxisStart(aDragMetrics.mDirection, scrollbarPoint) -
+                        CSSCoord(aDragMetrics.mScrollbarDragOffset) -
                         GetAxisStart(aDragMetrics.mDirection, cssCompositionBound) -
-                        GetAxisStart(aDragMetrics.mDirection, aDragMetrics.mScrollTrack);
+                        CSSCoord(GetAxisStart(aDragMetrics.mDirection, aDragMetrics.mScrollTrack));
 
-  float scrollMax = GetAxisEnd(aDragMetrics.mDirection, aDragMetrics.mScrollTrack);
+  CSSCoord scrollMax = CSSCoord(GetAxisEnd(aDragMetrics.mDirection, aDragMetrics.mScrollTrack));
   scrollMax -= node->GetScrollSize() /
                GetAxisScale(aDragMetrics.mDirection, mFrameMetrics.GetZoom()) *
                mFrameMetrics.GetPresShellResolution();
 
   float scrollPercent = mousePosition / scrollMax;
 
-  float minScrollPosition =
+  CSSCoord minScrollPosition =
     GetAxisStart(aDragMetrics.mDirection, mFrameMetrics.GetScrollableRect().TopLeft());
-  float maxScrollPosition =
+  CSSCoord maxScrollPosition =
     GetAxisSize(aDragMetrics.mDirection, mFrameMetrics.GetScrollableRect()) -
-    GetAxisSize(aDragMetrics.mDirection, mFrameMetrics.GetCompositionBounds());
-  float scrollPosition = scrollPercent * maxScrollPosition;
+    GetAxisSize(aDragMetrics.mDirection, cssCompositionBound);
+  CSSCoord scrollPosition = scrollPercent * maxScrollPosition;
 
   scrollPosition = std::max(scrollPosition, minScrollPosition);
   scrollPosition = std::min(scrollPosition, maxScrollPosition);
