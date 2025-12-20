@@ -567,7 +567,6 @@ static const char* sObserverTopics[] = {
 #ifdef ACCESSIBILITY
   "a11y-init-or-shutdown",
 #endif
-  "app-theme-changed",
 #ifdef MOZ_ENABLE_PROFILER_SPS
   "profiler-started",
   "profiler-stopped",
@@ -2823,9 +2822,6 @@ ContentParent::Observe(nsISupports* aSubject,
     }
   }
 #endif
-  else if (!strcmp(aTopic, "app-theme-changed")) {
-    Unused << SendOnAppThemeChanged();
-  }
 #ifdef MOZ_ENABLE_PROFILER_SPS
   else if (!strcmp(aTopic, "profiler-started")) {
     nsCOMPtr<nsIProfilerStartParams> params(do_QueryInterface(aSubject));
