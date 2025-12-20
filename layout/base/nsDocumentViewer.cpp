@@ -1102,7 +1102,7 @@ nsDocumentViewer::PermitUnloadInternal(bool *aShouldPrompt,
   static bool sBeforeUnloadRequiresInteraction;
   static bool sBeforeUnloadPrefsCached = false;
 
-  if (!sBeforeUnloadPrefsCached ) {
+  if (!sBeforeUnloadPrefsCached) {
     sBeforeUnloadPrefsCached = true;
     Preferences::AddBoolVarCache(&sIsBeforeUnloadDisabled,
                                  BEFOREUNLOAD_DISABLED_PREFNAME);
@@ -1149,6 +1149,8 @@ nsDocumentViewer::PermitUnloadInternal(bool *aShouldPrompt,
     nsGlobalWindow* globalWindow = nsGlobalWindow::Cast(window);
     dialogsAreEnabled = globalWindow->AreDialogsEnabled();
     nsGlobalWindow::TemporarilyDisableDialogs disableDialogs(globalWindow);
+
+    nsIDocument::PageUnloadingEventTimeStamp timestamp(mDocument);
 
     mInPermitUnload = true;
     EventDispatcher::DispatchDOMEvent(window, nullptr, event, mPresContext,
@@ -1352,6 +1354,8 @@ nsDocumentViewer::PageHide(bool aIsUnload)
     // Never permit popups from the unload handler, no matter how we get
     // here.
     nsAutoPopupStatePusher popupStatePusher(openAbused, true);
+
+    nsIDocument::PageUnloadingEventTimeStamp timestamp(mDocument);
 
     EventDispatcher::Dispatch(window, mPresContext, &event, nullptr, &status);
   }
