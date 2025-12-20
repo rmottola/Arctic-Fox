@@ -31,6 +31,7 @@
 #include "mozilla/layers/GeckoContentController.h"
 #include "mozilla/layers/ISurfaceAllocator.h" // for ShmemAllocator
 #include "mozilla/layers/LayersMessages.h"  // for TargetConfig
+#include "mozilla/layers/MetricsSharingController.h"
 #include "mozilla/layers/PCompositorBridgeParent.h"
 #include "mozilla/layers/APZTestData.h"
 #include "mozilla/widget/CompositorWidget.h"
@@ -168,7 +169,8 @@ private:
 
 class CompositorBridgeParentBase : public PCompositorBridgeParent,
                                    public HostIPCAllocator,
-                                   public ShmemAllocator
+                                   public ShmemAllocator,
+                                   public MetricsSharingController
 {
 public:
   virtual void ShadowLayersUpdated(LayerTransactionParent* aLayerTree,
@@ -201,6 +203,8 @@ public:
 
   virtual ShmemAllocator* AsShmemAllocator() override { return this; }
 
+  virtual bool RecvSyncWithCompositor() override { return true; }
+
   // HostIPCAllocator
   virtual base::ProcessId GetChildProcessId() override;
   virtual void NotifyNotUsed(PTextureParent* aTexture, uint64_t aTransactionId) override;
@@ -215,8 +219,16 @@ public:
                                 mozilla::ipc::Shmem* aShmem) override;
   virtual void DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
 
-  virtual bool RecvSyncWithCompositor() override { return true; }
-
+  // MetricsSharingController
+  NS_IMETHOD_(MozExternalRefCountType) AddRef() override { return HostIPCAllocator::AddRef(); }
+  NS_IMETHOD_(MozExternalRefCountType) Release() override { return HostIPCAllocator::Release(); }
+  base::ProcessId RemotePid() override;
+  bool StartSharingMetrics(mozilla::ipc::SharedMemoryBasic::Handle aHandle,
+                           CrossProcessMutexHandle aMutexHandle,
+                           uint64_t aLayersId,
+                           uint32_t aApzcId) override;
+  bool StopSharingMetrics(FrameMetrics::ViewID aScrollId,
+                          uint32_t aApzcId) override;
 };
 
 class CompositorBridgeParent final : public CompositorBridgeParentBase
@@ -441,7 +453,7 @@ public:
     // acknowledged by the child.
     uint32_t mPendingCompositorUpdates;
 
-    PCompositorBridgeParent* CrossProcessPCompositorBridge() const;
+    MetricsSharingController* CrossProcessSharingController() const;
   };
 
   /**
