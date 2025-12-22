@@ -17,6 +17,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
                                    "@mozilla.org/content/style-sheet-service;1",
                                    "nsIStyleSheetService");
 
+XPCOMUtils.defineLazyGetter(this, "colorUtils", () => {
+  return require("devtools/shared/css-color").colorUtils;
+});
+
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 Cu.import("resource://gre/modules/AppConstants.jsm");
 
@@ -104,6 +108,10 @@ class BasePopup {
 
     this.viewNode.addEventListener(this.DESTROY_EVENT, this);
 
+    let doc = viewNode.ownerDocument;
+    let arrowContent = doc.getAnonymousElementByAttribute(this.panel, "class", "panel-arrowcontent");
+    this.borderColor = doc.defaultView.getComputedStyle(arrowContent).borderTopColor;
+
     this.browser = null;
     this.browserReady = this.createBrowser(viewNode, popupURI);
   }
@@ -118,6 +126,9 @@ class BasePopup {
       this.viewNode.removeEventListener(this.DESTROY_EVENT, this);
       this.browser.remove();
 
+      this.panel.style.setProperty("--panel-arrowcontent-background", "");
+      this.panel.style.setProperty("--panel-arrow-image-vertical", "");
+
       this.browser = null;
       this.viewNode = null;
     });
@@ -127,6 +138,14 @@ class BasePopup {
   // destroyed. This must be implemented by every subclass.
   get DESTROY_EVENT() {
     throw new Error("Not implemented");
+  }
+
+  get panel() {
+    let panel = this.viewNode;
+    while (panel.localName != "panel") {
+      panel = panel.parentNode;
+    }
+    return panel;
   }
 
   handleEvent(event) {
@@ -276,6 +295,72 @@ class BasePopup {
       return;
     }
 
+    let root = doc.documentElement;
+    let body = doc.body;
+    if (!body || doc.compatMode == "BackCompat") {
+      // In quirks mode, the root element is used as the scroll frame, and the
+      // body lies about its scroll geometry, and returns the values for the
+      // root instead.
+      body = root;
+    }
+
+
+    if (this.fixedWidth) {
+      // If we're in a fixed-width area (namely a slide-in subview of the main
+      // menu panel), we need to calculate the view height based on the
+      // preferred height of the content document's root scrollable element at the
+      // current width, rather than the complete preferred dimensions of the
+      // content window.
+
+      // Compensate for any offsets (margin, padding, ...) between the scroll
+      // area of the body and the outer height of the document.
+      let getHeight = elem => elem.getBoundingClientRect(elem).height;
+      let bodyPadding = getHeight(root) - getHeight(body);
+
+      let height = Math.ceil(body.scrollHeight + bodyPadding);
+
+      // Figure out how much extra space we have on the side of the panel
+      // opposite the arrow.
+      let side = this.panel.getAttribute("side") == "top" ? "bottom" : "top";
+      let maxHeight = this.viewHeight + this.extraHeight[side];
+
+      height = Math.min(height, maxHeight);
+      this.browser.style.height = `${height}px`;
+
+      // Set a maximum height on the <panelview> element to our preferred
+      // maximum height, so that the PanelUI resizing code can make an accurate
+      // calculation. If we don't do this, the flex sizing logic will prevent us
+      // from ever reporting a preferred size smaller than the height currently
+      // available to us in the panel.
+      height = Math.max(height, this.viewHeight);
+      this.viewNode.style.maxHeight = `${height}px`;
+    } else {
+      // Copy the background color of the document's body to the panel if it's
+      // fully opaque.
+      let panelBackground = "";
+      let panelArrow = "";
+
+      let background = doc.defaultView.getComputedStyle(body).backgroundColor;
+      if (background != "transparent") {
+        let bgColor = colorUtils.colorToRGBA(background);
+        if (bgColor.a == 1) {
+          panelBackground = background;
+          let borderColor = this.borderColor || background;
+
+          panelArrow = `url("data:image/svg+xml,${encodeURIComponent(`<?xml version="1.0" encoding="UTF-8"?>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">
+              <path d="M 0,10 L 10,0 20,10 z" fill="${borderColor}"/>
+              <path d="M 1,10 L 10,1 19,10 z" fill="${background}"/>
+            </svg>
+          `)}")`;
+        }
+      }
+
+      this.panel.style.setProperty("--panel-arrowcontent-background", panelBackground);
+      this.panel.style.setProperty("--panel-arrow-image-vertical", panelArrow);
+
+
+      // Adjust the size of the browser based on its content's preferred size.
     let width, height;
     try {
       let w = {}, h = {};
