@@ -726,8 +726,6 @@ var shell = {
 
     Services.obs.notifyObservers(null, 'content-start', null);
 
-    isGonk && Cu.import('resource://gre/modules/OperatorApps.jsm');
-
     if (AppConstants.MOZ_GRAPHENE &&
         Services.prefs.getBoolPref("b2g.nativeWindowGeometry.fullscreen")) {
       window.fullScreen = true;
@@ -1031,9 +1029,6 @@ window.addEventListener('ContentStart', function cr_onContentStart() {
 });
 
 window.addEventListener('ContentStart', function update_onContentStart() {
-  Cu.import('resource://gre/modules/WebappsUpdater.jsm');
-  WebappsUpdater.handleContentStart(shell);
-
   if (!AppConstants.MOZ_UPDATER) {
     return;
   }
