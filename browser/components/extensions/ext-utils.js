@@ -8,6 +8,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
                                   "resource://gre/modules/NetUtil.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Task",
+                                  "resource://gre/modules/Task.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "setTimeout",
+                                  "resource://gre/modules/Timer.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
                                    "@mozilla.org/content/style-sheet-service;1",
@@ -15,6 +19,8 @@ XPCOMUtils.defineLazyServiceGetter(this, "styleSheetService",
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 Cu.import("resource://gre/modules/AppConstants.jsm");
+
+const POPUP_LOAD_TIMEOUT_MS = 200;
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
@@ -82,18 +88,15 @@ XPCOMUtils.defineLazyGetter(this, "standaloneStylesheets", () => {
 });
 
 class BasePopup {
-  constructor(extension, viewNode, popupURL, browserStyle) {
-    let popupURI = Services.io.newURI(popupURL, null, extension.baseURI);
-
-    Services.scriptSecurityManager.checkLoadURIWithPrincipal(
-      extension.principal, popupURI,
-      Services.scriptSecurityManager.DISALLOW_SCRIPT);
-
+  constructor(extension, viewNode, popupURL, browserStyle, fixedWidth = false) {
     this.extension = extension;
-    this.popupURI = popupURI;
+    this.popupURL = popupURL;
     this.viewNode = viewNode;
     this.browserStyle = browserStyle;
     this.window = viewNode.ownerGlobal;
+    this.destroyed = false;
+    this.fixedWidth = fixedWidth;
+    this.ignoreResizes = true;
 
     this.contentReady = new Promise(resolve => {
       this._resolveContentReady = resolve;
@@ -162,6 +165,11 @@ class BasePopup {
         this.viewNode.setAttribute("aria-label", this.browser.contentTitle);
         break;
 
+      case "DOMContentLoaded":
+        this.browserLoadedDeferred.resolve();
+        this.resizeBrowser(true);
+        break;
+
       case "load":
         // We use a capturing listener, so we get this event earlier than any
         // load listeners in the content page. Resizing after a timeout ensures
@@ -169,7 +177,7 @@ class BasePopup {
         // (unless someone spins the event loop, anyway), and hopefully after
         // the content has made any modifications.
         Promise.resolve().then(() => {
-          this.resizeBrowser();
+          this.resizeBrowser(true);
         });
 
         // Mutation observer to make sure the panel shrinks when the content does.
@@ -188,7 +196,7 @@ class BasePopup {
     }
   }
 
-  createBrowser(viewNode, popupURI) {
+  createBrowser(viewNode, popupURL = null) {
     let document = viewNode.ownerDocument;
     this.browser = document.createElementNS(XUL_NS, "browser");
     this.browser.setAttribute("type", "content");
@@ -208,6 +216,20 @@ class BasePopup {
 
     viewNode.appendChild(this.browser);
 
+    let initBrowser = browser => {
+      browser.addEventListener("DOMWindowCreated", this, true);
+      browser.addEventListener("load", this, true);
+      browser.addEventListener("DOMContentLoaded", this, true);
+      browser.addEventListener("DOMTitleChanged", this, true);
+      browser.addEventListener("DOMWindowClose", this, true);
+      browser.addEventListener("MozScrolledAreaChanged", this, true);
+    };
+
+    if (!popupURL) {
+      initBrowser(this.browser);
+      return this.browser;
+    }
+
     return new Promise(resolve => {
       // The first load event is for about:blank.
       // We can't finish setting up the browser until the binding has fully
@@ -218,23 +240,29 @@ class BasePopup {
       };
       this.browser.addEventListener("load", loadListener, true);
     }).then(() => {
+      initBrowser(this.browser);
+
       let {contentWindow} = this.browser;
 
       contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                    .getInterface(Ci.nsIDOMWindowUtils)
                    .allowScriptsToClose();
 
-      this.browser.setAttribute("src", popupURI.spec);
-
-      this.browser.addEventListener("DOMWindowCreated", this, true);
-      this.browser.addEventListener("load", this, true);
-      this.browser.addEventListener("DOMTitleChanged", this, true);
-      this.browser.addEventListener("DOMWindowClose", this, true);
-      this.browser.addEventListener("MozScrolledAreaChanged", this, true);
+      this.browser.setAttribute("src", popupURL);
     });
   }
+
   // Resizes the browser to match the preferred size of the content (debounced).
-  resizeBrowser() {
+  resizeBrowser(ignoreThrottling = false) {
+    if (this.ignoreResizes) {
+      return;
+    }
+
+    if (ignoreThrottling && this.resizeTimeout) {
+      this.window.clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = null;
+    }
+
     if (this.resizeTimeout == null) {
       this._resizeBrowser();
       this.resizeTimeout = this.window.setTimeout(this._resizeBrowser.bind(this), RESIZE_TIMEOUT);
@@ -288,6 +316,8 @@ global.PanelPopup = class PanelPopup extends BasePopup {
     document.getElementById("mainPopupSet").appendChild(panel);
 
     super(extension, panel, popupURL, browserStyle);
+
+    this.ignoreResizes = false;
 
     this.contentReady.then(() => {
       panel.openPopup(imageNode, "bottomcenter topright", 0, 0, false, false);
