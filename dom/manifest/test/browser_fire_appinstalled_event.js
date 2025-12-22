@@ -2,16 +2,16 @@
 /*global Cu, BrowserTestUtils, ok, add_task, gBrowser */
 "use strict";
 const { PromiseMessage } = Cu.import("resource://gre/modules/PromiseMessage.jsm", {});
-const testPath = "/browser/dom/manifest/test/file_reg_install_event.html";
+const testPath = "/browser/dom/manifest/test/file_reg_appinstalled_event.html";
 const defaultURL = new URL("http://example.org/browser/dom/manifest/test/file_testserver.sjs");
 const testURL = new URL(defaultURL);
 testURL.searchParams.append("file", testPath);
 
-// Enable window.oninstall, so we can fire events at it.
-function enableOnInstallPref() {
+// Enable window.onappinstalled, so we can fire events at it.
+function enableOnAppInstalledPref() {
   const ops = {
     "set": [
-      ["dom.manifest.oninstall", true],
+      ["dom.manifest.onappinstalled", true],
     ],
   };
   return SpecialPowers.pushPrefEnv(ops);
@@ -21,21 +21,23 @@ function enableOnInstallPref() {
 // This cause file_reg_install_event.html to be dynamically change.
 function* theTest(aBrowser) {
   aBrowser.allowEvents = true;
-  // Resolves when we get a custom event with the correct name
-  const responsePromise = new Promise((resolve) => {
-    aBrowser.contentDocument.addEventListener("dom.manifest.oninstall", resolve);
+  let waitForInstall = ContentTask.spawn(aBrowser, null, function*() {
+    yield ContentTaskUtils.waitForEvent(content.window, "appinstalled");
   });
-  const mm = aBrowser.messageManager;
-  const msgKey = "DOM:Manifest:FireInstallEvent";
-  const { data: { success } } = yield PromiseMessage.send(mm, msgKey);
+  const { data: { success } } = yield PromiseMessage
+    .send(aBrowser.messageManager, "DOM:Manifest:FireAppInstalledEvent");
   ok(success, "message sent and received successfully.");
-  const { detail: { result } } = yield responsePromise;
-  ok(result, "the page sent us an acknowledgment as a custom event");
+  try {
+    yield waitForInstall;
+    ok(true, "AppInstalled event fired");
+  } catch (err) {
+    ok(false, "AppInstalled event didn't fire: " + err.message);
+  }
 }
 
 // Open a tab and run the test
 add_task(function*() {
-  yield enableOnInstallPref();
+  yield enableOnAppInstalledPref();
   let tabOptions = {
     gBrowser: gBrowser,
     url: testURL.href,
