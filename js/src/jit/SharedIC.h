@@ -202,8 +202,10 @@ class ICFallbackStub;
 #undef FORWARD_DECLARE_STUBS
 
 #ifdef JS_JITSPEW
-void FallbackICSpew(JSContext* cx, ICFallbackStub* stub, const char* fmt, ...);
-void TypeFallbackICSpew(JSContext* cx, ICTypeMonitor_Fallback* stub, const char* fmt, ...);
+void FallbackICSpew(JSContext* cx, ICFallbackStub* stub, const char* fmt, ...)
+    MOZ_FORMAT_PRINTF(3, 4);
+void TypeFallbackICSpew(JSContext* cx, ICTypeMonitor_Fallback* stub, const char* fmt, ...)
+    MOZ_FORMAT_PRINTF(3, 4);
 #else
 #define FallbackICSpew(...)
 #define TypeFallbackICSpew(...)
@@ -337,6 +339,17 @@ class ICEntry
         return &firstStub_;
     }
 
+  protected:
+    void traceEntry(JSTracer* trc);
+};
+
+class BaselineICEntry : public ICEntry
+{
+  public:
+    BaselineICEntry(uint32_t pcOffset, Kind kind)
+      : ICEntry(pcOffset, kind)
+    { }
+
     void trace(JSTracer* trc);
 };
 
@@ -353,6 +366,8 @@ class IonICEntry : public ICEntry
     JSScript* script() {
         return script_;
     }
+
+    void trace(JSTracer* trc);
 };
 
 class ICMonitoredStub;

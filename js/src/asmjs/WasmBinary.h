@@ -123,13 +123,6 @@ enum class DefinitionKind
     Global                               = 0x03
 };
 
-enum class ResizableFlags
-{
-    Default                              = 0x1,
-    HasMaximum                           = 0x2,
-    AllowedMask                          = 0x3
-};
-
 enum class GlobalFlags
 {
     IsMutable                            = 0x1,
@@ -770,7 +763,7 @@ class Decoder
     static const size_t ExprLimit = 2 * UINT8_MAX - 1;
 
   public:
-    Decoder(const uint8_t* begin, const uint8_t* end, UniqueChars* error = nullptr)
+    Decoder(const uint8_t* begin, const uint8_t* end, UniqueChars* error)
       : beg_(begin),
         end_(end),
         cur_(begin),
@@ -785,7 +778,7 @@ class Decoder
         error_(error)
     {}
 
-    bool fail(const char* msg, ...);
+    bool fail(const char* msg, ...) MOZ_FORMAT_PRINTF(2, 3);
     bool fail(UniqueChars msg);
     void clearError() {
         if (error_)

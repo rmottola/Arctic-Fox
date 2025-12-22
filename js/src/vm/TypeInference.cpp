@@ -152,7 +152,8 @@ TypeSet::ObjectGroupString(ObjectGroup* group)
 
 #ifdef DEBUG
 
-static bool InferSpewActive(SpewChannel channel)
+bool
+js::InferSpewActive(SpewChannel channel)
 {
     static bool active[SPEW_COUNT];
     static bool checked = false;
@@ -222,12 +223,10 @@ js::InferSpewColor(TypeSet* types)
     return colors[DefaultHasher<TypeSet*>::hash(types) % 7];
 }
 
+#ifdef DEBUG
 void
-js::InferSpew(SpewChannel channel, const char* fmt, ...)
+js::InferSpewImpl(const char* fmt, ...)
 {
-    if (!InferSpewActive(channel))
-        return;
-
     va_list ap;
     va_start(ap, fmt);
     fprintf(stderr, "[infer] ");
@@ -235,8 +234,10 @@ js::InferSpew(SpewChannel channel, const char* fmt, ...)
     fprintf(stderr, "\n");
     va_end(ap);
 }
+#endif
 
 MOZ_NORETURN MOZ_COLD static void
+MOZ_FORMAT_PRINTF(2, 3)
 TypeFailure(JSContext* cx, const char* fmt, ...)
 {
     char msgbuf[1024]; /* Larger error messages will be truncated */
@@ -526,9 +527,39 @@ TypeSet::clearObjects()
     objectSet = nullptr;
 }
 
+JSCompartment*
+TypeSet::maybeCompartment()
+{
+    if (unknownObject())
+        return nullptr;
+
+    unsigned objectCount = getObjectCount();
+    for (unsigned i = 0; i < objectCount; i++) {
+        ObjectKey* key = getObject(i);
+        if (!key)
+            continue;
+
+        JSCompartment* comp = key->maybeCompartment();
+        if (comp)
+            return comp;
+    }
+
+    return nullptr;
+}
+
+#ifdef DEBUG
+static inline bool
+CompartmentsMatch(JSCompartment* a, JSCompartment* b)
+{
+    return !a || !b || a == b;
+}
+#endif
+
 void
 TypeSet::addType(Type type, LifoAlloc* alloc)
 {
+    MOZ_ASSERT(CompartmentsMatch(maybeCompartment(), type.maybeCompartment()));
+
     if (unknown())
         return;
 
@@ -3252,13 +3283,15 @@ js::FillBytecodeTypeMap(JSScript* script, uint32_t* bytecodeMap)
 void
 js::TypeMonitorResult(JSContext* cx, JSScript* script, jsbytecode* pc, TypeSet::Type type)
 {
+    assertSameCompartment(cx, script, type);
+
     AutoEnterAnalysis enter(cx);
 
     StackTypeSet* types = TypeScript::BytecodeTypes(script, pc);
     if (types->hasType(type))
         return;
 
-    InferSpew(ISpewOps, "bytecodeType: %p %05u: %s",
+    InferSpew(ISpewOps, "bytecodeType: %p %05" PRIuSIZE ": %s",
               script, script->pcToOffset(pc), TypeSet::TypeString(type));
     types->addType(cx, type);
 }

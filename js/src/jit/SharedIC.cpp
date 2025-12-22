@@ -96,7 +96,20 @@ ICEntry::fallbackStub() const
 }
 
 void
-ICEntry::trace(JSTracer* trc)
+IonICEntry::trace(JSTracer* trc)
+{
+    TraceManuallyBarrieredEdge(trc, &script_, "IonICEntry::script_");
+    traceEntry(trc);
+}
+
+void
+BaselineICEntry::trace(JSTracer* trc)
+{
+    traceEntry(trc);
+}
+
+void
+ICEntry::traceEntry(JSTracer* trc)
 {
     if (!hasStub())
         return;
@@ -2124,7 +2137,7 @@ UpdateExistingGenerationalDOMProxyStub(ICGetProp_Fallback* stub,
                 // Update generation
                 uint64_t generation = expandoAndGeneration->generation;
                 JitSpew(JitSpew_BaselineIC,
-                        "  Updating existing stub with generation, old value: %i, "
+                        "  Updating existing stub with generation, old value: %" PRIu64 ", "
                         "new value: %" PRIu64 "", updateStub->generation(),
                         generation);
                 updateStub->setGeneration(generation);
