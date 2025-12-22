@@ -639,7 +639,7 @@ ThrowJSExceptionASCII(JSContext *cx, const char *message)
 
     PopException();
   } else {
-    ::JS_ReportErrorASCII(cx, message);
+    ::JS_ReportErrorASCII(cx, "%s", message);
   }
 }
 

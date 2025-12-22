@@ -1482,7 +1482,7 @@ struct WasmParseContext
     {}
 
     bool fail(const char* message) {
-        error->reset(JS_smprintf(message));
+        error->reset(js_strdup(message));
         return false;
     }
     ~WasmParseContext() {
@@ -3235,12 +3235,9 @@ class Resolver
         return false;
     }
     bool failResolveLabel(const char* kind, AstName name) {
-        Vector<char16_t, 0, SystemAllocPolicy> nameWithNull;
-        if (!nameWithNull.append(name.begin(), name.length()))
-            return false;
-        if (!nameWithNull.append(0))
-            return false;
-        error_->reset(JS_smprintf("%s label '%hs' not found", kind, nameWithNull.begin()));
+        TwoByteChars chars(name.begin(), name.length());
+        UniqueChars utf8Chars(CharsToNewUTF8CharsZ(nullptr, chars).c_str());
+        error_->reset(JS_smprintf("%s label '%s' not found", kind, utf8Chars.get()));
         return false;
     }
 
