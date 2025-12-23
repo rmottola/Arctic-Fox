@@ -527,8 +527,7 @@ GenerateMaskSurface(const PaintFramesParams& aParams,
   // when mask-mode is not add(source over). Switch to skia when CG backend
   // detected.
   RefPtr<DrawTarget> maskDT =
-    (ctx.GetDrawTarget()->GetBackendType() == BackendType::COREGRAPHICS ||
-     ctx.GetDrawTarget()->GetBackendType() == BackendType::DIRECT2D1_1)
+    (ctx.GetDrawTarget()->GetBackendType() == BackendType::COREGRAPHICS)
     ? Factory::CreateDrawTarget(BackendType::SKIA, maskSurfaceRect.Size(),
                                 SurfaceFormat::A8)
     : ctx.GetDrawTarget()->CreateSimilarDrawTarget(maskSurfaceRect.Size(),
@@ -574,8 +573,8 @@ GenerateMaskSurface(const PaintFramesParams& aParams,
 
         maskContext->Multiply(ThebesMatrix(svgMaskMatrix));
         Rect drawRect = IntRectToRect(IntRect(IntPoint(0, 0), svgMask->GetSize()));
-        maskDT->DrawSurface(svgMask, drawRect, drawRect, DrawSurfaceOptions(),
-                            DrawOptions(1.0f, compositionOp));
+        maskDT->MaskSurface(ColorPattern(Color(0.0, 0.0, 0.0, 1.0)), svgMask, drawRect.TopLeft(),
+                            DrawOptions(1.0, compositionOp));
       }
     } else {
       gfxContextMatrixAutoSaveRestore matRestore(maskContext);
