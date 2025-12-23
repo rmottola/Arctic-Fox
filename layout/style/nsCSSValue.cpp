@@ -2903,6 +2903,8 @@ css::ImageValue::Initialize(nsIDocument* aDocument)
 
 css::ImageValue::~ImageValue()
 {
+  MOZ_ASSERT(NS_IsMainThread());
+
   for (auto iter = mRequests.Iter(); !iter.Done(); iter.Next()) {
     nsIDocument* doc = iter.Key();
     RefPtr<imgRequestProxy>& proxy = iter.Data();
