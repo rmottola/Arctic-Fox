@@ -7328,7 +7328,7 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
   }
 
   // Now that the dust has settled, register the images with the document
-  bg->mImage.TrackImages(aContext->PresContext());
+  bg->mImage.TrackImages(aContext->PresContext()->Document()->ImageTracker());
 
   COMPUTE_END_RESET(Background, bg)
 }
@@ -7716,7 +7716,7 @@ nsRuleNode::ComputeBorderData(void* aStartStruct,
            parentBorder->mBorderImageRepeatV,
            NS_STYLE_BORDER_IMAGE_REPEAT_STRETCH);
 
-  border->TrackImage(aContext->PresContext());
+  border->TrackImage(aContext->PresContext()->Document()->ImageTracker());
 
   COMPUTE_END_RESET(Border, border)
 }
@@ -8984,7 +8984,8 @@ nsRuleNode::ComputeContentData(void* aStartStruct,
   for (uint32_t i = 0; i < content->ContentCount(); ++i) {
     if ((content->ContentAt(i).mType == eStyleContentType_Image) &&
         content->ContentAt(i).mContent.mImage) {
-      content->ContentAt(i).TrackImage(aContext->PresContext());
+      content->ContentAt(i).TrackImage(
+          aContext->PresContext()->Document()->ImageTracker());
     }
   }
 
@@ -10051,7 +10052,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
   }
 #endif
 
-  svgReset->mMask.TrackImages(aContext->PresContext());
+  svgReset->mMask.TrackImages(aContext->PresContext()->Document()->ImageTracker());
 
   COMPUTE_END_RESET(SVGReset, svgReset)
 }

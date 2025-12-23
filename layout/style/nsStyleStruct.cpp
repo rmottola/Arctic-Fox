@@ -460,8 +460,10 @@ nsStyleBorder::GetImageOutset() const
 }
 
 void
-nsStyleBorder::Destroy(nsPresContext* aContext) {
-  UntrackImage(aContext);
+nsStyleBorder::Destroy(nsPresContext* aContext)
+{
+  UntrackImage(aContext->Document()->ImageTracker());
+
   this->~nsStyleBorder();
   aContext->PresShell()->
     FreeByObjectID(eArenaObjectID_nsStyleBorder, this);
@@ -1160,7 +1162,7 @@ nsStyleSVGReset::nsStyleSVGReset(const nsStyleSVGReset& aSource)
 void
 nsStyleSVGReset::Destroy(nsPresContext* aContext)
 {
-  mMask.UntrackImages(aContext);
+  mMask.UntrackImages(aContext->Document()->ImageTracker());
 
   this->~nsStyleSVGReset();
   aContext->PresShell()->
@@ -2002,18 +2004,14 @@ nsStyleImage::SetImageData(imgRequestProxy* aImage)
 }
 
 void
-nsStyleImage::TrackImage(nsPresContext* aContext)
+nsStyleImage::TrackImage(ImageTracker* aImageTracker)
 {
   // Sanity
   MOZ_ASSERT(!mImageTracked, "Already tracking image!");
   MOZ_ASSERT(mType == eStyleImageType_Image,
              "Can't track image when there isn't one!");
 
-  // Register the image with the document
-  nsIDocument* doc = aContext->Document();
-  if (doc) {
-    doc->ImageTracker()->Add(mImage);
-  }
+  aImageTracker->Add(mImage);
 
   // Mark state
 #ifdef DEBUG
@@ -2022,18 +2020,14 @@ nsStyleImage::TrackImage(nsPresContext* aContext)
 }
 
 void
-nsStyleImage::UntrackImage(nsPresContext* aContext)
+nsStyleImage::UntrackImage(ImageTracker* aImageTracker)
 {
   // Sanity
   MOZ_ASSERT(mImageTracked, "Image not tracked!");
   MOZ_ASSERT(mType == eStyleImageType_Image,
              "Can't untrack image when there isn't one!");
 
-  // Unregister the image with the document
-  nsIDocument* doc = aContext->Document();
-  if (doc) {
-    doc->ImageTracker()->Remove(mImage);
-  }
+  aImageTracker->Remove(mImage);
 
   // Mark state
 #ifdef DEBUG
@@ -2737,7 +2731,7 @@ void
 nsStyleBackground::Destroy(nsPresContext* aContext)
 {
   // Untrack all the images stored in our layers
-  mImage.UntrackImages(aContext);
+  mImage.UntrackImages(aContext->Document()->ImageTracker());
 
   this->~nsStyleBackground();
   aContext->PresShell()->
@@ -3396,7 +3390,7 @@ nsStyleContentData::operator==(const nsStyleContentData& aOther) const
 }
 
 void
-nsStyleContentData::TrackImage(nsPresContext* aContext)
+nsStyleContentData::TrackImage(ImageTracker* aImageTracker)
 {
   // Sanity
   MOZ_ASSERT(!mImageTracked, "Already tracking image!");
@@ -3405,11 +3399,7 @@ nsStyleContentData::TrackImage(nsPresContext* aContext)
   MOZ_ASSERT(mContent.mImage,
              "Can't track image when there isn't one!");
 
-  // Register the image with the document
-  nsIDocument* doc = aContext->Document();
-  if (doc) {
-    doc->ImageTracker()->Add(mContent.mImage);
-  }
+  aImageTracker->Add(mContent.mImage);
 
   // Mark state
 #ifdef DEBUG
@@ -3418,7 +3408,7 @@ nsStyleContentData::TrackImage(nsPresContext* aContext)
 }
 
 void
-nsStyleContentData::UntrackImage(nsPresContext* aContext)
+nsStyleContentData::UntrackImage(ImageTracker* aImageTracker)
 {
   // Sanity
   MOZ_ASSERT(mImageTracked, "Image not tracked!");
@@ -3427,11 +3417,7 @@ nsStyleContentData::UntrackImage(nsPresContext* aContext)
   MOZ_ASSERT(mContent.mImage,
              "Can't untrack image when there isn't one!");
 
-  // Unregister the image with the document
-  nsIDocument* doc = aContext->Document();
-  if (doc) {
-    doc->ImageTracker()->Remove(mContent.mImage);
-  }
+  aImageTracker->Remove(mContent.mImage);
 
   // Mark state
 #ifdef DEBUG
@@ -3461,7 +3447,7 @@ nsStyleContent::Destroy(nsPresContext* aContext)
   // Unregister any images we might have with the document.
   for (auto& content : mContents) {
     if (content.mType == eStyleContentType_Image && content.mContent.mImage) {
-      content.UntrackImage(aContext);
+      content.UntrackImage(aContext->Document()->ImageTracker());
     }
   }
 
