@@ -512,21 +512,6 @@ jit::FinishOffThreadBuilder(JSRuntime* runtime, IonBuilder* builder,
     js_delete(builder->alloc().lifoAlloc());
 }
 
-static inline void
-FinishAllOffThreadCompilations(JSCompartment* comp)
-{
-    AutoLockHelperThreadState lock;
-    GlobalHelperThreadState::IonBuilderVector& finished = HelperThreadState().ionFinishedList(lock);
-
-    for (size_t i = 0; i < finished.length(); i++) {
-        IonBuilder* builder = finished[i];
-        if (builder->compartment == CompileCompartment::get(comp)) {
-            FinishOffThreadBuilder(nullptr, builder, lock);
-            HelperThreadState().remove(finished, &i);
-        }
-    }
-}
-
 static bool
 LinkCodeGen(JSContext* cx, IonBuilder* builder, CodeGenerator *codegen)
 {
@@ -672,8 +657,7 @@ JitCompartment::sweep(FreeOp* fop, JSCompartment* compartment)
     // buffer, in which case store buffer marking will take care of this during
     // minor GCs.
     MOZ_ASSERT(!fop->runtime()->isHeapMinorCollecting());
-    CancelOffThreadIonCompile(compartment, nullptr);
-    FinishAllOffThreadCompilations(compartment);
+    CancelOffThreadIonCompile(compartment);
 
     stubCodes_->sweep();
     cacheIRStubCodes_->sweep();
@@ -3172,8 +3156,7 @@ jit::StopAllOffThreadCompilations(JSCompartment* comp)
 {
     if (!comp->jitCompartment())
         return;
-    CancelOffThreadIonCompile(comp, nullptr);
-    FinishAllOffThreadCompilations(comp);
+    CancelOffThreadIonCompile(comp);
 }
 
 void
@@ -3214,7 +3197,7 @@ jit::Invalidate(TypeZone& types, FreeOp* fop,
         MOZ_ASSERT(co->isValid());
 
         if (cancelOffThread)
-            CancelOffThreadIonCompile(co->script()->compartment(), co->script());
+            CancelOffThreadIonCompile(co->script());
 
         if (!co->ion())
             continue;
@@ -3356,7 +3339,7 @@ jit::ForbidCompilation(JSContext* cx, JSScript* script)
     JitSpew(JitSpew_IonAbort, "Disabling Ion compilation of script %s:%" PRIuSIZE,
             script->filename(), script->lineno());
 
-    CancelOffThreadIonCompile(cx->compartment(), script);
+    CancelOffThreadIonCompile(script);
 
     if (script->hasIonScript())
         Invalidate(cx, script, false);
