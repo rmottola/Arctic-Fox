@@ -2450,11 +2450,10 @@ nsStyleImageLayers::HasLayerWithImage() const
 bool
 nsStyleImageLayers::IsInitialPositionForLayerType(Position aPosition, LayerType aType)
 {
-  float intialValue = nsStyleImageLayers::GetInitialPositionForLayerType(aType);
-  if (aPosition.mXPosition.mPercent == intialValue &&
+  if (aPosition.mXPosition.mPercent == 0.0f &&
       aPosition.mXPosition.mLength == 0 &&
       aPosition.mXPosition.mHasPercent &&
-      aPosition.mYPosition.mPercent == intialValue &&
+      aPosition.mYPosition.mPercent == 0.0f &&
       aPosition.mYPosition.mLength == 0 &&
       aPosition.mYPosition.mHasPercent) {
     return true;
@@ -2608,9 +2607,7 @@ nsStyleImageLayers::Layer::Initialize(nsStyleImageLayers::LayerType aType)
 {
   mRepeat.SetInitialValues();
 
-  float initialPositionValue =
-    nsStyleImageLayers::GetInitialPositionForLayerType(aType);
-  mPosition.SetInitialPercentValues(initialPositionValue);
+  mPosition.SetInitialPercentValues(0.0f);
 
   if (aType == LayerType::Background) {
     mOrigin = NS_STYLE_IMAGELAYER_ORIGIN_PADDING;
