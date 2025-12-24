@@ -110,7 +110,6 @@ class WasmToken
         Param,
         Result,
         Return,
-        Segment,
         SetGlobal,
         SetLocal,
         SignedInteger,
@@ -309,7 +308,6 @@ class WasmToken
           case OpenParen:
           case Param:
           case Result:
-          case Segment:
           case SignedInteger:
           case Start:
           case Table:
@@ -1433,8 +1431,6 @@ WasmTokenStream::next()
             return WasmToken(WasmToken::SetGlobal, begin, cur_);
         if (consume(u"set_local"))
             return WasmToken(WasmToken::SetLocal, begin, cur_);
-        if (consume(u"segment"))
-            return WasmToken(WasmToken::Segment, begin, cur_);
         if (consume(u"start"))
             return WasmToken(WasmToken::Start, begin, cur_);
         break;
