@@ -3078,7 +3078,7 @@ EmitGrowMemory(FunctionCompiler& f)
         return false;
 
     MDefinition* delta;
-    if (!f.iter().readUnary(ValType::I32, &delta))
+    if (!f.iter().readGrowMemory(&delta))
         return false;
 
     if (!f.passArg(delta, ValType::I32, &args))
@@ -3104,7 +3104,7 @@ EmitCurrentMemory(FunctionCompiler& f)
 
     CallCompileState args(f, lineOrBytecode);
 
-    if (!f.iter().readNullary(ValType::I32))
+    if (!f.iter().readCurrentMemory())
         return false;
 
     if (!f.startCall(&args))

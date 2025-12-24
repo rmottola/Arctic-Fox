@@ -78,6 +78,7 @@ class WasmToken
         ComparisonOpcode,
         Const,
         ConversionOpcode,
+        CurrentMemory,
         Data,
         Drop,
         Elem,
@@ -92,6 +93,7 @@ class WasmToken
         GetGlobal,
         GetLocal,
         Global,
+        GrowMemory,
         If,
         Import,
         Index,
@@ -120,7 +122,6 @@ class WasmToken
         Text,
         Then,
         Type,
-        NullaryOpcode,
         UnaryOpcode,
         Unreachable,
         UnsignedInteger,
@@ -198,7 +199,7 @@ class WasmToken
         MOZ_ASSERT(begin != end);
         MOZ_ASSERT(kind_ == UnaryOpcode || kind_ == BinaryOpcode || kind_ == TernaryOpcode ||
                    kind_ == ComparisonOpcode || kind_ == ConversionOpcode ||
-                   kind_ == Load || kind_ == Store || kind_ == NullaryOpcode);
+                   kind_ == Load || kind_ == Store);
         u.expr_ = expr;
     }
     explicit WasmToken(const char16_t* begin)
@@ -248,7 +249,7 @@ class WasmToken
     Expr expr() const {
         MOZ_ASSERT(kind_ == UnaryOpcode || kind_ == BinaryOpcode || kind_ == TernaryOpcode ||
                    kind_ == ComparisonOpcode || kind_ == ConversionOpcode ||
-                   kind_ == Load || kind_ == Store || kind_ == NullaryOpcode);
+                   kind_ == Load || kind_ == Store);
         return u.expr_;
     }
     bool isOpcode() const {
@@ -263,9 +264,11 @@ class WasmToken
           case ComparisonOpcode:
           case Const:
           case ConversionOpcode:
+          case CurrentMemory:
           case Drop:
           case GetGlobal:
           case GetLocal:
+          case GrowMemory:
           case If:
           case Load:
           case Loop:
@@ -276,7 +279,6 @@ class WasmToken
           case Store:
           case TeeLocal:
           case TernaryOpcode:
-          case NullaryOpcode:
           case UnaryOpcode:
           case Unreachable:
             return true;
@@ -848,7 +850,7 @@ WasmTokenStream::next()
             return WasmToken(WasmToken::Call, begin, cur_);
         }
         if (consume(u"current_memory"))
-            return WasmToken(WasmToken::NullaryOpcode, Expr::CurrentMemory, begin, cur_);
+            return WasmToken(WasmToken::CurrentMemory, begin, cur_);
         break;
 
       case 'd':
@@ -1085,7 +1087,7 @@ WasmTokenStream::next()
         if (consume(u"global"))
             return WasmToken(WasmToken::Global, begin, cur_);
         if (consume(u"grow_memory"))
-            return WasmToken(WasmToken::UnaryOpcode, Expr::GrowMemory, begin, cur_);
+            return WasmToken(WasmToken::GrowMemory, begin, cur_);
         break;
 
       case 'i':
@@ -1400,7 +1402,7 @@ WasmTokenStream::next()
         if (consume(u"nan"))
             return nan(begin);
         if (consume(u"nop"))
-            return WasmToken(WasmToken::NullaryOpcode, Expr::Nop, begin, cur_);
+            return WasmToken(WasmToken::Nop, begin, cur_);
         break;
 
       case 'o':
@@ -2082,12 +2084,6 @@ ParseUnaryOperator(WasmParseContext& c, Expr expr, bool inParens)
     return new(c.lifo) AstUnaryOperator(expr, op);
 }
 
-static AstNullaryOperator*
-ParseNullaryOperator(WasmParseContext& c, Expr expr)
-{
-    return new(c.lifo) AstNullaryOperator(expr);
-}
-
 static AstBinaryOperator*
 ParseBinaryOperator(WasmParseContext& c, Expr expr, bool inParens)
 {
@@ -2375,6 +2371,16 @@ ParseBranchTable(WasmParseContext& c, WasmToken brTable, bool inParens)
     return new(c.lifo) AstBranchTable(*index, def, Move(table), value);
 }
 
+static AstGrowMemory*
+ParseGrowMemory(WasmParseContext& c, bool inParens)
+{
+    AstExpr* op = ParseExpr(c, inParens);
+    if (!op)
+        return nullptr;
+
+    return new(c.lifo) AstGrowMemory(op);
+}
+
 static AstExpr*
 ParseExprBody(WasmParseContext& c, WasmToken token, bool inParens)
 {
@@ -2427,8 +2433,12 @@ ParseExprBody(WasmParseContext& c, WasmToken token, bool inParens)
         return ParseTernaryOperator(c, token.expr(), inParens);
       case WasmToken::UnaryOpcode:
         return ParseUnaryOperator(c, token.expr(), inParens);
-      case WasmToken::NullaryOpcode:
-        return ParseNullaryOperator(c, token.expr());
+      case WasmToken::Nop:
+        return new(c.lifo) AstNop();
+      case WasmToken::CurrentMemory:
+        return new(c.lifo) AstCurrentMemory();
+      case WasmToken::GrowMemory:
+        return ParseGrowMemory(c, inParens);
       default:
         c.ts.generateError(token, c.error);
         return nullptr;
@@ -3515,6 +3525,12 @@ ResolveUnaryOperator(Resolver& r, AstUnaryOperator& b)
 }
 
 static bool
+ResolveGrowMemory(Resolver& r, AstGrowMemory& gm)
+{
+    return ResolveExpr(r, *gm.op());
+}
+
+static bool
 ResolveBinaryOperator(Resolver& r, AstBinaryOperator& b)
 {
     return ResolveExpr(r, *b.lhs()) &&
@@ -3607,8 +3623,8 @@ ResolveExpr(Resolver& r, AstExpr& expr)
     switch (expr.kind()) {
       case AstExprKind::Nop:
       case AstExprKind::Pop:
-      case AstExprKind::NullaryOperator:
       case AstExprKind::Unreachable:
+      case AstExprKind::CurrentMemory:
         return true;
       case AstExprKind::Drop:
         return ResolveDropOperator(r, expr.as<AstDrop>());
@@ -3654,6 +3670,8 @@ ResolveExpr(Resolver& r, AstExpr& expr)
         return ResolveTernaryOperator(r, expr.as<AstTernaryOperator>());
       case AstExprKind::UnaryOperator:
         return ResolveUnaryOperator(r, expr.as<AstUnaryOperator>());
+      case AstExprKind::GrowMemory:
+        return ResolveGrowMemory(r, expr.as<AstGrowMemory>());
     }
     MOZ_CRASH("Bad expr kind");
 }
@@ -3873,6 +3891,9 @@ EncodeCallIndirect(Encoder& e, AstCallIndirect& c)
     if (!e.writeVarU32(c.sig().index()))
         return false;
 
+    if (!e.writeVarU32(uint32_t(MemoryTableFlags::Default)))
+        return false;
+
     return true;
 }
 
@@ -3948,12 +3969,6 @@ EncodeUnaryOperator(Encoder& e, AstUnaryOperator& b)
 {
     return EncodeExpr(e, *b.op()) &&
            e.writeExpr(b.expr());
-}
-
-static bool
-EncodeNullaryOperator(Encoder& e, AstNullaryOperator& b)
-{
-    return e.writeExpr(b.expr());
 }
 
 static bool
@@ -4083,6 +4098,33 @@ EncodeBranchTable(Encoder& e, AstBranchTable& bt)
 }
 
 static bool
+EncodeCurrentMemory(Encoder& e, AstCurrentMemory& cm)
+{
+    if (!e.writeExpr(Expr::CurrentMemory))
+        return false;
+
+    if (!e.writeVarU32(uint32_t(MemoryTableFlags::Default)))
+        return false;
+
+    return true;
+}
+
+static bool
+EncodeGrowMemory(Encoder& e, AstGrowMemory& gm)
+{
+    if (!EncodeExpr(e, *gm.op()))
+        return false;
+
+    if (!e.writeExpr(Expr::GrowMemory))
+        return false;
+
+    if (!e.writeVarU32(uint32_t(MemoryTableFlags::Default)))
+        return false;
+
+    return true;
+}
+
+static bool
 EncodeExpr(Encoder& e, AstExpr& expr)
 {
     switch (expr.kind()) {
@@ -4136,8 +4178,10 @@ EncodeExpr(Encoder& e, AstExpr& expr)
         return EncodeTernaryOperator(e, expr.as<AstTernaryOperator>());
       case AstExprKind::UnaryOperator:
         return EncodeUnaryOperator(e, expr.as<AstUnaryOperator>());
-      case AstExprKind::NullaryOperator:
-        return EncodeNullaryOperator(e, expr.as<AstNullaryOperator>());
+      case AstExprKind::CurrentMemory:
+        return EncodeCurrentMemory(e, expr.as<AstCurrentMemory>());
+      case AstExprKind::GrowMemory:
+        return EncodeGrowMemory(e, expr.as<AstGrowMemory>());
     }
     MOZ_CRASH("Bad expr kind");
 }
