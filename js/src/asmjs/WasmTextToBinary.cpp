@@ -2210,7 +2210,7 @@ ParseIf(WasmParseContext& c, bool inParens)
             if (!c.ts.match(WasmToken::CloseParen, c.error))
                 return nullptr;
         } else {
-            if (!c.ts.getIf(WasmToken::End))
+            if (!c.ts.match(WasmToken::End, c.error))
                 return nullptr;
         }
     }
