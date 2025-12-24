@@ -1136,6 +1136,8 @@ ExprIter<Policy>::readBrTableEntry(ExprType* type, Value* value, uint32_t* depth
     if (!readVarU32(depth))
         return false;
 
+    ExprType knownType = *type;
+
     if (MOZ_LIKELY(reachable_)) {
         ControlStackEntry<ControlItem>* controlItem = nullptr;
         if (!getControl(*depth, &controlItem))
@@ -1146,7 +1148,6 @@ ExprIter<Policy>::readBrTableEntry(ExprType* type, Value* value, uint32_t* depth
 
             // If we've already seen one label, we know the type and can check
             // that the type for the current label matches it.
-            ExprType knownType = *type;
             if (knownType != ExprType::Limit)
                 return checkType(knownType, controlItem->type());
 
@@ -1157,6 +1158,9 @@ ExprIter<Policy>::readBrTableEntry(ExprType* type, Value* value, uint32_t* depth
                 return popWithType(NonVoidToValType(expectedType), value);
             }
         }
+
+        if (knownType != ExprType::Limit && knownType != ExprType::Void)
+            return typeMismatch(knownType, ExprType::Void);
     }
 
     *type = ExprType::Void;

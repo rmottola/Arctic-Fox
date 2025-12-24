@@ -1679,7 +1679,7 @@ EmitLoop(FunctionCompiler& f)
     if (!f.iter().readLoop())
         return false;
 
-    MBasicBlock *loopHeader;
+    MBasicBlock* loopHeader;
     if (!f.startLoop(&loopHeader))
         return false;
 
@@ -1692,7 +1692,7 @@ EmitLoop(FunctionCompiler& f)
 static bool
 EmitIf(FunctionCompiler& f)
 {
-    MDefinition* condition;
+    MDefinition* condition = nullptr;
     if (!f.iter().readIf(&condition))
         return false;
 
@@ -1707,7 +1707,7 @@ EmitIf(FunctionCompiler& f)
 static bool
 EmitElse(FunctionCompiler& f)
 {
-    MBasicBlock *block = f.iter().controlItem();
+    MBasicBlock* block = f.iter().controlItem();
 
     ExprType thenType;
     MDefinition* thenValue;
@@ -1726,7 +1726,7 @@ EmitElse(FunctionCompiler& f)
 static bool
 EmitEnd(FunctionCompiler& f)
 {
-    MBasicBlock *block = f.iter().controlItem();
+    MBasicBlock* block = f.iter().controlItem();
 
     LabelKind kind;
     ExprType type;
@@ -1737,7 +1737,7 @@ EmitEnd(FunctionCompiler& f)
     if (!IsVoid(type))
         f.pushDef(value);
 
-    MDefinition* def;
+    MDefinition* def = nullptr;
     switch (kind) {
       case LabelKind::Block:
         if (!f.finishBlock(&def))
@@ -1763,8 +1763,10 @@ EmitEnd(FunctionCompiler& f)
         break;
     }
 
-    if (!IsVoid(type))
+    if (!IsVoid(type)) {
+        MOZ_ASSERT_IF(!f.inDeadCode(), def);
         f.iter().setResult(def);
+    }
 
     return true;
 }

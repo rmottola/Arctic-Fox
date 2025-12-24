@@ -2346,7 +2346,7 @@ ParseBranchTable(WasmParseContext& c, WasmToken brTable, bool inParens)
     }
 
     if (table.empty()) {
-        c.ts.generateError(brTable, c.error);
+        c.ts.generateError(c.ts.get(), c.error);
         return nullptr;
     }
 
