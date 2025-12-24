@@ -8417,8 +8417,8 @@ StoreAsmJSModuleInCache(AsmJSParser& parser, Module& module, ExclusiveContext* c
     if (!moduleChars.init(parser))
         return JS::AsmJSCache_InternalError;
 
-    size_t serializedSize = moduleChars.serializedSize() +
-                            module.serializedSize();
+    size_t serializedSize = module.serializedSize() +
+                            moduleChars.serializedSize();
 
     JS::OpenAsmJSCacheEntryForWriteOp open = cx->asmJSCacheOps().openEntryForWrite;
     if (!open)
@@ -8435,8 +8435,8 @@ StoreAsmJSModuleInCache(AsmJSParser& parser, Module& module, ExclusiveContext* c
         return openResult;
 
     uint8_t* cursor = entry.memory;
-    cursor = moduleChars.serialize(cursor);
     cursor = module.serialize(cursor);
+    cursor = moduleChars.serialize(cursor);
 
     MOZ_ASSERT(cursor == entry.memory + serializedSize);
     return JS::AsmJSCache_Success;
@@ -8463,9 +8463,11 @@ LookupAsmJSModuleInCache(ExclusiveContext* cx, AsmJSParser& parser, bool* loaded
 
     const uint8_t* cursor = entry.memory;
 
-    ModuleCharsForLookup moduleChars;
-    cursor = moduleChars.deserialize(cursor);
-    if (!moduleChars.match(parser))
+    Assumptions assumptions;
+    if (!assumptions.initBuildIdFromContext(cx))
+        return false;
+
+    if (!Module::assumptionsMatch(assumptions, cursor))
         return true;
 
     MutableAsmJSMetadata asmJSMetadata = cx->new_<AsmJSMetadata>();
@@ -8478,6 +8480,13 @@ LookupAsmJSModuleInCache(ExclusiveContext* cx, AsmJSParser& parser, bool* loaded
         return false;
     }
 
+    // Due to the hash comparison made by openEntryForRead, this should succeed
+    // with high probability.
+    ModuleCharsForLookup moduleChars;
+    cursor = moduleChars.deserialize(cursor);
+    if (!moduleChars.match(parser))
+        return true;
+
     // See AsmJSMetadata comment as well as ModuleValidator::init().
     asmJSMetadata->srcStart = parser.pc->functionBox()->functionNode->pn_body->pn_pos.begin;
     asmJSMetadata->srcBodyStart = parser.tokenStream.currentToken().pos.end;
@@ -8487,13 +8496,6 @@ LookupAsmJSModuleInCache(ExclusiveContext* cx, AsmJSParser& parser, bool* loaded
     bool atEnd = cursor == entry.memory + entry.serializedSize;
     MOZ_ASSERT(atEnd, "Corrupt cache file");
     if (!atEnd)
-        return true;
-
-    Assumptions assumptions;
-    if (!assumptions.initBuildIdFromContext(cx))
-        return false;
-
-    if (assumptions != (*module)->metadata().assumptions)
         return true;
 
     if (!parser.tokenStream.advance(asmJSMetadata->srcEndBeforeCurly()))
