@@ -7538,8 +7538,6 @@ ValidateGlobalVariable(JSContext* cx, const AsmJSGlobal& global, HandleValue imp
             *val = Val(simdConstant.asInt32x4());
             return true;
           }
-          case ValType::Limit:
-            MOZ_CRASH("Limit");
         }
       }
     }
