@@ -2748,6 +2748,36 @@ ParseLimits(WasmParseContext& c, Limits* resizable)
 static bool
 ParseMemory(WasmParseContext& c, WasmToken token, AstModule* module)
 {
+    AstName name = c.ts.getIfName();
+
+    WasmToken openParen;
+    if (c.ts.getIf(WasmToken::OpenParen)) {
+        if (c.ts.getIf(WasmToken::Import)) {
+            InlineImport names;
+            if (!ParseInlineImport(c, &names))
+                return false;
+            if (!c.ts.match(WasmToken::CloseParen, c.error))
+                return false;
+
+            Limits memory;
+            if (!ParseLimits(c, &memory))
+                return false;
+
+            auto* imp = new(c.lifo) AstImport(name, names.module.text(), names.field.text(),
+                                              DefinitionKind::Memory, memory);
+            return imp && module->append(imp);
+        }
+
+        if (c.ts.getIf(WasmToken::Export)) {
+            if (!ParseInlineExport(c, DefinitionKind::Memory, module))
+                return false;
+            if (!c.ts.match(WasmToken::CloseParen, c.error))
+                return false;
+        } else {
+            c.ts.unget(openParen);
+        }
+    }
+
     if (c.ts.getIf(WasmToken::OpenParen)) {
         if (!c.ts.match(WasmToken::Data, c.error))
             return false;
@@ -2855,6 +2885,9 @@ ParseImport(WasmParseContext& c, AstModule* module)
     WasmToken openParen;
     if (c.ts.getIf(WasmToken::OpenParen, &openParen)) {
         if (c.ts.getIf(WasmToken::Memory)) {
+            if (name.empty())
+                name = c.ts.getIfName();
+
             Limits memory;
             if (!ParseLimits(c, &memory))
                 return nullptr;
