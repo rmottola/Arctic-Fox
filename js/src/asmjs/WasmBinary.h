@@ -347,8 +347,8 @@ enum class Expr : uint32_t // fix type so we can cast from any u16 in decoder
     I64Eqz                               = 0xba,
 
     // Global access.
-    GetGlobal                            = 0xc0,
-    SetGlobal                            = 0xc1,
+    GetGlobal                            = 0xbb,
+    SetGlobal                            = 0xbc,
 
     // ------------------------------------------------------------------------
     // The rest of these operators are currently only emitted internally when
