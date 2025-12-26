@@ -9618,15 +9618,16 @@ GetDatabaseBaseFilename(const nsAString& aFilename,
 }
 
 nsresult
-ConvertBlobsToActors(PBackgroundParent* aBackgroundActor,
-                     Database* aDatabase,
-                     const nsTArray<StructuredCloneFile>& aFiles,
-                     FallibleTArray<BlobOrMutableFile>& aActors)
+SerializeStructuredCloneFiles(
+                         PBackgroundParent* aBackgroundActor,
+                         Database* aDatabase,
+                         const nsTArray<StructuredCloneFile>& aFiles,
+                         FallibleTArray<SerializedStructuredCloneFile>& aResult)
 {
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(aBackgroundActor);
   MOZ_ASSERT(aDatabase);
-  MOZ_ASSERT(aActors.IsEmpty());
+  MOZ_ASSERT(aResult.IsEmpty());
 
   if (aFiles.IsEmpty()) {
     return NS_OK;
@@ -9650,7 +9651,7 @@ ConvertBlobsToActors(PBackgroundParent* aBackgroundActor,
 
   const uint32_t count = aFiles.Length();
 
-  if (NS_WARN_IF(!aActors.SetCapacity(count, fallible))) {
+  if (NS_WARN_IF(!aResult.SetCapacity(count, fallible))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
@@ -9688,15 +9689,22 @@ ConvertBlobsToActors(PBackgroundParent* aBackgroundActor,
           return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
         }
 
-        MOZ_ALWAYS_TRUE(aActors.AppendElement(actor, fallible));
+        SerializedStructuredCloneFile* file = aResult.AppendElement(fallible);
+        MOZ_ASSERT(file);
+
+        file->file() = actor;
+        file->type() = StructuredCloneFile::eBlob;
 
         break;
       }
 
       case StructuredCloneFile::eMutableFile: {
         if (aDatabase->IsFileHandleDisabled()) {
-          MOZ_ALWAYS_TRUE(aActors.AppendElement(NullableMutableFile(null_t()),
-                                                fallible));
+          SerializedStructuredCloneFile* file = aResult.AppendElement(fallible);
+          MOZ_ASSERT(file);
+
+          file->file() = null_t();
+          file->type() = StructuredCloneFile::eMutableFile;
         } else {
           RefPtr<MutableFile> actor =
             MutableFile::Create(nativeFile, aDatabase, file.mFileInfo);
@@ -9716,17 +9724,25 @@ ConvertBlobsToActors(PBackgroundParent* aBackgroundActor,
             return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
           }
 
-          MOZ_ALWAYS_TRUE(aActors.AppendElement(NullableMutableFile(actor),
-                                                fallible));
+          SerializedStructuredCloneFile* file = aResult.AppendElement(fallible);
+          MOZ_ASSERT(file);
+
+          file->file() = actor;
+          file->type() = StructuredCloneFile::eMutableFile;
         }
 
         break;
       }
 
-      case StructuredCloneFile::eStructuredClone:
-        MOZ_ALWAYS_TRUE(aActors.AppendElement(null_t(), fallible));
+      case StructuredCloneFile::eStructuredClone: {
+        SerializedStructuredCloneFile* file = aResult.AppendElement(fallible);
+        MOZ_ASSERT(file);
+
+        file->file() = null_t();
+        file->type() = StructuredCloneFile::eStructuredClone;
 
         break;
+      }
 
       default:
         MOZ_CRASH("Should never get here!");
@@ -14989,30 +15005,34 @@ TransactionBase::VerifyRequestParams(const ObjectStoreAddPutParams& aParams)
     MOZ_ASSERT(!updates[index].value().GetBuffer().IsEmpty());
   }
 
-  const nsTArray<DatabaseOrMutableFile>& files = aParams.files();
+  const nsTArray<FileAddInfo>& fileAddInfos = aParams.fileAddInfos();
 
-  for (uint32_t index = 0; index < files.Length(); index++) {
-    const DatabaseOrMutableFile& file = files[index];
+  for (uint32_t index = 0; index < fileAddInfos.Length(); index++) {
+    const FileAddInfo& fileAddInfo = fileAddInfos[index];
 
+    const DatabaseOrMutableFile& file = fileAddInfo.file();
     MOZ_ASSERT(file.type() != DatabaseOrMutableFile::T__None);
 
-    switch (file.type()) {
-      case DatabaseOrMutableFile::TPBackgroundIDBDatabaseFileChild:
-        ASSERT_UNLESS_FUZZING();
-        return false;
-
-      case DatabaseOrMutableFile::TPBackgroundIDBDatabaseFileParent:
+    switch (fileAddInfo.type()) {
+      case StructuredCloneFile::eBlob:
+        if (NS_WARN_IF(file.type() !=
+                         DatabaseOrMutableFile::TPBackgroundIDBDatabaseFileParent)) {
+          ASSERT_UNLESS_FUZZING();
+          return false;
+        }
         if (NS_WARN_IF(!file.get_PBackgroundIDBDatabaseFileParent())) {
           ASSERT_UNLESS_FUZZING();
           return false;
         }
         break;
 
-      case DatabaseOrMutableFile::TPBackgroundMutableFileChild:
-        ASSERT_UNLESS_FUZZING();
-        return false;
+      case StructuredCloneFile::eMutableFile: {
+        if (NS_WARN_IF(file.type() !=
+                         DatabaseOrMutableFile::TPBackgroundMutableFileParent)) {
+          ASSERT_UNLESS_FUZZING();
+          return false;
+        }
 
-      case DatabaseOrMutableFile::TPBackgroundMutableFileParent: {
         if (NS_WARN_IF(mDatabase->IsFileHandleDisabled())) {
           ASSERT_UNLESS_FUZZING();
           return false;
@@ -15039,6 +15059,11 @@ TransactionBase::VerifyRequestParams(const ObjectStoreAddPutParams& aParams)
 
         break;
       }
+
+      case StructuredCloneFile::eStructuredClone:
+      case StructuredCloneFile::eEndGuard:
+        ASSERT_UNLESS_FUZZING();
+        return false;
 
       default:
         MOZ_CRASH("Should never get here!");
@@ -16427,11 +16452,11 @@ Cursor::SendResponseInternal(
       MOZ_ASSERT(mDatabase);
       MOZ_ASSERT(mBackgroundParent);
 
-      FallibleTArray<BlobOrMutableFile> actors;
-      nsresult rv = ConvertBlobsToActors(mBackgroundParent,
-                                         mDatabase,
-                                         files,
-                                         actors);
+      FallibleTArray<SerializedStructuredCloneFile> serializedFiles;
+      nsresult rv = SerializeStructuredCloneFiles(mBackgroundParent,
+                                                  mDatabase,
+                                                  files,
+                                                  serializedFiles);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         aResponse = ClampResultCode(rv);
         break;
@@ -16456,9 +16481,9 @@ Cursor::SendResponseInternal(
       }
 
       MOZ_ASSERT(serializedInfo);
-      MOZ_ASSERT(serializedInfo->blobs().IsEmpty());
+      MOZ_ASSERT(serializedInfo->files().IsEmpty());
 
-      serializedInfo->blobs().SwapElements(actors);
+      serializedInfo->files().SwapElements(serializedFiles);
     }
   }
 
@@ -25466,10 +25491,10 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
   }
 #endif
 
-  const nsTArray<DatabaseOrMutableFile>& files = mParams.files();
+  const nsTArray<FileAddInfo>& fileAddInfos = mParams.fileAddInfos();
 
-  if (!files.IsEmpty()) {
-    const uint32_t count = files.Length();
+  if (!fileAddInfos.IsEmpty()) {
+    const uint32_t count = fileAddInfos.Length();
 
     if (NS_WARN_IF(!mStoredFileInfos.SetCapacity(count, fallible))) {
       return false;
@@ -25480,17 +25505,21 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
     MOZ_ASSERT(fileManager);
 
     for (uint32_t index = 0; index < count; index++) {
-      const DatabaseOrMutableFile& file = files[index];
-      MOZ_ASSERT(file.type() ==
-                   DatabaseOrMutableFile::TPBackgroundIDBDatabaseFileParent ||
-                 file.type() ==
-                   DatabaseOrMutableFile::TPBackgroundMutableFileParent);
+      const FileAddInfo& fileAddInfo = fileAddInfos[index];
+
+      MOZ_ASSERT(fileAddInfo.type() == StructuredCloneFile::eBlob ||
+                 fileAddInfo.type() == StructuredCloneFile::eMutableFile);
+
+      const DatabaseOrMutableFile& file = fileAddInfo.file();
 
       StoredFileInfo* storedFileInfo = mStoredFileInfos.AppendElement(fallible);
       MOZ_ASSERT(storedFileInfo);
 
-      switch (file.type()) {
-        case DatabaseOrMutableFile::TPBackgroundIDBDatabaseFileParent: {
+      switch (fileAddInfo.type()) {
+        case StructuredCloneFile::eBlob: {
+          MOZ_ASSERT(file.type() ==
+                       DatabaseOrMutableFile::TPBackgroundIDBDatabaseFileParent);
+
           storedFileInfo->mFileActor =
             static_cast<DatabaseFile*>(
               file.get_PBackgroundIDBDatabaseFileParent());
@@ -25509,7 +25538,10 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
           break;
         }
 
-        case DatabaseOrMutableFile::TPBackgroundMutableFileParent: {
+        case StructuredCloneFile::eMutableFile: {
+          MOZ_ASSERT(file.type() ==
+                       DatabaseOrMutableFile::TPBackgroundMutableFileParent);
+
           auto mutableFileActor =
             static_cast<MutableFile*>(
               file.get_PBackgroundMutableFileParent());
@@ -25522,7 +25554,6 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
           break;
         }
 
-        case DatabaseOrMutableFile::TPBackgroundIDBDatabaseFileChild:
         default:
           MOZ_CRASH("Should never get here!");
       }
@@ -26126,18 +26157,18 @@ ObjectStoreGetRequestOp::ConvertResponse(
 
   aSerializedInfo.data().data = Move(info.mData);
 
-  FallibleTArray<BlobOrMutableFile> blobs;
-  nsresult rv = ConvertBlobsToActors(mBackgroundParent,
-                                     mDatabase,
-                                     info.mFiles,
-                                     blobs);
+  FallibleTArray<SerializedStructuredCloneFile> serializedFiles;
+  nsresult rv = SerializeStructuredCloneFiles(mBackgroundParent,
+                                              mDatabase,
+                                              info.mFiles,
+                                              serializedFiles);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
 
-  MOZ_ASSERT(aSerializedInfo.blobs().IsEmpty());
+  MOZ_ASSERT(aSerializedInfo.files().IsEmpty());
 
-  aSerializedInfo.blobs().SwapElements(blobs);
+  aSerializedInfo.files().SwapElements(serializedFiles);
 
   return NS_OK;
 }
@@ -26849,19 +26880,19 @@ IndexGetRequestOp::GetResponse(RequestResponse& aResponse)
 
         serializedInfo.data().data = Move(info.mData);
 
-        FallibleTArray<BlobOrMutableFile> blobs;
-        nsresult rv = ConvertBlobsToActors(mBackgroundParent,
-                                           mDatabase,
-                                           info.mFiles,
-                                           blobs);
+        FallibleTArray<SerializedStructuredCloneFile> serializedFiles;
+        nsresult rv = SerializeStructuredCloneFiles(mBackgroundParent,
+                                                    mDatabase,
+                                                    info.mFiles,
+                                                    serializedFiles);
         if (NS_WARN_IF(NS_FAILED(rv))) {
           aResponse = rv;
           return;
         }
 
-        MOZ_ASSERT(serializedInfo.blobs().IsEmpty());
+        MOZ_ASSERT(serializedInfo.files().IsEmpty());
 
-        serializedInfo.blobs().SwapElements(blobs);
+        serializedInfo.files().SwapElements(serializedFiles);
       }
 
       nsTArray<SerializedStructuredCloneReadInfo>& cloneInfos =
@@ -26883,20 +26914,20 @@ IndexGetRequestOp::GetResponse(RequestResponse& aResponse)
 
     serializedInfo.data().data = Move(info.mData);
 
-    FallibleTArray<BlobOrMutableFile> blobs;
+    FallibleTArray<SerializedStructuredCloneFile> serializedFiles;
     nsresult rv =
-      ConvertBlobsToActors(mBackgroundParent,
-                           mDatabase,
-                           info.mFiles,
-                           blobs);
+      SerializeStructuredCloneFiles(mBackgroundParent,
+                                    mDatabase,
+                                    info.mFiles,
+                                    serializedFiles);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       aResponse = rv;
       return;
     }
 
-    MOZ_ASSERT(serializedInfo.blobs().IsEmpty());
+    MOZ_ASSERT(serializedInfo.files().IsEmpty());
 
-    serializedInfo.blobs().SwapElements(blobs);
+    serializedInfo.files().SwapElements(serializedFiles);
   }
 }
 
