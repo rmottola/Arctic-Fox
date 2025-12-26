@@ -2795,7 +2795,7 @@ ParseMemory(WasmParseContext& c, WasmToken token, AstModule* module)
             return false;
 
         WasmToken text;
-        size_t length = 0;
+        size_t pages = 0;
         if (c.ts.getIf(WasmToken::Text, &text)) {
             AstExpr* offset = new(c.lifo) AstConst(Val(uint32_t(0)));
             if (!offset)
@@ -2805,12 +2805,12 @@ ParseMemory(WasmParseContext& c, WasmToken token, AstModule* module)
             if (!segment || !module->append(segment))
                 return false;
 
-            length = segment->text().length();
-            if (length != uint32_t(length))
+            pages = AlignBytes<size_t>(segment->text().length(), PageSize) / PageSize;
+            if (pages != uint32_t(pages))
                 return false;
         }
 
-        Limits memory = { uint32_t(length), Some(uint32_t(length)) };
+        Limits memory = { uint32_t(pages), Some(uint32_t(pages)) };
         if (!module->addMemory(name, memory))
             return false;
 
