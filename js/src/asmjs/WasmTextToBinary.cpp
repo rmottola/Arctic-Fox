@@ -1495,11 +1495,17 @@ ParseExprBody(WasmParseContext& c, WasmToken token, bool inParens);
 static AstExpr*
 ParseExpr(WasmParseContext& c, bool inParens)
 {
-    if (!inParens)
+    WasmToken openParen;
+    if (!inParens || !c.ts.getIf(WasmToken::OpenParen, &openParen))
         return new(c.lifo) AstPop();
 
-    if (!c.ts.match(WasmToken::OpenParen, c.error))
-        return nullptr;
+    // Special case: If we have an open paren, but it's a "(then ...", then
+    // we don't have an expresion following us, so we pop here too. This
+    // handles "(if (then ...))" which pops the condition.
+    if (c.ts.peek().kind() == WasmToken::Then) {
+        c.ts.unget(openParen);
+        return new(c.lifo) AstPop();
+    }
 
     AstExpr* expr = ParseExprInsideParens(c);
     if (!expr)
@@ -1613,17 +1619,12 @@ ParseBranch(WasmParseContext& c, Expr expr, bool inParens)
 
     AstExpr* cond = nullptr;
     if (expr == Expr::BrIf) {
-        if (inParens) {
-            if (c.ts.getIf(WasmToken::OpenParen)) {
-                cond = ParseExprInsideParens(c);
-                if (!cond)
-                    return nullptr;
-                if (!c.ts.match(WasmToken::CloseParen, c.error))
-                    return nullptr;
-            } else {
-                cond = value;
-                value = nullptr;
-            }
+        if (inParens && c.ts.getIf(WasmToken::OpenParen)) {
+            cond = ParseExprInsideParens(c);
+            if (!cond)
+                return nullptr;
+            if (!c.ts.match(WasmToken::CloseParen, c.error))
+                return nullptr;
         } else {
             cond = new(c.lifo) AstPop();
             if (!cond)
@@ -2711,13 +2712,29 @@ MaybeParseOwnerIndex(WasmParseContext& c)
     return true;
 }
 
+static AstExpr*
+ParseInitializerExpression(WasmParseContext& c)
+{
+    if (!c.ts.match(WasmToken::OpenParen, c.error))
+        return nullptr;
+
+    AstExpr* initExpr = ParseExprInsideParens(c);
+    if (!initExpr)
+        return nullptr;
+
+    if (!c.ts.match(WasmToken::CloseParen, c.error))
+        return nullptr;
+
+    return initExpr;
+}
+
 static AstDataSegment*
 ParseDataSegment(WasmParseContext& c)
 {
     if (!MaybeParseOwnerIndex(c))
         return nullptr;
 
-    AstExpr* offset = ParseExpr(c, true);
+    AstExpr* offset = ParseInitializerExpression(c);
     if (!offset)
         return nullptr;
 
@@ -3118,7 +3135,7 @@ ParseElemSegment(WasmParseContext& c)
     if (!MaybeParseOwnerIndex(c))
         return nullptr;
 
-    AstExpr* offset = ParseExpr(c, true);
+    AstExpr* offset = ParseInitializerExpression(c);
     if (!offset)
         return nullptr;
 
@@ -3180,7 +3197,7 @@ ParseGlobal(WasmParseContext& c, AstModule* module)
     if (!ParseGlobalType(c, &typeToken, &isMutable))
         return false;
 
-    AstExpr* init = ParseExpr(c, true);
+    AstExpr* init = ParseInitializerExpression(c);
     if (!init)
         return false;
 
