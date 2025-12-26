@@ -238,6 +238,10 @@ class Module : public JS::WasmModule
                        Metadata::SeenSet* seenMetadata,
                        ShareableBytes::SeenSet* seenBytes,
                        size_t* code, size_t* data) const;
+
+    // Generated code analysis support:
+
+    bool extractCode(JSContext* cx, MutableHandleValue vp);
 };
 
 typedef RefPtr<Module> SharedModule;
