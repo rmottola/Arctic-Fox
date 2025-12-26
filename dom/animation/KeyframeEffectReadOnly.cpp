@@ -273,7 +273,7 @@ KeyframeEffectReadOnly::UpdateProperties(nsStyleContext* aStyleContext)
     if (mEffectOptions.mSpacingMode == SpacingMode::paced) {
       KeyframeUtils::ApplySpacing(keyframesCopy, SpacingMode::paced,
                                   mEffectOptions.mPacedProperty,
-                                  computedValues);
+                                  computedValues, aStyleContext);
     }
 
     properties =
