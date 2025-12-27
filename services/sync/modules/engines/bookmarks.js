@@ -34,6 +34,7 @@ const ANNOS_TO_TRACK = [DESCRIPTION_ANNO, SIDEBAR_ANNO,
 
 const SERVICE_NOT_SUPPORTED = "Service not supported on this platform";
 const FOLDER_SORTINDEX = 1000000;
+const { SOURCE_SYNC } = Ci.nsINavBookmarksService;
 
 this.PlacesItem = function PlacesItem(collection, id, type) {
   CryptoWrapper.call(this, collection, id);
