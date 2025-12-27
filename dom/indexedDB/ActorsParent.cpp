@@ -5910,13 +5910,15 @@ protected:
                                           uint32_t aDataIndex,
                                           uint32_t aFileIdsIndex,
                                           FileManager* aFileManager,
-                                          StructuredCloneReadInfo* aInfo)
+                                          StructuredCloneReadInfo* aInfo,
+                                          bool* aHasWasm)
   {
     return GetStructuredCloneReadInfoFromSource(aStatement,
                                                 aDataIndex,
                                                 aFileIdsIndex,
                                                 aFileManager,
-                                                aInfo);
+                                                aInfo,
+                                                aHasWasm);
   }
 
   static nsresult
@@ -5926,11 +5928,13 @@ protected:
                                            FileManager* aFileManager,
                                            StructuredCloneReadInfo* aInfo)
   {
+    bool dummy;
     return GetStructuredCloneReadInfoFromSource(aValues,
                                                 aDataIndex,
                                                 aFileIdsIndex,
                                                 aFileManager,
-                                                aInfo);
+                                                aInfo,
+                                                &dummy);
   }
 
   static nsresult
@@ -5994,20 +5998,23 @@ private:
                                        uint32_t aDataIndex,
                                        uint32_t aFileIdsIndex,
                                        FileManager* aFileManager,
-                                       StructuredCloneReadInfo* aInfo);
+                                       StructuredCloneReadInfo* aInfo,
+                                       bool* aHasWasm);
 
   static nsresult
   GetStructuredCloneReadInfoFromBlob(const uint8_t* aBlobData,
                                      uint32_t aBlobDataLength,
                                      FileManager* aFileManager,
                                      const nsAString& aFileIds,
-                                     StructuredCloneReadInfo* aInfo);
+                                     StructuredCloneReadInfo* aInfo,
+                                     bool* aHasWasm);
 
   static nsresult
   GetStructuredCloneReadInfoFromExternalBlob(uint64_t aIntData,
                                              FileManager* aFileManager,
                                              const nsAString& aFileIds,
-                                             StructuredCloneReadInfo* aInfo);
+                                             StructuredCloneReadInfo* aInfo,
+                                             bool* aHasWasm);
 
   // Not to be overridden by subclasses.
   NS_DECL_MOZISTORAGEPROGRESSHANDLER
@@ -6033,8 +6040,19 @@ public:
 class TransactionDatabaseOperationBase
   : public DatabaseOperationBase
 {
+  enum class InternalState
+  {
+    Initial,
+    DatabaseWork,
+    SendingPreprocess,
+    WaitingForContinue,
+    SendingResults,
+    Completed
+  };
+
   RefPtr<TransactionBase> mTransaction;
   const int64_t mTransactionLoggingSerialNumber;
+  InternalState mInternalState;
   const bool mTransactionIsAborted;
 
 public:
@@ -6046,6 +6064,13 @@ public:
   { }
 #endif
 
+  uint64_t
+  StartOnConnectionPool(const nsID& aBackgroundChildLoggingId,
+                        const nsACString& aDatabaseId,
+                        int64_t aLoggingSerialNumber,
+                        const nsTArray<nsString>& aObjectStoreNames,
+                        bool aIsWriteTransaction);
+
   void
   DispatchToConnectionPool();
 
@@ -6056,6 +6081,9 @@ public:
 
     return mTransaction;
   }
+
+  void
+  NoteContinueReceived();
 
   // May be overridden by subclasses if they need to perform work on the
   // background thread before being dispatched. Returning false will kill the
@@ -6089,6 +6117,19 @@ protected:
   virtual nsresult
   DoDatabaseWork(DatabaseConnection* aConnection) = 0;
 
+  // May be overriden in subclasses. Called on the background thread to decide
+  // if the subclass needs to send any preprocess info to the child actor.
+  virtual bool
+  HasPreprocessInfo();
+
+  // May be overriden in subclasses. Called on the background thread to allow
+  // the subclass to serialize its preprocess info and send it to the child
+  // actor. A successful return value will trigger a wait for a
+  // NoteContinueReceived callback on the background thread while a failure
+  // value will trigger a SendFailureResult callback.
+  virtual nsresult
+  SendPreprocessInfo();
+
   // Must be overridden in subclasses. Called on the background thread to allow
   // the subclass to serialize its results and send them to the child actor. A
   // failed return value will trigger a SendFailureResult callback.
@@ -6104,7 +6145,16 @@ protected:
 
 private:
   void
-  RunOnOwningThread();
+  SendToConnectionPool();
+
+  void
+  SendPreprocess();
+
+  void
+  SendResults();
+
+  void
+  SendPreprocessInfoOrResults(bool aSendPreprocessInfo);
 
   // Not to be overridden by subclasses.
   NS_DECL_NSIRUNNABLE
@@ -6182,7 +6232,6 @@ private:
 class WaitForTransactionsHelper final
   : public Runnable
 {
-  nsCOMPtr<nsIEventTarget> mOwningThread;
   const nsCString mDatabaseId;
   nsCOMPtr<nsIRunnable> mCallback;
 
@@ -6197,8 +6246,7 @@ class WaitForTransactionsHelper final
 public:
   WaitForTransactionsHelper(const nsCString& aDatabaseId,
                             nsIRunnable* aCallback)
-    : mOwningThread(NS_GetCurrentThread())
-    , mDatabaseId(aDatabaseId)
+    : mDatabaseId(aDatabaseId)
     , mCallback(aCallback)
     , mState(State::Initial)
   {
@@ -8105,6 +8153,9 @@ private:
   // IPDL methods.
   virtual void
   ActorDestroy(ActorDestroyReason aWhy) override;
+
+  virtual bool
+  RecvContinue(const PreprocessResponse& aResponse) override;
 };
 
 class ObjectStoreAddOrPutRequestOp final
@@ -8258,6 +8309,7 @@ class ObjectStoreGetRequestOp final
   PBackgroundParent* mBackgroundParent;
   const uint32_t mLimit;
   const bool mGetAll;
+  bool mHasWasm;
 
 private:
   // Only created by TransactionBase.
@@ -8299,6 +8351,12 @@ private:
 
   virtual nsresult
   DoDatabaseWork(DatabaseConnection* aConnection) override;
+
+  virtual bool
+  HasPreprocessInfo() override;
+
+  virtual nsresult
+  SendPreprocessInfo() override;
 
   virtual void
   GetResponse(RequestResponse& aResponse) override;
@@ -9598,9 +9656,11 @@ DeserializeStructuredCloneFile(FileManager* aFileManager,
 nsresult
 DeserializeStructuredCloneFiles(FileManager* aFileManager,
                                 const nsAString& aText,
-                                nsTArray<StructuredCloneFile>& aResult)
+                                nsTArray<StructuredCloneFile>& aResult,
+                                bool* aHasWasm)
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aHasWasm);
 
   nsCharSeparatedTokenizerTemplate<TokenizerIgnoreNothing>
     tokenizer(aText, ' ');
@@ -9619,7 +9679,12 @@ DeserializeStructuredCloneFiles(FileManager* aFileManager,
       return rv;
     }
 
-    if (file->mType == StructuredCloneFile::eWasmCompiled) {
+    if (file->mType == StructuredCloneFile::eWasmBytecode) {
+      MOZ_ASSERT(file->mValid);
+
+      *aHasWasm = true;
+    }
+    else if (file->mType == StructuredCloneFile::eWasmCompiled) {
       if (!directory) {
         directory = aFileManager->GetCheckedDirectory();
         if (NS_WARN_IF(!directory)) {
@@ -9651,6 +9716,8 @@ DeserializeStructuredCloneFiles(FileManager* aFileManager,
       MOZ_ASSERT(file->mValid);
       file->mValid = JS::CompiledWasmModuleAssumptionsMatch(fileDesc,
                                                             Move(buildId));
+
+      *aHasWasm = true;
     }
   }
 
@@ -9684,6 +9751,7 @@ SerializeStructuredCloneFiles(
                          PBackgroundParent* aBackgroundActor,
                          Database* aDatabase,
                          const nsTArray<StructuredCloneFile>& aFiles,
+                         bool aForPreprocess,
                          FallibleTArray<SerializedStructuredCloneFile>& aResult)
 {
   AssertIsOnBackgroundThread();
@@ -9711,6 +9779,12 @@ SerializeStructuredCloneFiles(
 
   for (uint32_t index = 0; index < count; index++) {
     const StructuredCloneFile& file = aFiles[index];
+
+    if (aForPreprocess &&
+        file.mType != StructuredCloneFile::eWasmBytecode &&
+        file.mType != StructuredCloneFile::eWasmCompiled) {
+      continue;
+    }
 
     const int64_t fileId = file.mFileInfo->Id();
     MOZ_ASSERT(fileId > 0);
@@ -9793,13 +9867,13 @@ SerializeStructuredCloneFiles(
 
       case StructuredCloneFile::eWasmBytecode:
       case StructuredCloneFile::eWasmCompiled: {
-        if (file.mType == StructuredCloneFile::eWasmCompiled && !file.mValid) {
+        if (!aForPreprocess || !file.mValid) {
           SerializedStructuredCloneFile* serializedFile =
             aResult.AppendElement(fallible);
           MOZ_ASSERT(serializedFile);
 
           serializedFile->file() = null_t();
-          serializedFile->type() = StructuredCloneFile::eWasmCompiled;
+          serializedFile->type() = file.mType;
         } else {
           RefPtr<BlobImpl> impl = new BlobImplStoredFile(nativeFile,
                                                          file.mFileInfo,
@@ -11412,7 +11486,8 @@ UpdateRefcountFunction::ProcessValue(mozIStorageValueArray* aValues,
   }
 
   nsTArray<StructuredCloneFile> files;
-  rv = DeserializeStructuredCloneFiles(mFileManager, ids, files);
+  bool dummy;
+  rv = DeserializeStructuredCloneFiles(mFileManager, ids, files, &dummy);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -14354,12 +14429,11 @@ Database::RecvPBackgroundIDBTransactionConstructor(
   RefPtr<StartTransactionOp> startOp = new StartTransactionOp(transaction);
 
   uint64_t transactionId =
-    gConnectionPool->Start(GetLoggingInfo()->Id(),
-                           mMetadata->mDatabaseId,
-                           transaction->LoggingSerialNumber(),
-                           aObjectStoreNames,
-                           aMode != IDBTransaction::READ_ONLY,
-                           startOp);
+    startOp->StartOnConnectionPool(GetLoggingInfo()->Id(),
+                                   mMetadata->mDatabaseId,
+                                   transaction->LoggingSerialNumber(),
+                                   aObjectStoreNames,
+                                   aMode != IDBTransaction::READ_ONLY);
 
   transaction->SetActive(transactionId);
 
@@ -16553,6 +16627,7 @@ Cursor::SendResponseInternal(
       nsresult rv = SerializeStructuredCloneFiles(mBackgroundParent,
                                                   mDatabase,
                                                   files,
+                                                  /* aForPreprocess */ false,
                                                   serializedFiles);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         aResponse = ClampResultCode(rv);
@@ -19232,7 +19307,8 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromSource(
                                                  uint32_t aDataIndex,
                                                  uint32_t aFileIdsIndex,
                                                  FileManager* aFileManager,
-                                                 StructuredCloneReadInfo* aInfo)
+                                                 StructuredCloneReadInfo* aInfo,
+                                                 bool* aHasWasm)
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
   MOZ_ASSERT(aSource);
@@ -19275,7 +19351,8 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromSource(
     rv = GetStructuredCloneReadInfoFromExternalBlob(intData,
                                                     aFileManager,
                                                     fileIds,
-                                                    aInfo);
+                                                    aInfo,
+                                                    aHasWasm);
   } else {
     const uint8_t* blobData;
     uint32_t blobDataLength;
@@ -19289,7 +19366,8 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromSource(
                                             blobDataLength,
                                             aFileManager,
                                             fileIds,
-                                            aInfo);
+                                            aInfo,
+                                            aHasWasm);
   }
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -19305,7 +19383,8 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromBlob(
                                                  uint32_t aBlobDataLength,
                                                  FileManager* aFileManager,
                                                  const nsAString& aFileIds,
-                                                 StructuredCloneReadInfo* aInfo)
+                                                 StructuredCloneReadInfo* aInfo,
+                                                 bool* aHasWasm)
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
   MOZ_ASSERT(aFileManager);
@@ -19341,8 +19420,10 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromBlob(
   }
 
   if (!aFileIds.IsVoid()) {
-    nsresult rv =
-      DeserializeStructuredCloneFiles(aFileManager, aFileIds, aInfo->mFiles);
+    nsresult rv = DeserializeStructuredCloneFiles(aFileManager,
+                                                  aFileIds,
+                                                  aInfo->mFiles,
+                                                  aHasWasm);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -19389,7 +19470,8 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromExternalBlob(
                                                  uint64_t aIntData,
                                                  FileManager* aFileManager,
                                                  const nsAString& aFileIds,
-                                                 StructuredCloneReadInfo* aInfo)
+                                                 StructuredCloneReadInfo* aInfo,
+                                                 bool* aHasWasm)
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
   MOZ_ASSERT(aFileManager);
@@ -19403,7 +19485,10 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromExternalBlob(
   nsresult rv;
 
   if (!aFileIds.IsVoid()) {
-    rv = DeserializeStructuredCloneFiles(aFileManager, aFileIds, aInfo->mFiles);
+    rv = DeserializeStructuredCloneFiles(aFileManager,
+                                         aFileIds,
+                                         aInfo->mFiles,
+                                         aHasWasm);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -21919,12 +22004,12 @@ OpenDatabaseOp::DispatchToWorkThread()
   RefPtr<VersionChangeOp> versionChangeOp = new VersionChangeOp(this);
 
   uint64_t transactionId =
-    gConnectionPool->Start(backgroundChildLoggingId,
-                           mVersionChangeTransaction->DatabaseId(),
-                           loggingSerialNumber,
-                           objectStoreNames,
-                           /* aIsWriteTransaction */ true,
-                           versionChangeOp);
+    versionChangeOp->StartOnConnectionPool(
+                                        backgroundChildLoggingId,
+                                        mVersionChangeTransaction->DatabaseId(),
+                                        loggingSerialNumber,
+                                        objectStoreNames,
+                                        /* aIsWriteTransaction */ true);
 
   mVersionChangeOp = versionChangeOp;
 
@@ -23050,6 +23135,7 @@ TransactionDatabaseOperationBase::TransactionDatabaseOperationBase(
                           aTransaction->GetLoggingInfo()->NextRequestSN())
   , mTransaction(aTransaction)
   , mTransactionLoggingSerialNumber(aTransaction->LoggingSerialNumber())
+  , mInternalState(InternalState::Initial)
   , mTransactionIsAborted(aTransaction->IsAborted())
 {
   MOZ_ASSERT(aTransaction);
@@ -23063,6 +23149,7 @@ TransactionDatabaseOperationBase::TransactionDatabaseOperationBase(
                           aLoggingSerialNumber)
   , mTransaction(aTransaction)
   , mTransactionLoggingSerialNumber(aTransaction->LoggingSerialNumber())
+  , mInternalState(InternalState::Initial)
   , mTransactionIsAborted(aTransaction->IsAborted())
 {
   MOZ_ASSERT(aTransaction);
@@ -23070,6 +23157,7 @@ TransactionDatabaseOperationBase::TransactionDatabaseOperationBase(
 
 TransactionDatabaseOperationBase::~TransactionDatabaseOperationBase()
 {
+  MOZ_ASSERT(mInternalState == InternalState::Completed);
   MOZ_ASSERT(!mTransaction,
              "TransactionDatabaseOperationBase::Cleanup() was not called by a "
              "subclass!");
@@ -23086,20 +23174,43 @@ TransactionDatabaseOperationBase::AssertIsOnConnectionThread() const
 
 #endif // DEBUG
 
+uint64_t
+TransactionDatabaseOperationBase::StartOnConnectionPool(
+                                    const nsID& aBackgroundChildLoggingId,
+                                    const nsACString& aDatabaseId,
+                                    int64_t aLoggingSerialNumber,
+                                    const nsTArray<nsString>& aObjectStoreNames,
+                                    bool aIsWriteTransaction)
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::Initial);
+
+  // Must set mInternalState before dispatching otherwise we will race with the
+  // connection thread.
+  mInternalState = InternalState::DatabaseWork;
+
+  return gConnectionPool->Start(aBackgroundChildLoggingId,
+                                aDatabaseId,
+                                aLoggingSerialNumber,
+                                aObjectStoreNames,
+                                aIsWriteTransaction,
+                                this);
+}
+
 void
 TransactionDatabaseOperationBase::DispatchToConnectionPool()
 {
   AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::Initial);
 
-  gConnectionPool->Dispatch(mTransaction->TransactionId(), this);
-
-  mTransaction->NoteActiveRequest();
+  Unused << this->Run();
 }
 
 void
 TransactionDatabaseOperationBase::RunOnConnectionThread()
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(mInternalState == InternalState::DatabaseWork);
   MOZ_ASSERT(mTransaction);
   MOZ_ASSERT(NS_SUCCEEDED(mResultCode));
 
@@ -23166,14 +23277,86 @@ TransactionDatabaseOperationBase::RunOnConnectionThread()
     }
   }
 
+  // Must set mInternalState before dispatching otherwise we will race with the
+  // owning thread.
+  if (HasPreprocessInfo()) {
+    mInternalState = InternalState::SendingPreprocess;
+  } else {
+    mInternalState = InternalState::SendingResults;
+  }
+
   MOZ_ALWAYS_SUCCEEDS(mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL));
 }
 
+bool
+TransactionDatabaseOperationBase::HasPreprocessInfo()
+{
+  return false;
+}
+
+nsresult
+TransactionDatabaseOperationBase::SendPreprocessInfo()
+{
+  return NS_OK;
+}
+
 void
-TransactionDatabaseOperationBase::RunOnOwningThread()
+TransactionDatabaseOperationBase::NoteContinueReceived()
 {
   AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::WaitingForContinue);
+
+  mInternalState = InternalState::SendingResults;
+
+  Unused << this->Run();
+}
+
+void
+TransactionDatabaseOperationBase::SendToConnectionPool()
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::Initial);
+
+  // Must set mInternalState before dispatching otherwise we will race with the
+  // connection thread.
+  mInternalState = InternalState::DatabaseWork;
+
+  gConnectionPool->Dispatch(mTransaction->TransactionId(), this);
+
+  mTransaction->NoteActiveRequest();
+}
+
+void
+TransactionDatabaseOperationBase::SendPreprocess()
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::SendingPreprocess);
+
+  SendPreprocessInfoOrResults(/* aSendPreprocessInfo */ true);
+}
+
+void
+TransactionDatabaseOperationBase::SendResults()
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::SendingResults);
+
+  SendPreprocessInfoOrResults(/* aSendPreprocessInfo */ false);
+}
+
+void
+TransactionDatabaseOperationBase::SendPreprocessInfoOrResults(
+                                                       bool aSendPreprocessInfo)
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::SendingPreprocess ||
+             mInternalState == InternalState::SendingResults);
   MOZ_ASSERT(mTransaction);
+
+  // Only needed if we're being called from within NoteContinueReceived() since
+  // this TransactionDatabaseOperationBase is only held alive by the IPDL.
+  // SendSuccessResult/SendFailureResult releases that last reference.
+  RefPtr<TransactionDatabaseOperationBase> kungFuDeathGrip;
 
   if (NS_WARN_IF(IsActorDestroyed())) {
     // Don't send any notifications if the actor was destroyed already.
@@ -23182,13 +23365,22 @@ TransactionDatabaseOperationBase::RunOnOwningThread()
       mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
     }
   } else {
+    if (!aSendPreprocessInfo) {
+      kungFuDeathGrip = this;
+    }
+
     if (mTransaction->IsInvalidated() || mTransaction->IsAborted()) {
       // Aborted transactions always see their requests fail with ABORT_ERR,
       // even if the request succeeded or failed with another error.
       mResultCode = NS_ERROR_DOM_INDEXEDDB_ABORT_ERR;
     } else if (NS_SUCCEEDED(mResultCode)) {
-      // This may release the IPDL reference.
-      mResultCode = SendSuccessResult();
+      if (aSendPreprocessInfo) {
+        // This should not release the IPDL reference.
+        mResultCode = SendPreprocessInfo();
+      } else {
+        // This may release the IPDL reference.
+        mResultCode = SendSuccessResult();
+      }
     }
 
     if (NS_FAILED(mResultCode)) {
@@ -23200,17 +23392,24 @@ TransactionDatabaseOperationBase::RunOnOwningThread()
     }
   }
 
-  if (mLoggingSerialNumber) {
-    mTransaction->NoteFinishedRequest();
-  }
+  if (aSendPreprocessInfo && NS_SUCCEEDED(mResultCode)) {
+    mInternalState = InternalState::WaitingForContinue;
+  } else {
+    if (mLoggingSerialNumber) {
+      mTransaction->NoteFinishedRequest();
+    }
 
-  Cleanup();
+    Cleanup();
+
+    mInternalState = InternalState::Completed;
+  }
 }
 
 bool
 TransactionDatabaseOperationBase::Init(TransactionBase* aTransaction)
 {
   AssertIsOnBackgroundThread();
+  MOZ_ASSERT(mInternalState == InternalState::Initial);
   MOZ_ASSERT(aTransaction);
 
   return true;
@@ -23220,6 +23419,7 @@ void
 TransactionDatabaseOperationBase::Cleanup()
 {
   AssertIsOnOwningThread();
+  MOZ_ASSERT(mInternalState == InternalState::SendingResults);
   MOZ_ASSERT(mTransaction);
 
   mTransaction = nullptr;
@@ -23228,15 +23428,26 @@ TransactionDatabaseOperationBase::Cleanup()
 NS_IMETHODIMP
 TransactionDatabaseOperationBase::Run()
 {
-  MOZ_ASSERT(mTransaction);
+  switch (mInternalState) {
+    case InternalState::Initial:
+      SendToConnectionPool();
+      return NS_OK;
 
-  if (IsOnBackgroundThread()) {
-    RunOnOwningThread();
-  } else {
-    RunOnConnectionThread();
+    case InternalState::DatabaseWork:
+      RunOnConnectionThread();
+      return NS_OK;
+
+    case InternalState::SendingPreprocess:
+      SendPreprocess();
+      return NS_OK;
+
+    case InternalState::SendingResults:
+      SendResults();
+      return NS_OK;
+
+    default:
+      MOZ_CRASH("Bad state!");
   }
-
-  return NS_OK;
 }
 
 TransactionBase::
@@ -25433,6 +25644,28 @@ NormalTransactionOp::ActorDestroy(ActorDestroyReason aWhy)
   NoteActorDestroyed();
 }
 
+bool
+NormalTransactionOp::RecvContinue(const PreprocessResponse& aResponse)
+{
+  AssertIsOnOwningThread();
+
+  switch (aResponse.type()) {
+    case PreprocessResponse::Tnsresult:
+      mResultCode = aResponse.get_nsresult();
+      break;
+
+    case PreprocessResponse::TObjectStoreGetPreprocessResponse:
+      break;
+
+    default:
+      MOZ_CRASH("Should never get here!");
+  }
+
+  NoteContinueReceived();
+
+  return true;
+}
+
 ObjectStoreAddOrPutRequestOp::ObjectStoreAddOrPutRequestOp(
                                                   TransactionBase* aTransaction,
                                                   const RequestParams& aParams)
@@ -26296,6 +26529,7 @@ ObjectStoreGetRequestOp::ObjectStoreGetRequestOp(TransactionBase* aTransaction,
   , mBackgroundParent(aTransaction->GetBackgroundParent())
   , mLimit(aGetAll ? aParams.get_ObjectStoreGetAllParams().limit() : 1)
   , mGetAll(aGetAll)
+  , mHasWasm(false)
 {
   MOZ_ASSERT(aParams.type() == RequestParams::TObjectStoreGetParams ||
              aParams.type() == RequestParams::TObjectStoreGetAllParams);
@@ -26322,6 +26556,7 @@ ObjectStoreGetRequestOp::ConvertResponse(
   nsresult rv = SerializeStructuredCloneFiles(mBackgroundParent,
                                               mDatabase,
                                               info.mFiles,
+                                              /* aForPreprocess */ false,
                                               serializedFiles);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -26400,7 +26635,8 @@ ObjectStoreGetRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
 
     rv = GetStructuredCloneReadInfoFromStatement(stmt, 1, 0,
                                                  mDatabase->GetFileManager(),
-                                                 cloneInfo);
+                                                 cloneInfo,
+                                                 &mHasWasm);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -26411,6 +26647,53 @@ ObjectStoreGetRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
   }
 
   MOZ_ASSERT_IF(!mGetAll, mResponse.Length() <= 1);
+
+  return NS_OK;
+}
+
+bool
+ObjectStoreGetRequestOp::HasPreprocessInfo()
+{
+  return mHasWasm;
+}
+
+nsresult
+ObjectStoreGetRequestOp::SendPreprocessInfo()
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(!IsActorDestroyed());
+  MOZ_ASSERT(!mResponse.IsEmpty());
+
+  if (mGetAll) {
+    MOZ_ASSERT(false, "Fix me!");
+    IDB_REPORT_INTERNAL_ERR();
+    return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
+  }
+
+  StructuredCloneReadInfo& cloneInfo = mResponse[0];
+
+  FallibleTArray<SerializedStructuredCloneFile> serializedFiles;
+  nsresult rv = SerializeStructuredCloneFiles(mBackgroundParent,
+                                              mDatabase,
+                                              cloneInfo.mFiles,
+                                              /* aForPreprocess */ true,
+                                              serializedFiles);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  WasmModulePreprocessInfo preprocessInfo;
+
+  MOZ_ASSERT(preprocessInfo.files().IsEmpty());
+
+  preprocessInfo.files().SwapElements(serializedFiles);
+
+  PreprocessParams params = ObjectStoreGetPreprocessParams(preprocessInfo);
+
+  if (NS_WARN_IF(!PBackgroundIDBRequestParent::SendPreprocess(params))) {
+    IDB_REPORT_INTERNAL_ERR();
+    return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
+  }
 
   return NS_OK;
 }
@@ -26998,9 +27281,11 @@ IndexGetRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
       return NS_ERROR_OUT_OF_MEMORY;
     }
 
+    bool dummy;
     rv = GetStructuredCloneReadInfoFromStatement(stmt, 1, 0,
                                                  mDatabase->GetFileManager(),
-                                                 cloneInfo);
+                                                 cloneInfo,
+                                                 &dummy);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -27045,6 +27330,7 @@ IndexGetRequestOp::GetResponse(RequestResponse& aResponse)
         nsresult rv = SerializeStructuredCloneFiles(mBackgroundParent,
                                                     mDatabase,
                                                     info.mFiles,
+                                                    /* aForPreprocess */ false,
                                                     serializedFiles);
         if (NS_WARN_IF(NS_FAILED(rv))) {
           aResponse = rv;
@@ -27080,6 +27366,7 @@ IndexGetRequestOp::GetResponse(RequestResponse& aResponse)
       SerializeStructuredCloneFiles(mBackgroundParent,
                                     mDatabase,
                                     info.mFiles,
+                                    /* aForPreprocess */ false,
                                     serializedFiles);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       aResponse = rv;
@@ -27369,11 +27656,13 @@ CursorOpBase::PopulateResponseFromStatement(
   switch (mCursor->mType) {
     case OpenCursorParams::TObjectStoreOpenCursorParams: {
       StructuredCloneReadInfo cloneInfo;
+      bool dummy;
       rv = GetStructuredCloneReadInfoFromStatement(aStmt,
                                                    2,
                                                    1,
                                                    mCursor->mFileManager,
-                                                   &cloneInfo);
+                                                   &cloneInfo,
+                                                   &dummy);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
       }
@@ -27412,11 +27701,13 @@ CursorOpBase::PopulateResponseFromStatement(
       }
 
       StructuredCloneReadInfo cloneInfo;
+      bool dummy;
       rv = GetStructuredCloneReadInfoFromStatement(aStmt,
                                                    4,
                                                    3,
                                                    mCursor->mFileManager,
-                                                   &cloneInfo);
+                                                   &cloneInfo,
+                                                   &dummy);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
       }
