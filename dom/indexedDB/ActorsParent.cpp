@@ -8139,11 +8139,18 @@ protected:
                         const bool aMayHaveIndexes,
                         bool* aHasIndexes);
 
+  virtual nsresult
+  GetPreprocessParams(PreprocessParams& aParams);
+
+
   // Subclasses use this override to set the IPDL response value.
   virtual void
   GetResponse(RequestResponse& aResponse) = 0;
 
 private:
+  virtual nsresult
+  SendPreprocessInfo() override;
+
   virtual nsresult
   SendSuccessResult() override;
 
@@ -8356,7 +8363,7 @@ private:
   HasPreprocessInfo() override;
 
   virtual nsresult
-  SendPreprocessInfo() override;
+  GetPreprocessParams(PreprocessParams& aParams) override;
 
   virtual void
   GetResponse(RequestResponse& aResponse) override;
@@ -25576,6 +25583,34 @@ NormalTransactionOp::ObjectStoreHasIndexes(NormalTransactionOp* aOp,
 }
 
 nsresult
+NormalTransactionOp::GetPreprocessParams(PreprocessParams& aParams)
+{
+  return NS_OK;
+}
+
+nsresult
+NormalTransactionOp::SendPreprocessInfo()
+{
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(!IsActorDestroyed());
+
+  PreprocessParams params;
+  nsresult rv = GetPreprocessParams(params);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  MOZ_ASSERT(params.type() != PreprocessParams::T__None);
+
+  if (NS_WARN_IF(!PBackgroundIDBRequestParent::SendPreprocess(params))) {
+    IDB_REPORT_INTERNAL_ERR();
+    return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
+  }
+
+  return NS_OK;
+}
+
+nsresult
 NormalTransactionOp::SendSuccessResult()
 {
   AssertIsOnOwningThread();
@@ -26658,10 +26693,9 @@ ObjectStoreGetRequestOp::HasPreprocessInfo()
 }
 
 nsresult
-ObjectStoreGetRequestOp::SendPreprocessInfo()
+ObjectStoreGetRequestOp::GetPreprocessParams(PreprocessParams& aParams)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(!IsActorDestroyed());
   MOZ_ASSERT(!mResponse.IsEmpty());
 
   if (mGetAll) {
@@ -26688,12 +26722,7 @@ ObjectStoreGetRequestOp::SendPreprocessInfo()
 
   preprocessInfo.files().SwapElements(serializedFiles);
 
-  PreprocessParams params = ObjectStoreGetPreprocessParams(preprocessInfo);
-
-  if (NS_WARN_IF(!PBackgroundIDBRequestParent::SendPreprocess(params))) {
-    IDB_REPORT_INTERNAL_ERR();
-    return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-  }
+  aParams = ObjectStoreGetPreprocessParams(preprocessInfo);
 
   return NS_OK;
 }
