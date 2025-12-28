@@ -2821,7 +2821,7 @@ EnterIon(JSContext* cx, EnterJitData& data)
 
 #ifdef DEBUG
     // See comment in EnterBaseline.
-    mozilla::Maybe<JS::AutoAssertOnGC> nogc;
+    mozilla::Maybe<JS::AutoAssertNoGC> nogc;
     nogc.emplace(cx);
 #endif
 
@@ -2958,7 +2958,7 @@ jit::FastInvoke(JSContext* cx, HandleFunction fun, CallArgs& args)
 
 #ifdef DEBUG
     // See comment in EnterBaseline.
-    mozilla::Maybe<JS::AutoAssertOnGC> nogc;
+    mozilla::Maybe<JS::AutoAssertNoGC> nogc;
     nogc.emplace(cx);
 #endif
 
