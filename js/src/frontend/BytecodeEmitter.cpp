@@ -6972,6 +6972,13 @@ BytecodeEmitter::emitFunction(ParseNode* pn, bool needsProto)
             MOZ_ASSERT(pn->getOp() == JSOP_FUNWITHPROTO || pn->getOp() == JSOP_LAMBDA);
             pn->setOp(JSOP_FUNWITHPROTO);
         }
+
+        if (pn->getOp() == JSOP_DEFFUN) {
+            if (!emitIndex32(JSOP_LAMBDA, index))
+                return false;
+            return emit1(JSOP_DEFFUN);
+        }
+
         return emitIndex32(pn->getOp(), index);
     }
 
@@ -7002,7 +7009,9 @@ BytecodeEmitter::emitFunction(ParseNode* pn, bool needsProto)
             MOZ_ASSERT(sc->isGlobalContext() || sc->isEvalContext());
             MOZ_ASSERT(pn->getOp() == JSOP_NOP);
             switchToPrologue();
-            if (!emitIndex32(JSOP_DEFFUN, index))
+            if (!emitIndex32(JSOP_LAMBDA, index))
+                return false;
+            if (!emit1(JSOP_DEFFUN))
                 return false;
             if (!updateSourceCoordNotes(pn->pn_pos.begin))
                 return false;
