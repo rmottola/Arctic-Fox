@@ -5060,9 +5060,6 @@ pref("dom.sms.defaultServiceId", 0);
 // negative: read ahead all IDs if possible.
 pref("dom.sms.maxReadAheadEntries", 0);
 
-// WebAlarms
-pref("dom.mozAlarms.enabled", false);
-
 // Push
 
 pref("dom.push.enabled", false);
