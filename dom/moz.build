@@ -58,7 +58,6 @@ DIRS += [
     'filehandle',
     'filesystem',
     'flyweb',
-    'fmradio',
     'gamepad',
     'geolocation',
     'grid',

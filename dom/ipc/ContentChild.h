@@ -337,10 +337,6 @@ public:
 
   virtual bool DeallocPBluetoothChild(PBluetoothChild* aActor) override;
 
-  virtual PFMRadioChild* AllocPFMRadioChild() override;
-
-  virtual bool DeallocPFMRadioChild(PFMRadioChild* aActor) override;
-
   virtual PPresentationChild* AllocPPresentationChild() override;
 
   virtual bool DeallocPPresentationChild(PPresentationChild* aActor) override;
