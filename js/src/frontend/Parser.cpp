@@ -6490,8 +6490,13 @@ Parser<ParseHandler>::nextTokenContinuesLetDeclaration(TokenKind next, YieldHand
 
     // Otherwise a let declaration must have a name.
     if (next == TOK_NAME) {
-        MOZ_ASSERT(tokenStream.nextName() != context->names().yield,
-                   "token stream should interpret 'yield' as TOK_YIELD");
+        if (tokenStream.nextName() == context->names().yield) {
+            MOZ_ASSERT(tokenStream.nextNameContainsEscape(),
+                       "token stream should interpret unescaped 'yield' as TOK_YIELD");
+
+            // Same as |next == TOK_YIELD|.
+            return yieldHandling == YieldIsName;
+        }
 
         // One non-"yield" TOK_NAME edge case deserves special comment.
         // Consider this:
@@ -8279,12 +8284,25 @@ Parser<ParseHandler>::labelOrIdentifierReference(YieldHandling yieldHandling,
                                                  bool yieldTokenizedAsName)
 {
     PropertyName* ident;
+    bool isYield;
     const Token& tok = tokenStream.currentToken();
-    if (tok.type == TOK_NAME && !yieldTokenizedAsName) {
-        ident = tok.name();
-        MOZ_ASSERT(ident != context->names().yield,
-                   "tokenizer should have treated 'yield' as TOK_YIELD");
+    if (tok.type == TOK_NAME) {
+        MOZ_ASSERT(tok.name() != context->names().yield ||
+                   tok.nameContainsEscape() ||
+                   yieldTokenizedAsName,
+                   "tokenizer should have treated unescaped 'yield' as TOK_YIELD");
+        MOZ_ASSERT_IF(yieldTokenizedAsName, tok.name() == context->names().yield);
 
+        ident = tok.name();
+        isYield = ident == context->names().yield;
+    } else {
+        MOZ_ASSERT(tok.type == TOK_YIELD && !yieldTokenizedAsName);
+
+        ident = context->names().yield;
+        isYield = true;
+    }
+
+    if (!isYield) {
         if (pc->sc()->strict()) {
             const char* badName = ident == context->names().let
                                   ? "let"
@@ -8297,8 +8315,6 @@ Parser<ParseHandler>::labelOrIdentifierReference(YieldHandling yieldHandling,
             }
         }
     } else {
-        MOZ_ASSERT(tok.type == TOK_YIELD);
-
         if (yieldHandling == YieldIsKeyword ||
             pc->sc()->strict() ||
             versionNumber() >= JSVERSION_1_7)
@@ -8306,8 +8322,6 @@ Parser<ParseHandler>::labelOrIdentifierReference(YieldHandling yieldHandling,
             report(ParseError, false, null(), JSMSG_RESERVED_ID, "yield");
             return nullptr;
         }
-
-        ident = context->names().yield;
     }
 
     return ident;
@@ -8318,12 +8332,22 @@ PropertyName*
 Parser<ParseHandler>::bindingIdentifier(YieldHandling yieldHandling)
 {
     PropertyName* ident;
+    bool isYield;
     const Token& tok = tokenStream.currentToken();
     if (tok.type == TOK_NAME) {
-        ident = tok.name();
-        MOZ_ASSERT(ident != context->names().yield,
-                   "tokenizer should have treated 'yield' as TOK_YIELD");
+        MOZ_ASSERT(tok.name() != context->names().yield || tok.nameContainsEscape(),
+                   "tokenizer should have treated unescaped 'yield' as TOK_YIELD");
 
+        ident = tok.name();
+        isYield = ident == context->names().yield;
+    } else {
+        MOZ_ASSERT(tok.type == TOK_YIELD);
+
+        ident = context->names().yield;
+        isYield = true;
+    }
+
+    if (!isYield) {
         if (pc->sc()->strict()) {
             const char* badName = ident == context->names().arguments
                                   ? "arguments"
@@ -8346,10 +8370,6 @@ Parser<ParseHandler>::bindingIdentifier(YieldHandling yieldHandling)
             }
         }
     } else {
-        MOZ_ASSERT(tok.type == TOK_YIELD ||
-                   (tok.type == TOK_NAME && yieldTokenizedAsName &&
-                    tok.name() == context->names().yield));
-
         if (yieldHandling == YieldIsKeyword ||
             pc->sc()->strict() ||
             versionNumber() >= JSVERSION_1_7)
@@ -8357,8 +8377,6 @@ Parser<ParseHandler>::bindingIdentifier(YieldHandling yieldHandling)
             report(ParseError, false, null(), JSMSG_RESERVED_ID, "yield");
             return nullptr;
         }
-
-        ident = context->names().yield;
     }
 
     return ident;
