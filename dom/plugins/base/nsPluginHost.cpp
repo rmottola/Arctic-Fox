@@ -4183,7 +4183,7 @@ public:
     PR_APPEND_LINK(this, &sRunnableListHead);
   }
 
-  virtual ~nsPluginDestroyRunnable()
+  ~nsPluginDestroyRunnable() override
   {
     PR_REMOVE_LINK(this);
   }

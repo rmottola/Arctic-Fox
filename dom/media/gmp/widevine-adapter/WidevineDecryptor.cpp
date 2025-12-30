@@ -153,7 +153,7 @@ public:
   {
   }
 
-  ~WidevineDecryptedBlock() {
+  ~WidevineDecryptedBlock() override {
     if (mBuffer) {
       mBuffer->Destroy();
       mBuffer = nullptr;
@@ -221,7 +221,7 @@ public:
     Log("WidevineBuffer(size=" PRIuSIZE ") created", aSize);
     mBuffer.SetLength(aSize);
   }
-  ~WidevineBuffer() {
+  ~WidevineBuffer() override {
     Log("WidevineBuffer(size=" PRIuSIZE ") destroyed", Size());
   }
   void Destroy() override { delete this; }

@@ -624,9 +624,9 @@ class nsPluginThreadRunnable : public Runnable,
 public:
   nsPluginThreadRunnable(NPP instance, PluginThreadCallback func,
                          void *userData);
-  virtual ~nsPluginThreadRunnable();
+  ~nsPluginThreadRunnable() override;
 
-  NS_IMETHOD Run();
+  NS_IMETHOD Run() override;
 
   bool IsForInstance(NPP instance)
   {

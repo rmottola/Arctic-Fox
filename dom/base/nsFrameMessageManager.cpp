@@ -1967,13 +1967,13 @@ public:
   {
     MOZ_COUNT_CTOR(SameParentProcessMessageManagerCallback);
   }
-  virtual ~SameParentProcessMessageManagerCallback()
+  ~SameParentProcessMessageManagerCallback() override
   {
     MOZ_COUNT_DTOR(SameParentProcessMessageManagerCallback);
   }
 
-  virtual bool DoLoadMessageManagerScript(const nsAString& aURL,
-                                          bool aRunInGlobalScope) override
+  bool DoLoadMessageManagerScript(const nsAString& aURL,
+                                  bool aRunInGlobalScope) override
   {
     ProcessGlobal* global = ProcessGlobal::Get();
     MOZ_ASSERT(!aRunInGlobalScope);
@@ -1981,11 +1981,11 @@ public:
     return true;
   }
 
-  virtual nsresult DoSendAsyncMessage(JSContext* aCx,
-                                      const nsAString& aMessage,
-                                      StructuredCloneData& aData,
-                                      JS::Handle<JSObject *> aCpows,
-                                      nsIPrincipal* aPrincipal) override
+  nsresult DoSendAsyncMessage(JSContext* aCx,
+                              const nsAString& aMessage,
+                              StructuredCloneData& aData,
+                              JS::Handle<JSObject *> aCpows,
+                              nsIPrincipal* aPrincipal) override
   {
     JS::RootingContext* rcx = JS::RootingContext::get(aCx);
     RefPtr<nsAsyncMessageToSameProcessChild> ev =
@@ -2020,7 +2020,7 @@ public:
     return true;
   }
 
-  virtual bool CheckAppHasStatus(unsigned short aStatus) override
+  bool CheckAppHasStatus(unsigned short aStatus) override
   {
     // In a single-process scenario, the child always has all capabilities.
     return true;
@@ -2038,18 +2038,18 @@ public:
   {
     MOZ_COUNT_CTOR(ChildProcessMessageManagerCallback);
   }
-  virtual ~ChildProcessMessageManagerCallback()
+  ~ChildProcessMessageManagerCallback() override
   {
     MOZ_COUNT_DTOR(ChildProcessMessageManagerCallback);
   }
 
-  virtual bool DoSendBlockingMessage(JSContext* aCx,
-                                     const nsAString& aMessage,
-                                     StructuredCloneData& aData,
-                                     JS::Handle<JSObject *> aCpows,
-                                     nsIPrincipal* aPrincipal,
-                                     nsTArray<StructuredCloneData>* aRetVal,
-                                     bool aIsSync) override
+  bool DoSendBlockingMessage(JSContext* aCx,
+                             const nsAString& aMessage,
+                             StructuredCloneData& aData,
+                             JS::Handle<JSObject *> aCpows,
+                             nsIPrincipal* aPrincipal,
+                             nsTArray<StructuredCloneData>* aRetVal,
+                             bool aIsSync) override
   {
     mozilla::dom::ContentChild* cc =
       mozilla::dom::ContentChild::GetSingleton();
@@ -2072,11 +2072,11 @@ public:
                               IPC::Principal(aPrincipal), aRetVal);
   }
 
-  virtual nsresult DoSendAsyncMessage(JSContext* aCx,
-                                      const nsAString& aMessage,
-                                      StructuredCloneData& aData,
-                                      JS::Handle<JSObject *> aCpows,
-                                      nsIPrincipal* aPrincipal) override
+  nsresult DoSendAsyncMessage(JSContext* aCx,
+                              const nsAString& aMessage,
+                              StructuredCloneData& aData,
+                              JS::Handle<JSObject *> aCpows,
+                              nsIPrincipal* aPrincipal) override
   {
     mozilla::dom::ContentChild* cc =
       mozilla::dom::ContentChild::GetSingleton();
@@ -2109,7 +2109,7 @@ public:
                                     JS::Handle<JSObject*> aCpows)
     : nsSameProcessAsyncMessageBase(aRootingCx, aCpows)
   { }
-  virtual nsresult HandleMessage() override
+  nsresult HandleMessage() override
   {
     nsFrameMessageManager* ppm = nsFrameMessageManager::sSameProcessParentManager;
     ReceiveMessage(static_cast<nsIContentFrameMessageManager*>(ppm), nullptr, ppm);
@@ -2127,18 +2127,18 @@ public:
   {
     MOZ_COUNT_CTOR(SameChildProcessMessageManagerCallback);
   }
-  virtual ~SameChildProcessMessageManagerCallback()
+  ~SameChildProcessMessageManagerCallback() override
   {
     MOZ_COUNT_DTOR(SameChildProcessMessageManagerCallback);
   }
 
-  virtual bool DoSendBlockingMessage(JSContext* aCx,
-                                     const nsAString& aMessage,
-                                     StructuredCloneData& aData,
-                                     JS::Handle<JSObject *> aCpows,
-                                     nsIPrincipal* aPrincipal,
-                                     nsTArray<StructuredCloneData>* aRetVal,
-                                     bool aIsSync) override
+  bool DoSendBlockingMessage(JSContext* aCx,
+                             const nsAString& aMessage,
+                             StructuredCloneData& aData,
+                             JS::Handle<JSObject *> aCpows,
+                             nsIPrincipal* aPrincipal,
+                             nsTArray<StructuredCloneData>* aRetVal,
+                             bool aIsSync) override
   {
     SameProcessMessageQueue* queue = SameProcessMessageQueue::Get();
     queue->Flush();
@@ -2152,11 +2152,11 @@ public:
     return true;
   }
 
-  virtual nsresult DoSendAsyncMessage(JSContext* aCx,
-                                  const nsAString& aMessage,
-                                  StructuredCloneData& aData,
-                                  JS::Handle<JSObject *> aCpows,
-                                  nsIPrincipal* aPrincipal) override
+  nsresult DoSendAsyncMessage(JSContext* aCx,
+                              const nsAString& aMessage,
+                              StructuredCloneData& aData,
+                              JS::Handle<JSObject *> aCpows,
+                              nsIPrincipal* aPrincipal) override
   {
     SameProcessMessageQueue* queue = SameProcessMessageQueue::Get();
     JS::RootingContext* rcx = JS::RootingContext::get(aCx);
