@@ -102,7 +102,8 @@ DesktopNotification::PostDesktopNotification()
                             EmptyString(),
                             EmptyString(),
                             principal,
-                            inPrivateBrowsing);
+                            inPrivateBrowsing,
+                            false /* requireInteraction */);
   NS_ENSURE_SUCCESS(rv, rv);
   return alerts->ShowAlert(alert, mObserver);
 }
