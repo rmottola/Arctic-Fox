@@ -4992,8 +4992,12 @@ pref("notification.feature.enabled", false);
 
 // Web Notification
 pref("dom.webnotifications.enabled", true);
-#if !defined(RELEASE_OR_BETA)
 pref("dom.webnotifications.serviceworker.enabled", true);
+pref("dom.webnotifications.requireinteraction.count", 3);
+#ifdef NIGHTLY_BUILD
+pref("dom.webnotifications.requireinteraction.enabled", true);
+#else
+pref("dom.webnotifications.requireinteraction.enabled", false);
 #endif
 
 // Alert animation effect, name is disableSlidingEffect for backwards-compat.
