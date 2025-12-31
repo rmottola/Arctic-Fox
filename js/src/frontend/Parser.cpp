@@ -8504,6 +8504,8 @@ Parser<ParseHandler>::arrayInitializer(YieldHandling yieldHandling, PossibleErro
                     modifier = TokenStream::None;
                     break;
                 }
+                if (tt == TOK_TRIPLEDOT && possibleError)
+                    possibleError->setPendingDestructuringError(null(), JSMSG_REST_WITH_COMMA);
             }
         }
 
