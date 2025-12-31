@@ -2608,6 +2608,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
     }
     if (hasArguments) {
         bool hasRest = false;
+        bool hasDefault = false;
         bool duplicatedParam = false;
         bool disallowDuplicateParams = kind == Arrow || kind == Method || kind == ClassConstructor;
         AtomVector& positionalFormals = pc->positionalFormalParameterNames();
@@ -2726,13 +2727,15 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
                     report(ParseError, false, null(), JSMSG_BAD_DUP_ARGS);
                     return false;
                 }
-                if (!funbox->hasParameterExprs) {
-                    funbox->hasParameterExprs = true;
+
+                if (!hasDefault) {
+                    hasDefault = true;
 
                     // The Function.length property is the number of formals
                     // before the first default argument.
                     funbox->length = positionalFormals.length() - 1;
                 }
+                funbox->hasParameterExprs = true;
 
                 Node def_expr = assignExprWithoutYield(yieldHandling, JSMSG_YIELD_IN_DEFAULT);
                 if (!def_expr)
@@ -2766,9 +2769,10 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
             }
         }
 
-        if (!funbox->hasParameterExprs)
+        if (!hasDefault)
             funbox->length = positionalFormals.length() - hasRest;
-        else if (funbox->hasDirectEval())
+
+        if (funbox->hasParameterExprs && funbox->hasDirectEval())
             funbox->hasDirectEvalInParameterExpr = true;
 
         funbox->function()->setArgCount(positionalFormals.length());
