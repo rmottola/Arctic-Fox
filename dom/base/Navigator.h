@@ -84,7 +84,6 @@ class MobileConnectionArray;
 
 class PowerManager;
 class IccManager;
-class Telephony;
 class InputPortManager;
 class DeviceStorageAreaListener;
 class Presentation;
@@ -221,7 +220,6 @@ public:
 
   DesktopNotificationCenter* GetMozNotification(ErrorResult& aRv);
   IccManager* GetMozIccManager(ErrorResult& aRv);
-  Telephony* GetMozTelephony(ErrorResult& aRv);
   InputPortManager* GetInputPortManager(ErrorResult& aRv);
   already_AddRefed<LegacyMozTCPSocket> MozTCPSocket();
   network::Connection* GetConnection(ErrorResult& aRv);
@@ -322,7 +320,6 @@ private:
   RefPtr<Promise> mBatteryPromise;
   RefPtr<PowerManager> mPowerManager;
   RefPtr<IccManager> mIccManager;
-  RefPtr<Telephony> mTelephony;
   RefPtr<InputPortManager> mInputPortManager;
   RefPtr<network::Connection> mConnection;
 #ifdef MOZ_B2G_RIL
