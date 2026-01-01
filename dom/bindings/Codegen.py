@@ -16929,6 +16929,7 @@ class CGEventMethod(CGNativeMember):
             e->InitEvent(${eventType}, ${eventInit}.mBubbles, ${eventInit}.mCancelable);
             $*{members}
             e->SetTrusted(trusted);
+            e->SetComposed(${eventInit}.mComposed);
             $*{holdJS}
             return e.forget();
             """,

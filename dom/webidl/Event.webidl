@@ -43,6 +43,8 @@ interface Event {
   readonly attribute boolean defaultPreventedByChrome;
   [ChromeOnly, Pure]
   readonly attribute boolean defaultPreventedByContent;
+  [Pure]
+  readonly attribute boolean composed;
 
   [Unforgeable, Pure]
   readonly attribute boolean isTrusted;
@@ -71,4 +73,5 @@ partial interface Event {
 dictionary EventInit {
   boolean bubbles = false;
   boolean cancelable = false;
+  boolean composed = false;
 };
