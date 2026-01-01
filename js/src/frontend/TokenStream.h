@@ -439,6 +439,8 @@ class MOZ_STACK_CLASS TokenStream
         {}
     };
 
+    bool awaitIsKeyword = false;
+
   public:
     typedef Token::Modifier Modifier;
     static constexpr Modifier None = Token::None;
