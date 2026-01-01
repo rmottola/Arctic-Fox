@@ -165,9 +165,6 @@
 @RESPATH@/components/dom_wappush.xpt
 @RESPATH@/components/dom_mobileconnection.xpt
 #endif
-#ifdef MOZ_B2G_BT
-@RESPATH@/components/dom_bluetooth.xpt
-#endif
 @RESPATH@/components/dom_canvas.xpt
 @RESPATH@/components/dom_contacts.xpt
 @RESPATH@/components/dom_core.xpt
