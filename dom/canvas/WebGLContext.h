@@ -1846,6 +1846,21 @@ private:
 
 ////
 
+class ScopedLazyBind final
+    : public gl::ScopedGLWrapper<ScopedLazyBind>
+{
+    friend struct gl::ScopedGLWrapper<ScopedLazyBind>;
+
+    const GLenum mTarget;
+    const WebGLBuffer* const mBuf;
+
+public:
+    ScopedLazyBind(gl::GLContext* gl, GLenum target, const WebGLBuffer* buf);
+
+private:
+    void UnwrapImpl();
+};
+
 void
 Intersect(uint32_t srcSize, int32_t dstStartInSrc, uint32_t dstSize,
           uint32_t* const out_intStartInSrc, uint32_t* const out_intStartInDst,
