@@ -599,6 +599,7 @@ class ScriptSourceObject : public NativeObject
 };
 
 enum GeneratorKind { NotGenerator, LegacyGenerator, StarGenerator };
+enum FunctionAsyncKind { SyncFunction, AsyncFunction };
 
 static inline unsigned
 GeneratorKindAsBits(GeneratorKind generatorKind) {
@@ -609,6 +610,17 @@ static inline GeneratorKind
 GeneratorKindFromBits(unsigned val) {
     MOZ_ASSERT(val <= StarGenerator);
     return static_cast<GeneratorKind>(val);
+}
+
+static inline unsigned
+AsyncKindAsBits(FunctionAsyncKind asyncKind) {
+    return static_cast<unsigned>(asyncKind);
+}
+
+static inline FunctionAsyncKind
+AsyncKindFromBits(unsigned val) {
+    MOZ_ASSERT(val <= AsyncFunction);
+    return static_cast<FunctionAsyncKind>(val);
 }
 
 /*
@@ -947,6 +959,8 @@ class JSScript : public js::gc::TenuredCell
     bool isDerivedClassConstructor_:1;
     bool isDefaultClassConstructor_:1;
 
+    bool isAsync_:1;
+
     // Add padding so JSScript is gc::Cell aligned. Make padding protected
     // instead of private to suppress -Wunused-private-field compiler warnings.
   protected:
@@ -1233,6 +1247,14 @@ class JSScript : public js::gc::TenuredCell
         // so it can only transition from not being a generator.
         MOZ_ASSERT(!isGenerator());
         generatorKindBits_ = GeneratorKindAsBits(kind);
+    }
+
+    js::FunctionAsyncKind asyncKind() const {
+        return isAsync_ ? js::AsyncFunction : js::SyncFunction;
+    }
+
+    void setAsyncKind(js::FunctionAsyncKind kind) {
+        isAsync_ = kind == js::AsyncFunction;
     }
 
     void setNeedsHomeObject() {
@@ -1846,7 +1868,8 @@ class LazyScript : public gc::TenuredCell
 
         uint32_t shouldDeclareArguments : 1;
         uint32_t hasThisBinding : 1;
-        uint32_t numClosedOverBindings : 22;
+        uint32_t isAsync : 1;
+        uint32_t numClosedOverBindings : 21;
         uint32_t numInnerFunctions : 20;
 
         uint32_t generatorKindBits : 2;
@@ -1981,6 +2004,14 @@ class LazyScript : public gc::TenuredCell
         // Legacy generators cannot currently be lazy.
         MOZ_ASSERT(kind != LegacyGenerator);
         p_.generatorKindBits = GeneratorKindAsBits(kind);
+    }
+
+    FunctionAsyncKind asyncKind() const {
+        return p_.isAsync ? AsyncFunction : SyncFunction;
+    }
+
+    void setAsyncKind(FunctionAsyncKind kind) {
+        p_.isAsync = kind == AsyncFunction;
     }
 
     bool strict() const {
