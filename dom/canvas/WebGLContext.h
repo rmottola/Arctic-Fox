@@ -1844,8 +1844,6 @@ private:
     void UnwrapImpl();
 };
 
-////
-
 class ScopedLazyBind final
     : public gl::ScopedGLWrapper<ScopedLazyBind>
 {
@@ -1860,6 +1858,8 @@ public:
 private:
     void UnwrapImpl();
 };
+
+////
 
 void
 Intersect(uint32_t srcSize, int32_t dstStartInSrc, uint32_t dstSize,
