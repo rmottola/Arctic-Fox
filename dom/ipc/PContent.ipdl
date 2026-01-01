@@ -41,7 +41,6 @@ include protocol PSendStream;
 include protocol POfflineCacheUpdate;
 include protocol PRenderFrame;
 include protocol PScreenManager;
-include protocol PSms;
 include protocol PSpeechSynthesis;
 include protocol PStorage;
 include protocol PTelephony;
@@ -369,7 +368,6 @@ nested(upto inside_cpow) sync protocol PContent
     manages PPrinting;
     manages PSendStream;
     manages PScreenManager;
-    manages PSms;
     manages PSpeechSynthesis;
     manages PStorage;
     manages PTelephony;
@@ -814,8 +812,6 @@ parent:
         returns (uint32_t numberOfScreens,
                  float systemDefaultScale,
                  bool success);
-
-    async PSms();
 
     async PSpeechSynthesis();
 

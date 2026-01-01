@@ -317,10 +317,6 @@ public:
 
   virtual bool DeallocPHandlerServiceChild(PHandlerServiceChild*) override;
 
-  virtual PSmsChild* AllocPSmsChild() override;
-
-  virtual bool DeallocPSmsChild(PSmsChild*) override;
-
   virtual PTelephonyChild* AllocPTelephonyChild() override;
 
   virtual bool DeallocPTelephonyChild(PTelephonyChild*) override;
