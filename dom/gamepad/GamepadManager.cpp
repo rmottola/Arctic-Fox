@@ -59,8 +59,7 @@ NS_IMPL_ISUPPORTS(GamepadManager, nsIObserver)
 GamepadManager::GamepadManager()
   : mEnabled(false),
     mNonstandardEventsEnabled(false),
-    mShuttingDown(false),
-    mChild(nullptr)
+    mShuttingDown(false)
 {}
 
 nsresult
@@ -105,10 +104,10 @@ GamepadManager::Observe(nsISupports* aSubject,
 void
 GamepadManager::StopMonitoring()
 {
-  if(mChild) {
-    mChild->SendGamepadListenerRemoved();
-    mChild = nullptr;
+  for (uint32_t i = 0; i < mChannelChildren.Length(); ++i) {
+    mChannelChildren[i]->SendGamepadListenerRemoved();
   }
+  mChannelChildren.Clear();
   mGamepads.Clear();
 }
 
@@ -143,9 +142,10 @@ GamepadManager::AddListener(nsGlobalWindow* aWindow)
   mListeners.AppendElement(aWindow);
 
   // IPDL child has been created
-  if (mChild) {
+  if (!mChannelChildren.IsEmpty()) {
     return;
   }
+
   PBackgroundChild *actor = BackgroundChild::GetForCurrentThread();
   //Try to get the PBackground Child actor
   if (actor) {
@@ -612,8 +612,11 @@ GamepadManager::ActorCreated(PBackgroundChild *aActor)
     return;
   }
   MOZ_ASSERT(initedChild == child);
-  mChild = child;
-  mChild->SendGamepadListenerAdded();
+  child->SendGamepadListenerAdded();
+  mChannelChildren.AppendElement(child);
+
+  // TODO: Add more event channels to mChannelChildren if you would
+  // like to support more kinds of devices.
 }
 
 //Override nsIIPCBackgroundChildCreateCallback
