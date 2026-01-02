@@ -42,6 +42,7 @@
 #include "vm/Debugger.h"
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
+#include "vm/SelfHosting.h"
 #include "vm/Shape.h"
 #include "vm/SharedImmutableStringsCache.h"
 #include "vm/StringBuffer.h"
@@ -1664,7 +1665,8 @@ const JSFunctionSpec js::function_methods[] = {
 };
 
 static bool
-FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind generatorKind)
+FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind generatorKind,
+                    FunctionAsyncKind asyncKind)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
@@ -1676,7 +1678,10 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
     }
 
     bool isStarGenerator = generatorKind == StarGenerator;
+    bool isAsync = asyncKind == AsyncFunction;
     MOZ_ASSERT(generatorKind != LegacyGenerator);
+    MOZ_ASSERT_IF(isAsync, isStarGenerator);
+    MOZ_ASSERT_IF(!isStarGenerator, !isAsync);
 
     RootedScript maybeScript(cx);
     const char* filename;
@@ -1687,7 +1692,9 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
                                          &mutedErrors);
 
     const char* introductionType = "Function";
-    if (generatorKind != NotGenerator)
+    if (isAsync)
+        introductionType = "AsyncFunction";
+    else if (generatorKind != NotGenerator)
         introductionType = "GeneratorFunction";
 
     const char* introducerFilename = filename;
@@ -1781,6 +1788,8 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
     RootedAtom anonymousAtom(cx, cx->names().anonymous);
     RootedObject proto(cx);
     if (isStarGenerator) {
+        // Unwrapped function of async function should use GeneratorFunction,
+        // while wrapped function isn't generator.
         proto = GlobalObject::getOrCreateStarGeneratorFunctionPrototype(cx, global);
         if (!proto)
             return false;
@@ -1790,10 +1799,11 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
     }
 
     RootedObject globalLexical(cx, &global->lexicalEnvironment());
+    AllocKind allocKind = isAsync ? AllocKind::FUNCTION_EXTENDED : AllocKind::FUNCTION;
     RootedFunction fun(cx, NewFunctionWithProto(cx, nullptr, 0,
                                                 JSFunction::INTERPRETED_LAMBDA, globalLexical,
                                                 anonymousAtom, proto,
-                                                AllocKind::FUNCTION, TenuredObject));
+                                                allocKind, TenuredObject));
     if (!fun)
         return false;
 
@@ -1881,7 +1891,9 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
                                               : SourceBufferHolder::NoOwnership;
     bool ok;
     SourceBufferHolder srcBuf(chars.start().get(), chars.length(), ownership);
-    if (isStarGenerator)
+    if (isAsync)
+        ok = frontend::CompileAsyncFunctionBody(cx, &fun, options, formals, srcBuf);
+    else if (isStarGenerator)
         ok = frontend::CompileStarGeneratorBody(cx, &fun, options, formals, srcBuf);
     else
         ok = frontend::CompileFunctionBody(cx, &fun, options, formals, srcBuf);
@@ -1892,13 +1904,26 @@ FunctionConstructor(JSContext* cx, unsigned argc, Value* vp, GeneratorKind gener
 bool
 js::Function(JSContext* cx, unsigned argc, Value* vp)
 {
-    return FunctionConstructor(cx, argc, vp, NotGenerator);
+    return FunctionConstructor(cx, argc, vp, NotGenerator, SyncFunction);
 }
 
 bool
 js::Generator(JSContext* cx, unsigned argc, Value* vp)
 {
-    return FunctionConstructor(cx, argc, vp, StarGenerator);
+    return FunctionConstructor(cx, argc, vp, StarGenerator, SyncFunction);
+}
+
+bool
+js::AsyncFunctionConstructor(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (!FunctionConstructor(cx, argc, vp, StarGenerator, AsyncFunction))
+        return false;
+
+    FixedInvokeArgs<1> args2(cx);
+    args2[0].set(args.rval());
+    return CallSelfHostedFunction(cx, cx->names().AsyncFunction_wrap,
+                                  NullHandleValue, args2, args.rval());
 }
 
 bool
