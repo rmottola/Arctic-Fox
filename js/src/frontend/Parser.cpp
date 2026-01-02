@@ -3517,22 +3517,27 @@ Parser<ParseHandler>::functionStmt(YieldHandling yieldHandling, DefaultHandling 
 
 template <typename ParseHandler>
 typename ParseHandler::Node
-Parser<ParseHandler>::functionExpr(InvokedPrediction invoked)
+Parser<ParseHandler>::functionExpr(InvokedPrediction invoked, FunctionAsyncKind asyncKind)
 {
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_FUNCTION));
 
-    GeneratorKind generatorKind = NotGenerator;
+    AutoAwaitIsKeyword awaitIsKeyword(&tokenStream, asyncKind == AsyncFunction);
+    GeneratorKind generatorKind = asyncKind == AsyncFunction ? StarGenerator : NotGenerator;
     TokenKind tt;
     if (!tokenStream.getToken(&tt))
         return null();
 
     if (tt == TOK_MUL) {
+        if (asyncKind != SyncFunction) {
+            report(ParseError, false, null(), JSMSG_ASYNC_GENERATOR);
+            return null();
+        }
         generatorKind = StarGenerator;
         if (!tokenStream.getToken(&tt))
             return null();
     }
 
-    YieldHandling yieldHandling = GetYieldHandling(generatorKind, SyncFunction);
+    YieldHandling yieldHandling = GetYieldHandling(generatorKind, asyncKind);
 
     RootedPropertyName name(context);
     if (tt == TOK_NAME || tt == TOK_YIELD) {
@@ -3544,7 +3549,7 @@ Parser<ParseHandler>::functionExpr(InvokedPrediction invoked)
     }
 
     return functionDefinition(InAllowed, yieldHandling, name, Expression, generatorKind,
-                              SyncFunction, invoked);
+                              asyncKind, invoked);
 }
 
 /*
@@ -9233,6 +9238,17 @@ Parser<ParseHandler>::primaryExpr(YieldHandling yieldHandling, TripledotHandling
 
       case TOK_YIELD:
       case TOK_NAME: {
+        if (tokenStream.currentName() == context->names().async) {
+            TokenKind nextSameLine = TOK_EOF;
+            if (!tokenStream.peekTokenSameLine(&nextSameLine))
+                return null();
+
+            if (nextSameLine == TOK_FUNCTION) {
+                tokenStream.consumeKnownToken(TOK_FUNCTION);
+                return functionExpr(PredictUninvoked, AsyncFunction);
+            }
+        }
+
         Rooted<PropertyName*> name(context, identifierReference(yieldHandling));
         if (!name)
             return null();
