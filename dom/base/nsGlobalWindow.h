@@ -1446,6 +1446,7 @@ public:
   // |interval| is in milliseconds.
   nsresult SetTimeoutOrInterval(nsITimeoutHandler* aHandler,
                                 int32_t interval, bool aIsInterval,
+                                mozilla::dom::Timeout::Reason aReason,
                                 int32_t* aReturn);
   int32_t SetTimeoutOrInterval(JSContext* aCx,
                                mozilla::dom::Function& aFunction,
@@ -1455,7 +1456,8 @@ public:
   int32_t SetTimeoutOrInterval(JSContext* aCx, const nsAString& aHandler,
                                int32_t aTimeout, bool aIsInterval,
                                mozilla::ErrorResult& aError);
-  void ClearTimeoutOrInterval(int32_t aTimerId);
+  void ClearTimeoutOrInterval(int32_t aTimerId,
+                              mozilla::dom::Timeout::Reason aReason);
 
   // JS specific timeout functions (JS args grabbed from context).
   nsresult ResetTimersForNonBackgroundWindow();
@@ -1474,6 +1476,7 @@ public:
   // fire after it, but no earlier than mTimeoutInsertionPoint, if any.
   void InsertTimeoutIntoList(mozilla::dom::Timeout* aTimeout);
   static void TimerCallback(nsITimer *aTimer, void *aClosure);
+  uint32_t GetTimeoutId(mozilla::dom::Timeout::Reason aReason);
 
   // Helper Functions
   already_AddRefed<nsIDocShellTreeOwner> GetTreeOwner();
@@ -1809,7 +1812,7 @@ protected:
   // This is a dummy timeout at the moment; if that ever changes, the logic in
   // ResetTimersForNonBackgroundWindow needs to change.
   mozilla::dom::Timeout*      mTimeoutInsertionPoint;
-  uint32_t                    mTimeoutPublicIdCounter;
+  uint32_t                    mTimeoutIdCounter;
   uint32_t                    mTimeoutFiringDepth;
   RefPtr<mozilla::dom::Location> mLocation;
   RefPtr<nsHistory>           mHistory;
@@ -1829,6 +1832,8 @@ protected:
 
   uint32_t mSerial;
 
+   // The current idle request callback timeout handle
+  uint32_t mIdleCallbackTimeoutCounter;
 #ifdef DEBUG
   bool mSetOpenerWindowCalled;
   nsCOMPtr<nsIURI> mLastOpenedURI;
