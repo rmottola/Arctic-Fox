@@ -1963,6 +1963,7 @@ Parser<FullParseHandler>::moduleBody(ModuleSharedContext* modulesc)
     if (!mn)
         return null();
 
+    AutoAwaitIsKeyword awaitIsKeyword(&tokenStream, true);
     ParseNode* pn = statementList(YieldIsKeyword);
     if (!pn)
         return null();
