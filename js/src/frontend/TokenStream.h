@@ -241,8 +241,7 @@ struct Token
 
 struct CompileError {
     JSErrorReport report;
-    char* message;
-    CompileError() : message(nullptr) {}
+    CompileError() {}
     ~CompileError();
     void throwError(JSContext* cx);
 
