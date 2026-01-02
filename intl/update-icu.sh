@@ -69,6 +69,14 @@ for patch in \
   patch -d ${icu_dir}/../../ -p1 --no-backup-if-mismatch < ${icu_dir}/../icu-patches/$patch
 done
 
-# NOTE: If you're updating this script for a new ICU version, you have to rerun
-# js/src/tests/ecma_6/String/make-normalize-generateddata-input.py for any
-# normalization changes the new ICU implements.
+topsrcdir=`dirname $0`/../
+python ${topsrcdir}/js/src/tests/ecma_6/String/make-normalize-generateddata-input.py $topsrcdir
+
+# Update our moz.build files in config/external/icu, and
+# build a new ICU data file.
+python `dirname $0`/icu_sources_data.py $topsrcdir
+
+hg addremove ${icu_dir} ${topsrcdir}/config/external/icu
+
+# Check local tzdata version.
+`dirname $0`/update-tzdata.sh -c
