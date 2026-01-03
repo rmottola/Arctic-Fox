@@ -8412,6 +8412,8 @@ BytecodeEmitter::emitConditionalExpression(ConditionalExpression& conditional)
         return false;
     if (!emitJumpTargetAndPatch(beq))
         return false;
+    if (!setSrcNoteOffset(noteIndex, 0, jmp.offset - beq.offset))
+        return false;
 
     /*
      * Because each branch pushes a single value, but our stack budgeting
@@ -8428,7 +8430,8 @@ BytecodeEmitter::emitConditionalExpression(ConditionalExpression& conditional)
         return false;
     if (!emitJumpTargetAndPatch(jmp))
         return false;
-    return setSrcNoteOffset(noteIndex, 0, jmp.offset - beq.offset);
+
+    return true;
 }
 
 bool
