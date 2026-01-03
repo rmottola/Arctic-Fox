@@ -5166,6 +5166,10 @@ IonBuilder::inlineScriptedCall(CallInfo& callInfo, JSFunction* target)
     MOZ_ASSERT(target->hasScript());
     MOZ_ASSERT(IsIonInlinablePC(pc));
 
+    MBasicBlock::BackupPoint backup(current);
+    if (!backup.init(alloc()))
+        return InliningStatus_Error;
+
     callInfo.setImplicitlyUsedUnchecked();
 
     // Ensure sufficient space in the slots: needed for inlining from FUNAPPLY.
@@ -5251,9 +5255,8 @@ IonBuilder::inlineScriptedCall(CallInfo& callInfo, JSFunction* target)
         // the inlining was aborted for a non-exception reason.
         if (inlineBuilder.abortReason_ == AbortReason_Disable) {
             calleeScript->setUninlineable();
-            abortReason_ = AbortReason_Inlining;
-        } else if (inlineBuilder.abortReason_ == AbortReason_Inlining) {
-            abortReason_ = AbortReason_Inlining;
+            current = backup.restore();
+            return InliningStatus_NotInlined;
         } else if (inlineBuilder.abortReason_ == AbortReason_Alloc) {
             abortReason_ = AbortReason_Alloc;
         } else if (inlineBuilder.abortReason_ == AbortReason_PreliminaryObjects) {
@@ -5282,8 +5285,8 @@ IonBuilder::inlineScriptedCall(CallInfo& callInfo, JSFunction* target)
     if (returns.empty()) {
         // Inlining of functions that have no exit is not supported.
         calleeScript->setUninlineable();
-        abortReason_ = AbortReason_Inlining;
-        return InliningStatus_Error;
+        current = backup.restore();
+        return InliningStatus_NotInlined;
     }
     MDefinition* retvalDefn = patchInlinedReturns(callInfo, returns, returnBlock);
     if (!retvalDefn)
@@ -6075,7 +6078,6 @@ IonBuilder::inlineCalls(CallInfo& callInfo, const ObjectVector& targets, BoolVec
 
         // Natives may veto inlining.
         if (status == InliningStatus_NotInlined) {
-            MOZ_ASSERT(target->isNative());
             MOZ_ASSERT(current == inlineBlock);
             graph().removeBlock(inlineBlock);
             choiceSet[i] = false;
