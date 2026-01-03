@@ -280,7 +280,7 @@ namespace jit {
     _(WasmTrap)                                                             \
     _(WasmTruncateToInt32)                                                  \
     _(AsmJSNeg)                                                             \
-    _(AsmJSUnsignedToDouble)                                                \
+    _(WasmUnsignedToDouble)                                                 \
     _(AsmJSUnsignedToFloat32)                                               \
     _(AsmJSLoadHeap)                                                        \
     _(AsmJSStoreHeap)                                                       \
