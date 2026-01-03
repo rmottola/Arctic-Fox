@@ -13905,18 +13905,18 @@ class MWasmStoreGlobalVar
     }
 };
 
-class MAsmJSParameter : public MNullaryInstruction
+class MWasmParameter : public MNullaryInstruction
 {
     ABIArg abi_;
 
-    MAsmJSParameter(ABIArg abi, MIRType mirType)
+    MWasmParameter(ABIArg abi, MIRType mirType)
       : abi_(abi)
     {
         setResultType(mirType);
     }
 
   public:
-    INSTRUCTION_HEADER(AsmJSParameter)
+    INSTRUCTION_HEADER(WasmParameter)
     TRIVIAL_NEW_WRAPPERS
 
     ABIArg abi() const { return abi_; }
@@ -13949,11 +13949,11 @@ class MWasmReturnVoid
     TRIVIAL_NEW_WRAPPERS
 };
 
-class MAsmJSPassStackArg
+class MWasmStackArg
   : public MUnaryInstruction,
     public NoTypePolicy::Data
 {
-    MAsmJSPassStackArg(uint32_t spOffset, MDefinition* ins)
+    MWasmStackArg(uint32_t spOffset, MDefinition* ins)
       : MUnaryInstruction(ins),
         spOffset_(spOffset)
     {}
@@ -13961,7 +13961,7 @@ class MAsmJSPassStackArg
     uint32_t spOffset_;
 
   public:
-    INSTRUCTION_HEADER(AsmJSPassStackArg)
+    INSTRUCTION_HEADER(WasmStackArg)
     TRIVIAL_NEW_WRAPPERS
     NAMED_OPERANDS((0, arg))
 
