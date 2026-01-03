@@ -2103,6 +2103,9 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_TYPEOFEXPR:
         return jsop_typeof();
 
+      case JSOP_TOASYNC:
+        return jsop_toasync();
+
       case JSOP_TOID:
         return jsop_toid();
 
@@ -13520,6 +13523,20 @@ IonBuilder::jsop_typeof()
     current->push(ins);
 
     return true;
+}
+
+bool
+IonBuilder::jsop_toasync()
+{
+    MDefinition* unwrapped = current->pop();
+    MOZ_ASSERT(unwrapped->type() == MIRType::Object);
+
+    MToAsync* ins = MToAsync::New(alloc(), unwrapped);
+
+    current->add(ins);
+    current->push(ins);
+
+    return resumeAfter(ins);
 }
 
 bool
