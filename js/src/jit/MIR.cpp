@@ -425,12 +425,6 @@ AliasSet::Name(size_t flag)
     }
 }
 
-MTest*
-MTest::NewAsm(TempAllocator& alloc, MDefinition* ins, MBasicBlock* ifFalse)
-{
-    return new(alloc) MTest(ins, nullptr, ifFalse);
-}
-
 void
 MTest::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
 {
@@ -783,7 +777,7 @@ MConstant::NewInt64(TempAllocator& alloc, int64_t i)
 }
 
 MConstant*
-MConstant::NewAsmJS(TempAllocator& alloc, const Value& v, MIRType type)
+MConstant::New(TempAllocator& alloc, const Value& v, MIRType type)
 {
     if (type == MIRType::Float32)
         return NewFloat32(alloc, v.toNumber());
@@ -2101,20 +2095,6 @@ MRound::trySpecializeFloat32(TempAllocator& alloc)
         specialization_ = MIRType::Float32;
 }
 
-MCompare*
-MCompare::NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right, JSOp op,
-                   CompareType compareType)
-{
-    MOZ_ASSERT(compareType == Compare_Int32 || compareType == Compare_UInt32 ||
-               compareType == Compare_Int64 || compareType == Compare_UInt64 ||
-               compareType == Compare_Double || compareType == Compare_Float32);
-    MCompare* comp = new(alloc) MCompare(left, right, op);
-    comp->compareType_ = compareType;
-    comp->operandMightEmulateUndefined_ = false;
-    comp->setResultType(MIRType::Int32);
-    return comp;
-}
-
 MTableSwitch*
 MTableSwitch::New(TempAllocator& alloc, MDefinition* ins, int32_t low, int32_t high)
 {
@@ -2136,7 +2116,7 @@ MGoto::New(TempAllocator::Fallible alloc, MBasicBlock* target)
 }
 
 MGoto*
-MGoto::NewAsm(TempAllocator& alloc)
+MGoto::New(TempAllocator& alloc)
 {
     return new(alloc) MGoto(nullptr);
 }
@@ -3727,7 +3707,7 @@ MCompare::cacheOperandMightEmulateUndefined(CompilerConstraintList* constraints)
 }
 
 MBitNot*
-MBitNot::NewAsmJS(TempAllocator& alloc, MDefinition* input)
+MBitNot::NewInt32(TempAllocator& alloc, MDefinition* input)
 {
     MBitNot* ins = new(alloc) MBitNot(input);
     ins->specialization_ = MIRType::Int32;
@@ -3817,7 +3797,7 @@ MBitAnd::New(TempAllocator& alloc, MDefinition* left, MDefinition* right)
 }
 
 MBitAnd*
-MBitAnd::NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
+MBitAnd::New(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
 {
     MBitAnd* ins = new(alloc) MBitAnd(left, right, type);
     ins->specializeAs(type);
@@ -3831,7 +3811,7 @@ MBitOr::New(TempAllocator& alloc, MDefinition* left, MDefinition* right)
 }
 
 MBitOr*
-MBitOr::NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
+MBitOr::New(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
 {
     MBitOr* ins = new(alloc) MBitOr(left, right, type);
     ins->specializeAs(type);
@@ -3845,7 +3825,7 @@ MBitXor::New(TempAllocator& alloc, MDefinition* left, MDefinition* right)
 }
 
 MBitXor*
-MBitXor::NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
+MBitXor::New(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
 {
     MBitXor* ins = new(alloc) MBitXor(left, right, type);
     ins->specializeAs(type);
@@ -3859,7 +3839,7 @@ MLsh::New(TempAllocator& alloc, MDefinition* left, MDefinition* right)
 }
 
 MLsh*
-MLsh::NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
+MLsh::New(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
 {
     MLsh* ins = new(alloc) MLsh(left, right, type);
     ins->specializeAs(type);
@@ -3873,7 +3853,7 @@ MRsh::New(TempAllocator& alloc, MDefinition* left, MDefinition* right)
 }
 
 MRsh*
-MRsh::NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
+MRsh::New(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
 {
     MRsh* ins = new(alloc) MRsh(left, right, type);
     ins->specializeAs(type);
@@ -3887,7 +3867,7 @@ MUrsh::New(TempAllocator& alloc, MDefinition* left, MDefinition* right)
 }
 
 MUrsh*
-MUrsh::NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
+MUrsh::New(TempAllocator& alloc, MDefinition* left, MDefinition* right, MIRType type)
 {
     MUrsh* ins = new(alloc) MUrsh(left, right, type);
     ins->specializeAs(type);
@@ -5546,7 +5526,7 @@ MWasmUnsignedToFloat32::foldsTo(TempAllocator& alloc)
     if (input()->isConstant() && input()->type() == MIRType::Int32) {
         double dval = double(uint32_t(input()->toConstant()->toInt32()));
         if (IsFloat32Representable(dval))
-            return MConstant::NewAsmJS(alloc, JS::Float32Value(float(dval)), MIRType::Float32);
+            return MConstant::New(alloc, JS::Float32Value(float(dval)), MIRType::Float32);
     }
 
     return this;

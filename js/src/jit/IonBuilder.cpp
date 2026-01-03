@@ -14354,8 +14354,8 @@ IonBuilder::loadTypedObjectElements(MDefinition* typedObj,
         *ownerScaledOffset = ConvertLinearSum(alloc(), current, ownerByteOffset);
     } else {
         MDefinition* unscaledOffset = ConvertLinearSum(alloc(), current, ownerByteOffset);
-        *ownerScaledOffset = MDiv::NewAsmJS(alloc(), unscaledOffset, constantInt(scale),
-                                            MIRType::Int32, /* unsigned = */ false);
+        *ownerScaledOffset = MDiv::New(alloc(), unscaledOffset, constantInt(scale),
+                                       MIRType::Int32, /* unsigned = */ false);
         current->add((*ownerScaledOffset)->toInstruction());
     }
 }
