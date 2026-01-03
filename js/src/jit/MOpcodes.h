@@ -286,9 +286,9 @@ namespace jit {
     _(AsmJSStoreHeap)                                                       \
     _(WasmLoadGlobalVar)                                                    \
     _(WasmStoreGlobalVar)                                                   \
-    _(AsmJSReturn)                                                          \
+    _(WasmReturn)                                                           \
+    _(WasmReturnVoid)                                                       \
     _(AsmJSParameter)                                                       \
-    _(AsmJSVoidReturn)                                                      \
     _(AsmJSPassStackArg)                                                    \
     _(WasmCall)                                                             \
     _(WasmSelect)                                                           \
