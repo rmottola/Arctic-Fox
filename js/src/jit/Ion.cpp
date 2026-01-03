@@ -2365,19 +2365,19 @@ CheckScript(JSContext* cx, JSScript* script, bool osr)
         return false;
     }
 
-    if (script->nTypeSets() >= UINT16_MAX) {
-        // In this case multiple bytecode ops can share a single observed
-        // TypeSet (see bug 1303710).
-        TrackAndSpewIonAbort(cx, script, "too many typesets");
-        return false;
-    }
-
     if (script->functionHasExtraBodyVarScope() &&
         script->functionExtraBodyVarScope()->hasEnvironment())
     {
         // This restriction will be lifted when intra-function scope chains
         // are compilable by Ion. See bug 1273858.
         TrackAndSpewIonAbort(cx, script, "has extra var environment");
+        return false;
+    }
+
+    if (script->nTypeSets() >= UINT16_MAX) {
+        // In this case multiple bytecode ops can share a single observed
+        // TypeSet (see bug 1303710).
+        TrackAndSpewIonAbort(cx, script, "too many typesets");
         return false;
     }
 
