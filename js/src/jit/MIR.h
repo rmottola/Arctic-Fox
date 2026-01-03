@@ -14055,11 +14055,11 @@ class MWasmCall final
     }
 };
 
-class MAsmSelect
+class MWasmSelect
   : public MTernaryInstruction,
     public NoTypePolicy::Data
 {
-    MAsmSelect(MDefinition* trueExpr, MDefinition* falseExpr, MDefinition *condExpr)
+    MWasmSelect(MDefinition* trueExpr, MDefinition* falseExpr, MDefinition *condExpr)
       : MTernaryInstruction(trueExpr, falseExpr, condExpr)
     {
         MOZ_ASSERT(condExpr->type() == MIRType::Int32);
@@ -14069,7 +14069,7 @@ class MAsmSelect
     }
 
   public:
-    INSTRUCTION_HEADER(AsmSelect)
+    INSTRUCTION_HEADER(WasmSelect)
     TRIVIAL_NEW_WRAPPERS
     NAMED_OPERANDS((0, trueExpr), (1, falseExpr), (2, condExpr))
 
@@ -14081,7 +14081,7 @@ class MAsmSelect
         return congruentIfOperandsEqual(ins);
     }
 
-    ALLOW_CLONE(MAsmSelect)
+    ALLOW_CLONE(MWasmSelect)
 };
 
 class MWasmReinterpret
