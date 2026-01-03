@@ -292,7 +292,7 @@ namespace jit {
     _(AsmJSPassStackArg)                                                    \
     _(WasmCall)                                                             \
     _(AsmSelect)                                                            \
-    _(AsmReinterpret)                                                       \
+    _(WasmReinterpret)                                                      \
     _(Rotate)                                                               \
     _(NewDerivedTypedObject)                                                \
     _(RecompileCheck)                                                       \
@@ -307,7 +307,7 @@ namespace jit {
     _(NewTarget)                                                            \
     _(ArrowNewTarget)                                                       \
     _(CheckReturn)                                                          \
-    _(CheckIsObj)                                                             \
+    _(CheckIsObj)                                                           \
     _(CheckObjCoercible)                                                    \
     _(DebugCheckSelfHosted)
 
