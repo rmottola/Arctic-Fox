@@ -2859,7 +2859,7 @@ MacroAssembler::wasmEmitTrapOutOfLineCode()
             break;
           }
           case wasm::TrapSite::MemoryAccess: {
-            append(wasm::MemoryAccess(site.codeOffset, size()));
+            append(wasm::MemoryAccess(site.codeOffset, currentOffset()));
             break;
           }
         }
@@ -2882,8 +2882,7 @@ MacroAssembler::wasmEmitTrapOutOfLineCode()
             // by the wasm::CallSite to allow unwinding this frame.
             setFramePushed(site.framePushed);
 
-            // Align the stack for a nullary call. The call does not return so
-            // there's no need to emit a corresponding increment.
+            // Align the stack for a nullary call.
             size_t alreadyPushed = sizeof(AsmJSFrame) + framePushed();
             size_t toPush = ABIArgGenerator().stackBytesConsumedSoFar();
             if (size_t dec = StackDecrementForCall(ABIStackAlignment, alreadyPushed, toPush))
@@ -2897,12 +2896,12 @@ MacroAssembler::wasmEmitTrapOutOfLineCode()
             // the trapping instruction.
             wasm::CallSiteDesc desc(site.bytecodeOffset, wasm::CallSiteDesc::TrapExit);
             call(desc, site.trap);
+        }
 
 #ifdef DEBUG
-            // Traps do not return.
-            breakpoint();
+        // Traps do not return, so no need to freeStack().
+        breakpoint();
 #endif
-        }
     }
 
     // Ensure that the return address of the last emitted call above is always
