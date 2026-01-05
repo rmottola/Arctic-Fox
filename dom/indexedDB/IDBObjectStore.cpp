@@ -1796,7 +1796,6 @@ IDBObjectStore::GetKeyPath(JSContext* aCx,
                            ErrorResult& aRv)
 {
   if (!mCachedKeyPath.isUndefined()) {
-    JS::ExposeValueToActiveJS(mCachedKeyPath);
     aResult.set(mCachedKeyPath);
     return;
   }
@@ -1811,7 +1810,6 @@ IDBObjectStore::GetKeyPath(JSContext* aCx,
     mRooted = true;
   }
 
-  JS::ExposeValueToActiveJS(mCachedKeyPath);
   aResult.set(mCachedKeyPath);
 }
 

@@ -1186,7 +1186,6 @@ ExtendableMessageEvent::GetData(JSContext* aCx,
                                 JS::MutableHandle<JS::Value> aData,
                                 ErrorResult& aRv)
 {
-  JS::ExposeValueToActiveJS(mData);
   aData.set(mData);
   if (!JS_WrapValue(aCx, aData)) {
     aRv.Throw(NS_ERROR_FAILURE);
