@@ -1031,21 +1031,6 @@ BaselineCacheIRCompiler::emitLoadProto()
 }
 
 bool
-BaselineCacheIRCompiler::emitLoadUnboxedExpando()
-{
-    Register obj = allocator.useRegister(masm, reader.objOperandId());
-    Register output = allocator.defineRegister(masm, reader.objOperandId());
-
-    FailurePath* failure;
-    if (!addFailurePath(&failure))
-        return false;
-
-    Address expandoAddr(obj, UnboxedPlainObject::offsetOfExpando());
-    masm.loadPtr(expandoAddr, output);
-    return true;
-}
-
-bool
 BaselineCacheIRCompiler::init(CacheKind kind)
 {
     size_t numInputs = writer_.numInputOperands();
