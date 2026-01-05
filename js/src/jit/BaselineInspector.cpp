@@ -808,9 +808,13 @@ GetCacheIRExpectedInputType(ICCacheIR_Monitored* stub)
 {
     CacheIRReader reader(stub->stubInfo());
 
-    // For now, all CacheIR stubs expect an object.
-    MOZ_ALWAYS_TRUE(reader.matchOp(CacheOp::GuardIsObject, ObjOperandId(0)));
-    return MIRType::Object;
+    if (reader.matchOp(CacheOp::GuardIsObject, ValOperandId(0)))
+        return MIRType::Object;
+    if (reader.matchOp(CacheOp::GuardType, ValOperandId(0))) {
+        JSValueType type = reader.valueType();
+        return MIRTypeFromValueType(type);
+    }
+    MOZ_CRASH("Unexpected instruction");
 }
 
 MIRType
@@ -862,10 +866,6 @@ BaselineInspector::expectedPropertyAccessInputType(jsbytecode* pc)
           case ICStub::GetElem_TypedArray:
           case ICStub::GetElem_UnboxedArray:
             stubType = MIRType::Object;
-            break;
-
-          case ICStub::GetProp_Primitive:
-            stubType = MIRTypeFromValueType(stub->toGetProp_Primitive()->primitiveType());
             break;
 
           case ICStub::GetProp_StringLength:
