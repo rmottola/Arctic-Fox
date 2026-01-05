@@ -6779,6 +6779,9 @@ IonBuilder::jsop_call(uint32_t argc, bool constructing)
     if (status == InliningStatus_Error)
         return false;
 
+    // Discard unreferenced & pre-allocated resume points.
+    replaceMaybeFallbackFunctionGetter(nullptr);
+
     // No inline, just make the call.
     JSFunction* target = nullptr;
     if (targets.length() == 1 && targets[0]->is<JSFunction>())
