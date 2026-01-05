@@ -169,7 +169,7 @@ CodeGenerator::CodeGenerator(MIRGenerator* gen, LIRGraph* graph, MacroAssembler*
 
 CodeGenerator::~CodeGenerator()
 {
-    MOZ_ASSERT_IF(!gen->compilingAsmJS(), masm.numAsmJSAbsoluteAddresses() == 0);
+    MOZ_ASSERT_IF(!gen->compilingWasm(), masm.numAsmJSAbsoluteAddresses() == 0);
     js_delete(scriptCounts_);
 }
 
@@ -5064,7 +5064,7 @@ CodeGenerator::generateBody()
 
 #if defined(JS_ION_PERF)
     PerfSpewer* perfSpewer = &perfSpewer_;
-    if (gen->compilingAsmJS())
+    if (gen->compilingWasm())
         perfSpewer = &gen->perfSpewer();
 #endif
 
@@ -6734,7 +6734,7 @@ CodeGenerator::visitModD(LModD* ins)
     masm.passABIArg(lhs, MoveOp::DOUBLE);
     masm.passABIArg(rhs, MoveOp::DOUBLE);
 
-    if (gen->compilingAsmJS())
+    if (gen->compilingWasm())
         masm.callWithABI(wasm::SymbolicAddress::ModD, MoveOp::DOUBLE);
     else
         masm.callWithABI(JS_FUNC_TO_DATA_PTR(void*, NumberMod), MoveOp::DOUBLE);
@@ -11733,7 +11733,7 @@ CodeGenerator::visitInterruptCheck(LInterruptCheck* lir)
 void
 CodeGenerator::visitWasmTrap(LWasmTrap* lir)
 {
-    MOZ_ASSERT(gen->compilingAsmJS());
+    MOZ_ASSERT(gen->compilingWasm());
     const MWasmTrap* mir = lir->mir();
 
     masm.jump(trap(mir, mir->trap()));
