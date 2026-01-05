@@ -717,7 +717,7 @@ BaselineInspector::commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shap
     MOZ_ASSERT(receivers.empty());
     MOZ_ASSERT(convertUnboxedGroups.empty());
 
-    *holder = nullptr;
+    *commonGetter = nullptr;
     const ICEntry& entry = icEntryFromPC(pc);
 
     for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
@@ -730,8 +730,8 @@ BaselineInspector::commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shap
             if (!isOwn && !AddReceiver(nstub->receiverGuard(), receivers, convertUnboxedGroups))
                 return false;
 
-            if (!*holder) {
-                *holder = nstub->holder();
+            if (!*commonGetter) {
+                *holder = isOwn ? nullptr : nstub->holder().get();
                 *holderShape = nstub->holderShape();
                 *commonGetter = nstub->getter();
                 *globalShape = GlobalShapeForGetPropFunction(nstub);
@@ -756,9 +756,10 @@ BaselineInspector::commonGetPropFunction(jsbytecode* pc, JSObject** holder, Shap
         }
     }
 
-    if (!*holder)
+    if (!*commonGetter)
         return false;
 
+    MOZ_ASSERT(*isOwnProperty == !*holder);
     MOZ_ASSERT(*isOwnProperty == (receivers.empty() && convertUnboxedGroups.empty()));
     return true;
 }
@@ -775,7 +776,7 @@ BaselineInspector::commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shap
     MOZ_ASSERT(receivers.empty());
     MOZ_ASSERT(convertUnboxedGroups.empty());
 
-    *holder = nullptr;
+    *commonSetter = nullptr;
     const ICEntry& entry = icEntryFromPC(pc);
 
     for (ICStub* stub = entry.firstStub(); stub; stub = stub->next()) {
@@ -785,8 +786,8 @@ BaselineInspector::commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shap
             if (!isOwn && !AddReceiver(nstub->receiverGuard(), receivers, convertUnboxedGroups))
                 return false;
 
-            if (!*holder) {
-                *holder = nstub->holder();
+            if (!*commonSetter) {
+                *holder = isOwn ? nullptr : nstub->holder().get();
                 *holderShape = nstub->holderShape();
                 *commonSetter = nstub->setter();
                 *isOwnProperty = isOwn;
@@ -803,9 +804,10 @@ BaselineInspector::commonSetPropFunction(jsbytecode* pc, JSObject** holder, Shap
         }
     }
 
-    if (!*holder)
+    if (!*commonSetter)
         return false;
 
+    MOZ_ASSERT(*isOwnProperty == !*holder);
     return true;
 }
 

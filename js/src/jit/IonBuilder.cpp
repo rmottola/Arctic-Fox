@@ -11131,6 +11131,7 @@ IonBuilder::testCommonGetterSetter(TemporaryTypeSet* types, PropertyName* name,
                                    Shape* globalShape/* = nullptr*/,
                                    MDefinition** globalGuard/* = nullptr */)
 {
+    MOZ_ASSERT(foundProto);
     MOZ_ASSERT_IF(globalShape, globalGuard);
     bool guardGlobal;
 
@@ -12117,7 +12118,7 @@ IonBuilder::addShapeGuardsForGetterSetter(MDefinition* obj, JSObject* holder, Sh
                 const BaselineInspector::ObjectGroupVector& convertUnboxedGroups,
                 bool isOwnProperty)
 {
-    MOZ_ASSERT(holder);
+    MOZ_ASSERT(isOwnProperty == !holder);
     MOZ_ASSERT(holderShape);
 
     obj = convertUnboxedObjects(obj, convertUnboxedGroups);
@@ -12156,13 +12157,17 @@ IonBuilder::getPropTryCommonGetter(bool* emitted, MDefinition* obj, PropertyName
     TemporaryTypeSet* objTypes = obj->resultTypeSet();
     MDefinition* guard = nullptr;
     MDefinition* globalGuard = nullptr;
-    bool canUseTIForGetter =
-        testCommonGetterSetter(objTypes, name, /* isGetter = */ true,
-                               foundProto, lastProperty, commonGetter, &guard,
-                               globalShape, &globalGuard);
+    bool canUseTIForGetter = false;
+    if (!isOwnProperty) {
+        // If it's not an own property, try to use TI to avoid shape guards.
+        // For own properties we use the path below.
+        canUseTIForGetter = testCommonGetterSetter(objTypes, name, /* isGetter = */ true,
+                                                   foundProto, lastProperty, commonGetter, &guard,
+                                                   globalShape, &globalGuard);
+    }
     if (!canUseTIForGetter) {
-        // If type information is bad, we can still optimize the getter if we
-        // shape guard.
+        // If it's an own property or type information is bad, we can still
+        // optimize the getter if we shape guard.
         obj = addShapeGuardsForGetterSetter(obj, foundProto, lastProperty,
                                             receivers, convertUnboxedGroups,
                                             isOwnProperty);
@@ -12727,12 +12732,16 @@ IonBuilder::setPropTryCommonSetter(bool* emitted, MDefinition* obj,
 
     TemporaryTypeSet* objTypes = obj->resultTypeSet();
     MDefinition* guard = nullptr;
-    bool canUseTIForSetter =
-        testCommonGetterSetter(objTypes, name, /* isGetter = */ false,
-                               foundProto, lastProperty, commonSetter, &guard);
+    bool canUseTIForSetter = false;
+    if (!isOwnProperty) {
+        // If it's not an own property, try to use TI to avoid shape guards.
+        // For own properties we use the path below.
+        canUseTIForSetter = testCommonGetterSetter(objTypes, name, /* isGetter = */ false,
+                                                   foundProto, lastProperty, commonSetter, &guard);
+    }
     if (!canUseTIForSetter) {
-        // If type information is bad, we can still optimize the setter if we
-        // shape guard.
+        // If it's an own property or type information is bad, we can still
+        // optimize the setter if we shape guard.
         obj = addShapeGuardsForGetterSetter(obj, foundProto, lastProperty,
                                             receivers, convertUnboxedGroups,
                                             isOwnProperty);
