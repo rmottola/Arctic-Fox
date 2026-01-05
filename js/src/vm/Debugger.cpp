@@ -2783,10 +2783,10 @@ Debugger::updateObservesAsmJSOnDebuggees(IsObserving observing)
         GlobalObject* global = r.front();
         JSCompartment* comp = global->compartment();
 
-        if (comp->debuggerObservesWasm() == observing)
+        if (comp->debuggerObservesAsmJS() == observing)
             continue;
 
-        comp->updateDebuggerObservesWasm();
+        comp->updateDebuggerObservesAsmJS();
     }
 }
 
@@ -3479,7 +3479,7 @@ Debugger::setAllowUnobservedAsmJS(JSContext* cx, unsigned argc, Value* vp)
     for (WeakGlobalObjectSet::Range r = dbg->debuggees.all(); !r.empty(); r.popFront()) {
         GlobalObject* global = r.front();
         JSCompartment* comp = global->compartment();
-        comp->updateDebuggerObservesWasm();
+        comp->updateDebuggerObservesAsmJS();
     }
 
     args.rval().setUndefined();
@@ -3931,7 +3931,7 @@ Debugger::addDebuggeeGlobal(JSContext* cx, Handle<GlobalObject*> global)
     // (6)
     AutoRestoreCompartmentDebugMode debugModeGuard(debuggeeCompartment);
     debuggeeCompartment->setIsDebuggee();
-    debuggeeCompartment->updateDebuggerObservesWasm();
+    debuggeeCompartment->updateDebuggerObservesAsmJS();
     debuggeeCompartment->updateDebuggerObservesCoverage();
     if (observesAllExecution() && !ensureExecutionObservabilityOfCompartment(cx, debuggeeCompartment))
         return false;
@@ -4047,7 +4047,7 @@ Debugger::removeDebuggeeGlobal(FreeOp* fop, GlobalObject* global,
         global->compartment()->unsetIsDebuggee();
     } else {
         global->compartment()->updateDebuggerObservesAllExecution();
-        global->compartment()->updateDebuggerObservesWasm();
+        global->compartment()->updateDebuggerObservesAsmJS();
         global->compartment()->updateDebuggerObservesCoverage();
     }
 }
