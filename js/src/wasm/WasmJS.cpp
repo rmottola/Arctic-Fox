@@ -46,9 +46,6 @@ using mozilla::Nothing;
 bool
 wasm::HasCompilerSupport(ExclusiveContext* cx)
 {
-    if (!cx->options().wasm())
-        return false;
-
     if (gc::SystemPageSize() > wasm::PageSize)
         return false;
 
@@ -73,6 +70,12 @@ wasm::HasCompilerSupport(ExclusiveContext* cx)
 #else
     return true;
 #endif
+}
+
+bool
+wasm::HasSupport(ExclusiveContext* cx)
+{
+    return cx->options().wasm() && HasCompilerSupport(cx);
 }
 
 // ============================================================================
@@ -1620,7 +1623,7 @@ InitErrorClass(JSContext* cx, HandleObject wasm, const char* name, JSExnType exn
 JSObject*
 js::InitWebAssemblyClass(JSContext* cx, HandleObject obj)
 {
-    MOZ_RELEASE_ASSERT(HasCompilerSupport(cx));
+    MOZ_RELEASE_ASSERT(HasSupport(cx));
 
     Handle<GlobalObject*> global = obj.as<GlobalObject>();
     MOZ_ASSERT(!global->isStandardClassResolved(JSProto_WebAssembly));
