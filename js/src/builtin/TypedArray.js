@@ -1575,3 +1575,4 @@ function ArrayBufferSpecies() {
     // Step 1.
     return this;
 }
+_SetCanonicalName(ArrayBufferSpecies, "get [Symbol.species]");
