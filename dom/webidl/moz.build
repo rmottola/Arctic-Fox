@@ -266,6 +266,7 @@ WEBIDL_FILES = [
     'IDBRequest.webidl',
     'IDBTransaction.webidl',
     'IDBVersionChangeEvent.webidl',
+    'IdleDeadline.webidl',
     'IIRFilterNode.webidl',
     'ImageBitmap.webidl',
     'ImageBitmapRenderingContext.webidl',
