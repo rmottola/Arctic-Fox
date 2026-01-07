@@ -138,7 +138,7 @@ int32_t DeviceInfoDS::Init()
 uint32_t DeviceInfoDS::NumberOfDevices()
 {
     ReadLockScoped cs(_apiLock);
-    return GetDeviceInfo(0, 0, 0, 0, 0, 0, 0);
+    return GetDeviceInfo(0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 int32_t DeviceInfoDS::GetDeviceName(
@@ -148,7 +148,8 @@ int32_t DeviceInfoDS::GetDeviceName(
                                        char* deviceUniqueIdUTF8,
                                        uint32_t deviceUniqueIdUTF8Length,
                                        char* productUniqueIdUTF8,
-                                       uint32_t productUniqueIdUTF8Length)
+                                       uint32_t productUniqueIdUTF8Length,
+                                       pid_t* pid)
 {
     ReadLockScoped cs(_apiLock);
     const int32_t result = GetDeviceInfo(deviceNumber, deviceNameUTF8,
@@ -156,7 +157,8 @@ int32_t DeviceInfoDS::GetDeviceName(
                                          deviceUniqueIdUTF8,
                                          deviceUniqueIdUTF8Length,
                                          productUniqueIdUTF8,
-                                         productUniqueIdUTF8Length);
+                                         productUniqueIdUTF8Length,
+                                         pid);
     return result > (int32_t) deviceNumber ? 0 : -1;
 }
 
@@ -167,7 +169,8 @@ int32_t DeviceInfoDS::GetDeviceInfo(
                                        char* deviceUniqueIdUTF8,
                                        uint32_t deviceUniqueIdUTF8Length,
                                        char* productUniqueIdUTF8,
-                                       uint32_t productUniqueIdUTF8Length)
+                                       uint32_t productUniqueIdUTF8Length,
+                                       pid_t* pid)
 
 {
 
