@@ -513,7 +513,7 @@ CamerasParent::EnsureInitialized(int aEngine)
 // It would be nice to get rid of the code duplication here,
 // perhaps via Promises.
 bool
-CamerasParent::RecvNumberOfCaptureDevices(const int& aCapEngine)
+CamerasParent::RecvNumberOfCaptureDevices(const CaptureEngine& aCapEngine)
 {
   LOG((__PRETTY_FUNCTION__));
 
@@ -547,7 +547,7 @@ CamerasParent::RecvNumberOfCaptureDevices(const int& aCapEngine)
 }
 
 bool
-CamerasParent::RecvNumberOfCapabilities(const int& aCapEngine,
+CamerasParent::RecvNumberOfCapabilities(const CaptureEngine& aCapEngine,
                                         const nsCString& unique_id)
 {
   LOG((__PRETTY_FUNCTION__));
@@ -586,7 +586,7 @@ CamerasParent::RecvNumberOfCapabilities(const int& aCapEngine,
 }
 
 bool
-CamerasParent::RecvGetCaptureCapability(const int &aCapEngine,
+CamerasParent::RecvGetCaptureCapability(const CaptureEngine& aCapEngine,
                                         const nsCString& unique_id,
                                         const int& num)
 {
@@ -636,7 +636,7 @@ CamerasParent::RecvGetCaptureCapability(const int &aCapEngine,
 }
 
 bool
-CamerasParent::RecvGetCaptureDevice(const int& aCapEngine,
+CamerasParent::RecvGetCaptureDevice(const CaptureEngine& aCapEngine,
                                     const int& aListNumber)
 {
   LOG((__PRETTY_FUNCTION__));
@@ -750,7 +750,7 @@ HasCameraPermission(const nsCString& aOrigin)
 }
 
 bool
-CamerasParent::RecvAllocateCaptureDevice(const int& aCapEngine,
+CamerasParent::RecvAllocateCaptureDevice(const CaptureEngine& aCapEngine,
                                          const nsCString& unique_id,
                                          const nsCString& aOrigin)
 {
@@ -807,7 +807,7 @@ CamerasParent::RecvAllocateCaptureDevice(const int& aCapEngine,
 }
 
 int
-CamerasParent::ReleaseCaptureDevice(const int& aCapEngine,
+CamerasParent::ReleaseCaptureDevice(const CaptureEngine& aCapEngine,
                                     const int& capnum)
 {
   int error = -1;
@@ -818,7 +818,7 @@ CamerasParent::ReleaseCaptureDevice(const int& aCapEngine,
 }
 
 bool
-CamerasParent::RecvReleaseCaptureDevice(const int& aCapEngine,
+CamerasParent::RecvReleaseCaptureDevice(const CaptureEngine& aCapEngine,
                                         const int& numdev)
 {
   LOG((__PRETTY_FUNCTION__));
@@ -852,7 +852,7 @@ CamerasParent::RecvReleaseCaptureDevice(const int& aCapEngine,
 }
 
 bool
-CamerasParent::RecvStartCapture(const int& aCapEngine,
+CamerasParent::RecvStartCapture(const CaptureEngine& aCapEngine,
                                 const int& capnum,
                                 const CaptureCapability& ipcCaps)
 {
@@ -914,7 +914,7 @@ CamerasParent::RecvStartCapture(const int& aCapEngine,
 }
 
 void
-CamerasParent::StopCapture(const int& aCapEngine,
+CamerasParent::StopCapture(const CaptureEngine& aCapEngine,
                            const int& capnum)
 {
   if (EnsureInitialized(aCapEngine)) {
@@ -935,7 +935,7 @@ CamerasParent::StopCapture(const int& aCapEngine,
 }
 
 bool
-CamerasParent::RecvStopCapture(const int& aCapEngine,
+CamerasParent::RecvStopCapture(const CaptureEngine& aCapEngine,
                                const int& capnum)
 {
   LOG((__PRETTY_FUNCTION__));
