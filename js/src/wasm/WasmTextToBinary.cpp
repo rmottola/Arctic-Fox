@@ -140,7 +140,12 @@ class WasmToken
         Expr expr_;
     } u;
   public:
-    explicit WasmToken() = default;
+    WasmToken()
+      : kind_(Kind(-1)),
+        begin_(nullptr),
+        end_(nullptr),
+        u()
+    { }
     WasmToken(Kind kind, const char16_t* begin, const char16_t* end)
       : kind_(kind),
         begin_(begin),
@@ -2770,7 +2775,7 @@ ParseMemory(WasmParseContext& c, WasmToken token, AstModule* module)
     AstName name = c.ts.getIfName();
 
     WasmToken openParen;
-    if (c.ts.getIf(WasmToken::OpenParen)) {
+    if (c.ts.getIf(WasmToken::OpenParen, &openParen)) {
         if (c.ts.getIf(WasmToken::Import)) {
             InlineImport names;
             if (!ParseInlineImport(c, &names))
