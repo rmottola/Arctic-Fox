@@ -213,6 +213,7 @@ class WasmToken
         end_(begin)
     {}
     Kind kind() const {
+        MOZ_ASSERT(kind_ != Kind(-1));
         return kind_;
     }
     const char16_t* begin() const {
