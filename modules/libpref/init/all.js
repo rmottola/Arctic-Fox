@@ -571,10 +571,9 @@ pref("media.track.enabled", false);
 pref("media.mediasource.enabled", true);
 pref("media.mediasource.mp4.enabled", true);
 pref("media.mediasource.webm.enabled", false);
-
+pref("media.mediasource.webm.audio.enabled", true);
 
 // Use new MediaFormatReader architecture for plain ogg.
-pref("media.format-reader.ogg", false);
 pref("media.flac.enabled", true);
 pref("media.ogg.flac.enabled", true);
 
