@@ -644,8 +644,7 @@ Tkhd::Tkhd(Box& aBox)
     NS_ASSERTION(!reserved, "reserved should be 0");
     mDuration = reader->ReadU64();
   }
-  // More stuff that we don't care about
-  reader->DiscardRemaining();
+  // We don't care about whatever else may be in the box.
   mValid = true;
 }
 
@@ -677,11 +676,9 @@ Mvhd::Mvhd(Box& aBox)
     mTimescale = reader->ReadU32();
     mDuration = reader->ReadU64();
   } else {
-    reader->DiscardRemaining();
     return;
   }
-  // More stuff that we don't care about
-  reader->DiscardRemaining();
+  // We don't care about whatever else may be in the box.
   if (mTimescale) {
     mValid = true;
   }
@@ -773,7 +770,6 @@ Tfdt::Tfdt(Box& aBox)
   } else if (version == 1) {
     mBaseMediaDecodeTime = reader->ReadU64();
   }
-  reader->DiscardRemaining();
   mValid = true;
 }
 
