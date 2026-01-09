@@ -657,7 +657,7 @@ nsIndexedToHTML::OnStopRequest(nsIRequest* request, nsISupports *aContext,
     }
 
     mParser->OnStopRequest(request, aContext, aStatus);
-    mParser = 0;
+    mParser = nullptr;
     
     return mListener->OnStopRequest(request, aContext, aStatus);
 }

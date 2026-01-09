@@ -1492,7 +1492,7 @@ nsContentSink::DidBuildModelImpl(bool aTerminated)
                ("nsContentSink::DidBuildModel: canceling notification "
                 "timeout"));
     mNotificationTimer->Cancel();
-    mNotificationTimer = 0;
+    mNotificationTimer = nullptr;
   }	
 }
 

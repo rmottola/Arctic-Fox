@@ -981,8 +981,8 @@ HttpChannelChild::DoOnStopRequest(nsIRequest* aRequest, nsresult aChannelStatus,
   }
   mOnStopRequestCalled = true;
 
-  mListener = 0;
-  mListenerContext = 0;
+  mListener = nullptr;
+  mListenerContext = nullptr;
   mCacheEntryAvailable = false;
   if (mLoadGroup)
     mLoadGroup->RemoveRequest(this, nullptr, mStatus);
