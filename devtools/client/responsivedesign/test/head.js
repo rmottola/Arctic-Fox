@@ -37,7 +37,7 @@ var openRDM = Task.async(function* (tab = gBrowser.selectedTab,
   let manager = ResponsiveUIManager;
 
   let opened = once(manager, "on");
-  let resized = once(manager, "contentResize");
+  let resized = once(manager, "content-resize");
   if (method == "menu") {
     document.getElementById("menu_responsiveUI").doCommand();
   } else {
@@ -68,7 +68,7 @@ var closeRDM = Task.async(function* (rdm) {
     rdm = manager.getResponsiveUIForTab(gBrowser.selectedTab);
   }
   let closed = once(manager, "off");
-  let resized = once(manager, "contentResize");
+  let resized = once(manager, "content-resize");
   rdm.close();
   yield resized;
   yield closed;
@@ -275,19 +275,19 @@ function waitForResizeTo(manager, width, height) {
       if (data.width != width || data.height != height) {
         return;
       }
-      manager.off("contentResize", onResize);
-      info(`Got contentResize to ${width} x ${height}`);
+      manager.off("content-resize", onResize);
+      info(`Got content-resize to ${width} x ${height}`);
       resolve();
     };
-    info(`Waiting for contentResize to ${width} x ${height}`);
-    manager.on("contentResize", onResize);
+    info(`Waiting for content-resize to ${width} x ${height}`);
+    manager.on("content-resize", onResize);
   });
 }
 
 var setPresetIndex = Task.async(function* (rdm, manager, index) {
   info(`Current preset: ${rdm.menulist.selectedIndex}, change to: ${index}`);
   if (rdm.menulist.selectedIndex != index) {
-    let resized = once(manager, "contentResize");
+    let resized = once(manager, "content-resize");
     rdm.menulist.selectedIndex = index;
     yield resized;
   }
@@ -299,7 +299,7 @@ var setSize = Task.async(function* (rdm, manager, width, height) {
        `set to: ${width} x ${height}`);
   if (size.width != width || size.height != height) {
     let resized = waitForResizeTo(manager, width, height);
-    rdm.setSize(width, height);
+    rdm.setViewportSize({ width, height });
     yield resized;
   }
 });
