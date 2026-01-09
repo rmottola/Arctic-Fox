@@ -1537,9 +1537,13 @@ TextEditor::StripCites()
 }
 
 NS_IMETHODIMP
-TextEditor::GetEmbeddedObjects(nsISupportsArray** aNodeList)
-{
-  *aNodeList = 0;
+TextEditor::GetEmbeddedObjects(nsIArray** aNodeList)
+ {
+  if (NS_WARN_IF(!aNodeList)) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  *aNodeList = nullptr;
   return NS_OK;
 }
 
