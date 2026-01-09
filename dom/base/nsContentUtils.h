@@ -2491,7 +2491,7 @@ public:
                                                 mozilla::dom::nsIContentParent* aContentParent,
                                                 mozilla::dom::TabChild* aTabChild);
 
-  static void TransferablesToIPCTransferables(nsISupportsArray* aTransferables,
+  static void TransferablesToIPCTransferables(nsIArray* aTransferables,
                                               nsTArray<mozilla::dom::IPCDataTransfer>& aIPC,
                                               bool aInSyncMessage,
                                               mozilla::dom::nsIContentChild* aChild,
