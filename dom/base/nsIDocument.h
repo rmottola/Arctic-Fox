@@ -2878,16 +2878,6 @@ public:
     return mHasScrollLinkedEffect;
   }
 
-  bool MayHavePluginFramesForPrinting()
-  {
-    return mMayHavePluginFramesForPrinting;
-  }
-
-  void SetMayHavePluginFramesForPrinting()
-  {
-    mMayHavePluginFramesForPrinting = true;
-  }
-
   virtual void AddIntersectionObserver(
     mozilla::dom::DOMIntersectionObserver* aObserver) = 0;
   virtual void RemoveIntersectionObserver(
@@ -3202,10 +3192,6 @@ protected:
 
   // True is document has ever been in a foreground window.
   bool mEverInForeground : 1;
-
-  // True if this document is a static clone for printing and may
-  // have elements referring to plugins in the original document.
-  bool mMayHavePluginFramesForPrinting : 1;
 
   enum Type {
     eUnknown, // should never be used
