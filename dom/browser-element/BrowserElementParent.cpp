@@ -263,6 +263,7 @@ BrowserElementParent::OpenWindowInProcess(nsPIDOMWindowOuter* aOpenerWindow,
                                           nsIURI* aURI,
                                           const nsAString& aName,
                                           const nsACString& aFeatures,
+                                          bool aForceNoOpener,
                                           mozIDOMWindowProxy** aReturnWindow)
 {
   *aReturnWindow = nullptr;
@@ -290,9 +291,11 @@ BrowserElementParent::OpenWindowInProcess(nsPIDOMWindowOuter* aOpenerWindow,
     aURI->GetSpec(spec);
   }
 
-  ErrorResult res;
-  popupFrameElement->PresetOpenerWindow(aOpenerWindow, res);
-  MOZ_ASSERT(!res.Failed());
+  if (!aForceNoOpener) {
+    ErrorResult res;
+    popupFrameElement->PresetOpenerWindow(aOpenerWindow, res);
+    MOZ_ASSERT(!res.Failed());
+  }
 
   OpenWindowResult opened =
     DispatchOpenWindowEvent(openerFrameElement, popupFrameElement,

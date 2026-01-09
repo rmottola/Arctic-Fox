@@ -906,7 +906,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
         rv = provider->ProvideWindow(aParent, chromeFlags, aCalledFromJS,
                                      sizeSpec.PositionSpecified(),
                                      sizeSpec.SizeSpecified(),
-                                     uriToLoad, name, features,
+                                     uriToLoad, name, features, aForceNoOpener,
                                      &windowIsNew, getter_AddRefs(newWindow));
 
         if (NS_SUCCEEDED(rv)) {
@@ -1021,8 +1021,9 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
             nsIWindowCreator2::PARENT_IS_LOADING_OR_RUNNING_TIMEOUT;
         }
 
+        mozIDOMWindowProxy* openerWindow = aForceNoOpener ? nullptr : aParent;
         rv = CreateChromeWindow(features, parentChrome, chromeFlags, contextFlags,
-                                nullptr, aParent, getter_AddRefs(newChrome));
+                                nullptr, openerWindow, getter_AddRefs(newChrome));
 
       } else {
         rv = mWindowCreator->CreateChromeWindow(parentChrome, chromeFlags,
@@ -1035,7 +1036,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
           nsCOMPtr<nsIXULBrowserWindow> xulBrowserWin;
           xulWin->GetXULBrowserWindow(getter_AddRefs(xulBrowserWin));
           if (xulBrowserWin) {
-            nsPIDOMWindowOuter* openerWindow = aForceNoOpener ? nullptr : parentWindow;
+            nsPIDOMWindowOuter* openerWindow = aForceNoOpener ? nullptr : parentWindow.get();
             xulBrowserWin->ForceInitialBrowserNonRemote(openerWindow);
           }
         }
@@ -2166,7 +2167,7 @@ nsWindowWatcher::ReadyOpenedDocShellItem(nsIDocShellTreeItem* aOpenedItem,
   if (piOpenedWindow) {
     if (!aForceNoOpener) {
       piOpenedWindow->SetOpenerWindow(aParent, aWindowIsNew); // damnit
-    } else if (aParent) {
+    } else if (aParent && aParent != piOpenedWindow) {
       MOZ_ASSERT(nsGlobalWindow::Cast(piOpenedWindow)->TabGroup() !=
                  nsGlobalWindow::Cast(aParent)->TabGroup(),
                  "If we're forcing no opener, they should be in different tab groups");

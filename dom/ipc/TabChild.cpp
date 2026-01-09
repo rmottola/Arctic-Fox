@@ -1170,8 +1170,8 @@ TabChild::ProvideWindow(mozIDOMWindowProxy* aParent,
                         bool aCalledFromJS,
                         bool aPositionSpecified, bool aSizeSpecified,
                         nsIURI* aURI, const nsAString& aName,
-                        const nsACString& aFeatures, bool* aWindowIsNew,
-                        mozIDOMWindowProxy** aReturn)
+                        const nsACString& aFeatures, bool aForceNoOpener,
+                        bool* aWindowIsNew, mozIDOMWindowProxy** aReturn)
 {
     *aReturn = nullptr;
 
@@ -1213,6 +1213,7 @@ TabChild::ProvideWindow(mozIDOMWindowProxy* aParent,
                                    aURI,
                                    aName,
                                    aFeatures,
+                                   aForceNoOpener,
                                    aWindowIsNew,
                                    aReturn);
 }
