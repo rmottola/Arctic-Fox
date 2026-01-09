@@ -125,6 +125,7 @@ class BoxObject;
 class CDATASection;
 class Comment;
 struct CustomElementDefinition;
+class DocGroup;
 class DocumentFragment;
 class DocumentTimeline;
 class DocumentType;
@@ -2891,10 +2892,12 @@ public:
     mozilla::dom::DOMIntersectionObserver* aObserver) = 0;
   virtual void RemoveIntersectionObserver(
     mozilla::dom::DOMIntersectionObserver* aObserver) = 0;
-  
+
   virtual void UpdateIntersectionObservations() = 0;
   virtual void ScheduleIntersectionObserverNotification() = 0;
   virtual void NotifyIntersectionObservers() = 0;
+
+  mozilla::dom::DocGroup* GetDocGroup();
 
 protected:
   bool GetUseCounter(mozilla::UseCounter aUseCounter)
@@ -3356,6 +3359,8 @@ protected:
   bool mUserHasInteracted;
 
   mozilla::TimeStamp mPageUnloadingEventTimeStamp;
+
+  RefPtr<mozilla::dom::DocGroup> mDocGroup;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsIDocument, NS_IDOCUMENT_IID)

@@ -1531,6 +1531,8 @@
               aNoReferrer           = params.noReferrer;
               aUserContextId        = params.userContextId;
               aRelatedBrowser       = params.relatedBrowser;
+              aOriginPrincipal      = params.originPrincipal;
+              aOpener               = params.opener;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
@@ -1550,7 +1552,9 @@
                                   forceNotRemote: aForceNotRemote,
                                   noReferrer: aNoReferrer,
                                   userContextId: aUserContextId,
-                                  relatedBrowser: aRelatedBrowser });
+                                  originPrincipal: aOriginPrincipal,
+                                  relatedBrowser: aRelatedBrowser,
+                                  opener: aOpener });
             if (!bgLoad)
               this.selectedTab = tab;
 
@@ -1663,11 +1667,27 @@
       <method name="updateBrowserRemoteness">
         <parameter name="aBrowser"/>
         <parameter name="aShouldBeRemote"/>
+        <parameter name="aOpener"/>
         <body>
           <![CDATA[
             let isRemote = aBrowser.getAttribute("remote") == "true";
-            if (isRemote == aShouldBeRemote)
+
+            // If we are passed an opener, we must be making the browser non-remote, and
+            // if the browser is _currently_ non-remote, we need the openers to match,
+            // because it is already too late to change it.
+            if (aOpener) {
+              if (aShouldBeRemote) {
+                throw new Exception("Cannot set an opener on a browser which should be remote!");
+              }
+              if (!isRemote && aBrowser.contentWindow.opener != aOpener) {
+                throw new Exception("Cannot change opener on an already non-remote browser!");
+              }
+            }
+
+            // Abort if we're not going to change anything
+            if (isRemote == aShouldBeRemote) {
               return false;
+            }
 
             let wasActive = document.activeElement == aBrowser;
 
@@ -1690,13 +1710,24 @@
             // Make sure the browser is destroyed so it unregisters from observer notifications
             aBrowser.destroy();
 
-            // Make sure to restore the original droppedLinkHandler.
+            // Make sure to restore the original droppedLinkHandler and
+            // relatedBrowser.
             let droppedLinkHandler = aBrowser.droppedLinkHandler;
+            let relatedBrowser = aBrowser.relatedBrowser;
 
             // Change the "remote" attribute.
             let parent = aBrowser.parentNode;
             parent.removeChild(aBrowser);
             aBrowser.setAttribute("remote", aShouldBeRemote ? "true" : "false");
+
+            // NB: This works with the hack in the browser constructor that
+            // turns this normal property into a field.
+            aBrowser.relatedBrowser = relatedBrowser;
+
+            // Set the opener window on the browser, such that when the frame
+            // loader is created the opener is set correctly.
+            aBrowser.presetOpenerWindow(aOpener);
+
             parent.appendChild(aBrowser);
 
             aBrowser.userTypedValue = oldUserTypedValue;
@@ -1885,6 +1916,13 @@
               b.setAttribute("remote", "true");
             }
 
+            if (aParams.opener) {
+              if (aParams.remote) {
+                throw new Exception("Cannot set opener window on a remote browser!");
+              }
+              b.QueryInterface(Ci.nsIFrameLoaderOwner).presetOpenerWindow(aParams.opener);
+            }
+
             if (window.gShowPageResizers && window.windowState == window.STATE_NORMAL) {
               b.setAttribute("showresizer", "true");
             }
@@ -1985,7 +2023,8 @@
                                              remote: remote,
                                              uriIsAboutBlank: uriIsAboutBlank,
                                              userContextId: aParams.userContextId,
-                                             relatedBrowser: aParams.relatedBrowser});
+                                             relatedBrowser: aParams.relatedBrowser,
+                                             opener: aParams.opener});
             }
 
             let notificationbox = this.getNotificationBox(browser);
@@ -2060,25 +2099,31 @@
             var aUserContextId;
             var aEventDetail;
             var aRelatedBrowser;
+            var aOriginPrincipal;
+            var aDisallowInheritPrincipal;
+            var aOpener;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
               let params = arguments[1];
-              aReferrerURI          = params.referrerURI;
-              aReferrerPolicy       = params.referrerPolicy;
-              aCharset              = params.charset;
-              aPostData             = params.postData;
-              aOwner                = params.ownerTab;
-              aAllowThirdPartyFixup = params.allowThirdPartyFixup;
-              aFromExternal         = params.fromExternal;
-              aRelatedToCurrent     = params.relatedToCurrent;
-              aSkipAnimation        = params.skipAnimation;
-              aAllowMixedContent    = params.allowMixedContent;
-              aForceNotRemote       = params.forceNotRemote;
-              aNoReferrer           = params.noReferrer;
-              aUserContextId        = params.userContextId;
-              aEventDetail          = params.eventDetail;
-              aRelatedBrowser       = params.relatedBrowser;
+              aReferrerURI              = params.referrerURI;
+              aReferrerPolicy           = params.referrerPolicy;
+              aCharset                  = params.charset;
+              aPostData                 = params.postData;
+              aOwner                    = params.ownerTab;
+              aAllowThirdPartyFixup     = params.allowThirdPartyFixup;
+              aFromExternal             = params.fromExternal;
+              aRelatedToCurrent         = params.relatedToCurrent;
+              aSkipAnimation            = params.skipAnimation;
+              aAllowMixedContent        = params.allowMixedContent;
+              aForceNotRemote           = params.forceNotRemote;
+              aNoReferrer               = params.noReferrer;
+              aUserContextId            = params.userContextId;
+              aEventDetail              = params.eventDetail;
+              aRelatedBrowser           = params.relatedBrowser;
+              aOriginPrincipal          = params.originPrincipal;
+              aDisallowInheritPrincipal = params.disallowInheritPrincipal;
+              aOpener                   = params.opener;
             }
 
             // if we're adding tabs, we're past interrupt mode, ditch the owner
@@ -2147,7 +2192,8 @@
             let browserParams = {
               forceNotRemote: aForceNotRemote,
               userContextId:  aUserContextId,
-              relatedBrowser: aRelatedBrowser
+              relatedBrowser: aRelatedBrowser,
+              opener: aOpener,
             };
             let { usingPreloadedContent } = this._linkBrowserToTab(t, aURI, browserParams);
             let b = t.linkedBrowser;
