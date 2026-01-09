@@ -133,7 +133,7 @@ typedef FrameMetrics::ViewID ViewID;
 // we'd need to re-institute a fixed version of bug 98158.
 #define MAX_DEPTH_CONTENT_FRAMES 10
 
-NS_IMPL_CYCLE_COLLECTION(nsFrameLoader, mDocShell, mMessageManager, mChildMessageManager)
+NS_IMPL_CYCLE_COLLECTION(nsFrameLoader, mDocShell, mMessageManager, mChildMessageManager, mOpener)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(nsFrameLoader)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(nsFrameLoader)
 
@@ -143,9 +143,10 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsFrameLoader)
   NS_INTERFACE_MAP_ENTRY(nsIWebBrowserPersistable)
 NS_INTERFACE_MAP_END
 
-nsFrameLoader::nsFrameLoader(Element* aOwner, bool aNetworkCreated)
+nsFrameLoader::nsFrameLoader(Element* aOwner, nsPIDOMWindowOuter* aOpener, bool aNetworkCreated)
   : mOwnerContent(aOwner)
   , mDetachedSubdocFrame(nullptr)
+  , mOpener(aOpener)
   , mRemoteBrowser(nullptr)
   , mChildID(0)
   , mEventMode(EVENT_MODE_NORMAL_DISPATCH)
@@ -166,6 +167,8 @@ nsFrameLoader::nsFrameLoader(Element* aOwner, bool aNetworkCreated)
   , mVisible(true)
 {
   mRemoteFrame = ShouldUseRemoteProcess();
+  MOZ_ASSERT(!mRemoteFrame || !aOpener,
+             "Cannot pass aOpener for a remote frame!");
 }
 
 nsFrameLoader::~nsFrameLoader()
@@ -177,7 +180,7 @@ nsFrameLoader::~nsFrameLoader()
 }
 
 nsFrameLoader*
-nsFrameLoader::Create(Element* aOwner, bool aNetworkCreated)
+nsFrameLoader::Create(Element* aOwner, nsPIDOMWindowOuter* aOpener, bool aNetworkCreated)
 {
   NS_ENSURE_TRUE(aOwner, nullptr);
   nsIDocument* doc = aOwner->OwnerDoc();
@@ -207,7 +210,7 @@ nsFrameLoader::Create(Element* aOwner, bool aNetworkCreated)
                   doc->IsStaticDocument()),
                  nullptr);
 
-  return new nsFrameLoader(aOwner, aNetworkCreated);
+  return new nsFrameLoader(aOwner, aOpener, aNetworkCreated);
 }
 
 NS_IMETHODIMP
@@ -917,10 +920,17 @@ nsFrameLoader::Hide()
 
 nsresult
 nsFrameLoader::SwapWithOtherRemoteLoader(nsFrameLoader* aOther,
-                                         RefPtr<nsFrameLoader>& aFirstToSwap,
-                                         RefPtr<nsFrameLoader>& aSecondToSwap)
+                                         nsIFrameLoaderOwner* aThisOwner,
+                                         nsIFrameLoaderOwner* aOtherOwner)
 {
   MOZ_ASSERT(NS_IsMainThread());
+
+#ifdef DEBUG
+  RefPtr<nsFrameLoader> first = aThisOwner->GetFrameLoader();
+  RefPtr<nsFrameLoader> second = aOtherOwner->GetFrameLoader();
+  MOZ_ASSERT(first == this, "aThisOwner must own this");
+  MOZ_ASSERT(second == aOther, "aOtherOwner must own aOther");
+#endif
 
   Element* ourContent = mOwnerContent;
   Element* otherContent = aOther->mOwnerContent;
@@ -1069,7 +1079,12 @@ nsFrameLoader::SwapWithOtherRemoteLoader(nsFrameLoader* aOther,
   }
   mMessageManager.swap(aOther->mMessageManager);
 
-  aFirstToSwap.swap(aSecondToSwap);
+  // Perform the actual swap of the internal refptrs. We keep a strong reference
+  // to ourselves to make sure we don't die while we overwrite our reference to
+  // ourself.
+  nsCOMPtr<nsIFrameLoader> kungFuDeathGrip(this);
+  aThisOwner->InternalSetFrameLoader(aOther);
+  aOtherOwner->InternalSetFrameLoader(kungFuDeathGrip);
 
   ourFrameFrame->EndSwapDocShells(otherFrame);
 
@@ -1160,12 +1175,16 @@ private:
 
 nsresult
 nsFrameLoader::SwapWithOtherLoader(nsFrameLoader* aOther,
-                                   RefPtr<nsFrameLoader>& aFirstToSwap,
-                                   RefPtr<nsFrameLoader>& aSecondToSwap)
+                                   nsIFrameLoaderOwner* aThisOwner,
+                                   nsIFrameLoaderOwner* aOtherOwner)
 {
-  NS_PRECONDITION((aFirstToSwap == this && aSecondToSwap == aOther) ||
-                  (aFirstToSwap == aOther && aSecondToSwap == this),
-                  "Swapping some sort of random loaders?");
+#ifdef DEBUG
+  RefPtr<nsFrameLoader> first = aThisOwner->GetFrameLoader();
+  RefPtr<nsFrameLoader> second = aOtherOwner->GetFrameLoader();
+  MOZ_ASSERT(first == this, "aThisOwner must own this");
+  MOZ_ASSERT(second == aOther, "aOtherOwner must own aOther");
+#endif
+
   NS_ENSURE_STATE(!mInShow && !aOther->mInShow);
 
   if (IsRemoteFrame() != aOther->IsRemoteFrame()) {
@@ -1207,7 +1226,7 @@ nsFrameLoader::SwapWithOtherLoader(nsFrameLoader* aOther,
   // Divert to a separate path for the remaining steps in the remote case
   if (IsRemoteFrame()) {
     MOZ_ASSERT(aOther->IsRemoteFrame());
-    return SwapWithOtherRemoteLoader(aOther, aFirstToSwap, aSecondToSwap);
+    return SwapWithOtherRemoteLoader(aOther, aThisOwner, aOtherOwner);
   }
 
   // Make sure there are no same-origin issues
@@ -1469,7 +1488,12 @@ nsFrameLoader::SwapWithOtherLoader(nsFrameLoader* aOther,
   }
   mMessageManager.swap(aOther->mMessageManager);
 
-  aFirstToSwap.swap(aSecondToSwap);
+  // Perform the actual swap of the internal refptrs. We keep a strong reference
+  // to ourselves to make sure we don't die while we overwrite our reference to
+  // ourself.
+  nsCOMPtr<nsIFrameLoader> kungFuDeathGrip(this);
+  aThisOwner->InternalSetFrameLoader(aOther);
+  aOtherOwner->InternalSetFrameLoader(kungFuDeathGrip);
 
   // Drop any cached content viewers in the two session histories.
   nsCOMPtr<nsISHistoryInternal> ourInternalHistory =
@@ -2026,6 +2050,12 @@ nsFrameLoader::MaybeCreateDocShell()
   nsCOMPtr<nsIBaseWindow> base_win(do_QueryInterface(mDocShell));
   if (win_private) {
     win_private->SetFrameElementInternal(frame_element);
+
+    // Set the opener window if we have one provided here
+    if (mOpener) {
+      win_private->SetOpenerWindow(mOpener, true);
+      mOpener = nullptr;
+    }
   }
 
   // This is kinda whacky, this call doesn't really create anything,
