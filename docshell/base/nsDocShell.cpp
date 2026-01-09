@@ -2495,7 +2495,7 @@ nsDocShell::SetAllowContentRetargetingOnChildren(
 NS_IMETHODIMP
 nsDocShell::GetInheritPrivateBrowsingId(bool* aInheritPrivateBrowsingId)
 {
-  *aInheritPrivateBrowsingId = mPrivateBrowsingId;
+  *aInheritPrivateBrowsingId = mInheritPrivateBrowsingId;
   return NS_OK;
 }
 
