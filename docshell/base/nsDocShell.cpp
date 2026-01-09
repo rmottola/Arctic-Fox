@@ -9736,7 +9736,6 @@ nsDocShell::InternalLoad(nsIURI* aURI,
 
   int16_t shouldLoad = nsIContentPolicy::ACCEPT;
   uint32_t contentType;
-  bool isNewDocShell = false;
   bool isTargetTopLevelDocShell = false;
   nsCOMPtr<nsIDocShell> targetDocShell;
   if (aWindowTarget && *aWindowTarget) {
@@ -9747,14 +9746,15 @@ nsDocShell::InternalLoad(nsIURI* aURI,
     NS_ENSURE_SUCCESS(rv, rv);
 
     targetDocShell = do_QueryInterface(targetItem);
-    // If the targetDocShell doesn't exist, then this is a new docShell
-    // and we should consider this a TYPE_DOCUMENT load
-    isNewDocShell = !targetDocShell;
-
-    // If the targetDocShell and the rootDocShell are the same, then the
-    // targetDocShell is the top level document and hence we should
-    // consider this TYPE_DOCUMENT
     if (targetDocShell) {
+      // If the targetDocShell and the rootDocShell are the same, then the
+      // targetDocShell is the top level document and hence we should
+      // consider this TYPE_DOCUMENT
+      //
+      // For example:
+      // 1. target="_top"
+      // 2. target="_parent", where this docshell is in the 2nd level of
+      //    docshell tree.
       nsCOMPtr<nsIDocShellTreeItem> sameTypeRoot;
       targetDocShell->GetSameTypeRootTreeItem(getter_AddRefs(sameTypeRoot));
       NS_ASSERTION(sameTypeRoot,
@@ -9762,13 +9762,20 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       nsCOMPtr<nsIDocShell> rootShell = do_QueryInterface(sameTypeRoot);
       NS_ASSERTION(rootShell,
                    "No root docshell from document shell root tree item.");
-
-      if (targetDocShell == rootShell) {
-        isTargetTopLevelDocShell = true;
-      }
+      isTargetTopLevelDocShell = targetDocShell == rootShell;
+    } else {
+      // If the targetDocShell doesn't exist, then this is a new docShell
+      // and we should consider this a TYPE_DOCUMENT load
+      //
+      // For example, when target="_blank"
+      isTargetTopLevelDocShell = true;
     }
   }
-  if (IsFrame() && !isNewDocShell && !isTargetTopLevelDocShell) {
+
+  // The contentType will be INTERNAL_(I)FRAME if:
+  // 1. This docshell is for iframe.
+  // 2. AND aWindowTarget is not a new window, nor a top-level window.
+  if (IsFrame() && !isTargetTopLevelDocShell) {
     NS_ASSERTION(requestingElement, "A frame but no DOM element!?");
     contentType = requestingElement->IsHTMLElement(nsGkAtoms::iframe) ?
       nsIContentPolicy::TYPE_INTERNAL_IFRAME : nsIContentPolicy::TYPE_INTERNAL_FRAME;
