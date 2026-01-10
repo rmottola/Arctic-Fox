@@ -1089,10 +1089,11 @@ public:
   Element* FullScreenStackTop();
 
   // DOM-exposed fullscreen API
-  bool FullscreenEnabled() override;
+  bool FullscreenEnabled(mozilla::dom::CallerType aCallerType) override;
   Element* GetFullscreenElement() override;
 
-  void RequestPointerLock(Element* aElement) override;
+  void RequestPointerLock(Element* aElement,
+                          mozilla::dom::CallerType aCallerType) override;
   bool SetPointerLock(Element* aElement, int aCursorStyle);
   static void UnlockPointer(nsIDocument* aDoc = nullptr);
 
