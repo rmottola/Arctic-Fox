@@ -91,6 +91,9 @@ static WindowsDllInterceptor sUser32Intercept;
 typedef BOOL (WINAPI *GetWindowInfoPtr)(HWND hwnd, PWINDOWINFO pwi);
 static GetWindowInfoPtr sGetWindowInfoPtrStub = nullptr;
 static HWND sBrowserHwnd = nullptr;
+// sandbox process doesn't get current key states.  So we need get it on chrome.
+typedef SHORT (WINAPI *GetKeyStatePtr)(int);
+static GetKeyStatePtr sGetKeyStatePtrStub = nullptr;
 #endif
 
 /* static */
@@ -2067,6 +2070,20 @@ PMCGetWindowInfoHook(HWND hWnd, PWINDOWINFO pwi)
       pwi->rcWindow = pwi->rcClient;
   return result;
 }
+
+// static
+SHORT WINAPI
+PMCGetKeyState(int aVirtKey)
+{
+    PluginModuleChild* chromeInstance = PluginModuleChild::GetChrome();
+    if (chromeInstance) {
+        int16_t ret = 0;
+        if (chromeInstance->CallGetKeyState(aVirtKey, &ret)) {
+          return ret;
+        }
+    }
+    return sGetKeyStatePtrStub(aVirtKey);
+}
 #endif
 
 PPluginInstanceChild*
@@ -2087,11 +2104,17 @@ PluginModuleChild::AllocPPluginInstanceChild(const nsCString& aMimeType,
     mQuirks = GetChrome()->mQuirks;
 
 #ifdef XP_WIN
+    sUser32Intercept.Init("user32.dll");
     if ((mQuirks & QUIRK_FLASH_HOOK_GETWINDOWINFO) &&
         !sGetWindowInfoPtrStub) {
-        sUser32Intercept.Init("user32.dll");
         sUser32Intercept.AddHook("GetWindowInfo", reinterpret_cast<intptr_t>(PMCGetWindowInfoHook),
                                  (void**) &sGetWindowInfoPtrStub);
+    }
+
+    if ((mQuirks & QUIRK_FLASH_HOOK_GETKEYSTATE) &&
+        !sGetKeyStatePtrStub) {
+        sUser32Intercept.AddHook("GetKeyState", reinterpret_cast<intptr_t>(PMCGetKeyState),
+                                 (void**) &sGetKeyStatePtrStub);
     }
 #endif
 
