@@ -93,7 +93,6 @@ public:
   using nsDocument::SetTitle;
   using nsDocument::GetLastStyleSheetSet;
   using nsDocument::MozSetImageElement;
-  using nsDocument::GetMozFullScreenElement;
 
   // nsIDOMNode interface
   NS_FORWARD_NSIDOMNODE_TO_NSINODE
