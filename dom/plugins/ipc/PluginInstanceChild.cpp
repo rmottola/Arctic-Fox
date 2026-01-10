@@ -3530,10 +3530,8 @@ PluginInstanceChild::EnsureCurrentBuffer(void)
         void *caLayer = nullptr;
         if (mDrawingModel == NPDrawingModelCoreGraphics) {
             if (!mCGLayer) {
-                bool avoidCGCrashes = !nsCocoaFeatures::OnMountainLionOrLater() &&
-                  (GetQuirks() & QUIRK_FLASH_AVOID_CGMODE_CRASHES);
-                caLayer = mozilla::plugins::PluginUtilsOSX::GetCGLayer(CallCGDraw, this,
-                                                                       avoidCGCrashes,
+                caLayer = mozilla::plugins::PluginUtilsOSX::GetCGLayer(CallCGDraw,
+                                                                       this,
                                                                        mContentsScaleFactor);
 
                 if (!caLayer) {
