@@ -3401,7 +3401,7 @@ ContentParent::DeallocPPresentationParent(PPresentationParent* aActor)
 bool
 ContentParent::RecvPPresentationConstructor(PPresentationParent* aActor)
 {
-  return static_cast<PresentationParent*>(aActor)->Init();
+  return static_cast<PresentationParent*>(aActor)->Init(mChildID);
 }
 
 PFlyWebPublishedServerParent*

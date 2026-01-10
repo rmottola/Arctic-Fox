@@ -6,6 +6,7 @@
 
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/PPresentation.h"
+#include "mozilla/dom/TabParent.h"
 #include "mozilla/ipc/InputStreamUtils.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "nsGlobalWindow.h"
@@ -58,6 +59,7 @@ PresentationIPCService::StartSession(const nsTArray<nsString>& aUrls,
                                      const nsAString& aOrigin,
                                      const nsAString& aDeviceId,
                                      uint64_t aWindowId,
+                                     nsIDOMEventTarget* aEventTarget,
                                      nsIPresentationServiceCallback* aCallback)
 {
   if (aWindowId != 0) {
@@ -66,11 +68,16 @@ PresentationIPCService::StartSession(const nsTArray<nsString>& aUrls,
                            nsIPresentationService::ROLE_CONTROLLER);
   }
 
+  nsPIDOMWindowInner* window =
+    nsGlobalWindow::GetInnerWindowWithId(aWindowId)->AsInner();
+  TabId tabId = TabParent::GetTabIdFrom(window->GetDocShell());
+
   return SendRequest(aCallback, StartSessionRequest(aUrls,
                                                     nsString(aSessionId),
                                                     nsString(aOrigin),
                                                     nsString(aDeviceId),
-                                                    aWindowId));
+                                                    aWindowId,
+                                                    tabId));
 }
 
 NS_IMETHODIMP
