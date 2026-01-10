@@ -2277,8 +2277,8 @@ nsGenericHTMLFormElement::IsElementDisabledForEvents(EventMessage aMessage,
   bool disabled = IsDisabled();
   if (!disabled && aFrame) {
     const nsStyleUserInterface* uiStyle = aFrame->StyleUserInterface();
-    disabled = uiStyle->mUserInput == NS_STYLE_USER_INPUT_NONE ||
-      uiStyle->mUserInput == NS_STYLE_USER_INPUT_DISABLED;
+    disabled = uiStyle->mUserInput == StyleUserInput::None ||
+               uiStyle->mUserInput == StyleUserInput::Disabled;
 
   }
   return disabled;

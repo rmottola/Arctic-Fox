@@ -4917,8 +4917,9 @@ EventStateManager::SetContentState(nsIContent* aContent, EventStates aState)
     if (mCurrentTarget)
     {
       const nsStyleUserInterface* ui = mCurrentTarget->StyleUserInterface();
-      if (ui->mUserInput == NS_STYLE_USER_INPUT_NONE)
+      if (ui->mUserInput == StyleUserInput::None) {
         return false;
+      }
     }
 
     if (aState == NS_EVENT_STATE_ACTIVE) {
