@@ -2960,6 +2960,8 @@ js::MarkCompartmentActive(InterpreterFrame* fp)
 void
 GCRuntime::requestMajorGC(JS::gcreason::Reason reason)
 {
+    MOZ_ASSERT(!CurrentThreadIsPerformingGC());
+
     if (majorGCRequested())
         return;
 
@@ -2975,6 +2977,8 @@ void
 GCRuntime::requestMinorGC(JS::gcreason::Reason reason)
 {
     MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
+    MOZ_ASSERT(!CurrentThreadIsPerformingGC());
+
     if (minorGCRequested())
         return;
 
