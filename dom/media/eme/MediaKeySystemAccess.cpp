@@ -96,23 +96,17 @@ MediaKeySystemAccess::CreateMediaKeys(ErrorResult& aRv)
 }
 
 static bool
-HaveGMPFor(mozIGeckoMediaPluginService* aGMPService,
-           const nsCString& aKeySystem,
-           const nsCString& aAPI,
-           const nsCString& aTag = EmptyCString())
+HavePluginForKeySystem(const nsCString& aKeySystem)
 {
-  nsTArray<nsCString> tags;
-  tags.AppendElement(aKeySystem);
-  if (!aTag.IsEmpty()) {
-    tags.AppendElement(aTag);
+  bool havePlugin = HaveGMPFor(NS_LITERAL_CSTRING(GMP_API_DECRYPTOR),
+                               { aKeySystem });
+#ifdef MOZ_WIDGET_ANDROID
+  // Check if we can use MediaDrm for this keysystem.
+  if (!havePlugin) {
+    havePlugin = mozilla::java::MediaDrmProxy::IsSchemeSupported(aKeySystem);
   }
-  bool hasPlugin = false;
-  if (NS_FAILED(aGMPService->HasPluginForAPI(aAPI,
-                                             &tags,
-                                             &hasPlugin))) {
-    return false;
-  }
-  return hasPlugin;
+#endif
+  return havePlugin;
 }
 
 static MediaKeySystemStatus
