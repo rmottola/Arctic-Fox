@@ -69,7 +69,6 @@ public:
 #ifdef MOZ_FFMPEG
     FFmpegRuntimeLinker::Init();
 #endif
-    GMPDecoderModule::Init();
   }
 };
 
