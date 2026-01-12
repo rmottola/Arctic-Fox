@@ -10889,17 +10889,15 @@ nsGlobalWindow::FireOfflineStatusEventIfChanged()
   if (!AsInner()->IsCurrentInnerWindow())
     return;
 
-  bool isOffline = NS_IsOffline() || NS_IsAppOffline(GetPrincipal());
-
   // Don't fire an event if the status hasn't changed
-  if (mWasOffline == isOffline) {
+  if (mWasOffline == NS_IsOffline()) {
     return;
   }
 
-  mWasOffline = isOffline;
+  mWasOffline = !mWasOffline;
 
   nsAutoString name;
-  if (isOffline) {
+  if (mWasOffline) {
     name.AssignLiteral("offline");
   } else {
     name.AssignLiteral("online");
@@ -11523,8 +11521,7 @@ nsresult
 nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
                         const char16_t* aData)
 {
-  if (!nsCRT::strcmp(aTopic, NS_IOSERVICE_OFFLINE_STATUS_TOPIC) ||
-      !nsCRT::strcmp(aTopic, NS_IOSERVICE_APP_OFFLINE_STATUS_TOPIC)) {
+  if (!nsCRT::strcmp(aTopic, NS_IOSERVICE_OFFLINE_STATUS_TOPIC)) {
     if (!IsFrozen()) {
         // Fires an offline status event if the offline status has changed
         FireOfflineStatusEventIfChanged();
@@ -14341,7 +14338,7 @@ nsGlobalWindow::Create(nsGlobalWindow *aOuterWindow)
 void
 nsGlobalWindow::InitWasOffline()
 {
-  mWasOffline = NS_IsOffline() || NS_IsAppOffline(GetPrincipal());
+  mWasOffline = NS_IsOffline();
 }
 
 void
