@@ -193,7 +193,6 @@
 #include "mozilla/widget/PuppetBidiKeyboard.h"
 #include "mozilla/RemoteSpellCheckEngineChild.h"
 #include "GMPServiceChild.h"
-#include "GMPDecoderModule.h"
 #include "gfxPlatform.h"
 #include "nscore.h" // for NS_FREE_PERMANENT_DATA
 #include "VRManagerChild.h"
@@ -1684,14 +1683,6 @@ ContentChild::RecvNotifyPresentationReceiverCleanUp(const nsString& aSessionId)
 
   Unused << NS_WARN_IF(NS_FAILED(service->UntrackSessionInfo(aSessionId, nsIPresentationService::ROLE_RECEIVER)));
 
-  return true;
-}
-
-bool
-ContentChild::RecvNotifyGMPsChanged()
-{
-  GMPDecoderModule::UpdateUsableCodecs();
-  MOZ_ASSERT(NS_IsMainThread());
   return true;
 }
 
