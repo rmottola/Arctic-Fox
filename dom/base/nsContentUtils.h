@@ -2697,6 +2697,8 @@ public:
                                  nsIAtom* aAtom,
                                  JS::MutableHandle<JSObject*> prototype);
 
+  static bool AttemptLargeAllocationLoad(nsIHttpChannel* aChannel);
+
 private:
   static bool InitializeEventTable();
 

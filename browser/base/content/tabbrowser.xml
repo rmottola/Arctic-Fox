@@ -1668,6 +1668,7 @@
         <parameter name="aBrowser"/>
         <parameter name="aShouldBeRemote"/>
         <parameter name="aOpener"/>
+        <parameter name="aFreshProcess"/>
         <body>
           <![CDATA[
             let isRemote = aBrowser.getAttribute("remote") == "true";
@@ -1685,7 +1686,7 @@
             }
 
             // Abort if we're not going to change anything
-            if (isRemote == aShouldBeRemote) {
+            if (isRemote == aShouldBeRemote && !aFreshProcess) {
               return false;
             }
 
@@ -1728,7 +1729,17 @@
             // loader is created the opener is set correctly.
             aBrowser.presetOpenerWindow(aOpener);
 
+            // Set the freshProcess attribute so that the frameloader knows to
+            // create a new process
+            if (aFreshProcess) {
+              aBrowser.setAttribute("freshProcess", "true");
+            }
+
             parent.appendChild(aBrowser);
+
+            // Remove the freshProcess attribute if we set it, as we don't
+            // want it to apply for the next time the frameloader is created
+            aBrowser.removeAttribute("freshProcess");
 
             aBrowser.userTypedValue = oldUserTypedValue;
             if (hadStartedLoad) {
@@ -1795,6 +1806,22 @@
             tab.dispatchEvent(evt);
 
             return true;
+          ]]>
+        </body>
+      </method>
+
+      <method name="switchBrowserIntoFreshProcess">
+        <parameter name="aBrowser"/>
+        <body>
+          <![CDATA[
+            if (!gMultiProcessBrowser) {
+              return this.updateBrowserRemoteness(aBrowser, false);
+            }
+
+            return this.updateBrowserRemoteness(aBrowser,
+                                                /* aShouldBeRemote */ true,
+                                                /* aOpener */ null,
+                                                /* aFreshProcess */ true);
           ]]>
         </body>
       </method>
