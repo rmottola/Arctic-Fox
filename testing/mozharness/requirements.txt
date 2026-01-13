@@ -18,7 +18,7 @@ pyflakes==0.6.1
 pylint==0.27.0
 simplejson==2.1.1
 unittest2==0.5.1
-virtualenv==1.5.1
+virtualenv==20.36.1
 wsgiref==0.1.2
 urllib3==1.9.1
 google-api-python-client==1.5.1
