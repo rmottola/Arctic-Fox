@@ -36,7 +36,6 @@ namespace mozilla {
 MP4Decoder::MP4Decoder(MediaDecoderOwner* aOwner)
   : MediaDecoder(aOwner)
 {
-  mDormantSupported = Preferences::GetBool("media.decoder.heuristic.dormant.enabled", false);
 }
 
 MediaDecoderStateMachine* MP4Decoder::CreateStateMachine()

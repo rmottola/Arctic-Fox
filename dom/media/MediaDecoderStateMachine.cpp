@@ -2534,14 +2534,6 @@ void MediaDecoderStateMachine::RecomputeDuration()
 }
 
 void
-MediaDecoderStateMachine::DispatchSetDormant(bool aDormant)
-{
-  nsCOMPtr<nsIRunnable> r = NewRunnableMethod<bool>(
-    this, &MediaDecoderStateMachine::SetDormant, aDormant);
-  OwnerThread()->Dispatch(r.forget());
-}
-
-void
 MediaDecoderStateMachine::SetDormant(bool aDormant)
 {
   MOZ_ASSERT(OnTaskQueue());
