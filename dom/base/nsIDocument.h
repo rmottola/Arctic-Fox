@@ -988,6 +988,8 @@ public:
     return mPageUnloadingEventTimeStamp;
   }
 
+  virtual void NotifyLayerManagerRecreated() = 0;
+
 protected:
   virtual Element *GetRootElementInternal() const = 0;
 

@@ -439,6 +439,12 @@ MediaFormatReader::MediaFormatReader(AbstractMediaDecoder* aDecoder,
 {
   MOZ_ASSERT(aDemuxer);
   MOZ_COUNT_CTOR(MediaFormatReader);
+
+  if (aDecoder && aDecoder->CompositorUpdatedEvent()) {
+    mCompositorUpdatedListener =
+      aDecoder->CompositorUpdatedEvent()->Connect(
+        mTaskQueue, this, &MediaFormatReader::NotifyCompositorUpdated);
+  }
 }
 
 MediaFormatReader::~MediaFormatReader()
@@ -498,6 +504,8 @@ MediaFormatReader::Shutdown()
   mDemuxer = nullptr;
   mPlatform = nullptr;
   mVideoFrameContainer = nullptr;
+
+  mCompositorUpdatedListener.DisconnectIfExists();
 
   return MediaDecoderReader::Shutdown();
 }
