@@ -57,7 +57,6 @@ const PREF_UNIFIED = PREF_BRANCH + "unified";
 
 
 const MESSAGE_TELEMETRY_PAYLOAD = "Telemetry:Payload";
-const MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD = "Telemetry:GetChildPayload";
 const MESSAGE_TELEMETRY_THREAD_HANGS = "Telemetry:ChildThreadHangs";
 const MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS = "Telemetry:GetChildThreadHangs";
 const MESSAGE_TELEMETRY_USS = "Telemetry:USS";
@@ -539,13 +538,6 @@ this.TelemetrySession = Object.freeze({
    */
   getPayload: function(reason, clearSubsession = false) {
     return Impl.getPayload(reason, clearSubsession);
-  },
-  /**
-   * Asks the content processes to send their payloads.
-   * @returns Object
-   */
-  requestChildPayloads: function() {
-    return Impl.requestChildPayloads();
   },
   /**
    * Returns a promise that resolves to an array of thread hang stats from content processes, one entry per process.
@@ -1515,7 +1507,6 @@ var Impl = {
     }
 
     Services.obs.addObserver(this, "content-child-shutdown", false);
-    cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD, this);
     cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS, this);
     cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_USS, this);
 
@@ -1553,14 +1544,6 @@ var Impl = {
       let source = message.data.childUUID;
       delete message.data.childUUID;
 
-      for (let child of this._childTelemetry) {
-        if (child.source === source) {
-          // Update existing telemetry data.
-          child.payload = message.data;
-          return;
-        }
-      }
-      // Did not find existing child in this._childTelemetry.
       this._childTelemetry.push({
         source: source,
         payload: message.data,
@@ -1571,12 +1554,6 @@ var Impl = {
         Telemetry.getHistogramById("TELEMETRY_DISCARDED_CONTENT_PINGS_COUNT").add();
       }
 
-      break;
-    }
-    case MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD:
-    {
-      // In child process, send the requested Telemetry payload
-      this.sendContentProcessPing("saved-session");
       break;
     }
     case MESSAGE_TELEMETRY_THREAD_HANGS:
@@ -1756,11 +1733,6 @@ var Impl = {
     }
     this.gatherMemory();
     return this.getSessionPayload(reason, clearSubsession);
-  },
-
-  requestChildPayloads: function() {
-    this._log.trace("requestChildPayloads");
-    ppmm.broadcastAsyncMessage(MESSAGE_TELEMETRY_GET_CHILD_PAYLOAD, {});
   },
 
   getChildThreadHangs: function getChildThreadHangs() {
