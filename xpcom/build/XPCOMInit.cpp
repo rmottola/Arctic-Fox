@@ -814,6 +814,8 @@ NS_InitMinimalXPCOM()
 
   AbstractThread::InitStatics();
   SharedThreadPool::InitStatics();
+  mozilla::HangMonitor::Startup();
+  mozilla::BackgroundHangMonitor::Startup();
 
   return NS_OK;
 }
