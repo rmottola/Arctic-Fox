@@ -5140,7 +5140,7 @@ bool
 ContentParent::RecvAccumulateChildHistogram(
                 InfallibleTArray<Accumulation>&& aAccumulations)
 {
-  Telemetry::AccumulateChild(aAccumulations);
+  Telemetry::AccumulateChild(GeckoProcessType_Content, aAccumulations);
   return true;
 }
 
@@ -5148,6 +5148,6 @@ bool
 ContentParent::RecvAccumulateChildKeyedHistogram(
                 InfallibleTArray<KeyedAccumulation>&& aAccumulations)
 {
-  Telemetry::AccumulateChildKeyed(aAccumulations);
+  Telemetry::AccumulateChildKeyed(GeckoProcessType_Content, aAccumulations);
   return true;
 }
