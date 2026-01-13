@@ -1250,7 +1250,6 @@ var Impl = {
       simpleMeasurements: simpleMeasurements,
       histograms: protect(() => this.getHistograms(isSubsession, clearSubsession)),
       keyedHistograms: protect(() => this.getKeyedHistograms(isSubsession, clearSubsession)),
-      scalars: protect(() => this.getScalars(isSubsession, clearSubsession)),
     };
 
     // Add extended set measurements common to chrome & content processes
@@ -1264,6 +1263,13 @@ var Impl = {
     if (Utils.isContentProcess) {
       return payloadObj;
     }
+
+    // Set the scalars for the parent process.
+    payloadObj.processes = {
+      parent: {
+        scalars: protect(() => this.getScalars(isSubsession, clearSubsession)),
+      }
+    };
 
     // Additional payload for chrome process.
     payloadObj.info = info;
