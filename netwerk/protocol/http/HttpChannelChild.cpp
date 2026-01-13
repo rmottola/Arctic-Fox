@@ -1671,10 +1671,17 @@ HttpChannelChild::OnRedirectVerifyCallback(nsresult result)
     }
   }
 
+  bool chooseAppcache = false;
+  nsCOMPtr<nsIApplicationCacheChannel> appCacheChannel =
+    do_QueryInterface(newHttpChannel);
+  if (appCacheChannel) {
+    appCacheChannel->GetChooseApplicationCache(&chooseAppcache);
+  }
+
   if (mIPCOpen)
     SendRedirect2Verify(result, *headerTuples, loadFlags, redirectURI,
                         corsPreflightArgs, forceHSTSPriming,
-                        mixedContentWouldBlock);
+                        mixedContentWouldBlock, chooseAppcache);
 
   return NS_OK;
 }
