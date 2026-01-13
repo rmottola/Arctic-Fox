@@ -180,7 +180,7 @@ XMLHttpRequestMainThread::XMLHttpRequestMainThread()
     mProgressTimerIsActive(false),
     mIsHtml(false),
     mWarnAboutSyncHtml(false),
-    mLoadTotal(0),
+    mLoadTotal(-1),
     mIsSystem(false),
     mIsAnon(false),
     mFirstStartRequestSeen(false),
@@ -1047,9 +1047,9 @@ XMLHttpRequestMainThread::CloseRequestWithError(const ProgressEventType aType)
     if (!mFlagSyncLooping) {
       if (mUpload && !mUploadComplete) {
         mUploadComplete = true;
-        DispatchProgressEvent(mUpload, aType, 0, 0);
+        DispatchProgressEvent(mUpload, aType, 0, -1);
       }
-      DispatchProgressEvent(this, aType, 0, 0);
+      DispatchProgressEvent(this, aType, 0, -1);
     }
   }
 
@@ -1323,7 +1323,7 @@ XMLHttpRequestMainThread::DispatchProgressEvent(DOMEventTargetHelper* aTarget,
       return;
     }
     aLoaded = 0;
-    aTotal = 0;
+    aTotal = -1;
   }
 
   if (aType == ProgressEventType::progress) {
@@ -1333,7 +1333,7 @@ XMLHttpRequestMainThread::DispatchProgressEvent(DOMEventTargetHelper* aTarget,
   ProgressEventInit init;
   init.mBubbles = false;
   init.mCancelable = false;
-  init.mLengthComputable = aTotal != 0; // XHR spec step 6.1
+  init.mLengthComputable = aTotal != -1; // XHR spec step 6.1
   init.mLoaded = aLoaded;
   init.mTotal = (aTotal == -1) ? 0 : aTotal;
 
@@ -2216,7 +2216,11 @@ XMLHttpRequestMainThread::ChangeStateToDone()
     mTimeoutTimer->Cancel();
   }
 
-  mLoadTotal = mLoadTransferred;
+  if (mLoadTransferred) {
+    mLoadTotal = mLoadTransferred;
+  } else {
+    mLoadTotal = -1;
+  }
 
   // Per spec, fire the last download progress event, if any,
   // before readystatechange=4/done. (Note that 0-sized responses
@@ -2234,7 +2238,7 @@ XMLHttpRequestMainThread::ChangeStateToDone()
   // Per spec, if we failed in the upload phase, fire a final error
   // and loadend events for the upload after readystatechange=4/done.
   if (!mFlagSynchronous && mUpload && !mUploadComplete) {
-    DispatchProgressEvent(mUpload, ProgressEventType::error, 0, 0);
+    DispatchProgressEvent(mUpload, ProgressEventType::error, 0, -1);
   }
 
   // Per spec, fire download's load/error and loadend events after
@@ -2243,7 +2247,7 @@ XMLHttpRequestMainThread::ChangeStateToDone()
                         mErrorLoad ? ProgressEventType::error :
                                      ProgressEventType::load,
                         mErrorLoad ? 0 : mLoadTransferred,
-                        mErrorLoad ? 0 : mLoadTotal);
+                        mErrorLoad ? -1 : mLoadTotal);
 
   if (mErrorLoad) {
     // By nulling out channel here we make it so that Send() can test
@@ -2808,7 +2812,7 @@ XMLHttpRequestMainThread::SendInternal(const RequestBodyBase* aBody)
   // By default we don't have any upload, so mark upload complete.
   mUploadComplete = true;
   mErrorLoad = false;
-  mLoadTotal = 0;
+  mLoadTotal = -1;
   nsCOMPtr<nsIInputStream> uploadStream;
   nsAutoCString uploadContentType;
   nsCOMPtr<nsIHttpChannel> httpChannel(do_QueryInterface(mChannel));
@@ -2958,7 +2962,7 @@ XMLHttpRequestMainThread::SendInternal(const RequestBodyBase* aBody)
       StartProgressEventTimer();
     }
     // Dispatch loadstart events
-    DispatchProgressEvent(this, ProgressEventType::loadstart, 0, 0);
+    DispatchProgressEvent(this, ProgressEventType::loadstart, 0, -1);
     if (mUpload && !mUploadComplete) {
       DispatchProgressEvent(mUpload, ProgressEventType::loadstart,
                             0, mUploadTotal);
@@ -3318,8 +3322,9 @@ XMLHttpRequestMainThread::OnProgress(nsIRequest *aRequest, nsISupports *aContext
       StartProgressEventTimer();
     }
   } else {
-    mLoadTotal = lengthComputable ? aProgressMax : 0;
+    mLoadTotal = lengthComputable ? aProgressMax : -1;
     mLoadTransferred = aProgress;
+  
     // OnDataAvailable() handles mProgressSinceLastProgressEvent
     // for the download phase.
   }
