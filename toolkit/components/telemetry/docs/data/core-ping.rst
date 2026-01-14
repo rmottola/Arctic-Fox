@@ -22,7 +22,9 @@ Submission will be per the Edge server specification::
 Note: Counts below (e.g. search & usage times) are “since the last
 ping”, not total for the whole application lifetime.
 
-Structure::
+Structure:
+
+.. code-block:: js
 
     {
       "v": 7, // ping format version
