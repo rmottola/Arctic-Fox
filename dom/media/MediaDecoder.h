@@ -252,8 +252,6 @@ protected:
   void UpdateEstimatedMediaDuration(int64_t aDuration) override;
 
 public:
-  // Set a flag indicating whether random seeking is supported
-  void SetMediaSeekable(bool aMediaSeekable);
   // Set a flag indicating whether seeking is supported only in buffered ranges
   void SetMediaSeekableOnlyInBufferedRanges(bool aMediaSeekableOnlyInBufferedRanges);
 
@@ -576,7 +574,7 @@ private:
 
   void OnMediaNotSeekable()
   {
-    SetMediaSeekable(false);
+    mMediaSeekable = false;
   }
 
   void FinishShutdown();
