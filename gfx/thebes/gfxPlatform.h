@@ -134,7 +134,8 @@ enum class DeviceResetReason
   INVALID_CALL,
   OUT_OF_MEMORY,
   FORCED_RESET,
-  UNKNOWN
+  UNKNOWN,
+  D3D9_RESET
 };
 
 enum class ForcedDeviceResetReason
