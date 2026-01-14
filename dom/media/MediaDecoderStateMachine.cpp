@@ -242,6 +242,8 @@ protected:
            (Reader()->IsWaitForDataSupported() &&
             (Reader()->IsWaitingAudioData() || Reader()->IsWaitingVideoData()));
   }
+  MediaQueue<MediaData>& AudioQueue() { return mMaster->mAudioQueue; }
+  MediaQueue<MediaData>& VideoQueue() { return mMaster->mVideoQueue; }
 
   // Note this function will delete the current state object.
   // Don't access members to avoid UAF after this call.
@@ -812,7 +814,7 @@ public:
       mSeekTask = new NextFrameSeekTask(
         mMaster->mDecoderID, OwnerThread(), Reader(), mSeekJob.mTarget,
         Info(), mMaster->Duration(),mMaster->GetMediaTime(),
-        mMaster->AudioQueue(), mMaster->VideoQueue());
+        AudioQueue(), VideoQueue());
     } else {
       MOZ_DIAGNOSTIC_ASSERT(false, "Cannot handle this seek task.");
     }
@@ -916,11 +918,11 @@ private:
     }
 
     if (aValue.mIsAudioQueueFinished) {
-      mMaster->AudioQueue().Finish();
+      AudioQueue().Finish();
     }
 
     if (aValue.mIsVideoQueueFinished) {
-      mMaster->VideoQueue().Finish();
+      VideoQueue().Finish();
     }
 
     SeekCompleted();
@@ -931,11 +933,11 @@ private:
     mSeekTaskRequest.Complete();
 
     if (aValue.mIsAudioQueueFinished) {
-      mMaster->AudioQueue().Finish();
+      AudioQueue().Finish();
     }
 
     if (aValue.mIsVideoQueueFinished) {
-      mMaster->VideoQueue().Finish();
+      VideoQueue().Finish();
     }
 
     mMaster->DecodeError(aValue.mError);
@@ -1450,8 +1452,8 @@ DecodingFirstFrameState::MaybeFinishDecodeFirstFrame()
 {
   MOZ_ASSERT(!mMaster->mSentFirstFrameLoadedEvent);
 
-  if ((mMaster->IsAudioDecoding() && mMaster->AudioQueue().GetSize() == 0) ||
-      (mMaster->IsVideoDecoding() && mMaster->VideoQueue().GetSize() == 0)) {
+  if ((mMaster->IsAudioDecoding() && AudioQueue().GetSize() == 0) ||
+      (mMaster->IsVideoDecoding() && VideoQueue().GetSize() == 0)) {
     return;
   }
 
@@ -1596,7 +1598,7 @@ SeekingState::SeekCompleted()
   if (seekTime == mMaster->Duration().ToMicroseconds()) {
     newCurrentTime = seekTime;
   } else if (mMaster->HasAudio()) {
-    RefPtr<MediaData> audio = mMaster->AudioQueue().PeekFront();
+    RefPtr<MediaData> audio = AudioQueue().PeekFront();
     // Though we adjust the newCurrentTime in audio-based, and supplemented
     // by video. For better UX, should NOT bind the slide position to
     // the first audio data timestamp directly.
