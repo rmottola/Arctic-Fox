@@ -61,6 +61,7 @@ GPUProcessManager::Shutdown()
 GPUProcessManager::GPUProcessManager()
  : mTaskFactory(this),
    mNextLayerTreeId(0),
+   mNextResetSequenceNo(0),
    mNumProcessAttempts(0),
    mDeviceResetCount(0),
    mProcess(nullptr),
@@ -303,10 +304,12 @@ GPUProcessManager::OnProcessDeviceReset(GPUProcessHost* aHost)
     HandleProcessLost();
     return;
   }
+  
+  uint64_t seqNo = GetNextDeviceResetSequenceNumber();
 
   // We're good, do a reset like normal
   for (auto& session : mRemoteSessions) {
-    session->NotifyDeviceReset();
+    session->NotifyDeviceReset(seqNo);
   }
 }
 
