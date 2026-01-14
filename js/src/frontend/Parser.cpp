@@ -3800,10 +3800,8 @@ Parser<ParseHandler>::statementList(YieldHandling yieldHandling)
         if (tt == TOK_EOF || tt == TOK_RC)
             break;
         if (afterReturn) {
-            TokenPos pos(0, 0);
-            if (!tokenStream.peekTokenPos(&pos, TokenStream::Operand))
+            if (!tokenStream.peekOffset(&statementBegin, TokenStream::Operand))
                 return null();
-            statementBegin = pos.begin;
         }
         Node next = statementListItem(yieldHandling, canHaveDirectives);
         if (!next) {
@@ -5749,10 +5747,8 @@ Parser<ParseHandler>::switchStatement(YieldHandling yieldHandling)
             if (tt == TOK_RC || tt == TOK_CASE || tt == TOK_DEFAULT)
                 break;
             if (afterReturn) {
-                TokenPos pos(0, 0);
-                if (!tokenStream.peekTokenPos(&pos, TokenStream::Operand))
+                if (!tokenStream.peekOffset(&statementBegin, TokenStream::Operand))
                     return null();
-                statementBegin = pos.begin;
             }
             Node stmt = statementListItem(yieldHandling);
             if (!stmt)
