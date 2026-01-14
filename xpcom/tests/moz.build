@@ -30,7 +30,6 @@ SimplePrograms([
     'TestRacingServiceManager',
     'TestRegistrationOrder',
     'TestThreadPoolListener',
-    'TestTimers',
     'TestUnicodeArguments',
 ])
 
@@ -63,7 +62,8 @@ GeckoCppUnitTests([
     'TestStringAPI',
     'TestTArray',
     'TestTextFormatter',
-    'TestThreadUtils'
+    'TestThreadUtils',
+    'TestTimers'
 ])
 
 if CONFIG['MOZ_MEMORY']:
