@@ -1006,6 +1006,24 @@ var Impl = {
     return ret;
   },
 
+  getEvents: function(isSubsession, clearSubsession) {
+    if (!isSubsession) {
+      // We only support scalars for subsessions.
+      this._log.trace("getEvents - We only support events in subsessions.");
+      return [];
+    }
+
+    let events = Telemetry.snapshotBuiltinEvents(this.getDatasetType(),
+                                                 clearSubsession);
+
+    // Don't return the test events outside of test environments.
+    if (!this._testing) {
+      events = events.filter(e => e[1].startsWith("telemetry.test"));
+    }
+
+    return events;
+  },
+
   getThreadHangStats: function getThreadHangStats(stats) {
     this._log.trace("getThreadHangStats");
 
@@ -1296,6 +1314,7 @@ var Impl = {
       parent: {
         scalars: protect(() => this.getScalars(isSubsession, clearSubsession)),
         keyedScalars: protect(() => this.getScalars(isSubsession, clearSubsession, true)),
+        events: protect(() => this.getEvents(isSubsession, clearSubsession)),
       },
       content: {
         histograms: histograms[HISTOGRAM_SUFFIXES.CONTENT],
