@@ -44,6 +44,7 @@
 #include "TelemetryCommon.h"
 #include "TelemetryHistogram.h"
 #include "TelemetryScalar.h"
+#include "TelemetryEvent.h"
 #include "WebrtcTelemetry.h"
 #include "nsTHashtable.h"
 #include "nsHashKeys.h"
@@ -1869,6 +1870,7 @@ NS_IMETHODIMP
 TelemetryImpl::SetCanRecordBase(bool canRecord) {
   TelemetryHistogram::SetCanRecordBase(canRecord);
   TelemetryScalar::SetCanRecordBase(canRecord);
+  TelemetryEvent::SetCanRecordBase(canRecord);
   return NS_OK;
 }
 
@@ -1889,6 +1891,7 @@ NS_IMETHODIMP
 TelemetryImpl::SetCanRecordExtended(bool canRecord) {
   TelemetryHistogram::SetCanRecordExtended(canRecord);
   TelemetryScalar::SetCanRecordExtended(canRecord);
+  TelemetryEvent::SetCanRecordExtended(canRecord);
   return NS_OK;
 }
 
@@ -1922,6 +1925,9 @@ TelemetryImpl::CreateTelemetryInstance()
   // Only record scalars from the parent process.
   TelemetryScalar::InitializeGlobalState(XRE_IsParentProcess(), XRE_IsParentProcess());
 
+  // Only record events from the parent process.
+  TelemetryEvent::InitializeGlobalState(XRE_IsParentProcess(), XRE_IsParentProcess());
+
   // Now, create and initialize the Telemetry global state.
   sTelemetry = new TelemetryImpl();
 
@@ -1947,6 +1953,7 @@ TelemetryImpl::ShutdownTelemetry()
   // so as to release any heap storage that would otherwise be kept alive by it.
   TelemetryHistogram::DeInitializeGlobalState();
   TelemetryScalar::DeInitializeGlobalState();
+  TelemetryEvent::DeInitializeGlobalState();
 }
 
 void
@@ -2311,13 +2318,7 @@ TelemetryImpl::GetFileIOReports(JSContext *cx, JS::MutableHandleValue ret)
 NS_IMETHODIMP
 TelemetryImpl::MsSinceProcessStart(double* aResult)
 {
-  bool error;
-  *aResult = (TimeStamp::NowLoRes() -
-              TimeStamp::ProcessCreation(error)).ToMilliseconds();
-  if (error) {
-    return NS_ERROR_NOT_AVAILABLE;
-  }
-  return NS_OK;
+  return Telemetry::Common::MsSinceProcessStart(aResult);
 }
 
 // Telemetry Scalars IDL Implementation
@@ -2353,6 +2354,31 @@ TelemetryImpl::ClearScalars()
   TelemetryScalar::ClearScalars();
   return NS_OK;
 }
+
+// Telemetry Event IDL implementation.
+
+NS_IMETHODIMP
+TelemetryImpl::RecordEvent(const nsACString & aCategory, const nsACString & aMethod,
+                           const nsACString & aObject, JS::HandleValue aValue,
+                           JS::HandleValue aExtra, JSContext* aCx, uint8_t optional_argc)
+{
+  return TelemetryEvent::RecordEvent(aCategory, aMethod, aObject, aValue, aExtra, aCx, optional_argc);
+}
+
+NS_IMETHODIMP
+TelemetryImpl::SnapshotBuiltinEvents(uint32_t aDataset, bool aClear, JSContext* aCx,
+                                     uint8_t optional_argc, JS::MutableHandleValue aResult)
+{
+  return TelemetryEvent::CreateSnapshots(aDataset, aClear, aCx, optional_argc, aResult);
+}
+
+NS_IMETHODIMP
+TelemetryImpl::ClearEvents()
+{
+  TelemetryEvent::ClearEvents();
+  return NS_OK;
+}
+
 
 NS_IMETHODIMP
 TelemetryImpl::FlushBatchedChildTelemetry()
@@ -2392,6 +2418,7 @@ TelemetryImpl::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
 
   n += TelemetryHistogram::GetHistogramSizesofIncludingThis(aMallocSizeOf);
   n += TelemetryScalar::GetScalarSizesOfIncludingThis(aMallocSizeOf);
+  n += TelemetryEvent::SizeOfIncludingThis(aMallocSizeOf);
 
   return n;
 }
