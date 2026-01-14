@@ -256,6 +256,14 @@ GPUProcessManager::OnProcessLaunchComplete(GPUProcessHost* aHost)
 }
 
 void
+GPUProcessManager::OnProcessDeviceReset(GPUProcessHost* aHost)
+{
+  for (auto& session : mRemoteSessions) {
+    session->NotifyDeviceReset();
+  }
+}
+
+void
 GPUProcessManager::OnProcessUnexpectedShutdown(GPUProcessHost* aHost)
 {
   MOZ_ASSERT(mProcess && mProcess == aHost);
