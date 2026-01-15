@@ -194,8 +194,7 @@ public:
 
   // Event handlers for various events.
   virtual void HandleCDMProxyReady() {}
-
-  virtual bool HandleAudioDecoded(MediaData* aAudio) { return false; }
+  virtual void HandleAudioDecoded(MediaData* aAudio) {}
 
   virtual bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart)
   {
@@ -490,11 +489,10 @@ public:
     return DECODER_STATE_DECODING_FIRSTFRAME;
   }
 
-  bool HandleAudioDecoded(MediaData* aAudio) override
+  void HandleAudioDecoded(MediaData* aAudio) override
   {
     mMaster->Push(aAudio, MediaData::AUDIO_DATA);
     MaybeFinishDecodeFirstFrame();
-    return true;
   }
 
   bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
@@ -590,11 +588,10 @@ public:
     return DECODER_STATE_DECODING;
   }
 
-  bool HandleAudioDecoded(MediaData* aAudio) override
+  void HandleAudioDecoded(MediaData* aAudio) override
   {
     mMaster->Push(aAudio, MediaData::AUDIO_DATA);
     MaybeStopPrerolling();
-    return true;
   }
 
   bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
@@ -861,10 +858,9 @@ public:
     return DECODER_STATE_SEEKING;
   }
 
-  bool HandleAudioDecoded(MediaData* aAudio) override
+  void HandleAudioDecoded(MediaData* aAudio) override
   {
     MOZ_ASSERT(false);
-    return true;
   }
 
   bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
@@ -974,13 +970,12 @@ public:
     return DECODER_STATE_BUFFERING;
   }
 
-  bool HandleAudioDecoded(MediaData* aAudio) override
+  void HandleAudioDecoded(MediaData* aAudio) override
   {
     // This might be the sample we need to exit buffering.
     // Schedule Step() to check it.
     mMaster->Push(aAudio, MediaData::AUDIO_DATA);
     mMaster->ScheduleStateMachine();
-    return true;
   }
 
   bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
