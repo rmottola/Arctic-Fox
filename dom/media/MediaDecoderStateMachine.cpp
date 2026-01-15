@@ -193,8 +193,7 @@ public:
   virtual State GetState() const = 0;
 
   // Event handlers for various events.
-  // Return true if the event is handled by this state object.
-  virtual bool HandleCDMProxyReady() { return false; }
+  virtual void HandleCDMProxyReady() {}
 
   virtual bool HandleAudioDecoded(MediaData* aAudio) { return false; }
 
@@ -376,7 +375,7 @@ public:
     return DECODER_STATE_WAIT_FOR_CDM;
   }
 
-  bool HandleCDMProxyReady() override;
+  void HandleCDMProxyReady() override;
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override
   {
@@ -1327,12 +1326,11 @@ DormantState::HandlePlayStateChanged(MediaDecoder::PlayState aPlayState)
   }
 }
 
-bool
+void
 MediaDecoderStateMachine::
 WaitForCDMState::HandleCDMProxyReady()
 {
   SetState<DecodingFirstFrameState>(Move(mPendingSeek));
-  return true;
 }
 
 void
