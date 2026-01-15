@@ -278,7 +278,6 @@ protected:
  * Transition to other states when decoding metadata is done:
  *   SHUTDOWN if failing to decode metadata.
  *   WAIT_FOR_CDM if the media is encrypted and CDM is not available.
- *   DORMANT if any pending dormant request.
  *   DECODING_FIRSTFRAME otherwise.
  */
 class MediaDecoderStateMachine::DecodeMetadataState
@@ -352,7 +351,6 @@ private:
  * Purpose: wait for the CDM to start decoding.
  *
  * Transition to other states when CDM is ready:
- *   DORMANT if any pending dormant request.
  *   DECODING_FIRSTFRAME otherwise.
  */
 class MediaDecoderStateMachine::WaitForCDMState
@@ -460,7 +458,6 @@ private:
  * Purpose: decode the 1st audio and video frames to fire the 'loadeddata' event.
  *
  * Transition to:
- *   DORMANT if any dormant request.
  *   SHUTDOWN if any decode error.
  *   SEEKING if any pending seek and seek is possible.
  *   DECODING when the 'loadeddata' event is fired.
@@ -475,7 +472,7 @@ public:
 
   void Exit() override
   {
-    // mPendingSeek is either moved before transition to SEEKING or DORMANT,
+    // mPendingSeek is either moved before transition to SEEKING,
     // or should be rejected here before transition to SHUTDOWN.
     mPendingSeek.RejectIfExists(__func__);
   }
@@ -530,7 +527,7 @@ private:
  * Purpose: decode audio/video data for playback.
  *
  * Transition to:
- *   DORMANT if any dormant request.
+ *   DORMANT if playback is paused for a while.
  *   SEEKING if any seek request.
  *   SHUTDOWN if any decode error.
  *   BUFFERING if playback can't continue due to lack of decoded data.
@@ -769,7 +766,6 @@ private:
  * Purpose: seek to a particular new playback position.
  *
  * Transition to:
- *   DORMANT if any dormant request.
  *   SEEKING if any new seek request.
  *   SHUTDOWN if seek failed.
  *   COMPLETED if the new playback position is the end of the media resource.
@@ -945,7 +941,6 @@ private:
  * Purpose: stop playback until enough data is decoded to continue playback.
  *
  * Transition to:
- *   DORMANT if any dormant request.
  *   SEEKING if any seek request.
  *   SHUTDOWN if any decode error.
  *   COMPLETED when having decoded all audio/video data.
@@ -1023,7 +1018,6 @@ private:
  * Purpose: play all the decoded data and fire the 'ended' event.
  *
  * Transition to:
- *   DORMANT if any dormant request.
  *   SEEKING if any seek request.
  */
 class MediaDecoderStateMachine::CompletedState
