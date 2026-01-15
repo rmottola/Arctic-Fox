@@ -1746,10 +1746,6 @@ pref("network.http.referer.trimmingPolicy", 0);
 // 0=always send, 1=send if base domains match, 2=send if hosts match
 pref("network.http.referer.XOriginPolicy", 0);
 
-// Controls whether we send HTTPS referrers to other HTTPS sites.
-// By default this is enabled for compatibility (see bug 141641)
-pref("network.http.sendSecureXSiteReferrer", true);
-
 // Controls whether referrer attributes in <a>, <img>, <area>, and <iframe> are honoured
 pref("network.http.enablePerElementReferrer", true);
 
