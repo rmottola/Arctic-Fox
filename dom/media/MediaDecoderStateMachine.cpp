@@ -196,8 +196,7 @@ public:
   virtual void HandleCDMProxyReady() {}
   virtual void HandleAudioDecoded(MediaData* aAudio) {}
   virtual void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) {}
-
-  virtual bool HandleEndOfStream() { return false; }
+  virtual void HandleEndOfStream() {}
 
   virtual bool HandleWaitingForData() { return false; }
 
@@ -497,10 +496,9 @@ public:
     MaybeFinishDecodeFirstFrame();
   }
 
-  bool HandleEndOfStream() override
+  void HandleEndOfStream() override
   {
     MaybeFinishDecodeFirstFrame();
-    return true;
   }
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
@@ -598,7 +596,7 @@ public:
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
 
-  bool HandleEndOfStream() override;
+  void HandleEndOfStream() override;
 
   bool HandleWaitingForData() override
   {
@@ -979,7 +977,7 @@ public:
     mMaster->ScheduleStateMachine();
   }
 
-  bool HandleEndOfStream() override;
+  void HandleEndOfStream() override;
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
 
@@ -1435,7 +1433,7 @@ DecodingState::HandleSeek(SeekTarget aTarget)
   return SetState<SeekingState>(Move(seekJob));
 }
 
-bool
+void
 MediaDecoderStateMachine::
 DecodingState::HandleEndOfStream()
 {
@@ -1444,7 +1442,6 @@ DecodingState::HandleEndOfStream()
   } else {
     MaybeStopPrerolling();
   }
-  return true;
 }
 
 void
@@ -1608,7 +1605,7 @@ BufferingState::Step()
   SetState<DecodingState>();
 }
 
-bool
+void
 MediaDecoderStateMachine::
 BufferingState::HandleEndOfStream()
 {
@@ -1618,7 +1615,6 @@ BufferingState::HandleEndOfStream()
     // Check if we can exit buffering.
     mMaster->ScheduleStateMachine();
   }
-  return true;
 }
 
 RefPtr<MediaDecoder::SeekPromise>
