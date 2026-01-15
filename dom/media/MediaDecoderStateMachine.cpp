@@ -217,6 +217,12 @@ private:
   auto ReturnTypeHelper(R(S::*)(As...)) -> R;
 
 protected:
+  enum class EventVisibility : int8_t
+  {
+    Observable,
+    Suppressed
+  };
+
   using Master = MediaDecoderStateMachine;
   explicit StateObject(Master* aPtr) : mMaster(aPtr) {}
   TaskQueue* OwnerThread() const { return mMaster->mTaskQueue; }
@@ -757,7 +763,8 @@ class MediaDecoderStateMachine::SeekingState
 public:
   explicit SeekingState(Master* aPtr) : StateObject(aPtr) {}
 
-  RefPtr<MediaDecoder::SeekPromise> Enter(SeekJob aSeekJob)
+  RefPtr<MediaDecoder::SeekPromise> Enter(SeekJob aSeekJob,
+                                          EventVisibility aVisibility)
   {
     mSeekJob = Move(aSeekJob);
 
@@ -800,8 +807,7 @@ public:
     mMaster->UpdatePlaybackPositionInternal(
       mSeekTask->GetSeekTarget().GetTime().ToMicroseconds());
 
-    if (mSeekJob.mTarget.mEventVisibility ==
-        MediaDecoderEventVisibility::Observable) {
+    if (aVisibility == EventVisibility::Observable) {
       mMaster->mOnPlaybackEvent.Notify(MediaEventType::SeekStarted);
     }
 
@@ -1139,7 +1145,7 @@ StateObject::HandleSeek(SeekTarget aTarget)
   SLOG("Changed state to SEEKING (to %lld)", aTarget.GetTime().ToMicroseconds());
   SeekJob seekJob;
   seekJob.mTarget = aTarget;
-  return SetState<SeekingState>(Move(seekJob));
+  return SetState<SeekingState>(Move(seekJob), EventVisibility::Observable);
 }
 
 RefPtr<ShutdownPromise>
@@ -1215,7 +1221,7 @@ StateObject::HandleResumeVideoDecoding()
                                MediaDecoderEventVisibility::Suppressed,
                                true /* aVideoOnly */);
 
-  SetState<SeekingState>(Move(seekJob))->Then(
+  SetState<SeekingState>(Move(seekJob), EventVisibility::Suppressed)->Then(
     AbstractThread::MainThread(), __func__,
     [start, info, hw](){ ReportRecoveryTelemetry(start, info, hw); },
     [](){});
@@ -1292,7 +1298,7 @@ DormantState::HandlePlayStateChanged(MediaDecoder::PlayState aPlayState)
     // Exit dormant when the user wants to play.
     MOZ_ASSERT(!Info().IsEncrypted() || mMaster->mCDMProxy);
     MOZ_ASSERT(mMaster->mSentFirstFrameLoadedEvent);
-    SetState<SeekingState>(Move(mPendingSeek));
+    SetState<SeekingState>(Move(mPendingSeek), EventVisibility::Suppressed);
   }
 }
 
@@ -1311,7 +1317,7 @@ DecodingFirstFrameState::Enter(SeekJob aPendingSeek)
   if (aPendingSeek.Exists() &&
       (mMaster->mSentFirstFrameLoadedEvent ||
        Reader()->ForceZeroStartTime())) {
-    SetState<SeekingState>(Move(aPendingSeek));
+    SetState<SeekingState>(Move(aPendingSeek), EventVisibility::Observable);
     return;
   }
 
@@ -1365,7 +1371,7 @@ DecodingFirstFrameState::MaybeFinishDecodeFirstFrame()
   mMaster->FinishDecodeFirstFrame();
 
   if (mPendingSeek.Exists()) {
-    SetState<SeekingState>(Move(mPendingSeek));
+    SetState<SeekingState>(Move(mPendingSeek), EventVisibility::Observable);
   } else {
     SetState<DecodingState>();
   }
