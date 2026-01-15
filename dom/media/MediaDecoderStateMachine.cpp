@@ -194,7 +194,7 @@ public:
 
   // Event handlers for various events.
   // Return true if the event is handled by this state object.
-  virtual bool HandleDormant(bool aDormant);
+  bool HandleDormant(bool aDormant);
 
   virtual bool HandleCDMProxyReady() { return false; }
 
@@ -320,7 +320,7 @@ public:
     return DECODER_STATE_DECODING_METADATA;
   }
 
-  bool HandleDormant(bool aDormant) override
+  bool HandleDormant(bool aDormant)
   {
     mPendingDormant = aDormant;
     return true;
@@ -392,7 +392,7 @@ public:
     return DECODER_STATE_WAIT_FOR_CDM;
   }
 
-  bool HandleDormant(bool aDormant) override;
+  bool HandleDormant(bool aDormant);
 
   bool HandleCDMProxyReady() override;
 
@@ -455,7 +455,7 @@ public:
     return DECODER_STATE_DORMANT;
   }
 
-  bool HandleDormant(bool aDormant) override;
+  bool HandleDormant(bool aDormant);
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
 
@@ -532,7 +532,7 @@ public:
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
 
-  bool HandleDormant(bool aDormant) override;
+  bool HandleDormant(bool aDormant);
 
   void HandleVideoSuspendTimeout() override
   {
@@ -879,7 +879,7 @@ public:
     return DECODER_STATE_SEEKING;
   }
 
-  bool HandleDormant(bool aDormant) override;
+  bool HandleDormant(bool aDormant);
 
   bool HandleAudioDecoded(MediaData* aAudio) override
   {
@@ -1161,7 +1161,7 @@ public:
     return DECODER_STATE_SHUTDOWN;
   }
 
-  bool HandleDormant(bool aDormant) override
+  bool HandleDormant(bool aDormant)
   {
     return true;
   }
