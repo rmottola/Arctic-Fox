@@ -1888,7 +1888,7 @@ HttpChannelChild::AsyncOpen(nsIStreamListener *listener, nsISupports *aContext)
   LOG(("HttpChannelChild::AsyncOpen [this=%p uri=%s]\n", this, mSpec.get()));
 
 #ifdef DEBUG
-  CheckPrivateBrowsing();
+  AssertPrivateBrowsingId();
 #endif
 
   if (mCanceled)
