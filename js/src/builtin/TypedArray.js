@@ -1658,3 +1658,10 @@ function ArrayBufferSpecies() {
     return this;
 }
 _SetCanonicalName(ArrayBufferSpecies, "get [Symbol.species]");
+
+// ES 2017 proposal
+function SharedArrayBufferSpecies() {
+    // Step 1.
+    return this;
+}
+_SetCanonicalName(SharedArrayBufferSpecies, "get [Symbol.species]");
