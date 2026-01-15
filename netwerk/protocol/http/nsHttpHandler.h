@@ -369,6 +369,11 @@ public:
         return mKeepEmptyResponseHeadersAsEmtpyString;
     }
 
+    uint32_t DefaultHpackBuffer() const
+    {
+        return mDefaultHpackBuffer;
+    }
+
 private:
     virtual ~nsHttpHandler();
 
@@ -583,6 +588,9 @@ private:
     // Call SetHeader with an empty value will still delete the header.
     // (Bug 6699259)
     bool mKeepEmptyResponseHeadersAsEmtpyString;
+
+    // The default size (in bytes) of the HPACK decompressor table.
+    uint32_t mDefaultHpackBuffer;
 
 private:
     // For Rate Pacing Certain Network Events. Only assign this pointer on
