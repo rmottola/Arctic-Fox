@@ -3753,9 +3753,6 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
 
   LOG(LogLevel::Debug, ("%p Cloned decoder %p from %p", this, decoder.get(), aOriginal));
 
-  decoder->SetMediaSeekableOnlyInBufferedRanges(
-    aOriginal->IsMediaSeekableOnlyInBufferedRanges());
-
   RefPtr<MediaResource> resource =
     originalResource->CloneData(decoder->GetResourceCallback());
 
