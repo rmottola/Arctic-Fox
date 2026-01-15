@@ -8219,6 +8219,7 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
     return NS_ERROR_FAILURE;
 
   EventMessage msg;
+  WidgetMouseEvent::ExitFrom exitFrom = WidgetMouseEvent::eChild;
   bool contextMenuKey = false;
   if (aType.EqualsLiteral("mousedown")) {
     msg = eMouseDown;
@@ -8230,6 +8231,9 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
     msg = eMouseEnterIntoWidget;
   } else if (aType.EqualsLiteral("mouseout")) {
     msg = eMouseExitFromWidget;
+  } else if (aType.EqualsLiteral("mousecancel")) {
+    msg = eMouseExitFromWidget;
+    exitFrom = WidgetMouseEvent::eTopLevel;
   } else if (aType.EqualsLiteral("mouselongtap")) {
     msg = eMouseLongTap;
   } else if (aType.EqualsLiteral("contextmenu")) {
@@ -8261,6 +8265,7 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
   event.mClickCount = aClickCount;
   event.mTime = PR_IntervalNow();
   event.mFlags.mIsSynthesizedForTests = aIsDOMEventSynthesized;
+  event.mExitFrom = exitFrom;
 
   nsPresContext* presContext = aPresShell->GetPresContext();
   if (!presContext)
