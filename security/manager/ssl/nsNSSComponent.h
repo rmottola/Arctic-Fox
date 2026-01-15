@@ -211,7 +211,7 @@ private:
 #endif
 
 #ifdef DEBUG
-  nsAutoString mTestBuiltInRootHash;
+  nsString mTestBuiltInRootHash;
 #endif
   nsString mContentSigningRootHash;
 
