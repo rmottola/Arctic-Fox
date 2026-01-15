@@ -231,6 +231,10 @@ CacheIOThread::CacheIOThread()
 , mInsideLoop(true)
 #endif
 {
+  for (uint32_t i = 0; i < LAST_LEVEL; ++i) {
+    mQueueLength[i] = 0;
+  }
+
   sSelf = this;
 }
 
@@ -303,6 +307,8 @@ nsresult CacheIOThread::DispatchAfterPendingOpens(nsIRunnable* aRunnable)
 
   // Move everything from later executed OPEN level to the OPEN_PRIORITY level
   // where we post the (eviction) runnable.
+  mQueueLength[OPEN_PRIORITY] += mEventQueue[OPEN].Length();
+  mQueueLength[OPEN] -= mEventQueue[OPEN].Length();
   mEventQueue[OPEN_PRIORITY].AppendElements(mEventQueue[OPEN]);
   mEventQueue[OPEN].Clear();
 
@@ -319,6 +325,7 @@ nsresult CacheIOThread::DispatchInternal(already_AddRefed<nsIRunnable> aRunnable
 
   mMonitor.AssertCurrentThreadOwns();
 
+  ++mQueueLength[aLevel];
   mEventQueue[aLevel].AppendElement(runnable.forget());
   if (mLowestLevelWaiting > aLevel)
     mLowestLevelWaiting = aLevel;
@@ -552,6 +559,8 @@ void CacheIOThread::LoopOneLevel(uint32_t aLevel)
         returnEvents = true;
         break;
       }
+
+      --mQueueLength[aLevel];
 
       // Release outside the lock.
       events[index] = nullptr;
