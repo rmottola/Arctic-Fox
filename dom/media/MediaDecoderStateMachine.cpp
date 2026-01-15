@@ -3100,7 +3100,6 @@ MediaDecoderStateMachine::AudioEndTime() const
   if (mMediaSink->IsStarted()) {
     return mMediaSink->GetEndTime(TrackInfo::kAudioTrack);
   }
-  MOZ_ASSERT(!HasAudio());
   return -1;
 }
 
