@@ -1414,6 +1414,16 @@ OOMTest(JSContext* cx, unsigned argc, Value* vp)
             cx->clearPendingException();
             cx->runtime()->hadOutOfMemory = false;
 
+#ifdef JS_TRACE_LOGGING
+            // Reset the TraceLogger state if enabled.
+            TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+            if (logger->enabled()) {
+                while (logger->enabled())
+                    logger->disable();
+                logger->enable(cx);
+            }
+#endif
+
             allocation++;
         } while (handledOOM);
 
