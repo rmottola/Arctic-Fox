@@ -195,11 +195,7 @@ public:
   // Event handlers for various events.
   virtual void HandleCDMProxyReady() {}
   virtual void HandleAudioDecoded(MediaData* aAudio) {}
-
-  virtual bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart)
-  {
-    return false;
-  }
+  virtual void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) {}
 
   virtual bool HandleEndOfStream() { return false; }
 
@@ -495,11 +491,10 @@ public:
     MaybeFinishDecodeFirstFrame();
   }
 
-  bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
+  void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
     mMaster->Push(aVideo, MediaData::VIDEO_DATA);
     MaybeFinishDecodeFirstFrame();
-    return true;
   }
 
   bool HandleEndOfStream() override
@@ -594,12 +589,11 @@ public:
     MaybeStopPrerolling();
   }
 
-  bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
+  void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
     mMaster->Push(aVideo, MediaData::VIDEO_DATA);
     MaybeStopPrerolling();
     CheckSlowDecoding(aDecodeStart);
-    return true;
   }
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
@@ -863,10 +857,9 @@ public:
     MOZ_ASSERT(false);
   }
 
-  bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
+  void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
     MOZ_ASSERT(false);
-    return true;
   }
 
   RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
@@ -978,13 +971,12 @@ public:
     mMaster->ScheduleStateMachine();
   }
 
-  bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
+  void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
     // This might be the sample we need to exit buffering.
     // Schedule Step() to check it.
     mMaster->Push(aVideo, MediaData::VIDEO_DATA);
     mMaster->ScheduleStateMachine();
-    return true;
   }
 
   bool HandleEndOfStream() override;
