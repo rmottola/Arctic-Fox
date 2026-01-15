@@ -2535,13 +2535,6 @@ void MediaDecoderStateMachine::RecomputeDuration()
   mDuration = Some(duration);
 }
 
-void
-MediaDecoderStateMachine::SetDormant(bool aDormant)
-{
-  MOZ_ASSERT(OnTaskQueue());
-  mStateObj->HandleDormant(aDormant);
-}
-
 RefPtr<ShutdownPromise>
 MediaDecoderStateMachine::Shutdown()
 {
