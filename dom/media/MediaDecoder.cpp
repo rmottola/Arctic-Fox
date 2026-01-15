@@ -1130,7 +1130,7 @@ MediaDecoder::NotifyBytesConsumed(int64_t aBytes, int64_t aOffset)
 }
 
 void
-MediaDecoder::OnSeekResolved(SeekResolveValue aVal)
+MediaDecoder::OnSeekResolved()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!IsShutdown());
