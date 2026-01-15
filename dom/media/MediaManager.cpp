@@ -2774,9 +2774,10 @@ MediaManager::RemoveMediaDevicesCallback(uint64_t aWindowID)
     if (mediadevices) {
       nsPIDOMWindowInner* window = mediadevices->GetOwner();
       MOZ_ASSERT(window);
-      if (window && window->WindowID() == aWindowID)
+      if (window && window->WindowID() == aWindowID) {
         DeviceChangeCallback::RemoveDeviceChangeCallback(observer);
         return;
+      }
     }
   }
 }
