@@ -4494,7 +4494,7 @@ Parser<ParseHandler>::declarationName(Node decl, DeclarationKind declKind, Token
             // Normal const declarations, and const declarations in for(;;)
             // heads, must be initialized.
             if (declKind == DeclarationKind::Const) {
-                reportWithNode(ParseError, false, binding, JSMSG_BAD_CONST_DECL);
+                errorAt(namePos.begin, JSMSG_BAD_CONST_DECL);
                 return null();
             }
         }
