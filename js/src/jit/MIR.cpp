@@ -2325,6 +2325,8 @@ MPhi::foldsTernary(TempAllocator& alloc)
     // - fold testArg ? testArg : 0 to testArg
     // - fold testArg ? 0 : testArg to 0
     if (testArg->type() == MIRType::Int32 && c->numberToDouble() == 0) {
+        testArg->setGuardRangeBailoutsUnchecked();
+
         // When folding to the constant we need to hoist it.
         if (trueDef == c && !c->block()->dominates(block()))
             c->block()->moveBefore(pred->lastIns(), c);
@@ -2857,6 +2859,9 @@ CanProduceNegativeZero(MDefinition* def)
 static inline bool
 NeedNegativeZeroCheck(MDefinition* def)
 {
+    if (def->isGuardRangeBailouts())
+        return true;
+
     // Test if all uses have the same semantics for -0 and 0
     for (MUseIterator use = def->usesBegin(); use != def->usesEnd(); use++) {
         if (use->consumer()->isResumePoint())
@@ -4323,8 +4328,7 @@ MCompare::tryFoldEqualOperands(bool* result)
             return false;
     }
 
-    if (DeadIfUnused(lhs()))
-        lhs()->setGuardRangeBailouts();
+    lhs()->setGuardRangeBailoutsUnchecked();
 
     *result = (jsop() == JSOP_STRICTEQ);
     return true;
