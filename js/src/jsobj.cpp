@@ -3766,7 +3766,6 @@ JSObject::allocKindForTenure(const js::Nursery& nursery) const
     return GetBackgroundAllocKind(kind);
 }
 
-
 void
 JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassInfo* info)
 {
