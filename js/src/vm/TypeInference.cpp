@@ -496,6 +496,14 @@ TypeSet::addTypesToConstraint(JSContext* cx, TypeConstraint* constraint)
     return true;
 }
 
+#ifdef DEBUG
+static inline bool
+CompartmentsMatch(JSCompartment* a, JSCompartment* b)
+{
+    return !a || !b || a == b;
+}
+#endif
+
 bool
 ConstraintTypeSet::addConstraint(JSContext* cx, TypeConstraint* constraint, bool callExisting)
 {
@@ -505,6 +513,7 @@ ConstraintTypeSet::addConstraint(JSContext* cx, TypeConstraint* constraint, bool
     }
 
     MOZ_ASSERT(cx->zone()->types.activeAnalysis);
+    MOZ_ASSERT(CompartmentsMatch(maybeCompartment(), constraint->maybeCompartment()));
 
     InferSpew(ISpewOps, "addConstraint: %sT%p%s %sC%p%s %s",
               InferSpewColor(this), this, InferSpewColorReset(),
@@ -546,14 +555,6 @@ TypeSet::maybeCompartment()
 
     return nullptr;
 }
-
-#ifdef DEBUG
-static inline bool
-CompartmentsMatch(JSCompartment* a, JSCompartment* b)
-{
-    return !a || !b || a == b;
-}
-#endif
 
 void
 TypeSet::addType(Type type, LifoAlloc* alloc)
@@ -1221,6 +1222,10 @@ class TypeCompilerConstraint : public TypeConstraint
         *res = zone.typeLifoAlloc.new_<TypeCompilerConstraint<T> >(compilation, data);
         return true;
     }
+
+    JSCompartment* maybeCompartment() {
+        return data.maybeCompartment();
+    }
 };
 
 template <typename T>
@@ -1401,6 +1406,10 @@ class TypeConstraintFreezeStack : public TypeConstraint
             return false;
         *res = zone.typeLifoAlloc.new_<TypeConstraintFreezeStack>(script_);
         return true;
+    }
+
+    JSCompartment* maybeCompartment() {
+        return script_->compartment();
     }
 };
 
@@ -1599,6 +1608,8 @@ class ConstraintDataFreeze
     }
 
     bool shouldSweep() { return false; }
+
+    JSCompartment* maybeCompartment() { return nullptr; }
 };
 
 } /* anonymous namespace */
@@ -1794,6 +1805,8 @@ class ConstraintDataFreezeObjectFlags
     }
 
     bool shouldSweep() { return false; }
+
+    JSCompartment* maybeCompartment() { return nullptr; }
 };
 
 } /* anonymous namespace */
@@ -1896,6 +1909,8 @@ class ConstraintDataFreezeObjectForInlinedCall
     }
 
     bool shouldSweep() { return false; }
+
+    JSCompartment* maybeCompartment() { return nullptr; }
 };
 
 // Constraint which triggers recompilation when a typed array's data becomes
@@ -1936,6 +1951,10 @@ class ConstraintDataFreezeObjectForTypedArrayData
         // Note: |viewData| is only used for equality testing.
         return IsAboutToBeFinalizedUnbarriered(&obj);
     }
+
+    JSCompartment* maybeCompartment() {
+        return obj->compartment();
+    }
 };
 
 // Constraint which triggers recompilation if an unboxed object in some group
@@ -1961,6 +1980,8 @@ class ConstraintDataFreezeObjectForUnboxedConvertedToNative
     }
 
     bool shouldSweep() { return false; }
+
+    JSCompartment* maybeCompartment() { return nullptr; }
 };
 
 } /* anonymous namespace */
@@ -2055,6 +2076,8 @@ class ConstraintDataFreezePropertyState
     }
 
     bool shouldSweep() { return false; }
+
+    JSCompartment* maybeCompartment() { return nullptr; }
 };
 
 } /* anonymous namespace */
@@ -2109,6 +2132,8 @@ class ConstraintDataConstantProperty
     }
 
     bool shouldSweep() { return false; }
+
+    JSCompartment* maybeCompartment() { return nullptr; }
 };
 
 } /* anonymous namespace */
@@ -2169,6 +2194,8 @@ class ConstraintDataInert
     }
 
     bool shouldSweep() { return false; }
+
+    JSCompartment* maybeCompartment() { return nullptr; }
 };
 
 bool
@@ -3137,6 +3164,10 @@ class TypeConstraintClearDefiniteGetterSetter : public TypeConstraint
         *res = zone.typeLifoAlloc.new_<TypeConstraintClearDefiniteGetterSetter>(group);
         return true;
     }
+
+    JSCompartment* maybeCompartment() {
+        return group->compartment();
+    }
 };
 
 bool
@@ -3191,6 +3222,10 @@ class TypeConstraintClearDefiniteSingle : public TypeConstraint
             return false;
         *res = zone.typeLifoAlloc.new_<TypeConstraintClearDefiniteSingle>(group);
         return true;
+    }
+
+    JSCompartment* maybeCompartment() {
+        return group->compartment();
     }
 };
 
@@ -4194,9 +4229,11 @@ ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
     TypeConstraint* constraint = constraintList;
     constraintList = nullptr;
     while (constraint) {
+        MOZ_ASSERT(zone->types.sweepTypeLifoAlloc.contains(constraint));
         TypeConstraint* copy;
         if (constraint->sweep(zone->types, &copy)) {
             if (copy) {
+                MOZ_ASSERT(zone->types.typeLifoAlloc.contains(copy));
                 copy->next = constraintList;
                 constraintList = copy;
             } else {
