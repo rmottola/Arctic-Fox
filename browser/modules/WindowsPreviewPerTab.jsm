@@ -450,16 +450,8 @@ TabWindow.prototype = {
     let preview = AeroPeek.taskbar.createTaskbarTabPreview(docShell, controller);
     preview.visible = AeroPeek.enabled;
     preview.active = this.tabbrowser.selectedTab == controller.tab;
-    // Grab the default favicon
-    getFaviconAsImage(
-      null,
-      PrivateBrowsingUtils.isWindowPrivate(this.win),
-      function (img) {
-        // It is possible that we've already gotten the real favicon, so make sure
-        // we have not set one before setting this default one.
-        if (!preview.icon)
-          preview.icon = img;
-      });
+    this.onLinkIconAvailable(controller.tab.linkedBrowser,
+                             controller.tab.getAttribute("image"));
     return preview;
   },
 
@@ -612,21 +604,20 @@ TabWindow.prototype = {
     "file", "chrome", "resource", "about"
   ]),
   onLinkIconAvailable: function (aBrowser, aIconURL) {
-    if (!aIconURL) {
-      return;
+    let requestURL = null;
+    if (aIconURL) {
+      let shouldRequestFaviconURL = true;
+      try {
+        urlObject = NetUtil.newURI(aIconURL);
+        shouldRequestFaviconURL =
+          !this.directRequestProtocols.has(urlObject.scheme);
+      } catch (ex) {}
+
+      requestURL = shouldRequestFaviconURL ?
+        "moz-anno:favicon:" + aIconURL :
+        aIconURL;
     }
-    let tab = this.tabbrowser.getTabForBrowser(aBrowser);
-    let shouldRequestFaviconURL = true;
-    try {
-      urlObject = NetUtil.newURI(aIconURL);
-      shouldRequestFaviconURL =
-        !this.directRequestProtocols.has(urlObject.scheme);
-    } catch (ex) {}
-
-    let requestURL = shouldRequestFaviconURL ?
-      "moz-anno:favicon:" + aIconURL :
-      aIconURL;
-
+    let isDefaultFavicon = !requestURL;
     getFaviconAsImage(
       requestURL,
       PrivateBrowsingUtils.isWindowPrivate(this.win),
@@ -637,8 +628,10 @@ TabWindow.prototype = {
         // will have finished fetching 'in order'.
         if (index != -1) {
           let tab = this.tabbrowser.tabs[index];
-          if (tab.getAttribute("image") == aIconURL) {
-            this.previews.get(tab).icon = img;
+          let preview = this.previews.get(tab);
+          if (tab.getAttribute("image") == aIconURL ||
+              (!preview.icon && isDefaultFavicon)) {
+            preview.icon = img;
           }
         }
       }
@@ -656,9 +649,11 @@ TabWindow.prototype = {
 this.AeroPeek = {
   available: false,
   // Does the pref say we're enabled?
-  _prefenabled: true,
+  __prefenabled: false,
 
   _enabled: true,
+
+  initialized: false,
 
   // nsITaskbarTabPreview array
   previews: [],
@@ -683,24 +678,13 @@ this.AeroPeek = {
     if (!this.available)
       return;
 
-    this.prefs.addObserver(TOGGLE_PREF_NAME, this, false);
-    this.prefs.addObserver(DISABLE_THRESHOLD_PREF_NAME, this, false);
-    this.prefs.addObserver(CACHE_EXPIRATION_TIME_PREF_NAME, this, false);
-    PlacesUtils.history.addObserver(this, true);
-
-    this.cacheLifespan = this.prefs.getIntPref(CACHE_EXPIRATION_TIME_PREF_NAME);
-
-    this.maxpreviews = this.prefs.getIntPref(DISABLE_THRESHOLD_PREF_NAME);
-
+    this.prefs.addObserver(TOGGLE_PREF_NAME, this, true);
     this.enabled = this._prefenabled = this.prefs.getBoolPref(TOGGLE_PREF_NAME);
+    this.initialized = true;
   },
 
   destroy: function destroy() {
     this._enabled = false;
-
-    this.prefs.removeObserver(TOGGLE_PREF_NAME, this);
-    this.prefs.removeObserver(DISABLE_THRESHOLD_PREF_NAME, this);
-    this.prefs.removeObserver(CACHE_EXPIRATION_TIME_PREF_NAME, this);
 
     if (this.cacheTimer)
       this.cacheTimer.cancel();
@@ -721,6 +705,57 @@ this.AeroPeek = {
     });
   },
 
+  get _prefenabled() {
+    return this.__prefenabled;
+  },
+
+  set _prefenabled(enable) {
+    if (enable == this.__prefenabled) {
+      return;
+    }
+    this.__prefenabled = enable;
+
+    if (enable) {
+      this.enable();
+    } else {
+      this.disable();
+    }
+  },
+
+  _observersAdded: false,
+
+  enable() {
+    if (!this._observersAdded) {
+      this.prefs.addObserver(DISABLE_THRESHOLD_PREF_NAME, this, true);
+      this.prefs.addObserver(CACHE_EXPIRATION_TIME_PREF_NAME, this, true);
+      PlacesUtils.history.addObserver(this, true);
+      this._observersAdded = true;
+    }
+
+    this.cacheLifespan = this.prefs.getIntPref(CACHE_EXPIRATION_TIME_PREF_NAME);
+
+    this.maxpreviews = this.prefs.getIntPref(DISABLE_THRESHOLD_PREF_NAME);
+
+    // If the user toggled us on/off while the browser was already up
+    // (rather than this code running on startup because the pref was
+    // already set to true), we must initialize previews for open windows:
+    if (this.initialized) {
+      let browserWindows = Services.wm.getEnumerator("navigator:browser");
+      while (browserWindows.hasMoreElements()) {
+        let win = browserWindows.getNext();
+        if (!win.closed) {
+          this.onOpenWindow(win);
+        }
+      }
+    }
+  },
+
+  disable() {
+    while (this.windows.length) {
+      this.windows[0].destroy(); // This will remove us from the array.
+    }
+  },
+
   addPreview: function (preview) {
     this.previews.push(preview);
     this.checkPreviewCount();
@@ -733,15 +768,15 @@ this.AeroPeek = {
   },
 
   checkPreviewCount: function () {
-    if (this.previews.length > this.maxpreviews)
-      this.enabled = false;
-    else
-      this.enabled = this._prefenabled;
+    if (!this._prefenabled) {
+      return;
+    }
+    this.enabled = this.previews.length <= this.maxpreviews;
   },
 
   onOpenWindow: function (win) {
     // This occurs when the taskbar service is not available (xp, vista)
-    if (!this.available)
+    if (!this.available || !this._prefenabled)
       return;
 
     win.gTaskbarTabGroup = new TabWindow(win);
@@ -749,7 +784,7 @@ this.AeroPeek = {
 
   onCloseWindow: function (win) {
     // This occurs when the taskbar service is not available (xp, vista)
-    if (!this.available)
+    if (!this.available || !this._prefenabled)
       return;
 
     win.gTaskbarTabGroup.destroy();
@@ -766,14 +801,18 @@ this.AeroPeek = {
 
   //// nsIObserver
   observe: function (aSubject, aTopic, aData) {
+    if (aTopic == "nsPref:changed" && aData == TOGGLE_PREF_NAME) {
+      this._prefenabled = this.prefs.getBoolPref(TOGGLE_PREF_NAME);
+    }
+    if (!this._prefenabled) {
+      return;
+    }
     switch (aTopic) {
       case "nsPref:changed":
         if (aData == CACHE_EXPIRATION_TIME_PREF_NAME)
           break;
 
-        if (aData == TOGGLE_PREF_NAME)
-          this._prefenabled = this.prefs.getBoolPref(TOGGLE_PREF_NAME);
-        else if (aData == DISABLE_THRESHOLD_PREF_NAME)
+        if (aData == DISABLE_THRESHOLD_PREF_NAME)
           this.maxpreviews = this.prefs.getIntPref(DISABLE_THRESHOLD_PREF_NAME);
         // Might need to enable/disable ourselves
         this.checkPreviewCount();
@@ -798,7 +837,7 @@ this.AeroPeek = {
   onClearHistory() {},
   onDeleteVisits() {},
   onPageChanged(uri, changedConst, newValue) {
-    if (this._enabled && changedConst == Ci.nsINavHistoryObserver.ATTRIBUTE_FAVICON) {
+    if (this.enabled && changedConst == Ci.nsINavHistoryObserver.ATTRIBUTE_FAVICON) {
       for (let win of this.windows) {
         for (let [tab, preview] of win.previews) {
           if (tab.getAttribute("image") == newValue) {
@@ -809,7 +848,11 @@ this.AeroPeek = {
     }
   },
 
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsISupportsWeakReference, Ci.nsINavHistoryObserver]),
+  QueryInterface: XPCOMUtils.generateQI([
+    Ci.nsISupportsWeakReference,
+    Ci.nsINavHistoryObserver,
+    Ci.nsIObserver
+  ]),
 };
 
 XPCOMUtils.defineLazyGetter(AeroPeek, "cacheTimer", () =>
