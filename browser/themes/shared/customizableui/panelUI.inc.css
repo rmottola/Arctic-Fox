@@ -277,6 +277,10 @@ panelview[id^=PanelUI-webext-] {
   overflow: hidden;
 }
 
+panelview[id^=PanelUI-webext-] {
+  overflow: hidden;
+}
+
 panelview:not([mainview]) .toolbarbutton-text,
 .cui-widget-panel toolbarbutton > .toolbarbutton-text {
   text-align: start;

@@ -111,6 +111,11 @@ class BasePopup {
     this.fixedWidth = fixedWidth;
     this.ignoreResizes = true;
 
+    this.panel = this.viewNode;
+    while (this.panel.localName != "panel") {
+      this.panel = this.panel.parentNode;
+    }
+
     this.contentReady = new Promise(resolve => {
       this._resolveContentReady = resolve;
     });
@@ -177,6 +182,10 @@ class BasePopup {
       panel = panel.parentNode;
     }
     return panel;
+  }
+
+  get fixedWidth() {
+    return false;
   }
 
   handleEvent(event) {
@@ -255,14 +264,15 @@ class BasePopup {
     this.browser.setAttribute("class", "webextension-popup-browser");
     this.browser.setAttribute("webextension-view-type", "popup");
 
+    // We only need flex sizing for the sake of the slide-in sub-views of the
+    // main menu panel, so that the browser occupies the full width of the view,
+    // and also takes up any extra height that's available to it.
+    this.browser.setAttribute("flex", "1");
+
     // Note: When using noautohide panels, the popup manager will add width and
     // height attributes to the panel, breaking our resize code, if the browser
     // starts out smaller than 30px by 10px. This isn't an issue now, but it
     // will be if and when we popup debugging.
-
-    // This overrides the content's preferred size when displayed in a
-    // fixed-size, slide-in panel.
-    this.browser.setAttribute("flex", "1");
 
     viewNode.appendChild(this.browser);
 
