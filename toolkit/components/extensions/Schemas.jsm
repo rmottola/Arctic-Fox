@@ -1127,6 +1127,11 @@ class SubModuleProperty extends Entry {
 
     let ns = Schemas.namespaces.get(this.namespaceName);
     let type = ns.get(this.reference);
+    if (!type && this.reference.includes(".")) {
+      let [namespaceName, ref] = this.reference.split(".");
+      ns = Schemas.namespaces.get(namespaceName);
+      type = ns.get(ref);
+    }
     if (!type || !(type instanceof SubModuleType)) {
       throw new Error(`Internal error: ${this.namespaceName}.${this.reference} is not a sub-module`);
     }
