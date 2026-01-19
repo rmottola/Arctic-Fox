@@ -166,12 +166,14 @@ ReportOnCallerUTF8(JSContext* callerContext,
 
     char* buf = JS_vsmprintf(format, ap);
     if (!buf) {
+        va_end(ap);
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
     JS_ReportErrorUTF8(callerContext, "%s", buf);
     JS_smprintf_free(buf);
 
+    va_end(ap);
     return NS_OK;
 }
 
@@ -185,11 +187,12 @@ ReportOnCallerUTF8(JSCLContextHelper& helper,
 
     char* buf = JS_vsmprintf(format, ap);
     if (!buf) {
+        va_end(ap);
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
     helper.reportErrorAfterPop(buf);
-
+    va_end(ap);
     return NS_OK;
 }
 
