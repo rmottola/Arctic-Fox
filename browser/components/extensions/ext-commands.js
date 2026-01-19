@@ -126,6 +126,9 @@ CommandList.prototype = {
       if (name == "_execute_page_action") {
         let win = event.target.ownerGlobal;
         pageActionFor(this.extension).triggerAction(win);
+      } else if (name == "_execute_browser_action") {
+        let win = event.target.ownerDocument.defaultView;
+        browserActionFor(this.extension).triggerAction(win);
       } else {
         this.emit("command", name);
       }
