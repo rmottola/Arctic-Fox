@@ -608,7 +608,7 @@ TabWindow.prototype = {
     if (aIconURL) {
       let shouldRequestFaviconURL = true;
       try {
-        urlObject = NetUtil.newURI(aIconURL);
+        let urlObject = NetUtil.newURI(aIconURL);
         shouldRequestFaviconURL =
           !this.directRequestProtocols.has(urlObject.scheme);
       } catch (ex) {}
