@@ -91,6 +91,14 @@ XPCOMUtils.defineLazyGetter(this, "standaloneStylesheets", () => {
   return stylesheets;
 });
 
+/* eslint-disable mozilla/balanced-listeners */
+extensions.on("page-shutdown", (type, context) => {
+  if (context.type == "popup" && context.active) {
+    context.contentWindow.close();
+  }
+});
+/* eslint-enable mozilla/balanced-listeners */
+
 class BasePopup {
   constructor(extension, viewNode, popupURL, browserStyle, fixedWidth = false) {
     this.extension = extension;
@@ -113,25 +121,39 @@ class BasePopup {
     this.borderColor = doc.defaultView.getComputedStyle(arrowContent).borderTopColor;
 
     this.browser = null;
-    this.browserReady = this.createBrowser(viewNode, popupURI);
+    this.browserLoaded = new Promise((resolve, reject) => {
+      this.browserLoadedDeferred = {resolve, reject};
+    });
+    this.browserReady = this.createBrowser(viewNode, popupURL);
   }
 
   destroy() {
-    this.browserReady.then(() => {
-      this.browser.removeEventListener("DOMWindowCreated", this, true);
-      this.browser.removeEventListener("load", this, true);
-      this.browser.removeEventListener("DOMTitleChanged", this, true);
-      this.browser.removeEventListener("DOMWindowClose", this, true);
-      this.browser.removeEventListener("MozScrolledAreaChanged", this, true);
-      this.viewNode.removeEventListener(this.DESTROY_EVENT, this);
+    this.destroyed = true;
+    this.browserLoadedDeferred.reject(new Error("Popup destroyed"));
+    return this.browserReady.then(() => {
+      this.destroyBrowser(this.browser);
       this.browser.remove();
 
-      this.panel.style.setProperty("--panel-arrowcontent-background", "");
-      this.panel.style.setProperty("--panel-arrow-image-vertical", "");
+      this.viewNode.removeEventListener(this.DESTROY_EVENT, this);
+      this.viewNode.style.maxHeight = "";
+
+      if (this.panel) {
+        this.panel.style.removeProperty("--panel-arrowcontent-background");
+        this.panel.style.removeProperty("--panel-arrow-image-vertical");
+      }
 
       this.browser = null;
       this.viewNode = null;
     });
+  }
+
+  destroyBrowser(browser) {
+    browser.removeEventListener("DOMWindowCreated", this, true);
+    browser.removeEventListener("load", this, true);
+    browser.removeEventListener("DOMContentLoaded", this, true);
+    browser.removeEventListener("DOMTitleChanged", this, true);
+    browser.removeEventListener("DOMWindowClose", this, true);
+    browser.removeEventListener("MozScrolledAreaChanged", this, true);
   }
 
   // Returns the name of the event fired on `viewNode` when the popup is being
@@ -142,7 +164,7 @@ class BasePopup {
 
   get panel() {
     let panel = this.viewNode;
-    while (panel.localName != "panel") {
+    while (panel && panel.localName != "panel") {
       panel = panel.parentNode;
     }
     return panel;
