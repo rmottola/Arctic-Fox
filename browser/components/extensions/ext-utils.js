@@ -445,6 +445,12 @@ global.PanelPopup = class PanelPopup extends BasePopup {
 
     this.contentReady.then(() => {
       panel.openPopup(imageNode, "bottomcenter topright", 0, 0, false, false);
+
+      let event = new this.window.CustomEvent("WebExtPopupLoaded", {
+        bubbles: true,
+        detail: {extension},
+      });
+      this.browser.dispatchEvent(event);
     });
   }
 
@@ -468,12 +474,121 @@ global.PanelPopup = class PanelPopup extends BasePopup {
 };
 
 global.ViewPopup = class ViewPopup extends BasePopup {
+  constructor(extension, window, popupURL, browserStyle, fixedWidth) {
+    let document = window.document;
+
+    // Create a temporary panel to hold the browser while it pre-loads its
+    // content. This panel will never be shown, but the browser's docShell will
+    // be swapped with the browser in the real panel when it's ready.
+    let panel = document.createElement("panel");
+    panel.setAttribute("type", "arrow");
+    document.getElementById("mainPopupSet").appendChild(panel);
+
+    super(extension, panel, popupURL, browserStyle, fixedWidth);
+
+    this.attached = false;
+    this.tempPanel = panel;
+
+    this.browser.classList.add("webextension-preload-browser");
+  }
+
+  /**
+   * Attaches the pre-loaded browser to the given view node, and reserves a
+   * promise which resolves when the browser is ready.
+   *
+   * @param {Element} viewNode
+   *        The node to attach the browser to.
+   * @returns {Promise<boolean>}
+   *        Resolves when the browser is ready. Resolves to `false` if the
+   *        browser was destroyed before it was fully loaded, and the popup
+   *        should be closed, or `true` otherwise.
+   */
+  attach(viewNode) {
+    return Task.spawn(function* () {
+      this.viewNode = viewNode;
+      this.viewNode.addEventListener(this.DESTROY_EVENT, this);
+
+      // Wait until the browser element is fully initialized, and give it at least
+      // a short grace period to finish loading its initial content, if necessary.
+      //
+      // In practice, the browser that was created by the mousdown handler should
+      // nearly always be ready by this point.
+      yield Promise.all([
+        this.browserReady,
+        Promise.race([
+          // This promise may be rejected if the popup calls window.close()
+          // before it has fully loaded.
+          this.browserLoaded.catch(() => {}),
+          new Promise(resolve => setTimeout(resolve, POPUP_LOAD_TIMEOUT_MS)),
+        ]),
+      ]);
+
+      if (this.destroyed) {
+        return false;
+      }
+
+      this.attached = true;
+
+      // Store the initial height of the view, so that we never resize menu panel
+      // sub-views smaller than the initial height of the menu.
+      this.viewHeight = this.viewNode.boxObject.height;
+
+      // Calculate the extra height available on the screen above and below the
+      // menu panel. Use that to calculate the how much the sub-view may grow.
+      let popupRect = this.panel.getBoundingClientRect();
+
+      let win = this.window;
+      let popupBottom = win.mozInnerScreenY + popupRect.bottom;
+      let popupTop = win.mozInnerScreenY + popupRect.top;
+
+      let screenBottom = win.screen.availTop + win.screen.availHeight;
+      this.extraHeight = {
+        bottom: Math.max(0, screenBottom - popupBottom),
+        top:  Math.max(0, popupTop - win.screen.availTop),
+      };
+
+      // Create a new browser in the real popup.
+      let browser = this.browser;
+      this.createBrowser(this.viewNode);
+
+      this.browser.swapDocShells(browser);
+      this.destroyBrowser(browser);
+
+      this.ignoreResizes = false;
+      this.resizeBrowser(true);
+
+      this.tempPanel.remove();
+      this.tempPanel = null;
+
+      let event = new this.window.CustomEvent("WebExtPopupLoaded", {
+        bubbles: true,
+        detail: {extension: this.extension},
+      });
+      this.browser.dispatchEvent(event);
+
+      return true;
+    }.bind(this));
+  }
+
+  destroy() {
+    return super.destroy().then(() => {
+      if (this.tempPanel) {
+        this.tempPanel.remove();
+        this.tempPanel = null;
+      }
+    });
+  }
+
   get DESTROY_EVENT() {
     return "ViewHiding";
   }
 
   closePopup() {
-    CustomizableUI.hidePanelForNode(this.viewNode);
+    if (this.attached) {
+      CustomizableUI.hidePanelForNode(this.viewNode);
+    } else {
+      this.destroy();
+    }
   }
 };
 
