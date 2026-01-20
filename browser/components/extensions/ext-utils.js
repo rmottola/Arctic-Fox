@@ -97,11 +97,6 @@ class BasePopup {
     this.destroyed = false;
     this.fixedWidth = fixedWidth;
 
-    this.panel = this.viewNode;
-    while (this.panel.localName != "panel") {
-      this.panel = this.panel.parentNode;
-    }
-
     this.contentReady = new Promise(resolve => {
       this._resolveContentReady = resolve;
     });
