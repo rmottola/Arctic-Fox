@@ -341,11 +341,14 @@ class InjectionContext extends Context {
    *     e.g. in the case of "devtools.inspectedWindow".
    * @param {string} [name] The name of the property in the namespace.
    *     `null` if we are checking whether the namespace should be injected.
-   * @param {Array} restrictions An arbitrary list of restrictions as declared
-   *     by the schema for a given API node.
+   * @param {Array<string>} allowedContexts A list of additional contexts in which
+   *     this API should be available. May include any of:
+   *         "main" - The main chrome browser process.
+   *         "addon" - An addon process.
+   *         "content" - A content process.
    * @returns {boolean} Whether the API should be injected.
    */
-  shouldInject(namespace, name, restrictions) {
+  shouldInject(namespace, name, allowedContexts) {
     throw new Error("Not implemented");
   }
 
@@ -470,11 +473,11 @@ class Entry {
     this.preprocessor = schema.preprocess || null;
 
     /**
-     * @property {Array<string>} restrictions A list of restrictions to
-     * consider before generating the API.
+     * @property {Array<string>} allowedContexts A list of allowed contexts
+     * to consider before generating the API.
      * These are not parsed by the schema, but passed to `shouldInject`.
      */
-    this.restrictions = schema.restrictions || [];
+    this.allowedContexts = schema.allowedContexts || [];
   }
 
   /**
@@ -554,7 +557,7 @@ class Type extends Entry {
    *        schemas of this type.
    */
   static get EXTRA_PROPERTIES() {
-    return ["description", "deprecated", "preprocess", "restrictions"];
+    return ["description", "deprecated", "preprocess", "allowedContexts"];
   }
 
   /**
@@ -1425,8 +1428,8 @@ class SubModuleProperty extends Entry {
     for (let fun of functions) {
       let subpath = path.concat(name);
       let namespace = subpath.join(".");
-      let restrictions = fun.restrictions.length ? fun.restrictions : ns.defaultRestrictions;
-      if (context.shouldInject(namespace, fun.name, restrictions)) {
+      let allowedContexts = fun.allowedContexts.length ? fun.allowedContexts : ns.defaultContexts;
+      if (context.shouldInject(namespace, fun.name, allowedContexts)) {
         let apiImpl = context.getImplementation(namespace, fun.name);
         fun.inject(apiImpl, subpath, fun.name, obj, context);
       }
@@ -1656,197 +1659,41 @@ this.Schemas = {
     if (!ns) {
       ns = new Map();
       ns.permissions = null;
-      ns.restrictions = [];
-      ns.defeaultRestrictions = [];
+      ns.allowedContexts = [];
+      ns.defaultContexts = [];
       this.namespaces.set(namespaceName, ns);
     }
     ns.set(symbol, value);
   },
 
-  // FIXME: Bug 1265371 - Refactor normalize and parseType in Schemas.jsm to reduce complexity
-  parseType(path, type, extraProperties = []) { // eslint-disable-line complexity
+  parseSchema(schema, path, extraProperties = []) {
     let allowedProperties = new Set(extraProperties);
 
-    // Do some simple validation of our own schemas.
-    function checkTypeProperties(...extra) {
-      let allowedSet = new Set([...allowedProperties, ...extra, "description", "deprecated", "preprocess", "restrictions"]);
-      for (let prop of Object.keys(type)) {
-        if (!allowedSet.has(prop)) {
-          throw new Error(`Internal error: Namespace ${path.join(".")} has invalid type property "${prop}" in type "${type.id || JSON.stringify(type)}"`);
-        }
-      }
+    if ("choices" in schema) {
+      return ChoiceType.parseSchema(schema, path, allowedProperties);
+    } else if ("$ref" in schema) {
+      return RefType.parseSchema(schema, path, allowedProperties);
     }
 
-    if ("choices" in type) {
-      checkTypeProperties("choices");
-
-      let choices = type.choices.map(t => this.parseType(path, t));
-      return new ChoiceType(type, choices);
-    } else if ("$ref" in type) {
-      checkTypeProperties("$ref");
-      let ref = type.$ref;
-      let ns = path[0];
-      if (ref.includes(".")) {
-        [ns, ref] = ref.split(".");
-      }
-      return new RefType(type, ns, ref);
-    }
-
-    if (!("type" in type)) {
-      throw new Error(`Unexpected value for type: ${JSON.stringify(type)}`);
+    if (!("type" in schema)) {
+      throw new Error(`Unexpected value for type: ${JSON.stringify(schema)}`);
     }
 
     allowedProperties.add("type");
 
-    // Otherwise it's a normal type...
-    if (type.type == "string") {
-      checkTypeProperties("enum", "minLength", "maxLength", "pattern", "format");
-
-      let enumeration = type.enum || null;
-      if (enumeration) {
-        // The "enum" property is either a list of strings that are
-        // valid values or else a list of {name, description} objects,
-        // where the .name values are the valid values.
-        enumeration = enumeration.map(e => {
-          if (typeof(e) == "object") {
-            return e.name;
-          }
-          return e;
-        });
-      }
-
-      let pattern = null;
-      if (type.pattern) {
-        try {
-          pattern = parsePattern(type.pattern);
-        } catch (e) {
-          throw new Error(`Internal error: Invalid pattern ${JSON.stringify(type.pattern)}`);
-        }
-      }
-
-      let format = null;
-      if (type.format) {
-        if (!(type.format in FORMATS)) {
-          throw new Error(`Internal error: Invalid string format ${type.format}`);
-        }
-        format = FORMATS[type.format];
-      }
-      return new StringType(type, enumeration,
-                            type.minLength || 0,
-                            type.maxLength || Infinity,
-                            pattern,
-                            format);
-    } else if (type.type == "object" && "functions" in type) {
-      checkTypeProperties("functions");
-
-      // The path we pass in here is only used for error messages.
-      let functions = type.functions.map(fun => this.parseFunction(path.concat(type.id), fun));
-
-      return new SubModuleType(functions);
-    } else if (type.type == "object") {
-      let parseProperty = (type, extraProps = []) => {
-        return {
-          type: this.parseType(path, type,
-                               ["unsupported", "onError", "permissions", ...extraProps]),
-          optional: type.optional || false,
-          unsupported: type.unsupported || false,
-          onError: type.onError || null,
-        };
-      };
-
-      let properties = Object.create(null);
-      for (let propName of Object.keys(type.properties || {})) {
-        properties[propName] = parseProperty(type.properties[propName], ["optional"]);
-      }
-
-      let patternProperties = [];
-      for (let propName of Object.keys(type.patternProperties || {})) {
-        let pattern;
-        try {
-          pattern = parsePattern(propName);
-        } catch (e) {
-          throw new Error(`Internal error: Invalid property pattern ${JSON.stringify(propName)}`);
-        }
-
-        patternProperties.push({
-          pattern,
-          type: parseProperty(type.patternProperties[propName]),
-        });
-      }
-
-      let additionalProperties = null;
-      if (type.additionalProperties) {
-        additionalProperties = this.parseType(path, type.additionalProperties);
-      }
-
-      if ("$extend" in type) {
-        // Only allow extending "properties" and "patternProperties".
-        checkTypeProperties("properties", "patternProperties");
-      } else {
-        checkTypeProperties("properties", "additionalProperties", "patternProperties", "isInstanceOf");
-      }
-      return new ObjectType(type, properties, additionalProperties, patternProperties, type.isInstanceOf || null);
-    } else if (type.type == "array") {
-      checkTypeProperties("items", "minItems", "maxItems");
-      return new ArrayType(type, this.parseType(path, type.items),
-                           type.minItems || 0, type.maxItems || Infinity);
-    } else if (type.type == "number") {
-      checkTypeProperties();
-      return new NumberType(type);
-    } else if (type.type == "integer") {
-      checkTypeProperties("minimum", "maximum");
-      return new IntegerType(type, type.minimum || -Infinity, type.maximum || Infinity);
-    } else if (type.type == "boolean") {
-      checkTypeProperties();
-      return new BooleanType(type);
-    } else if (type.type == "function") {
-      let isAsync = Boolean(type.async);
-
-      let parameters = null;
-      if ("parameters" in type) {
-        parameters = [];
-        for (let param of type.parameters) {
-          // Callbacks default to optional for now, because of promise
-          // handling.
-          let isCallback = isAsync && param.name == type.async;
-
-          parameters.push({
-            type: this.parseType(path, param, ["name", "optional"]),
-            name: param.name,
-            optional: param.optional == null ? isCallback : param.optional,
-          });
-        }
-      }
-
-      let hasAsyncCallback = false;
-      if (isAsync) {
-        if (parameters && parameters.length && parameters[parameters.length - 1].name == type.async) {
-          hasAsyncCallback = true;
-        }
-        if (type.returns) {
-          throw new Error("Internal error: Async functions must not have return values.");
-        }
-        if (type.allowAmbiguousOptionalArguments && !hasAsyncCallback) {
-          throw new Error("Internal error: Async functions with ambiguous arguments must declare the callback as the last parameter");
-        }
-      }
-
-      checkTypeProperties("parameters", "async", "returns");
-      return new FunctionType(type, parameters, isAsync, hasAsyncCallback);
-    } else if (type.type == "any") {
-      // Need to see what minimum and maximum are supposed to do here.
-      checkTypeProperties("minimum", "maximum");
-      return new AnyType(type);
+    let type = TYPES[schema.type];
+    if (!type) {
+      throw new Error(`Unexpected type ${schema.type}`);
     }
-    throw new Error(`Unexpected type ${type.type}`);
+    return type.parseSchema(schema, path, allowedProperties);
   },
 
   parseFunction(path, fun) {
     let f = new FunctionEntry(fun, path, fun.name,
-                              this.parseType(path, fun,
-                                             ["name", "unsupported", "returns",
-                                              "permissions",
-                                              "allowAmbiguousOptionalArguments"]),
+                              this.parseSchema(fun, path,
+                                               ["name", "unsupported", "returns",
+                                                "permissions",
+                                                "allowAmbiguousOptionalArguments"]),
                               fun.unsupported || false,
                               fun.allowAmbiguousOptionalArguments || false,
                               fun.returns || null,
@@ -2007,8 +1854,8 @@ this.Schemas = {
 
       let ns = this.namespaces.get(name);
       ns.permissions = namespace.permissions || null;
-      ns.restrictions = namespace.restrictions || [];
-      ns.defaultRestrictions = namespace.defaultRestrictions || [];
+      ns.allowedContexts = namespace.allowedContexts || [];
+      ns.defaultContexts = namespace.defaultContexts || [];
     }
   },
 
@@ -2076,14 +1923,14 @@ this.Schemas = {
         continue;
       }
 
-      if (!wrapperFuncs.shouldInject(namespace, null, ns.restrictions)) {
+      if (!wrapperFuncs.shouldInject(namespace, null, ns.allowedContexts)) {
         continue;
       }
 
       let obj = Cu.createObjectIn(dest, {defineAs: namespace});
       for (let [name, entry] of ns) {
-        let restrictions = entry.restrictions.length ? entry.restrictions : ns.defaultRestrictions;
-        if (context.shouldInject(namespace, name, restrictions)) {
+        let allowedContexts = entry.allowedContexts.length ? entry.allowedContexts : ns.defaultContexts;
+        if (context.shouldInject(namespace, name, allowedContexts)) {
           let apiImpl = context.getImplementation(namespace, name);
           entry.inject(apiImpl, [namespace], name, obj, context);
         }
