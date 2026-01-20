@@ -1787,7 +1787,6 @@ class ChildAPIManager {
 
     let data = {childId: id, extensionId: context.extension.id, principal: context.principal};
     Object.assign(data, contextData);
-    messageManager.sendAsyncMessage("API:CreateProxyContext", data);
 
     messageManager.addMessageListener("API:RunListener", this);
     messageManager.addMessageListener("API:CallResult", this);
@@ -1798,6 +1797,12 @@ class ChildAPIManager {
 
     // Map[callId -> Deferred]
     this.callPromises = new Map();
+
+    this.createProxyContextInConstructor(data);
+  }
+
+  createProxyContextInConstructor(data) {
+    this.messageManager.sendAsyncMessage("API:CreateProxyContext", data);
   }
 
   receiveMessage({name, data}) {
@@ -1852,12 +1857,16 @@ class ChildAPIManager {
       }
     }
 
+    return this.getFallbackImplementation(namespace, name);
+  }
+
+  getFallbackImplementation(namespace, name) {
     // No local API found, defer implementation to the parent.
     return new ProxyAPIImplementation(namespace, name, this);
   }
 
   hasPermission(permission) {
-    return this.context.extension.permissions.has(permission);
+    return this.context.extension.hasPermission(permission);
   }
 }
 

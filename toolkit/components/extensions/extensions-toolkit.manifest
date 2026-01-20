@@ -23,6 +23,8 @@ category webextension-scripts-content runtime chrome://extensions/content/ext-c-
 category webextension-scripts-addon extension chrome://extensions/content/ext-c-extension.js
 category webextension-scripts-addon i18n chrome://extensions/content/ext-i18n.js
 category webextension-scripts-addon runtime chrome://extensions/content/ext-c-runtime.js
+category webextension-scripts-addon test chrome://extensions/content/ext-c-test.js
+category webextension-scripts-addon storage chrome://extensions/content/ext-c-storage.js
 
 # schemas
 category webextension-schemas alarms chrome://extensions/content/schemas/alarms.json
