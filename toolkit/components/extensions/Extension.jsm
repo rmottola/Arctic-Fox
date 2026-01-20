@@ -258,6 +258,10 @@ class ProxyContext extends BaseContext {
     return this.sandbox;
   }
 
+  shutdown() {
+    this.unload();
+  }
+
   unload() {
     if (this.unloaded) {
       return;
@@ -301,6 +305,11 @@ class ExtensionChildProxyContext extends ProxyContext {
     let {gBrowser} = this.xulBrowser.ownerGlobal;
     let tab = gBrowser && gBrowser.getTabForBrowser(this.xulBrowser);
     return tab && Management.global.TabManager.getId(tab);
+  }
+
+  shutdown() {
+    Management.emit("page-shutdown", this);
+    super.shutdown();
   }
 }
 
@@ -351,6 +360,15 @@ var ParentAPIManager = {
     for (let [childId, context] of this.proxyContexts) {
       if (context.messageManager == mm) {
         this.closeProxyContext(childId);
+      }
+    }
+  },
+
+  shutdownExtension(extensionId) {
+    for (let [childId, context] of this.proxyContexts) {
+      if (context.extension.id == extensionId) {
+        context.shutdown();
+        this.proxyContexts.delete(childId);
       }
     }
   },
@@ -1530,10 +1548,6 @@ this.Extension = class extends ExtensionData {
 
     GlobalManager.uninit(this);
 
-    for (let view of this.views) {
-      view.shutdown();
-    }
-
     for (let obj of this.onShutdown) {
       obj.close();
     }
@@ -1541,6 +1555,8 @@ this.Extension = class extends ExtensionData {
     for (let api of this.apis) {
       api.destroy();
     }
+
+    ParentAPIManager.shutdownExtension(this.id);
 
     Management.emit("shutdown", this);
 
