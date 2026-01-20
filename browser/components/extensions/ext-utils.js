@@ -248,6 +248,8 @@ class BasePopup {
 
     viewNode.appendChild(this.browser);
 
+    extensions.emit("extension-browser-inserted", this.browser);
+
     let initBrowser = browser => {
       let mm = browser.messageManager;
       mm.addMessageListener("DOMTitleChanged", this);
