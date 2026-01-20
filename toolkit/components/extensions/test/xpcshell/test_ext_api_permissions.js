@@ -4,7 +4,10 @@
 
 add_task(function* test_storage_api_without_permissions() {
   let extension = ExtensionTestUtils.loadExtension({
-    background() {},
+    background() {
+      // Force API initialization.
+      void browser.storage;
+    },
 
     manifest: {
       permissions: [],
@@ -15,6 +18,9 @@ add_task(function* test_storage_api_without_permissions() {
 
   let context = Array.from(extension.extension.views)[0];
 
+  // Force API initialization.
+  void context.apiObj;
+
   ok(!("storage" in context._unwrappedAPIs),
      "The storage API should not be initialized");
 
@@ -23,7 +29,9 @@ add_task(function* test_storage_api_without_permissions() {
 
 add_task(function* test_storage_api_with_permissions() {
   let extension = ExtensionTestUtils.loadExtension({
-    background() {},
+    background() {
+      void browser.storage;
+    },
 
     manifest: {
       permissions: ["storage"],
@@ -33,6 +41,9 @@ add_task(function* test_storage_api_with_permissions() {
   yield extension.startup();
 
   let context = Array.from(extension.extension.views)[0];
+
+  // Force API initialization.
+  void context.apiObj;
 
   equal(typeof context._unwrappedAPIs.storage, "object",
         "The storage API should be initialized");
