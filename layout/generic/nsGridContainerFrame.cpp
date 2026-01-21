@@ -231,7 +231,6 @@ nsGridContainerFrame::TrackSize::Initialize(nscoord aPercentageBasis,
   }
   // http://dev.w3.org/csswg/css-grid/#algo-init
   switch (minSizeUnit) {
-    case eStyleUnit_FlexFraction:
     case eStyleUnit_Auto:
       mState |= eAutoMinSizing;
       break;
@@ -240,6 +239,8 @@ nsGridContainerFrame::TrackSize::Initialize(nscoord aPercentageBasis,
                                         : eMaxContentMinSizing;
       break;
     default:
+      MOZ_ASSERT(minSizeUnit != eStyleUnit_FlexFraction,
+                 "<flex> min-sizing is invalid as a track size");
       mBase = ::ResolveToDefiniteSize(aMinCoord, aPercentageBasis);
   }
   switch (maxSizeUnit) {
