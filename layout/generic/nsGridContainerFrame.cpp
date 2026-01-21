@@ -4117,6 +4117,15 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
   nsRenderingContext* rc = &aState.mRenderingContext;
   WritingMode wm = aState.mWM;
   uint32_t maxSpan = 0; // max span of the step2Items items
+  // Setup track selector for step 2.2:
+  const auto contentBasedMinSelector =
+    aConstraint == SizingConstraint::eMinContent ?
+    TrackSize::eIntrinsicMinSizing : TrackSize::eMinOrMaxContentMinSizing;
+  // Setup track selector for step 2.3:
+  const auto maxContentMinSelector =
+    aConstraint == SizingConstraint::eMaxContent ?
+    (TrackSize::eMaxContentMinSizing | TrackSize::eAutoMinSizing) :
+    TrackSize::eMaxContentMinSizing;
   iter.Reset();
   for (; !iter.AtEnd(); iter.Next()) {
     auto& gridItem = aGridItems[iter.GridItemIndex()];
@@ -4148,13 +4157,13 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
           minSize = MinSize(gridItem, aState, rc, wm, mAxis, &cache);
         }
         nscoord minContent = 0;
-        if (state & (TrackSize::eMinOrMaxContentMinSizing | // for 2.2
-                     TrackSize::eIntrinsicMaxSizing)) {     // for 2.5
+        if (state & (contentBasedMinSelector |          // for 2.2
+                     TrackSize::eIntrinsicMaxSizing)) { // for 2.5
           minContent = MinContentContribution(gridItem, aState,
                                               rc, wm, mAxis, &cache);
         }
         nscoord maxContent = 0;
-        if (state & (TrackSize::eMaxContentMinSizing |         // for 2.3
+        if (state & (maxContentMinSelector |                   // for 2.3
                      TrackSize::eAutoOrMaxContentMaxSizing)) { // for 2.6
           maxContent = MaxContentContribution(gridItem, aState,
                                               rc, wm, mAxis, &cache);
@@ -4212,9 +4221,10 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
         }
       }
 
-      selector = TrackSize::eMinOrMaxContentMinSizing;
+      selector = contentBasedMinSelector;
       if (stateBitsPerSpan[span] & selector) {
-        // Step 2.2 MinContentContribution to min-/max-content min-sizing.
+        // Step 2.2 MinContentContribution to min-/max-content (and 'auto' when
+        // sizing under a min-content constraint) min-sizing.
         for (i = spanGroupStartIndex; i < spanGroupEndIndex; ++i) {
           Step2ItemData& item = step2Items[i];
           if (!(item.mState & selector)) {
@@ -4234,11 +4244,13 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
         }
       }
 
-      if (stateBitsPerSpan[span] & TrackSize::eMaxContentMinSizing) {
-        // Step 2.3 MaxContentContribution to max-content min-sizing.
+      selector = maxContentMinSelector;
+      if (stateBitsPerSpan[span] & selector) {
+        // Step 2.3 MaxContentContribution to max-content (and 'auto' when
+        // sizing under a max-content constraint) min-sizing.
         for (i = spanGroupStartIndex; i < spanGroupEndIndex; ++i) {
           Step2ItemData& item = step2Items[i];
-          if (!(item.mState & TrackSize::eMaxContentMinSizing)) {
+          if (!(item.mState & selector)) {
             continue;
           }
           nscoord space = item.mMaxContentContribution;
@@ -4246,12 +4258,10 @@ nsGridContainerFrame::Tracks::ResolveIntrinsicSize(
             continue;
           }
           tracks.ClearAndRetainStorage();
-          space = CollectGrowable(space, mSizes, item.mLineRange,
-                                  TrackSize::eMaxContentMinSizing,
+          space = CollectGrowable(space, mSizes, item.mLineRange, selector,
                                   tracks);
           if (space > 0) {
-            DistributeToTrackBases(space, plan, tracks,
-                                   TrackSize::eMaxContentMinSizing);
+            DistributeToTrackBases(space, plan, tracks, selector);
             updatedBase = true;
           }
         }
