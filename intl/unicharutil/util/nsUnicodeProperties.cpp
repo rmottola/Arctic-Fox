@@ -286,6 +286,7 @@ uint32_t GetPairedBracket(uint32_t aCh)
 #endif
 }
 
+#if !ENABLE_INTL_API
 static inline uint32_t
 GetCaseMapValue(uint32_t aCh)
 {
@@ -300,10 +301,14 @@ GetCaseMapValue(uint32_t aCh)
     }
     return 0;
 }
+#endif
 
 uint32_t
 GetUppercase(uint32_t aCh)
 {
+#if ENABLE_INTL_API
+    return u_toupper(aCh);
+#else
     uint32_t mapValue = GetCaseMapValue(aCh);
     if (mapValue & (kLowerToUpper | kTitleToUpper)) {
         return aCh ^ (mapValue & kCaseMapCharMask);
@@ -312,11 +317,15 @@ GetUppercase(uint32_t aCh)
         return GetUppercase(aCh ^ (mapValue & kCaseMapCharMask));
     }
     return aCh;
+#endif
 }
 
 uint32_t
 GetLowercase(uint32_t aCh)
 {
+#if ENABLE_INTL_API
+    return u_tolower(aCh);
+#else
     uint32_t mapValue = GetCaseMapValue(aCh);
     if (mapValue & kUpperToLower) {
         return aCh ^ (mapValue & kCaseMapCharMask);
@@ -325,21 +334,29 @@ GetLowercase(uint32_t aCh)
         return GetLowercase(aCh ^ (mapValue & kCaseMapCharMask));
     }
     return aCh;
+#endif
 }
 
 uint32_t
 GetTitlecaseForLower(uint32_t aCh)
 {
+#if ENABLE_INTL_API
+    return u_isULowercase(aCh) ? u_totitle(aCh) : aCh;
+#else
     uint32_t mapValue = GetCaseMapValue(aCh);
     if (mapValue & (kLowerToTitle | kLowerToUpper)) {
         return aCh ^ (mapValue & kCaseMapCharMask);
     }
     return aCh;
+#endif
 }
 
 uint32_t
 GetTitlecaseForAll(uint32_t aCh)
 {
+#if ENABLE_INTL_API
+    return u_totitle(aCh);
+#else
     uint32_t mapValue = GetCaseMapValue(aCh);
     if (mapValue & (kLowerToTitle | kLowerToUpper)) {
         return aCh ^ (mapValue & kCaseMapCharMask);
@@ -348,6 +365,7 @@ GetTitlecaseForAll(uint32_t aCh)
         return GetTitlecaseForLower(aCh ^ (mapValue & kCaseMapCharMask));
     }
     return aCh;
+#endif
 }
 
 #if 0 // currently unused - bug 857481
