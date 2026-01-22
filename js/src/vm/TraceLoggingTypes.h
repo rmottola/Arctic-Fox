@@ -38,6 +38,7 @@
     _(VM)                                             \
     _(CompressSource)                                 \
     _(WasmCompilation)                                \
+    _(Call)                                           \
                                                       \
     /* Specific passes during ion compilation */      \
     _(PruneUnusedBranches)                            \
