@@ -7530,8 +7530,7 @@ HTMLInputElement::HasPatternMismatch() const
 bool
 HTMLInputElement::IsRangeOverflow() const
 {
-  // TODO: this is temporary until bug 888316 is fixed.
-  if (!DoesMinMaxApply() || mType == NS_FORM_INPUT_WEEK) {
+  if (!DoesMinMaxApply()) {
     return false;
   }
 
@@ -7551,8 +7550,7 @@ HTMLInputElement::IsRangeOverflow() const
 bool
 HTMLInputElement::IsRangeUnderflow() const
 {
-  // TODO: this is temporary until bug 888316 is fixed.
-  if (!DoesMinMaxApply() || mType == NS_FORM_INPUT_WEEK) {
+  if (!DoesMinMaxApply()) {
     return false;
   }
 
@@ -8560,8 +8558,7 @@ HTMLInputElement::UpdateHasRange()
 
   mHasRange = false;
 
-  // TODO: this is temporary until bug 888316 is fixed.
-  if (!DoesMinMaxApply() || mType == NS_FORM_INPUT_WEEK) {
+  if (!DoesMinMaxApply()) {
     return;
   }
 
