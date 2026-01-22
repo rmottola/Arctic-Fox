@@ -164,4 +164,4 @@ class TbplFormatter(BaseFormatter):
         fmt = "TEST-UNEXPECTED-{level} | {path}:{lineno}{column} | {message} ({rule})"
         data["column"] = ":%s" % data["column"] if data["column"] else ""
         data['rule'] = data['rule'] or data['linter'] or ""
-        message.append(fmt.format(**data))
+        return fmt.append(fmt.format(**data))

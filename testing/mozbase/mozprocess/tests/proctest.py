@@ -45,7 +45,8 @@ class ProcTest(unittest.TestCase):
             didtimeout -- True if process timed out, defaults to False
             isalive -- Use True to indicate we pass if the process exists; however, by default
                        the test will pass if the process does not exist (isalive == False)
-            expectedfail -- Defaults to [], used to indicate a list of fields that are expected to fail
+            expectedfail -- Defaults to [], used to indicate a list of fields
+                            that are expected to fail
         """
         if 'returncode' in expectedfail:
             self.assertTrue(returncode, "Detected an unexpected return code of: %s" % returncode)
@@ -60,6 +61,8 @@ class ProcTest(unittest.TestCase):
             self.assertTrue(not didtimeout, "Detected that process timed out")
 
         if isalive:
-            self.assertTrue(detected, "Detected process is not running, process output: %s" % output)
+            self.assertTrue(detected, "Detected process is not running, "
+                            "process output: %s" % output)
         else:
-            self.assertTrue(not detected, "Detected process is still running, process output: %s" % output)
+            self.assertTrue(not detected, "Detected process is still running, "
+                            "process output: %s" % output)

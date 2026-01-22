@@ -12,6 +12,7 @@ from mozprocess import processhandler
 
 here = os.path.dirname(os.path.abspath(__file__))
 
+
 def make_proclaunch(aDir):
     """
         Makes the proclaunch executable.
@@ -35,7 +36,8 @@ def make_proclaunch(aDir):
     # on windows anyway (to file?), let's just call out both targets explicitly.
     for command in [["make", "-C", "iniparser"],
                     ["make"]]:
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=aDir)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, cwd=aDir)
         stdout, stderr = process.communicate()
         if process.returncode:
             # SomethingBadHappen; print all the things
@@ -46,7 +48,8 @@ def make_proclaunch(aDir):
 
     # ensure the launcher now exists
     if not os.path.exists(exepath):
-        raise AssertionError("proclaunch executable '%s' does not exist (sys.platform=%s)" % (exepath, sys.platform))
+        raise AssertionError("proclaunch executable '%s' "
+                             "does not exist (sys.platform=%s)" % (exepath, sys.platform))
     return exepath
 
 def check_for_process(processName):
@@ -118,7 +121,8 @@ class ProcTest(unittest.TestCase):
                 except OSError as e:
                     errors.append(str(e))
         if errors:
-            raise OSError("Error(s) encountered tearing down %s.%s:\n%s" % (cls.__module__, cls.__name__, '\n'.join(errors)))
+            raise OSError("Error(s) encountered tearing down "
+                          "%s.%s:\n%s" % (cls.__module__, cls.__name__, '\n'.join(errors)))
 
     def test_process_normal_finish(self):
         """Process is started, runs to completion while we wait for it"""
@@ -180,7 +184,7 @@ class ProcTest(unittest.TestCase):
         """Process is started runs to completion while we wait indefinitely"""
 
         p = processhandler.ProcessHandler([self.proclaunch,
-                                          "process_waittimeout_10s.ini"],
+                                           "process_waittimeout_10s.ini"],
                                           cwd=here)
         p.run()
         p.wait()
@@ -213,6 +217,7 @@ class ProcTest(unittest.TestCase):
             to complete. Process should not be killed.
         """
         p = None
+
         def timeout_handler():
             self.assertEqual(p.proc.poll(), None)
             p.kill()
@@ -238,7 +243,7 @@ class ProcTest(unittest.TestCase):
         Process is still running and didn't timeout
         """
         p = processhandler.ProcessHandler([self.proclaunch,
-                                          "process_waittimeout_10s.ini"],
+                                           "process_waittimeout_10s.ini"],
                                           cwd=here)
 
         p.run()
@@ -256,7 +261,7 @@ class ProcTest(unittest.TestCase):
         """ Process is started, runs to completion before our wait times out
         """
         p = processhandler.ProcessHandler([self.proclaunch,
-                                          "process_waittimeout_10s.ini"],
+                                           "process_waittimeout_10s.ini"],
                                           cwd=here)
         p.run(timeout=30)
         p.wait()
@@ -286,7 +291,7 @@ class ProcTest(unittest.TestCase):
         Process is started, then processOutput is called a second time explicitly
         """
         p = processhandler.ProcessHandler([self.proclaunch,
-                                          "process_waittimeout_10s.ini"],
+                                           "process_waittimeout_10s.ini"],
                                           cwd=here)
 
         p.run()

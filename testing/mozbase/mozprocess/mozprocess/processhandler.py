@@ -49,7 +49,8 @@ class ProcessHandlerMixin(object):
         (defaults to an empty list). If this is not specified, stderr lines
         will be sent to the *processOutputLine* callbacks.
     :param onTimeout: function or list of functions to be called when the process times out.
-    :param onFinish: function or list of functions to be called when the process terminates normally without timing out.
+    :param onFinish: function or list of functions to be called when the process terminates
+      normally without timing out.
     :param kwargs: additional keyword args to pass directly into Popen.
 
     NOTE: Child processes will be tracked by default.  If for any reason
@@ -177,7 +178,7 @@ class ProcessHandlerMixin(object):
             # Redefine the execute child so that we can track process groups
             def _execute_child(self, *args_tuple):
                 # workaround for bug 950894
-                if sys.hexversion < 0x02070600: # prior to 2.7.6
+                if sys.hexversion < 0x02070600:  # prior to 2.7.6
                     (args, executable, preexec_fn, close_fds,
                      cwd, env, universal_newlines, startupinfo,
                      creationflags, shell,
@@ -185,7 +186,7 @@ class ProcessHandlerMixin(object):
                      c2pread, c2pwrite,
                      errread, errwrite) = args_tuple
                     to_close = set()
-                else: # 2.7.6 and later
+                else:  # 2.7.6 and later
                     (args, executable, preexec_fn, close_fds,
                      cwd, env, universal_newlines, startupinfo,
                      creationflags, shell, to_close,
@@ -220,7 +221,8 @@ class ProcessHandlerMixin(object):
                 if not (can_create_job or can_nest_jobs) and not self._ignore_children:
                     # We can't create job objects AND the user wanted us to
                     # Warn the user about this.
-                    print >> sys.stderr, "ProcessManager UNABLE to use job objects to manage child processes"
+                    print >> sys.stderr, \
+                        "ProcessManager UNABLE to use job objects to manage child processes"
 
                 # set process creation flags
                 creationflags |= winprocess.CREATE_SUSPENDED
@@ -235,8 +237,8 @@ class ProcessHandlerMixin(object):
                 # create the process
                 hp, ht, pid, tid = winprocess.CreateProcess(
                     executable, args,
-                    None, None, # No special security
-                    1, # Must inherit handles!
+                    None, None,  # No special security
+                    1,  # Must inherit handles!
                     creationflags,
                     winprocess.EnvironmentBlock(env),
                     cwd, startupinfo)
@@ -257,34 +259,35 @@ class ProcessHandlerMixin(object):
                         # Now associate the io comp port and the job object
                         joacp = JOBOBJECT_ASSOCIATE_COMPLETION_PORT(winprocess.COMPKEY_JOBOBJECT,
                                                                     self._io_port)
-                        winprocess.SetInformationJobObject(self._job,
-                                                          JobObjectAssociateCompletionPortInformation,
-                                                          addressof(joacp),
-                                                          sizeof(joacp)
-                                                          )
+                        winprocess.SetInformationJobObject(
+                            self._job,
+                            JobObjectAssociateCompletionPortInformation,
+                            addressof(joacp),
+                            sizeof(joacp)
+                        )
 
                         # Allow subprocesses to break away from us - necessary for
                         # flash with protected mode
                         jbli = JOBOBJECT_BASIC_LIMIT_INFORMATION(
-                                                c_longlong(0), # per process time limit (ignored)
-                                                c_longlong(0), # per job user time limit (ignored)
-                                                winprocess.JOB_OBJECT_LIMIT_BREAKAWAY_OK,
-                                                0, # min working set (ignored)
-                                                0, # max working set (ignored)
-                                                0, # active process limit (ignored)
-                                                None, # affinity (ignored)
-                                                0, # Priority class (ignored)
-                                                0, # Scheduling class (ignored)
-                                                )
+                            c_longlong(0),  # per process time limit (ignored)
+                            c_longlong(0),  # per job user time limit (ignored)
+                            winprocess.JOB_OBJECT_LIMIT_BREAKAWAY_OK,
+                            0,  # min working set (ignored)
+                            0,  # max working set (ignored)
+                            0,  # active process limit (ignored)
+                            None,  # affinity (ignored)
+                            0,  # Priority class (ignored)
+                            0,  # Scheduling class (ignored)
+                        )
 
                         iocntr = IO_COUNTERS()
                         jeli = JOBOBJECT_EXTENDED_LIMIT_INFORMATION(
-                                                jbli, # basic limit info struct
-                                                iocntr,    # io_counters (ignored)
-                                                0,    # process mem limit (ignored)
-                                                0,    # job mem limit (ignored)
-                                                0,    # peak process limit (ignored)
-                                                0)    # peak job limit (ignored)
+                            jbli,  # basic limit info struct
+                            iocntr,    # io_counters (ignored)
+                            0,    # process mem limit (ignored)
+                            0,    # job mem limit (ignored)
+                            0,    # peak process limit (ignored)
+                            0)    # peak job limit (ignored)
 
                         winprocess.SetInformationJobObject(self._job,
                                                            JobObjectExtendedLimitInformation,
@@ -300,7 +303,7 @@ class ProcessHandlerMixin(object):
                         self._process_events = Queue()
 
                         # Spin up our thread for managing the IO Completion Port
-                        self._procmgrthread = threading.Thread(target = self._procmgr)
+                        self._procmgrthread = threading.Thread(target=self._procmgr)
                     except:
                         print >> sys.stderr, """Exception trying to use job objects;
 falling back to not using job objects for managing child processes"""
@@ -320,16 +323,15 @@ falling back to not using job objects for managing child processes"""
                     if i is not None:
                         i.Close()
 
+            # Per:
+            # https://msdn.microsoft.com/en-us/library/windows/desktop/hh448388%28v=vs.85%29.aspx
+            # Nesting jobs came in with windows versions starting with 6.2 according to the table
+            # on this page:
+            # https://msdn.microsoft.com/en-us/library/ms724834%28v=vs.85%29.aspx
             def _can_nest_jobs(self):
-                # Per:
-                # https://msdn.microsoft.com/en-us/library/windows/desktop/hh448388%28v=vs.85%29.aspx
-                # Nesting jobs came in with windows versions starting with 6.2 according to the table
-                # on this page:
-                # https://msdn.microsoft.com/en-us/library/ms724834%28v=vs.85%29.aspx
                 winver = sys.getwindowsversion()
                 return (winver.major > 6 or
                         winver.major == 6 and winver.minor >= 2)
-
 
             # Windows Process Manager - watches the IO Completion Port and
             # keeps track of child processes
@@ -388,7 +390,9 @@ falling back to not using job objects for managing child processes"""
                             # Timeouts are expected, just keep on polling
                             continue
                         else:
-                            print >> sys.stderr, "Error Code %s trying to query IO Completion Port, exiting" % errcode
+                            print >> sys.stderr, \
+                                "Error Code %s trying to query IO Completion Port, " \
+                                "exiting" % errcode
                             raise WinError(errcode)
                             break
 
@@ -464,12 +468,12 @@ falling back to not using job objects for managing child processes"""
                     # We use queues to synchronize between the thread and this
                     # function because events just didn't have robust enough error
                     # handling on pre-2.7 versions
-                    err = None
                     try:
                         # timeout is the max amount of time the procmgr thread will wait for
                         # child processes to shutdown before killing them with extreme prejudice.
-                        item = self._process_events.get(timeout=self.MAX_IOCOMPLETION_PORT_NOTIFICATION_DELAY +
-                                                                self.MAX_PROCESS_KILL_DELAY)
+                        item = self._process_events.get(
+                            timeout=self.MAX_IOCOMPLETION_PORT_NOTIFICATION_DELAY +
+                            self.MAX_PROCESS_KILL_DELAY)
                         if item[self.pid] == 'FINISHED':
                             self._process_events.task_done()
                     except:
@@ -529,7 +533,8 @@ falling back to not using job objects for managing child processes"""
                     # (saw this intermittently while testing)
                     self._job = None
 
-                if getattr(self, '_io_port', None) and self._io_port != winprocess.INVALID_HANDLE_VALUE:
+                if getattr(self, '_io_port', None) and \
+                   self._io_port != winprocess.INVALID_HANDLE_VALUE:
                     self._io_port.Close()
                     self._io_port = None
                 else:
@@ -581,7 +586,8 @@ falling back to not using job objects for managing child processes"""
                         if getattr(e, "errno", None) != 10:
                             # Error 10 is "no child process", which could indicate normal
                             # close
-                            print >> sys.stderr, "Encountered error waiting for pid to close: %s" % e
+                            print >> sys.stderr, \
+                                "Encountered error waiting for pid to close: %s" % e
                             raise
 
                         return self.returncode
@@ -596,7 +602,8 @@ falling back to not using job objects for managing child processes"""
 
         else:
             # An unrecognized platform, we will call the base class for everything
-            print >> sys.stderr, "Unrecognized platform, process groups may not be managed properly"
+            print >> sys.stderr, \
+                "Unrecognized platform, process groups may not be managed properly"
 
             def _wait(self):
                 self.returncode = subprocess.Popen.wait(self)
@@ -610,8 +617,8 @@ falling back to not using job objects for managing child processes"""
                  args=None,
                  cwd=None,
                  env=None,
-                 ignore_children = False,
-                 kill_on_timeout = True,
+                 ignore_children=False,
+                 kill_on_timeout=True,
                  processOutputLine=(),
                  processStderrLine=(),
                  onTimeout=(),
@@ -657,7 +664,7 @@ falling back to not using job objects for managing child processes"""
         # It is common for people to pass in the entire array with the cmd and
         # the args together since this is how Popen uses it.  Allow for that.
         if isinstance(self.cmd, list):
-            if self.args != None:
+            if self.args is not None:
                 raise TypeError("cmd and args must not both be lists")
             (self.cmd, self.args) = (self.cmd[0], self.cmd[1:])
         elif self.args is None:
@@ -810,6 +817,7 @@ falling back to not using job objects for managing child processes"""
         return self.proc.pid
 
 class CallableList(list):
+
     def __call__(self, *args, **kwargs):
         for e in self:
             e(*args, **kwargs)
@@ -817,7 +825,9 @@ class CallableList(list):
     def __add__(self, lst):
         return CallableList(list.__add__(self, lst))
 
+
 class ProcessReader(object):
+
     def __init__(self, stdout_callback=None, stderr_callback=None,
                  finished_callback=None, timeout_callback=None,
                  timeout=None, output_timeout=None):
@@ -875,7 +885,7 @@ class ProcessReader(object):
             output_timeout += start_time
 
         while (stdout_reader and stdout_reader.is_alive()) \
-              or (stderr_reader and stderr_reader.is_alive()):
+                or (stderr_reader and stderr_reader.is_alive()):
             has_line = True
             try:
                 line, callback = queue.get(True, 0.02)
@@ -911,8 +921,9 @@ class ProcessReader(object):
             return self.thread.is_alive()
         return False
 
-### default output handlers
-### these should be callables that take the output line
+# default output handlers
+# these should be callables that take the output line
+
 
 class StoreOutput(object):
     """accumulate stdout"""
@@ -922,6 +933,7 @@ class StoreOutput(object):
 
     def __call__(self, line):
         self.output.append(line)
+
 
 class StreamOutput(object):
     """pass output to a stream and flush"""
@@ -938,6 +950,7 @@ class StreamOutput(object):
             self.stream.write(line.decode('iso8859-1') + '\n')
         self.stream.flush()
 
+
 class LogOutput(StreamOutput):
     """pass output to a file"""
 
@@ -950,7 +963,8 @@ class LogOutput(StreamOutput):
             self.file_obj.close()
 
 
-### front end class with the default handlers
+# front end class with the default handlers
+
 
 class ProcessHandler(ProcessHandlerMixin):
     """

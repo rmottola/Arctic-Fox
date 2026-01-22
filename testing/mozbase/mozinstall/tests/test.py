@@ -14,6 +14,7 @@ import unittest
 # Store file location at load time
 here = os.path.dirname(os.path.abspath(__file__))
 
+
 class TestMozInstall(unittest.TestCase):
 
     @classmethod
@@ -44,13 +45,13 @@ class TestMozInstall(unittest.TestCase):
             binary_exe = os.path.join(installdir_exe, 'firefox', 'firefox',
                                       'firefox.exe')
             self.assertEqual(binary_exe, mozinstall.get_binary(installdir_exe,
-                             'firefox'))
+                                                               'firefox'))
 
             installdir_zip = mozinstall.install(self.zipfile,
                                                 os.path.join(self.tempdir, 'zip'))
             binary_zip = os.path.join(installdir_zip, 'firefox.exe')
             self.assertEqual(binary_zip, mozinstall.get_binary(installdir_zip,
-                             'firefox'))
+                                                               'firefox'))
 
         elif mozinfo.isMac:
             installdir = mozinstall.install(self.dmg, self.tempdir)
@@ -81,7 +82,7 @@ class TestMozInstall(unittest.TestCase):
             try:
                 # test stub browser file
                 # without pefile on the system this test will fail
-                import pefile
+                import pefile  # noqa
                 stub_exe = os.path.join(here, 'build_stub', 'firefox.exe')
                 self.assertFalse(mozinstall.is_installer(stub_exe))
             except ImportError:

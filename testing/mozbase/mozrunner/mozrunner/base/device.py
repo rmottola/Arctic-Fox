@@ -16,20 +16,21 @@ import mozfile
 from .runner import BaseRunner
 from ..devices import Emulator
 
+
 class DeviceRunner(BaseRunner):
     """
     The base runner class used for running gecko on
     remote devices (or emulators), such as B2G.
     """
-    env = { 'MOZ_CRASHREPORTER': '1',
-            'MOZ_CRASHREPORTER_NO_REPORT': '1',
-            'MOZ_CRASHREPORTER_SHUTDOWN': '1',
-            'MOZ_HIDE_RESULTS_TABLE': '1',
-            'MOZ_LOG': 'signaling:5,mtransport:5,datachannel:5,jsep:5,MediaPipelineFactory:5',
-            'R_LOG_LEVEL': '6',
-            'R_LOG_DESTINATION': 'stderr',
-            'R_LOG_VERBOSE': '1',
-            'NO_EM_RESTART': '1', }
+    env = {'MOZ_CRASHREPORTER': '1',
+           'MOZ_CRASHREPORTER_NO_REPORT': '1',
+           'MOZ_CRASHREPORTER_SHUTDOWN': '1',
+           'MOZ_HIDE_RESULTS_TABLE': '1',
+           'MOZ_LOG': 'signaling:5,mtransport:5,datachannel:5,jsep:5,MediaPipelineFactory:5',
+           'R_LOG_LEVEL': '6',
+           'R_LOG_DESTINATION': 'stderr',
+           'R_LOG_VERBOSE': '1',
+           'NO_EM_RESTART': '1', }
 
     def __init__(self, device_class, device_args=None, **kwargs):
         process_log = tempfile.NamedTemporaryFile(suffix='pidlog')
@@ -40,7 +41,7 @@ class DeviceRunner(BaseRunner):
         process_args = {'stream': sys.stdout,
                         'processOutputLine': self.on_output,
                         'onFinish': self.on_finish,
-                        'onTimeout': self.on_timeout }
+                        'onTimeout': self.on_timeout}
         process_args.update(kwargs.get('process_args') or {})
 
         kwargs['process_args'] = process_args
@@ -83,7 +84,7 @@ class DeviceRunner(BaseRunner):
         BaseRunner.start(self, *args, **kwargs)
         self.env = self._env
 
-        timeout = 10 # seconds
+        timeout = 10  # seconds
         starttime = datetime.datetime.now()
         while datetime.datetime.now() - starttime < datetime.timedelta(seconds=timeout):
             if self.is_running():

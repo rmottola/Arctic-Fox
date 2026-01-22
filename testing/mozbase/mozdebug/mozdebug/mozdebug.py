@@ -62,7 +62,8 @@ _DEBUGGER_PRIORITIES = {
       'unknown': ['gdb']
 }
 
-def get_debugger_info(debugger, debuggerArgs = None, debuggerInteractive = False):
+
+def get_debugger_info(debugger, debuggerArgs=None, debuggerInteractive=False):
     '''
     Get the information about the requested debugger.
 
@@ -84,7 +85,7 @@ def get_debugger_info(debugger, debuggerArgs = None, debuggerInteractive = False
         # Append '.exe' to the debugger on Windows if it's not present,
         # so things like '--debugger=devenv' work.
         if (os.name == 'nt'
-            and not debugger.lower().endswith('.exe')):
+                and not debugger.lower().endswith('.exe')):
             debugger += '.exe'
 
         debuggerPath = find_executable(debugger)
@@ -129,9 +130,12 @@ def get_debugger_info(debugger, debuggerArgs = None, debuggerInteractive = False
     return d
 
 # Defines the search policies to use in get_default_debugger_name.
+
+
 class DebuggerSearch:
-  OnlyFirst = 1
-  KeepLooking = 2
+    OnlyFirst = 1
+    KeepLooking = 2
+
 
 def get_default_debugger_name(search=DebuggerSearch.OnlyFirst):
     '''
@@ -199,6 +203,8 @@ def get_default_debugger_name(search=DebuggerSearch.OnlyFirst):
 # --px-file-backed=unwindregs-at-mem-access
 #                             [these reduce PX overheads as described above]
 #
+
+
 def get_default_valgrind_args():
     return (['--fair-sched=yes',
              '--smc-check=all-non-file',

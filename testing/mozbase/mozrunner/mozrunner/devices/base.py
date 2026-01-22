@@ -16,6 +16,7 @@ import traceback
 from mozdevice import DMError
 from mozprocess import ProcessHandler
 
+
 class Device(object):
     connected = False
 
@@ -46,8 +47,8 @@ class Device(object):
         for section in cfg.sections():
             if cfg.has_option(section, 'Path'):
                 if cfg.has_option(section, 'IsRelative') and cfg.getint(section, 'IsRelative'):
-                    profiles.append(posixpath.join(posixpath.dirname(remote_ini), \
-                                    cfg.get(section, 'Path')))
+                    profiles.append(posixpath.join(posixpath.dirname(remote_ini),
+                                                   cfg.get(section, 'Path')))
                 else:
                     profiles.append(cfg.get(section, 'Path'))
         return profiles
@@ -80,7 +81,7 @@ class Device(object):
 
         self.dm.pushDir(profile.profile, self.app_ctx.remote_profile)
 
-        timeout = 5 # seconds
+        timeout = 5  # seconds
         starttime = datetime.datetime.now()
         while datetime.datetime.now() - starttime < datetime.timedelta(seconds=timeout):
             if self.dm.fileExists(self.app_ctx.remote_profiles_ini):
@@ -113,7 +114,9 @@ class Device(object):
             self.app_ctx.setup_profile(profile)
 
     def _get_online_devices(self):
-        return [d[0] for d in self.dm.devices() if d[1] != 'offline' if not d[0].startswith('emulator')]
+        return [d[0] for d in self.dm.devices()
+                if d[1] != 'offline'
+                if not d[0].startswith('emulator')]
 
     def connect(self):
         """
@@ -128,7 +131,8 @@ class Device(object):
         else:
             online_devices = self._get_online_devices()
             if not online_devices:
-                raise IOError("No devices connected. Ensure the device is on and remote debugging via adb is enabled in the settings.")
+                raise IOError("No devices connected. Ensure the device is on and "
+                              "remote debugging via adb is enabled in the settings.")
             serial = online_devices[0]
 
         self.dm._deviceSerial = serial
@@ -163,7 +167,7 @@ class Device(object):
         # TODO for some reason using dm.shellCheckOutput doesn't work,
         #      while calling adb shell directly does.
         args = [self.app_ctx.adb, '-s', self.dm._deviceSerial,
-                'shell', 'cd /system/bin; chmod 555 busybox;' \
+                'shell', 'cd /system/bin; chmod 555 busybox;'
                 'for x in `./busybox --list`; do ln -s ./busybox $x; done']
         adb = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         adb.wait()
@@ -181,7 +185,7 @@ class Device(object):
         """
         if not local_port:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.bind(("",0))
+            s.bind(("", 0))
             local_port = s.getsockname()[1]
             s.close()
 
@@ -192,8 +196,9 @@ class Device(object):
         active = False
         time_out = 0
         while not active and time_out < 40:
-            proc = subprocess.Popen([self.app_ctx.adb, 'shell', '/system/bin/netcfg'], stdout=subprocess.PIPE)
-            proc.stdout.readline() # ignore first line
+            proc = subprocess.Popen([self.app_ctx.adb, 'shell', '/system/bin/netcfg'],
+                                    stdout=subprocess.PIPE)
+            proc.stdout.readline()  # ignore first line
             line = proc.stdout.readline()
             while line != "":
                 if (re.search(r'UP\s+[1-9]\d{0,2}\.\d{1,3}\.\d{1,3}\.\d{1,3}', line)):
@@ -247,7 +252,8 @@ class Device(object):
             self.dm.removeFile(added_file)
 
         for backup_file in self.backup_files:
-            if self.dm.fileExists('%s.orig' % backup_file) or self.dm.dirExists('%s.orig' % backup_file):
+            if self.dm.fileExists('%s.orig' % backup_file) or \
+               self.dm.dirExists('%s.orig' % backup_file):
                 self.dm.moveTree('%s.orig' % backup_file, backup_file)
 
         # Perform application specific profile cleanup if necessary
@@ -273,9 +279,8 @@ class Device(object):
             if index == 3:
                 os.remove(destlog)
             else:
-                self._rotate_log(destlog, index+1)
+                self._rotate_log(destlog, index + 1)
         shutil.move(srclog, destlog)
-
 
 
 class ProfileConfigParser(RawConfigParser):
@@ -305,4 +310,3 @@ class ProfileConfigParser(RawConfigParser):
                     key = "=".join((key, str(value).replace('\n', '\n\t')))
                 fp.write("%s\n" % (key))
             fp.write("\n")
-

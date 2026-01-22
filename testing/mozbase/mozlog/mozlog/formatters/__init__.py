@@ -12,3 +12,7 @@ from errorsummary import ErrorSummaryFormatter
 
 def JSONFormatter():
     return lambda x: json.dumps(x) + "\n"
+
+__all__ = ['UnittestFormatter', 'XUnitFormatter', 'HTMLFormatter',
+           'MachFormatter', 'TbplFormatter', 'ErrorSummaryFormatter',
+           'JSONFormatter']

@@ -113,17 +113,18 @@ def B2GEmulatorRunner(arch='arm',
     :returns: A DeviceRunner for B2G emulators.
     """
     kwargs['app_ctx'] = get_app_context('b2g')(b2g_home, adb_path=adb_path)
-    device_args = { 'app_ctx': kwargs['app_ctx'],
-                    'arch': arch,
-                    'binary': binary,
-                    'resolution': resolution,
-                    'sdcard': sdcard,
-                    'userdata': userdata,
-                    'no_window': no_window,
-                    'logdir': logdir }
+    device_args = {'app_ctx': kwargs['app_ctx'],
+                   'arch': arch,
+                   'binary': binary,
+                   'resolution': resolution,
+                   'sdcard': sdcard,
+                   'userdata': userdata,
+                   'no_window': no_window,
+                   'logdir': logdir}
     return DeviceRunner(device_class=Emulator,
                         device_args=device_args,
                         **kwargs)
+
 
 def B2GDeviceRunner(b2g_home=None,
                     adb_path=None,

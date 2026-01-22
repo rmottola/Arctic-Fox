@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# flake8: noqa
 
 from copy import deepcopy
 import os
