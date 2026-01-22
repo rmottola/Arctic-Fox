@@ -8,6 +8,7 @@ UNIFIED_SOURCES += [
     'Helpers.cpp',
 	'TestAtoms.cpp',
     'TestCloneInputStream.cpp',
+    'TestCOMArray.cpp',
     'TestCRT.cpp',
     'TestEncoding.cpp',
     'TestEscapeURL.cpp',
