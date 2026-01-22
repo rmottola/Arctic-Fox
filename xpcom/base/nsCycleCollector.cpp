@@ -2065,7 +2065,7 @@ private:
   CycleCollectorResults& mResults;
   NodePool::Builder mNodeBuilder;
   EdgePool::Builder mEdgeBuilder;
-  PtrInfo* mCurrPi;
+  MOZ_INIT_OUTSIDE_CTOR PtrInfo* mCurrPi;
   nsCycleCollectionParticipant* mJSParticipant;
   nsCycleCollectionParticipant* mJSZoneParticipant;
   nsCString mNextEdgeName;
