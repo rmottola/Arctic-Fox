@@ -1595,9 +1595,11 @@ struct nsStyleGridLine
   int32_t mInteger;  // 0 means not provided
   nsString mLineName;  // Empty string means not provided.
 
+  // These are the limits that we choose to clamp grid line numbers to.
+  // http://dev.w3.org/csswg/css-grid/#overlarge-grids
   // mInteger is clamped to this range:
-  static const int32_t kMinLine;
-  static const int32_t kMaxLine;
+  static const int32_t kMinLine = -10000;
+  static const int32_t kMaxLine = 10000;
 
   nsStyleGridLine()
     : mHasSpan(false)
@@ -3470,7 +3472,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleColumn
    * This is the maximum number of columns we can process. It's used in both
    * nsColumnSetFrame and nsRuleNode.
    */
-  static const uint32_t kMaxColumnCount;
+  static const uint32_t kMaxColumnCount = 1000;
 
   uint32_t     mColumnCount; // [reset] see nsStyleConsts.h
   nsStyleCoord mColumnWidth; // [reset] coord, auto
