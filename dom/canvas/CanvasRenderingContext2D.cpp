@@ -2984,10 +2984,13 @@ CanvasRenderingContext2D::FillRect(double aX, double aY, double aW,
     bounds = mTarget->GetTransform().TransformBounds(fillRect);
   }
 
+  AntialiasMode antialiasMode = CurrentState().imageSmoothingEnabled ?
+                                AntialiasMode::DEFAULT : AntialiasMode::NONE;
+
   AdjustedTarget(this, bounds.IsEmpty() ? nullptr : &bounds)->
     FillRect(gfx::Rect(aX, aY, aW, aH),
              CanvasGeneralPattern().ForStyle(this, Style::FILL, mTarget),
-             DrawOptions(state.globalAlpha, op));
+             DrawOptions(state.globalAlpha, op, antialiasMode));
 
   RedrawUser(gfxRect(aX, aY, aW, aH));
 }
@@ -4879,6 +4882,9 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
     if (!res.mSourceSurface) {
       res = nsLayoutUtils::SurfaceFromElement(element, sfeFlags, mTarget);
+      if (res.mSourceSurface) {
+        gfxUtils::WriteAsPNG(res.mSourceSurface, "/Volumes/firefoxos/Dev/mozilla-git/temp.png");
+      }
     }
 
     if (!res.mSourceSurface && !res.mDrawInfo.mImgContainer) {
@@ -4944,11 +4950,15 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
   }
 
   SamplingFilter samplingFilter;
+  AntialiasMode antialiasMode;
 
-  if (CurrentState().imageSmoothingEnabled)
+  if (CurrentState().imageSmoothingEnabled) {
     samplingFilter = gfx::SamplingFilter::LINEAR;
-  else
+    antialiasMode = AntialiasMode::DEFAULT;
+  } else {
     samplingFilter = gfx::SamplingFilter::POINT;
+    antialiasMode = AntialiasMode::NONE;
+  }
 
   gfx::Rect bounds;
 
@@ -4971,8 +4981,8 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
       DrawSurface(srcSurf,
                   gfx::Rect(aDx, aDy, aDw, aDh),
                   sourceRect,
-                  DrawSurfaceOptions(samplingFilter),
-                  DrawOptions(CurrentState().globalAlpha, UsedOperation()));
+                  DrawSurfaceOptions(samplingFilter, SamplingBounds::UNBOUNDED),
+                  DrawOptions(CurrentState().globalAlpha, UsedOperation(), antialiasMode));
   } else {
     DrawDirectlyToCanvas(drawInfo, &bounds,
                          gfx::Rect(aDx, aDy, aDw, aDh),
