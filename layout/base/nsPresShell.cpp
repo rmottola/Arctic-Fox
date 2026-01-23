@@ -4966,8 +4966,8 @@ PresShell::PaintRangePaintInfo(const nsTArray<UniquePtr<RangePaintInfo>>& aItems
                                nsISelection* aSelection,
                                nsIntRegion* aRegion,
                                nsRect aArea,
-                               nsIntPoint& aPoint,
-                               nsIntRect* aScreenRect,
+                               const LayoutDeviceIntPoint aPoint,
+                               LayoutDeviceIntRect* aScreenRect,
                                uint32_t aFlags)
 {
   nsPresContext* pc = GetPresContext();
@@ -5115,8 +5115,8 @@ PresShell::PaintRangePaintInfo(const nsTArray<UniquePtr<RangePaintInfo>>& aItems
 already_AddRefed<SourceSurface>
 PresShell::RenderNode(nsIDOMNode* aNode,
                       nsIntRegion* aRegion,
-                      nsIntPoint& aPoint,
-                      nsIntRect* aScreenRect,
+                      const LayoutDeviceIntPoint aPoint,
+                      LayoutDeviceIntRect* aScreenRect,
                       uint32_t aFlags)
 {
   // area will hold the size of the surface needed to draw the node, measured
@@ -5160,8 +5160,8 @@ PresShell::RenderNode(nsIDOMNode* aNode,
 
 already_AddRefed<SourceSurface>
 PresShell::RenderSelection(nsISelection* aSelection,
-                           nsIntPoint& aPoint,
-                           nsIntRect* aScreenRect,
+                           const LayoutDeviceIntPoint aPoint,
+                           LayoutDeviceIntRect* aScreenRect,
                            uint32_t aFlags)
 {
   // area will hold the size of the surface needed to draw the selection,
