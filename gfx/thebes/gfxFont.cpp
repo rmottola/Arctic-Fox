@@ -2023,6 +2023,10 @@ gfxFont::Draw(const gfxTextRun *aTextRun, uint32_t aStart, uint32_t aEnd,
 
     FontDrawParams fontParams;
 
+    if (aRunParams.drawOpts) {
+        fontParams.drawOptions = *aRunParams.drawOpts;
+    }
+
     fontParams.scaledFont = GetScaledFont(aRunParams.dt);
     if (!fontParams.scaledFont) {
         return;
