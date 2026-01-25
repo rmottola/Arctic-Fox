@@ -31,6 +31,7 @@ Compressor::Compressor(const unsigned char* inp, size_t inplen)
     : inp(inp),
       inplen(inplen),
       initialized(false),
+      finished(false),
       currentChunkSize(0),
       chunkOffsets()
 {
@@ -54,7 +55,7 @@ Compressor::~Compressor()
         if (ret != Z_OK) {
             // If we finished early, we can get a Z_DATA_ERROR.
             MOZ_ASSERT(ret == Z_DATA_ERROR);
-            MOZ_ASSERT(uInt(zs.next_in - inp) < inplen || !zs.avail_out);
+            MOZ_ASSERT(!finished);
         }
     }
 }
@@ -94,8 +95,7 @@ Compressor::compressMore()
 {
     MOZ_ASSERT(zs.next_out);
     uInt left = inplen - (zs.next_in - inp);
-    bool done = left <= MAX_INPUT_SIZE;
-    if (done)
+    if (left <= MAX_INPUT_SIZE)
         zs.avail_in = left;
     else if (zs.avail_in == 0)
         zs.avail_in = MAX_INPUT_SIZE;
@@ -111,6 +111,9 @@ Compressor::compressMore()
         flush = true;
     }
 
+    MOZ_ASSERT(zs.avail_in <= left);
+    bool done = zs.avail_in == left;
+
     Bytef* oldin = zs.next_in;
     Bytef* oldout = zs.next_out;
     int ret = deflate(&zs, done ? Z_FINISH : (flush ? Z_FULL_FLUSH : Z_NO_FLUSH));
@@ -122,7 +125,9 @@ Compressor::compressMore()
         zs.avail_out = 0;
         return OOM;
     }
-    if (ret == Z_BUF_ERROR || (done && ret == Z_OK)) {
+    if (ret == Z_BUF_ERROR || (ret == Z_OK && zs.avail_out == 0)) {
+        // We have to resize the output buffer. Note that we're not done yet
+        // because ret != Z_STREAM_END.
         MOZ_ASSERT(zs.avail_out == 0);
         return MOREOUTPUT;
     }
@@ -148,7 +153,7 @@ Compressor::totalBytesNeeded() const
 }
 
 void
-Compressor::finish(char* dest, size_t destBytes) const
+Compressor::finish(char* dest, size_t destBytes)
 {
     MOZ_ASSERT(!chunkOffsets.empty());
 
@@ -164,6 +169,8 @@ Compressor::finish(char* dest, size_t destBytes) const
 
     MOZ_ASSERT(uintptr_t(dest + destBytes) == uintptr_t(destArr + chunkOffsets.length()));
     mozilla::PodCopy(destArr, chunkOffsets.begin(), chunkOffsets.length());
+
+    finished = true;
 }
 
 bool
