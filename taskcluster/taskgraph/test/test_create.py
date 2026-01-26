@@ -9,18 +9,10 @@ import os
 
 from .. import create
 from ..graph import Graph
-from ..types import Task, TaskGraph
+from ..types import TaskGraph
+from .util import TestTask
 
 from mozunit import main
-
-
-class FakeKind(object):
-
-    def get_task_definition(self, task, deps_by_name):
-        # sanity-check the deps_by_name
-        for k, v in deps_by_name.iteritems():
-            assert k == 'edge'
-        return {'payload': 'hello world'}
 
 
 class TestCreate(unittest.TestCase):
@@ -64,9 +56,8 @@ class TestCreate(unittest.TestCase):
     def test_create_task_without_dependencies(self):
         "a task with no dependencies depends on the decision task"
         os.environ['TASK_ID'] = 'decisiontask'
-        kind = FakeKind()
         tasks = {
-            'tid-a': Task(kind=kind, label='a', task={'payload': 'hello world'}),
+            'tid-a': TestTask(label='a', task={'payload': 'hello world'}),
         }
         label_to_taskid = {'a': 'tid-a'}
         graph = Graph(nodes={'tid-a'}, edges=set())
@@ -75,7 +66,7 @@ class TestCreate(unittest.TestCase):
         create.create_tasks(taskgraph, label_to_taskid)
 
         for tid, task in self.created_tasks.iteritems():
-            self.assertEqual(task['dependencies'], [os.environ['TASK_ID']])
+            self.assertEqual(task.get('dependencies'), [os.environ['TASK_ID']])
 
 
 if __name__ == '__main__':
