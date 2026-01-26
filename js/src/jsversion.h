@@ -37,8 +37,4 @@
  */
 #define JS_OLD_GETTER_SETTER_METHODS    1
 
-#ifdef NIGHTLY_BUILD
-
-#endif // NIGHTLY_BUILD
-
 #endif /* jsversion_h */
