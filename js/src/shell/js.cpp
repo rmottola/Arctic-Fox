@@ -1155,9 +1155,8 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
         if (!JS::ToUint32(cx, args[2], &size))
             return false;
         sizeGiven = true;
-        if (offset > size) {
-            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_ARG_INDEX_OUT_OF_RANGE,
-                                      "2");
+        if (size == 0) {
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_ARRAY_LENGTH);
             return false;
         }
     }
@@ -1175,7 +1174,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
             JS_ReportErrorASCII(cx, "Unable to stat file");
             return false;
         }
-        if (st.st_size < off_t(offset)) {
+        if (off_t(offset) >= st.st_size) {
             JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                                       JSMSG_ARG_INDEX_OUT_OF_RANGE, "2");
             return false;
