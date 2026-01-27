@@ -155,6 +155,7 @@ RIDEALONG_BUILDS = {
         'sm-package',
         'sm-tsan',
         'sm-asan',
+        'sm-mozjs-sys',
         'sm-msan',
     ],
 }
