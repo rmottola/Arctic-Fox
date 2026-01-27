@@ -11,6 +11,20 @@ users or automated tests.  This is more restrictive than most definitions of
 "build" in a Mozilla context: it does not include tasks that run build-like
 actions for static analysis or to produce instrumented artifacts.
 
+artifact-build
+--------------
+
+This kind performs an artifact build: one based on precompiled binaries
+discovered via the TaskCluster index.  This task verifies that such builds
+continue to work correctly.
+
+hazard
+------
+
+Hazard builds are similar to "regular' builds, but use a compiler extension to
+extract a bunch of data from the build and then analyze that data looking for
+hazardous behaviors.
+
 Tests
 -----
 
