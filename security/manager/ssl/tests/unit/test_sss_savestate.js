@@ -15,6 +15,10 @@ let gProfileDir = null;
 // separated by newlines ('\n')
 
 function checkStateWritten(aSubject, aTopic, aData) {
+  if (aData == PRELOAD_STATE_FILE_NAME) {
+    return;
+  }
+
   equal(aData, SSS_STATE_FILE_NAME);
 
   let stateFile = gProfileDir.clone();
@@ -201,7 +205,8 @@ function run_test() {
   let SSService = Cc["@mozilla.org/ssservice;1"]
                     .getService(Ci.nsISiteSecurityService);
   // Put an HPKP entry
-  SSService.setKeyPins("dynamic-pin.example.com", true, 1000, 1,
+  SSService.setKeyPins("dynamic-pin.example.com", true,
+                       new Date().getTime() + 1000000, 1,
                        [NON_ISSUED_KEY_HASH]);
 
   let uris = [ Services.io.newURI("http://bugzilla.mozilla.org", null, null),
