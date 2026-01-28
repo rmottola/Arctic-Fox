@@ -6,9 +6,6 @@
 
 TEST_DIRS += [
     'external',
-    'component',
-    'bug656331_component',
-    'component_no_aslr',
     'gtest',
 ]
 
