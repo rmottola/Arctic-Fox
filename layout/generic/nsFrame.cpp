@@ -1198,7 +1198,7 @@ nsIFrame::Combines3DTransformWithAncestors() const
   if (!GetParent() || !GetParent()->Extend3DContext()) {
     return false;
   }
-  return StyleDisplay()->HasTransform(this) || BackfaceIsHidden();
+  return IsTransformed() || BackfaceIsHidden();
 }
 
 bool
