@@ -1456,14 +1456,14 @@ EditorBase::SplitNode(nsIContent& aNode,
 
   mRangeUpdater.SelAdjSplitNode(aNode, aOffset, newNode);
 
-  nsresult result = aResult.StealNSResult();
+  nsresult rv = aResult.StealNSResult();
   for (auto& listener : mActionListeners) {
     listener->DidSplitNode(aNode.AsDOMNode(), aOffset, GetAsDOMNode(newNode),
-                           result);
+                           rv);
   }
   // Note: result might be a success code, so we can't use Throw() to
   // set it on aResult.
-  aResult = result;
+  aResult = rv;
 
   return newNode;
 }
@@ -1500,11 +1500,11 @@ EditorBase::JoinNodes(nsINode& aLeftNode,
                             parent->AsDOMNode());
   }
 
-  nsresult result = NS_OK;
+  nsresult rv = NS_OK;
   RefPtr<JoinNodeTransaction> transaction =
     CreateTxnForJoinNode(aLeftNode, aRightNode);
   if (transaction)  {
-    result = DoTransaction(transaction);
+    rv = DoTransaction(transaction);
   }
 
   mRangeUpdater.SelAdjJoinNodes(aLeftNode, aRightNode, *parent, offset,
@@ -1512,10 +1512,10 @@ EditorBase::JoinNodes(nsINode& aLeftNode,
 
   for (auto& listener : mActionListeners) {
     listener->DidJoinNodes(aLeftNode.AsDOMNode(), aRightNode.AsDOMNode(),
-                           parent->AsDOMNode(), result);
+                           parent->AsDOMNode(), rv);
   }
 
-  return result;
+  return rv;
 }
 
 NS_IMETHODIMP
