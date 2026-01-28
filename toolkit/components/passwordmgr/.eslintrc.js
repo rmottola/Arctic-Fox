@@ -1,0 +1,12 @@
+"use strict";
+
+module.exports = { // eslint-disable-line no-undef
+  "extends": "../../.eslintrc.js",
+  "rules": {
+    // No space before always a space after a comma
+    "comma-spacing": [2, {"before": false, "after": true}],
+
+    // Commas at the end of the line not the start
+    "comma-style": 2,
+  }
+};
