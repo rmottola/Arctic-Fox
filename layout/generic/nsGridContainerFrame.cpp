@@ -6705,6 +6705,12 @@ nsGridContainerFrame::SynthesizeBaseline(
     // No item in this fragment - synthesize a baseline from our border-box.
     return ::SynthesizeBaselineFromBorderBox(aGroup, aCBWM, aCBSize);
   }
+  auto GetBBaseline = [] (BaselineSharingGroup aGroup, WritingMode aWM,
+                          const nsIFrame* aFrame, nscoord* aBaseline) {
+    return aGroup == BaselineSharingGroup::eFirst ?
+      nsLayoutUtils::GetFirstLineBaseline(aWM, aFrame, aBaseline) :
+      nsLayoutUtils::GetLastLineBaseline(aWM, aFrame, aBaseline);
+  };
   nsIFrame* child = aGridOrderItem.mItem->mFrame;
   nsGridContainerFrame* grid = do_QueryFrame(child);
   auto childWM = child->GetWritingMode();
@@ -6719,7 +6725,7 @@ nsGridContainerFrame::SynthesizeBaseline(
       isOrthogonal ? grid->GetIBaseline(aGroup, &baseline) :
                      grid->GetBBaseline(aGroup, &baseline);
     } else if (!isOrthogonal && aGridOrderItem.mIsInEdgeTrack &&
-               nsLayoutUtils::GetLastLineBaseline(childWM, child, &baseline)) {
+               GetBBaseline(aGroup, childWM, child, &baseline)) {
       if (aGroup == BaselineSharingGroup::eLast) {
         baseline = size - baseline; // convert to distance from border-box end
       }
@@ -6733,7 +6739,7 @@ nsGridContainerFrame::SynthesizeBaseline(
       isOrthogonal ? grid->GetBBaseline(aGroup, &baseline) :
                      grid->GetIBaseline(aGroup, &baseline);
     } else if (isOrthogonal && aGridOrderItem.mIsInEdgeTrack &&
-               nsLayoutUtils::GetLastLineBaseline(childWM, child, &baseline)) {
+               GetBBaseline(aGroup, childWM, child, &baseline)) {
       if (aGroup == BaselineSharingGroup::eLast) {
         baseline = size - baseline; // convert to distance from border-box end
       }
