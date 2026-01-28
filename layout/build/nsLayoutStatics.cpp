@@ -155,6 +155,7 @@ nsLayoutStatics::Initialize()
   nsCSSPseudoClasses::AddRefAtoms();
   nsCSSPseudoElements::AddRefAtoms();
   nsCSSKeywords::AddRefTable();
+  nsCSSProps::AddRefAtoms();
   nsCSSProps::AddRefTable();
   nsColorNames::AddRefTable();
   nsGkAtoms::AddRefAtoms();
