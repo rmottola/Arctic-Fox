@@ -5206,9 +5206,12 @@ nsFrame::ComputeSizeWithIntrinsicDimensions(nsRenderingContext*  aRenderingConte
         tentISize = nsPresContext::CSSPixelsToAppUnits(300);
       }
 
+      // If we need to clamp the inline size to fit the CB, we use the 'stretch'
+      // or 'normal' codepath.  We use the ratio-preserving 'normal' codepath
+      // unless we have 'stretch' in the other axis.
       if ((aFlags & ComputeSizeFlags::eIClampMarginBoxMinSize) &&
-          tentISize > iSize) {
-        stretchI = eStretch;
+          stretchI != eStretch && tentISize > iSize) {
+        stretchI = (stretchB == eStretch ? eStretch : eStretchPreservingRatio);
       }
 
       if (hasIntrinsicBSize) {
@@ -5219,9 +5222,10 @@ nsFrame::ComputeSizeWithIntrinsicDimensions(nsRenderingContext*  aRenderingConte
         tentBSize = nsPresContext::CSSPixelsToAppUnits(150);
       }
 
+      // (ditto the comment about clamping the inline size above)
       if ((aFlags & ComputeSizeFlags::eBClampMarginBoxMinSize) &&
-          tentBSize > bSize) {
-        stretchB = eStretch;
+          stretchB != eStretch && tentBSize > bSize) {
+        stretchB = (stretchI == eStretch ? eStretch : eStretchPreservingRatio);
       }
 
       if (aIntrinsicRatio != nsSize(0, 0)) {
