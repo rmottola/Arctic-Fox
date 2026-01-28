@@ -69,8 +69,8 @@ exports.PSEUDO_ELEMENTS = PSEUDO_ELEMENTS;
  *    "supports": [ 7, 9, 10 ]
  *  }
  */
-
 exports.CSS_PROPERTIES = CSS_PROPERTIES;
+
 exports.CSS_PROPERTIES_DB = {
   properties: CSS_PROPERTIES,
   pseudoElements: PSEUDO_ELEMENTS
