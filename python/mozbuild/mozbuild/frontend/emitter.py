@@ -145,7 +145,6 @@ ALLOWED_XPCOM_GLUE = {
     ('test_transaction_helper', 'storage/test'),
     ('test_true_async', 'storage/test'),
     ('test_unlock_notify', 'storage/test'),
-    ('TestTXMgr', 'editor/txmgr/tests'),
     ('test_IHistory', 'toolkit/components/places/tests/cpp'),
     ('testcrasher', 'toolkit/crashreporter/test'),
     ('TestStartupCache', 'startupcache/test'),
