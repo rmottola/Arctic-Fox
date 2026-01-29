@@ -167,31 +167,24 @@ TestWriteObject() {
   const char* id = "id";
   nsCOMPtr<nsIStorageStream> storageStream
     = do_CreateInstance("@mozilla.org/storagestream;1");
-  NS_ENSURE_ARG_POINTER(storageStream);
-  
+  ASSERT_TRUE(storageStream);
+
   rv = storageStream->Init(256, (uint32_t) -1);
-  NS_ENSURE_SUCCESS(rv, rv);
-  
+  EXPECT_TRUE(NS_SUCCEEDED(rv));
+
   nsCOMPtr<nsIObjectOutputStream> objectOutput
     = do_CreateInstance("@mozilla.org/binaryoutputstream;1");
-  if (!objectOutput)
-    return NS_ERROR_OUT_OF_MEMORY;
-  
+  ASSERT_TRUE(objectOutput);
+
   nsCOMPtr<nsIOutputStream> outputStream
     = do_QueryInterface(storageStream);
-  
-  rv = objectOutput->SetOutputStream(outputStream);
 
-  if (NS_FAILED(rv)) {
-    fail("failed to create output stream");
-    return rv;
-  }
+  rv = objectOutput->SetOutputStream(outputStream);
+  EXPECT_TRUE(NS_SUCCEEDED(rv));
+
   nsCOMPtr<nsISupports> objQI(do_QueryInterface(obj));
   rv = objectOutput->WriteObject(objQI, true);
-  if (NS_FAILED(rv)) {
-    fail("failed to write object");
-    return rv;
-  }
+  EXPECT_TRUE(NS_SUCCEEDED(rv));
 
   UniquePtr<char[]> buf;
   uint32_t len;
