@@ -103,9 +103,6 @@ from mozbuild.base import ExecutionSummary
 
 ALLOWED_XPCOM_GLUE = {
     ('TestMinStringAPI', 'xpcom/tests/external'),
-    ('testcomponent', 'xpcom/tests/component'),
-    ('test656331', 'xpcom/tests/bug656331_component'),
-    ('testcompnoaslr', 'xpcom/tests/component_no_aslr'),
     ('TestStreamConv', 'netwerk/streamconv/test'),
     ('PropertiesTest', 'netwerk/test'),
     ('ReadNTLM', 'netwerk/test'),
