@@ -122,11 +122,15 @@ class WasmModuleObject : public NativeObject
     static const unsigned MODULE_SLOT = 0;
     static const ClassOps classOps_;
     static void finalize(FreeOp* fop, JSObject* obj);
+    static bool imports(JSContext* cx, unsigned argc, Value* vp);
+    static bool exports(JSContext* cx, unsigned argc, Value* vp);
+
   public:
     static const unsigned RESERVED_SLOTS = 1;
     static const Class class_;
     static const JSPropertySpec properties[];
     static const JSFunctionSpec methods[];
+    static const JSFunctionSpec static_methods[];
     static bool construct(JSContext*, unsigned, Value*);
 
     static WasmModuleObject* create(ExclusiveContext* cx,
@@ -163,6 +167,7 @@ class WasmInstanceObject : public NativeObject
     static const Class class_;
     static const JSPropertySpec properties[];
     static const JSFunctionSpec methods[];
+    static const JSFunctionSpec static_methods[];
     static bool construct(JSContext*, unsigned, Value*);
 
     static WasmInstanceObject* create(JSContext* cx,
@@ -209,6 +214,7 @@ class WasmMemoryObject : public NativeObject
     static const Class class_;
     static const JSPropertySpec properties[];
     static const JSFunctionSpec methods[];
+    static const JSFunctionSpec static_methods[];
     static bool construct(JSContext*, unsigned, Value*);
 
     static WasmMemoryObject* create(ExclusiveContext* cx,
@@ -246,6 +252,7 @@ class WasmTableObject : public NativeObject
     static const Class class_;
     static const JSPropertySpec properties[];
     static const JSFunctionSpec methods[];
+    static const JSFunctionSpec static_methods[];
     static bool construct(JSContext*, unsigned, Value*);
 
     // Note that, after creation, a WasmTableObject's table() is not initialized
