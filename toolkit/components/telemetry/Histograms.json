@@ -5980,29 +5980,12 @@
     "n_values": 10,
     "description": "Track click count on about:newtab tiles per index (0-8). For non-default row or column configurations all clicks into the '9' bucket. *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
-  "BROWSERPROVIDER_XUL_IMPORT_TIME": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "low": 20,
-    "high": 600000,
-    "n_buckets": 20,
-    "description": "Time for the initial conversion of a XUL places database (ms)",
-    "cpp_guard": "ANDROID"
-  },
   "BROWSERPROVIDER_XUL_IMPORT_BOOKMARKS": {
     "expires_in_version": "default",
     "kind": "exponential",
     "high": 50000,
     "n_buckets": 20,
     "description": "Number of bookmarks in the original XUL places database",
-    "cpp_guard": "ANDROID"
-  },
-  "BROWSERPROVIDER_XUL_IMPORT_HISTORY": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": 1000000,
-    "n_buckets": 20,
-    "description": "Number of history entries in the original XUL places database",
     "cpp_guard": "ANDROID"
   },
   "FENNEC_GLOBALHISTORY_ADD_MS": {
@@ -6181,13 +6164,6 @@
     "high": 200,
     "n_buckets": 50,
     "description": "Recorded once per session near startup: records the search plugin count, including both built-in plugins (including the ones the user has hidden) and user-installed plugins."
-  },
-  "SEARCH_SERVICE_BUILD_CACHE_MS": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": 1000,
-    "n_buckets": 15,
-    "description": "Time (ms) it takes to build the cache of the search service"
   },
   "SEARCH_SERVICE_COUNTRY_FETCH_TIME_MS": {
     "alert_emails": ["mhammond@mozilla.com", "gavin@mozilla.com"],
@@ -8083,24 +8059,6 @@
     "kind": "enumerated",
     "description": "Record on which attempt we successfully unlocked a database. See DATABASE_LOCKED_EXCEPTION.",
     "n_values": 5
-  },
-  "SQLITEBRIDGE_PROVIDER_PASSWORDS_LOCKED": {
-    "expires_in_version": "40",
-    "kind": "enumerated",
-    "n_values": 10,
-    "description": "The number of errors using the PasswordsProvider due to a locked DB. *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
-  },
-  "SQLITEBRIDGE_PROVIDER_FORMS_LOCKED": {
-    "expires_in_version": "40",
-    "kind": "enumerated",
-    "n_values": 10,
-    "description": "The number of errors using the FormHistoryProvider due to a locked DB. *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
-  },
-  "SQLITEBRIDGE_PROVIDER_HOME_LOCKED": {
-    "expires_in_version": "40",
-    "kind": "enumerated",
-    "n_values": 10,
-    "description": "The number of errors using the HomeProvider due to a locked DB."
   },
   "SSL_TLS13_INTOLERANCE_REASON_PRE": {
     "alert_emails": ["seceng-telemetry@mozilla.com"],
