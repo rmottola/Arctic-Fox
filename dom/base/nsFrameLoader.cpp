@@ -3469,6 +3469,7 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
   nsCOMPtr<mozIApplication> containingApp = GetContainingApp();
   DocShellOriginAttributes attrs;
   attrs.mInIsolatedMozBrowser = OwnerIsIsolatedMozBrowserFrame();
+  nsresult rv;
 
   nsCString signedPkgOrigin;
   if (!aPackageId.IsEmpty()) {
@@ -3480,11 +3481,11 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
   // Get the AppId from ownApp
   uint32_t appId = nsIScriptSecurityManager::NO_APP_ID;
   if (ownApp) {
-    nsresult rv = ownApp->GetLocalId(&appId);
+    rv = ownApp->GetLocalId(&appId);
     NS_ENSURE_SUCCESS(rv, rv);
     NS_ENSURE_STATE(appId != nsIScriptSecurityManager::NO_APP_ID);
   } else if (containingApp) {
-    nsresult rv = containingApp->GetLocalId(&appId);
+    rv = containingApp->GetLocalId(&appId);
     NS_ENSURE_SUCCESS(rv, rv);
     NS_ENSURE_STATE(appId != nsIScriptSecurityManager::NO_APP_ID);
   }
@@ -3495,18 +3496,8 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
 
   // set the userContextId on the attrs before we pass them into
   // the tab context
-  nsAutoString userContextIdStr;
-  if (mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::usercontextid)) {
-    mOwnerContent->GetAttr(kNameSpaceID_None,
-                           nsGkAtoms::usercontextid,
-                           userContextIdStr);
-  }
-  if (!userContextIdStr.IsEmpty()) {
-    nsresult err;
-    uint32_t userContextId = userContextIdStr.ToInteger(&err);
-    NS_ENSURE_SUCCESS(err, err);
-    attrs.mUserContextId = userContextId;
-  }
+  rv = PopulateUserContextIdFromAttribute(attrs);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   nsAutoString presentationURLStr;
   mOwnerContent->GetAttr(kNameSpaceID_None,
