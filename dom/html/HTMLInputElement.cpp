@@ -691,7 +691,7 @@ nsColorPickerShownCallback::UpdateInternal(const nsAString& aColor,
   if (aTrustedUpdate) {
     valueChanged = true;
   } else {
-    mInput->GetValue(oldValue);
+    mInput->GetValue(oldValue, CallerType::System);
   }
 
   IgnoredErrorResult rv;
@@ -699,7 +699,7 @@ nsColorPickerShownCallback::UpdateInternal(const nsAString& aColor,
 
   if (!aTrustedUpdate) {
     nsAutoString newValue;
-    mInput->GetValue(newValue);
+    mInput->GetValue(newValue, CallerType::System);
     if (!oldValue.Equals(newValue)) {
       valueChanged = true;
     }
@@ -785,7 +785,7 @@ DatePickerShownCallback::Done(const nsAString& aDate)
   nsAutoString oldValue;
 
   mInput->PickerClosed();
-  mInput->GetValue(oldValue);
+  mInput->GetValue(oldValue, CallerType::System);
 
   if(!oldValue.Equals(aDate)){
     IgnoredErrorResult rv;
@@ -866,7 +866,7 @@ HTMLInputElement::InitDatePicker()
   }
 
   nsAutoString initialValue;
-  GetValueInternal(initialValue);
+  GetNonFileValueInternal(initialValue);
   rv = datePicker->Init(win, title, initialValue);
 
   nsCOMPtr<nsIDatePickerShownCallback> callback =
@@ -911,7 +911,7 @@ HTMLInputElement::InitColorPicker()
   }
 
   nsAutoString initialValue;
-  GetValueInternal(initialValue);
+  GetNonFileValueInternal(initialValue);
   nsresult rv = colorPicker->Init(win, title, initialValue);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1322,7 +1322,7 @@ HTMLInputElement::Clone(mozilla::dom::NodeInfo* aNodeInfo, nsINode** aResult) co
         // We don't have our default value anymore.  Set our value on
         // the clone.
         nsAutoString value;
-        GetValueInternal(value);
+        GetNonFileValueInternal(value);
         // SetValueInternal handles setting the VALUE_CHANGED bit for us
         rv = it->SetValueInternal(value, nsTextEditorState::eSetValue_Notify);
         NS_ENSURE_SUCCESS(rv, rv);
@@ -1515,7 +1515,7 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
         // a step mismatch and a value that results in overflow. For example,
         // if @max in the example above were to change from 1 to -1.
         nsAutoString value;
-        GetValue(value);
+        GetNonFileValueInternal(value);
         nsresult rv =
           SetValueInternal(value, nsTextEditorState::eSetValue_Internal);
         NS_ENSURE_SUCCESS(rv, rv);
@@ -1534,7 +1534,7 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       if (mType == NS_FORM_INPUT_RANGE) {
         // See @max comment
         nsAutoString value;
-        GetValue(value);
+        GetNonFileValueInternal(value);
         nsresult rv =
           SetValueInternal(value, nsTextEditorState::eSetValue_Internal);
         NS_ENSURE_SUCCESS(rv, rv);
@@ -1550,7 +1550,7 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       if (mType == NS_FORM_INPUT_RANGE) {
         // See @max comment
         nsAutoString value;
-        GetValue(value);
+        GetNonFileValueInternal(value);
         nsresult rv =
           SetValueInternal(value, nsTextEditorState::eSetValue_Internal);
         NS_ENSURE_SUCCESS(rv, rv);
@@ -1568,7 +1568,7 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       if (mType == NS_FORM_INPUT_NUMBER) {
         // Update the value that is displayed to the user to the new locale:
         nsAutoString value;
-        GetValueInternal(value);
+        GetNonFileValueInternal(value);
         nsNumberControlFrame* numberControlFrame =
           do_QueryFrame(GetPrimaryFrame());
         if (numberControlFrame) {
@@ -1750,22 +1750,41 @@ HTMLInputElement::SetWidth(uint32_t aWidth)
   return rv.StealNSResult();
 }
 
-NS_IMETHODIMP
-HTMLInputElement::GetValue(nsAString& aValue)
+void
+HTMLInputElement::GetValue(nsAString& aValue, CallerType aCallerType)
 {
-  GetValueInternal(aValue);
+  GetValueInternal(aValue, aCallerType);
 
   // Don't return non-sanitized value for types that are experimental on mobile
   // or datetime types
   if (IsExperimentalMobileType(mType) || IsDateTimeInputType(mType)) {
     SanitizeValue(aValue);
   }
-
-  return NS_OK;
 }
 
 void
-HTMLInputElement::GetValueInternal(nsAString& aValue) const
+HTMLInputElement::GetValueInternal(nsAString& aValue,
+                                   CallerType aCallerType) const
+{
+  if (mType != NS_FORM_INPUT_FILE) {
+    GetNonFileValueInternal(aValue);
+    return;
+  }
+
+  if (aCallerType == CallerType::System) {
+    aValue.Assign(mFirstFilePath);
+  } else {
+    // Just return the leaf name
+    if (mFilesOrDirectories.IsEmpty()) {
+      aValue.Truncate();
+    } else {
+      GetDOMFileOrDirectoryName(mFilesOrDirectories[0], aValue);
+    }
+  }
+}
+
+void
+HTMLInputElement::GetNonFileValueInternal(nsAString& aValue) const
 {
   switch (GetValueMode()) {
     case VALUE_MODE_VALUE:
@@ -1777,17 +1796,9 @@ HTMLInputElement::GetValueInternal(nsAString& aValue) const
       return;
 
     case VALUE_MODE_FILENAME:
-      if (nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
-        aValue.Assign(mFirstFilePath);
-      } else {
-        // Just return the leaf name
-        if (mFilesOrDirectories.IsEmpty()) {
-          aValue.Truncate();
-        } else {
-          GetDOMFileOrDirectoryName(mFilesOrDirectories[0], aValue);
-        }
-      }
-
+      NS_NOTREACHED("Someone screwed up here");
+      // We'll just return empty string if someone does screw up.
+      aValue.Truncate();
       return;
 
     case VALUE_MODE_DEFAULT:
@@ -1808,7 +1819,7 @@ bool
 HTMLInputElement::IsValueEmpty() const
 {
   nsAutoString value;
-  GetValueInternal(value);
+  GetNonFileValueInternal(value);
 
   return value.IsEmpty();
 }
@@ -1929,7 +1940,7 @@ HTMLInputElement::GetValueAsDecimal() const
   Decimal decimalValue;
   nsAutoString stringValue;
 
-  GetValueInternal(stringValue);
+  GetNonFileValueInternal(stringValue);
 
   return !ConvertStringToNumber(stringValue, decimalValue) ? Decimal::nan()
                                                            : decimalValue;
@@ -1972,7 +1983,7 @@ HTMLInputElement::SetValue(const nsAString& aValue, CallerType aCallerType,
       // NOTE: this is currently quite expensive work (too much string
       // manipulation). We should probably optimize that.
       nsAutoString currentValue;
-      GetValue(currentValue);
+      GetValue(currentValue, aCallerType);
 
       nsresult rv =
         SetValueInternal(aValue, nsTextEditorState::eSetValue_ByContent |
@@ -1983,7 +1994,7 @@ HTMLInputElement::SetValue(const nsAString& aValue, CallerType aCallerType,
       }
 
       if (mFocusedValue.Equals(currentValue)) {
-        GetValue(mFocusedValue);
+        GetValue(mFocusedValue, aCallerType);
       }
     } else {
       nsresult rv =
@@ -1995,13 +2006,6 @@ HTMLInputElement::SetValue(const nsAString& aValue, CallerType aCallerType,
       }
     }
   }
-}
-
-NS_IMETHODIMP
-HTMLInputElement::SetValue(const nsAString& aValue)
-{
-  NS_NOTREACHED("No one should be calling this method");
-  return NS_ERROR_FAILURE;
 }
 
 nsGenericHTMLElement*
@@ -2203,7 +2207,7 @@ HTMLInputElement::GetValueAsDate(ErrorResult& aRv)
     {
       uint32_t year, month, day;
       nsAutoString value;
-      GetValueInternal(value);
+      GetNonFileValueInternal(value);
       if (!ParseDate(value, &year, &month, &day)) {
         return Nullable<Date>();
       }
@@ -2215,7 +2219,7 @@ HTMLInputElement::GetValueAsDate(ErrorResult& aRv)
     {
       uint32_t millisecond;
       nsAutoString value;
-      GetValueInternal(value);
+      GetNonFileValueInternal(value);
       if (!ParseTime(value, &millisecond)) {
         return Nullable<Date>();
       }
@@ -2230,7 +2234,7 @@ HTMLInputElement::GetValueAsDate(ErrorResult& aRv)
     {
       uint32_t year, month;
       nsAutoString value;
-      GetValueInternal(value);
+      GetNonFileValueInternal(value);
       if (!ParseMonth(value, &year, &month)) {
         return Nullable<Date>();
       }
@@ -2242,7 +2246,7 @@ HTMLInputElement::GetValueAsDate(ErrorResult& aRv)
     {
       uint32_t year, week;
       nsAutoString value;
-      GetValueInternal(value);
+      GetNonFileValueInternal(value);
       if (!ParseWeek(value, &year, &week)) {
         return Nullable<Date>();
       }
@@ -3087,8 +3091,10 @@ HTMLInputElement::AfterSetFilesOrDirectories(bool aSetValueChanged)
 void
 HTMLInputElement::FireChangeEventIfNeeded()
 {
+  // We're not exposing the GetValue return value anywhere here, so it's safe to
+  // claim to be a system caller.
   nsAutoString value;
-  GetValue(value);
+  GetValue(value, CallerType::System);
 
   if (!MayFireChangeOnBlur() || mFocusedValue.Equals(value)) {
     return;
@@ -3856,7 +3862,7 @@ HTMLInputElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
       // StartRangeThumbDrag already set mFocusedValue on 'mousedown' before
       // we get the 'focus' event.
       !mIsDraggingRange) {
-    GetValue(mFocusedValue);
+    GetValue(mFocusedValue, CallerType::System);
   }
 
   // Fire onchange (if necessary), before we do the blur, bug 357684.
@@ -3866,7 +3872,7 @@ HTMLInputElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
     // option has been enabled on desktop.
     if (IsExperimentalMobileType(mType)) {
       nsAutoString aValue;
-      GetValueInternal(aValue);
+      GetNonFileValueInternal(aValue);
       nsresult rv =
         SetValueInternal(aValue, nsTextEditorState::eSetValue_Internal);
       NS_ENSURE_SUCCESS(rv, rv);
@@ -4040,7 +4046,7 @@ HTMLInputElement::StartRangeThumbDrag(WidgetGUIEvent* aEvent)
   // because the 'focus' event is handled after the 'mousedown' event that
   // we're being called for (i.e. too late to update mFocusedValue, since we'll
   // have changed it by then).
-  GetValue(mFocusedValue);
+  GetValue(mFocusedValue, CallerType::System);
 
   SetValueOfRangeForUserEvent(rangeFrame->GetValueAtEventPoint(aEvent));
 }
@@ -5007,7 +5013,9 @@ HTMLInputElement::HandleTypeChange(uint8_t aNewType)
   nsAutoString aOldValue;
 
   if (aOldValueMode == VALUE_MODE_VALUE) {
-    GetValue(aOldValue);
+    // Doesn't matter what caller type we pass here, since we know we're not a
+    // file input anyway.
+    GetValue(aOldValue, CallerType::NonSystem);
   }
 
   nsTextEditorState::SelectionProperties sp;
@@ -5072,7 +5080,7 @@ HTMLInputElement::HandleTypeChange(uint8_t aNewType)
   // Otherwise, if the new type doesn't fire a change event on blur, but the
   // previous type does, we should clear out mFocusedValue.
   if (MayFireChangeOnBlur(mType) && !MayFireChangeOnBlur(oldType)) {
-    GetValue(mFocusedValue);
+    GetValue(mFocusedValue, CallerType::System);
   } else if (!IsSingleLineTextControl(false, mType) &&
              IsSingleLineTextControl(false, oldType)) {
     mFocusedValue.Truncate();
@@ -5891,19 +5899,11 @@ HTMLInputElement::GetControllers(nsIControllers** aResult)
 }
 
 int32_t
-HTMLInputElement::GetTextLength(ErrorResult& aRv)
+HTMLInputElement::InputTextLength(CallerType aCallerType)
 {
   nsAutoString val;
-  GetValue(val);
+  GetValue(val, aCallerType);
   return val.Length();
-}
-
-NS_IMETHODIMP
-HTMLInputElement::GetTextLength(int32_t* aTextLength)
-{
-  ErrorResult rv;
-  *aTextLength = GetTextLength(rv);
-  return rv.StealNSResult();
 }
 
 void
@@ -5995,7 +5995,7 @@ HTMLInputElement::SetRangeText(const nsAString& aReplacement, uint32_t aStart,
   }
 
   nsAutoString value;
-  GetValueInternal(value);
+  GetNonFileValueInternal(value);
   uint32_t inputValueLength = value.Length();
 
   if (aStart > inputValueLength) {
@@ -6416,7 +6416,7 @@ HTMLInputElement::SetDirectionIfAuto(bool aAuto, bool aNotify)
     SetHasDirAuto();
     if (IsSingleLineTextControl(true)) {
       nsAutoString value;
-      GetValue(value);
+      GetValue(value, CallerType::System);
       SetDirectionalityFromValue(this, value, aNotify);
     }
   } else {
@@ -6499,29 +6499,9 @@ HTMLInputElement::SubmitNamesValues(HTMLFormSubmission* aFormSubmission)
     return NS_OK;
   }
 
-  //
-  // Submit name=value
-  //
-
   // If name not there, don't submit
   if (name.IsEmpty()) {
     return NS_OK;
-  }
-
-  // Get the value
-  nsAutoString value;
-  nsresult rv = GetValue(value);
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
-  if (mType == NS_FORM_INPUT_SUBMIT && value.IsEmpty() &&
-      !HasAttr(kNameSpaceID_None, nsGkAtoms::value)) {
-    // Get our default value, which is the same as our default label
-    nsXPIDLString defaultValue;
-    nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
-                                       "Submit", defaultValue);
-    value = defaultValue;
   }
 
   //
@@ -6556,6 +6536,24 @@ HTMLInputElement::SubmitNamesValues(HTMLFormSubmission* aFormSubmission)
     return aFormSubmission->AddNameValuePair(name,
                                              NS_ConvertASCIItoUTF16(charset));
   }
+
+  //
+  // Submit name=value
+  //
+
+  // Get the value
+  nsAutoString value;
+  GetValue(value, CallerType::System);
+
+  if (mType == NS_FORM_INPUT_SUBMIT && value.IsEmpty() &&
+      !HasAttr(kNameSpaceID_None, nsGkAtoms::value)) {
+    // Get our default value, which is the same as our default label
+    nsXPIDLString defaultValue;
+    nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
+                                       "Submit", defaultValue);
+    value = defaultValue;
+  }
+
   if (IsSingleLineTextControl(true) &&
       name.EqualsLiteral("isindex") &&
       aFormSubmission->SupportsIsindexSubmission()) {
@@ -6594,13 +6592,10 @@ HTMLInputElement::SaveState()
 
       inputState = new HTMLInputElementState();
       nsAutoString value;
-      nsresult rv = GetValue(value);
-      if (NS_FAILED(rv)) {
-        return rv;
-      }
+      GetValue(value, CallerType::System);
 
       if (!IsSingleLineTextControl(false)) {
-        rv = nsLinebreakConverter::ConvertStringLineBreaks(
+        nsresult rv = nsLinebreakConverter::ConvertStringLineBreaks(
                value,
                nsLinebreakConverter::eLinebreakPlatform,
                nsLinebreakConverter::eLinebreakContent);
@@ -6658,7 +6653,7 @@ HTMLInputElement::DoneCreatingElement()
   // Sanitize the value.
   if (GetValueMode() == VALUE_MODE_VALUE) {
     nsAutoString aValue;
-    GetValue(aValue);
+    GetValue(aValue, CallerType::System);
     // TODO: What should we do if SetValueInternal fails?  (The allocation
     // may potentially be big, but most likely we've failed to allocate
     // before the type change.)
@@ -7336,10 +7331,7 @@ HTMLInputElement::IsTooLong()
     return false;
   }
 
-  int32_t textLength = -1;
-  GetTextLength(&textLength);
-
-  return textLength > maxLength;
+  return InputTextLength(CallerType::System) > maxLength;
 }
 
 bool
@@ -7359,8 +7351,7 @@ HTMLInputElement::IsTooShort()
     return false;
   }
 
-  int32_t textLength = -1;
-  GetTextLength(&textLength);
+  int32_t textLength = InputTextLength(CallerType::System);
 
   return textLength && textLength < minLength;
 }
@@ -7406,7 +7397,7 @@ HTMLInputElement::HasTypeMismatch() const
   }
 
   nsAutoString value;
-  GetValueInternal(value);
+  GetNonFileValueInternal(value);
 
   if (value.IsEmpty()) {
     return false;
@@ -7449,7 +7440,7 @@ HTMLInputElement::HasPatternMismatch() const
   GetAttr(kNameSpaceID_None, nsGkAtoms::pattern, pattern);
 
   nsAutoString value;
-  GetValueInternal(value);
+  GetNonFileValueInternal(value);
 
   if (value.IsEmpty()) {
     return false;
@@ -7584,7 +7575,7 @@ HTMLInputElement::HasBadInput() const
 {
   if (mType == NS_FORM_INPUT_NUMBER) {
     nsAutoString value;
-    GetValueInternal(value);
+    GetNonFileValueInternal(value);
     if (!value.IsEmpty()) {
       // The input can't be bad, otherwise it would have been sanitized to the
       // empty string.
@@ -7608,7 +7599,7 @@ HTMLInputElement::HasBadInput() const
     nsAutoString value;
     nsAutoCString unused;
     uint32_t unused2;
-    GetValueInternal(value);
+    GetNonFileValueInternal(value);
     HTMLSplitOnSpacesTokenizer tokenizer(value, ',');
     while (tokenizer.hasMoreTokens()) {
       if (!PunycodeEncodeEmailAddress(tokenizer.nextToken(), unused, &unused2)) {
@@ -7775,11 +7766,9 @@ HTMLInputElement::GetValidationMessage(nsAString& aValidationMessage,
     {
       nsXPIDLString message;
       int32_t maxLength = MaxLength();
-      int32_t textLength = -1;
+      int32_t textLength = InputTextLength(CallerType::System);
       nsAutoString strMaxLength;
       nsAutoString strTextLength;
-
-      GetTextLength(&textLength);
 
       strMaxLength.AppendInt(maxLength);
       strTextLength.AppendInt(textLength);
@@ -7795,11 +7784,9 @@ HTMLInputElement::GetValidationMessage(nsAString& aValidationMessage,
     {
       nsXPIDLString message;
       int32_t minLength = MinLength();
-      int32_t textLength = -1;
+      int32_t textLength = InputTextLength(CallerType::System);
       nsAutoString strMinLength;
       nsAutoString strTextLength;
-
-      GetTextLength(&textLength);
 
       strMinLength.AppendInt(minLength);
       strTextLength.AppendInt(textLength);
