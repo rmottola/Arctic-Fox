@@ -565,7 +565,6 @@ stubPackets.set("console.timeEnd('bar')", {
 			"appId": 0,
 			"inIsolatedMozBrowser": false,
 			"privateBrowsingId": 0,
-			"signedPkg": "",
 			"userContextId": 0
 		},
 		"private": false,
