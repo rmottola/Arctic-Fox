@@ -1761,6 +1761,8 @@ nsWindow::GetNativeData(uint32_t aDataType)
         }
         return mIMContext.get();
     }
+    case NS_NATIVE_OPENGL_CONTEXT:
+      return nullptr;
 #ifdef MOZ_X11
     case NS_NATIVE_COMPOSITOR_DISPLAY:
         return gfxPlatformGtk::GetPlatform()->GetCompositorDisplay();
