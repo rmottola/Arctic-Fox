@@ -244,6 +244,11 @@ public:
   }
 };
 
+AndroidDecoderModule::AndroidDecoderModule(CDMProxy* aProxy)
+{
+  mProxy = static_cast<MediaDrmCDMProxy*>(aProxy);
+}
+
 bool
 AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType,
                                        DecoderDoctorDiagnostics* aDiagnostics) const
