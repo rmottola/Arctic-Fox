@@ -4141,6 +4141,9 @@ ContentParent::RecvKeywordToURI(const nsCString& aKeyword,
                                 OptionalInputStreamParams* aPostData,
                                 OptionalURIParams* aURI)
 {
+  *aPostData = void_t();
+  *aURI = void_t();
+
   nsCOMPtr<nsIURIFixup> fixup = do_GetService(NS_URIFIXUP_CONTRACTID);
   if (!fixup) {
     return true;
