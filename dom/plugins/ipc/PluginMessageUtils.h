@@ -94,7 +94,7 @@ struct NPRemoteWindow
   VisualID visualID;
   Colormap colormap;
 #endif /* XP_UNIX */
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
   double contentsScaleFactor;
 #endif
 };
@@ -364,7 +364,7 @@ struct ParamTraits<mozilla::plugins::NPRemoteWindow>
     aMsg->WriteULong(aParam.visualID);
     aMsg->WriteULong(aParam.colormap);
 #endif
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
     aMsg->WriteDouble(aParam.contentsScaleFactor);
 #endif
   }
@@ -393,7 +393,7 @@ struct ParamTraits<mozilla::plugins::NPRemoteWindow>
       return false;
 #endif
 
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
     double contentsScaleFactor;
     if (!aMsg->ReadDouble(aIter, &contentsScaleFactor))
       return false;
@@ -410,7 +410,7 @@ struct ParamTraits<mozilla::plugins::NPRemoteWindow>
     aResult->visualID = visualID;
     aResult->colormap = colormap;
 #endif
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
     aResult->contentsScaleFactor = contentsScaleFactor;
 #endif
     return true;
