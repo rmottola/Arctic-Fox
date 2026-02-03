@@ -132,6 +132,18 @@ function transformPacket(packet) {
       });
     }
 
+    case "networkEvent": {
+      let { networkEvent } = packet;
+
+      // TODO: Replace the ConsoleMessage with NetworkEventMessage
+      //       once the new component is ready.
+      return new ConsoleMessage({
+        source: MESSAGE_SOURCE.CONSOLE_API,
+        type: MESSAGE_TYPE.LOG,
+        level: MESSAGE_LEVEL.LOG,
+        messageText: networkEvent.request.method + " " + networkEvent.request.url,
+      });
+    }
     case "evaluationResult":
     default: {
       let { result } = packet;
@@ -166,6 +178,9 @@ function convertCachedPacket(packet) {
   } else if ("_navPayload" in packet) {
     convertPacket.type = "navigationMessage";
     convertPacket.message = packet;
+  } else if (packet._type === "NetworkEvent") {
+    convertPacket.networkEvent = packet;
+    convertPacket.type = "networkEvent";
   } else {
     throw new Error("Unexpected packet type");
   }
