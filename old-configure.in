@@ -1339,7 +1339,7 @@ MOZ_CXX11
 AC_LANG_C
 
 case "${OS_TARGET}" in
-WINNT|Darwin|Android)
+Darwin)
   ;;
 *)
   STL_FLAGS="-I${DIST}/stl_wrappers"
