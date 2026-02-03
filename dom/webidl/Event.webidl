@@ -36,8 +36,9 @@ interface Event {
   readonly attribute boolean bubbles;
   [Pure]
   readonly attribute boolean cancelable;
+  [NeedsCallerType]
   void preventDefault();
-  [Pure]
+  [Pure, NeedsCallerType]
   readonly attribute boolean defaultPrevented;
   [ChromeOnly, Pure]
   readonly attribute boolean defaultPreventedByChrome;
