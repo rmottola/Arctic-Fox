@@ -37,6 +37,7 @@
 #include "nsITransport.h"
 #include "nsIOService.h"
 #include "nsIRequestContext.h"
+#include "nsIHttpAuthenticator.h"
 #include <algorithm>
 
 #ifdef MOZ_WIDGET_GONK
