@@ -110,11 +110,6 @@ DIRS += [
 if CONFIG['OS_ARCH'] == 'WINNT':
     DIRS += ['plugins/ipc/hangui']
 
-if CONFIG['MOZ_B2G_RIL']:
-    DIRS += [
-        'wappush',
-    ]
-
 if CONFIG['MOZ_SECUREELEMENT']:
     DIRS += ['secureelement']
 
