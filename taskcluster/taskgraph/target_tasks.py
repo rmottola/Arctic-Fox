@@ -6,6 +6,13 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 from taskgraph import try_option_syntax
+from taskgraph.util.attributes import attrmatch
+
+BUILD_AND_TEST_KINDS = set([
+    'legacy',  # builds
+    'desktop-test',
+    'android-test',
+])
 
 INTEGRATION_PROJECTS = set([
     'mozilla-inbound',

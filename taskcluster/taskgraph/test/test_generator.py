@@ -8,7 +8,7 @@ import unittest
 
 from ..generator import TaskGraphGenerator
 from .. import graph
-from ..kind import base
+from ..task import base
 from mozunit import main
 
 

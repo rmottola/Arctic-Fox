@@ -85,3 +85,16 @@ class Task(object):
         The default never optimizes.
         """
         return False, None
+
+    @classmethod
+    def from_json(cls, task_dict):
+        """
+        Given a data structure as produced by taskgraph.to_json, re-construct
+        the original Task object.  This is used to "resume" the task-graph
+        generation process, for example in Action tasks.
+        """
+        return cls(
+            kind=task_dict['attributes']['kind'],
+            label=task_dict['label'],
+            attributes=task_dict['attributes'],
+            task=task_dict['task'])

@@ -43,6 +43,11 @@ PER_PROJECT_PARAMETERS = {
         'optimize_target_tasks': True,
     },
 
+    'ash': {
+        'target_tasks_method': 'ash_tasks',
+        'optimize_target_tasks': True,
+    },
+
     # the default parameters are used for projects that do not match above.
     'default': {
         'target_tasks_method': 'default',

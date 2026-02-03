@@ -103,24 +103,22 @@ def configure_dependent_task(task_path, parameters, taskid, templates, build_tre
 
     task['requires'].append(parameters['build_slugid'])
 
-    if 'extra' not in task['task']:
-        task['task']['extra'] = {}
+    if 'treeherder' not in task['task']['extra']:
+        task['task']['extra']['treeherder'] = {}
 
-    # only set up treeherder information if the task contained any to begin with
-    if 'treeherder' in task['task']['extra']:
-        # Copy over any treeherder configuration from the build so
-        # tests show up under the same platform...
-        treeherder_config = task['task']['extra']['treeherder']
+    # Copy over any treeherder configuration from the build so
+    # tests show up under the same platform...
+    treeherder_config = task['task']['extra']['treeherder']
 
-        treeherder_config['collection'] = \
-            build_treeherder_config.get('collection', {})
+    treeherder_config['collection'] = \
+        build_treeherder_config.get('collection', {})
 
-        treeherder_config['build'] = \
-            build_treeherder_config.get('build', {})
+    treeherder_config['build'] = \
+        build_treeherder_config.get('build', {})
 
-        if 'machine' not in treeherder_config:
-            treeherder_config['machine'] = \
-                build_treeherder_config.get('machine', {})
+    if 'machine' not in treeherder_config:
+        treeherder_config['machine'] = \
+            build_treeherder_config.get('machine', {})
 
     if 'routes' not in task['task']:
         task['task']['routes'] = []
@@ -147,54 +145,19 @@ def set_interactive_task(task, interactive):
 
 
 def remove_caches_from_task(task):
-    r"""Remove all caches but vcs from the task.
+    r"""Remove all caches but tc-vcs from the task.
 
     :param task: task definition.
     """
     whitelist = [
         re.compile("^level-[123]-.*-tc-vcs(-public-sources)?$"),
-        re.compile("^level-[123]-hg-shared$"),
-        # The assumption here is that `hg robustcheckout --purge` is used and
-        # the checkout will start from a clean slate on job execution. This
-        # means there should be no contamination from previous tasks.
-        re.compile("^level-[123]-checkouts$"),
         re.compile("^tooltool-cache$"),
     ]
     try:
         caches = task["task"]["payload"]["cache"]
-        scopes = task["task"]["scopes"]
         for cache in caches.keys():
             if not any(pat.match(cache) for pat in whitelist):
                 caches.pop(cache)
-                scope = 'docker-worker:cache:' + cache
-                try:
-                    scopes.remove(scope)
-                except ValueError:
-                    raise ValueError("scope '{}' not in {}".format(scope, scopes))
-    except KeyError:
-        pass
-
-
-def remove_coalescing_from_task(task):
-    r"""Remove coalescing route and supersederUrl from job task
-
-    :param task: task definition.
-    """
-    patterns = [
-        re.compile("^coalesce.v1.builds.*pgo$"),
-    ]
-
-    try:
-        payload = task["task"]["payload"]
-        routes = task["task"]["routes"]
-        removable_routes = [route for route in list(routes)
-                            if any([p.match(route) for p in patterns])]
-        if removable_routes:
-            # we remove supersederUrl only when we have also routes to remove
-            payload.pop("supersederUrl")
-
-        for route in removable_routes:
-            routes.remove(route)
     except KeyError:
         pass
 
@@ -349,12 +312,8 @@ class LegacyTask(base.Task):
         self.task_dict = kwargs.pop('task_dict')
         super(LegacyTask, self).__init__(*args, **kwargs)
 
-    def __eq__(self, other):
-        return super(LegacyTask, self).__eq__(other) and \
-               self.task_dict == other.task_dict
-
     @classmethod
-    def load_tasks(cls, kind, path, config, params, loaded_tasks):
+    def load_tasks(cls, kind, path, config, params):
         root = os.path.abspath(os.path.join(path, config['legacy_path']))
 
         project = params['project']
@@ -375,9 +334,11 @@ class LegacyTask(base.Task):
         cmdline_interactive = params.get('interactive', False)
 
         # Default to current time if querying the head rev fails
+        push_epoch = int(time.time())
         vcs_info = query_vcs_info(params['head_repository'], params['head_rev'])
         changed_files = set()
         if vcs_info:
+            push_epoch = vcs_info.pushdate
 
             logger.debug(
                 '{} commits influencing task scheduling:'.format(len(vcs_info.changesets)))
@@ -387,7 +348,7 @@ class LegacyTask(base.Task):
                     desc=c['desc'].splitlines()[0].encode('ascii', 'ignore')))
                 changed_files |= set(c['files'])
 
-        pushdate = time.strftime('%Y%m%d%H%M%S', time.gmtime(params['pushdate']))
+        pushdate = time.strftime('%Y%m%d%H%M%S', time.gmtime(push_epoch))
 
         # Template parameters used when expanding the graph
         parameters = dict(gaia_info().items() + {
@@ -401,11 +362,11 @@ class LegacyTask(base.Task):
             'head_ref': params['head_ref'] or params['head_rev'],
             'head_rev': params['head_rev'],
             'pushdate': pushdate,
+            'push_epoch': push_epoch,
             'pushtime': pushdate[8:],
             'year': pushdate[0:4],
             'month': pushdate[4:6],
             'day': pushdate[6:8],
-            'rank': params['pushdate'],
             'owner': params['owner'],
             'level': params['level'],
         }.items())
@@ -493,19 +454,11 @@ class LegacyTask(base.Task):
             build_parameters['build_type'] = task_extra['build_type']
             build_parameters['build_product'] = task_extra['build_product']
 
-            if 'treeherder' in task_extra:
-                tier = task_extra['treeherder'].get('tier', 1)
-                if tier != 1:
-                    # Only tier 1 jobs use the build time as rank. Everything
-                    # else gets rank 0 until it is promoted to tier 1.
-                    task_extra['index']['rank'] = 0
-
             set_interactive_task(build_task, interactive)
 
-            # try builds don't use cache nor coalescing
+            # try builds don't use cache
             if project == "try":
                 remove_caches_from_task(build_task)
-                remove_coalescing_from_task(build_task)
                 set_expiration(build_task, TRY_EXPIRATION)
 
             decorate_task_treeherder_routes(build_task['task'],
@@ -518,11 +471,7 @@ class LegacyTask(base.Task):
 
             # Ensure each build graph is valid after construction.
             validate_build_task(build_task)
-            attributes = build_task['attributes'] = {
-                'kind': 'legacy',
-                'legacy_kind': 'build',
-                'run_on_projects': ['all'],
-            }
+            attributes = build_task['attributes'] = {'kind': 'legacy', 'legacy_kind': 'build'}
             if 'build_name' in build:
                 attributes['build_platform'] = build['build_name']
             if 'build_type' in task_extra:
@@ -624,12 +573,3 @@ class LegacyTask(base.Task):
     def optimize(self):
         # no optimization for the moment
         return False, None
-
-    @classmethod
-    def from_json(cls, task_dict):
-        legacy_task = cls(kind='legacy',
-                          label=task_dict['label'],
-                          attributes=task_dict['attributes'],
-                          task=task_dict['task'],
-                          task_dict=task_dict)
-        return legacy_task
