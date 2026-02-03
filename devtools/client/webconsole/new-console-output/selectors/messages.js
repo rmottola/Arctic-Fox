@@ -30,6 +30,10 @@ function getAllMessagesUiById(state) {
   return state.messages.messagesUiById;
 }
 
+function getAllMessagesTableDataById(state) {
+  return state.messages.messagesTableDataById;
+}
+
 function filterLevel(messages, filters) {
   return messages.filter((message) => {
     return filters.get(message.level) === true
@@ -99,3 +103,4 @@ function prune(messages, logLimit) {
 
 exports.getAllMessages = getAllMessages;
 exports.getAllMessagesUiById = getAllMessagesUiById;
+exports.getAllMessagesTableDataById = getAllMessagesTableDataById;
