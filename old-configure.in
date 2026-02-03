@@ -4283,6 +4283,18 @@ fi
 AC_SUBST(MOZ_SYSTEM_SQLITE)
 
 dnl ========================================================
+dnl = Enable url-classifier
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(url-classifier,
+[  --enable-url-classifier Enable url classifier module],
+    MOZ_URL_CLASSIFIER=1,
+    MOZ_URL_CLASSIFIER= )
+if test -n "$MOZ_URL_CLASSIFIER"; then
+    AC_DEFINE(MOZ_URL_CLASSIFIER)
+fi
+AC_SUBST(MOZ_URL_CLASSIFIER)
+
+dnl ========================================================
 dnl = Disable zipwriter
 dnl ========================================================
 MOZ_ARG_DISABLE_BOOL(zipwriter,
