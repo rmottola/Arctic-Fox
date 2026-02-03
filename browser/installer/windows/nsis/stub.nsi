@@ -107,6 +107,7 @@ Var DownloadedBytes
 Var DownloadRetryCount
 Var OpenedDownloadPage
 Var DownloadServerIP
+Var PostSigningData
 
 Var ControlHeightPX
 Var ControlRightPX
@@ -115,7 +116,7 @@ Var ControlRightPX
 ; the stub installer
 ;!define STUB_DEBUG
 
-!define StubURLVersion "v6"
+!define StubURLVersion "v7"
 
 ; Successful install exit code
 !define ERR_SUCCESS 0
@@ -220,11 +221,13 @@ Var ControlRightPX
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
+!include "TextFunc.nsh"
 !include "WinVer.nsh"
 !include "WordFunc.nsh"
 
 !insertmacro GetParameters
 !insertmacro GetOptions
+!insertmacro LineFind
 !insertmacro StrFilter
 
 !include "locales.nsi"
@@ -724,14 +727,15 @@ Function SendPing
                       $\nHas Admin = $R8 \
                       $\nDefault Status = $R2 \
                       $\nSet As Sefault Status = $R3 \
-                      $\nDownload Server IP = $DownloadServerIP"
+                      $\nDownload Server IP = $DownloadServerIP \
+                      $\nPost-Signing Data = $PostSigningData"
     ; The following will exit the installer
     SetAutoClose true
     StrCpy $R9 "2"
     Call RelativeGotoPage
 !else
     ${NSD_CreateTimer} OnPing ${DownloadIntervalMS}
-    InetBgDL::Get "${BaseURLStubPing}/${StubURLVersion}${StubURLVersionAppend}/${Channel}/${UpdateChannel}/${AB_CD}/$R0/$R1/$5/$6/$7/$8/$9/$ExitCode/$FirefoxLaunchCode/$DownloadRetryCount/$DownloadedBytes/$DownloadSizeBytes/$IntroPhaseSeconds/$OptionsPhaseSeconds/$0/$1/$DownloadFirstTransferSeconds/$2/$3/$4/$InitialInstallRequirementsCode/$OpenedDownloadPage/$ExistingProfile/$ExistingVersion/$ExistingBuildID/$R5/$R6/$R7/$R8/$R2/$R3/$DownloadServerIP" \
+    InetBgDL::Get "${BaseURLStubPing}/${StubURLVersion}${StubURLVersionAppend}/${Channel}/${UpdateChannel}/${AB_CD}/$R0/$R1/$5/$6/$7/$8/$9/$ExitCode/$FirefoxLaunchCode/$DownloadRetryCount/$DownloadedBytes/$DownloadSizeBytes/$IntroPhaseSeconds/$OptionsPhaseSeconds/$0/$1/$DownloadFirstTransferSeconds/$2/$3/$4/$InitialInstallRequirementsCode/$OpenedDownloadPage/$ExistingProfile/$ExistingVersion/$ExistingBuildID/$R5/$R6/$R7/$R8/$R2/$R3/$DownloadServerIP/$PostSigningData" \
                   "$PLUGINSDIR\_temp" /END
 !endif
   ${Else}
@@ -1742,8 +1746,8 @@ Function FinishProgressBar
 
   ${NSD_KillTimer} FinishProgressBar
 
+  Call CopyPostSigningData
   Call LaunchApp
-
   Call SendPing
 FunctionEnd
 
@@ -1970,6 +1974,17 @@ Function LaunchAppFromElevatedProcess
   ${GetParent} "$0" $1
   SetOutPath "$1"
   Exec "$\"$0$\""
+FunctionEnd
+
+Function CopyPostSigningData
+  ${LineRead} "$EXEDIR\postSigningData" "1" $PostSigningData
+  ${If} ${Errors}
+    ClearErrors
+    StrCpy $PostSigningData "0"
+  ${Else}
+    CreateDirectory "$LOCALAPPDATA\Mozilla\Firefox"
+    CopyFiles /SILENT "$EXEDIR\postSigningData" "$LOCALAPPDATA\Mozilla\Firefox"
+  ${Endif}
 FunctionEnd
 
 Function DisplayDownloadError
