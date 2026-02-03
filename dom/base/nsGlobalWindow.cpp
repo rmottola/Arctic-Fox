@@ -239,6 +239,7 @@
 #include "mozilla/dom/ServiceWorkerRegistration.h"
 #include "mozilla/dom/U2F.h"
 #include "mozilla/dom/WebIDLGlobalNameHash.h"
+#include "mozilla/dom/Worklet.h"
 #ifdef HAVE_SIDEBAR
 #include "mozilla/dom/ExternalBinding.h"
 #endif
@@ -14945,6 +14946,13 @@ nsGlobalWindow::TemporarilyDisableDialogs::~TemporarilyDisableDialogs()
   if (mTopWindow) {
     mTopWindow->mAreDialogsEnabled = mSavedDialogsEnabled;
   }
+}
+
+already_AddRefed<Worklet>
+nsGlobalWindow::CreateWorklet(ErrorResult& aRv)
+{
+  RefPtr<Worklet> worklet = new Worklet(this);
+  return worklet.forget();
 }
 
 template class nsPIDOMWindow<mozIDOMWindowProxy>;
