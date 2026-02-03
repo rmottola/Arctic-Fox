@@ -5944,7 +5944,7 @@ dnl ========================================================
 # Refer to bug 1281101 for more details.
 
 # Enable mask-as-shorthand property by default for nightly and aurora channels
-if test -z "$RELEASE_BUILD"; then
+if test -z "$RELEASE_OR_BETA"; then
   dnl mask as shorthand property enabled
   MOZ_ENABLE_MASK_AS_SHORTHAND=1
   AC_DEFINE(MOZ_ENABLE_MASK_AS_SHORTHAND)
