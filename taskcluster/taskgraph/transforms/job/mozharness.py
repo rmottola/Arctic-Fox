@@ -153,7 +153,7 @@ def mozharness_on_windows(config, job, taskdesc):
 
     # fail if invalid run options are included
     invalid = []
-    for prop in ['actions', 'options', 'custom-build-variant-cfg',
+    for prop in ['actions', 'custom-build-variant-cfg',
                  'tooltool-downloads', 'secrets', 'taskcluster-proxy',
                  'need-xvfb']:
         if prop in run and run[prop]:
@@ -187,6 +187,9 @@ def mozharness_on_windows(config, job, taskdesc):
         mh_command.append('--config ' + cfg.replace('/', '\\'))
     mh_command.append('--branch ' + config.params['project'])
     mh_command.append(r'--skip-buildbot-actions --work-dir %cd:Z:=z:%\build')
+    for option in run.get('options', []):
+        mh_command.append('--' + option)
+
     worker['command'] = [
         r'mkdir .\build\src',
         r'hg share c:\builds\hg-shared\mozilla-central .\build\src',
