@@ -8,8 +8,6 @@ import logging
 import json
 import os
 import urllib2
-import tarfile
-import time
 
 from . import base
 from taskgraph.util.docker import (
@@ -30,18 +28,16 @@ class DockerImageTask(base.Task):
         self.index_paths = kwargs.pop('index_paths')
         super(DockerImageTask, self).__init__(*args, **kwargs)
 
-    @classmethod
-    def load_tasks(cls, kind, path, config, params):
-        # TODO: make this match the pushdate (get it from a parameter rather than vcs)
-        pushdate = time.strftime('%Y%m%d%H%M%S', time.gmtime())
 
+    @classmethod
+    def load_tasks(cls, kind, path, config, params, loaded_tasks):
         parameters = {
             'pushlog_id': params.get('pushlog_id', 0),
-            'pushdate': pushdate,
-            'pushtime': pushdate[8:],
-            'year': pushdate[0:4],
-            'month': pushdate[4:6],
-            'day': pushdate[6:8],
+            'pushdate': params['moz_build_date'],
+            'pushtime': params['moz_build_date'][8:],
+            'year': params['moz_build_date'][0:4],
+            'month': params['moz_build_date'][4:6],
+            'day': params['moz_build_date'][6:8],
             'project': params['project'],
             'docker_image': docker_image,
             'base_repository': params['base_repository'] or params['head_repository'],
