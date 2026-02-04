@@ -316,6 +316,7 @@ OriginAttributes::SetFromGenericAttributes(const GenericOriginAttributes& aAttrs
   mFirstPartyDomain = aAttrs.mFirstPartyDomain;
 }
 
+/* static */
 bool
 OriginAttributes::IsFirstPartyEnabled()
 {
