@@ -195,6 +195,8 @@ CSPDirective CSP_ContentTypeToDirective(nsContentPolicyType aType);
 
 class nsCSPSrcVisitor;
 
+void CSP_PercentDecodeStr(const nsAString& aEncStr, nsAString& outDecStr);
+
 /* =============== nsCSPSrc ================== */
 
 class nsCSPBaseSrc {
