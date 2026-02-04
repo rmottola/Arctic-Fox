@@ -2329,8 +2329,9 @@ nsHTMLDocument::CreateAndAddWyciwygChannel(void)
                      NodePrincipal(),
                      nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL,
                      nsIContentPolicy::TYPE_OTHER);
-
   NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsILoadInfo> loadInfo = channel->GetLoadInfo();
+  loadInfo->SetPrincipalToInherit(NodePrincipal());
 
   mWyciwygChannel = do_QueryInterface(channel);
 
