@@ -105,6 +105,7 @@ function run_test() {
         let inlineOK = true;
         inlineOK = csp.getAllowsInline(Ci.nsIContentPolicy.TYPE_SCRIPT,
                                        "", // aNonce
+                                       false, // aParserCreated
                                        "", // aContent
                                        0); // aLineNumber
 
@@ -146,6 +147,7 @@ function run_test() {
         let inlineOK = true;
         inlineOK = csp.getAllowsInline(Ci.nsIContentPolicy.TYPE_SCRIPT,
                                        "", // aNonce
+                                       false, // aParserCreated
                                        "", // aContent
                                        0); // aLineNumber
 
