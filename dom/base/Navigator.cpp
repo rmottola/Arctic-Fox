@@ -67,7 +67,6 @@
 #include "DeviceStorage.h"
 #include "nsStreamUtils.h"
 #include "nsIAppsService.h"
-#include "mozIApplication.h"
 #include "WidgetUtils.h"
 #include "nsIPresentationService.h"
 
