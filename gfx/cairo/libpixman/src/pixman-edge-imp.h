@@ -55,7 +55,7 @@ RASTERIZE_EDGES (pixman_image_t  *image,
 	 *
 	 * (The AA case does a similar  adjustment in RENDER_SAMPLES_X)
 	 */
-	/* we cast to unsigned to get defined behaviour for overflow */
+        /* we cast to unsigned to get defined behaviour for overflow */
 	lx = (unsigned)lx + X_FRAC_FIRST(1) - pixman_fixed_e;
 	rx = (unsigned)rx + X_FRAC_FIRST(1) - pixman_fixed_e;
 #endif
