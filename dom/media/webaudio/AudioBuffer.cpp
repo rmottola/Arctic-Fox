@@ -177,13 +177,13 @@ AudioBuffer::~AudioBuffer()
 {
   AudioBufferMemoryTracker::UnregisterAudioBuffer(this);
   ClearJSChannels();
+  mozilla::DropJSObjects(this);
 }
 
 void
 AudioBuffer::ClearJSChannels()
 {
   mJSChannels.Clear();
-  mozilla::DropJSObjects(this);
 }
 
 /* static */ already_AddRefed<AudioBuffer>
