@@ -101,7 +101,7 @@ TrackBuffersManager::TrackBuffersManager(MediaSourceDecoder* aParentDecoder,
                                                  100 * 1024 * 1024))
   , mAudioEvictionThreshold(Preferences::GetUint("media.mediasource.eviction_threshold.audio",
                                                  30 * 1024 * 1024))
-  , mEvictionOccurred(false)
+  , mEvictionState(EvictionState::NO_EVICTION_NEEDED)
   , mMonitor("TrackBuffersManager")
 {
   MOZ_ASSERT(NS_IsMainThread(), "Must be instantiated on the main thread");
@@ -276,18 +276,22 @@ TrackBuffersManager::EvictData(const TimeUnit& aPlaybackTime, int64_t aSize)
             GetSize() / 1024, EvictionThreshold() / 1024, toEvict / 1024);
 
   if (toEvict <= 0) {
+    mEvictionState = EvictionState::NO_EVICTION_NEEDED;
     return EvictDataResult::NO_DATA_EVICTED;
   }
   if (toEvict <= 512*1024) {
     // Don't bother evicting less than 512KB.
+    mEvictionState = EvictionState::NO_EVICTION_NEEDED;
     return EvictDataResult::CANT_EVICT;
   }
 
-  if (mBufferFull && mEvictionOccurred) {
+  if (mBufferFull && mEvictionState == EvictionState::EVICTION_COMPLETED) {
     return EvictDataResult::BUFFER_FULL;
   }
 
   MSE_DEBUG("Reaching our size limit, schedule eviction of %lld bytes", toEvict);
+
+  mEvictionState = EvictionState::EVICTION_NEEDED;
 
   QueueTask(new EvictDataTask(aPlaybackTime, toEvict));
 
@@ -412,6 +416,8 @@ TrackBuffersManager::DoEvictData(const TimeUnit& aPlaybackTime,
                                  int64_t aSizeToEvict)
 {
   MOZ_ASSERT(OnTaskQueue());
+
+  mEvictionState = EvictionState::EVICTION_COMPLETED;
 
   // Video is what takes the most space, only evict there if we have video.
   const auto& track = HasVideo() ? mVideoTracks : mAudioTracks;
@@ -575,7 +581,6 @@ TrackBuffersManager::CodedFrameRemoval(TimeInterval aInterval)
   if (mBufferFull && mSizeSourceBuffer < EvictionThreshold()) {
     mBufferFull = false;
   }
-  mEvictionOccurred = true;
 
   return dataRemoved;
 }
@@ -1308,7 +1313,6 @@ TrackBuffersManager::CompleteCodedFrameProcessing()
   // 4. If this SourceBuffer is full and cannot accept more media data, then set the buffer full flag to true.
   if (mSizeSourceBuffer >= EvictionThreshold()) {
     mBufferFull = true;
-    mEvictionOccurred = false;
   }
 
   // 5. If the input buffer does not contain a complete media segment, then jump to the need more data step below.

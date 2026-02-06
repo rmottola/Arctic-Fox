@@ -428,7 +428,13 @@ private:
   Atomic<int64_t> mSizeSourceBuffer;
   const int64_t mVideoEvictionThreshold;
   const int64_t mAudioEvictionThreshold;
-  Atomic<bool> mEvictionOccurred;
+  enum class EvictionState
+  {
+    NO_EVICTION_NEEDED,
+    EVICTION_NEEDED,
+    EVICTION_COMPLETED,
+  };
+  Atomic<EvictionState> mEvictionState;
 
   // Monitor to protect following objects accessed across multiple threads.
   mutable Monitor mMonitor;
