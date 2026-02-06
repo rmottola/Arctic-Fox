@@ -304,7 +304,7 @@ TrackBuffersManager::EvictData(const TimeUnit& aPlaybackTime, int64_t aSize)
 }
 
 TimeIntervals
-TrackBuffersManager::Buffered()
+TrackBuffersManager::Buffered() const
 {
   MSE_DEBUG("");
 
@@ -1940,6 +1940,19 @@ TrackBuffersManager::GetTracksList()
   return tracks;
 }
 
+nsTArray<const TrackBuffersManager::TrackData*>
+TrackBuffersManager::GetTracksList() const
+{
+  nsTArray<const TrackData*> tracks;
+  if (HasVideo()) {
+    tracks.AppendElement(&mVideoTracks);
+  }
+  if (HasAudio()) {
+    tracks.AppendElement(&mAudioTracks);
+  }
+  return tracks;
+}
+
 void
 TrackBuffersManager::SetAppendState(SourceBufferAttributes::AppendState aAppendState)
 {
@@ -1949,21 +1962,21 @@ TrackBuffersManager::SetAppendState(SourceBufferAttributes::AppendState aAppendS
 }
 
 MediaInfo
-TrackBuffersManager::GetMetadata()
+TrackBuffersManager::GetMetadata() const
 {
   MonitorAutoLock mon(mMonitor);
   return mInfo;
 }
 
 const TimeIntervals&
-TrackBuffersManager::Buffered(TrackInfo::TrackType aTrack)
+TrackBuffersManager::Buffered(TrackInfo::TrackType aTrack) const
 {
   MOZ_ASSERT(OnTaskQueue());
   return GetTracksData(aTrack).mBufferedRanges;
 }
 
 const media::TimeUnit&
-TrackBuffersManager::HighestStartTime(TrackInfo::TrackType aTrack)
+TrackBuffersManager::HighestStartTime(TrackInfo::TrackType aTrack) const
 {
   MOZ_ASSERT(OnTaskQueue());
   return GetTracksData(aTrack).mHighestStartTimestamp;
@@ -1979,7 +1992,7 @@ TrackBuffersManager::SafeBuffered(TrackInfo::TrackType aTrack) const
 }
 
 TimeUnit
-TrackBuffersManager::HighestStartTime()
+TrackBuffersManager::HighestStartTime() const
 {
   MonitorAutoLock mon(mMonitor);
   TimeUnit highestStartTime;
@@ -2047,7 +2060,7 @@ TrackBuffersManager::UpdateEvictionIndex(TrackData& aTrackData,
 }
 
 const TrackBuffersManager::TrackBuffer&
-TrackBuffersManager::GetTrackBuffer(TrackInfo::TrackType aTrack)
+TrackBuffersManager::GetTrackBuffer(TrackInfo::TrackType aTrack) const
 {
   MOZ_ASSERT(OnTaskQueue());
   return GetTracksData(aTrack).GetTrackBuffer();
@@ -2369,7 +2382,7 @@ TrackBuffersManager::GetSample(TrackInfo::TrackType aTrack,
 
 int32_t
 TrackBuffersManager::FindCurrentPosition(TrackInfo::TrackType aTrack,
-                                         const TimeUnit& aFuzz)
+                                         const TimeUnit& aFuzz) const
 {
   MOZ_ASSERT(OnTaskQueue());
   auto& trackData = GetTracksData(aTrack);
@@ -2464,17 +2477,17 @@ TrackBuffersManager::GetNextRandomAccessPoint(TrackInfo::TrackType aTrack,
 }
 
 void
-TrackBuffersManager::TrackData::AddSizeOfResources(MediaSourceDecoder::ResourceSizes* aSizes)
+TrackBuffersManager::TrackData::AddSizeOfResources(MediaSourceDecoder::ResourceSizes* aSizes) const
 {
-  for (TrackBuffer& buffer : mBuffers) {
-    for (MediaRawData* data : buffer) {
+  for (const TrackBuffer& buffer : mBuffers) {
+    for (const MediaRawData* data : buffer) {
       aSizes->mByteSize += data->SizeOfIncludingThis(aSizes->mMallocSizeOf);
     }
   }
 }
 
 void
-TrackBuffersManager::AddSizeOfResources(MediaSourceDecoder::ResourceSizes* aSizes)
+TrackBuffersManager::AddSizeOfResources(MediaSourceDecoder::ResourceSizes* aSizes) const
 {
   MOZ_ASSERT(OnTaskQueue());
   mVideoTracks.AddSizeOfResources(aSizes);
