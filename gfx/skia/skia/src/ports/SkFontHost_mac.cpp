@@ -168,6 +168,22 @@ static CGFloat CGRectGetWidth_inline(const CGRect& rect) {
     return rect.size.width;
 }
 
+#if defined(MAC_OS_X_VERSION_MAX_ALLOWED) || (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_6)
+static void legacy_CTFontDrawGlyphs(CTFontRef, const CGGlyph glyphs[], const CGPoint points[],
+                                    size_t count, CGContextRef cg) {
+    CGContextShowGlyphsAtPositions(cg, glyphs, points, count);
+}
+
+typedef decltype(legacy_CTFontDrawGlyphs) CTFontDrawGlyphsProc;
+
+static CTFontDrawGlyphsProc* choose_CTFontDrawGlyphs() {
+    if (void* real = dlsym(RTLD_DEFAULT, "CTFontDrawGlyphs")) {
+        return (CTFontDrawGlyphsProc*)real;
+    }
+    return &legacy_CTFontDrawGlyphs;
+}
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 
 static void sk_memset_rect32(uint32_t* ptr, uint32_t value,
@@ -333,7 +349,11 @@ static bool supports_LCD() {
     static const UniChar pipeChar = '|';
     CGGlyph pipeGlyph;
     CTFontGetGlyphsForCharacters(ctFont, &pipeChar, &pipeGlyph, 1);
+#if defined(MAC_OS_X_VERSION_MAX_ALLOWED) || (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_6)
+    legacy_CTFontDrawGlyphs(ctFont, &pipeGlyph, &point, 1, cgContext);
+#else
     CTFontDrawGlyphs(ctFont, &pipeGlyph, &point, 1, cgContext);
+#endif
 
     uint32_t r = (rgb >> 16) & 0xFF;
     uint32_t g = (rgb >>  8) & 0xFF;
@@ -851,6 +871,12 @@ SkScalerContext_Mac::SkScalerContext_Mac(SkTypeface_Mac* typeface,
 CGRGBPixel* Offscreen::getCG(const SkScalerContext_Mac& context, const SkGlyph& glyph,
                              CGGlyph glyphID, size_t* rowBytesPtr,
                              bool generateA8FromLCD) {
+#if defined(MAC_OS_X_VERSION_MAX_ALLOWED) || (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_6)
+    static SkOnce once;
+    static CTFontDrawGlyphsProc* ctFontDrawGlyphs;
+    once([]{ ctFontDrawGlyphs = choose_CTFontDrawGlyphs(); });
+#endif
+
     if (!fRGBSpace) {
         //It doesn't appear to matter what color space is specified.
         //Regular blends and antialiased text are always (s*a + d*(1-a))
@@ -918,6 +944,15 @@ CGRGBPixel* Offscreen::getCG(const SkScalerContext_Mac& context, const SkGlyph& 
         fDoAA = !doAA;
         fDoLCD = !doLCD;
 
+#if defined(MAC_OS_X_VERSION_MAX_ALLOWED) || (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_6)
+        if (legacy_CTFontDrawGlyphs == ctFontDrawGlyphs) {
+            // CTFontDrawGlyphs will apply the font, font size, and font matrix to the CGContext.
+            // Our 'fake' one does not, so set up the CGContext here.
+            CGContextSetFont(fCG, context.fCGFont);
+            CGContextSetFontSize(fCG, CTFontGetSize(context.fCTFont));
+        }
+#endif
+
         CGContextSetTextMatrix(fCG, context.fTransform);
     }
 
@@ -963,7 +998,11 @@ CGRGBPixel* Offscreen::getCG(const SkScalerContext_Mac& context, const SkGlyph& 
     // So always make the font transform identity and place the transform on the context.
     point = CGPointApplyAffineTransform(point, context.fInvTransform);
 
+#if defined(MAC_OS_X_VERSION_MAX_ALLOWED) || (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_6)
+    ctFontDrawGlyphs(context.fCTFont, &glyphID, &point, 1, fCG);
+#else
     CTFontDrawGlyphs(context.fCTFont, &glyphID, &point, 1, fCG);
+#endif
 
     SkASSERT(rowBytesPtr);
     *rowBytesPtr = rowBytes;
