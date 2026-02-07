@@ -19,6 +19,11 @@
 #include "prerror.h"
 #include "secerr.h"
 
+#if defined(OS_MACOSX) && (!defined(MAC_OS_X_VERSION_10_6) || \
+    MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_6)
+#define strnlen(s, n) PL_strnlen(s, n)
+#endif
+
 extern mozilla::LazyLogModule gPIPNSSLog;
 
 NS_IMPL_ISUPPORTS(nsPK11Token, nsIPK11Token)
