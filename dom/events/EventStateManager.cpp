@@ -203,7 +203,7 @@ public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSITIMERCALLBACK
 private:
-  ~UITimerCallback() {}
+  ~UITimerCallback() = default;
   uint32_t mPreviousCount;
 };
 
@@ -242,9 +242,7 @@ OverOutElementsWrapper::OverOutElementsWrapper()
 {
 }
 
-OverOutElementsWrapper::~OverOutElementsWrapper()
-{
-}
+OverOutElementsWrapper::~OverOutElementsWrapper() = default;
 
 NS_IMPL_CYCLE_COLLECTION(OverOutElementsWrapper,
                          mLastOverElement,
@@ -1262,9 +1260,9 @@ EventStateManager::IsRemoteTarget(nsIContent* target) {
     return true;
   }
 
-  // <frame/iframe mozbrowser/mozapp>
+  // <frame/iframe mozbrowser>
   nsCOMPtr<nsIMozBrowserFrame> browserFrame = do_QueryInterface(target);
-  if (browserFrame && browserFrame->GetReallyIsBrowserOrApp()) {
+  if (browserFrame && browserFrame->GetReallyIsBrowser()) {
     return !!TabParent::GetFrom(target);
   }
 
@@ -1975,7 +1973,7 @@ EventStateManager::DoDefaultDragStart(nsPresContext* aPresContext,
   int32_t imageX, imageY;
   Element* dragImage = aDataTransfer->GetDragImage(&imageX, &imageY);
 
-  nsCOMPtr<nsISupportsArray> transArray =
+  nsCOMPtr<nsIArray> transArray =
     aDataTransfer->GetTransferables(dragTarget->AsDOMNode());
   if (!transArray)
     return false;
@@ -3817,7 +3815,7 @@ class MOZ_STACK_CLASS ESMEventCB : public EventDispatchingCallback
 public:
   explicit ESMEventCB(nsIContent* aTarget) : mTarget(aTarget) {}
 
-  virtual void HandleEvent(EventChainPostVisitor& aVisitor)
+  void HandleEvent(EventChainPostVisitor& aVisitor) override
   {
     if (aVisitor.mPresContext) {
       nsIFrame* frame = aVisitor.mPresContext->GetPrimaryFrameFor(mTarget);
@@ -4919,8 +4917,9 @@ EventStateManager::SetContentState(nsIContent* aContent, EventStates aState)
     if (mCurrentTarget)
     {
       const nsStyleUserInterface* ui = mCurrentTarget->StyleUserInterface();
-      if (ui->mUserInput == NS_STYLE_USER_INPUT_NONE)
+      if (ui->mUserInput == StyleUserInput::None) {
         return false;
+      }
     }
 
     if (aState == NS_EVENT_STATE_ACTIVE) {

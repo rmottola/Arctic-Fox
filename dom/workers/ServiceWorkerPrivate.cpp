@@ -11,6 +11,7 @@
 #include "nsIHttpChannelInternal.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "nsINetworkInterceptController.h"
+#include "nsIPushErrorReporter.h"
 #include "nsISupportsImpl.h"
 #include "nsIUploadChannel2.h"
 #include "nsNetUtil.h"
@@ -26,13 +27,9 @@
 #include "mozilla/dom/InternalHeaders.h"
 #include "mozilla/dom/NotificationEvent.h"
 #include "mozilla/dom/PromiseNativeHandler.h"
+#include "mozilla/dom/PushEventBinding.h"
 #include "mozilla/dom/RequestBinding.h"
 #include "mozilla/Unused.h"
-
-#ifndef MOZ_SIMPLEPUSH
-#include "nsIPushErrorReporter.h"
-#include "mozilla/dom/PushEventBinding.h"
-#endif
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -215,7 +212,7 @@ private:
     mDone = true;
 #endif
     mCallback->SetResult(aResult);
-    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(mCallback));
+    MOZ_ALWAYS_SUCCEEDS(mWorkerPrivate->DispatchToMainThread(mCallback));
   }
 };
 
@@ -498,7 +495,7 @@ public:
   {
     nsCOMPtr<nsIRunnable> runnable =
       new RegistrationUpdateRunnable(mRegistration, true /* time check */);
-    NS_DispatchToMainThread(runnable.forget());
+    aWorkerPrivate->DispatchToMainThread(runnable.forget());
 
     ExtendableEventWorkerRunnable::PostRun(aCx, aWorkerPrivate, aRunResult);
   }
@@ -538,7 +535,7 @@ public:
   Cancel() override
   {
     mCallback->SetResult(false);
-    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(mCallback));
+    MOZ_ALWAYS_SUCCEEDS(mWorkerPrivate->DispatchToMainThread(mCallback));
 
     return WorkerRunnable::Cancel();
   }
@@ -634,7 +631,7 @@ public:
     mDone = true;
 
     mCallback->SetResult(aResult);
-    nsresult rv = NS_DispatchToMainThread(mCallback);
+    nsresult rv = mWorkerPrivate->DispatchToMainThread(mCallback);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       NS_RUNTIMEABORT("Failed to dispatch life cycle event handler.");
     }
@@ -729,7 +726,6 @@ ServiceWorkerPrivate::SendLifeCycleEvent(const nsAString& aEventType,
   return NS_OK;
 }
 
-#ifndef MOZ_SIMPLEPUSH
 namespace {
 
 class PushErrorReporter final : public PromiseNativeHandler
@@ -766,6 +762,7 @@ public:
 
   void Report(uint16_t aReason = nsIPushErrorReporter::DELIVERY_INTERNAL_ERROR)
   {
+    WorkerPrivate* workerPrivate = mWorkerPrivate;
     mWorkerPrivate->AssertIsOnWorkerThread();
     mWorkerPrivate = nullptr;
 
@@ -777,7 +774,7 @@ public:
       NewRunnableMethod<uint16_t>(this,
         &PushErrorReporter::ReportOnMainThread, aReason);
     MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-      NS_DispatchToMainThread(runnable.forget())));
+      workerPrivate->DispatchToMainThread(runnable.forget())));
   }
 
   void ReportOnMainThread(uint16_t aReason)
@@ -895,16 +892,12 @@ public:
 };
 
 } // anonymous namespace
-#endif // !MOZ_SIMPLEPUSH
 
 nsresult
 ServiceWorkerPrivate::SendPushEvent(const nsAString& aMessageId,
                                     const Maybe<nsTArray<uint8_t>>& aData,
                                     ServiceWorkerRegistrationInfo* aRegistration)
 {
-#ifdef MOZ_SIMPLEPUSH
-  return NS_ERROR_NOT_AVAILABLE;
-#else
   nsresult rv = SpawnWorkerIfNeeded(PushEvent, nullptr);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -931,15 +924,11 @@ ServiceWorkerPrivate::SendPushEvent(const nsAString& aMessageId,
   }
 
   return NS_OK;
-#endif // MOZ_SIMPLEPUSH
 }
 
 nsresult
 ServiceWorkerPrivate::SendPushSubscriptionChangeEvent()
 {
-#ifdef MOZ_SIMPLEPUSH
-  return NS_ERROR_NOT_AVAILABLE;
-#else
   nsresult rv = SpawnWorkerIfNeeded(PushSubscriptionChangeEvent, nullptr);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -951,7 +940,6 @@ ServiceWorkerPrivate::SendPushSubscriptionChangeEvent()
   }
 
   return NS_OK;
-#endif // MOZ_SIMPLEPUSH
 }
 
 namespace {
@@ -1352,12 +1340,19 @@ public:
     httpChannel->GetRequestHeader(NS_LITERAL_CSTRING("Referer"), referrer);
     if (!referrer.IsEmpty()) {
       mReferrer = referrer;
+    } else {
+      // If there's no referrer Header, means the header was omitted for
+      // security/privacy reason.
+      mReferrer = EmptyCString();
     }
 
     uint32_t referrerPolicy = 0;
     rv = httpChannel->GetReferrerPolicy(&referrerPolicy);
     NS_ENSURE_SUCCESS(rv, rv);
     switch (referrerPolicy) {
+      case nsIHttpChannel::REFERRER_POLICY_UNSET:
+      mReferrerPolicy = ReferrerPolicy::_empty;
+      break;
     case nsIHttpChannel::REFERRER_POLICY_NO_REFERRER:
       mReferrerPolicy = ReferrerPolicy::No_referrer;
       break;
@@ -1372,6 +1367,15 @@ public:
       break;
     case nsIHttpChannel::REFERRER_POLICY_UNSAFE_URL:
       mReferrerPolicy = ReferrerPolicy::Unsafe_url;
+      break;
+    case nsIHttpChannel::REFERRER_POLICY_SAME_ORIGIN:
+      mReferrerPolicy = ReferrerPolicy::Same_origin;
+      break;
+    case nsIHttpChannel::REFERRER_POLICY_STRICT_ORIGIN_WHEN_XORIGIN:
+      mReferrerPolicy = ReferrerPolicy::Strict_origin_when_cross_origin;
+      break;
+    case nsIHttpChannel::REFERRER_POLICY_STRICT_ORIGIN:
+      mReferrerPolicy = ReferrerPolicy::Strict_origin;
       break;
     default:
       MOZ_ASSERT_UNREACHABLE("Invalid Referrer Policy enum value?");
@@ -1433,7 +1437,7 @@ public:
   Cancel() override
   {
     nsCOMPtr<nsIRunnable> runnable = new ResumeRequest(mInterceptedChannel);
-    if (NS_FAILED(NS_DispatchToMainThread(runnable))) {
+    if (NS_FAILED(mWorkerPrivate->DispatchToMainThread(runnable))) {
       NS_WARNING("Failed to resume channel on FetchEventRunnable::Cancel()!\n");
     }
     WorkerRunnable::Cancel();
@@ -1533,7 +1537,9 @@ private:
     nsresult rv2 = target->DispatchDOMEvent(nullptr, event, nullptr, nullptr);
     if (NS_WARN_IF(NS_FAILED(rv2)) || !event->WaitToRespond()) {
       nsCOMPtr<nsIRunnable> runnable;
-      if (event->DefaultPrevented(aCx)) {
+      MOZ_ASSERT(!aWorkerPrivate->UsesSystemPrincipal(),
+                 "We don't support system-principal serviceworkers");
+      if (event->DefaultPrevented(CallerType::NonSystem)) {
         event->ReportCanceled();
       } else if (event->WidgetEventPtr()->mFlags.mExceptionWasRaised) {
         // Exception logged via the WorkerPrivate ErrorReporter
@@ -1547,7 +1553,7 @@ private:
                                              NS_ERROR_INTERCEPTION_FAILED);
       }
 
-      MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable));
+      MOZ_ALWAYS_SUCCEEDS(mWorkerPrivate->DispatchToMainThread(runnable.forget()));
     }
 
     RefPtr<Promise> waitUntilPromise = event->GetPromise();
@@ -1699,7 +1705,7 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
   // TODO(catalinb): Bug 1192138 - Add telemetry for service worker wake-ups.
 
   // Ensure that the IndexedDatabaseManager is initialized
-  NS_WARN_IF(!IndexedDatabaseManager::GetOrCreate());
+  Unused << NS_WARN_IF(!IndexedDatabaseManager::GetOrCreate());
 
   WorkerLoadInfo info;
   nsresult rv = NS_NewURI(getter_AddRefs(info.mBaseURI), mInfo->ScriptSpec(),
@@ -1726,7 +1732,7 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
   nsContentUtils::StorageAccess access =
     nsContentUtils::StorageAllowedForPrincipal(info.mPrincipal);
   info.mStorageAllowed = access > nsContentUtils::StorageAccess::ePrivateBrowsing;
-  info.mPrivateBrowsing = false;
+  info.mOriginAttributes = mInfo->GetOriginAttributes();
 
   nsCOMPtr<nsIContentSecurityPolicy> csp;
   rv = info.mPrincipal->GetCsp(getter_AddRefs(csp));
@@ -1798,7 +1804,7 @@ ServiceWorkerPrivate::TerminateWorker()
       }
     }
 
-    NS_WARN_IF(!mWorkerPrivate->Terminate());
+    Unused << NS_WARN_IF(!mWorkerPrivate->Terminate());
     mWorkerPrivate = nullptr;
     mSupportsArray.Clear();
 

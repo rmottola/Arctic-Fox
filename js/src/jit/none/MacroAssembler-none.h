@@ -43,15 +43,15 @@ static constexpr Register IntArgReg3 = { Registers::invalid_reg };
 static constexpr Register GlobalReg = { Registers::invalid_reg };
 static constexpr Register HeapReg = { Registers::invalid_reg };
 
-static constexpr Register AsmJSIonExitRegCallee = { Registers::invalid_reg };
-static constexpr Register AsmJSIonExitRegE0 = { Registers::invalid_reg };
-static constexpr Register AsmJSIonExitRegE1 = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegCallee = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegE0 = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegE1 = { Registers::invalid_reg };
 
-static constexpr Register AsmJSIonExitRegReturnData = { Registers::invalid_reg };
-static constexpr Register AsmJSIonExitRegReturnType = { Registers::invalid_reg };
-static constexpr Register AsmJSIonExitRegD0 = { Registers::invalid_reg };
-static constexpr Register AsmJSIonExitRegD1 = { Registers::invalid_reg };
-static constexpr Register AsmJSIonExitRegD2 = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegReturnData = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegReturnType = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegD0 = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegD1 = { Registers::invalid_reg };
+static constexpr Register WasmIonExitRegD2 = { Registers::invalid_reg };
 
 static constexpr Register RegExpTesterRegExpReg = { Registers::invalid_reg };
 static constexpr Register RegExpTesterStringReg = { Registers::invalid_reg };
@@ -109,6 +109,8 @@ class Assembler : public AssemblerShared
         LessThan,
         LessThanOrEqual,
         Overflow,
+        CarrySet,
+        CarryClear,
         Signed,
         NotSigned,
         Zero,
@@ -146,8 +148,6 @@ class Assembler : public AssemblerShared
     static void ToggleToJmp(CodeLocationLabel) { MOZ_CRASH(); }
     static void ToggleToCmp(CodeLocationLabel) { MOZ_CRASH(); }
     static void ToggleCall(CodeLocationLabel, bool) { MOZ_CRASH(); }
-
-    static void UpdateBoundsCheck(uint8_t*, uint32_t) { MOZ_CRASH(); }
 
     static uintptr_t GetPointer(uint8_t*) { MOZ_CRASH(); }
 
@@ -203,7 +203,7 @@ class MacroAssemblerNone : public Assembler
     void flushBuffer() { MOZ_CRASH(); }
 
     template <typename T> void bind(T) { MOZ_CRASH(); }
-    void bindLater(Label*, wasm::JumpTarget) { MOZ_CRASH(); }
+    void bindLater(Label*, wasm::TrapDesc) { MOZ_CRASH(); }
     template <typename T> void j(Condition, T) { MOZ_CRASH(); }
     template <typename T> void jump(T) { MOZ_CRASH(); }
     void haltingAlign(size_t) { MOZ_CRASH(); }
@@ -352,8 +352,6 @@ class MacroAssemblerNone : public Assembler
     template <typename T, typename S> void atomicXor16(const T& value, const S& mem) { MOZ_CRASH(); }
     template <typename T, typename S> void atomicXor32(const T& value, const S& mem) { MOZ_CRASH(); }
 
-    void clampIntToUint8(Register) { MOZ_CRASH(); }
-
     Register splitTagForTest(ValueOperand) { MOZ_CRASH(); }
 
     void boxDouble(FloatRegister, ValueOperand) { MOZ_CRASH(); }
@@ -382,7 +380,8 @@ class MacroAssemblerNone : public Assembler
 
     template <typename T> void convertInt32ToDouble(T, FloatRegister) { MOZ_CRASH(); }
     void convertFloat32ToDouble(FloatRegister, FloatRegister) { MOZ_CRASH(); }
-    void convertUInt64ToDouble(Register64, Register, FloatRegister) { MOZ_CRASH(); }
+    static bool convertUInt64ToDoubleNeedsTemp() { MOZ_CRASH(); }
+    void convertUInt64ToDouble(Register64, FloatRegister, Register) { MOZ_CRASH(); }
 
     void boolValueToDouble(ValueOperand, FloatRegister) { MOZ_CRASH(); }
     void boolValueToFloat32(ValueOperand, FloatRegister) { MOZ_CRASH(); }
@@ -391,11 +390,13 @@ class MacroAssemblerNone : public Assembler
 
     void loadConstantDouble(double, FloatRegister) { MOZ_CRASH(); }
     void loadConstantFloat32(float, FloatRegister) { MOZ_CRASH(); }
+    void loadConstantDouble(wasm::RawF64, FloatRegister) { MOZ_CRASH(); }
+    void loadConstantFloat32(wasm::RawF32, FloatRegister) { MOZ_CRASH(); }
     Condition testInt32Truthy(bool, ValueOperand) { MOZ_CRASH(); }
     Condition testStringTruthy(bool, ValueOperand) { MOZ_CRASH(); }
 
     template <typename T> void loadUnboxedValue(T, MIRType, AnyRegister) { MOZ_CRASH(); }
-    template <typename T> void storeUnboxedValue(ConstantOrRegister, MIRType, T, MIRType) { MOZ_CRASH(); }
+    template <typename T> void storeUnboxedValue(const ConstantOrRegister&, MIRType, T, MIRType) { MOZ_CRASH(); }
     template <typename T> void storeUnboxedPayload(ValueOperand value, T, size_t) { MOZ_CRASH(); }
 
     void convertUInt32ToDouble(Register, FloatRegister) { MOZ_CRASH(); }
@@ -424,6 +425,12 @@ class MacroAssemblerNone : public Assembler
     Address ToPayload(Address) { MOZ_CRASH(); }
     Address ToType(Address) { MOZ_CRASH(); }
 #endif
+
+    struct AutoPrepareForPatching {
+        explicit AutoPrepareForPatching(MacroAssemblerNone&) {
+            MOZ_CRASH();
+        }
+    };
 };
 
 typedef MacroAssemblerNone MacroAssemblerSpecific;

@@ -34,7 +34,7 @@ struct ClassInfo;
 
 namespace js {
 
-using PropertyDescriptorVector = JS::GCVector<PropertyDescriptor>;
+using PropertyDescriptorVector = JS::GCVector<JS::PropertyDescriptor>;
 class GCMarker;
 class Nursery;
 
@@ -75,8 +75,13 @@ extern const Class MathClass;
 class GlobalObject;
 class NewObjectCache;
 
+enum class IntegrityLevel {
+    Sealed,
+    Frozen
+};
+
 // Forward declarations, required for later friend declarations.
-bool PreventExtensions(JSContext* cx, JS::HandleObject obj, JS::ObjectOpResult& result);
+bool PreventExtensions(JSContext* cx, JS::HandleObject obj, JS::ObjectOpResult& result, IntegrityLevel level = IntegrityLevel::Sealed);
 bool SetImmutablePrototype(js::ExclusiveContext* cx, JS::HandleObject obj, bool* succeeded);
 
 }  /* namespace js */
@@ -106,7 +111,7 @@ class JSObject : public js::gc::Cell
     friend class js::NewObjectCache;
     friend class js::Nursery;
     friend class js::gc::RelocationOverlay;
-    friend bool js::PreventExtensions(JSContext* cx, JS::HandleObject obj, JS::ObjectOpResult& result);
+    friend bool js::PreventExtensions(JSContext* cx, JS::HandleObject obj, JS::ObjectOpResult& result, js::IntegrityLevel level);
     friend bool js::SetImmutablePrototype(js::ExclusiveContext* cx, JS::HandleObject obj,
                                           bool* succeeded);
 
@@ -748,13 +753,16 @@ IsExtensible(ExclusiveContext* cx, HandleObject obj, bool* extensible);
  * ES6 [[PreventExtensions]]. Attempt to change the [[Extensible]] bit on |obj|
  * to false.  Indicate success or failure through the |result| outparam, or
  * actual error through the return value.
+ *
+ * The `level` argument is SM-specific. `obj` should have an integrity level of
+ * at least `level`.
  */
 extern bool
-PreventExtensions(JSContext* cx, HandleObject obj, ObjectOpResult& result);
+PreventExtensions(JSContext* cx, HandleObject obj, ObjectOpResult& result, IntegrityLevel level);
 
 /* Convenience function. As above, but throw on failure. */
 extern bool
-PreventExtensions(JSContext* cx, HandleObject obj);
+PreventExtensions(JSContext* cx, HandleObject obj, IntegrityLevel level = IntegrityLevel::Sealed);
 
 /*
  * ES6 [[GetOwnProperty]]. Get a description of one of obj's own properties.
@@ -764,12 +772,12 @@ PreventExtensions(JSContext* cx, HandleObject obj);
  */
 extern bool
 GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
-                         MutableHandle<PropertyDescriptor> desc);
+                         MutableHandle<JS::PropertyDescriptor> desc);
 
 /* ES6 [[DefineOwnProperty]]. Define a property on obj. */
 extern bool
 DefineProperty(JSContext* cx, HandleObject obj, HandleId id,
-               Handle<PropertyDescriptor> desc, ObjectOpResult& result);
+               Handle<JS::PropertyDescriptor> desc, ObjectOpResult& result);
 
 extern bool
 DefineProperty(ExclusiveContext* cx, HandleObject obj, HandleId id, HandleValue value,
@@ -788,7 +796,7 @@ DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, HandleValu
  * that any failure results in a TypeError.
  */
 extern bool
-DefineProperty(JSContext* cx, HandleObject obj, HandleId id, Handle<PropertyDescriptor> desc);
+DefineProperty(JSContext* cx, HandleObject obj, HandleId id, Handle<JS::PropertyDescriptor> desc);
 
 extern bool
 DefineProperty(ExclusiveContext* cx, HandleObject obj, HandleId id, HandleValue value,
@@ -985,7 +993,7 @@ SetImmutablePrototype(js::ExclusiveContext* cx, JS::HandleObject obj, bool* succ
 
 extern bool
 GetPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
-                      MutableHandle<PropertyDescriptor> desc);
+                      MutableHandle<JS::PropertyDescriptor> desc);
 
 /*
  * Deprecated. A version of HasProperty that also returns the object on which
@@ -1121,9 +1129,15 @@ namespace js {
 inline gc::InitialHeap
 GetInitialHeap(NewObjectKind newKind, const Class* clasp)
 {
+    if (newKind == NurseryAllocatedProxy) {
+        MOZ_ASSERT(clasp->isProxy());
+        MOZ_ASSERT(clasp->hasFinalize());
+        MOZ_ASSERT(!CanNurseryAllocateFinalizedClass(clasp));
+        return gc::DefaultHeap;
+    }
     if (newKind != GenericObject)
         return gc::TenuredHeap;
-    if (clasp->hasFinalize() && !(clasp->flags & JSCLASS_SKIP_NURSERY_FINALIZE))
+    if (clasp->hasFinalize() && !CanNurseryAllocateFinalizedClass(clasp))
         return gc::TenuredHeap;
     return gc::DefaultHeap;
 }
@@ -1160,9 +1174,6 @@ CloneObject(JSContext* cx, HandleObject obj, Handle<js::TaggedProto> proto);
 extern JSObject*
 DeepCloneObjectLiteral(JSContext* cx, HandleObject obj, NewObjectKind newKind = GenericObject);
 
-extern bool
-DefineProperties(JSContext* cx, HandleObject obj, HandleObject props);
-
 inline JSGetterOp
 CastAsGetterOp(JSObject* object)
 {
@@ -1178,7 +1189,7 @@ CastAsSetterOp(JSObject* object)
 /* ES6 draft rev 32 (2015 Feb 2) 6.2.4.5 ToPropertyDescriptor(Obj) */
 bool
 ToPropertyDescriptor(JSContext* cx, HandleValue descval, bool checkAccessors,
-                     MutableHandle<PropertyDescriptor> desc);
+                     MutableHandle<JS::PropertyDescriptor> desc);
 
 /*
  * Throw a TypeError if desc.getterObject() or setterObject() is not
@@ -1186,10 +1197,10 @@ ToPropertyDescriptor(JSContext* cx, HandleValue descval, bool checkAccessors,
  * when checkAccessors is false.
  */
 bool
-CheckPropertyDescriptorAccessors(JSContext* cx, Handle<PropertyDescriptor> desc);
+CheckPropertyDescriptorAccessors(JSContext* cx, Handle<JS::PropertyDescriptor> desc);
 
 void
-CompletePropertyDescriptor(MutableHandle<PropertyDescriptor> desc);
+CompletePropertyDescriptor(MutableHandle<JS::PropertyDescriptor> desc);
 
 /*
  * Read property descriptors from props, as for Object.defineProperties. See
@@ -1260,7 +1271,7 @@ HasOwnDataPropertyPure(JSContext* cx, JSObject* obj, jsid id, bool* result);
 
 bool
 GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
-                         MutableHandle<PropertyDescriptor> desc);
+                         MutableHandle<JS::PropertyDescriptor> desc);
 
 bool
 GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id, MutableHandleValue vp);
@@ -1274,7 +1285,7 @@ GetOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id, MutableHa
  * defineProperty: it would be senseless to define a "missing" property.
  */
 extern bool
-FromPropertyDescriptorToObject(JSContext* cx, Handle<PropertyDescriptor> desc,
+FromPropertyDescriptorToObject(JSContext* cx, Handle<JS::PropertyDescriptor> desc,
                                MutableHandleValue vp);
 
 extern bool
@@ -1339,11 +1350,6 @@ Throw(JSContext* cx, jsid id, unsigned errorNumber);
 extern bool
 Throw(JSContext* cx, JSObject* obj, unsigned errorNumber);
 
-enum class IntegrityLevel {
-    Sealed,
-    Frozen
-};
-
 /*
  * ES6 rev 29 (6 Dec 2014) 7.3.13. Mark obj as non-extensible, and adjust each
  * of obj's own properties' attributes appropriately: each property becomes
@@ -1368,6 +1374,12 @@ TestIntegrityLevel(JSContext* cx, HandleObject obj, IntegrityLevel level, bool* 
 
 extern bool
 SpeciesConstructor(JSContext* cx, HandleObject obj, HandleValue defaultCtor, MutableHandleValue pctor);
+
+extern bool
+SpeciesConstructor(JSContext* cx, HandleObject obj, JSProtoKey ctorKey, MutableHandleValue pctor);
+
+extern bool
+GetObjectFromIncumbentGlobal(JSContext* cx, MutableHandleObject obj);
 
 }  /* namespace js */
 

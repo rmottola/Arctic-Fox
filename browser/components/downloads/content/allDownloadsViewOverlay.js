@@ -1028,7 +1028,8 @@ DownloadsPlacesView.prototype = {
     // Hack for bug 836283: reset xbl fields to their old values after the
     // binding is reattached to avoid breaking the selection state
     let xblFields = new Map();
-    for (let [key, value] in Iterator(this._richlistbox)) {
+    for (let key of Object.getOwnPropertyNames(this._richlistbox)) {
+      let value = this._richlistbox[key];
       xblFields.set(key, value);
     }
 
@@ -1385,9 +1386,9 @@ DownloadsPlacesView.prototype = {
 
   onDragOver(aEvent) {
     let types = aEvent.dataTransfer.types;
-    if (types.contains("text/uri-list") ||
-        types.contains("text/x-moz-url") ||
-        types.contains("text/plain")) {
+    if (types.includes("text/uri-list") ||
+        types.includes("text/x-moz-url") ||
+        types.includes("text/plain")) {
       aEvent.preventDefault();
     }
   },
@@ -1400,12 +1401,15 @@ DownloadsPlacesView.prototype = {
       return;
     }
 
-    let name = {};
-    let url = Services.droppedLinkHandler.dropLink(aEvent, name);
-    if (url) {
-      let browserWin = RecentWindow.getMostRecentBrowserWindow();
-      let initiatingDoc = browserWin ? browserWin.document : document;
-      DownloadURL(url, name.value, initiatingDoc);
+    let links = Services.droppedLinkHandler.dropLinks(aEvent);
+    if (!links.length)
+      return;
+    let browserWin = RecentWindow.getMostRecentBrowserWindow();
+    let initiatingDoc = browserWin ? browserWin.document : document;
+    for (let link of links) {
+      if (link.url.startsWith("about:"))
+        continue;
+      DownloadURL(link.url, link.name, initiatingDoc);
     }
   },
 };

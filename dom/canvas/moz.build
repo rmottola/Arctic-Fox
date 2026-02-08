@@ -71,7 +71,6 @@ SOURCES += [
 UNIFIED_SOURCES += [
     'TexUnpackBlob.cpp',
     'WebGL1Context.cpp',
-    'WebGL1ContextBuffers.cpp',
     'WebGL1ContextUniforms.cpp',
     'WebGL2Context.cpp',
     'WebGL2ContextBuffers.cpp',
@@ -150,7 +149,6 @@ UNIFIED_SOURCES += [
     'WebGLTexelConversions.cpp',
     'WebGLTexture.cpp',
     'WebGLTextureUpload.cpp',
-    'WebGLTimerQuery.cpp',
     'WebGLTransformFeedback.cpp',
     'WebGLUniformLocation.cpp',
     'WebGLValidateStrings.cpp',
@@ -158,6 +156,7 @@ UNIFIED_SOURCES += [
     'WebGLVertexArrayFake.cpp',
     'WebGLVertexArrayGL.cpp',
     'WebGLVertexArrayObject.cpp',
+    'WebGLVertexAttribData.cpp',
 ]
 
 SOURCES += [

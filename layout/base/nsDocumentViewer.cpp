@@ -42,8 +42,8 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/dom/EncodingUtils.h"
 #include "mozilla/WeakPtr.h"
-#include "mozilla/StyleSheetHandle.h"
-#include "mozilla/StyleSheetHandleInlines.h"
+#include "mozilla/StyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 
 #include "nsViewManager.h"
 #include "nsView.h"
@@ -52,7 +52,7 @@
 #include "nsNetUtil.h"
 #include "nsIContentViewerEdit.h"
 #include "nsIContentViewerFile.h"
-#include "mozilla/CSSStyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 #include "mozilla/css/Loader.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsIInterfaceRequestorUtils.h"
@@ -1102,7 +1102,7 @@ nsDocumentViewer::PermitUnloadInternal(bool *aShouldPrompt,
   static bool sBeforeUnloadRequiresInteraction;
   static bool sBeforeUnloadPrefsCached = false;
 
-  if (!sBeforeUnloadPrefsCached ) {
+  if (!sBeforeUnloadPrefsCached) {
     sBeforeUnloadPrefsCached = true;
     Preferences::AddBoolVarCache(&sIsBeforeUnloadDisabled,
                                  BEFOREUNLOAD_DISABLED_PREFNAME);
@@ -1149,6 +1149,8 @@ nsDocumentViewer::PermitUnloadInternal(bool *aShouldPrompt,
     nsGlobalWindow* globalWindow = nsGlobalWindow::Cast(window);
     dialogsAreEnabled = globalWindow->AreDialogsEnabled();
     nsGlobalWindow::TemporarilyDisableDialogs disableDialogs(globalWindow);
+
+    nsIDocument::PageUnloadingEventTimeStamp timestamp(mDocument);
 
     mInPermitUnload = true;
     EventDispatcher::DispatchDOMEvent(window, nullptr, event, mPresContext,
@@ -1352,6 +1354,8 @@ nsDocumentViewer::PageHide(bool aIsUnload)
     // Never permit popups from the unload handler, no matter how we get
     // here.
     nsAutoPopupStatePusher popupStatePusher(openAbused, true);
+
+    nsIDocument::PageUnloadingEventTimeStamp timestamp(mDocument);
 
     EventDispatcher::Dispatch(window, mPresContext, &event, nullptr, &status);
   }
@@ -2247,7 +2251,7 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument)
   auto cache = nsLayoutStylesheetCache::For(backendType);
 
   // Handle the user sheets.
-  StyleSheetHandle sheet = nullptr;
+  StyleSheet* sheet = nullptr;
   if (nsContentUtils::IsInChromeDocshell(aDocument)) {
     sheet = cache->UserChromeSheet();
   } else {
@@ -2264,7 +2268,7 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument)
   nsCOMPtr<nsIDocShell> ds(mContainer);
   nsCOMPtr<nsIDOMEventTarget> chromeHandler;
   nsCOMPtr<nsIURI> uri;
-  StyleSheetHandle::RefPtr chromeSheet;
+  RefPtr<StyleSheet> chromeSheet;
 
   if (ds) {
     ds->GetChromeEventHandler(getter_AddRefs(chromeHandler));
@@ -2383,10 +2387,10 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument)
   if (styleSet->IsGecko()) {
     nsStyleSheetService* sheetService = nsStyleSheetService::GetInstance();
     if (sheetService) {
-      for (StyleSheetHandle sheet : *sheetService->AgentStyleSheets()) {
+      for (StyleSheet* sheet : *sheetService->AgentStyleSheets()) {
         styleSet->AppendStyleSheet(SheetType::Agent, sheet);
       }
-      for (StyleSheetHandle sheet : Reversed(*sheetService->UserStyleSheets())) {
+      for (StyleSheet* sheet : Reversed(*sheetService->UserStyleSheets())) {
         styleSet->PrependStyleSheet(SheetType::User, sheet);
       }
     }
@@ -3806,6 +3810,7 @@ nsDocumentViewer::Print(nsIPrintSettings*       aPrintSettings,
       return rv;
     }
   }
+
   if (mPrintEngine->HasPrintCallbackCanvas()) {
     mBeforeAndAfterPrint = beforeAndAfterPrint;
   }

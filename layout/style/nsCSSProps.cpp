@@ -21,6 +21,7 @@
 #include "mozilla/LookAndFeel.h" // for system colors
 
 #include "nsString.h"
+#include "nsStaticAtom.h"
 #include "nsStaticNameTable.h"
 
 #include "mozilla/Preferences.h"
@@ -29,9 +30,6 @@ using namespace mozilla;
 
 typedef nsCSSProps::KTableEntry KTableEntry;
 
-// MSVC before 2015 doesn't consider string literal as a constant
-// expression, thus we are not able to do this check here.
-#if !defined(_MSC_VER) || _MSC_VER >= 1900
 // By wrapping internal-only properties in this macro, we are not
 // exposing them in the CSSOM. Since currently it is not necessary to
 // allow accessing them in that way, it is easier and cheaper to just
@@ -46,7 +44,6 @@ typedef nsCSSProps::KTableEntry KTableEntry;
 #undef CSS_PROP_LIST_EXCLUDE_INTERNAL
 #undef CSS_PROP_LIST_INCLUDE_LOGICAL
 #undef CSS_PROP
-#endif
 
 #define CSS_PROP(name_, id_, method_, flags_, pref_, ...) \
   static_assert(!((flags_) & CSS_PROPERTY_ENABLED_IN_CHROME) || \
@@ -717,6 +714,49 @@ nsCSSProps::GetStringValue(nsCSSCounterDesc aCounterDesc)
   }
 }
 
+#define CSS_PROP(name_, id_, ...) nsICSSProperty* nsCSSProps::id_;
+#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, ...)
+#define CSS_PROP_LIST_INCLUDE_LOGICAL
+#include "nsCSSPropList.h"
+#undef CSS_PROP_LIST_INCLUDE_LOGICAL
+#undef CSS_PROP_SHORTHAND
+#undef CSS_PROP
+
+#define CSS_PROP(name_, id_, ...) NS_STATIC_ATOM_BUFFER(id_##_buffer, #name_)
+#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, ...)
+#define CSS_PROP_LIST_INCLUDE_LOGICAL
+#include "nsCSSPropList.h"
+#undef CSS_PROP_LIST_INCLUDE_LOGICAL
+#undef CSS_PROP_SHORTHAND
+#undef CSS_PROP
+
+static const nsStaticAtom CSSProps_info[] = {
+#define CSS_PROP(name_, id_, ...) \
+  NS_STATIC_ATOM(id_##_buffer, (nsIAtom**)&nsCSSProps::id_),
+#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, __VA_ARGS__)
+#define CSS_PROP_LIST_INCLUDE_LOGICAL
+#include "nsCSSPropList.h"
+#undef CSS_PROP_LIST_INCLUDE_LOGICAL
+#undef CSS_PROP_SHORTHAND
+#undef CSS_PROP
+};
+
+nsICSSProperty* nsCSSProps::gPropertyAtomTable[eCSSProperty_COUNT];
+
+/* static */ void
+nsCSSProps::AddRefAtoms()
+{
+  NS_RegisterStaticAtoms(CSSProps_info);
+#define CSS_PROP(name_, id_, ...) \
+  gPropertyAtomTable[eCSSProperty_##id_] = nsCSSProps::id_;
+#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, ...)
+#define CSS_PROP_LIST_INCLUDE_LOGICAL
+#include "nsCSSPropList.h"
+#undef CSS_PROP_LIST_INCLUDE_LOGICAL
+#undef CSS_PROP_SHORTHAND
+#undef CSS_PROP
+}
+
 /***************************************************************************/
 
 const KTableEntry nsCSSProps::kAnimationDirectionKTable[] = {
@@ -868,6 +908,8 @@ const KTableEntry nsCSSProps::kAppearanceKTable[] = {
   { eCSSKeyword__moz_mac_disclosure_button_closed, NS_THEME_MAC_DISCLOSURE_BUTTON_CLOSED },
   { eCSSKeyword__moz_gtk_info_bar,              NS_THEME_GTK_INFO_BAR },
   { eCSSKeyword__moz_mac_source_list,           NS_THEME_MAC_SOURCE_LIST },
+  { eCSSKeyword__moz_mac_source_list_selection, NS_THEME_MAC_SOURCE_LIST_SELECTION },
+  { eCSSKeyword__moz_mac_active_source_list_selection, NS_THEME_MAC_ACTIVE_SOURCE_LIST_SELECTION },
   { eCSSKeyword_UNKNOWN,                        -1 }
 };
 
@@ -993,11 +1035,6 @@ const KTableEntry nsCSSProps::kBorderCollapseKTable[] = {
   { eCSSKeyword_collapse,  NS_STYLE_BORDER_COLLAPSE },
   { eCSSKeyword_separate,  NS_STYLE_BORDER_SEPARATE },
   { eCSSKeyword_UNKNOWN,   -1 }
-};
-
-const KTableEntry nsCSSProps::kBorderColorKTable[] = {
-  { eCSSKeyword__moz_use_text_color, NS_STYLE_COLOR_MOZ_USE_TEXT_COLOR },
-  { eCSSKeyword_UNKNOWN, -1 }
 };
 
 const KTableEntry nsCSSProps::kBorderImageRepeatKTable[] = {
@@ -1295,8 +1332,6 @@ KTableEntry nsCSSProps::kDisplayKTable[] = {
   { eCSSKeyword__webkit_inline_box,  StyleDisplay::WebkitInlineBox },
   { eCSSKeyword__webkit_flex,        StyleDisplay::Flex },
   { eCSSKeyword__webkit_inline_flex, StyleDisplay::InlineFlex },
-  // The next entry is controlled by the layout.css.display-contents.enabled
-  // pref.
   { eCSSKeyword_contents,            StyleDisplay::Contents },
   { eCSSKeyword_UNKNOWN,             -1 }
 };
@@ -1318,7 +1353,7 @@ const KTableEntry nsCSSProps::kAlignAllKeywords[] = {
   { eCSSKeyword_left,          NS_STYLE_ALIGN_LEFT },
   { eCSSKeyword_right,         NS_STYLE_ALIGN_RIGHT },
   { eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE },
-  { eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE },
+  // Also "first/last baseline"; see nsCSSValue::AppendAlignJustifyValueToString
   { eCSSKeyword_stretch,       NS_STYLE_ALIGN_STRETCH },
   { eCSSKeyword_self_start,    NS_STYLE_ALIGN_SELF_START },
   { eCSSKeyword_self_end,      NS_STYLE_ALIGN_SELF_END },
@@ -1367,7 +1402,7 @@ const KTableEntry nsCSSProps::kAlignAutoNormalStretchBaseline[] = {
   { eCSSKeyword_normal,        NS_STYLE_ALIGN_NORMAL },
   { eCSSKeyword_stretch,       NS_STYLE_ALIGN_STRETCH },
   { eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE },
-  { eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE },
+  // Also "first baseline" & "last baseline"; see CSSParserImpl::ParseAlignEnum
   { eCSSKeyword_UNKNOWN,       -1 }
 };
 
@@ -1375,14 +1410,14 @@ const KTableEntry nsCSSProps::kAlignNormalStretchBaseline[] = {
   { eCSSKeyword_normal,        NS_STYLE_ALIGN_NORMAL },
   { eCSSKeyword_stretch,       NS_STYLE_ALIGN_STRETCH },
   { eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE },
-  { eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE },
+  // Also "first baseline" & "last baseline"; see CSSParserImpl::ParseAlignEnum
   { eCSSKeyword_UNKNOWN,       -1 }
 };
 
 const KTableEntry nsCSSProps::kAlignNormalBaseline[] = {
   { eCSSKeyword_normal,        NS_STYLE_ALIGN_NORMAL },
   { eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE },
-  { eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE },
+  // Also "first baseline" & "last baseline"; see CSSParserImpl::ParseAlignEnum
   { eCSSKeyword_UNKNOWN,       -1 }
 };
 
@@ -1795,10 +1830,10 @@ const KTableEntry nsCSSProps::kObjectFitKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kOrientKTable[] = {
-  { eCSSKeyword_inline,     NS_STYLE_ORIENT_INLINE },
-  { eCSSKeyword_block,      NS_STYLE_ORIENT_BLOCK },
-  { eCSSKeyword_horizontal, NS_STYLE_ORIENT_HORIZONTAL },
-  { eCSSKeyword_vertical,   NS_STYLE_ORIENT_VERTICAL },
+  { eCSSKeyword_inline,     StyleOrient::Inline },
+  { eCSSKeyword_block,      StyleOrient::Block },
+  { eCSSKeyword_horizontal, StyleOrient::Horizontal },
+  { eCSSKeyword_vertical,   StyleOrient::Vertical },
   { eCSSKeyword_UNKNOWN,    -1 }
 };
 
@@ -1814,11 +1849,6 @@ const KTableEntry nsCSSProps::kOutlineStyleKTable[] = {
   { eCSSKeyword_ridge,  NS_STYLE_BORDER_STYLE_RIDGE },
   { eCSSKeyword_inset,  NS_STYLE_BORDER_STYLE_INSET },
   { eCSSKeyword_outset, NS_STYLE_BORDER_STYLE_OUTSET },
-  { eCSSKeyword_UNKNOWN, -1 }
-};
-
-const KTableEntry nsCSSProps::kOutlineColorKTable[] = {
-  { eCSSKeyword__moz_use_text_color, NS_STYLE_COLOR_MOZ_USE_TEXT_COLOR },
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
@@ -2135,17 +2165,17 @@ const KTableEntry nsCSSProps::kUserFocusKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kUserInputKTable[] = {
-  { eCSSKeyword_none,     NS_STYLE_USER_INPUT_NONE },
-  { eCSSKeyword_auto,     NS_STYLE_USER_INPUT_AUTO },
-  { eCSSKeyword_enabled,  NS_STYLE_USER_INPUT_ENABLED },
-  { eCSSKeyword_disabled, NS_STYLE_USER_INPUT_DISABLED },
+  { eCSSKeyword_none,     StyleUserInput::None },
+  { eCSSKeyword_enabled,  StyleUserInput::Enabled },
+  { eCSSKeyword_disabled, StyleUserInput::Disabled },
+  { eCSSKeyword_auto,     StyleUserInput::Auto },
   { eCSSKeyword_UNKNOWN,  -1 }
 };
 
 const KTableEntry nsCSSProps::kUserModifyKTable[] = {
-  { eCSSKeyword_read_only,  NS_STYLE_USER_MODIFY_READ_ONLY },
-  { eCSSKeyword_read_write, NS_STYLE_USER_MODIFY_READ_WRITE },
-  { eCSSKeyword_write_only, NS_STYLE_USER_MODIFY_WRITE_ONLY },
+  { eCSSKeyword_read_only,  StyleUserModify::ReadOnly },
+  { eCSSKeyword_read_write, StyleUserModify::ReadWrite },
+  { eCSSKeyword_write_only, StyleUserModify::WriteOnly },
   { eCSSKeyword_UNKNOWN,    -1 }
 };
 
@@ -2203,9 +2233,9 @@ const KTableEntry nsCSSProps::kWidthKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kWindowDraggingKTable[] = {
-  { eCSSKeyword_default, NS_STYLE_WINDOW_DRAGGING_DEFAULT },
-  { eCSSKeyword_drag, NS_STYLE_WINDOW_DRAGGING_DRAG },
-  { eCSSKeyword_no_drag, NS_STYLE_WINDOW_DRAGGING_NO_DRAG },
+  { eCSSKeyword_default, StyleWindowDragging::Default },
+  { eCSSKeyword_drag, StyleWindowDragging::Drag },
+  { eCSSKeyword_no_drag, StyleWindowDragging::NoDrag },
   { eCSSKeyword_UNKNOWN, -1 }
 };
 

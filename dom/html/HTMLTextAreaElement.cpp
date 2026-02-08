@@ -340,9 +340,6 @@ HTMLTextAreaElement::SetValue(const nsAString& aValue)
 NS_IMETHODIMP 
 HTMLTextAreaElement::SetUserInput(const nsAString& aValue)
 {
-  if (!nsContentUtils::IsCallerChrome()) {
-    return NS_ERROR_DOM_SECURITY_ERR;
-  }
   return SetValueInternal(aValue, nsTextEditorState::eSetValue_BySetUserInput);
 }
 
@@ -402,9 +399,12 @@ HTMLTextAreaElement::ParseAttribute(int32_t aNamespaceID,
     if (aAttribute == nsGkAtoms::maxlength ||
         aAttribute == nsGkAtoms::minlength) {
       return aResult.ParseNonNegativeIntValue(aValue);
-    } else if (aAttribute == nsGkAtoms::cols ||
-               aAttribute == nsGkAtoms::rows) {
-      return aResult.ParsePositiveIntValue(aValue);
+    } else if (aAttribute == nsGkAtoms::cols) {
+      aResult.ParseIntWithFallback(aValue, DEFAULT_COLS);
+      return true;
+    } else if (aAttribute == nsGkAtoms::rows) {
+      aResult.ParseIntWithFallback(aValue, DEFAULT_ROWS_TEXTAREA);
+      return true;
     }
   }
   return nsGenericHTMLElement::ParseAttribute(aNamespaceID, aAttribute, aValue,
@@ -1205,6 +1205,11 @@ HTMLTextAreaElement::IntrinsicState() const
     }
   }
 
+  if (HasAttr(kNameSpaceID_None, nsGkAtoms::placeholder) &&
+      IsValueEmpty()) {
+    state |= NS_EVENT_STATE_PLACEHOLDERSHOWN;
+  }
+
   return state;
 }
 
@@ -1614,7 +1619,8 @@ HTMLTextAreaElement::OnValueChanged(bool aNotify, bool aWasInteractiveUserChange
   UpdateTooShortValidityState();
   UpdateValueMissingValidityState();
 
-  if (validBefore != IsValid()) {
+  if (validBefore != IsValid() ||
+      HasAttr(kNameSpaceID_None, nsGkAtoms::placeholder)) {
     UpdateState(aNotify);
   }
 }

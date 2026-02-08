@@ -61,6 +61,7 @@ class HeapSlot;
 void SetGCZeal(JSRuntime*, uint8_t, uint32_t);
 
 namespace gc {
+class AutoMaybeStartBackgroundAllocation;
 struct Cell;
 class MinorCollectionTracer;
 class RelocationOverlay;
@@ -112,6 +113,20 @@ class TenuringTracer : public JSTracer
     void traceSlots(JS::Value* vp, JS::Value* end);
 };
 
+/*
+ * Classes with JSCLASS_SKIP_NURSERY_FINALIZE or Wrapper classes with
+ * CROSS_COMPARTMENT flags will not have their finalizer called if they are
+ * nursery allocated and not promoted to the tenured heap. The finalizers for
+ * these classes must do nothing except free data which was allocated via
+ * Nursery::allocateBuffer.
+ */
+inline bool
+CanNurseryAllocateFinalizedClass(const js::Class* const clasp)
+{
+    MOZ_ASSERT(clasp->hasFinalize());
+    return clasp->flags & JSCLASS_SKIP_NURSERY_FINALIZE;
+}
+
 class Nursery
 {
   public:
@@ -160,17 +175,17 @@ class Nursery
     JSObject* allocateObject(JSContext* cx, size_t size, size_t numDynamic, const js::Class* clasp);
 
     /* Allocate a buffer for a given zone, using the nursery if possible. */
-    void* allocateBuffer(JS::Zone* zone, uint32_t nbytes);
+    void* allocateBuffer(JS::Zone* zone, size_t nbytes);
 
     /*
      * Allocate a buffer for a given object, using the nursery if possible and
      * obj is in the nursery.
      */
-    void* allocateBuffer(JSObject* obj, uint32_t nbytes);
+    void* allocateBuffer(JSObject* obj, size_t nbytes);
 
     /* Resize an existing object buffer. */
     void* reallocateBuffer(JSObject* obj, void* oldBuffer,
-                           uint32_t oldBytes, uint32_t newBytes);
+                           size_t oldBytes, size_t newBytes);
 
     /* Free an object buffer. */
     void freeBuffer(void* buffer);
@@ -291,9 +306,12 @@ class Nursery
     /* Promotion rate for the previous minor collection. */
     double previousPromotionRate_;
 
-    /* Report minor collections taking more than this many us, if enabled. */
+    /* Report minor collections taking at least this many us, if enabled. */
     int64_t profileThreshold_;
     bool enableProfiling_;
+
+    /* Report ObjectGroups with at lest this many instances tenured. */
+    int64_t reportTenurings_;
 
     /* Profiling data. */
 
@@ -371,7 +389,9 @@ class Nursery
     void setStartPosition();
 
     void updateNumChunks(unsigned newCount);
-    void updateNumChunksLocked(unsigned newCount, AutoLockGC& lock);
+    void updateNumChunksLocked(unsigned newCount,
+                               gc::AutoMaybeStartBackgroundAllocation& maybeBgAlloc,
+                               AutoLockGC& lock);
 
     MOZ_ALWAYS_INLINE uintptr_t allocationEnd() const {
         MOZ_ASSERT(numChunks() > 0);
@@ -431,6 +451,7 @@ class Nursery
     void maybeResizeNursery(JS::gcreason::Reason reason, double promotionRate);
     void growAllocableSpace();
     void shrinkAllocableSpace();
+    void minimizeAllocableSpace();
 
     /* Profile recording and printing. */
     void startProfile(ProfileKey key);

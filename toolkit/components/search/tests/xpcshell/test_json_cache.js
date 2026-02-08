@@ -55,7 +55,7 @@ function run_test() {
 
   // The list of visibleDefaultEngines needs to match or the cache will be ignored.
   let chan = NetUtil.newChannel({
-    uri: "resource://search-plugins/list.txt",
+    uri: "resource://search-plugins/list.json",
     loadUsingSystemPrincipal: true
   });
   let visibleDefaultEngines = [];
@@ -63,13 +63,9 @@ function run_test() {
               createInstance(Ci.nsIScriptableInputStream);
   sis.init(chan.open2());
   let list = sis.read(sis.available());
-  let names = list.split("\n").filter(n => !!n);
-  for (let name of names) {
-    if (name.endsWith(":hidden"))
-      continue;
-    visibleDefaultEngines.push(name);
-  }
-  cacheTemplate.visibleDefaultEngines = visibleDefaultEngines;
+  let searchSettings = JSON.parse(list);
+
+  cacheTemplate.visibleDefaultEngines = searchSettings["default"]["visibleDefaultEngines"];
 
   run_next_test();
 }
@@ -213,11 +209,6 @@ var EXPECTED_ENGINE = {
               "name": "q",
               "value": "{searchTerms}",
               "purpose": undefined,
-            },
-            {
-              "name": "channel",
-              "value": "none",
-              "purpose": "",
             },
             {
               "name": "channel",

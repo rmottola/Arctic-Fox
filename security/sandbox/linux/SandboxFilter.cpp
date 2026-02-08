@@ -19,6 +19,7 @@
 #include <linux/net.h>
 #include <linux/prctl.h>
 #include <linux/sched.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
@@ -26,8 +27,8 @@
 #include <unistd.h>
 
 #include "sandbox/linux/bpf_dsl/bpf_dsl.h"
-#include "sandbox/linux/seccomp-bpf/linux_seccomp.h"
-#include "sandbox/linux/services/linux_syscalls.h"
+#include "sandbox/linux/system_headers/linux_seccomp.h"
+#include "sandbox/linux/system_headers/linux_syscalls.h"
 
 using namespace sandbox::bpf_dsl;
 #define CASES SANDBOX_BPF_DSL_CASES
@@ -39,6 +40,11 @@ using namespace sandbox::bpf_dsl;
 #endif
 #ifndef MADV_DONTDUMP
 #define MADV_DONTDUMP 16
+#endif
+
+// Added in Linux 4.5; see bug 1303813.
+#ifndef MADV_FREE
+#define MADV_FREE 8
 #endif
 
 #ifndef PR_SET_PTRACER
@@ -377,14 +383,14 @@ class ContentSandboxPolicy : public SandboxPolicyCommon {
   static intptr_t StatTrap(ArgsRef aArgs, void* aux) {
     auto broker = static_cast<SandboxBrokerClient*>(aux);
     auto path = reinterpret_cast<const char*>(aArgs.args[0]);
-    auto buf = reinterpret_cast<struct stat*>(aArgs.args[1]);
+    auto buf = reinterpret_cast<statstruct*>(aArgs.args[1]);
     return broker->Stat(path, buf);
   }
 
   static intptr_t LStatTrap(ArgsRef aArgs, void* aux) {
     auto broker = static_cast<SandboxBrokerClient*>(aux);
     auto path = reinterpret_cast<const char*>(aArgs.args[0]);
-    auto buf = reinterpret_cast<struct stat*>(aArgs.args[1]);
+    auto buf = reinterpret_cast<statstruct*>(aArgs.args[1]);
     return broker->LStat(path, buf);
   }
 
@@ -392,7 +398,7 @@ class ContentSandboxPolicy : public SandboxPolicyCommon {
     auto broker = static_cast<SandboxBrokerClient*>(aux);
     auto fd = static_cast<int>(aArgs.args[0]);
     auto path = reinterpret_cast<const char*>(aArgs.args[1]);
-    auto buf = reinterpret_cast<struct stat*>(aArgs.args[2]);
+    auto buf = reinterpret_cast<statstruct*>(aArgs.args[2]);
     auto flags = static_cast<int>(aArgs.args[3]);
     if (fd != AT_FDCWD && path[0] != '/') {
       SANDBOX_LOG_ERROR("unsupported fd-relative fstatat(%d, \"%s\", %p, %d)",
@@ -407,6 +413,61 @@ class ContentSandboxPolicy : public SandboxPolicyCommon {
     return (flags & AT_SYMLINK_NOFOLLOW) == 0
       ? broker->Stat(path, buf)
       : broker->LStat(path, buf);
+  }
+
+  static intptr_t ChmodTrap(ArgsRef aArgs, void* aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    auto mode = static_cast<mode_t>(aArgs.args[1]);
+    return broker->Chmod(path, mode);
+  }
+
+  static intptr_t LinkTrap(ArgsRef aArgs, void *aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    auto path2 = reinterpret_cast<const char*>(aArgs.args[1]);
+    return broker->Link(path, path2);
+  }
+
+  static intptr_t SymlinkTrap(ArgsRef aArgs, void *aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    auto path2 = reinterpret_cast<const char*>(aArgs.args[1]);
+    return broker->Symlink(path, path2);
+  }
+
+  static intptr_t RenameTrap(ArgsRef aArgs, void *aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    auto path2 = reinterpret_cast<const char*>(aArgs.args[1]);
+    return broker->Rename(path, path2);
+  }
+
+  static intptr_t MkdirTrap(ArgsRef aArgs, void* aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    auto mode = static_cast<mode_t>(aArgs.args[1]);
+    return broker->Mkdir(path, mode);
+  }
+
+  static intptr_t RmdirTrap(ArgsRef aArgs, void* aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    return broker->Rmdir(path);
+  }
+
+  static intptr_t UnlinkTrap(ArgsRef aArgs, void* aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    return broker->Unlink(path);
+  }
+
+  static intptr_t ReadlinkTrap(ArgsRef aArgs, void* aux) {
+    auto broker = static_cast<SandboxBrokerClient*>(aux);
+    auto path = reinterpret_cast<const char*>(aArgs.args[0]);
+    auto buf = reinterpret_cast<char*>(aArgs.args[1]);
+    auto size = static_cast<size_t>(aArgs.args[2]);
+    return broker->Readlink(path, buf, size);
   }
 
   static intptr_t GetPPidTrap(ArgsRef aArgs, void* aux) {
@@ -437,8 +498,9 @@ public:
         return Some(Allow());
       }
       Arg<int> domain(0), type(1);
-      return Some(If(domain == AF_UNIX &&
-                     (type == SOCK_STREAM || type == SOCK_SEQPACKET), Allow())
+      return Some(If(AllOf(domain == AF_UNIX,
+                           AnyOf(type == SOCK_STREAM, type == SOCK_SEQPACKET)),
+                     Allow())
                   .Else(InvalidSyscall()));
     }
 
@@ -506,6 +568,22 @@ public:
         return Trap(LStatTrap, mBroker);
       CASES_FOR_fstatat:
         return Trap(StatAtTrap, mBroker);
+      case __NR_chmod:
+        return Trap(ChmodTrap, mBroker);
+      case __NR_link:
+        return Trap(LinkTrap, mBroker);
+      case __NR_mkdir:
+        return Trap(MkdirTrap, mBroker);
+      case __NR_symlink:
+        return Trap(SymlinkTrap, mBroker);
+      case __NR_rename:
+        return Trap(RenameTrap, mBroker);
+      case __NR_rmdir:
+        return Trap(RmdirTrap, mBroker);
+      case __NR_unlink:
+        return Trap(UnlinkTrap, mBroker);
+      case __NR_readlink:
+        return Trap(ReadlinkTrap, mBroker);
       }
     } else {
       // No broker; allow the syscalls directly.  )-:
@@ -517,6 +595,14 @@ public:
       CASES_FOR_stat:
       CASES_FOR_lstat:
       CASES_FOR_fstatat:
+      case __NR_chmod:
+      case __NR_link:
+      case __NR_mkdir:
+      case __NR_symlink:
+      case __NR_rename:
+      case __NR_rmdir:
+      case __NR_unlink:
+      case __NR_readlink:
         return Allow();
       }
     }
@@ -528,23 +614,16 @@ public:
 
       // Filesystem syscalls that need more work to determine who's
       // using them, if they need to be, and what we intend to about it.
-    case __NR_mkdir:
-    case __NR_rmdir:
     case __NR_getcwd:
     CASES_FOR_statfs:
     CASES_FOR_fstatfs:
-    case __NR_chmod:
-    case __NR_rename:
-    case __NR_symlink:
     case __NR_quotactl:
-    case __NR_link:
-    case __NR_unlink:
     CASES_FOR_fchown:
     case __NR_fchmod:
+    case __NR_flock:
 #endif
       return Allow();
 
-    case __NR_readlink:
     case __NR_readlinkat:
 #ifdef DESKTOP
       // Bug 1290896
@@ -637,7 +716,12 @@ public:
     CASES_FOR_getresgid:
       return Allow();
 
+    case __NR_umask:
     case __NR_kill:
+    case __NR_wait4:
+#ifdef __NR_waitpid
+    case __NR_waitpid:
+#endif
 #ifdef __NR_arch_prctl
     case __NR_arch_prctl:
 #endif
@@ -817,6 +901,7 @@ public:
     case __NR_madvise: {
       Arg<int> advice(2);
       return If(advice == MADV_DONTNEED, Allow())
+        .ElseIf(advice == MADV_FREE, Allow())
 #ifdef MOZ_ASAN
         .ElseIf(advice == MADV_NOHUGEPAGE, Allow())
         .ElseIf(advice == MADV_DONTDUMP, Allow())
@@ -835,6 +920,10 @@ public:
       return If(pid == 0, Allow())
         .Else(Trap(SchedTrap, nullptr));
     }
+
+    // For clock(3) on older glibcs; bug 1304220.
+    case __NR_times:
+      return Allow();
 
     default:
       return SandboxPolicyCommon::EvaluateSyscall(sysno);

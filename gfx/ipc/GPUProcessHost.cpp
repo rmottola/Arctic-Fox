@@ -13,6 +13,8 @@
 namespace mozilla {
 namespace gfx {
 
+using namespace ipc;
+
 GPUProcessHost::GPUProcessHost(Listener* aListener)
  : GeckoChildProcessHost(GeckoProcessType_GPU),
    mListener(aListener),
@@ -37,6 +39,8 @@ GPUProcessHost::Launch()
   MOZ_ASSERT(!mGPUChild);
 
   mLaunchPhase = LaunchPhase::Waiting;
+  mLaunchTime = TimeStamp::Now();
+
   if (!GeckoChildProcessHost::AsyncLaunch()) {
     mLaunchPhase = LaunchPhase::Complete;
     return false;
@@ -219,6 +223,12 @@ DelayedDeleteSubprocess(GeckoChildProcessHost* aSubprocess)
 {
   XRE_GetIOMessageLoop()->
     PostTask(mozilla::MakeAndAddRef<DeleteTask<GeckoChildProcessHost>>(aSubprocess));
+}
+
+void
+GPUProcessHost::KillProcess()
+{
+  KillHard("DiagnosticKill");
 }
 
 void

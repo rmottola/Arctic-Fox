@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-import errno
 import json
 import logging
 import mozpack.path as mozpath
@@ -16,8 +15,7 @@ import which
 
 from mach.mixin.logging import LoggingMixin
 from mach.mixin.process import ProcessExecutionMixin
-
-from mozfile.mozfile import remove as mozfileremove
+from mozversioncontrol import get_repository_object
 
 from .backend.configenvironment import ConfigEnvironment
 from .controller.clobber import Clobberer
@@ -284,59 +282,16 @@ class MozbuildObject(ProcessExecutionMixin):
                             env[key] = value
         return env
 
+    @memoized_property
+    def repository(self):
+        '''Get a `mozversioncontrol.Repository` object for the
+        top source directory.'''
+        return get_repository_object(self.topsrcdir)
+
     def is_clobber_needed(self):
         if not os.path.exists(self.topobjdir):
             return False
         return Clobberer(self.topsrcdir, self.topobjdir).clobber_needed()
-
-    def have_winrm(self):
-        # `winrm -h` should print 'winrm version ...' and exit 1
-        try:
-            p = subprocess.Popen(['winrm.exe', '-h'],
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT)
-            return p.wait() == 1 and p.stdout.read().startswith('winrm')
-        except:
-            return False
-
-    def remove_objdir(self, full=True):
-        """Remove the object directory.
-
-        ``full`` controls whether to fully delete the objdir. If False,
-        some directories (e.g. Visual Studio Project Files) will not be
-        deleted.
-        """
-        # Top-level files and directories to not clobber by default.
-        no_clobber = {
-            '.mozbuild',
-            'msvc',
-        }
-
-        if full:
-            # mozfile doesn't like unicode arguments (bug 818783).
-            paths = [self.topobjdir.encode('utf-8')]
-        else:
-            try:
-                paths = []
-                for p in os.listdir(self.topobjdir):
-                    if p not in no_clobber:
-                        paths.append(os.path.join(self.topobjdir, p).encode('utf-8'))
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
-                return
-
-        procs = []
-        for p in sorted(paths):
-            path = os.path.join(self.topobjdir, p)
-            if sys.platform.startswith('win') and self.have_winrm() and os.path.isdir(path):
-                procs.append(subprocess.Popen(['winrm', '-rf', path]))
-            else:
-                # We use mozfile because it is faster than shutil.rmtree().
-                mozfileremove(path)
-
-        for p in procs:
-            p.wait()
 
     def get_binary_path(self, what='app', validate_exists=True, where='default'):
         """Obtain the path to a compiled binary for this build configuration.
@@ -700,8 +655,14 @@ class MachCommandBase(MozbuildObject):
                 # that objdir, not another one. This prevents accidental usage
                 # of the wrong objdir when the current objdir is ambiguous.
                 config_topobjdir = dummy.resolve_mozconfig_topobjdir()
-                if config_topobjdir and not samepath(topobjdir,
-                                                     config_topobjdir):
+
+                try:
+                    universal_bin = dummy.substs.get('UNIVERSAL_BINARY')
+                except:
+                    universal_bin = False
+
+                if config_topobjdir and not (samepath(topobjdir, config_topobjdir) or
+                        universal_bin and topobjdir.startswith(config_topobjdir)):
                     raise ObjdirMismatchException(topobjdir, config_topobjdir)
         except BuildEnvironmentNotFoundException:
             pass

@@ -281,14 +281,6 @@ CSSAnimation::UpdateTiming(SeekFlag aSeekFlag, SyncNotifyFlag aSyncNotifyFlag)
   Animation::UpdateTiming(aSeekFlag, aSyncNotifyFlag);
 }
 
-TimeStamp
-CSSAnimation::ElapsedTimeToTimeStamp(const StickyTimeDuration&
-                                       aElapsedTime) const
-{
-  return AnimationTimeToTimeStamp(aElapsedTime +
-                                  mEffect->SpecifiedTiming().mDelay);
-}
-
 ////////////////////////// nsAnimationManager ////////////////////////////
 
 NS_IMPL_CYCLE_COLLECTION(nsAnimationManager, mEventDispatcher)
@@ -415,13 +407,7 @@ nsAnimationManager::UpdateAnimations(nsStyleContext* aStyleContext,
     return;
   }
 
-  if (collection) {
-    EffectSet* effectSet =
-      EffectSet::GetEffectSet(aElement, aStyleContext->GetPseudoType());
-    if (effectSet) {
-      effectSet->UpdateAnimationGeneration(mPresContext);
-    }
-  } else {
+  if (!collection) {
     bool createdCollection = false;
     collection =
       CSSAnimationCollection::GetOrCreateAnimationCollection(
@@ -442,12 +428,6 @@ nsAnimationManager::UpdateAnimations(nsStyleContext* aStyleContext,
   for (size_t newAnimIdx = newAnimations.Length(); newAnimIdx-- != 0; ) {
     newAnimations[newAnimIdx]->CancelFromStyle();
   }
-
-  mPresContext->EffectCompositor()->
-    MaybeUpdateAnimationRule(aElement,
-                             aStyleContext->GetPseudoType(),
-                             EffectCompositor::CascadeLevel::Animations,
-                             aStyleContext);
 
   // We don't actually dispatch the pending events now.  We'll either
   // dispatch them the next time we get a refresh driver notification

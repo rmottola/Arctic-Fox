@@ -11,6 +11,7 @@
 #include "mozilla/ArenaRefPtr.h"
 #include "mozilla/ArenaRefPtrInlines.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/StyleComplexColor.h"
 #include "nsCOMPtr.h"
 #include "nscore.h"
 #include "nsCSSProps.h"
@@ -104,8 +105,8 @@ public:
   // nsDOMCSSDeclaration abstract methods which should never be called
   // on a nsComputedDOMStyle object, but must be defined to avoid
   // compile errors.
-  virtual mozilla::css::Declaration* GetCSSDeclaration(Operation) override;
-  virtual nsresult SetCSSDeclaration(mozilla::css::Declaration*) override;
+  virtual mozilla::DeclarationBlock* GetCSSDeclaration(Operation) override;
+  virtual nsresult SetCSSDeclaration(mozilla::DeclarationBlock*) override;
   virtual nsIDocument* DocToUpdate() override;
   virtual void GetCSSParsingEnvironment(CSSParsingEnvironment& aCSSParseEnv) override;
 
@@ -583,14 +584,16 @@ private:
 
   /* Helper functions */
   void SetToRGBAColor(nsROCSSPrimitiveValue* aValue, nscolor aColor);
+  void SetValueFromComplexColor(nsROCSSPrimitiveValue* aValue,
+                                const mozilla::StyleComplexColor& aColor);
   void SetValueToStyleImage(const nsStyleImage& aStyleImage,
                             nsROCSSPrimitiveValue* aValue);
   void SetValueToPositionCoord(const mozilla::Position::Coord& aCoord,
                                nsROCSSPrimitiveValue* aValue);
   void SetValueToPosition(const mozilla::Position& aPosition,
                           nsDOMCSSValueList* aValueList);
-  void SetValueToFragmentOrURL(const mozilla::FragmentOrURL* aFragmentOrURL,
-                               nsROCSSPrimitiveValue* aValue);
+  void SetValueToURLValue(const mozilla::css::URLValueData* aURL,
+                          nsROCSSPrimitiveValue* aValue);
 
   /**
    * A method to get a percentage base for a percentage value.  Returns true

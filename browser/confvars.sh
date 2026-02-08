@@ -71,6 +71,7 @@ if test "$OS_TARGET" = "WINNT" -o "$OS_TARGET" = "Darwin"; then
 fi
 MOZ_JSDOWNLOADS=1
 MOZ_RUST_MP4PARSE=1
+MOZ_RUST_URLPARSE=1
 
 # Include the DevTools client, not just the server (which is the default)
 MOZ_DEVTOOLS=all

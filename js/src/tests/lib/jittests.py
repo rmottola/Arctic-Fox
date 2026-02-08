@@ -114,10 +114,13 @@ class JitTest:
         self.tz_pacific = False # True means force Pacific time for the test
         self.test_also_noasmjs = False # True means run with and without asm.js
                                        # enabled.
+        self.test_also_wasm_baseline = False # True means run with and and without
+                                       # wasm baseline compiler enabled.
         self.test_also = [] # List of other configurations to test with.
         self.test_join = [] # List of other configurations to test with all existing variants.
         self.expect_error = '' # Errors to expect and consider passing
         self.expect_status = 0 # Exit status to expect from shell
+        self.expect_crash = False # Exit status or error output.
         self.is_module = False
         self.test_reflect_stringify = None  # Reflect.stringify implementation to test
 
@@ -134,10 +137,12 @@ class JitTest:
         t.valgrind = self.valgrind
         t.tz_pacific = self.tz_pacific
         t.test_also_noasmjs = self.test_also_noasmjs
+        t.test_also_wasm_baseline = self.test_also_noasmjs
         t.test_also = self.test_also
         t.test_join = self.test_join
         t.expect_error = self.expect_error
         t.expect_status = self.expect_status
+        t.expect_crash = self.expect_crash
         t.test_reflect_stringify = self.test_reflect_stringify
         t.enable = True
         t.is_module = self.is_module
@@ -164,15 +169,40 @@ class JitTest:
 
     COOKIE = '|jit-test|'
     CacheDir = JS_CACHE_DIR
+    Directives = {}
+
+    @classmethod
+    def find_directives(cls, file_name):
+        meta = ''
+        line = open(file_name).readline()
+        i = line.find(cls.COOKIE)
+        if i != -1:
+            meta = ';' + line[i + len(cls.COOKIE):].strip('\n')
+        return meta
 
     @classmethod
     def from_file(cls, path, options):
         test = cls(path)
 
-        line = open(path).readline()
-        i = line.find(cls.COOKIE)
-        if i != -1:
-            meta = line[i + len(cls.COOKIE):].strip('\n')
+        # If directives.txt exists in the test's directory then it may
+        # contain metainformation that will be catenated with
+        # whatever's in the test file.  The form of the directive in
+        # the directive file is the same as in the test file.  Only
+        # the first line is considered, just as for the test file.
+
+        dir_meta = ''
+        dir_name = os.path.dirname(path)
+        if dir_name in cls.Directives:
+            dir_meta = cls.Directives[dir_name]
+        else:
+            meta_file_name = os.path.join(dir_name, "directives.txt")
+            if os.path.exists(meta_file_name):
+                dir_meta = cls.find_directives(meta_file_name)
+            cls.Directives[dir_name] = dir_meta
+
+        meta = cls.find_directives(path)
+        if meta != '' or dir_meta != '':
+            meta = meta + dir_meta
             parts = meta.split(';')
             for part in parts:
                 part = part.strip()
@@ -213,14 +243,22 @@ class JitTest:
                     elif name == 'tz-pacific':
                         test.tz_pacific = True
                     elif name == 'test-also-noasmjs':
-                        if options.can_test_also_noasmjs:
+                        if options.asmjs_enabled:
                             test.test_also.append(['--no-asmjs'])
+                    elif name == 'test-also-wasm-baseline':
+                        if options.wasm_enabled:
+                            test.test_also.append(['--wasm-always-baseline'])
+                    elif name == 'test-also-wasm-check-bce':
+                        if options.wasm_enabled:
+                            test.test_also.append(['--wasm-check-bce'])
                     elif name.startswith('test-also='):
                         test.test_also.append([name[len('test-also='):]])
                     elif name.startswith('test-join='):
                         test.test_join.append([name[len('test-join='):]])
                     elif name == 'module':
                         test.is_module = True
+                    elif name == 'crash':
+                        test.expect_crash = True
                     elif name.startswith('--'):
                         # // |jit-test| --ion-gvn=off; --no-sse4
                         test.jitflags.append(name)
@@ -291,7 +329,7 @@ def find_tests(substring=None):
         for filename in filenames:
             if not filename.endswith('.js'):
                 continue
-            if filename in ('shell.js', 'browser.js', 'jsref.js'):
+            if filename in ('shell.js', 'browser.js'):
                 continue
             test = os.path.join(dirpath, filename)
             if substring is None \
@@ -359,6 +397,19 @@ def check_output(out, err, rc, timed_out, test, options):
     for line in err.split('\n'):
         if 'Assertion failed:' in line:
             return False
+
+    if test.expect_crash:
+        if sys.platform == 'win32' and rc == 3 - 2 ** 31:
+            return True
+
+        if sys.platform != 'win32' and rc == -11:
+            return True
+
+        # When building with ASan enabled, ASan will convert the -11 returned
+        # value to 1. As a work-around we look for the error output which
+        # includes the crash reason.
+        if rc == 1 and ("Hit MOZ_CRASH" in err or "Assertion failure:" in err):
+            return True
 
     if rc != test.expect_status:
         # Tests which expect a timeout check for exit code 6.
@@ -487,6 +538,7 @@ def process_test_results(results, num_tests, pb, options):
     failures = []
     timeouts = 0
     complete = False
+    output_dict = {}
     doing = 'before starting'
 
     if num_tests == 0:
@@ -513,6 +565,13 @@ def process_test_results(results, num_tests, pb, options):
             if res.test.valgrind and not show_output:
                 pb.beginline()
                 sys.stdout.write(res.err)
+
+            if options.check_output:
+                if res.test.path in output_dict.keys():
+                    if output_dict[res.test.path] != res.out:
+                        pb.message("FAIL - OUTPUT DIFFERS {}".format(res.test.relpath_tests))
+                else:
+                    output_dict[res.test.path] = res.out
 
             doing = 'after {}'.format(res.test.relpath_tests)
             if not ok:
@@ -541,20 +600,20 @@ def process_test_results(results, num_tests, pb, options):
     pb.finish(True)
     return print_test_summary(num_tests, failures, complete, doing, options)
 
-def run_tests(tests, prefix, options):
+def run_tests(tests, num_tests, prefix, options):
     # The jstests tasks runner requires the following options. The names are
     # taken from the jstests options processing code, which are frequently
     # subtly different from the options jit-tests expects. As such, we wrap
     # them here, as needed.
-    AdaptorOptions = namedtuple("AdaptorOptions", ["worker_count",
-        "passthrough", "timeout", "output_fp", "hide_progress", "run_skipped"])
+    AdaptorOptions = namedtuple("AdaptorOptions", [
+        "worker_count", "passthrough", "timeout", "output_fp",
+        "hide_progress", "run_skipped", "show_cmd"])
     shim_options = AdaptorOptions(options.max_jobs, False, options.timeout,
-                                  sys.stdout, False, True)
+                                  sys.stdout, False, True, options.show_cmd)
 
     # The test runner wants the prefix as a static on the Test class.
     JitTest.js_cmd_prefix = prefix
 
-    num_tests = len(tests) * options.repeat
     pb = create_progressbar(num_tests, options)
     gen = run_all_tests(tests, prefix, pb, shim_options)
     ok = process_test_results(gen, num_tests, pb, options)
@@ -590,7 +649,7 @@ def push_progs(options, device, progs):
                                      os.path.basename(local_file))
         device.pushFile(local_file, remote_file)
 
-def run_tests_remote(tests, prefix, options):
+def run_tests_remote(tests, num_tests, prefix, options):
     # Setup device with everything needed to run our tests.
     from mozdevice import devicemanagerADB, devicemanagerSUT
 
@@ -638,7 +697,6 @@ def run_tests_remote(tests, prefix, options):
     prefix[0] = os.path.join(options.remote_test_root, 'js')
 
     # Run all tests.
-    num_tests = len(tests) * options.repeat
     pb = create_progressbar(num_tests, options)
     gen = get_remote_results(tests, dm, prefix, options)
     ok = process_test_results(gen, num_tests, pb, options)

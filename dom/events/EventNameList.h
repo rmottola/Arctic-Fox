@@ -499,6 +499,14 @@ FORWARDED_EVENT(focus,
                 eFocus,
                 EventNameType_HTMLXUL,
                 eFocusEventClass)
+FORWARDED_EVENT(focusin,
+                eFocusIn,
+                EventNameType_HTMLXUL,
+                eFocusEventClass)
+FORWARDED_EVENT(focusout,
+                eFocusOut,
+                EventNameType_HTMLXUL,
+                eFocusEventClass)
 FORWARDED_EVENT(load,
                 eLoad,
                 EventNameType_All,
@@ -616,8 +624,8 @@ WINDOW_ONLY_EVENT(vrdisplaypresentchange,
                   EventNameType_None,
                   eBasicEventClass)
 // Install events as per W3C Manifest spec
-WINDOW_ONLY_EVENT(install,
-                  eInstall,
+WINDOW_ONLY_EVENT(appinstalled,
+                  eAppInstalled,
                   EventNameType_None,
                   eBasicEventClass)
 
@@ -740,11 +748,6 @@ NON_IDL_EVENT(stop,
 
 NON_IDL_EVENT(warning,
               eMediaRecorderWarning,
-              EventNameType_None,
-              eBasicEventClass)
-
-NON_IDL_EVENT(speakerforcedchange,
-              eSpeakerForcedChange,
               EventNameType_None,
               eBasicEventClass)
 
@@ -975,6 +978,14 @@ NON_IDL_EVENT(MozEdgeUICompleted,
               eSimpleGestureEventClass)
 
 // CSS Transition & Animation events:
+EVENT(transitionstart,
+      eTransitionStart,
+      EventNameType_All,
+      eTransitionEventClass)
+EVENT(transitionrun,
+      eTransitionRun,
+      EventNameType_All,
+      eTransitionEventClass)
 EVENT(transitionend,
       eTransitionEnd,
       EventNameType_All,

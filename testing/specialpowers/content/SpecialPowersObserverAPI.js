@@ -324,10 +324,10 @@ SpecialPowersObserverAPI.prototype = {
           case "BOOL":
             if (aMessage.json.op == "get")
               return(prefs.getBoolPref(prefName));
-            else 
+            else
               return(prefs.setBoolPref(prefName, prefValue));
           case "INT":
-            if (aMessage.json.op == "get") 
+            if (aMessage.json.op == "get")
               return(prefs.getIntPref(prefName));
             else
               return(prefs.setIntPref(prefName, prefValue));
@@ -400,57 +400,6 @@ SpecialPowersObserverAPI.prototype = {
         var oldEnabledState = plugin.enabledState;
         plugin.enabledState = aMessage.data.newEnabledState;
         return oldEnabledState;
-      }
-
-      case "SPWebAppService": {
-        let Webapps = {};
-        Components.utils.import("resource://gre/modules/Webapps.jsm", Webapps);
-        switch (aMessage.json.op) {
-          case "allow-unsigned-addons":
-            {
-              let utils = {};
-              Components.utils.import("resource://gre/modules/AppsUtils.jsm", utils);
-              utils.AppsUtils.allowUnsignedAddons = true;
-              return;
-            }
-          case "debug-customizations":
-            {
-              let scope = {};
-              Components.utils.import("resource://gre/modules/UserCustomizations.jsm", scope);
-              scope.UserCustomizations._debug = aMessage.json.value;
-              return;
-            }
-          case "inject-app":
-            {
-              let aAppId = aMessage.json.appId;
-              let aApp   = aMessage.json.app;
-
-              let keys = Object.keys(Webapps.DOMApplicationRegistry.webapps);
-              let exists = keys.indexOf(aAppId) !== -1;
-              if (exists) {
-                return false;
-              }
-
-              Webapps.DOMApplicationRegistry.webapps[aAppId] = aApp;
-              return true;
-            }
-          case "reject-app":
-            {
-              let aAppId = aMessage.json.appId;
-
-              let keys = Object.keys(Webapps.DOMApplicationRegistry.webapps);
-              let exists = keys.indexOf(aAppId) !== -1;
-              if (!exists) {
-                return false;
-              }
-
-              delete Webapps.DOMApplicationRegistry.webapps[aAppId];
-              return true;
-            }
-          default:
-            throw new SpecialPowersError("Invalid operation for SPWebAppsService");
-        }
-        return undefined;	// See comment at the beginning of this function.
       }
 
       case "SPObserverService": {
@@ -563,6 +512,7 @@ SpecialPowersObserverAPI.prototype = {
         let sss = Cc["@mozilla.org/ssservice;1"].
                   getService(Ci.nsISiteSecurityService);
         sss.removeState(Ci.nsISiteSecurityService.HEADER_HSTS, uri, flags);
+        return undefined;
       }
 
       case "SPLoadExtension": {
@@ -652,7 +602,7 @@ SpecialPowersObserverAPI.prototype = {
           attributes.inIsolatedMozBrowser = true;
         }
         this._notifyCategoryAndObservers(null,
-                                         "clear-origin-data",
+                                         "clear-origin-attributes-data",
                                          JSON.stringify(attributes));
 
         let subject = {

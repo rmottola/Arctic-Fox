@@ -367,7 +367,7 @@ XRE_InitChildProcess(int aArgc,
 #endif
 
   // NB: This must be called before profiler_init
-  NS_LogInit();
+  ScopedLogging logger;
 
   // This is needed by Telemetry to initialize histogram collection.
   // NB: This must be called after NS_LogInit().
@@ -380,7 +380,7 @@ XRE_InitChildProcess(int aArgc,
   mozilla::LogModule::Init();
 
   char aLocal;
-  profiler_init(&aLocal);
+  GeckoProfilerInitRAII profiler(&aLocal);
 
   PROFILER_LABEL("Startup", "XRE_InitChildProcess",
     js::ProfileEntry::Category::OTHER);
@@ -559,8 +559,6 @@ XRE_InitChildProcess(int aArgc,
 
   nsresult rv = XRE_InitCommandLine(aArgc, aArgv);
   if (NS_FAILED(rv)) {
-    profiler_shutdown();
-    NS_LogTerm();
     return NS_ERROR_FAILURE;
   }
 
@@ -606,13 +604,44 @@ XRE_InitChildProcess(int aArgc,
       case GeckoProcessType_Content: {
           process = new ContentProcess(parentPID);
           // If passed in grab the application path for xpcom init
-          nsCString appDir;
+          bool foundAppdir = false;
+
+#if defined(XP_MACOSX) && defined(MOZ_CONTENT_SANDBOX)
+          // If passed in grab the profile path for sandboxing
+          bool foundProfile = false;
+#endif
+
           for (int idx = aArgc; idx > 0; idx--) {
             if (aArgv[idx] && !strcmp(aArgv[idx], "-appdir")) {
+              MOZ_ASSERT(!foundAppdir);
+              if (foundAppdir) {
+                  continue;
+              }
+              nsCString appDir;
               appDir.Assign(nsDependentCString(aArgv[idx+1]));
               static_cast<ContentProcess*>(process.get())->SetAppDir(appDir);
+              foundAppdir = true;
+            }
+
+#if defined(XP_MACOSX) && defined(MOZ_CONTENT_SANDBOX)
+            if (aArgv[idx] && !strcmp(aArgv[idx], "-profile")) {
+              MOZ_ASSERT(!foundProfile);
+              if (foundProfile) {
+                continue;
+              }
+              nsCString profile;
+              profile.Assign(nsDependentCString(aArgv[idx+1]));
+              static_cast<ContentProcess*>(process.get())->SetProfile(profile);
+              foundProfile = true;
+            }
+            if (foundProfile && foundAppdir) {
               break;
             }
+#else
+            if (foundAppdir) {
+              break;
+            }
+#endif /* XP_MACOSX && MOZ_CONTENT_SANDBOX */
           }
         }
         break;
@@ -638,8 +667,6 @@ XRE_InitChildProcess(int aArgc,
       }
 
       if (!process->Init()) {
-        profiler_shutdown();
-        NS_LogTerm();
         return NS_ERROR_FAILURE;
       }
 
@@ -686,8 +713,6 @@ XRE_InitChildProcess(int aArgc,
   }
 
   Telemetry::DestroyStatisticsRecorder();
-  profiler_shutdown();
-  NS_LogTerm();
   return XRE_DeinitCommandLine();
 }
 

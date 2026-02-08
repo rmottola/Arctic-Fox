@@ -1128,6 +1128,19 @@ NS_IMETHODIMP CacheEntry::SetExpirationTime(uint32_t aExpirationTime)
 NS_IMETHODIMP CacheEntry::OpenInputStream(int64_t offset, nsIInputStream * *_retval)
 {
   LOG(("CacheEntry::OpenInputStream [this=%p]", this));
+  return OpenInputStreamInternal(offset, nullptr, _retval);
+}
+
+NS_IMETHODIMP CacheEntry::OpenAlternativeInputStream(const nsACString & type, nsIInputStream * *_retval)
+{
+  LOG(("CacheEntry::OpenAlternativeInputStream [this=%p, type=%s]", this,
+       PromiseFlatCString(type).get()));
+  return OpenInputStreamInternal(0, PromiseFlatCString(type).get(), _retval);
+}
+
+nsresult CacheEntry::OpenInputStreamInternal(int64_t offset, const char *aAltDataType, nsIInputStream * *_retval)
+{
+  LOG(("CacheEntry::OpenInputStreamInternal [this=%p]", this));
 
   NS_ENSURE_SUCCESS(mFileStatus, NS_ERROR_NOT_AVAILABLE);
 
@@ -1136,7 +1149,12 @@ NS_IMETHODIMP CacheEntry::OpenInputStream(int64_t offset, nsIInputStream * *_ret
   RefPtr<CacheEntryHandle> selfHandle = NewHandle();
 
   nsCOMPtr<nsIInputStream> stream;
-  rv = mFile->OpenInputStream(selfHandle, getter_AddRefs(stream));
+  if (aAltDataType) {
+    rv = mFile->OpenAlternativeInputStream(selfHandle, aAltDataType,
+                                           getter_AddRefs(stream));
+  } else {
+    rv = mFile->OpenInputStream(selfHandle, getter_AddRefs(stream));
+  }
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr<nsISeekableStream> seekable =
@@ -1185,6 +1203,30 @@ NS_IMETHODIMP CacheEntry::OpenOutputStream(int64_t offset, nsIOutputStream * *_r
   // Invoke any pending readers now.
   InvokeCallbacks();
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP CacheEntry::OpenAlternativeOutputStream(const nsACString & type, nsIOutputStream * *_retval)
+{
+  LOG(("CacheEntry::OpenAlternativeOutputStream [this=%p, type=%s]", this,
+       PromiseFlatCString(type).get()));
+
+  nsresult rv;
+
+  mozilla::MutexAutoLock lock(mLock);
+
+  if (!mHasData || mState < READY || mOutputStream || mIsDoomed) {
+    LOG(("  entry not in state to write alt-data"));
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  nsCOMPtr<nsIOutputStream> stream;
+  rv = mFile->OpenAlternativeOutputStream(nullptr,
+                                          PromiseFlatCString(type).get(),
+                                          getter_AddRefs(stream));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  stream.swap(*_retval);
   return NS_OK;
 }
 
@@ -1486,6 +1528,15 @@ NS_IMETHODIMP CacheEntry::Close()
 {
   // NOT IMPLEMENTED ACTUALLY
   return NS_OK;
+}
+
+NS_IMETHODIMP CacheEntry::GetDiskStorageSizeInKB(uint32_t *aDiskStorageSize)
+{
+  if (NS_FAILED(mFileStatus)) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  return mFile->GetDiskStorageSizeInKB(aDiskStorageSize);
 }
 
 // nsIRunnable
@@ -1823,7 +1874,6 @@ NS_IMETHODIMP CacheOutputCloseListener::Run()
 size_t CacheEntry::SizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const
 {
   size_t n = 0;
-  nsCOMPtr<nsISizeOf> sizeOf;
 
   n += mCallbacks.ShallowSizeOfExcludingThis(mallocSizeOf);
   if (mFile) {

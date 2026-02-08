@@ -12,16 +12,19 @@ const {
 const ReactDOM = require("devtools/client/shared/vendor/react-dom");
 const { connect } = require("devtools/client/shared/vendor/react-redux");
 
-const { getAllMessages, getAllMessagesUiById } = require("devtools/client/webconsole/new-console-output/selectors/messages");
+const { getAllMessages, getAllMessagesUiById, getAllMessagesTableDataById } = require("devtools/client/webconsole/new-console-output/selectors/messages");
 const MessageContainer = createFactory(require("devtools/client/webconsole/new-console-output/components/message-container").MessageContainer);
 
 const ConsoleOutput = createClass({
 
   propTypes: {
-    jsterm: PropTypes.object.isRequired,
+    hudProxyClient: PropTypes.object.isRequired,
     messages: PropTypes.object.isRequired,
+    messagesUi: PropTypes.object.isRequired,
     sourceMapService: PropTypes.object,
     onViewSourceInDebugger: PropTypes.func.isRequired,
+    openNetworkPanel: PropTypes.func.isRequired,
+    openLink: PropTypes.func.isRequired,
   },
 
   displayName: "ConsoleOutput",
@@ -43,21 +46,29 @@ const ConsoleOutput = createClass({
   render() {
     let {
       dispatch,
+      hudProxyClient,
       messages,
       messagesUi,
+      messagesTableData,
       sourceMapService,
-      onViewSourceInDebugger
+      onViewSourceInDebugger,
+      openNetworkPanel,
+      openLink,
     } = this.props;
 
-    let messageNodes = messages.map(function (message) {
+    let messageNodes = messages.map((message) => {
       return (
         MessageContainer({
           dispatch,
+          hudProxyClient,
           message,
           key: message.id,
           sourceMapService,
           onViewSourceInDebugger,
-          open: messagesUi.includes(message.id)
+          openNetworkPanel,
+          openLink,
+          open: messagesUi.includes(message.id),
+          tableData: messagesTableData.get(message.id),
         })
       );
     });
@@ -77,7 +88,8 @@ function isScrolledToBottom(outputNode, scrollNode) {
 function mapStateToProps(state) {
   return {
     messages: getAllMessages(state),
-    messagesUi: getAllMessagesUiById(state)
+    messagesUi: getAllMessagesUiById(state),
+    messagesTableData: getAllMessagesTableDataById(state),
   };
 }
 

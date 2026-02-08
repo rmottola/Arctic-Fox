@@ -20,11 +20,14 @@ class TabParent;
 namespace layers {
 
 /**
- * RemoteContentController uses the PAPZ protocol to implement a
- * GeckoContentController for a browser living in a remote process.
- * Most of the member functions can be called on any thread, exceptions are
- * annotated in comments. The PAPZ protocol runs on the main thread (so all the
- * Recv* member functions do too).
+ * RemoteContentController implements PAPZChild and is used to access a
+ * GeckoContentController that lives in a different process.
+ *
+ * RemoteContentController lives on the compositor thread. All methods can
+ * be called off the compositor thread and will get dispatched to the right
+ * thread, with the exception of RequestContentRepaint and NotifyFlushComplete,
+ * which must be called on the repaint thread, which in this case is the compositor
+ * thread.
  */
 class RemoteContentController : public GeckoContentController
                               , public PAPZParent
@@ -45,13 +48,16 @@ public:
                          const ScrollableLayerGuid& aGuid,
                          uint64_t aInputBlockId) override;
 
+  virtual void NotifyPinchGesture(PinchGestureInput::PinchGestureType aType,
+                                  const ScrollableLayerGuid& aGuid,
+                                  LayoutDeviceCoord aSpanChange,
+                                  Modifiers aModifiers) override;
+
   virtual void PostDelayedTask(already_AddRefed<Runnable> aTask, int aDelayMs) override;
 
   virtual bool IsRepaintThread() override;
 
   virtual void DispatchToRepaintThread(already_AddRefed<Runnable> aTask) override;
-
-  virtual bool GetTouchSensitiveRegion(CSSRect* aOutRegion) override;
 
   virtual void NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                                     APZStateChange aChange,
@@ -68,8 +74,6 @@ public:
 
   virtual void NotifyFlushComplete() override;
 
-  virtual bool RecvUpdateHitRegion(const nsRegion& aRegion) override;
-
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 
   virtual void Destroy() override;
@@ -78,9 +82,6 @@ private:
   MessageLoop* mCompositorThread;
   bool mCanSend;
 
-  // Mutex protecting members below accessed from multiple threads.
-  mozilla::Mutex mMutex;
-  nsRegion mTouchSensitiveRegion;
 };
 
 } // namespace layers

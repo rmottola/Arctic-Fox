@@ -22,8 +22,8 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
-  RELEASE_BUILD:
-#ifdef RELEASE_BUILD
+  RELEASE_OR_BETA:
+#ifdef RELEASE_OR_BETA
   true,
 #else
   false,
@@ -130,6 +130,13 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
+  MOZ_WIDGET_GTK:
+#ifdef MOZ_WIDGET_GTK
+  true,
+#else
+  false,
+#endif
+
 # MOZ_B2G covers both device and desktop b2g
   MOZ_B2G:
 #ifdef MOZ_B2G
@@ -206,6 +213,13 @@ this.AppConstants = Object.freeze({
 
   DEBUG:
 #ifdef DEBUG
+  true,
+#else
+  false,
+#endif
+
+  ASAN:
+#ifdef MOZ_ASAN
   true,
 #else
   false,
@@ -308,6 +322,13 @@ this.AppConstants = Object.freeze({
 
   HAVE_USR_LIB64_DIR:
 #ifdef HAVE_USR_LIB64_DIR
+    true,
+#else
+    false,
+#endif
+
+  HAVE_SHELL_SERVICE:
+#ifdef HAVE_SHELL_SERVICE
     true,
 #else
     false,

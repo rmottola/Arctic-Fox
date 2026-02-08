@@ -54,6 +54,7 @@
 #include "mozilla/BinarySearch.h"
 #include "nsIHttpHeaderVisitor.h"
 #include "nsIXULRuntime.h"
+#include "nsICacheInfoChannel.h"
 
 #include <algorithm>
 
@@ -107,6 +108,7 @@ HttpBaseChannel::HttpBaseChannel()
   , mFetchCacheMode(nsIHttpChannelInternal::FETCH_CACHE_MODE_DEFAULT)
   , mOnStartRequestCalled(false)
   , mOnStopRequestCalled(false)
+  , mAfterOnStartRequestBegun(false)
   , mTransferSize(0)
   , mDecodedBodySize(0)
   , mEncodedBodySize(0)
@@ -924,6 +926,11 @@ HttpBaseChannel::DoApplyContentConversions(nsIStreamListener* aNextListener,
     return NS_OK;
   }
 
+  if (!mAvailableCachedAltDataType.IsEmpty()) {
+    LOG(("not applying conversion because delivering alt-data\n"));
+    return NS_OK;
+  }
+
   nsAutoCString contentEncoding;
   nsresult rv = mResponseHead->GetHeader(nsHttp::Content_Encoding, contentEncoding);
   if (NS_FAILED(rv) || contentEncoding.IsEmpty())
@@ -1281,7 +1288,7 @@ HttpBaseChannel::SetReferrerWithPolicy(nsIURI *referrer,
   if(NS_FAILED(rv)) {
     return rv;
   }
-  mReferrerPolicy = REFERRER_POLICY_NO_REFERRER_WHEN_DOWNGRADE;
+  mReferrerPolicy = referrerPolicy;
 
   if (!referrer) {
     return NS_OK;
@@ -1289,7 +1296,6 @@ HttpBaseChannel::SetReferrerWithPolicy(nsIURI *referrer,
 
   // Don't send referrer at all when the meta referrer setting is "no-referrer"
   if (referrerPolicy == REFERRER_POLICY_NO_REFERRER) {
-    mReferrerPolicy = REFERRER_POLICY_NO_REFERRER;
     return NS_OK;
   }
 
@@ -1401,22 +1407,6 @@ HttpBaseChannel::SetReferrerWithPolicy(nsIURI *referrer,
 
       // in other referrer policies, https->http is not allowed...
       if (!match) return NS_OK;
-
-      // ...and https->https is possibly only allowed if the hosts match.
-      if (!gHttpHandler->SendSecureXSiteReferrer()) {
-        nsAutoCString referrerHost;
-        nsAutoCString host;
-
-        rv = referrer->GetAsciiHost(referrerHost);
-        if (NS_FAILED(rv)) return rv;
-
-        rv = mURI->GetAsciiHost(host);
-        if (NS_FAILED(rv)) return rv;
-
-        // GetAsciiHost returns lowercase hostname.
-        if (!referrerHost.Equals(host))
-          return NS_OK;
-      }
     }
   }
 
@@ -1443,6 +1433,12 @@ HttpBaseChannel::SetReferrerWithPolicy(nsIURI *referrer,
     isCrossOrigin = NS_FAILED(rv);
   } else {
     LOG(("no triggering principal available via loadInfo, assuming load is cross-origin"));
+  }
+
+  // Don't send referrer when the request is cross-origin and policy is "same-origin".
+  if (isCrossOrigin && referrerPolicy == REFERRER_POLICY_SAME_ORIGIN) {
+    mReferrerPolicy = REFERRER_POLICY_SAME_ORIGIN;
+    return NS_OK;
   }
 
   nsCOMPtr<nsIURI> clone;
@@ -1504,13 +1500,27 @@ HttpBaseChannel::SetReferrerWithPolicy(nsIURI *referrer,
 
   nsAutoCString spec;
 
+  // Apply the user cross-origin trimming policy if it's more
+  // restrictive than the general one.
+  if (isCrossOrigin) {
+    int userReferrerXOriginTrimmingPolicy =
+      gHttpHandler->ReferrerXOriginTrimmingPolicy();
+    userReferrerTrimmingPolicy =
+      std::max(userReferrerTrimmingPolicy, userReferrerXOriginTrimmingPolicy);
+  }
+
   // site-specified referrer trimming may affect the trim level
   // "unsafe-url" behaves like "origin" (send referrer in the same situations) but
   // "unsafe-url" sends the whole referrer and origin removes the path.
   // "origin-when-cross-origin" trims the referrer only when the request is
   // cross-origin.
+  // "Strict" request from https->http case was bailed out, so here:
+  // "strict-origin" behaves the same as "origin".
+  // "strict-origin-when-cross-origin" behaves the same as "origin-when-cross-origin"
   if (referrerPolicy == REFERRER_POLICY_ORIGIN ||
-      (isCrossOrigin && referrerPolicy == REFERRER_POLICY_ORIGIN_WHEN_XORIGIN)) {
+      referrerPolicy == REFERRER_POLICY_STRICT_ORIGIN ||
+      (isCrossOrigin && (referrerPolicy == REFERRER_POLICY_ORIGIN_WHEN_XORIGIN ||
+                         referrerPolicy == REFERRER_POLICY_STRICT_ORIGIN_WHEN_XORIGIN))) {
     userReferrerTrimmingPolicy = 2;
   }
 
@@ -1567,7 +1577,6 @@ HttpBaseChannel::SetReferrerWithPolicy(nsIURI *referrer,
   if (NS_FAILED(rv)) return rv;
 
   mReferrer = clone;
-  mReferrerPolicy = referrerPolicy;
   return NS_OK;
 }
 
@@ -2022,34 +2031,18 @@ HttpBaseChannel::GetResponseVersion(uint32_t *major, uint32_t *minor)
   return NS_OK;
 }
 
-namespace {
-
-class CookieNotifierRunnable : public Runnable
+void
+HttpBaseChannel::NotifySetCookie(char const *aCookie)
 {
-public:
-  CookieNotifierRunnable(HttpBaseChannel* aChannel, char const * aCookie)
-    : mChannel(aChannel)
-  {
-    CopyASCIItoUTF16(aCookie, mCookie);
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  if (obs) {
+    nsAutoString cookie;
+    CopyASCIItoUTF16(aCookie, cookie);
+    obs->NotifyObservers(static_cast<nsIChannel*>(this),
+                         "http-on-response-set-cookie",
+                         cookie.get());
   }
-
-  NS_IMETHOD Run() override
-  {
-    nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-    if (obs) {
-      obs->NotifyObservers(static_cast<nsIChannel*>(mChannel.get()),
-                           "http-on-response-set-cookie",
-                           mCookie.get());
-    }
-    return NS_OK;
-  }
-
-private:
-  RefPtr<HttpBaseChannel> mChannel;
-  nsString mCookie;
-};
-
-} // namespace
+}
 
 NS_IMETHODIMP
 HttpBaseChannel::SetCookie(const char *aCookieHeader)
@@ -2070,9 +2063,7 @@ HttpBaseChannel::SetCookie(const char *aCookieHeader)
     cs->SetCookieStringFromHttp(mURI, nullptr, nullptr, aCookieHeader,
                                 date.get(), this);
   if (NS_SUCCEEDED(rv)) {
-    RefPtr<CookieNotifierRunnable> r =
-      new CookieNotifierRunnable(this, aCookieHeader);
-    NS_DispatchToMainThread(r);
+    NotifySetCookie(aCookieHeader);
   }
   return rv;
 }
@@ -2661,18 +2652,33 @@ HttpBaseChannel::ShouldIntercept(nsIURI* aURI)
   return shouldIntercept;
 }
 
-void HttpBaseChannel::CheckPrivateBrowsing()
+#ifdef DEBUG
+void HttpBaseChannel::AssertPrivateBrowsingId()
 {
   nsCOMPtr<nsILoadContext> loadContext;
   NS_QueryNotificationCallbacks(this, loadContext);
   // For addons it's possible that mLoadInfo is null.
-  if (mLoadInfo && loadContext) {
-      DocShellOriginAttributes docShellAttrs;
-      loadContext->GetOriginAttributes(docShellAttrs);
-      MOZ_ASSERT(mLoadInfo->GetOriginAttributes().mPrivateBrowsingId == docShellAttrs.mPrivateBrowsingId,
-                 "PrivateBrowsingId values are not the same between LoadInfo and LoadContext.");
+  if (!mLoadInfo) {
+    return;
   }
+
+  if (!loadContext) {
+    return;
+  }
+
+  // We skip testing of favicon loading here since it could be triggered by XUL image
+  // which uses SystemPrincipal. The SystemPrincpal doesn't have mPrivateBrowsingId.
+  if (nsContentUtils::IsSystemPrincipal(mLoadInfo->LoadingPrincipal()) &&
+      mLoadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_INTERNAL_IMAGE_FAVICON) {
+    return;
+  }
+
+  DocShellOriginAttributes docShellAttrs;
+  loadContext->GetOriginAttributes(docShellAttrs);
+  MOZ_ASSERT(mLoadInfo->GetOriginAttributes().mPrivateBrowsingId == docShellAttrs.mPrivateBrowsingId,
+             "PrivateBrowsingId values are not the same between LoadInfo and LoadContext.");
 }
+#endif
 
 //-----------------------------------------------------------------------------
 // nsHttpChannel::nsITraceableChannel
@@ -2929,6 +2935,36 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
   if (mLoadInfo) {
     nsCOMPtr<nsILoadInfo> newLoadInfo =
       static_cast<mozilla::LoadInfo*>(mLoadInfo.get())->Clone();
+
+    // re-compute the origin attributes of the loadInfo if it's top-level load.
+    bool isTopLevelDoc =
+      newLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_DOCUMENT;
+
+    if (isTopLevelDoc) {
+      nsCOMPtr<nsILoadContext> loadContext;
+      NS_QueryNotificationCallbacks(this, loadContext);
+      DocShellOriginAttributes docShellAttrs;
+      if (loadContext) {
+        loadContext->GetOriginAttributes(docShellAttrs);
+      }
+      MOZ_ASSERT(docShellAttrs.mFirstPartyDomain.IsEmpty(),
+                 "top-level docshell shouldn't have firstPartyDomain attribute.");
+
+      NeckoOriginAttributes attrs = newLoadInfo->GetOriginAttributes();
+
+      MOZ_ASSERT(docShellAttrs.mAppId == attrs.mAppId,
+                "docshell and necko should have the same appId attribute.");
+      MOZ_ASSERT(docShellAttrs.mUserContextId == attrs.mUserContextId,
+                "docshell and necko should have the same userContextId attribute.");
+      MOZ_ASSERT(docShellAttrs.mInIsolatedMozBrowser == attrs.mInIsolatedMozBrowser,
+                "docshell and necko should have the same inIsolatedMozBrowser attribute.");
+      MOZ_ASSERT(docShellAttrs.mPrivateBrowsingId == attrs.mPrivateBrowsingId,
+                 "docshell and necko should have the same privateBrowsingId attribute.");
+
+      attrs.InheritFromDocShellToNecko(docShellAttrs, true, newURI);
+      newLoadInfo->SetOriginAttributes(attrs);
+    }
+
     bool isInternalRedirect =
       (redirectFlags & (nsIChannelEventSink::REDIRECT_INTERNAL |
                         nsIChannelEventSink::REDIRECT_STS_UPGRADE));
@@ -3136,6 +3172,12 @@ HttpBaseChannel::SetupReplacementChannel(nsIURI       *newURI,
         mAllRedirectsPassTimingAllowCheck &&
         oldTimedChannel->TimingAllowCheck(principal));
     }
+  }
+
+  // Pass the preferred alt-data type on to the new channel.
+  nsCOMPtr<nsICacheInfoChannel> cacheInfoChan(do_QueryInterface(newChannel));
+  if (cacheInfoChan) {
+    cacheInfoChan->PreferAlternativeDataType(mPreferredCachedAltDataType);
   }
 
   if (redirectFlags & (nsIChannelEventSink::REDIRECT_INTERNAL |

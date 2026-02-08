@@ -3385,7 +3385,8 @@ SVGTextFrame::HandleAttributeChangeInDescendant(Element* aElement,
     if (aNameSpaceID == kNameSpaceID_None &&
         aAttribute == nsGkAtoms::startOffset) {
       NotifyGlyphMetricsChange();
-    } else if (aNameSpaceID == kNameSpaceID_XLink &&
+    } else if ((aNameSpaceID == kNameSpaceID_XLink ||
+                aNameSpaceID == kNameSpaceID_None) &&
                aAttribute == nsGkAtoms::href) {
       // Blow away our reference, if any
       nsIFrame* childElementFrame = aElement->GetPrimaryFrame();
@@ -3788,7 +3789,7 @@ SVGTextFrame::ReflowSVG()
   TextRenderedRunIterator it(this, TextRenderedRunIterator::eAllFrames);
   for (TextRenderedRun run = it.Current(); run.mFrame; run = it.Next()) {
     uint32_t runFlags = 0;
-    if (run.mFrame->StyleSVG()->mFill.mType != eStyleSVGPaintType_None) {
+    if (run.mFrame->StyleSVG()->mFill.Type() != eStyleSVGPaintType_None) {
       runFlags |= TextRenderedRun::eIncludeFill |
                   TextRenderedRun::eIncludeTextShadow;
     }
@@ -3861,7 +3862,7 @@ TextRenderedRunFlagsForBBoxContribution(const TextRenderedRun& aRun,
   uint32_t flags = 0;
   if ((aBBoxFlags & nsSVGUtils::eBBoxIncludeFillGeometry) ||
       ((aBBoxFlags & nsSVGUtils::eBBoxIncludeFill) &&
-       aRun.mFrame->StyleSVG()->mFill.mType != eStyleSVGPaintType_None)) {
+       aRun.mFrame->StyleSVG()->mFill.Type() != eStyleSVGPaintType_None)) {
     flags |= TextRenderedRun::eIncludeFill;
   }
   if ((aBBoxFlags & nsSVGUtils::eBBoxIncludeStrokeGeometry) ||
@@ -4739,10 +4740,10 @@ SVGTextFrame::AdjustChunksForLineBreaks()
   nsBlockFrame* block = nsLayoutUtils::GetAsBlock(PrincipalChildList().FirstChild());
   NS_ASSERTION(block, "expected block frame");
 
-  nsBlockFrame::line_iterator line = block->begin_lines();
+  nsBlockFrame::LineIterator line = block->LinesBegin();
 
   CharIterator it(this, CharIterator::eOriginal);
-  while (!it.AtEnd() && line != block->end_lines()) {
+  while (!it.AtEnd() && line != block->LinesEnd()) {
     if (it.TextFrame() == line->mFirstChild) {
       mPositions[it.TextElementCharIndex()].mStartOfChunk = true;
       line++;
@@ -4822,7 +4823,14 @@ SVGTextFrame::GetTextPathPathElement(nsIFrame* aTextPathFrame)
     nsIContent* content = aTextPathFrame->GetContent();
     dom::SVGTextPathElement* tp = static_cast<dom::SVGTextPathElement*>(content);
     nsAutoString href;
-    tp->mStringAttributes[dom::SVGTextPathElement::HREF].GetAnimValue(href, tp);
+    if (tp->mStringAttributes[dom::SVGTextPathElement::HREF].IsExplicitlySet()) {
+      tp->mStringAttributes[dom::SVGTextPathElement::HREF]
+        .GetAnimValue(href, tp);
+    } else {
+      tp->mStringAttributes[dom::SVGTextPathElement::XLINK_HREF]
+        .GetAnimValue(href, tp);
+    }
+
     if (href.IsEmpty()) {
       return nullptr; // no URL
     }
@@ -5192,8 +5200,8 @@ SVGTextFrame::ShouldRenderAsPath(nsTextFrame* aFrame,
 
   // Fill is a non-solid paint, has a non-default fill-rule or has
   // non-1 opacity.
-  if (!(style->mFill.mType == eStyleSVGPaintType_None ||
-        (style->mFill.mType == eStyleSVGPaintType_Color &&
+  if (!(style->mFill.Type() == eStyleSVGPaintType_None ||
+        (style->mFill.Type() == eStyleSVGPaintType_Color &&
          style->mFillOpacity == 1))) {
     return true;
   }
@@ -5621,10 +5629,9 @@ SVGTextFrame::TransformFrameRectFromTextChild(const nsRect& aRect,
     // Intersect it with the run.
     uint32_t flags = TextRenderedRun::eIncludeFill |
                      TextRenderedRun::eIncludeStroke;
-    rectInFrameUserSpace.IntersectRect
-      (rectInFrameUserSpace, run.GetFrameUserSpaceRect(presContext, flags).ToThebesRect());
 
-    if (!rectInFrameUserSpace.IsEmpty()) {
+    if (rectInFrameUserSpace.IntersectRect(rectInFrameUserSpace,
+        run.GetFrameUserSpaceRect(presContext, flags).ToThebesRect())) {
       // Transform it up to user space of the <text>, also taking into
       // account the font size scale.
       gfxMatrix m = run.GetTransformFromRunUserSpaceToUserSpace(presContext);

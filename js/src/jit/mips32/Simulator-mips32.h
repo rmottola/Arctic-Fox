@@ -32,8 +32,8 @@
 #ifdef JS_SIMULATOR_MIPS32
 
 #include "jit/IonTypes.h"
-#include "threading/Mutex.h"
 #include "threading/Thread.h"
+#include "vm/MutexIDs.h"
 
 namespace js {
 namespace jit {
@@ -142,7 +142,7 @@ class Simulator {
     };
 
     // Returns nullptr on OOM.
-    static Simulator* Create();
+    static Simulator* Create(JSContext* cx);
 
     static void Destroy(Simulator* simulator);
 

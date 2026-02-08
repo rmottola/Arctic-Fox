@@ -99,20 +99,12 @@ public:
     , options_(mozilla::Forward<O>(options))
   { }
 
-  // Start a thread of execution at functor |f| with parameters |args|. Note
-  // that the arguments must be either POD or rvalue references (mozilla::Move).
-  // Attempting to pass a reference will result in the value being copied, which
-  // may not be the intended behavior. See the comment below on
-  // ThreadTrampoline::args for an explanation.
-  template <typename F, typename... Args>
-  explicit Thread(F&& f, Args&&... args) {
-    MOZ_RELEASE_ASSERT(init(mozilla::Forward<F>(f),
-                            mozilla::Forward<Args>(args)...));
-  }
-
   // Start a thread of execution at functor |f| with parameters |args|. This
   // method will return false if thread creation fails. This Thread must not
-  // already have been created.
+  // already have been created. Note that the arguments must be either POD or
+  // rvalue references (mozilla::Move). Attempting to pass a reference will
+  // result in the value being copied, which may not be the intended behavior.
+  // See the comment below on ThreadTrampoline::args for an explanation.
   template <typename F, typename... Args>
   MOZ_MUST_USE bool init(F&& f, Args&&... args) {
     MOZ_RELEASE_ASSERT(!joinable());
@@ -184,6 +176,12 @@ Thread::Id GetId();
 // available on all platforms; on these platforms setName() will simply do
 // nothing.
 void SetName(const char* name);
+
+// Get the current thread name. As with SetName, not available on all
+// platforms. On these platforms getName() will give back an empty string (by
+// storing NUL in nameBuffer[0]). 'len' is the bytes available to be written in
+// 'nameBuffer', including the terminating NUL.
+void GetName(char* nameBuffer, size_t len);
 
 } // namespace ThisThread
 

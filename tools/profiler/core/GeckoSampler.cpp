@@ -485,7 +485,7 @@ void BuildJavaThreadJSObject(SpliceableJSONWriter& aWriter)
           firstRun = false;
 
           double sampleTime =
-              java::GeckoJavaSampler::GetSampleTimeJavaProfiling(0, sampleId);
+              java::GeckoJavaSampler::GetSampleTime(0, sampleId);
 
           aWriter.StartObjectElement();
             aWriter.DoubleProperty("time", sampleTime);
@@ -562,7 +562,7 @@ void GeckoSampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
 
   #if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
       if (ProfileJava()) {
-        java::GeckoJavaSampler::PauseJavaProfiling();
+        java::GeckoJavaSampler::Pause();
 
         aWriter.Start();
         {
@@ -570,7 +570,7 @@ void GeckoSampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
         }
         aWriter.End();
 
-        java::GeckoJavaSampler::UnpauseJavaProfiling();
+        java::GeckoJavaSampler::Unpause();
       }
   #endif
 #endif
@@ -666,19 +666,22 @@ void addPseudoEntry(volatile StackEntry &entry, ThreadProfile &aProfile,
     addDynamicTag(aProfile, 'c', sampleLabel);
 #ifndef SPS_STANDALONE
     if (entry.isJs()) {
-      if (!entry.pc()) {
-        // The JIT only allows the top-most entry to have a nullptr pc
-        MOZ_ASSERT(&entry == &stack->mStack[stack->stackSize() - 1]);
-        // If stack-walking was disabled, then that's just unfortunate
-        if (lastpc) {
-          jsbytecode *jspc = js::ProfilingGetPC(stack->mContext, entry.script(),
-                                                lastpc);
-          if (jspc) {
-            lineno = JS_PCToLineNumber(entry.script(), jspc);
+      JSScript* script = entry.script();
+      if (script) {
+        if (!entry.pc()) {
+          // The JIT only allows the top-most entry to have a nullptr pc
+          MOZ_ASSERT(&entry == &stack->mStack[stack->stackSize() - 1]);
+          // If stack-walking was disabled, then that's just unfortunate
+          if (lastpc) {
+            jsbytecode *jspc = js::ProfilingGetPC(stack->mContext, script,
+                                                  lastpc);
+            if (jspc) {
+              lineno = JS_PCToLineNumber(script, jspc);
+            }
           }
+        } else {
+          lineno = JS_PCToLineNumber(script, entry.pc());
         }
-      } else {
-        lineno = JS_PCToLineNumber(entry.script(), entry.pc());
       }
     } else {
       lineno = entry.line();
@@ -772,7 +775,7 @@ void mergeStacksIntoProfile(ThreadProfile& aProfile, TickSample* aSample, Native
                                         startBufferGen);
       for (; jsCount < maxFrames && !jsIter.done(); ++jsIter) {
         // See note below regarding 'J' entries.
-        if (aSample->isSamplingCurrentThread || jsIter.isAsmJS()) {
+        if (aSample->isSamplingCurrentThread || jsIter.isWasm()) {
           uint32_t extracted = jsIter.extractStack(jsFrames, jsCount, maxFrames);
           jsCount += extracted;
           if (jsCount == maxFrames)
@@ -781,7 +784,7 @@ void mergeStacksIntoProfile(ThreadProfile& aProfile, TickSample* aSample, Native
           mozilla::Maybe<JS::ProfilingFrameIterator::Frame> frame =
             jsIter.getPhysicalFrameWithoutLabel();
           if (frame.isSome())
-            jsFrames[jsCount++] = frame.value();
+            jsFrames[jsCount++] = mozilla::Move(frame.ref());
         }
       }
     }
@@ -876,7 +879,7 @@ void mergeStacksIntoProfile(ThreadProfile& aProfile, TickSample* aSample, Native
       MOZ_ASSERT(jsIndex >= 0);
       const JS::ProfilingFrameIterator::Frame& jsFrame = jsFrames[jsIndex];
 
-      // Stringifying non-asm.js JIT frames is delayed until streaming
+      // Stringifying non-wasm JIT frames is delayed until streaming
       // time. To re-lookup the entry in the JitcodeGlobalTable, we need to
       // store the JIT code address ('J') in the circular buffer.
       //
@@ -890,8 +893,8 @@ void mergeStacksIntoProfile(ThreadProfile& aProfile, TickSample* aSample, Native
       // the buffer, nsRefreshDriver would now be holding on to a backtrace
       // with stale JIT code return addresses.
       if (aSample->isSamplingCurrentThread ||
-          jsFrame.kind == JS::ProfilingFrameIterator::Frame_AsmJS) {
-        addDynamicTag(aProfile, 'c', jsFrame.label);
+          jsFrame.kind == JS::ProfilingFrameIterator::Frame_Wasm) {
+        addDynamicTag(aProfile, 'c', jsFrame.label.get());
       } else {
         MOZ_ASSERT(jsFrame.kind == JS::ProfilingFrameIterator::Frame_Ion ||
                    jsFrame.kind == JS::ProfilingFrameIterator::Frame_Baseline);

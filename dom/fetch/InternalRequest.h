@@ -23,6 +23,11 @@
 #endif
 
 namespace mozilla {
+
+namespace ipc {
+class PrincipalInfo;
+} // namespace ipc
+
 namespace dom {
 
 /*
@@ -45,7 +50,7 @@ namespace dom {
  * frame             | TYPE_INTERNAL_FRAME
  * hyperlink         |
  * iframe            | TYPE_INTERNAL_IFRAME
- * image             | TYPE_INTERNAL_IMAGE, TYPE_INTERNAL_IMAGE_PRELOAD
+ * image             | TYPE_INTERNAL_IMAGE, TYPE_INTERNAL_IMAGE_PRELOAD, TYPE_INTERNAL_IMAGE_FAVICON
  * imageset          | TYPE_IMAGESET
  * import            | Not supported by Gecko
  * internal          | TYPE_DOCUMENT, TYPE_XBL, TYPE_OTHER
@@ -90,34 +95,7 @@ class InternalRequest final
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(InternalRequest)
 
-  explicit InternalRequest(const nsACString& aURL)
-    : mMethod("GET")
-    , mHeaders(new InternalHeaders(HeadersGuardEnum::None))
-    , mContentPolicyType(nsIContentPolicy::TYPE_FETCH)
-    , mReferrer(NS_LITERAL_STRING(kFETCH_CLIENT_REFERRER_STR))
-    , mReferrerPolicy(ReferrerPolicy::_empty)
-    , mEnvironmentReferrerPolicy(net::RP_Default)
-    , mMode(RequestMode::No_cors)
-    , mCredentialsMode(RequestCredentials::Omit)
-    , mResponseTainting(LoadTainting::Basic)
-    , mCacheMode(RequestCache::Default)
-    , mRedirectMode(RequestRedirect::Follow)
-    , mAuthenticationFlag(false)
-    , mForceOriginHeader(false)
-    , mPreserveContentCodings(false)
-      // FIXME(nsm): This should be false by default, but will lead to the
-      // algorithm never loading data: URLs right now. See Bug 1018872 about
-      // how certain contexts will override it to set it to true. Fetch
-      // specification does not handle this yet.
-    , mSameOriginDataURL(true)
-    , mSkipServiceWorker(false)
-    , mSynchronous(false)
-    , mUnsafeRequest(false)
-    , mUseURLCredentials(false)
-  {
-    MOZ_ASSERT(!aURL.IsEmpty());
-    AddURL(aURL);
-  }
+  explicit InternalRequest(const nsACString& aURL);
 
   InternalRequest(const nsACString& aURL,
                   const nsACString& aMethod,
@@ -129,32 +107,7 @@ public:
                   const nsAString& aReferrer,
                   ReferrerPolicy aReferrerPolicy,
                   nsContentPolicyType aContentPolicyType,
-                  const nsAString& aIntegrity)
-    : mMethod(aMethod)
-    , mHeaders(aHeaders)
-    , mContentPolicyType(aContentPolicyType)
-    , mReferrer(aReferrer)
-    , mReferrerPolicy(aReferrerPolicy)
-    , mEnvironmentReferrerPolicy(net::RP_Default)
-    , mMode(aMode)
-    , mCredentialsMode(aRequestCredentials)
-    , mResponseTainting(LoadTainting::Basic)
-    , mCacheMode(aCacheMode)
-    , mRedirectMode(aRequestRedirect)
-    , mIntegrity(aIntegrity)
-    , mAuthenticationFlag(false)
-    , mForceOriginHeader(false)
-    , mPreserveContentCodings(false)
-      // FIXME See the above comment in the default constructor.
-    , mSameOriginDataURL(true)
-    , mSkipServiceWorker(false)
-    , mSynchronous(false)
-    , mUnsafeRequest(false)
-    , mUseURLCredentials(false)
-  {
-    MOZ_ASSERT(!aURL.IsEmpty());
-    AddURL(aURL);
-  }
+                  const nsAString& aIntegrity);
 
   explicit InternalRequest(const IPCInternalRequest& aIPCRequest);
 
@@ -269,6 +222,72 @@ public:
   SetReferrerPolicy(ReferrerPolicy aReferrerPolicy)
   {
     mReferrerPolicy = aReferrerPolicy;
+  }
+
+  void
+  SetReferrerPolicy(net::ReferrerPolicy aReferrerPolicy)
+  {
+    switch (aReferrerPolicy) {
+      case net::RP_Unset:
+        mReferrerPolicy = ReferrerPolicy::_empty;
+        break;
+      case net::RP_No_Referrer:
+        mReferrerPolicy = ReferrerPolicy::No_referrer;
+        break;
+      case net::RP_No_Referrer_When_Downgrade:
+        mReferrerPolicy = ReferrerPolicy::No_referrer_when_downgrade;
+        break;
+      case net::RP_Origin:
+        mReferrerPolicy = ReferrerPolicy::Origin;
+        break;
+      case net::RP_Origin_When_Crossorigin:
+        mReferrerPolicy = ReferrerPolicy::Origin_when_cross_origin;
+        break;
+      case net::RP_Unsafe_URL:
+        mReferrerPolicy = ReferrerPolicy::Unsafe_url;
+        break;
+      case net::RP_Same_Origin:
+        mReferrerPolicy = ReferrerPolicy::Same_origin;
+        break;
+      case net::RP_Strict_Origin:
+        mReferrerPolicy = ReferrerPolicy::Strict_origin;
+        break;
+      case net::RP_Strict_Origin_When_Cross_Origin:
+        mReferrerPolicy = ReferrerPolicy::Strict_origin_when_cross_origin;
+        break;
+      default:
+        MOZ_ASSERT_UNREACHABLE("Invalid ReferrerPolicy value");
+        break;
+    }
+  }
+
+  net::ReferrerPolicy
+  GetReferrerPolicy()
+  {
+    switch (mReferrerPolicy) {
+      case ReferrerPolicy::_empty:
+        return net::RP_Unset;
+      case ReferrerPolicy::No_referrer:
+        return net::RP_No_Referrer;
+      case ReferrerPolicy::No_referrer_when_downgrade:
+        return net::RP_No_Referrer_When_Downgrade;
+      case ReferrerPolicy::Origin:
+        return net::RP_Origin;
+      case ReferrerPolicy::Origin_when_cross_origin:
+        return net::RP_Origin_When_Crossorigin;
+      case ReferrerPolicy::Unsafe_url:
+        return net::RP_Unsafe_URL;
+      case ReferrerPolicy::Strict_origin:
+        return net::RP_Strict_Origin;
+      case ReferrerPolicy::Same_origin:
+        return net::RP_Same_Origin;
+      case ReferrerPolicy::Strict_origin_when_cross_origin:
+        return net::RP_Strict_Origin_When_Cross_Origin;
+      default:
+        MOZ_ASSERT_UNREACHABLE("Invalid ReferrerPolicy enum value?");
+        break;
+    }
+    return net::RP_Unset;
   }
 
   net::ReferrerPolicy
@@ -493,6 +512,16 @@ public:
   static RequestCredentials
   MapChannelToRequestCredentials(nsIChannel* aChannel);
 
+  // Takes ownership of the principal info.
+  void
+  SetPrincipalInfo(UniquePtr<mozilla::ipc::PrincipalInfo> aPrincipalInfo);
+
+  const UniquePtr<mozilla::ipc::PrincipalInfo>&
+  GetPrincipalInfo() const
+  {
+    return mPrincipalInfo;
+  }
+
 private:
   // Does not copy mBodyStream.  Use fallible Clone() for complete copy.
   explicit InternalRequest(const InternalRequest& aOther);
@@ -553,6 +582,8 @@ private:
   // It is illegal to pass such a Request object to a fetch() method unless
   // if the caller has chrome privileges.
   bool mContentPolicyTypeOverridden = false;
+
+  UniquePtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
 };
 
 } // namespace dom

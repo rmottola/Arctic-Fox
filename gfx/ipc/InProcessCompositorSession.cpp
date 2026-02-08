@@ -24,7 +24,7 @@ InProcessCompositorSession::InProcessCompositorSession(widget::CompositorWidget*
 
 /* static */ RefPtr<InProcessCompositorSession>
 InProcessCompositorSession::Create(nsIWidget* aWidget,
-                                   ClientLayerManager* aLayerManager,
+                                   LayerManager* aLayerManager,
                                    const uint64_t& aRootLayerTreeId,
                                    CSSToLayoutDeviceScale aScale,
                                    bool aUseAPZ,
@@ -54,10 +54,18 @@ InProcessCompositorSession::SetContentController(GeckoContentController* aContro
   mCompositorBridgeParent->SetControllerForLayerTree(mRootLayerTreeId, aController);
 }
 
-already_AddRefed<IAPZCTreeManager>
+RefPtr<IAPZCTreeManager>
 InProcessCompositorSession::GetAPZCTreeManager() const
 {
   return mCompositorBridgeParent->GetAPZCTreeManager(mRootLayerTreeId);
+}
+
+bool
+InProcessCompositorSession::Reset(const nsTArray<LayersBackend>& aBackendHints,
+                                  uint64_t aSeqNo,
+                                  TextureFactoryIdentifier* aOutIdentifier)
+{
+  return mCompositorBridgeParent->ResetCompositor(aBackendHints, aSeqNo, aOutIdentifier);
 }
 
 void

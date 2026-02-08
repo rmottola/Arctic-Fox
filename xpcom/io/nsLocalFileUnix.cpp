@@ -10,6 +10,7 @@
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/Sprintf.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1299,7 +1300,7 @@ GetDeviceName(int aDeviceMajor, int aDeviceMinor, nsACString& aDeviceName)
   char mountinfoLine[kMountInfoLineLength];
   char deviceNum[kMountInfoLineLength];
 
-  snprintf(deviceNum, kMountInfoLineLength, "%d:%d", aDeviceMajor, aDeviceMinor);
+  SprintfLiteral(deviceNum, "%d:%d", aDeviceMajor, aDeviceMinor);
 
   FILE* f = fopen("/proc/self/mountinfo", "rt");
   if (!f) {
@@ -1439,10 +1440,8 @@ nsLocalFile::GetParent(nsIFile** aParent)
 
   // <brendan, after jband> I promise to play nice
   char* buffer = mPath.BeginWriting();
-  char* slashp = buffer;
-
   // find the last significant slash in buffer
-  slashp = strrchr(buffer, '/');
+  char* slashp = strrchr(buffer, '/');
   NS_ASSERTION(slashp, "non-canonical path?");
   if (!slashp) {
     return NS_ERROR_FILE_INVALID_PATH;

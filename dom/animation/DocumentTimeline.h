@@ -7,6 +7,8 @@
 #ifndef mozilla_dom_DocumentTimeline_h
 #define mozilla_dom_DocumentTimeline_h
 
+#include "mozilla/dom/DocumentTimelineBinding.h"
+#include "mozilla/LinkedList.h"
 #include "mozilla/TimeStamp.h"
 #include "AnimationTimeline.h"
 #include "nsIDocument.h"
@@ -27,6 +29,7 @@ namespace dom {
 class DocumentTimeline final
   : public AnimationTimeline
   , public nsARefreshObserver
+  , public LinkedListElement<DocumentTimeline>
 {
 public:
   DocumentTimeline(nsIDocument* aDocument, const TimeDuration& aOriginTime)
@@ -35,6 +38,9 @@ public:
     , mIsObservingRefreshDriver(false)
     , mOriginTime(aOriginTime)
   {
+    if (mDocument) {
+      mDocument->Timelines().insertBack(this);
+    }
   }
 
 protected:
@@ -42,6 +48,9 @@ protected:
   {
     MOZ_ASSERT(!mIsObservingRefreshDriver, "Timeline should have disassociated"
                " from the refresh driver before being destroyed");
+    if (isInList()) {
+      remove();
+    }
   }
 
 public:
@@ -54,7 +63,7 @@ public:
 
   static already_AddRefed<DocumentTimeline>
   Constructor(const GlobalObject& aGlobal,
-              const DOMHighResTimeStamp& aOriginTime,
+              const DocumentTimelineOptions& aOptions,
               ErrorResult& aRv);
 
   // AnimationTimeline methods
@@ -83,6 +92,7 @@ public:
 protected:
   TimeStamp GetCurrentTimeStamp() const;
   nsRefreshDriver* GetRefreshDriver() const;
+  void UnregisterFromRefreshDriver();
 
   nsCOMPtr<nsIDocument> mDocument;
 

@@ -30,7 +30,6 @@
 #include "nsContentUtils.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIAppsService.h"
-#include "mozIApplication.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsPIDOMWindow.h"
 #include "nsIDocument.h"
@@ -206,7 +205,7 @@ public:
   NS_IMETHOD
   Observe(nsISupports* aSubject, const char* aTopic, const char16_t* aData) override
   {
-    MOZ_ASSERT(!nsCRT::strcmp(aTopic, "clear-origin-data"));
+    MOZ_ASSERT(!nsCRT::strcmp(aTopic, "clear-origin-attributes-data"));
 
     nsCOMPtr<nsIPermissionManager> permManager = do_GetService("@mozilla.org/permissionmanager;1");
     return permManager->RemovePermissionsWithAttributes(nsDependentString(aData));
@@ -540,7 +539,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
       foundHistory = true;
       rv = aHelper->Insert(origin, aType, aPermission,
                            aExpireType, aExpireTime, aModificationTime);
-      NS_WARN_IF(NS_WARN_IF(NS_FAILED(rv)));
+      NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "Insert failed");
       insertedOrigins.PutEntry(origin);
     }
 
@@ -727,7 +726,7 @@ nsPermissionManager::ClearOriginDataObserverInit()
 {
   nsCOMPtr<nsIObserverService> observerService =
     mozilla::services::GetObserverService();
-  observerService->AddObserver(new ClearOriginDataObserver(), "clear-origin-data", /* holdsWeak= */ false);
+  observerService->AddObserver(new ClearOriginDataObserver(), "clear-origin-attributes-data", /* ownsWeak= */ false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2414,63 +2413,6 @@ nsPermissionManager::RemovePermissionsWithAttributes(mozilla::OriginAttributesPa
   return NS_OK;
 }
 
-nsresult
-nsPermissionManager::RemoveExpiredPermissionsForApp(uint32_t aAppId)
-{
-  ENSURE_NOT_CHILD_PROCESS;
-
-  if (aAppId == nsIScriptSecurityManager::NO_APP_ID) {
-    return NS_OK;
-  }
-
-  for (auto iter = mPermissionTable.Iter(); !iter.Done(); iter.Next()) {
-    PermissionHashKey* entry = iter.Get();
-    nsCOMPtr<nsIPrincipal> principal;
-    GetPrincipalFromOrigin(entry->GetKey()->mOrigin, getter_AddRefs(principal));
-
-    if (principal->GetAppId() != aAppId) {
-      continue;
-    }
-
-    for (uint32_t i = 0; i < entry->GetPermissions().Length(); ++i) {
-      PermissionEntry& permEntry = entry->GetPermissions()[i];
-      if (permEntry.mExpireType != nsIPermissionManager::EXPIRE_SESSION) {
-        continue;
-      }
-
-      if (permEntry.mNonSessionExpireType ==
-            nsIPermissionManager::EXPIRE_SESSION) {
-        PermissionEntry oldPermEntry = entry->GetPermissions()[i];
-
-        entry->GetPermissions().RemoveElementAt(i);
-
-        NotifyObserversWithPermission(principal,
-                                      mTypeArray.ElementAt(oldPermEntry.mType),
-                                      oldPermEntry.mPermission,
-                                      oldPermEntry.mExpireType,
-                                      oldPermEntry.mExpireTime,
-                                      u"deleted");
-
-        --i;
-        continue;
-      }
-
-      permEntry.mPermission = permEntry.mNonSessionPermission;
-      permEntry.mExpireType = permEntry.mNonSessionExpireType;
-      permEntry.mExpireTime = permEntry.mNonSessionExpireTime;
-
-      NotifyObserversWithPermission(principal,
-                                    mTypeArray.ElementAt(permEntry.mType),
-                                    permEntry.mPermission,
-                                    permEntry.mExpireType,
-                                    permEntry.mExpireTime,
-                                    u"changed");
-    }
-  }
-
-  return NS_OK;
-}
-
 //*****************************************************************************
 //*** nsPermissionManager private methods
 //*****************************************************************************
@@ -2879,55 +2821,6 @@ nsPermissionManager::UpdateDB(OperationType aOp,
   nsCOMPtr<mozIStoragePendingStatement> pending;
   rv = aStmt->ExecuteAsync(nullptr, getter_AddRefs(pending));
   MOZ_ASSERT(NS_SUCCEEDED(rv));
-}
-
-NS_IMETHODIMP
-nsPermissionManager::AddrefAppId(uint32_t aAppId)
-{
-  if (aAppId == nsIScriptSecurityManager::NO_APP_ID) {
-    return NS_OK;
-  }
-
-  bool found = false;
-  for (uint32_t i = 0; i < mAppIdRefcounts.Length(); ++i) {
-    if (mAppIdRefcounts[i].mAppId == aAppId) {
-      ++mAppIdRefcounts[i].mCounter;
-      found = true;
-      break;
-    }
-  }
-
-  if (!found) {
-    ApplicationCounter app = { aAppId, 1 };
-    mAppIdRefcounts.AppendElement(app);
-  }
-
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsPermissionManager::ReleaseAppId(uint32_t aAppId)
-{
-  // An app has been released, maybe we have to reset its session.
-
-  if (aAppId == nsIScriptSecurityManager::NO_APP_ID) {
-    return NS_OK;
-  }
-
-  for (uint32_t i = 0; i < mAppIdRefcounts.Length(); ++i) {
-    if (mAppIdRefcounts[i].mAppId == aAppId) {
-      --mAppIdRefcounts[i].mCounter;
-
-      if (!mAppIdRefcounts[i].mCounter) {
-        mAppIdRefcounts.RemoveElementAt(i);
-        return RemoveExpiredPermissionsForApp(aAppId);
-      }
-
-      break;
-    }
-  }
-
-  return NS_OK;
 }
 
 NS_IMETHODIMP

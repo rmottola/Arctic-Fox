@@ -848,7 +848,7 @@ setReq.onerror = function() {
         rv.start()
         return rv
 
-    def add_test(self, test, expected='pass', test_container=None):
+    def add_test(self, test, expected='pass'):
         filepath = os.path.abspath(test)
 
         if os.path.isdir(filepath):
@@ -930,9 +930,6 @@ setReq.onerror = function() {
                                           capabilities=self.capabilities,
                                           logcat_stdout=self.logcat_stdout,
                                           result_callbacks=self.result_callbacks)
-
-            if test_container:
-                self.launch_test_container()
 
             results = runner.run(suite)
             self.results.append(results)

@@ -41,10 +41,8 @@ using CrashReporter::GetIDFromMinidump;
 #include "WMFDecoderModule.h"
 #endif
 
-#ifdef MOZ_EME
 #include "mozilla/dom/WidevineCDMManifestBinding.h"
 #include "widevine-adapter/WidevineAdapter.h"
-#endif
 
 namespace mozilla {
 
@@ -267,7 +265,7 @@ GMPParent::EnsureAsyncShutdownTimeoutSet()
   return rv;
 }
 
-bool
+mozilla::ipc::IPCResult
 GMPParent::RecvPGMPContentChildDestroyed()
 {
   --mGMPContentChildCount;
@@ -288,7 +286,7 @@ GMPParent::RecvPGMPContentChildDestroyed()
     }
   }
 #endif
-  return true;
+  return IPC_OK();
 }
 
 void
@@ -566,27 +564,43 @@ GMPParent::GMPThread()
   return mGMPThread;
 }
 
+/* static */
 bool
-GMPParent::SupportsAPI(const nsCString& aAPI, const nsCString& aTag)
+GMPCapability::Supports(const nsTArray<GMPCapability>& aCapabilities,
+                        const nsCString& aAPI,
+                        const nsTArray<nsCString>& aTags)
 {
-  for (uint32_t i = 0; i < mCapabilities.Length(); i++) {
-    if (!mCapabilities[i].mAPIName.Equals(aAPI)) {
+  for (const nsCString& tag : aTags) {
+    if (!GMPCapability::Supports(aCapabilities, aAPI, tag)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/* static */
+bool
+GMPCapability::Supports(const nsTArray<GMPCapability>& aCapabilities,
+                        const nsCString& aAPI,
+                        const nsCString& aTag)
+{
+  for (const GMPCapability& capabilities : aCapabilities) {
+    if (!capabilities.mAPIName.Equals(aAPI)) {
       continue;
     }
-    nsTArray<nsCString>& tags = mCapabilities[i].mAPITags;
-    for (uint32_t j = 0; j < tags.Length(); j++) {
-      if (tags[j].Equals(aTag)) {
+    for (const nsCString& tag : capabilities.mAPITags) {
+      if (tag.Equals(aTag)) {
 #ifdef XP_WIN
         // Clearkey on Windows advertises that it can decode in its GMP info
         // file, but uses Windows Media Foundation to decode. That's not present
         // on Windows XP, and on some Vista, Windows N, and KN variants without
         // certain services packs.
-        if (tags[j].Equals(kEMEKeySystemClearkey)) {
-          if (mCapabilities[i].mAPIName.EqualsLiteral(GMP_API_VIDEO_DECODER)) {
+        if (tag.Equals(kEMEKeySystemClearkey)) {
+          if (capabilities.mAPIName.EqualsLiteral(GMP_API_VIDEO_DECODER)) {
             if (!WMFDecoderModule::HasH264()) {
               continue;
             }
-          } else if (mCapabilities[i].mAPIName.EqualsLiteral(GMP_API_AUDIO_DECODER)) {
+          } else if (capabilities.mAPIName.EqualsLiteral(GMP_API_AUDIO_DECODER)) {
             if (!WMFDecoderModule::HasAAC()) {
               continue;
             }
@@ -750,20 +764,20 @@ GMPParent::DeallocPGMPStorageParent(PGMPStorageParent* aActor)
   return true;
 }
 
-bool
+mozilla::ipc::IPCResult
 GMPParent::RecvPGMPStorageConstructor(PGMPStorageParent* aActor)
 {
   GMPStorageParent* p  = (GMPStorageParent*)aActor;
   if (NS_WARN_IF(NS_FAILED(p->Init()))) {
-    return false;
+    return IPC_FAIL_NO_REASON(this);
   }
-  return true;
+  return IPC_OK();
 }
 
-bool
+mozilla::ipc::IPCResult
 GMPParent::RecvPGMPTimerConstructor(PGMPTimerParent* actor)
 {
-  return true;
+  return IPC_OK();
 }
 
 PGMPTimerParent*
@@ -810,7 +824,6 @@ GMPParent::ReadGMPMetaData()
     return ReadGMPInfoFile(infoFile);
   }
 
-#ifdef MOZ_EME
   // Maybe this is the Widevine adapted plugin?
   nsCOMPtr<nsIFile> manifestFile;
   rv = mDirectory->Clone(getter_AddRefs(manifestFile));
@@ -819,9 +832,6 @@ GMPParent::ReadGMPMetaData()
   }
   manifestFile->AppendRelativePath(NS_LITERAL_STRING("manifest.json"));
   return ReadChromiumManifestFile(manifestFile);
-#else
-  return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
-#endif
 }
 
 RefPtr<GenericPromise>
@@ -899,7 +909,7 @@ GMPParent::ReadGMPInfoFile(nsIFile* aFile)
       // Adobe GMP doesn't work without SSE2. Check the tags to see if
       // the decryptor is for the Adobe GMP, and refuse to load it if
       // SSE2 isn't supported.
-      if (cap.mAPITags.Contains(nsCString(kEMEKeySystemPrimetime)) &&
+      if (cap.mAPITags.Contains(kEMEKeySystemPrimetime) &&
           !mozilla::supports_sse2()) {
         return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
       }
@@ -935,7 +945,6 @@ GMPParent::ParseChromiumManifest(nsString aJSON)
   LOGD("%s: for '%s'", __FUNCTION__, NS_LossyConvertUTF16toASCII(aJSON).get());
 
   MOZ_ASSERT(NS_IsMainThread());
-#ifdef MOZ_EME
   mozilla::dom::WidevineCDMManifest m;
   if (!m.Init(aJSON)) {
     return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
@@ -956,11 +965,11 @@ GMPParent::ParseChromiumManifest(nsString aJSON)
   video.mAPITags.AppendElement(NS_LITERAL_CSTRING("h264"));
   video.mAPITags.AppendElement(NS_LITERAL_CSTRING("vp8"));
   video.mAPITags.AppendElement(NS_LITERAL_CSTRING("vp9"));
-  video.mAPITags.AppendElement(nsCString(kEMEKeySystemWidevine));
+  video.mAPITags.AppendElement(kEMEKeySystemWidevine);
   mCapabilities.AppendElement(Move(video));
 
   GMPCapability decrypt(NS_LITERAL_CSTRING(GMP_API_DECRYPTOR));
-  decrypt.mAPITags.AppendElement(nsCString(kEMEKeySystemWidevine));
+  decrypt.mAPITags.AppendElement(kEMEKeySystemWidevine);
   mCapabilities.AppendElement(Move(decrypt));
 
   MOZ_ASSERT(mName.EqualsLiteral("widevinecdm"));
@@ -970,10 +979,6 @@ GMPParent::ParseChromiumManifest(nsString aJSON)
 #endif
 
   return GenericPromise::CreateAndResolve(true, __func__);
-#else
-  MOZ_ASSERT_UNREACHABLE("don't call me if EME isn't enabled");
-  return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
-#endif
 }
 
 bool
@@ -1019,20 +1024,20 @@ GMPParent::GetPluginId() const
   return mPluginId;
 }
 
-bool
+mozilla::ipc::IPCResult
 GMPParent::RecvAsyncShutdownRequired()
 {
   LOGD("%s", __FUNCTION__);
   if (mAsyncShutdownRequired) {
     NS_WARNING("Received AsyncShutdownRequired message more than once!");
-    return true;
+    return IPC_OK();
   }
   mAsyncShutdownRequired = true;
   mService->AsyncShutdownNeeded(this);
-  return true;
+  return IPC_OK();
 }
 
-bool
+mozilla::ipc::IPCResult
 GMPParent::RecvAsyncShutdownComplete()
 {
   LOGD("%s", __FUNCTION__);
@@ -1045,7 +1050,7 @@ GMPParent::RecvAsyncShutdownComplete()
   }
 #endif
   AbortAsyncShutdown();
-  return true;
+  return IPC_OK();
 }
 
 class RunCreateContentParentCallbacks : public Runnable

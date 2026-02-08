@@ -454,6 +454,17 @@ MacroAssembler::rshift32Arithmetic(Imm32 shift, Register srcDest)
 }
 
 // ===============================================================
+// Condition functions
+
+template <typename T1, typename T2>
+void
+MacroAssembler::cmp32Set(Condition cond, T1 lhs, T2 rhs, Register dest)
+{
+    cmp32(lhs, rhs);
+    emitSet(cond, dest);
+}
+
+// ===============================================================
 // Branch instructions
 
 template <class L>
@@ -545,8 +556,9 @@ MacroAssembler::branchPtr(Condition cond, Register lhs, ImmWord rhs, Label* labe
     branchPtrImpl(cond, lhs, rhs, label);
 }
 
+template <class L>
 void
-MacroAssembler::branchPtr(Condition cond, const Address& lhs, Register rhs, Label* label)
+MacroAssembler::branchPtr(Condition cond, const Address& lhs, Register rhs, L label)
 {
     branchPtrImpl(cond, lhs, rhs, label);
 }
@@ -569,9 +581,9 @@ MacroAssembler::branchPtr(Condition cond, const Address& lhs, ImmWord rhs, Label
     branchPtrImpl(cond, lhs, rhs, label);
 }
 
-template <typename T, typename S>
+template <typename T, typename S, typename L>
 void
-MacroAssembler::branchPtrImpl(Condition cond, const T& lhs, const S& rhs, Label* label)
+MacroAssembler::branchPtrImpl(Condition cond, const T& lhs, const S& rhs, L label)
 {
     cmpPtr(Operand(lhs), rhs);
     j(cond, label);
@@ -640,9 +652,9 @@ MacroAssembler::branchDouble(DoubleCondition cond, FloatRegister lhs, FloatRegis
     j(ConditionFromDoubleCondition(cond), label);
 }
 
-template <typename T>
+template <typename T, typename L>
 void
-MacroAssembler::branchAdd32(Condition cond, T src, Register dest, Label* label)
+MacroAssembler::branchAdd32(Condition cond, T src, Register dest, L label)
 {
     addl(src, dest);
     j(cond, label);
@@ -1169,6 +1181,12 @@ MacroAssembler::storeFloat32x3(FloatRegister src, const BaseIndex& dest)
     storeFloat32(scratch, destZ);
 }
 
+void
+MacroAssembler::memoryBarrier(MemoryBarrierBits barrier)
+{
+    if (barrier & MembarStoreLoad)
+        storeLoadFence();
+}
 
 // ========================================================================
 // Truncate floating point.
@@ -1240,14 +1258,14 @@ MacroAssembler::truncateDoubleToInt64(Address src, Address dest, Register temp)
     freeStack(2*sizeof(int32_t));
 }
 
-//}}} check_macroassembler_style
 // ===============================================================
+// Clamping functions.
 
 void
-MacroAssemblerX86Shared::clampIntToUint8(Register reg)
+MacroAssembler::clampIntToUint8(Register reg)
 {
     Label inRange;
-    asMasm().branchTest32(Assembler::Zero, reg, Imm32(0xffffff00), &inRange);
+    branchTest32(Assembler::Zero, reg, Imm32(0xffffff00), &inRange);
     {
         sarl(Imm32(31), reg);
         notl(reg);
@@ -1255,6 +1273,9 @@ MacroAssemblerX86Shared::clampIntToUint8(Register reg)
     }
     bind(&inRange);
 }
+
+//}}} check_macroassembler_style
+// ===============================================================
 
 } // namespace jit
 } // namespace js

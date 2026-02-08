@@ -57,6 +57,9 @@ bool
 InvokeFunction(JSContext* cx, HandleObject obj, bool constructing, uint32_t argc, Value* argv,
                MutableHandleValue rval)
 {
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLogStartEvent(logger, TraceLogger_Call);
+
     AutoArrayRooter argvRoot(cx, argc + 1 + constructing, argv);
 
     // Data in the argument vector is arranged for a JIT -> JIT call.
@@ -71,7 +74,7 @@ InvokeFunction(JSContext* cx, HandleObject obj, bool constructing, uint32_t argc
         }
 
         ConstructArgs cargs(cx);
-        if (!cargs.init(argc))
+        if (!cargs.init(cx, argc))
             return false;
 
         for (uint32_t i = 0; i < argc; i++)
@@ -102,7 +105,7 @@ InvokeFunction(JSContext* cx, HandleObject obj, bool constructing, uint32_t argc
     }
 
     InvokeArgs args(cx);
-    if (!args.init(argc))
+    if (!args.init(cx, argc))
         return false;
 
     for (size_t i = 0; i < argc; i++)
@@ -410,6 +413,16 @@ StringFromCharCode(JSContext* cx, int32_t code)
         return cx->staticStrings().getUnit(c);
 
     return NewStringCopyN<CanGC>(cx, &c, 1);
+}
+
+JSString*
+StringFromCodePoint(JSContext* cx, int32_t codePoint)
+{
+    RootedValue rval(cx, Int32Value(codePoint));
+    if (!str_fromCodePoint_one_arg(cx, rval, &rval))
+        return nullptr;
+
+    return rval.toString();
 }
 
 bool
@@ -770,6 +783,11 @@ FinalSuspend(JSContext* cx, HandleObject obj, BaselineFrame* frame, jsbytecode* 
     MOZ_ASSERT(*pc == JSOP_FINALYIELDRVAL);
 
     if (!GeneratorObject::finalSuspend(cx, obj)) {
+
+        TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+        TraceLogStopEvent(logger, TraceLogger_Engine);
+        TraceLogStopEvent(logger, TraceLogger_Scripts);
+
         // Leave this frame and propagate the exception to the caller.
         return DebugEpilogue(cx, frame, pc, /* ok = */ false);
     }
@@ -1107,14 +1125,13 @@ RecompileImpl(JSContext* cx, bool force)
     MOZ_ASSERT(iter.type() == JitFrame_Exit);
     ++iter;
 
-    bool isConstructing = iter.isConstructing();
     RootedScript script(cx, iter.script());
     MOZ_ASSERT(script->hasIonScript());
 
     if (!IsIonEnabled(cx))
         return true;
 
-    MethodStatus status = Recompile(cx, script, nullptr, nullptr, isConstructing, force);
+    MethodStatus status = Recompile(cx, script, nullptr, nullptr, force);
     if (status == Method_Error)
         return false;
 
@@ -1295,6 +1312,15 @@ ThrowRuntimeLexicalError(JSContext* cx, unsigned errorNumber)
     ScriptFrameIter iter(cx);
     RootedScript script(cx, iter.script());
     ReportRuntimeLexicalError(cx, errorNumber, script, iter.pc());
+    return false;
+}
+
+bool
+ThrowReadOnlyError(JSContext* cx, HandleObject handle)
+{
+    HandleNativeObject obj = handle.as<NativeObject>();
+    RootedValue val(cx, ObjectValue(*obj));
+    ReportValueError(cx, JSMSG_READ_ONLY, JSDVG_IGNORE_STACK, val, nullptr);
     return false;
 }
 

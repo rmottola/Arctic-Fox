@@ -74,8 +74,8 @@
 #include "gfxTextRun.h"
 #include "nsFontFaceUtils.h"
 #include "nsLayoutStylesheetCache.h"
-#include "mozilla/StyleSheetHandle.h"
-#include "mozilla/StyleSheetHandleInlines.h"
+#include "mozilla/StyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 
 #if defined(MOZ_WIDGET_GTK)
 #include "gfxPlatformGtk.h" // xxx - for UseFcFontList
@@ -602,11 +602,6 @@ nsPresContext::GetUserPreferences()
     Preferences::GetInt(IBMBIDI_NUMERAL_STR,
                         GET_BIDI_OPTION_NUMERAL(bidiOptions));
   SET_BIDI_OPTION_NUMERAL(bidiOptions, prefInt);
-
-  prefInt =
-    Preferences::GetInt(IBMBIDI_SUPPORTMODE_STR,
-                        GET_BIDI_OPTION_SUPPORT(bidiOptions));
-  SET_BIDI_OPTION_SUPPORT(bidiOptions, prefInt);
 
   // We don't need to force reflow: either we are initializing a new
   // prescontext or we are being called from UpdateAfterPreferencesChanged()
@@ -1156,7 +1151,7 @@ nsPresContext::CompatibilityModeChanged()
 
   StyleSetHandle styleSet = mShell->StyleSet();
   auto cache = nsLayoutStylesheetCache::For(styleSet->BackendType());
-  StyleSheetHandle sheet = cache->QuirkSheet();
+  StyleSheet* sheet = cache->QuirkSheet();
 
   if (needsQuirkSheet) {
     // quirk.css needs to come after html.css; we just keep it at the end.
@@ -2505,8 +2500,9 @@ nsPresContext::HasCachedStyleData()
   nsStyleSet* styleSet = mShell->StyleSet()->GetAsGecko();
   if (!styleSet) {
     // XXXheycam ServoStyleSets do not use the rule tree, so just assume for now
-    // that we need to restyle when e.g. dppx changes.
-    return true;
+    // that we need to restyle when e.g. dppx changes assuming we're sufficiently
+    // bootstrapped.
+    return mShell->DidInitialize();
   }
 
   return styleSet->HasCachedStyleData();

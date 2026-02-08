@@ -283,9 +283,9 @@ CodeGeneratorX86Shared::visitCompareFAndBranch(LCompareFAndBranch* comp)
 }
 
 void
-CodeGeneratorX86Shared::visitAsmJSPassStackArg(LAsmJSPassStackArg* ins)
+CodeGeneratorX86Shared::visitWasmStackArg(LWasmStackArg* ins)
 {
-    const MAsmJSPassStackArg* mir = ins->mir();
+    const MWasmStackArg* mir = ins->mir();
     Address dst(StackPointer, mir->spOffset());
     if (ins->arg()->isConstant()) {
         masm.storePtr(ImmWord(ToInt32(ins->arg())), dst);
@@ -294,8 +294,10 @@ CodeGeneratorX86Shared::visitAsmJSPassStackArg(LAsmJSPassStackArg* ins)
     } else {
         switch (mir->input()->type()) {
           case MIRType::Double:
-          case MIRType::Float32:
             masm.storeDouble(ToFloatRegister(ins->arg()), dst);
+            return;
+          case MIRType::Float32:
+            masm.storeFloat32(ToFloatRegister(ins->arg()), dst);
             return;
           // StackPointer is SIMD-aligned and ABIArgGenerator guarantees
           // stack offsets are SIMD-aligned.
@@ -308,14 +310,14 @@ CodeGeneratorX86Shared::visitAsmJSPassStackArg(LAsmJSPassStackArg* ins)
             return;
           default: break;
         }
-        MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("unexpected mir type in AsmJSPassStackArg");
+        MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("unexpected mir type in WasmStackArg");
     }
 }
 
 void
-CodeGeneratorX86Shared::visitAsmJSPassStackArgI64(LAsmJSPassStackArgI64* ins)
+CodeGeneratorX86Shared::visitWasmStackArgI64(LWasmStackArgI64* ins)
 {
-    const MAsmJSPassStackArg* mir = ins->mir();
+    const MWasmStackArg* mir = ins->mir();
     Address dst(StackPointer, mir->spOffset());
     if (IsConstant(ins->arg()))
         masm.store64(Imm64(ToInt64(ins->arg())), dst);
@@ -324,7 +326,7 @@ CodeGeneratorX86Shared::visitAsmJSPassStackArgI64(LAsmJSPassStackArgI64* ins)
 }
 
 void
-CodeGeneratorX86Shared::visitAsmSelect(LAsmSelect* ins)
+CodeGeneratorX86Shared::visitWasmSelect(LWasmSelect* ins)
 {
     MIRType mirType = ins->mir()->type();
 
@@ -357,7 +359,7 @@ CodeGeneratorX86Shared::visitAsmSelect(LAsmSelect* ins)
         else
             masm.loadDouble(falseExpr, out);
     } else {
-        MOZ_CRASH("unhandled type in visitAsmSelect!");
+        MOZ_CRASH("unhandled type in visitWasmSelect!");
     }
 
     masm.bind(&done);
@@ -365,10 +367,10 @@ CodeGeneratorX86Shared::visitAsmSelect(LAsmSelect* ins)
 }
 
 void
-CodeGeneratorX86Shared::visitAsmReinterpret(LAsmReinterpret* lir)
+CodeGeneratorX86Shared::visitWasmReinterpret(LWasmReinterpret* lir)
 {
-    MOZ_ASSERT(gen->compilingAsmJS());
-    MAsmReinterpret* ins = lir->mir();
+    MOZ_ASSERT(gen->compilingWasm());
+    MWasmReinterpret* ins = lir->mir();
 
     MIRType to = ins->type();
 #ifdef DEBUG
@@ -388,7 +390,7 @@ CodeGeneratorX86Shared::visitAsmReinterpret(LAsmReinterpret* lir)
       case MIRType::Int64:
         MOZ_CRASH("not handled by this LIR opcode");
       default:
-        MOZ_CRASH("unexpected AsmReinterpret");
+        MOZ_CRASH("unexpected WasmReinterpret");
     }
 }
 
@@ -424,84 +426,17 @@ CodeGeneratorX86Shared::visitOutOfLineLoadTypedArrayOutOfBounds(OutOfLineLoadTyp
 }
 
 void
-CodeGeneratorX86Shared::visitOffsetBoundsCheck(OffsetBoundsCheck* oolCheck)
+CodeGeneratorX86Shared::visitWasmAddOffset(LWasmAddOffset* lir)
 {
-    // The access is heap[ptr + offset]. The inline code checks that
-    // ptr < heap.length - offset. We get here when that fails. We need to check
-    // for the case where ptr + offset >= 0, in which case the access is still
-    // in bounds.
-    MOZ_ASSERT(oolCheck->offset() != 0,
-               "An access without a constant offset doesn't need a separate OffsetBoundsCheck");
-    masm.cmp32(oolCheck->ptrReg(), Imm32(-uint32_t(oolCheck->offset())));
-    if (oolCheck->maybeOutOfBounds())
-        masm.j(Assembler::Below, oolCheck->maybeOutOfBounds());
-    else
-        masm.j(Assembler::Below, wasm::JumpTarget::OutOfBounds);
+    MWasmAddOffset* mir = lir->mir();
+    Register base = ToRegister(lir->base());
+    Register out = ToRegister(lir->output());
 
-#ifdef JS_CODEGEN_X64
-    // In order to get the offset to wrap properly, we must sign-extend the
-    // pointer to 32-bits. We'll zero out the sign extension immediately
-    // after the access to restore asm.js invariants.
-    masm.movslq(oolCheck->ptrReg(), oolCheck->ptrReg());
-#endif
+    if (base != out)
+        masm.move32(base, out);
+    masm.add32(Imm32(mir->offset()), out);
 
-    masm.jmp(oolCheck->rejoin());
-}
-
-void
-CodeGeneratorX86Shared::emitAsmJSBoundsCheckBranch(const MWasmMemoryAccess* access,
-                                                   const MInstruction* mir,
-                                                   Register ptr, Label* maybeFail)
-{
-    // Emit a bounds-checking branch for |access|.
-
-    MOZ_ASSERT(gen->needsBoundsCheckBranch(access));
-
-    Label* pass = nullptr;
-
-    // If we have a non-zero offset, it's possible that |ptr| itself is out of
-    // bounds, while adding the offset computes an in-bounds address. To catch
-    // this case, we need a second branch, which we emit out of line since it's
-    // unlikely to be needed in normal programs.
-    if (access->offset() != 0) {
-        auto oolCheck = new(alloc()) OffsetBoundsCheck(maybeFail, ptr, access->offset());
-        maybeFail = oolCheck->entry();
-        pass = oolCheck->rejoin();
-        addOutOfLineCode(oolCheck, mir);
-    }
-
-    // The bounds check is a comparison with an immediate value. The asm.js
-    // module linking process will add the length of the heap to the immediate
-    // field, so -access->endOffset() will turn into
-    // (heapLength - access->endOffset()), allowing us to test whether the end
-    // of the access is beyond the end of the heap.
-    MOZ_ASSERT(access->endOffset() >= 1,
-               "need to subtract 1 to use JAE, see also AssemblerX86Shared::UpdateBoundsCheck");
-
-    uint32_t cmpOffset = masm.cmp32WithPatch(ptr, Imm32(1 - access->endOffset())).offset();
-    if (maybeFail)
-        masm.j(Assembler::AboveOrEqual, maybeFail);
-    else
-        masm.j(Assembler::AboveOrEqual, wasm::JumpTarget::OutOfBounds);
-
-    if (pass)
-        masm.bind(pass);
-
-    masm.append(wasm::BoundsCheck(cmpOffset));
-}
-
-void
-CodeGeneratorX86Shared::visitWasmBoundsCheck(LWasmBoundsCheck* ins)
-{
-    const MWasmBoundsCheck* mir = ins->mir();
-    MOZ_ASSERT(gen->needsBoundsCheckBranch(mir));
-    if (mir->offset() > INT32_MAX) {
-        masm.jump(wasm::JumpTarget::OutOfBounds);
-        return;
-    }
-
-    Register ptrReg = ToRegister(ins->ptr());
-    maybeEmitWasmBoundsCheckBranch(mir, ptrReg, mir->isRedundant());
+    masm.j(Assembler::CarrySet, trap(mir, wasm::Trap::OutOfBounds));
 }
 
 void
@@ -537,103 +472,6 @@ CodeGeneratorX86Shared::visitWasmTruncateToInt32(LWasmTruncateToInt32* lir)
         MOZ_CRASH("unexpected type");
 
     masm.bind(ool->rejoin());
-}
-
-void
-CodeGeneratorX86Shared::maybeEmitWasmBoundsCheckBranch(const MWasmMemoryAccess* mir, Register ptr,
-                                                       bool redundant)
-{
-    if (!mir->needsBoundsCheck())
-        return;
-
-    MOZ_ASSERT(mir->endOffset() >= 1,
-               "need to subtract 1 to use JAE, see also AssemblerX86Shared::UpdateBoundsCheck");
-    /*
-     * TODO: See 1287224 Unify MWasmBoundsCheck::redunant_ and needsBoundsCheck
-     */
-    if (!redundant) {
-        uint32_t cmpOffset = masm.cmp32WithPatch(ptr, Imm32(1 - mir->endOffset())).offset();
-        masm.j(Assembler::AboveOrEqual, wasm::JumpTarget::OutOfBounds);
-        masm.append(wasm::BoundsCheck(cmpOffset));
-    } else {
-#ifdef DEBUG
-        Label ok;
-        uint32_t cmpOffset = masm.cmp32WithPatch(ptr, Imm32(1 - mir->endOffset())).offset();
-        masm.j(Assembler::Below, &ok);
-        masm.assumeUnreachable("Redundant bounds check failed!");
-        masm.bind(&ok);
-        masm.append(wasm::BoundsCheck(cmpOffset));
-#endif
-    }
-}
-
-bool
-CodeGeneratorX86Shared::maybeEmitThrowingAsmJSBoundsCheck(const MWasmMemoryAccess* access,
-                                                          const MInstruction* mir,
-                                                          const LAllocation* ptr)
-{
-    if (!gen->needsBoundsCheckBranch(access))
-        return false;
-
-    emitAsmJSBoundsCheckBranch(access, mir, ToRegister(ptr), nullptr);
-    return true;
-}
-
-bool
-CodeGeneratorX86Shared::maybeEmitAsmJSLoadBoundsCheck(const MAsmJSLoadHeap* mir, LAsmJSLoadHeap* ins,
-                                                      OutOfLineLoadTypedArrayOutOfBounds** ool)
-{
-    MOZ_ASSERT(!Scalar::isSimdType(mir->accessType()));
-    *ool = nullptr;
-
-    if (!gen->needsBoundsCheckBranch(mir))
-        return false;
-
-    Label* rejoin = nullptr;
-    if (!mir->isAtomicAccess()) {
-        *ool = new(alloc()) OutOfLineLoadTypedArrayOutOfBounds(ToAnyRegister(ins->output()),
-                                                               mir->accessType());
-        addOutOfLineCode(*ool, mir);
-        rejoin = (*ool)->entry();
-    }
-
-    emitAsmJSBoundsCheckBranch(mir, mir, ToRegister(ins->ptr()), rejoin);
-    return true;
-}
-
-bool
-CodeGeneratorX86Shared::maybeEmitAsmJSStoreBoundsCheck(const MAsmJSStoreHeap* mir, LAsmJSStoreHeap* ins,
-                                                       Label** rejoin)
-{
-    MOZ_ASSERT(!Scalar::isSimdType(mir->accessType()));
-
-    *rejoin = nullptr;
-    if (!gen->needsBoundsCheckBranch(mir))
-        return false;
-
-    if (!mir->isAtomicAccess())
-        *rejoin = alloc().lifoAlloc()->newInfallible<Label>();
-
-    emitAsmJSBoundsCheckBranch(mir, mir, ToRegister(ins->ptr()), *rejoin);
-    return true;
-}
-
-void
-CodeGeneratorX86Shared::cleanupAfterAsmJSBoundsCheckBranch(const MWasmMemoryAccess* access,
-                                                           Register ptr)
-{
-    // Clean up after performing a heap access checked by a branch.
-
-    MOZ_ASSERT(gen->needsBoundsCheckBranch(access));
-
-#ifdef JS_CODEGEN_X64
-    // If the offset is 0, we don't use an OffsetBoundsCheck.
-    if (access->offset() != 0) {
-        // Zero out the high 32 bits, in case the OffsetBoundsCheck code had to
-        // sign-extend (movslq) the pointer value to get wraparound to work.
-        masm.movl(ptr, ptr);
-    }
-#endif
 }
 
 bool
@@ -881,8 +719,8 @@ CodeGeneratorX86Shared::visitPowHalfD(LPowHalfD* ins)
         masm.branchDouble(cond, input, scratch, &sqrt);
 
         // Math.pow(-Infinity, 0.5) == Infinity.
-        masm.zeroDouble(input);
-        masm.subDouble(scratch, input);
+        masm.zeroDouble(output);
+        masm.subDouble(scratch, output);
         masm.jump(&done);
 
         masm.bind(&sqrt);
@@ -891,10 +729,11 @@ CodeGeneratorX86Shared::visitPowHalfD(LPowHalfD* ins)
     if (!ins->mir()->operandIsNeverNegativeZero()) {
         // Math.pow(-0, 0.5) == 0 == Math.pow(0, 0.5). Adding 0 converts any -0 to 0.
         masm.zeroDouble(scratch);
-        masm.addDouble(scratch, input);
+        masm.addDouble(input, scratch);
+        masm.vsqrtsd(scratch, output, output);
+    } else {
+        masm.vsqrtsd(input, output, output);
     }
-
-    masm.vsqrtsd(input, output, output);
 
     masm.bind(&done);
 }
@@ -1188,7 +1027,7 @@ CodeGeneratorX86Shared::visitUDivOrMod(LUDivOrMod* ins)
         masm.test32(rhs, rhs);
         if (ins->mir()->isTruncated()) {
             if (ins->trapOnError()) {
-                masm.j(Assembler::Zero, wasm::JumpTarget::IntegerDivideByZero);
+                masm.j(Assembler::Zero, trap(ins, wasm::Trap::IntegerDivideByZero));
             } else {
                 ool = new(alloc()) ReturnZero(output);
                 masm.j(Assembler::Zero, ool->entry());
@@ -1236,7 +1075,7 @@ CodeGeneratorX86Shared::visitUDivOrModConstant(LUDivOrModConstant *ins) {
     if (d == 0) {
         if (ins->mir()->isTruncated()) {
             if (ins->trapOnError())
-                masm.jump(wasm::JumpTarget::IntegerDivideByZero);
+                masm.jump(trap(ins, wasm::Trap::IntegerDivideByZero));
             else
                 masm.xorl(output, output);
         } else {
@@ -1375,7 +1214,7 @@ CodeGeneratorX86Shared::visitDivPowTwoI(LDivPowTwoI* ins)
         if (!mir->isTruncated())
             bailoutIf(Assembler::Overflow, ins->snapshot());
         else if (mir->trapOnError())
-            masm.j(Assembler::Overflow, wasm::JumpTarget::IntegerOverflow);
+            masm.j(Assembler::Overflow, trap(mir, wasm::Trap::IntegerOverflow));
     } else if (mir->isUnsigned() && !mir->isTruncated()) {
         // Unsigned division by 1 can overflow if output is not
         // truncated.
@@ -1494,7 +1333,7 @@ CodeGeneratorX86Shared::visitDivI(LDivI* ins)
     if (mir->canBeDivideByZero()) {
         masm.test32(rhs, rhs);
         if (mir->trapOnError()) {
-            masm.j(Assembler::Zero, wasm::JumpTarget::IntegerDivideByZero);
+            masm.j(Assembler::Zero, trap(mir, wasm::Trap::IntegerDivideByZero));
         } else if (mir->canTruncateInfinities()) {
             // Truncated division by zero is zero (Infinity|0 == 0)
             if (!ool)
@@ -1513,7 +1352,7 @@ CodeGeneratorX86Shared::visitDivI(LDivI* ins)
         masm.j(Assembler::NotEqual, &notmin);
         masm.cmp32(rhs, Imm32(-1));
         if (mir->trapOnError()) {
-            masm.j(Assembler::Equal, wasm::JumpTarget::IntegerOverflow);
+            masm.j(Assembler::Equal, trap(mir, wasm::Trap::IntegerOverflow));
         } else if (mir->canTruncateOverflow()) {
             // (-INT32_MIN)|0 == INT32_MIN and INT32_MIN is already in the
             // output register (lhs == eax).
@@ -1656,12 +1495,14 @@ CodeGeneratorX86Shared::visitModI(LModI* ins)
     if (lhs != eax)
         masm.mov(lhs, eax);
 
+    MMod* mir = ins->mir();
+
     // Prevent divide by zero.
-    if (ins->mir()->canBeDivideByZero()) {
+    if (mir->canBeDivideByZero()) {
         masm.test32(rhs, rhs);
-        if (ins->mir()->isTruncated()) {
-            if (ins->mir()->trapOnError()) {
-                masm.j(Assembler::Zero, wasm::JumpTarget::IntegerDivideByZero);
+        if (mir->isTruncated()) {
+            if (mir->trapOnError()) {
+                masm.j(Assembler::Zero, trap(mir, wasm::Trap::IntegerDivideByZero));
             } else {
                 if (!ool)
                     ool = new(alloc()) ReturnZero(edx);
@@ -1675,13 +1516,13 @@ CodeGeneratorX86Shared::visitModI(LModI* ins)
     Label negative;
 
     // Switch based on sign of the lhs.
-    if (ins->mir()->canBeNegativeDividend())
+    if (mir->canBeNegativeDividend())
         masm.branchTest32(Assembler::Signed, lhs, lhs, &negative);
 
     // If lhs >= 0 then remainder = lhs % rhs. The remainder must be positive.
     {
         // Check if rhs is a power-of-two.
-        if (ins->mir()->canBePowerOfTwoDivisor()) {
+        if (mir->canBePowerOfTwoDivisor()) {
             MOZ_ASSERT(rhs != remainder);
 
             // Rhs y is a power-of-two if (y & (y-1)) == 0. Note that if
@@ -1707,7 +1548,7 @@ CodeGeneratorX86Shared::visitModI(LModI* ins)
     }
 
     // Otherwise, we have to beware of two special cases:
-    if (ins->mir()->canBeNegativeDividend()) {
+    if (mir->canBeNegativeDividend()) {
         masm.jump(&done);
 
         masm.bind(&negative);
@@ -1721,7 +1562,7 @@ CodeGeneratorX86Shared::visitModI(LModI* ins)
         masm.cdq();
         masm.idiv(rhs);
 
-        if (!ins->mir()->isTruncated()) {
+        if (!mir->isTruncated()) {
             // A remainder of 0 means that the rval must be -0, which is a double.
             masm.test32(remainder, remainder);
             bailoutIf(Assembler::Zero, ins->snapshot());
@@ -1731,12 +1572,12 @@ CodeGeneratorX86Shared::visitModI(LModI* ins)
     masm.bind(&done);
 
     if (overflow) {
-        addOutOfLineCode(overflow, ins->mir());
+        addOutOfLineCode(overflow, mir);
         masm.bind(overflow->done());
     }
 
     if (ool) {
-        addOutOfLineCode(ool, ins->mir());
+        addOutOfLineCode(ool, mir);
         masm.bind(ool->rejoin());
     }
 }
@@ -2618,7 +2459,7 @@ CodeGeneratorX86Shared::visitFloat32x4ToInt32x4(LFloat32x4ToInt32x4* ins)
 
     masm.convertFloat32x4ToInt32x4(in, out);
 
-    OutOfLineSimdFloatToIntCheck *ool = new(alloc()) OutOfLineSimdFloatToIntCheck(temp, in, ins);
+    auto* ool = new(alloc()) OutOfLineSimdFloatToIntCheck(temp, in, ins, ins->mir()->trapOffset());
     addOutOfLineCode(ool, ins->mir());
 
     static const SimdConstant InvalidResult = SimdConstant::SplatX4(int32_t(-2147483648));
@@ -2661,8 +2502,8 @@ CodeGeneratorX86Shared::visitOutOfLineSimdFloatToIntCheck(OutOfLineSimdFloatToIn
 
     masm.jump(ool->rejoin());
 
-    if (gen->compilingAsmJS()) {
-        masm.bindLater(&onConversionError, wasm::JumpTarget::ImpreciseSimdConversion);
+    if (gen->compilingWasm()) {
+        masm.bindLater(&onConversionError, trap(ool, wasm::Trap::ImpreciseSimdConversion));
     } else {
         masm.bind(&onConversionError);
         bailout(ool->ins()->snapshot());
@@ -2675,6 +2516,7 @@ CodeGeneratorX86Shared::visitOutOfLineSimdFloatToIntCheck(OutOfLineSimdFloatToIn
 void
 CodeGeneratorX86Shared::visitFloat32x4ToUint32x4(LFloat32x4ToUint32x4* ins)
 {
+    const MSimdConvert* mir = ins->mir();
     FloatRegister in = ToFloatRegister(ins->input());
     FloatRegister out = ToFloatRegister(ins->output());
     Register temp = ToRegister(ins->tempR());
@@ -2740,8 +2582,8 @@ CodeGeneratorX86Shared::visitFloat32x4ToUint32x4(LFloat32x4ToUint32x4* ins)
     masm.vmovmskps(scratch, temp);
     masm.cmp32(temp, Imm32(0));
 
-    if (gen->compilingAsmJS())
-        masm.j(Assembler::NotEqual, wasm::JumpTarget::ImpreciseSimdConversion);
+    if (gen->compilingWasm())
+        masm.j(Assembler::NotEqual, trap(mir, wasm::Trap::ImpreciseSimdConversion));
     else
         bailoutIf(Assembler::NotEqual, ins->snapshot());
 }
@@ -3008,9 +2850,9 @@ CodeGeneratorX86Shared::visitSimdExtractElementF(LSimdExtractElementF* ins)
     }
     // NaNs contained within SIMD values are not enforced to be canonical, so
     // when we extract an element into a "regular" scalar JS value, we have to
-    // canonicalize. In asm.js code, we can skip this, as asm.js only has to
+    // canonicalize. In wasm code, we can skip this, as wasm only has to
     // canonicalize NaNs at FFI boundaries.
-    if (!gen->compilingAsmJS())
+    if (!gen->compilingWasm())
         masm.canonicalizeFloat(output);
 }
 
@@ -4734,19 +4576,20 @@ CodeGeneratorX86Shared::visitOutOfLineWasmTruncateCheck(OutOfLineWasmTruncateChe
     MIRType toType = ool->toType();
     Label* oolRejoin = ool->rejoin();
     bool isUnsigned = ool->isUnsigned();
+    wasm::TrapOffset off = ool->trapOffset();
 
     if (fromType == MIRType::Float32) {
         if (toType == MIRType::Int32)
-            masm.outOfLineWasmTruncateFloat32ToInt32(input, isUnsigned, oolRejoin);
+            masm.outOfLineWasmTruncateFloat32ToInt32(input, isUnsigned, off, oolRejoin);
         else if (toType == MIRType::Int64)
-            masm.outOfLineWasmTruncateFloat32ToInt64(input, isUnsigned, oolRejoin);
+            masm.outOfLineWasmTruncateFloat32ToInt64(input, isUnsigned, off, oolRejoin);
         else
             MOZ_CRASH("unexpected type");
     } else if (fromType == MIRType::Double) {
         if (toType == MIRType::Int32)
-            masm.outOfLineWasmTruncateDoubleToInt32(input, isUnsigned, oolRejoin);
+            masm.outOfLineWasmTruncateDoubleToInt32(input, isUnsigned, off, oolRejoin);
         else if (toType == MIRType::Int64)
-            masm.outOfLineWasmTruncateDoubleToInt64(input, isUnsigned, oolRejoin);
+            masm.outOfLineWasmTruncateDoubleToInt64(input, isUnsigned, off, oolRejoin);
         else
             MOZ_CRASH("unexpected type");
     } else {

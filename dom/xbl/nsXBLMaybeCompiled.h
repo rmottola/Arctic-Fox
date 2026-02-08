@@ -114,6 +114,17 @@ struct BarrierMethods<nsXBLMaybeCompiled<UncompiledT>>
                         nullptr);
     }
   }
+  static void exposeToJS(nsXBLMaybeCompiled<UncompiledT> fun) {
+    if (fun.IsCompiled()) {
+      JS::ExposeObjectToActiveJS(fun.UnsafeGetJSFunction());
+    }
+  }
+};
+
+template <class T>
+struct IsHeapConstructibleType<nsXBLMaybeCompiled<T>>
+{ // Yes, this is the exception to the rule. Sorry.
+  static constexpr bool value = true;
 };
 
 template <class UncompiledT>

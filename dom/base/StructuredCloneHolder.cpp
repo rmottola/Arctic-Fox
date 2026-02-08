@@ -31,6 +31,7 @@
 #include "mozilla/dom/SubtleCryptoBinding.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/dom/URLSearchParams.h"
+#include "mozilla/dom/URLSearchParamsBinding.h"
 #include "mozilla/dom/WebCryptoCommon.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/ipc/BackgroundChild.h"
@@ -40,9 +41,6 @@
 #include "nsIRemoteBlob.h"
 #include "nsQueryObject.h"
 
-#ifdef MOZ_NFC
-#include "mozilla/dom/MozNDEFRecord.h"
-#endif // MOZ_NFC
 #ifdef MOZ_WEBRTC
 #include "mozilla/dom/RTCCertificate.h"
 #include "mozilla/dom/RTCCertificateBinding.h"
@@ -174,20 +172,24 @@ bool
 StructuredCloneHolderBase::Write(JSContext* aCx,
                                  JS::Handle<JS::Value> aValue)
 {
-  return Write(aCx, aValue, JS::UndefinedHandleValue);
+  return Write(aCx, aValue, JS::UndefinedHandleValue,
+               JS::CloneDataPolicy().denySharedArrayBuffer());
 }
 
 bool
 StructuredCloneHolderBase::Write(JSContext* aCx,
                                  JS::Handle<JS::Value> aValue,
-                                 JS::Handle<JS::Value> aTransfer)
+                                 JS::Handle<JS::Value> aTransfer,
+                                 JS::CloneDataPolicy cloneDataPolicy)
 {
   MOZ_ASSERT(!mBuffer, "Double Write is not allowed");
   MOZ_ASSERT(!mClearCalled, "This method cannot be called after Clear.");
 
   mBuffer = MakeUnique<JSAutoStructuredCloneBuffer>(mStructuredCloneScope, &StructuredCloneHolder::sCallbacks, this);
 
-  if (!mBuffer->write(aCx, aValue, aTransfer, &StructuredCloneHolder::sCallbacks, this)) {
+  if (!mBuffer->write(aCx, aValue, aTransfer, cloneDataPolicy,
+                      &StructuredCloneHolder::sCallbacks, this))
+  {
     mBuffer = nullptr;
     return false;
   }
@@ -264,19 +266,21 @@ StructuredCloneHolder::Write(JSContext* aCx,
                              JS::Handle<JS::Value> aValue,
                              ErrorResult& aRv)
 {
-  Write(aCx, aValue, JS::UndefinedHandleValue, aRv);
+  Write(aCx, aValue, JS::UndefinedHandleValue,
+        JS::CloneDataPolicy().denySharedArrayBuffer(), aRv);
 }
 
 void
 StructuredCloneHolder::Write(JSContext* aCx,
                              JS::Handle<JS::Value> aValue,
                              JS::Handle<JS::Value> aTransfer,
+                             JS::CloneDataPolicy cloneDataPolicy,
                              ErrorResult& aRv)
 {
   MOZ_ASSERT_IF(mStructuredCloneScope == StructuredCloneScope::SameProcessSameThread,
                 mCreationThread == NS_GetCurrentThread());
 
-  if (!StructuredCloneHolderBase::Write(aCx, aValue, aTransfer)) {
+  if (!StructuredCloneHolderBase::Write(aCx, aValue, aTransfer, cloneDataPolicy)) {
     aRv.Throw(NS_ERROR_DOM_DATA_CLONE_ERR);
     return;
   }
@@ -405,28 +409,6 @@ StructuredCloneHolder::ReadFullySerializableObjects(JSContext* aCx,
     return result.toObjectOrNull();
   }
 
-#ifdef MOZ_NFC
-  if (aTag == SCTAG_DOM_NFC_NDEF) {
-    if (!NS_IsMainThread()) {
-      return nullptr;
-    }
-
-    nsIGlobalObject *global = xpc::NativeGlobal(JS::CurrentGlobalOrNull(aCx));
-    if (!global) {
-      return nullptr;
-    }
-
-    // Prevent the return value from being trashed by a GC during ~nsRefPtr.
-    JS::Rooted<JSObject*> result(aCx);
-    {
-      RefPtr<MozNDEFRecord> ndefRecord = new MozNDEFRecord(global);
-      result = ndefRecord->ReadStructuredClone(aCx, aReader) ?
-               ndefRecord->WrapObject(aCx, nullptr) : nullptr;
-    }
-    return result;
-  }
-#endif
-
 #ifdef MOZ_WEBRTC
   if (aTag == SCTAG_DOM_RTC_CERTIFICATE) {
     if (!NS_IsMainThread()) {
@@ -509,17 +491,6 @@ StructuredCloneHolder::WriteFullySerializableObjects(JSContext* aCx,
     }
   }
 
-#ifdef MOZ_NFC
-  {
-    MozNDEFRecord* ndefRecord = nullptr;
-    if (NS_SUCCEEDED(UNWRAP_OBJECT(MozNDEFRecord, aObj, ndefRecord))) {
-      MOZ_ASSERT(NS_IsMainThread());
-      return JS_WriteUint32Pair(aWriter, SCTAG_DOM_NFC_NDEF, 0) &&
-             ndefRecord->WriteStructuredClone(aCx, aWriter);
-    }
-  }
-#endif // MOZ_NFC
-
   // Don't know what this is
   xpc::Throw(aCx, NS_ERROR_DOM_DATA_CLONE_ERR);
   return false;
@@ -600,10 +571,10 @@ EnsureBlobForBackgroundManager(BlobImpl* aBlobImpl,
       nsString name;
       blobImpl->GetName(name);
 
-      blobImpl = MultipartBlobImpl::Create(newSubBlobImpls, name,
+      blobImpl = MultipartBlobImpl::Create(Move(newSubBlobImpls), name,
                                            contentType, aRv);
     } else {
-      blobImpl = MultipartBlobImpl::Create(newSubBlobImpls, contentType, aRv);
+      blobImpl = MultipartBlobImpl::Create(Move(newSubBlobImpls), contentType, aRv);
     }
 
     if (NS_WARN_IF(aRv.Failed())) {
@@ -1306,6 +1277,21 @@ StructuredCloneHolder::CustomFreeTransferHandler(uint32_t aTag,
     delete data;
     return;
   }
+}
+
+bool
+StructuredCloneHolder::TakeTransferredPortsAsSequence(Sequence<OwningNonNull<mozilla::dom::MessagePort>>& aPorts)
+{
+  nsTArray<RefPtr<MessagePort>> ports = TakeTransferredPorts();
+
+  aPorts.Clear();
+  for (uint32_t i = 0, len = ports.Length(); i < len; ++i) {
+    if (!aPorts.AppendElement(ports[i].forget(), fallible)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 } // dom namespace

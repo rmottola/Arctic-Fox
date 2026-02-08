@@ -17,12 +17,13 @@
 #include "mozilla/net/WebSocketChannelChild.h"
 #include "mozilla/net/WebSocketEventListenerChild.h"
 #include "mozilla/net/DNSRequestChild.h"
-#include "mozilla/net/RemoteOpenFileChild.h"
 #include "mozilla/net/ChannelDiverterChild.h"
 #include "mozilla/net/IPCTransportProvider.h"
 #include "mozilla/dom/network/TCPSocketChild.h"
 #include "mozilla/dom/network/TCPServerSocketChild.h"
 #include "mozilla/dom/network/UDPSocketChild.h"
+#include "mozilla/net/AltDataOutputStreamChild.h"
+
 #ifdef NECKO_PROTOCOL_rtsp
 #include "mozilla/net/RtspControllerChild.h"
 #include "mozilla/net/RtspChannelChild.h"
@@ -84,6 +85,24 @@ NeckoChild::DeallocPHttpChannelChild(PHttpChannelChild* channel)
   MOZ_ASSERT(IsNeckoChild(), "DeallocPHttpChannelChild called by non-child!");
 
   HttpChannelChild* child = static_cast<HttpChannelChild*>(channel);
+  child->ReleaseIPDLReference();
+  return true;
+}
+
+PAltDataOutputStreamChild*
+NeckoChild::AllocPAltDataOutputStreamChild(
+        const nsCString& type,
+        PHttpChannelChild* channel)
+{
+  AltDataOutputStreamChild* stream = new AltDataOutputStreamChild();
+  stream->AddIPDLReference();
+  return stream;
+}
+
+bool
+NeckoChild::DeallocPAltDataOutputStreamChild(PAltDataOutputStreamChild* aActor)
+{
+  AltDataOutputStreamChild* child = static_cast<AltDataOutputStreamChild*>(aActor);
   child->ReleaseIPDLReference();
   return true;
 }
@@ -296,25 +315,6 @@ NeckoChild::DeallocPDNSRequestChild(PDNSRequestChild* aChild)
   return true;
 }
 
-PRemoteOpenFileChild*
-NeckoChild::AllocPRemoteOpenFileChild(const SerializedLoadContext& aSerialized,
-                                      const URIParams&,
-                                      const OptionalURIParams&)
-{
-  // We don't allocate here: instead we always use IPDL constructor that takes
-  // an existing RemoteOpenFileChild
-  NS_NOTREACHED("AllocPRemoteOpenFileChild should not be called on child");
-  return nullptr;
-}
-
-bool
-NeckoChild::DeallocPRemoteOpenFileChild(PRemoteOpenFileChild* aChild)
-{
-  RemoteOpenFileChild *p = static_cast<RemoteOpenFileChild*>(aChild);
-  p->ReleaseIPDLReference();
-  return true;
-}
-
 PChannelDiverterChild*
 NeckoChild::AllocPChannelDiverterChild(const ChannelDiverterArgs& channel)
 {
@@ -344,7 +344,7 @@ NeckoChild::DeallocPTransportProviderChild(PTransportProviderChild* aActor)
   return true;
 }
 
-bool
+mozilla::ipc::IPCResult
 NeckoChild::RecvAsyncAuthPromptForNestedFrame(const TabId& aNestedFrameId,
                                               const nsCString& aUri,
                                               const nsString& aRealm,
@@ -353,14 +353,14 @@ NeckoChild::RecvAsyncAuthPromptForNestedFrame(const TabId& aNestedFrameId,
   RefPtr<dom::TabChild> tabChild = dom::TabChild::FindTabChild(aNestedFrameId);
   if (!tabChild) {
     MOZ_CRASH();
-    return false;
+    return IPC_FAIL_NO_REASON(this);
   }
   tabChild->SendAsyncAuthPrompt(aUri, aRealm, aCallbackId);
-  return true;
+  return IPC_OK();
 }
 
 /* Predictor Messages */
-bool
+mozilla::ipc::IPCResult
 NeckoChild::RecvPredOnPredictPrefetch(const URIParams& aURI,
                                       const uint32_t& aHttpStatus)
 {
@@ -373,13 +373,13 @@ NeckoChild::RecvPredOnPredictPrefetch(const URIParams& aURI,
   nsresult rv = NS_OK;
   nsCOMPtr<nsINetworkPredictorVerifier> predictor =
     do_GetService("@mozilla.org/network/predictor;1", &rv);
-  NS_ENSURE_SUCCESS(rv, false);
+  NS_ENSURE_SUCCESS(rv, IPC_FAIL_NO_REASON(this));
 
   predictor->OnPredictPrefetch(uri, aHttpStatus);
-  return true;
+  return IPC_OK();
 }
 
-bool
+mozilla::ipc::IPCResult
 NeckoChild::RecvPredOnPredictPreconnect(const URIParams& aURI)
 {
   MOZ_ASSERT(NS_IsMainThread(), "PredictorChild::RecvOnPredictPreconnect "
@@ -391,13 +391,13 @@ NeckoChild::RecvPredOnPredictPreconnect(const URIParams& aURI)
   nsresult rv = NS_OK;
   nsCOMPtr<nsINetworkPredictorVerifier> predictor =
     do_GetService("@mozilla.org/network/predictor;1", &rv);
-  NS_ENSURE_SUCCESS(rv, false);
+  NS_ENSURE_SUCCESS(rv, IPC_FAIL_NO_REASON(this));
 
   predictor->OnPredictPreconnect(uri);
-  return true;
+  return IPC_OK();
 }
 
-bool
+mozilla::ipc::IPCResult
 NeckoChild::RecvPredOnPredictDNS(const URIParams& aURI)
 {
   MOZ_ASSERT(NS_IsMainThread(), "PredictorChild::RecvOnPredictDNS off "
@@ -409,25 +409,13 @@ NeckoChild::RecvPredOnPredictDNS(const URIParams& aURI)
   nsresult rv = NS_OK;
   nsCOMPtr<nsINetworkPredictorVerifier> predictor =
     do_GetService("@mozilla.org/network/predictor;1", &rv);
-  NS_ENSURE_SUCCESS(rv, false);
+  NS_ENSURE_SUCCESS(rv, IPC_FAIL_NO_REASON(this));
 
   predictor->OnPredictDNS(uri);
-  return true;
+  return IPC_OK();
 }
 
-bool
-NeckoChild::RecvAppOfflineStatus(const uint32_t& aId, const bool& aOffline)
-{
-  // Instantiate the service to make sure gIOService is initialized
-  nsCOMPtr<nsIIOService> ioService = do_GetIOService();
-  if (gIOService) {
-    gIOService->SetAppOfflineInternal(aId, aOffline ?
-      nsIAppOfflineInfo::OFFLINE : nsIAppOfflineInfo::ONLINE);
-  }
-  return true;
-}
-
-bool
+mozilla::ipc::IPCResult
 NeckoChild::RecvSpeculativeConnectRequest()
 {
   nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
@@ -435,7 +423,7 @@ NeckoChild::RecvSpeculativeConnectRequest()
     obsService->NotifyObservers(nullptr, "speculative-connect-request",
                                 nullptr);
   }
-  return true;
+  return IPC_OK();
 }
 
 } // namespace net

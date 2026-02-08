@@ -117,7 +117,7 @@ class nsGeolocationRequest final
     {}
 
   private:
-    ~TimerCallbackHolder() {}
+    ~TimerCallbackHolder() = default;
     WeakPtr<nsGeolocationRequest> mRequest;
   };
 
@@ -282,7 +282,7 @@ PositionError::PositionError(Geolocation* aParent, int16_t aCode)
 {
 }
 
-PositionError::~PositionError(){}
+PositionError::~PositionError() = default;
 
 
 NS_IMETHODIMP
@@ -812,9 +812,7 @@ nsresult nsGeolocationService::Init()
   return NS_OK;
 }
 
-nsGeolocationService::~nsGeolocationService()
-{
-}
+nsGeolocationService::~nsGeolocationService() = default;
 
 void
 nsGeolocationService::HandleMozsettingChanged(nsISupports* aSubject)
@@ -1257,7 +1255,7 @@ Geolocation::Shutdown()
       if (doc) {
         doc->RemoveSystemEventListener(NS_LITERAL_STRING("visibilitychange"),
                                        this,
-                                       /* useCapture = */ true);
+                                       /* aUseCapture = */ true);
       }
     }
   }

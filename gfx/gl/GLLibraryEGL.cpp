@@ -346,8 +346,10 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel, nsACString* const out_failureId
 
         mEGLLibrary = LoadLibraryForEGLOnWindows(NS_LITERAL_STRING("libEGL.dll"));
 
-        if (!mEGLLibrary)
+        if (!mEGLLibrary) {
+            *out_failureId = NS_LITERAL_CSTRING("FEATURE_FAILURE_EGL_LOAD");
             return false;
+        }
     }
 
 #else // !Windows
@@ -372,6 +374,7 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel, nsACString* const out_failureId
 
     if (!mEGLLibrary) {
         NS_WARNING("Couldn't load EGL LIB.");
+        *out_failureId = NS_LITERAL_CSTRING("FEATURE_FAILURE_EGL_LOAD_2");
         return false;
     }
 
@@ -412,6 +415,7 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel, nsACString* const out_failureId
 
     if (!GLLibraryLoader::LoadSymbols(mEGLLibrary, &earlySymbols[0])) {
         NS_WARNING("Couldn't find required entry points in EGL library (early init)");
+        *out_failureId = NS_LITERAL_CSTRING("FEATURE_FAILURE_EGL_SYM");
         return false;
     }
 
@@ -426,11 +430,6 @@ GLLibraryEGL::EnsureInitialized(bool forceAccel, nsACString* const out_failureId
     // Do not warn about the failure to load this - see bug 1092191
     Unused << GLLibraryLoader::LoadSymbols(mEGLLibrary, &optionalSymbols[0],
                                            nullptr, nullptr, false);
-
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 18
-    MOZ_RELEASE_ASSERT(mSymbols.fQueryStringImplementationANDROID,
-                       "GFX: Couldn't find eglQueryStringImplementationANDROID");
-#endif
 
     InitClientExtensions();
 

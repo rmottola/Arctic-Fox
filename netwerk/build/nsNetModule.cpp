@@ -233,9 +233,6 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsNestedAboutURI)
 
 #ifdef NECKO_PROTOCOL_about
 // about
-#ifdef NS_BUILD_REFCNT_LOGGING
-#include "nsAboutBloat.h"
-#endif
 #include "nsAboutCache.h"
 #include "nsAboutCacheEntry.h"
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsAboutCacheEntry)
@@ -288,15 +285,20 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(ThrottleQueue)
 #endif // !NECKO_PROTOCOL_http
 
 #include "mozilla/net/Dashboard.h"
-#include "mozilla/net/PackagedAppService.h"
-#include "mozilla/net/PackagedAppVerifier.h"
 namespace mozilla {
 namespace net {
   NS_GENERIC_FACTORY_CONSTRUCTOR(Dashboard)
-  NS_GENERIC_FACTORY_CONSTRUCTOR(PackagedAppService)
-  NS_GENERIC_FACTORY_CONSTRUCTOR(PackagedAppVerifier)
 } // namespace net
 } // namespace mozilla
+
+#ifdef XP_WIN
+#include "../socket/nsNamedPipeService.h"
+namespace mozilla {
+namespace net {
+NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(NamedPipeService, Init)
+} // namespace net
+} // namespace mozilla
+#endif
 
 #ifdef NECKO_PROTOCOL_res
 // resource
@@ -467,7 +469,6 @@ nsresult NS_NewStreamConv(nsStreamConverterService **aStreamConv);
 #define INDEX_TO_HTML                "?from=application/http-index-format&to=text/html"
 #define MULTI_MIXED_X                "?from=multipart/x-mixed-replace&to=*/*"
 #define MULTI_MIXED                  "?from=multipart/mixed&to=*/*"
-#define APPLICATION_PACKAGE_CONV     "?from=" APPLICATION_PACKAGE "&to=*/*"
 #define MULTI_BYTERANGES             "?from=multipart/byteranges&to=*/*"
 #define UNKNOWN_CONTENT              "?from=" UNKNOWN_CONTENT_TYPE "&to=*/*"
 #define GZIP_TO_UNCOMPRESSED         "?from=gzip&to=uncompressed"
@@ -487,7 +488,6 @@ static const mozilla::Module::CategoryEntry kNeckoCategories[] = {
     { NS_ISTREAMCONVERTER_KEY, INDEX_TO_HTML, "" },
     { NS_ISTREAMCONVERTER_KEY, MULTI_MIXED_X, "" },
     { NS_ISTREAMCONVERTER_KEY, MULTI_MIXED, "" },
-    { NS_ISTREAMCONVERTER_KEY, APPLICATION_PACKAGE_CONV, "" },
     { NS_ISTREAMCONVERTER_KEY, MULTI_BYTERANGES, "" },
     { NS_ISTREAMCONVERTER_KEY, UNKNOWN_CONTENT, "" },
     { NS_ISTREAMCONVERTER_KEY, GZIP_TO_UNCOMPRESSED, "" },
@@ -672,7 +672,7 @@ CreateNewBinaryDetectorFactory(nsISupports *aOuter, REFNSIID aIID, void **aResul
     return NS_ERROR_NO_AGGREGATION;
   }
 
-  nsBinaryDetector* inst = new nsBinaryDetector();
+  auto* inst = new nsBinaryDetector();
   if (!inst) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -765,8 +765,9 @@ NS_DEFINE_NAMED_CID(NS_BUFFEREDOUTPUTSTREAM_CID);
 NS_DEFINE_NAMED_CID(NS_MIMEINPUTSTREAM_CID);
 NS_DEFINE_NAMED_CID(NS_PROTOCOLPROXYSERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_STREAMCONVERTERSERVICE_CID);
-NS_DEFINE_NAMED_CID(NS_PACKAGEDAPPSERVICE_CID);
-NS_DEFINE_NAMED_CID(NS_PACKAGEDAPPVERIFIER_CID);
+#if defined(XP_WIN)
+NS_DEFINE_NAMED_CID(NS_NAMEDPIPESERVICE_CID);
+#endif
 NS_DEFINE_NAMED_CID(NS_DASHBOARD_CID);
 #ifdef NECKO_PROTOCOL_ftp
 NS_DEFINE_NAMED_CID(NS_FTPDIRLISTINGCONVERTER_CID);
@@ -811,9 +812,6 @@ NS_DEFINE_NAMED_CID(NS_SAFEABOUTPROTOCOLHANDLER_CID);
 NS_DEFINE_NAMED_CID(NS_ABOUT_BLANK_MODULE_CID);
 NS_DEFINE_NAMED_CID(NS_NESTEDABOUTURI_CID);
 #ifdef NECKO_PROTOCOL_about
-#ifdef NS_BUILD_REFCNT_LOGGING
-NS_DEFINE_NAMED_CID(NS_ABOUT_BLOAT_MODULE_CID);
-#endif
 NS_DEFINE_NAMED_CID(NS_ABOUT_CACHE_MODULE_CID);
 NS_DEFINE_NAMED_CID(NS_ABOUT_CACHE_ENTRY_MODULE_CID);
 #endif
@@ -916,8 +914,9 @@ static const mozilla::Module::CIDEntry kNeckoCIDs[] = {
     { &kNS_MIMEINPUTSTREAM_CID, false, nullptr, nsMIMEInputStreamConstructor },
     { &kNS_PROTOCOLPROXYSERVICE_CID, true, nullptr, nsProtocolProxyServiceConstructor },
     { &kNS_STREAMCONVERTERSERVICE_CID, false, nullptr, CreateNewStreamConvServiceFactory },
-    { &kNS_PACKAGEDAPPSERVICE_CID, false, NULL, mozilla::net::PackagedAppServiceConstructor },
-    { &kNS_PACKAGEDAPPVERIFIER_CID, false, NULL, mozilla::net::PackagedAppVerifierConstructor },
+#if defined (XP_WIN)
+    { &kNS_NAMEDPIPESERVICE_CID, false, NULL, mozilla::net::NamedPipeServiceConstructor },
+#endif
     { &kNS_DASHBOARD_CID, false, nullptr, mozilla::net::DashboardConstructor },
 #ifdef NECKO_PROTOCOL_ftp
     { &kNS_FTPDIRLISTINGCONVERTER_CID, false, nullptr, CreateNewFTPDirListingConv },
@@ -962,9 +961,6 @@ static const mozilla::Module::CIDEntry kNeckoCIDs[] = {
     { &kNS_ABOUT_BLANK_MODULE_CID, false, nullptr, nsAboutBlank::Create },
     { &kNS_NESTEDABOUTURI_CID, false, nullptr, nsNestedAboutURIConstructor },
 #ifdef NECKO_PROTOCOL_about
-#ifdef NS_BUILD_REFCNT_LOGGING
-    { &kNS_ABOUT_BLOAT_MODULE_CID, false, nullptr, nsAboutBloat::Create },
-#endif
     { &kNS_ABOUT_CACHE_MODULE_CID, false, nullptr, nsAboutCache::Create },
     { &kNS_ABOUT_CACHE_ENTRY_MODULE_CID, false, nullptr, nsAboutCacheEntryConstructor },
 #endif
@@ -1069,8 +1065,9 @@ static const mozilla::Module::ContractIDEntry kNeckoContracts[] = {
     { NS_MIMEINPUTSTREAM_CONTRACTID, &kNS_MIMEINPUTSTREAM_CID },
     { NS_PROTOCOLPROXYSERVICE_CONTRACTID, &kNS_PROTOCOLPROXYSERVICE_CID },
     { NS_STREAMCONVERTERSERVICE_CONTRACTID, &kNS_STREAMCONVERTERSERVICE_CID },
-    { NS_PACKAGEDAPPSERVICE_CONTRACTID, &kNS_PACKAGEDAPPSERVICE_CID },
-    { NS_PACKAGEDAPPVERIFIER_CONTRACTID, &kNS_PACKAGEDAPPVERIFIER_CID },
+#if defined(XP_WIN)
+    { NS_NAMEDPIPESERVICE_CONTRACTID, &kNS_NAMEDPIPESERVICE_CID },
+#endif
     { NS_DASHBOARD_CONTRACTID, &kNS_DASHBOARD_CID },
 #ifdef NECKO_PROTOCOL_ftp
     { NS_ISTREAMCONVERTER_KEY FTP_TO_INDEX, &kNS_FTPDIRLISTINGCONVERTER_CID },
@@ -1080,7 +1077,6 @@ static const mozilla::Module::ContractIDEntry kNeckoContracts[] = {
     { NS_ISTREAMCONVERTER_KEY MULTI_MIXED_X, &kNS_MULTIMIXEDCONVERTER_CID },
     { NS_ISTREAMCONVERTER_KEY MULTI_BYTERANGES, &kNS_MULTIMIXEDCONVERTER_CID },
     { NS_ISTREAMCONVERTER_KEY MULTI_MIXED, &kNS_MULTIMIXEDCONVERTER_CID },
-    { NS_ISTREAMCONVERTER_KEY APPLICATION_PACKAGE_CONV, &kNS_MULTIMIXEDCONVERTER_CID },
     { NS_ISTREAMCONVERTER_KEY UNKNOWN_CONTENT, &kNS_UNKNOWNDECODER_CID },
     { NS_GENERIC_CONTENT_SNIFFER, &kNS_UNKNOWNDECODER_CID },
     { NS_BINARYDETECTOR_CONTRACTID, &kNS_BINARYDETECTOR_CID },
@@ -1122,9 +1118,6 @@ static const mozilla::Module::ContractIDEntry kNeckoContracts[] = {
     { NS_NETWORK_PROTOCOL_CONTRACTID_PREFIX "moz-safe-about", &kNS_SAFEABOUTPROTOCOLHANDLER_CID },
     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "blank", &kNS_ABOUT_BLANK_MODULE_CID },
 #ifdef NECKO_PROTOCOL_about
-#ifdef NS_BUILD_REFCNT_LOGGING
-    { NS_ABOUT_MODULE_CONTRACTID_PREFIX "bloat", &kNS_ABOUT_BLOAT_MODULE_CID },
-#endif
     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "cache", &kNS_ABOUT_CACHE_MODULE_CID },
     { NS_ABOUT_MODULE_CONTRACTID_PREFIX "cache-entry", &kNS_ABOUT_CACHE_ENTRY_MODULE_CID },
 #endif

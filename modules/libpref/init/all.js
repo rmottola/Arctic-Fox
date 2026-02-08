@@ -138,8 +138,8 @@ pref("dom.indexedDB.logging.profiler-marks", false);
 // Whether or not File Handle is enabled.
 pref("dom.fileHandle.enabled", true);
 
-// Whether window.oninstall from "W3C Web Manifest" is enabled
-pref("dom.manifest.oninstall", false);
+// Whether window.onappinstalled from "W3C Web Manifest" is enabled
+pref("dom.manifest.onappinstalled", false);
 
 // Whether or not selection events are enabled
 pref("dom.select_events.enabled", true);
@@ -187,14 +187,22 @@ pref("dom.enable_performance_observer", true);
 pref("dom.enable_performance_observer", false);
 #endif
 
+// Enable requestIdleCallback API
+#ifdef NIGHTLY_BUILD
+pref("dom.requestIdleCallback.enabled", true);
+#else
+pref("dom.requestIdleCallback.enabled", false);
+#endif
+
 // Whether the Gamepad API is enabled
 pref("dom.gamepad.enabled", true);
 pref("dom.gamepad.test.enabled", false);
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("dom.gamepad.non_standard_events.enabled", false);
 #else
 pref("dom.gamepad.non_standard_events.enabled", true);
 #endif
+pref("dom.gamepad.extensions.enabled", false);
 
 // Whether the KeyboardEvent.code is enabled
 pref("dom.keyboardevent.code.enabled", true);
@@ -204,10 +212,7 @@ pref("dom.keyboardevent.code.enabled", true);
 // even if this is true).
 pref("dom.keyboardevent.dispatch_during_composition", false);
 
-// Whether the UndoManager API is enabled
-pref("dom.undo_manager.enabled", false);
-
-// Whether URL,nsLocation,Link::GetHash should be percent encoded
+// Whether URL,Location,Link::GetHash should be percent encoded
 // in setter and percent decoded in getter (old behaviour = true)
 pref("dom.url.encode_decode_hash", true);
 // Whether ::GetHash should do percent decoding (old behaviour = true)
@@ -303,6 +308,20 @@ pref("mathml.disabled",    false);
 // Enable scale transform for stretchy MathML operators. See bug 414277.
 pref("mathml.scale_stretchy_operators.enabled", true);
 
+// Disable MediaError.message.
+#ifdef RELEASE_OR_BETA
+pref("dom.MediaError.message.enabled", false);
+#else
+pref("dom.MediaError.message.enabled", true);
+#endif
+
+// Enabled on nightly only until we fix mochitest failures.
+#ifdef NIGHTLY_BUILD
+pref("media.dormant-on-pause-timeout-ms", 5000);
+#else
+pref("media.dormant-on-pause-timeout-ms", -1);
+#endif
+
 // Media cache size in kilobytes
 pref("media.cache_size", 512000);
 // When a network connection is suspended, don't resume it until the
@@ -329,9 +348,6 @@ pref("media.play-stand-alone", true);
 pref("media.hardware-video-decoding.enabled", true);
 pref("media.hardware-video-decoding.force-enabled", false);
 
-pref("media.decoder.heuristic.dormant.enabled", true);
-pref("media.decoder.heuristic.dormant.timeout", 60000);
-
 #ifdef MOZ_DIRECTSHOW
 pref("media.directshow.enabled", true);
 #endif
@@ -347,6 +363,7 @@ pref("media.wmf.enabled", true);
 pref("media.wmf.decoder.thread-count", -1);
 pref("media.wmf.low-latency.enabled", false);
 pref("media.wmf.skip-blacklist", false);
+pref("media.wmf.vp9.enabled", true);
 pref("media.windows-media-foundation.allow-d3d11-dxva", true);
 pref("media.wmf.disable-d3d11-for-dlls", "igd10umd32.dll: 9.17.10.2857; isonyvideoprocessor.dll: 4.1.2247.8090, 4.1.2153.6200; tosqep.dll: 1.2.15.526, 1.1.12.201, 1.0.11.318, 1.0.11.215; tosqep64.dll: 1.1.12.201, 1.0.11.215");
 #endif
@@ -366,11 +383,7 @@ pref("media.raw.enabled", true);
 pref("media.ogg.enabled", true);
 pref("media.opus.enabled", true);
 pref("media.wave.enabled", true);
-pref("media.wave.decoder.enabled", true);
 pref("media.webm.enabled", true);
-#if defined(MOZ_FMP4) && defined(MOZ_WMF)
-pref("media.webm.intel_decoder.enabled", true);
-#endif
 
 #ifdef MOZ_APPLEMEDIA
 #ifdef MOZ_WIDGET_UIKIT
@@ -389,7 +402,7 @@ pref("media.gmp.storage.version.expected", 1);
 
 // Filter what triggers user notifications.
 // See DecoderDoctorDocumentWatcher::ReportAnalysis for details.
-pref("media.decoder-doctor.notifications-allowed", "MediaWidevineNoWMFNoSilverlight");
+pref("media.decoder-doctor.notifications-allowed", "MediaWMFNeeded,MediaWidevineNoWMFNoSilverlight,MediaCannotInitializePulseAudio,MediaCannotPlayNoDecoders,MediaUnsupportedLibavcodec");
 // Whether we report partial failures.
 pref("media.decoder-doctor.verbose", false);
 // Whether DD should consider WMF-disabled a WMF failure, useful for testing.
@@ -420,6 +433,8 @@ pref("media.navigator.video.use_tmmbr", false);
 pref("media.navigator.audio.use_fec", true);
 pref("media.navigator.video.red_ulpfec_enabled", false);
 
+pref("media.peerconnection.dtmf.enabled", false);
+
 pref("media.webrtc.debug.trace_mask", 0);
 pref("media.webrtc.debug.multi_log", false);
 pref("media.webrtc.debug.aec_log_dir", "");
@@ -449,6 +464,7 @@ pref("media.navigator.video.h264.level", 31); // 0x42E01f - level 3.1
 pref("media.navigator.video.h264.max_br", 0);
 pref("media.navigator.video.h264.max_mbps", 0);
 pref("media.peerconnection.video.h264_enabled", false);
+pref("media.peerconnection.video.vp9_enabled", true);
 pref("media.getusermedia.aec", 1);
 pref("media.getusermedia.browser.enabled", true);
 #endif
@@ -474,7 +490,9 @@ pref("media.peerconnection.identity.enabled", true);
 pref("media.peerconnection.identity.timeout", 10000);
 pref("media.peerconnection.ice.stun_client_maximum_transmits", 7);
 pref("media.peerconnection.ice.trickle_grace_period", 5000);
+pref("media.peerconnection.ice.no_host", false);
 pref("media.peerconnection.ice.default_address_only", false);
+pref("media.peerconnection.ice.proxy_only", false);
 
 // These values (aec, agc, and noice) are from media/webrtc/trunk/webrtc/common_types.h
 // kXxxUnchanged = 0, kXxxDefault = 1, and higher values are specific to each
@@ -527,11 +545,13 @@ pref("media.navigator.audio.full_duplex", false);
 #endif
 pref("media.mediasource.webm.audio.enabled", true);
 
+pref("dom.webaudio.enabled", true);
+
 #if !defined(ANDROID)
 pref("media.getusermedia.screensharing.enabled", true);
 #endif
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("media.getusermedia.screensharing.allowed_domains", "webex.com,*.webex.com,ciscospark.com,*.ciscospark.com,projectsquared.com,*.projectsquared.com,*.room.co,room.co,beta.talky.io,talky.io,*.clearslide.com,appear.in,*.appear.in,tokbox.com,*.tokbox.com,*.sso.francetelecom.fr,*.si.francetelecom.fr,*.sso.infra.ftgroup,*.multimedia-conference.orange-business.com,*.espacecollaboration.orange-business.com,free.gotomeeting.com,g2m.me,*.g2m.me,example.com");
 #else
  // temporary value, not intended for release - bug 1049087
@@ -551,12 +571,17 @@ pref("media.track.enabled", false);
 
 // Whether to enable MediaSource support.
 pref("media.mediasource.enabled", true);
-pref("media.mediasource.mp4.enabled", true);
-pref("media.mediasource.webm.enabled", false);
 
+pref("media.mediasource.mp4.enabled", true);
+
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_ANDROID)
+pref("media.mediasource.webm.enabled", false);
+#else
+pref("media.mediasource.webm.enabled", true);
+#endif
+pref("media.mediasource.webm.audio.enabled", true);
 
 // Use new MediaFormatReader architecture for plain ogg.
-pref("media.format-reader.ogg", false);
 pref("media.flac.enabled", true);
 pref("media.ogg.flac.enabled", true);
 
@@ -570,9 +595,6 @@ pref("media.webspeech.synth.enabled", false);
 #endif
 #ifdef MOZ_WEBM_ENCODER
 pref("media.encoder.webm.enabled", true);
-#endif
-#ifdef MOZ_OMX_ENCODER
-pref("media.encoder.omx.enabled", true);
 #endif
 
 // Whether to autostart a media element with an |autoplay| attribute
@@ -622,6 +644,7 @@ pref("apz.displayport_expiry_ms", 15000);
 pref("apz.enlarge_displayport_when_clipped", false);
 pref("apz.fling_accel_base_mult", "1.0");
 pref("apz.fling_accel_interval_ms", 500);
+pref("apz.fling_accel_min_velocity", "1.5");
 pref("apz.fling_accel_supplemental_mult", "1.0");
 pref("apz.fling_curve_function_x1", "0.0");
 pref("apz.fling_curve_function_y1", "0.0");
@@ -790,6 +813,8 @@ pref("gfx.content.azure.backends", "cairo");
 pref("gfx.content.azure.backends", "cairo");
 #endif
 
+pref("gfx.text.disable-aa", false);
+
 pref("gfx.work-around-driver-bugs", true);
 pref("gfx.prefer-mesa-llvmpipe", false);
 
@@ -836,7 +861,7 @@ pref("canvas.path.enabled", true);
 pref("canvas.capturestream.enabled", true);
 
 // Disable the ImageBitmap-extensions in the release build.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("canvas.imagebitmap_extensions.enabled", false);
 #else
 pref("canvas.imagebitmap_extensions.enabled", true);
@@ -895,11 +920,11 @@ pref("accessibility.typeaheadfind.prefillwithselection", false);
 #else
 pref("accessibility.typeaheadfind.prefillwithselection", true);
 #endif
-pref("accessibility.typeaheadfind.matchesCountTimeout", 100);
 pref("accessibility.typeaheadfind.matchesCountLimit", 1000);
 pref("findbar.highlightAll", false);
 pref("findbar.modalHighlight", false);
 pref("findbar.entireword", false);
+pref("findbar.iteratorTimeout", 100);
 
 // use Mac OS X Appearance panel text smoothing setting when rendering text, disabled by default
 pref("gfx.use_text_smoothing_setting", false);
@@ -966,8 +991,6 @@ pref("devtools.debugger.force-local", true);
 pref("devtools.debugger.prompt-connection", true);
 // Block tools from seeing / interacting with certified apps
 pref("devtools.debugger.forbid-certified-apps", true);
-// List of permissions that a sideloaded app can't ask for
-pref("devtools.apps.forbidden-permissions", "embed-apps,embed-widgets");
 
 // DevTools default color unit
 pref("devtools.defaultColorUnit", "authored");
@@ -1487,7 +1510,7 @@ pref("privacy.trackingprotection.pbmode.enabled",  true);
 
 pref("dom.event.contextmenu.enabled",       true);
 pref("dom.event.clipboardevents.enabled",   true);
-#if defined(XP_WIN) && !defined(RELEASE_BUILD) || defined(MOZ_WIDGET_GTK) && !defined(RELEASE_BUILD)
+#if defined(XP_WIN) && !defined(RELEASE_OR_BETA) || defined(MOZ_WIDGET_GTK) && !defined(RELEASE_OR_BETA)
 pref("dom.event.highrestimestamp.enabled",  true);
 #else
 pref("dom.event.highrestimestamp.enabled",  false);
@@ -1508,7 +1531,7 @@ pref("javascript.options.wasm",             false);
 pref("javascript.options.wasm_baselinejit", false);
 pref("javascript.options.native_regexp",    true);
 pref("javascript.options.parallel_parsing", true);
-#if !defined(RELEASE_BUILD) && !defined(ANDROID) && !defined(MOZ_B2G) && !defined(XP_IOS)
+#if !defined(RELEASE_OR_BETA) && !defined(ANDROID) && !defined(MOZ_B2G) && !defined(XP_IOS)
 pref("javascript.options.asyncstack",       true);
 #else
 pref("javascript.options.asyncstack",       false);
@@ -1571,6 +1594,11 @@ pref("image.animation_mode",                "normal");
 
 // Same-origin policy for file URIs, "false" is traditional
 pref("security.fileuri.strict_origin_policy", true);
+
+// If this pref is true, prefs in the logging.config branch will be cleared on
+// startup. This is done so that setting a log-file and log-modules at runtime
+// doesn't persist across restarts leading to huge logfile and low disk space.
+pref("logging.config.clear_on_startup", true);
 
 // If there is ever a security firedrill that requires
 // us to block certian ports global, this is the pref
@@ -1718,12 +1746,10 @@ pref("network.http.sendRefererHeader",      2);
 pref("network.http.referer.spoofSource", false);
 // 0=full URI, 1=scheme+host+port+path, 2=scheme+host+port
 pref("network.http.referer.trimmingPolicy", 0);
+// 0=full URI, 1=scheme+host+port+path, 2=scheme+host+port
+pref("network.http.referer.XOriginTrimmingPolicy", 0);
 // 0=always send, 1=send if base domains match, 2=send if hosts match
 pref("network.http.referer.XOriginPolicy", 0);
-
-// Controls whether we send HTTPS referrers to other HTTPS sites.
-// By default this is enabled for compatibility (see bug 141641)
-pref("network.http.sendSecureXSiteReferrer", true);
 
 // Controls whether referrer attributes in <a>, <img>, <area>, and <iframe> are honoured
 pref("network.http.enablePerElementReferrer", true);
@@ -1803,7 +1829,7 @@ pref("network.http.fast-fallback-to-IPv4", true);
 
 // The maximum amount of time the cache session lock can be held
 // before a new transaction bypasses the cache. In milliseconds.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("network.http.bypass-cachelock-threshold", 200000);
 #else
 pref("network.http.bypass-cachelock-threshold", 250);
@@ -1851,21 +1877,14 @@ pref("network.http.tcp_keepalive.long_lived_idle_time", 600);
 pref("network.http.enforce-framing.http1", false); // should be named "strict"
 pref("network.http.enforce-framing.soft", true);
 
-// Whether nsHttpChannel should use the PackagedAppService to load
-// resources from a package when directed to a URL
-// such as http://domain.com/package.pak!//resource.html
-// See http://www.w3.org/TR/web-packaging/#streamable-package-format
-pref("network.http.enable-packaged-apps", false);
-
-// Enable this to bring in the signature verification if the signature exists.
-// Set to false if you don't need the signed packaged web app support (i.e. NSec).
-pref("network.http.signed-packages.enabled", false);
-
 // If it is set to false, headers with empty value will not appear in the header
 // array - behavior as it used to be. If it is true: empty headers coming from
 // the network will exist in header array as empty string. Call SetHeader with
 // an empty value will still delete the header.(Bug 6699259)
 pref("network.http.keep_empty_response_headers_as_empty_string", false);
+
+// Max size, in bytes, for received HTTP response header.
+pref("network.http.max_response_header_size", 393216);
 
 // default values for FTP
 // in a DSCP environment this should be 40 (0x28, or AF11), per RFC-4594,
@@ -1932,7 +1951,7 @@ pref("dom.server-events.default-reconnection-time", 5000); // in milliseconds
 // by the jar channel.
 pref("network.jar.open-unsafe-types", false);
 // If true, loading remote JAR files using the jar: protocol will be prevented.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 // Keep allowing remote JAR files for IBM iNotes (see bug 1255139) for now.
 pref("network.jar.block-remote-files", false);
 #else
@@ -2251,12 +2270,15 @@ pref("network.cookie.cookieBehavior",       0); // 0-Accept, 1-dontAcceptForeign
 pref("network.cookie.cookieBehavior",       0); // Keep the old default of accepting all cookies
 #endif
 pref("network.cookie.thirdparty.sessionOnly", false);
+pref("network.cookie.leave-secure-alone",   true);
 pref("network.cookie.lifetimePolicy",       0); // 0-accept, 2-acceptForSession, 3-acceptForNDays
 pref("network.cookie.prefsMigrated",        false);
 pref("network.cookie.lifetime.days",        90);
 
 // The PAC file to load.  Ignored unless network.proxy.type is 2.
 pref("network.proxy.autoconfig_url", "");
+// Strip off paths when sending URLs to PAC scripts
+pref("network.proxy.autoconfig_url.include_path", false);
 
 // If we cannot load the PAC file, then try again (doubling from interval_min
 // until we reach interval_max or the PAC file is successfully loaded).
@@ -2400,9 +2422,6 @@ pref("security.notification_enable_delay", 500);
 pref("security.csp.enable", true);
 pref("security.csp.experimentalEnabled", false);
 
-// Default Content Security Policy to apply to privileged apps.
-pref("security.apps.privileged.CSP.default", "default-src * data: blob:; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'");
-
 // Default Content Security Policy to apply to signed contents.
 pref("security.signed_content.CSP.default", "script-src 'self'; style-src 'self'");
 
@@ -2413,8 +2432,8 @@ pref("security.mixed_content.block_display_content", false);
 // Sub-resource integrity
 pref("security.sri.enable", false);
 
-// Block scripts with MIME type 'image/'
-pref("security.block_script_with_mime_image", true);
+// Block scripts with wrong MIME type such as image/ or video/.
+pref("security.block_script_with_wrong_mime", true);
 
 // OCSP must-staple
 pref("security.ssl.enable_ocsp_must_staple", true);
@@ -2430,7 +2449,7 @@ pref("security.cert_pinning.process_headers_from_non_builtin_roots", false);
 // collections.
 pref("services.blocklist.signing.enforced", false);
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("security.onecrl.via.amo", true);
 #else
 pref("security.onecrl.via.amo", false);
@@ -2639,13 +2658,6 @@ pref("bidi.texttype", 1);
 // 5 = persiancontextnumeralBidi
 // 6 = persiannumeralBidi
 pref("bidi.numeral", 0);
-// ------------------
-//  Support Mode
-// ------------------
-// 1 = mozillaBidisupport *
-// 2 = OsBidisupport
-// 3 = disableBidisupport
-pref("bidi.support", 1);
 // Whether delete and backspace should immediately delete characters not
 // visually adjacent to the caret, or adjust the visual position of the caret
 // on the first keypress and delete the character on a second keypress
@@ -2737,14 +2749,14 @@ pref("layout.css.DOMQuad.enabled", true);
 pref("layout.css.DOMMatrix.enabled", true);
 
 // Is support for GeometryUtils.getBoxQuads enabled?
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("layout.css.getBoxQuads.enabled", false);
 #else
 pref("layout.css.getBoxQuads.enabled", true);
 #endif
 
 // Is support for GeometryUtils.getBoxQuads enabled?
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("layout.css.convertFromNode.enabled", false);
 #else
 pref("layout.css.convertFromNode.enabled", true);
@@ -2755,7 +2767,7 @@ pref("layout.css.text-align-unsafe-value.enabled", false);
 
 // Is support for CSS "float: inline-{start,end}" and
 // "clear: inline-{start,end}" enabled?
-#if defined(MOZ_B2G) || !defined(RELEASE_BUILD)
+#if defined(MOZ_B2G) || !defined(RELEASE_OR_BETA)
 pref("layout.css.float-logical-values.enabled", true);
 #else
 pref("layout.css.float-logical-values.enabled", false);
@@ -2835,7 +2847,7 @@ pref("layout.css.variables.enabled", true);
 pref("layout.css.overflow-clip-box.enabled", false);
 
 // Is support for CSS grid enabled?
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("layout.css.grid.enabled", false);
 #else
 pref("layout.css.grid.enabled", true);
@@ -2846,9 +2858,6 @@ pref("layout.css.grid-template-subgrid-value.enabled", false);
 
 // Is support for CSS contain enabled?
 pref("layout.css.contain.enabled", false);
-
-// Is support for CSS display:contents enabled?
-pref("layout.css.display-contents.enabled", true);
 
 // Is support for CSS box-decoration-break enabled?
 pref("layout.css.box-decoration-break.enabled", true);
@@ -2888,7 +2897,7 @@ pref("layout.css.shape-outside.enabled", false);
 pref("layout.css.font-loading-api.enabled", true);
 
 // Should stray control characters be rendered visibly?
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("layout.css.control-characters.visible", false);
 #else
 pref("layout.css.control-characters.visible", true);
@@ -2934,17 +2943,25 @@ pref("layout.frame_rate.precise", false);
 pref("layout.spammy_warnings.enabled", true);
 
 // Should we fragment floats inside CSS column layout?
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("layout.float-fragments-inside-column.enabled", false);
 #else
 pref("layout.float-fragments-inside-column.enabled", true);
 #endif
 
+// The number of frames times the frame rate is the time required to
+// pass without painting used to guess that we'll not paint again soon
+pref("layout.idle_period.required_quiescent_frames", 2);
+
+// The amount of time (milliseconds) needed between an idle period's
+// end and the start of the next tick to avoid jank.
+pref("layout.idle_period.time_limit", 1);
+
 // Is support for the Web Animations API enabled?
 // Before enabling this by default, make sure also CSSPseudoElement interface
 // has been spec'ed properly, or we should add a separate pref for
 // CSSPseudoElement interface. See Bug 1174575 for further details.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("dom.animations-api.core.enabled", false);
 #else
 pref("dom.animations-api.core.enabled", true);
@@ -2989,6 +3006,20 @@ pref("dom.global_stop_script", true);
 // If true, ArchiveReader will be enabled
 pref("dom.archivereader.enabled", false);
 
+// Time (milliseconds) between throttled idle callbacks.
+pref("dom.idle_period.throttled_length", 10000);
+
+// The amount of idle time (milliseconds) reserved for a long idle period
+pref("idle_queue.long_period", 50);
+
+// The minimum amount of time (milliseconds) required for an idle
+// period to be scheduled on the main thread. N.B. that
+// layout.idle_period.time_limit adds padding at the end of the idle
+// period, which makes the point in time that we expect to become busy
+// again be:
+// now + idle_queue.min_period + layout.idle_period.time_limit
+pref("idle_queue.min_period", 3);
+
 // Hang monitor timeout after which we kill the browser, in seconds
 // (0 is disabled)
 // Disabled on all platforms per bug 705748 until the found issues are
@@ -2998,7 +3029,10 @@ pref("hangmonitor.timeout", 0);
 pref("plugins.load_appdir_plugins", false);
 // If true, plugins will be click to play
 pref("plugins.click_to_play", false);
-
+#ifdef NIGHTLY_BUILD
+// This only supports one hidden ctp plugin, edit nsPluginArray.cpp if adding a second
+pref("plugins.navigator.hidden_ctp_plugin", "Shockwave Flash");
+#endif
 // The default value for nsIPluginTag.enabledState (STATE_ENABLED = 2)
 pref("plugin.default.state", 2);
 
@@ -3096,11 +3130,11 @@ pref("svg.marker-improvements.enabled", true);
 // See https://svgwg.org/svg2-draft/single-page.html#types-SVGBoundingBoxOptions
 pref("svg.new-getBBox.enabled", false);
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("svg.transform-box.enabled", false);
 #else
 pref("svg.transform-box.enabled", true);
-#endif // RELEASE_BUILD
+#endif // RELEASE_OR_BETA
 
 // Default font types and sizes by locale
 pref("font.default.ar", "sans-serif");
@@ -3650,9 +3684,6 @@ pref("print.print_extra_margin", 90); // twips (90 twips is an eigth of an inch)
 // Whether to extend the native dialog with information on printing frames.
 pref("print.extend_native_print_dialog", true);
 
-// Locate plugins by scanning the Adobe Acrobat installation directory with a minimum version
-pref("plugin.scan.Acrobat", "5.0");
-
 // Locate plugins by scanning the Quicktime installation directory with a minimum version
 pref("plugin.scan.Quicktime", "5.0");
 
@@ -3775,7 +3806,7 @@ pref("ui.window_class_override", "");
 pref("ui.elantech_gesture_hacks.enabled", -1);
 
 // Show the Windows on-screen keyboard (osk.exe) when a text field is focused.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("ui.osk.enabled", false);
 #else
 pref("ui.osk.enabled", true);
@@ -4374,7 +4405,7 @@ pref("intl.ime.use_simple_context_on_password_field", false);
 # gfxPangoFontGroup/gfxFontconfigUtils code for handling system fonts
 
 #ifdef MOZ_WIDGET_GTK
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("gfx.font_rendering.fontconfig.fontlist.enabled", false);
 #else
 pref("gfx.font_rendering.fontconfig.fontlist.enabled", true);
@@ -4742,7 +4773,7 @@ pref("webgl.webgl2-compat-mode", false);
 
 pref("webgl.enable-webgl2", true);
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 // Keep this disabled on Release and Beta for now. (see bug 1171228)
 pref("webgl.enable-debug-renderer-info", false);
 #else
@@ -4752,7 +4783,7 @@ pref("webgl.enable-debug-renderer-info", true);
 pref("webgl.renderer-string-override", "");
 pref("webgl.vendor-string-override", "");
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 // Keep this disabled on Release and Beta for now. (see bug 1171228)
 pref("webgl.enable-debug-renderer-info", false);
 #else
@@ -4881,7 +4912,7 @@ pref("layers.tiles.edge-padding", true);
 #endif
 
 // Whether to animate simple opacity and transforms on the compositor
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("layers.offmainthreadcomposition.async-animations", false);
 #else
 pref("layers.offmainthreadcomposition.async-animations", true);
@@ -4893,6 +4924,7 @@ pref("layers.offmainthreadcomposition.log-animations", false);
 pref("layers.bufferrotation.enabled", true);
 
 pref("layers.componentalpha.enabled", true);
+pref("layers.draw-mask-debug", false);
 
 // Use the DT-backend implemented PushLayer
 pref("gfx.content.use-native-pushlayer", false);
@@ -4982,8 +5014,12 @@ pref("notification.feature.enabled", false);
 
 // Web Notification
 pref("dom.webnotifications.enabled", true);
-#if !defined(RELEASE_BUILD)
 pref("dom.webnotifications.serviceworker.enabled", true);
+pref("dom.webnotifications.requireinteraction.count", 3);
+#ifdef NIGHTLY_BUILD
+pref("dom.webnotifications.requireinteraction.enabled", true);
+#else
+pref("dom.webnotifications.requireinteraction.enabled", false);
 #endif
 
 // Alert animation effect, name is disableSlidingEffect for backwards-compat.
@@ -4995,7 +5031,7 @@ pref("alerts.showFavicons", false);
 
 // DOM full-screen API.
 pref("full-screen-api.enabled", false);
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("full-screen-api.unprefix.enabled", false);
 #else
 pref("full-screen-api.unprefix.enabled", true);
@@ -5033,31 +5069,6 @@ pref("dom.vibrator.max_vibrate_list_len", 128);
 
 // Battery API
 pref("dom.battery.enabled", false);
-
-// Image srcset
-pref("dom.image.srcset.enabled", true);
-
-// <picture> element and sizes
-pref("dom.image.picture.enabled", true);
-
-// WebSMS
-pref("dom.sms.enabled", false);
-// Enable Latin characters replacement with corresponding ones in GSM SMS
-// 7-bit default alphabet.
-pref("dom.sms.strict7BitEncoding", false);
-pref("dom.sms.requestStatusReport", true);
-// Numeric default service id for SMS API calls with |serviceId| parameter
-// omitted.
-pref("dom.sms.defaultServiceId", 0);
-// MobileMessage GetMessages/GetThreads read ahead aggressiveness.
-//
-// positive: finite read-ahead entries,
-// 0: don't read ahead unless explicitly requested, (default)
-// negative: read ahead all IDs if possible.
-pref("dom.sms.maxReadAheadEntries", 0);
-
-// WebAlarms
-pref("dom.mozAlarms.enabled", false);
 
 // Push
 
@@ -5121,6 +5132,9 @@ pref("dom.w3c_touch_events.enabled", 2);
 
 // W3C draft pointer events
 pref("dom.w3c_pointer_events.enabled", false);
+
+// W3C pointer events draft
+pref("dom.w3c_pointer_events.implicit_capture", false);
 
 // W3C draft ImageCapture API
 pref("dom.imagecapture.enabled", false);
@@ -5203,30 +5217,6 @@ pref("social.toast-notifications.enabled", true);
 // observers (bug 780507).
 pref("dom.idle-observers-api.fuzz_time.disabled", true);
 
-// Lowest localId for apps.
-pref("dom.mozApps.maxLocalId", 1000);
-
-// Reset apps permissions
-pref("dom.apps.reset-permissions", false);
-
-// XXX Security: You CANNOT safely add a new app store for
-// installing privileged apps just by modifying this pref and
-// adding the signing cert for that store to the cert trust
-// database. *Any* origin listed can install apps signed with
-// *any* certificate trusted; we don't try to maintain a strong
-// association between certificate with installOrign. The
-// expectation here is that in production builds the pref will
-// contain exactly one origin. However, in custom development
-// builds it may contain more than one origin so we can test
-// different stages (dev, staging, prod) of the same app store.
-pref("dom.mozApps.signed_apps_installable_from", "https://marketplace.firefox.com");
-
-// Whether or not to dump mozApps debug messages to the console.
-// Only checked on startup, so restart after changing this pref.
-// Ignored on Android, where we always report debug messages because it's
-// unnecessary to restrict reporting, per bug 1003469.
-pref("dom.mozApps.debug", false);
-
 // Minimum delay in milliseconds between network activity notifications (0 means
 // no notifications). The delay is the same for both download and upload, though
 // they are handled separately. This pref is only read once at startup:
@@ -5247,7 +5237,7 @@ pref("dom.browserElement.maxScreenshotDelayMS", 2000);
 pref("dom.placeholder.show_on_focus", true);
 
 // VR is disabled by default in release and enabled for nightly and aurora
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("dom.vr.enabled", false);
 #else
 pref("dom.vr.enabled", true);
@@ -5255,11 +5245,15 @@ pref("dom.vr.enabled", true);
 pref("dom.vr.oculus.enabled", true);
 // OSVR device
 pref("dom.vr.osvr.enabled", false);
+// OpenVR device
+pref("dom.vr.openvr.enabled", false);
 // Pose prediction reduces latency effects by returning future predicted HMD
 // poses to callers of the WebVR API.  This currently only has an effect for
 // Oculus Rift on SDK 0.8 or greater.  It is disabled by default for now due to
 // frame uniformity issues with e10s.
 pref("dom.vr.poseprediction.enabled", false);
+// path to openvr DLL
+pref("gfx.vr.openvr-runtime", "");
 // path to OSVR DLLs
 pref("gfx.vr.osvr.utilLibPath", "");
 pref("gfx.vr.osvr.commonLibPath", "");
@@ -5330,7 +5324,7 @@ pref("captivedetect.maxWaitingTime", 5000);
 pref("captivedetect.pollingTime", 3000);
 pref("captivedetect.maxRetryCount", 5);
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("dom.forms.inputmode", false);
 #else
 pref("dom.forms.inputmode", true);
@@ -5340,47 +5334,6 @@ pref("dom.forms.inputmode", true);
 pref("dom.mozInputMethod.enabled", false);
 
 pref("dom.flyweb.enabled", false);
-
-// Telephony API
-#ifdef MOZ_B2G_RIL
-pref("dom.telephony.enabled", true);
-#else
-pref("dom.telephony.enabled", false);
-#endif
-// Numeric default service id for WebTelephony API calls with |serviceId|
-// parameter omitted.
-pref("dom.telephony.defaultServiceId", 0);
-
-// Cell Broadcast API
-#ifdef MOZ_B2G_RIL
-pref("dom.cellbroadcast.enabled", true);
-#else
-pref("dom.cellbroadcast.enabled", false);
-#endif
-
-// ICC API
-#ifdef MOZ_B2G_RIL
-pref("dom.icc.enabled", true);
-#else
-pref("dom.icc.enabled", false);
-#endif
-
-// Mobile Connection API
-#ifdef MOZ_B2G_RIL
-pref("dom.mobileconnection.enabled", true);
-#else
-pref("dom.mobileconnection.enabled", false);
-#endif
-
-// Voice Mail API
-#ifdef MOZ_B2G_RIL
-pref("dom.voicemail.enabled", true);
-#else
-pref("dom.voicemail.enabled", false);
-#endif
-// Numeric default service id for Voice Mail API calls with |serviceId|
-// parameter omitted.
-pref("dom.voicemail.defaultServiceId", 0);
 
 // Enable mapped array buffer by default.
 pref("dom.mapped_arraybuffer.enabled", true);
@@ -5505,6 +5458,9 @@ pref("layout.accessiblecaret.allow_dragging_across_other_caret", true);
 // Optionally provide haptic feedback on longPress selection events.
 pref("layout.accessiblecaret.hapticfeedback", false);
 
+// Keep the accessible carets hidden when the user is using mouse input.
+pref("layout.accessiblecaret.hide_carets_for_mouse_input", true);
+
 // Wakelock is disabled by default.
 pref("dom.wakelock.enabled", false);
 
@@ -5525,11 +5481,11 @@ pref("camera.control.face_detection.enabled", true);
 
 
 // SW Cache API
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("dom.caches.enabled", false);
 #else
 pref("dom.caches.enabled", true);
-#endif // RELEASE_BUILD
+#endif // RELEASE_OR_BETA
 
 #ifdef MOZ_WIDGET_GONK
 // Empirically, this is the value returned by hal::GetTotalSystemMemory()
@@ -5566,7 +5522,7 @@ pref("dom.presentation.discoverable.retry_ms", 5000);
 pref("dom.presentation.session_transport.data_channel.enable", false);
 
 #ifdef XP_MACOSX
-#if !defined(RELEASE_BUILD) || defined(DEBUG)
+#if !defined(RELEASE_OR_BETA) || defined(DEBUG)
 // In non-release builds we crash by default on insecure text input (when a
 // password editor has focus but secure event input isn't enabled).  The
 // following pref, when turned on, disables this behavior.  See bug 1188425.
@@ -5768,6 +5724,9 @@ pref("dom.input.fallbackUploadDir", "");
 // Turn rewriting of youtube embeds on/off
 pref("plugins.rewrite_youtube_embeds", true);
 
+// Don't hide Flash from navigator.plugins when it is click-to-activate
+pref("plugins.navigator_hide_disabled_flash", false);
+
 // Disable browser frames by default
 pref("dom.mozBrowserFramesEnabled", false);
 
@@ -5777,7 +5736,7 @@ pref("layout.css.color-adjust.enabled", true);
 pref("dom.audiochannel.audioCompeting", false);
 
 // Disable Node.rootNode in release builds.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("dom.node.rootNode.enabled", false);
 #else
 pref("dom.node.rootNode.enabled", true);
@@ -5792,7 +5751,7 @@ pref("media.seekToNextFrame.enabled", true);
 pref("dom.maxHardwareConcurrency", 16);
 
 // Shutdown the osfile worker if its no longer needed.
-#if !defined(RELEASE_BUILD)
+#if !defined(RELEASE_OR_BETA)
 pref("osfile.reset_worker_delay", 30000);
 #endif
 
@@ -5802,8 +5761,18 @@ pref("media.block-autoplay-until-in-foreground", true);
 pref("layout.css.servo.enabled", true);
 #endif
 
-#ifdef NIGHTLY_BUILD
-pref("dom.html_fragment_serialisation.appendLF", true);
+// HSTS Priming
+// If a request is mixed-content, send an HSTS priming request to attempt to
+// see if it is available over HTTPS.
+pref("security.mixed_content.send_hsts_priming", true);
+#ifdef RELEASE_OR_BETA
+// Don't change the order of evaluation of mixed-content and HSTS upgrades in
+// order to be most compatible with current standards
+pref("security.mixed_content.use_hsts", false);
 #else
-pref("dom.html_fragment_serialisation.appendLF", false);
+// Change the order of evaluation so HSTS upgrades happen before
+// mixed-content blocking
+pref("security.mixed_content.use_hsts", true);
 #endif
+// Approximately 1 week default cache for HSTS priming failures
+pref ("security.mixed_content.hsts_priming_cache_timeout", 10080);

@@ -177,13 +177,13 @@ AudioBuffer::~AudioBuffer()
 {
   AudioBufferMemoryTracker::UnregisterAudioBuffer(this);
   ClearJSChannels();
+  mozilla::DropJSObjects(this);
 }
 
 void
 AudioBuffer::ClearJSChannels()
 {
   mJSChannels.Clear();
-  mozilla::DropJSObjects(this);
 }
 
 /* static */ already_AddRefed<AudioBuffer>
@@ -344,9 +344,6 @@ AudioBuffer::GetChannelData(JSContext* aJSContext, uint32_t aChannel,
     return;
   }
 
-  if (mJSChannels[aChannel]) {
-    JS::ExposeObjectToActiveJS(mJSChannels[aChannel]);
-  }
   aRetval.set(mJSChannels[aChannel]);
 }
 

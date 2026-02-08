@@ -332,7 +332,8 @@ public:
     if (mFrame->IsSVGText()) {
       return 0;
     }
-    return mFrame->StyleContext()->GetTextStrokeColor();
+    return mFrame->StyleColor()->
+      CalcComplexColor(mFrame->StyleText()->mWebkitTextStrokeColor);
   }
   float GetWebkitTextStrokeWidth() {
     if (mFrame->IsSVGText()) {
@@ -1418,7 +1419,7 @@ BuildTextRuns(DrawTarget* aDrawTarget, nsTextFrame* aForFrame,
     NS_ASSERTION(backIterator.GetContainer() == block,
                  "Someone lied to us about the block");
   }
-  nsBlockFrame::line_iterator startLine = backIterator.GetLine();
+  nsBlockFrame::LineIterator startLine = backIterator.GetLine();
 
   // Find a line where we can start building text runs. We choose the last line
   // where:
@@ -1440,7 +1441,7 @@ BuildTextRuns(DrawTarget* aDrawTarget, nsTextFrame* aForFrame,
   bool mayBeginInTextRun = true;
   while (true) {
     forwardIterator = backIterator;
-    nsBlockFrame::line_iterator line = backIterator.GetLine();
+    nsBlockFrame::LineIterator line = backIterator.GetLine();
     if (!backIterator.Prev() || backIterator.GetLine()->IsBlock()) {
       mayBeginInTextRun = false;
       break;
@@ -1486,7 +1487,7 @@ BuildTextRuns(DrawTarget* aDrawTarget, nsTextFrame* aForFrame,
   bool seenStartLine = false;
   uint32_t linesAfterStartLine = 0;
   do {
-    nsBlockFrame::line_iterator line = forwardIterator.GetLine();
+    nsBlockFrame::LineIterator line = forwardIterator.GetLine();
     if (line->IsBlock())
       break;
     line->SetInvalidateTextRuns(false);
@@ -1757,8 +1758,8 @@ BuildTextRunsScanner::ContinueTextRunAcrossFrames(nsTextFrame* aFrame1, nsTextFr
   // already guaranteed to be the same as each other (and for the line
   // container).
   if (mBidiEnabled) {
-    FrameBidiData data1 = nsBidi::GetBidiData(aFrame1);
-    FrameBidiData data2 = nsBidi::GetBidiData(aFrame2);
+    FrameBidiData data1 = aFrame1->GetBidiData();
+    FrameBidiData data2 = aFrame2->GetBidiData();
     if (data1.embeddingLevel != data2.embeddingLevel ||
         data2.precedingControl != kBidiLevelNone) {
       return false;
@@ -1906,21 +1907,19 @@ static gfxFontGroup*
 GetFontGroupForFrame(nsIFrame* aFrame, float aFontSizeInflation,
                      nsFontMetrics** aOutFontMetrics = nullptr)
 {
-  if (aOutFontMetrics)
-    *aOutFontMetrics = nullptr;
-
   RefPtr<nsFontMetrics> metrics =
     nsLayoutUtils::GetFontMetricsForFrame(aFrame, aFontSizeInflation);
+  gfxFontGroup* fontGroup = metrics->GetThebesFontGroup();
 
+  // Populate outparam before we return:
   if (aOutFontMetrics) {
-    *aOutFontMetrics = metrics;
-    NS_ADDREF(*aOutFontMetrics);
+    metrics.forget(aOutFontMetrics);
   }
   // XXX this is a bit bogus, we're releasing 'metrics' so the
   // returned font-group might actually be torn down, although because
   // of the way the device context caches font metrics, this seems to
   // not actually happen. But we should fix this.
-  return metrics->GetThebesFontGroup();
+  return fontGroup;
 }
 
 static already_AddRefed<DrawTarget>
@@ -2227,7 +2226,7 @@ BuildTextRunsScanner::BuildTextRunForFrames(void* aTextBuffer)
   if (textFlags & nsTextFrameUtils::TEXT_HAS_SHY) {
     textFlags |= gfxTextRunFactory::TEXT_ENABLE_HYPHEN_BREAKS;
   }
-  if (mBidiEnabled && (IS_LEVEL_RTL(nsBidi::GetEmbeddingLevel(firstFrame)))) {
+  if (mBidiEnabled && (IS_LEVEL_RTL(firstFrame->GetEmbeddingLevel()))) {
     textFlags |= gfxTextRunFactory::TEXT_IS_RTL;
   }
   if (mNextRunContextInfo & nsTextFrameUtils::INCOMING_WHITESPACE) {
@@ -3696,7 +3695,7 @@ nsTextPaintStyle::GetTextColor()
       return NS_SAME_AS_FOREGROUND_COLOR;
 
     const nsStyleSVG* style = mFrame->StyleSVG();
-    switch (style->mFill.mType) {
+    switch (style->mFill.Type()) {
       case eStyleSVGPaintType_None:
         return NS_RGBA(0, 0, 0, 0);
       case eStyleSVGPaintType_Color:
@@ -3707,8 +3706,7 @@ nsTextPaintStyle::GetTextColor()
     }
   }
 
-  return nsLayoutUtils::GetColor(mFrame,
-                                 mFrame->StyleContext()->GetTextFillColorProp());
+  return nsLayoutUtils::GetColor(mFrame, eCSSProperty__webkit_text_fill_color);
 }
 
 bool
@@ -3901,7 +3899,8 @@ nsTextPaintStyle::InitSelectionColorsAndShadow()
     if (sc) {
       mSelectionBGColor =
         sc->GetVisitedDependentColor(eCSSProperty_background_color);
-      mSelectionTextColor = sc->GetVisitedDependentColor(sc->GetTextFillColorProp());
+      mSelectionTextColor =
+        sc->GetVisitedDependentColor(eCSSProperty__webkit_text_fill_color);
       mHasSelectionShadow =
         nsRuleNode::HasAuthorSpecifiedRules(sc,
                                             NS_AUTHOR_SPECIFIED_TEXT_SHADOW,
@@ -3939,13 +3938,13 @@ nsTextPaintStyle::InitSelectionColorsAndShadow()
     if (mSelectionTextColor == NS_DONT_CHANGE_COLOR) {
       nsCSSPropertyID property = mFrame->IsSVGText()
                                ? eCSSProperty_fill
-                               : mFrame->StyleContext()->GetTextFillColorProp();
+                               : eCSSProperty__webkit_text_fill_color;
       nscoord frameColor = mFrame->GetVisitedDependentColor(property);
       mSelectionTextColor = EnsureDifferentColors(frameColor, mSelectionBGColor);
     } else if (mSelectionTextColor == NS_CHANGE_COLOR_IF_SAME_AS_BG) {
       nsCSSPropertyID property = mFrame->IsSVGText()
                                ? eCSSProperty_fill
-                               : mFrame->StyleContext()->GetTextFillColorProp();
+                               : eCSSProperty__webkit_text_fill_color;
       nscolor frameColor = mFrame->GetVisitedDependentColor(property);
       if (frameColor == mSelectionBGColor) {
         mSelectionTextColor =
@@ -4299,9 +4298,9 @@ nsContinuingTextFrame::Init(nsIContent*       aContent,
     }
   }
   if (aPrevInFlow->GetStateBits() & NS_FRAME_IS_BIDI) {
-    FrameBidiData bidiData = nsBidi::GetBidiData(aPrevInFlow);
+    FrameBidiData bidiData = aPrevInFlow->GetBidiData();
     bidiData.precedingControl = kBidiLevelNone;
-    Properties().Set(nsBidi::BidiDataProperty(), bidiData);
+    Properties().Set(BidiDataProperty(), bidiData);
 
     if (nextContinuation) {
       SetNextContinuation(nextContinuation);
@@ -4310,7 +4309,7 @@ nsContinuingTextFrame::Init(nsIContent*       aContent,
       while (nextContinuation &&
              nextContinuation->GetContentOffset() < mContentOffset) {
 #ifdef DEBUG
-        FrameBidiData nextBidiData = nsBidi::GetBidiData(nextContinuation);
+        FrameBidiData nextBidiData = nextContinuation->GetBidiData();
         NS_ASSERTION(bidiData.embeddingLevel == nextBidiData.embeddingLevel &&
                      bidiData.baseLevel == nextBidiData.baseLevel,
                      "stealing text from different type of BIDI continuation");
@@ -4952,9 +4951,11 @@ nsTextFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   
   DO_GLOBAL_REFLOW_COUNT_DSP("nsTextFrame");
 
-  nsStyleContext* sc = StyleContext();
-  bool isTextTransparent = (NS_GET_A(sc->GetTextFillColor()) == 0) &&
-                           (NS_GET_A(sc->GetTextStrokeColor()) == 0);
+  const nsStyleColor* sc = StyleColor();
+  const nsStyleText* st = StyleText();
+  bool isTextTransparent =
+    NS_GET_A(sc->CalcComplexColor(st->mWebkitTextFillColor)) == 0 &&
+    NS_GET_A(sc->CalcComplexColor(st->mWebkitTextStrokeColor)) == 0;
   Maybe<bool> isSelected;
   if (((GetStateBits() & TEXT_NO_RENDERED_GLYPHS) ||
        (isTextTransparent && !StyleText()->HasTextShadow())) &&
@@ -5052,9 +5053,9 @@ LazyGetLineBaselineOffset(nsIFrame* aChildFrame, nsBlockFrame* aBlockFrame)
     nsIFrame::LineBaselineOffset(), &offsetFound);
 
   if (!offsetFound) {
-    for (nsBlockFrame::line_iterator line = aBlockFrame->begin_lines(),
-        line_end = aBlockFrame->end_lines();
-        line != line_end; line++) {
+    for (nsBlockFrame::LineIterator line = aBlockFrame->LinesBegin(),
+                                    line_end = aBlockFrame->LinesEnd();
+         line != line_end; line++) {
       if (line->IsInline()) {
         int32_t n = line->GetChildCount();
         nscoord lineBaseline = line->BStart() + line->GetLogicalAscent();
@@ -5174,7 +5175,7 @@ nsTextFrame::GetTextDecorations(
     physicalBlockStartOffset +=
       vertical ? f->GetNormalPosition().x : f->GetNormalPosition().y;
 
-    const uint8_t style = styleText->GetDecorationStyle();
+    const uint8_t style = styleText->mTextDecorationStyle;
     if (textDecorations) {
       nscolor color;
       if (useOverride) {
@@ -5383,7 +5384,7 @@ nsTextFrame::UnionAdditionalOverflow(nsPresContext* aPresContext,
     // rect when this is in floating first letter frame at *both* modes.
     // In this case, aBlock is the ::first-letter frame.
     uint8_t decorationStyle = aBlock->StyleContext()->
-                                StyleTextReset()->GetDecorationStyle();
+                                StyleTextReset()->mTextDecorationStyle;
     // If the style is none, let's include decoration line rect as solid style
     // since changing the style from none to solid/dotted/dashed doesn't cause
     // reflow.
@@ -6436,8 +6437,8 @@ nsTextFrame::GetCaretColorAt(int32_t aOffset)
   bool isSolidTextColor = true;
   if (IsSVGText()) {
     const nsStyleSVG* style = StyleSVG();
-    if (style->mFill.mType != eStyleSVGPaintType_None &&
-        style->mFill.mType != eStyleSVGPaintType_Color) {
+    if (style->mFill.Type() != eStyleSVGPaintType_None &&
+        style->mFill.Type() != eStyleSVGPaintType_Color) {
       isSolidTextColor = false;
     }
   }
@@ -9093,6 +9094,9 @@ nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
   }
   bool canTrimTrailingWhitespace = !textStyle->WhiteSpaceIsSignificant() ||
                                    (GetStateBits() & TEXT_IS_IN_TOKEN_MATHML);
+  // allow whitespace to overflow the container
+  bool whitespaceCanHang = textStyle->WhiteSpaceCanWrapStyle() &&
+                           textStyle->WhiteSpaceIsSignificant();
   gfxBreakPriority breakPriority = aLineLayout.LastOptionalBreakPriority();
   gfxTextRun::SuppressBreak suppressBreak = gfxTextRun::eNoSuppressBreak;
   bool shouldSuppressLineBreak = ShouldSuppressLineBreak();
@@ -9107,6 +9111,7 @@ nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
                                   availWidth,
                                   &provider, suppressBreak,
                                   canTrimTrailingWhitespace ? &trimmedWidth : nullptr,
+                                  whitespaceCanHang,
                                   &textMetrics, boundingBoxType,
                                   aDrawTarget,
                                   &usedHyphenation, &transformedLastBreak,
@@ -9580,17 +9585,10 @@ static void TransformChars(nsTextFrame* aFrame, const nsStyleText* aStyle,
 }
 
 static bool
-LineEndsInHardLineBreak(nsTextFrame* aFrame)
+LineEndsInHardLineBreak(nsTextFrame* aFrame, nsBlockFrame* aLineContainer)
 {
-  nsIFrame* lineContainer = FindLineContainer(aFrame);
-  nsBlockFrame* block = do_QueryFrame(lineContainer);
-  if (!block) {
-    // Weird situation where we have a line layout without a block.
-    // No soft breaks occur in this situation.
-    return true;
-  }
   bool foundValidLine;
-  nsBlockInFlowLineIterator iter(block, aFrame, &foundValidLine);
+  nsBlockInFlowLineIterator iter(aLineContainer, aFrame, &foundValidLine);
   if (!foundValidLine) {
     NS_ERROR("Invalid line!");
     return true;
@@ -9608,11 +9606,13 @@ nsTextFrame::GetRenderedText(uint32_t aStartOffset,
 
   // The handling of offsets could be more efficient...
   RenderedText result;
+  nsBlockFrame* lineContainer = nullptr;
   nsTextFrame* textFrame;
   const nsTextFragment* textFrag = mContent->GetText();
   uint32_t offsetInRenderedString = 0;
   bool haveOffsets = false;
 
+  Maybe<nsBlockFrame::AutoLineCursorSetup> autoLineCursor;
   for (textFrame = this; textFrame;
        textFrame = static_cast<nsTextFrame*>(textFrame->GetNextContinuation())) {
     if (textFrame->GetStateBits() & NS_FRAME_IS_DIRTY) {
@@ -9628,10 +9628,30 @@ nsTextFrame::GetRenderedText(uint32_t aStartOffset,
     }
     gfxSkipCharsIterator tmpIter = iter;
 
+    // Whether we need to trim whitespaces after the text frame.
+    bool trimAfter;
+    if (!textFrame->IsAtEndOfLine() ||
+        aTrimTrailingWhitespace !=
+          TrailingWhitespace::TRIM_TRAILING_WHITESPACE) {
+      trimAfter = false;
+    } else if (nsBlockFrame* thisLc =
+               do_QueryFrame(FindLineContainer(textFrame))) {
+      if (thisLc != lineContainer) {
+        // Setup line cursor when needed.
+        lineContainer = thisLc;
+        autoLineCursor.reset();
+        autoLineCursor.emplace(lineContainer);
+      }
+      trimAfter = LineEndsInHardLineBreak(textFrame, lineContainer);
+    } else {
+      // Weird situation where we have a line layout without a block.
+      // No soft breaks occur in this situation.
+      trimAfter = true;
+    }
+
     // Skip to the start of the text run, past ignored chars at start of line
-    TrimmedOffsets trimmedOffsets = textFrame->GetTrimmedOffsets(textFrag,
-       textFrame->IsAtEndOfLine() && LineEndsInHardLineBreak(textFrame) &&
-       aTrimTrailingWhitespace == TrailingWhitespace::TRIM_TRAILING_WHITESPACE);
+    TrimmedOffsets trimmedOffsets =
+        textFrame->GetTrimmedOffsets(textFrag, trimAfter);
     bool trimmedSignificantNewline =
         trimmedOffsets.GetEnd() < GetContentEnd() &&
         HasSignificantTerminalNewline();

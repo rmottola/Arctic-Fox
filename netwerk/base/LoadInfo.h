@@ -87,6 +87,7 @@ private:
   // Please note that aRedirectChain uses swapElements.
   LoadInfo(nsIPrincipal* aLoadingPrincipal,
            nsIPrincipal* aTriggeringPrincipal,
+           nsIPrincipal* aPrincipalToInherit,
            nsSecurityFlags aSecurityFlags,
            nsContentPolicyType aContentPolicyType,
            LoadTainting aTainting,
@@ -106,7 +107,9 @@ private:
            nsTArray<nsCOMPtr<nsIPrincipal>>& aRedirectChain,
            const nsTArray<nsCString>& aUnsafeHeaders,
            bool aForcePreflight,
-           bool aIsPreflight);
+           bool aIsPreflight,
+           bool aForceHSTSPriming,
+           bool aMixedContentWouldBlock);
   LoadInfo(const LoadInfo& rhs);
 
   friend nsresult
@@ -127,6 +130,7 @@ private:
   // if you add a member, please also update the copy constructor
   nsCOMPtr<nsIPrincipal>           mLoadingPrincipal;
   nsCOMPtr<nsIPrincipal>           mTriggeringPrincipal;
+  nsCOMPtr<nsIPrincipal>           mPrincipalToInherit;
   nsWeakPtr                        mLoadingContext;
   nsSecurityFlags                  mSecurityFlags;
   nsContentPolicyType              mInternalContentPolicyType;
@@ -148,6 +152,9 @@ private:
   nsTArray<nsCString>              mCorsUnsafeHeaders;
   bool                             mForcePreflight;
   bool                             mIsPreflight;
+
+  bool                             mForceHSTSPriming : 1;
+  bool                             mMixedContentWouldBlock : 1;
 
   // Is true if this load was triggered by processing the attributes of the
   // browsing context container.

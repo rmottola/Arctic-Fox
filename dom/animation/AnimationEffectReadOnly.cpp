@@ -44,17 +44,6 @@ AnimationEffectReadOnly::AnimationEffectReadOnly(
   MOZ_ASSERT(aTiming);
 }
 
-// https://w3c.github.io/web-animations/#in-play
-bool
-AnimationEffectReadOnly::IsInPlay() const
-{
-  if (!mAnimation || mAnimation->PlayState() == AnimationPlayState::Finished) {
-    return false;
-  }
-
-  return GetComputedTiming().mPhase == ComputedTiming::AnimationPhase::Active;
-}
-
 // https://w3c.github.io/web-animations/#current
 bool
 AnimationEffectReadOnly::IsCurrent() const
@@ -143,10 +132,14 @@ AnimationEffectReadOnly::GetComputedTimingAt(
   StickyTimeDuration activeTime;
 
   StickyTimeDuration beforeActiveBoundary =
-    std::min(StickyTimeDuration(aTiming.mDelay), result.mEndTime);
+    std::max(std::min(StickyTimeDuration(aTiming.mDelay), result.mEndTime),
+             zeroDuration);
+
   StickyTimeDuration activeAfterBoundary =
-    std::min(StickyTimeDuration(aTiming.mDelay + result.mActiveDuration),
-             result.mEndTime);
+    std::max(std::min(StickyTimeDuration(aTiming.mDelay +
+                                         result.mActiveDuration),
+                      result.mEndTime),
+             zeroDuration);
 
   if (localTime > activeAfterBoundary ||
       (aPlaybackRate >= 0 && localTime == activeAfterBoundary)) {
@@ -155,9 +148,10 @@ AnimationEffectReadOnly::GetComputedTimingAt(
       // The animation isn't active or filling at this time.
       return result;
     }
-    activeTime = std::max(std::min(result.mActiveDuration,
-                                   result.mActiveDuration + aTiming.mEndDelay),
-                          zeroDuration);
+    activeTime =
+      std::max(std::min(StickyTimeDuration(localTime - aTiming.mDelay),
+                        result.mActiveDuration),
+               zeroDuration);
   } else if (localTime < beforeActiveBoundary ||
              (aPlaybackRate < 0 && localTime == beforeActiveBoundary)) {
     result.mPhase = ComputedTiming::AnimationPhase::Before;
@@ -165,7 +159,8 @@ AnimationEffectReadOnly::GetComputedTimingAt(
       // The animation isn't active or filling at this time.
       return result;
     }
-    // activeTime is zero
+    activeTime = std::max(StickyTimeDuration(localTime - aTiming.mDelay),
+                          zeroDuration);
   } else {
     MOZ_ASSERT(result.mActiveDuration != zeroDuration,
                "How can we be in the middle of a zero-duration interval?");

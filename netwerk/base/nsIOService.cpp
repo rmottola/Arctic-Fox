@@ -52,6 +52,7 @@
 #include "mozilla/net/DNS.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "mozilla/net/NeckoChild.h"
+#include "mozilla/dom/ContentParent.h"
 #include "CaptivePortalService.h"
 #include "ReferrerPolicy.h"
 #include "nsContentSecurityManager.h"
@@ -173,8 +174,6 @@ uint32_t   nsIOService::gDefaultSegmentCount = 24;
 
 bool nsIOService::sTelemetryEnabled = false;
 
-NS_IMPL_ISUPPORTS(nsAppOfflineInfo, nsIAppOfflineInfo)
-
 ////////////////////////////////////////////////////////////////////////////////
 
 nsIOService::nsIOService()
@@ -190,7 +189,6 @@ nsIOService::nsIOService()
     , mNetworkLinkServiceInitialized(false)
     , mChannelEventSinks(NS_CHANNEL_EVENT_SINK_CATEGORY)
     , mNetworkNotifyChanged(true)
-    , mPreviousWifiState(-1)
     , mLastOfflineStateChange(PR_IntervalNow())
     , mLastConnectivityChange(PR_IntervalNow())
     , mLastNetworkLinkChange(PR_IntervalNow())
@@ -1105,7 +1103,7 @@ nsIOService::SetOffline(bool offline)
             NS_ASSERTION(NS_SUCCEEDED(rv), "DNS service shutdown failed");
         }
         if (mSocketTransportService) {
-            DebugOnly<nsresult> rv = mSocketTransportService->Shutdown();
+            DebugOnly<nsresult> rv = mSocketTransportService->Shutdown(mShutdown);
             NS_ASSERTION(NS_SUCCEEDED(rv), "socket transport service shutdown failed");
         }
     }
@@ -1341,45 +1339,6 @@ nsIOService::GetPrefBranch(nsIPrefBranch **result)
 {
     *result = nullptr;
     CallGetService(NS_PREFSERVICE_CONTRACTID, result);
-}
-
-// This returns true if wifi-only apps should have connectivity.
-// Always returns false in the child process (should not depend on this method)
-static bool
-IsWifiActive()
-{
-    // We don't need to do this check inside the child process
-    if (IsNeckoChild()) {
-        return false;
-    }
-#ifdef MOZ_WIDGET_GONK
-    // On B2G we query the network manager for the active interface
-    nsCOMPtr<nsINetworkManager> networkManager =
-        do_GetService("@mozilla.org/network/manager;1");
-    if (!networkManager) {
-        return false;
-    }
-    nsCOMPtr<nsINetworkInfo> activeNetworkInfo;
-    networkManager->GetActiveNetworkInfo(getter_AddRefs(activeNetworkInfo));
-    if (!activeNetworkInfo) {
-        return false;
-    }
-    int32_t type;
-    if (NS_FAILED(activeNetworkInfo->GetType(&type))) {
-        return false;
-    }
-    switch (type) {
-    case nsINetworkInfo::NETWORK_TYPE_WIFI:
-    case nsINetworkInfo::NETWORK_TYPE_WIFI_P2P:
-        return true;
-    default:
-        return false;
-    }
-#else
-    // On anything else than B2G we return true so than wifi-only
-    // apps don't think they are offline.
-    return true;
-#endif
 }
 
 class nsWakeupNotifier : public Runnable
@@ -1821,12 +1780,18 @@ IOServiceProxyCallback::OnProxyAvailable(nsICancelable *request, nsIChannel *cha
     if (!speculativeHandler)
         return NS_OK;
 
+    nsCOMPtr<nsILoadInfo> loadInfo = channel->GetLoadInfo();
+    nsCOMPtr<nsIPrincipal> principal;
+    if (loadInfo) {
+      principal = loadInfo->LoadingPrincipal();
+    }
+
     nsLoadFlags loadFlags = 0;
     channel->GetLoadFlags(&loadFlags);
     if (loadFlags & nsIRequest::LOAD_ANONYMOUS) {
-        speculativeHandler->SpeculativeAnonymousConnect(uri, mCallbacks);
+        speculativeHandler->SpeculativeAnonymousConnect2(uri, principal, mCallbacks);
     } else {
-        speculativeHandler->SpeculativeConnect(uri, mCallbacks);
+        speculativeHandler->SpeculativeConnect2(uri, principal, mCallbacks);
     }
 
     return NS_OK;
@@ -1834,13 +1799,16 @@ IOServiceProxyCallback::OnProxyAvailable(nsICancelable *request, nsIChannel *cha
 
 nsresult
 nsIOService::SpeculativeConnectInternal(nsIURI *aURI,
+                                        nsIPrincipal *aPrincipal,
                                         nsIInterfaceRequestor *aCallbacks,
                                         bool aAnonymous)
 {
     if (IsNeckoChild()) {
         ipc::URIParams params;
         SerializeURI(aURI, params);
-        gNeckoChild->SendSpeculativeConnect(params, aAnonymous);
+        gNeckoChild->SendSpeculativeConnect(params,
+                                            IPC::Principal(aPrincipal),
+                                            aAnonymous);
         return NS_OK;
     }
 
@@ -1852,12 +1820,17 @@ nsIOService::SpeculativeConnectInternal(nsIURI *aURI,
             do_GetService(NS_PROTOCOLPROXYSERVICE_CONTRACTID, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsCOMPtr<nsIScriptSecurityManager> secMan(
-        do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv));
-    NS_ENSURE_SUCCESS(rv, rv);
-    nsCOMPtr<nsIPrincipal> systemPrincipal;
-    rv = secMan->GetSystemPrincipal(getter_AddRefs(systemPrincipal));
-    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsIPrincipal> loadingPrincipal = aPrincipal;
+
+    // If the principal is given, we use this prinicpal directly. Otherwise,
+    // we fallback to use the system principal.
+    if (!aPrincipal) {
+        nsCOMPtr<nsIScriptSecurityManager> secMan(
+            do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID, &rv));
+        NS_ENSURE_SUCCESS(rv, rv);
+        rv = secMan->GetSystemPrincipal(getter_AddRefs(loadingPrincipal));
+        NS_ENSURE_SUCCESS(rv, rv);
+    }
 
     // dummy channel used to create a TCP connection.
     // we perform security checks on the *real* channel, responsible
@@ -1868,7 +1841,7 @@ nsIOService::SpeculativeConnectInternal(nsIURI *aURI,
     nsCOMPtr<nsIChannel> channel;
     rv = NewChannelFromURI2(aURI,
                             nullptr, // aLoadingNode,
-                            systemPrincipal,
+                            loadingPrincipal,
                             nullptr, //aTriggeringPrincipal,
                             nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                             nsIContentPolicy::TYPE_OTHER,
@@ -1896,177 +1869,30 @@ NS_IMETHODIMP
 nsIOService::SpeculativeConnect(nsIURI *aURI,
                                 nsIInterfaceRequestor *aCallbacks)
 {
-    return SpeculativeConnectInternal(aURI, aCallbacks, false);
+    return SpeculativeConnectInternal(aURI, nullptr, aCallbacks, false);
+}
+
+NS_IMETHODIMP
+nsIOService::SpeculativeConnect2(nsIURI *aURI,
+                                 nsIPrincipal *aPrincipal,
+                                 nsIInterfaceRequestor *aCallbacks)
+{
+    return SpeculativeConnectInternal(aURI, aPrincipal, aCallbacks, false);
 }
 
 NS_IMETHODIMP
 nsIOService::SpeculativeAnonymousConnect(nsIURI *aURI,
                                          nsIInterfaceRequestor *aCallbacks)
 {
-    return SpeculativeConnectInternal(aURI, aCallbacks, true);
-}
-
-void
-nsIOService::NotifyAppOfflineStatus(uint32_t appId, int32_t state)
-{
-    MOZ_RELEASE_ASSERT(NS_IsMainThread(),
-            "Should be called on the main thread");
-
-    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
-    MOZ_ASSERT(observerService, "The observer service should not be null");
-
-    if (observerService) {
-        RefPtr<nsAppOfflineInfo> info = new nsAppOfflineInfo(appId, state);
-        observerService->NotifyObservers(
-            info,
-            NS_IOSERVICE_APP_OFFLINE_STATUS_TOPIC,
-            u"all data in nsIAppOfflineInfo subject argument");
-    }
-}
-
-namespace {
-
-class SetAppOfflineMainThread : public Runnable
-{
-public:
-    SetAppOfflineMainThread(uint32_t aAppId, int32_t aState)
-        : mAppId(aAppId)
-        , mState(aState)
-    {
-    }
-
-    NS_IMETHOD Run() override
-    {
-        MOZ_ASSERT(NS_IsMainThread());
-        gIOService->SetAppOfflineInternal(mAppId, mState);
-        return NS_OK;
-    }
-private:
-    uint32_t mAppId;
-    int32_t mState;
-};
-
-} // namespace
-
-NS_IMETHODIMP
-nsIOService::SetAppOffline(uint32_t aAppId, int32_t aState)
-{
-    NS_ENSURE_TRUE(!IsNeckoChild(),
-                   NS_ERROR_FAILURE);
-    NS_ENSURE_TRUE(aAppId != nsIScriptSecurityManager::NO_APP_ID,
-                   NS_ERROR_INVALID_ARG);
-    NS_ENSURE_TRUE(aAppId != nsIScriptSecurityManager::UNKNOWN_APP_ID,
-                   NS_ERROR_INVALID_ARG);
-
-    if (!NS_IsMainThread()) {
-        NS_DispatchToMainThread(new SetAppOfflineMainThread(aAppId, aState));
-        return NS_OK;
-    }
-
-    SetAppOfflineInternal(aAppId, aState);
-
-    return NS_OK;
-}
-
-// This method may be called in both the parent and the child process
-// In parent it only gets called in from nsIOService::SetAppOffline
-// and SetAppOfflineMainThread::Run
-// In the child, it may get called from NeckoChild::RecvAppOfflineStatus
-// and TabChild::RecvAppOfflineStatus.
-// Note that in the child process, apps should never be in a WIFI_ONLY
-// because wifi status is not available on the child
-void
-nsIOService::SetAppOfflineInternal(uint32_t aAppId, int32_t aState)
-{
-    MOZ_ASSERT(NS_IsMainThread());
-    NS_ENSURE_TRUE_VOID(NS_IsMainThread());
-
-    int32_t state = nsIAppOfflineInfo::ONLINE;
-    mAppsOfflineStatus.Get(aAppId, &state);
-    if (state == aState) {
-        // The app is already in this state. Nothing needs to be done.
-        return;
-    }
-
-    // wifiActive will always be false in the child process
-    // but it will be true in the parent process on Desktop Firefox as it does
-    // not have wifi-detection capabilities
-    bool wifiActive = IsWifiActive();
-    bool offline = (state == nsIAppOfflineInfo::OFFLINE) ||
-                   (state == nsIAppOfflineInfo::WIFI_ONLY && !wifiActive);
-
-    switch (aState) {
-    case nsIAppOfflineInfo::OFFLINE:
-        mAppsOfflineStatus.Put(aAppId, nsIAppOfflineInfo::OFFLINE);
-        if (!offline) {
-            NotifyAppOfflineStatus(aAppId, nsIAppOfflineInfo::OFFLINE);
-        }
-        break;
-    case nsIAppOfflineInfo::WIFI_ONLY:
-        MOZ_RELEASE_ASSERT(!IsNeckoChild());
-        mAppsOfflineStatus.Put(aAppId, nsIAppOfflineInfo::WIFI_ONLY);
-        if (offline && wifiActive) {
-            NotifyAppOfflineStatus(aAppId, nsIAppOfflineInfo::ONLINE);
-        } else if (!offline && !wifiActive) {
-            NotifyAppOfflineStatus(aAppId, nsIAppOfflineInfo::OFFLINE);
-        }
-        break;
-    case nsIAppOfflineInfo::ONLINE:
-        mAppsOfflineStatus.Remove(aAppId);
-        if (offline) {
-            NotifyAppOfflineStatus(aAppId, nsIAppOfflineInfo::ONLINE);
-        }
-        break;
-    default:
-        break;
-    }
-
+    return SpeculativeConnectInternal(aURI, nullptr, aCallbacks, true);
 }
 
 NS_IMETHODIMP
-nsIOService::GetAppOfflineState(uint32_t aAppId, int32_t *aResult)
+nsIOService::SpeculativeAnonymousConnect2(nsIURI *aURI,
+                                          nsIPrincipal *aPrincipal,
+                                          nsIInterfaceRequestor *aCallbacks)
 {
-    NS_ENSURE_ARG(aResult);
-
-    if (aAppId == NECKO_NO_APP_ID ||
-        aAppId == NECKO_UNKNOWN_APP_ID) {
-        return NS_ERROR_NOT_AVAILABLE;
-    }
-
-    *aResult = nsIAppOfflineInfo::ONLINE;
-    mAppsOfflineStatus.Get(aAppId, aResult);
-
-    return NS_OK;
-}
-
-NS_IMETHODIMP
-nsIOService::IsAppOffline(uint32_t aAppId, bool* aResult)
-{
-    NS_ENSURE_ARG(aResult);
-    *aResult = false;
-
-    if (aAppId == NECKO_NO_APP_ID ||
-        aAppId == NECKO_UNKNOWN_APP_ID) {
-        return NS_ERROR_NOT_AVAILABLE;
-    }
-
-    int32_t state;
-    if (mAppsOfflineStatus.Get(aAppId, &state)) {
-        switch (state) {
-        case nsIAppOfflineInfo::OFFLINE:
-            *aResult = true;
-            break;
-        case nsIAppOfflineInfo::WIFI_ONLY:
-            MOZ_RELEASE_ASSERT(!IsNeckoChild());
-            *aResult = !IsWifiActive();
-            break;
-        default:
-            // The app is online by default
-            break;
-        }
-    }
-
-    return NS_OK;
+    return SpeculativeConnectInternal(aURI, aPrincipal, aCallbacks, true);
 }
 
 } // namespace net

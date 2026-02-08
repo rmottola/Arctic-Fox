@@ -82,9 +82,10 @@ public:
     uint8_t        ReferrerLevel()           { return mReferrerLevel; }
     bool           SpoofReferrerSource()     { return mSpoofReferrerSource; }
     uint8_t        ReferrerTrimmingPolicy()  { return mReferrerTrimmingPolicy; }
+    uint8_t        ReferrerXOriginTrimmingPolicy() {
+        return mReferrerXOriginTrimmingPolicy;
+    }
     uint8_t        ReferrerXOriginPolicy()   { return mReferrerXOriginPolicy; }
-    bool           SendSecureXSiteReferrer() { return mSendSecureXSiteReferrer; }
-    bool           PackagedAppsEnabled()     { return mPackagedAppsEnabled; }
     uint8_t        RedirectionLimit()        { return mRedirectionLimit; }
     PRIntervalTime IdleTimeout()             { return mIdleTimeout; }
     PRIntervalTime SpdyTimeout()             { return mSpdyTimeout; }
@@ -248,9 +249,9 @@ public:
                                           originAttributes);
     }
 
-    AltSvcMapping *GetAltServiceMapping(const nsACString &scheme,
-                                        const nsACString &host,
-                                        int32_t port, bool pb)
+    already_AddRefed<AltSvcMapping> GetAltServiceMapping(const nsACString &scheme,
+                                                         const nsACString &host,
+                                                         int32_t port, bool pb)
     {
         return mConnMgr->GetAltServiceMapping(scheme, host, port, pb);
     }
@@ -368,6 +369,16 @@ public:
         return mKeepEmptyResponseHeadersAsEmtpyString;
     }
 
+    uint32_t DefaultHpackBuffer() const
+    {
+        return mDefaultHpackBuffer;
+    }
+
+    uint32_t MaxHttpResponseHeaderSize() const
+    {
+        return mMaxHttpResponseHeaderSize;
+    }
+
 private:
     virtual ~nsHttpHandler();
 
@@ -412,6 +423,7 @@ private:
     uint8_t  mReferrerLevel;
     uint8_t  mSpoofReferrerSource;
     uint8_t  mReferrerTrimmingPolicy;
+    uint8_t  mReferrerXOriginTrimmingPolicy;
     uint8_t  mReferrerXOriginPolicy;
 
     bool mFastFallbackToIPv4;
@@ -438,9 +450,6 @@ private:
     PRIntervalTime mPipelineRescheduleTimeout;
     PRIntervalTime mPipelineReadTimeout;
     nsCOMPtr<nsITimer> mPipelineTestTimer;
-
-    // Whether a URL containing !// should be interpreted as a packaged app channel
-    bool mPackagedAppsEnabled = false;
 
     uint8_t  mRedirectionLimit;
 
@@ -488,9 +497,6 @@ private:
 
 
     bool           mPromptTempRedirect;
-    // mSendSecureXSiteReferrer: default is false,
-    // if true allow referrer headers between secure non-matching hosts
-    bool           mSendSecureXSiteReferrer;
 
     // Persistent HTTPS caching flag
     bool           mEnablePersistentHttpsCaching;
@@ -588,6 +594,12 @@ private:
     // (Bug 6699259)
     bool mKeepEmptyResponseHeadersAsEmtpyString;
 
+    // The default size (in bytes) of the HPACK decompressor table.
+    uint32_t mDefaultHpackBuffer;
+
+    // The max size (in bytes) for received Http response header.
+    uint32_t mMaxHttpResponseHeaderSize;
+
 private:
     // For Rate Pacing Certain Network Events. Only assign this pointer on
     // socket thread.
@@ -628,12 +640,14 @@ private:
 
 private:
     nsresult SpeculativeConnectInternal(nsIURI *aURI,
+                                        nsIPrincipal *aPrincipal,
                                         nsIInterfaceRequestor *aCallbacks,
                                         bool anonymous);
 
     // UUID generator for channelIds
     nsCOMPtr<nsIUUIDGenerator> mUUIDGen;
 
+public:
     nsresult NewChannelId(nsID *channelId);
 };
 

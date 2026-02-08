@@ -1175,7 +1175,7 @@ EventRunnable::PreDispatch(WorkerPrivate* /* unused */)
         }
 
         if (doClone) {
-          Write(cx, response, transferable, rv);
+          Write(cx, response, transferable, JS::CloneDataPolicy(), rv);
           if (NS_WARN_IF(rv.Failed())) {
             NS_WARNING("Failed to clone response!");
             mResponseResult = rv.StealNSResult();
@@ -1426,15 +1426,19 @@ OpenRunnable::MainThreadRunInternal()
   MOZ_ASSERT(!mProxy->mInOpen);
   mProxy->mInOpen = true;
 
-  rv = mProxy->mXHR->Open(mMethod, NS_ConvertUTF16toUTF8(mURL),
-                          Optional<bool>(true), mUser, mPassword);
+  ErrorResult rv2;
+  mProxy->mXHR->Open(mMethod, mURL, true,
+                     mUser.WasPassed() ? mUser.Value() : NullString(),
+                     mPassword.WasPassed() ? mPassword.Value() : NullString(),
+                     rv2);
 
   MOZ_ASSERT(mProxy->mInOpen);
   mProxy->mInOpen = false;
 
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (rv2.Failed()) {
+    return rv2.StealNSResult();
+  }
 
-  ErrorResult rv2;
   mProxy->mXHR->SetResponseType(mResponseType, rv2);
   if (rv2.Failed()) {
     return rv2.StealNSResult();
@@ -2408,7 +2412,6 @@ XMLHttpRequestWorker::GetResponse(JSContext* /* unused */,
     }
   }
 
-  JS::ExposeValueToActiveJS(mStateData.mResponse);
   aRv = mStateData.mResponseResult;
   aResponse.set(mStateData.mResponse);
 }
@@ -2421,9 +2424,10 @@ XMLHttpRequestWorker::GetResponseText(nsAString& aResponseText, ErrorResult& aRv
     return;
   }
 
-  nsAutoString foo;
-  mStateData.mResponseText.GetAsString(foo);
-  aResponseText.Assign(foo.BeginReading(), foo.Length());
+  if (!mStateData.mResponseText.GetAsString(aResponseText)) {
+    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    return;
+  }
 }
 
 void

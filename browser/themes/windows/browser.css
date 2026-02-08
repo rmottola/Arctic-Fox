@@ -3660,3 +3660,34 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 .browser-extension-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;
 }
+
+@media (-moz-os-version: windows-xp),
+       (-moz-os-version: windows-vista),
+       (-moz-os-version: windows-win7) {
+  .cui-widget-panelview[id^=PanelUI-webext-] {
+    border-radius: 4px;
+  }
+}
+
+.webextension-popup-browser {
+  margin-right: -1px;
+  border-radius: inherit;
+}
+
+#PanelUI-popup .webextension-popup-browser {
+  margin: 0;
+}
+
+#ContentSelectDropdown > menupopup {
+  background-color: -moz-field;
+  -moz-border-top-colors: GrayText;
+  -moz-border-right-colors: GrayText;
+  -moz-border-bottom-colors: GrayText;
+  -moz-border-left-colors: GrayText;
+}
+
+#ContentSelectDropdown > .isOpenedViaTouch > menucaption,
+#ContentSelectDropdown > .isOpenedViaTouch > menuitem {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}

@@ -8,7 +8,6 @@
 #include <stdint.h>                     // for uint16_t, uint32_t
 #include "CanvasLayerComposite.h"       // for CanvasLayerComposite
 #include "ColorLayerComposite.h"        // for ColorLayerComposite
-#include "Composer2D.h"                 // for Composer2D
 #include "CompositableHost.h"           // for CompositableHost
 #include "ContainerLayerComposite.h"    // for ContainerLayerComposite, etc
 #include "FPSCounter.h"                 // for FPSState, FPSCounter
@@ -41,6 +40,7 @@
 #include "mozilla/layers/Effects.h"     // for Effect, EffectChain, etc
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
 #include "mozilla/layers/LayersTypes.h"  // for etc
+#include "mozilla/widget/CompositorWidget.h" // for WidgetRenderingContext
 #include "ipc/CompositorBench.h"        // for CompositorBench
 #include "ipc/ShadowLayerUtils.h"
 #include "mozilla/mozalloc.h"           // for operator new, etc
@@ -57,15 +57,11 @@
 #include <android/log.h>
 #include <android/native_window.h>
 #endif
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
 #include "opengl/CompositorOGL.h"
 #include "GLContextEGL.h"
 #include "GLContextProvider.h"
 #include "ScopedGLHelpers.h"
-#endif
-#ifdef MOZ_WIDGET_GONK
-#include "nsScreenManagerGonk.h"
-#include "nsWindow.h"
 #endif
 #include "GeckoProfiler.h"
 #include "TextRenderer.h"               // for TextRenderer
@@ -129,7 +125,6 @@ LayerManagerComposite::LayerManagerComposite(Compositor* aCompositor)
 , mIsCompositorReady(false)
 , mDebugOverlayWantsNextFrame(false)
 , mGeometryChanged(true)
-, mLastFrameMissedHWC(false)
 , mWindowOverlayChanged(false)
 , mLastPaintTime(TimeDuration::Forever())
 , mRenderStartTime(TimeStamp::Now())
@@ -176,19 +171,21 @@ bool
 LayerManagerComposite::AreComponentAlphaLayersEnabled()
 {
   return mCompositor->GetBackendType() != LayersBackend::LAYERS_BASIC &&
+         mCompositor->SupportsEffect(EffectTypes::COMPONENT_ALPHA) &&
          LayerManager::AreComponentAlphaLayersEnabled();
 }
 
-void
+bool
 LayerManagerComposite::BeginTransaction()
 {
   mInTransaction = true;
 
   if (!mCompositor->Ready()) {
-    return;
+    return false;
   }
 
   mIsCompositorReady = true;
+  return true;
 }
 
 void
@@ -491,7 +488,7 @@ LayerManagerComposite::UpdateAndRender()
   }
 
   Render(invalid, opaque);
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
   RenderToPresentationSurface();
 #endif
   mGeometryChanged = false;
@@ -904,37 +901,18 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
     LayerScope::SendLayerDump(Move(packet));
   }
 
-  /** Our more efficient but less powerful alter ego, if one is available. */
-  RefPtr<Composer2D> composer2D;
-  composer2D = mCompositor->GetWidget()->GetComposer2D();
-
-  // We can't use composert2D if we have layer effects
-  if (!mTarget && !haveLayerEffects &&
-      gfxPrefs::Composer2DCompositionEnabled() &&
-      composer2D && composer2D->HasHwc() && composer2D->TryRenderWithHwc(mRoot,
-          mCompositor->GetWidget()->RealWidget(),
-          mGeometryChanged,
-          mCompositor->HasImageHostOverlays()))
-  {
-    LayerScope::SetHWComposed();
-    if (mFPS) {
-      double fps = mFPS->mCompositionFps.AddFrameAndGetFps(TimeStamp::Now());
-      if (gfxPrefs::LayersDrawFPS()) {
-        printf_stderr("HWComposer: FPS is %g\n", fps);
-      }
-    }
-    mCompositor->EndFrameForExternalComposition(Matrix());
-    mLastFrameMissedHWC = false;
-    return;
-  } else if (!mTarget && !haveLayerEffects) {
-    mLastFrameMissedHWC = !!composer2D;
-  }
+  mozilla::widget::WidgetRenderingContext widgetContext;
+#if defined(XP_MACOSX)
+  widgetContext.mLayerManager = this;
+#elif defined(MOZ_WIDGET_ANDROID)
+  widgetContext.mCompositor = GetCompositor();
+#endif
 
   {
     PROFILER_LABEL("LayerManagerComposite", "PreRender",
       js::ProfileEntry::Category::GRAPHICS);
 
-    if (!mCompositor->GetWidget()->PreRender(this)) {
+    if (!mCompositor->GetWidget()->PreRender(&widgetContext)) {
       return;
     }
   }
@@ -965,13 +943,13 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
   }
 
   if (actualBounds.IsEmpty()) {
-    mCompositor->GetWidget()->PostRender(this);
+    mCompositor->GetWidget()->PostRender(&widgetContext);
     return;
   }
 
   // Allow widget to render a custom background.
   mCompositor->GetWidget()->DrawWindowUnderlay(
-    this, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
+    &widgetContext, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
 
   RefPtr<CompositingRenderTarget> previousTarget;
   if (haveLayerEffects) {
@@ -999,7 +977,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
 
   // Allow widget to render a custom foreground.
   mCompositor->GetWidget()->DrawWindowOverlay(
-    this, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
+    &widgetContext, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
 
   // Debugging
   RenderDebugOverlay(actualBounds);
@@ -1014,16 +992,12 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
     mCompositor->SetDispAcquireFence(mRoot);
   }
 
-  if (composer2D) {
-    composer2D->Render(mCompositor->GetWidget()->RealWidget());
-  }
-
-  mCompositor->GetWidget()->PostRender(this);
+  mCompositor->GetWidget()->PostRender(&widgetContext);
 
   RecordFrame();
 }
 
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
 class ScopedCompositorProjMatrix {
 public:
   ScopedCompositorProjMatrix(CompositorOGL* aCompositor, const Matrix4x4& aProjMatrix):
@@ -1130,40 +1104,6 @@ LayerManagerComposite::RenderToPresentationSurface()
   const IntSize windowSize(ANativeWindow_getWidth(window),
                            ANativeWindow_getHeight(window));
 
-#elif defined(MOZ_WIDGET_GONK)
-  CompositorOGL* compositor = mCompositor->AsCompositorOGL();
-  nsScreenGonk* screen = static_cast<nsWindow*>(mCompositor->GetWidget()->RealWidget())->GetScreen();
-  if (!screen->IsPrimaryScreen()) {
-    // Only primary screen support mirroring
-    return;
-  }
-
-  nsWindow* mirrorScreenWidget = screen->GetMirroringWidget();
-  if (!mirrorScreenWidget) {
-    // No mirroring
-    return;
-  }
-
-  nsScreenGonk* mirrorScreen = mirrorScreenWidget->GetScreen();
-  if (!mirrorScreen->GetTopWindows().IsEmpty()) {
-    return;
-  }
-
-  EGLSurface surface = mirrorScreen->GetEGLSurface();
-  if (surface == LOCAL_EGL_NO_SURFACE) {
-    // Create GLContext
-    RefPtr<GLContext> gl = gl::GLContextProvider::CreateForWindow(mirrorScreenWidget, false);
-    mirrorScreenWidget->SetNativeData(NS_NATIVE_OPENGL_CONTEXT,
-                                      reinterpret_cast<uintptr_t>(gl.get()));
-    surface = mirrorScreen->GetEGLSurface();
-    if (surface == LOCAL_EGL_NO_SURFACE) {
-      // Failed to create EGLSurface
-      return;
-    }
-  }
-  GLContext* gl = compositor->gl();
-  GLContextEGL* egl = GLContextEGL::Cast(gl);
-  const IntSize windowSize = mirrorScreen->GetNaturalBounds().Size().ToUnknownSize();
 #endif
 
   if ((windowSize.width <= 0) || (windowSize.height <= 0)) {
@@ -1212,7 +1152,7 @@ LayerManagerComposite::RenderToPresentationSurface()
   PostProcessLayers(mRoot, opaque, visible, Nothing());
 
   nsIntRegion invalid;
-  IntRect bounds(0, 0, scale * pageWidth, actualHeight);
+  IntRect bounds = IntRect::Truncate(0, 0, scale * pageWidth, actualHeight);
   IntRect rect, actualBounds;
   MOZ_ASSERT(mRoot->GetOpacity() == 1);
   mCompositor->BeginFrame(invalid, nullptr, bounds, nsIntRegion(), &rect, &actualBounds);
@@ -1224,21 +1164,12 @@ LayerManagerComposite::RenderToPresentationSurface()
   egl->fClearColor(0.0, 0.0, 0.0, 0.0);
   egl->fClear(LOCAL_GL_COLOR_BUFFER_BIT);
 
-  const IntRect clipRect = IntRect(0, 0, actualWidth, actualHeight);
+  const IntRect clipRect = IntRect::Truncate(0, 0, actualWidth, actualHeight);
 
   RootLayer()->Prepare(RenderTargetIntRect::FromUnknownRect(clipRect));
   RootLayer()->RenderLayer(clipRect);
 
   mCompositor->EndFrame();
-#ifdef MOZ_WIDGET_GONK
-  mCompositor->SetDispAcquireFence(mRoot); // Call after EndFrame()
-
-  RefPtr<Composer2D> composer2D;
-  composer2D = mCompositor->GetWidget()->GetComposer2D();
-  if (composer2D) {
-    composer2D->Render(mirrorScreenWidget);
-  }
-#endif
 }
 #endif
 

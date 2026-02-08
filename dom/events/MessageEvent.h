@@ -9,7 +9,6 @@
 
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/BindingUtils.h"
-#include "mozilla/dom/MessagePortList.h"
 #include "nsCycleCollectionParticipant.h"
 
 namespace mozilla {
@@ -17,7 +16,6 @@ namespace dom {
 
 struct MessageEventInit;
 class MessagePort;
-class MessagePortList;
 class OwningWindowProxyOrMessagePort;
 class WindowProxyOrMessagePort;
 
@@ -49,12 +47,7 @@ public:
   void GetLastEventId(nsAString&) const;
   void GetSource(Nullable<OwningWindowProxyOrMessagePort>& aValue) const;
 
-  MessagePortList* GetPorts()
-  {
-    return mPorts;
-  }
-
-  void SetPorts(MessagePortList* aPorts);
+  void GetPorts(nsTArray<RefPtr<MessagePort>>& aPorts);
 
   // Non WebIDL methods
   void SetSource(mozilla::dom::MessagePort* aPort);
@@ -80,7 +73,7 @@ public:
                         bool aCancelable, JS::Handle<JS::Value> aData,
                         const nsAString& aOrigin, const nsAString& aLastEventId,
                         const Nullable<WindowProxyOrMessagePort>& aSource,
-                        const Nullable<Sequence<OwningNonNull<MessagePort>>>& aPorts);
+                        const Sequence<OwningNonNull<MessagePort>>& aPorts);
 
 protected:
   ~MessageEvent();
@@ -91,15 +84,11 @@ private:
   nsString mLastEventId;
   RefPtr<nsPIDOMWindowInner> mWindowSource;
   RefPtr<MessagePort> mPortSource;
-  RefPtr<MessagePortList> mPorts;
+
+  nsTArray<RefPtr<MessagePort>> mPorts;
 };
 
 } // namespace dom
 } // namespace mozilla
-
-already_AddRefed<mozilla::dom::MessageEvent>
-NS_NewDOMMessageEvent(mozilla::dom::EventTarget* aOwner,
-                      nsPresContext* aPresContext,
-                      mozilla::WidgetEvent* aEvent);
 
 #endif // mozilla_dom_MessageEvent_h_

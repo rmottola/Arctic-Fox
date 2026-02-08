@@ -220,9 +220,7 @@ public:
   NS_IMETHOD Run() override;
 
 private:
-  ~RegisterVoicesRunnable()
-  {
-  }
+  ~RegisterVoicesRunnable() override = default;
 
   // This runnable always use sync mode.  It is unnecesarry to reference object
   OSXSpeechSynthesizerService* mSpeechService;
@@ -266,9 +264,7 @@ public:
   NS_IMETHOD Run() override;
 
 private:
-  ~EnumVoicesRunnable()
-  {
-  }
+  ~EnumVoicesRunnable() override = default;
 
   RefPtr<OSXSpeechSynthesizerService> mSpeechService;
 };
@@ -332,9 +328,6 @@ OSXSpeechSynthesizerService::OSXSpeechSynthesizerService()
 {
 }
 
-OSXSpeechSynthesizerService::~OSXSpeechSynthesizerService()
-{
-}
 
 bool
 OSXSpeechSynthesizerService::Init()

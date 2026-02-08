@@ -1587,14 +1587,14 @@ nsTableFrame::IntrinsicISizeOffsets()
 
 /* virtual */
 LogicalSize
-nsTableFrame::ComputeSize(nsRenderingContext *aRenderingContext,
-                          WritingMode aWM,
-                          const LogicalSize& aCBSize,
-                          nscoord aAvailableISize,
-                          const LogicalSize& aMargin,
-                          const LogicalSize& aBorder,
-                          const LogicalSize& aPadding,
-                          ComputeSizeFlags aFlags)
+nsTableFrame::ComputeSize(nsRenderingContext* aRenderingContext,
+                          WritingMode         aWM,
+                          const LogicalSize&  aCBSize,
+                          nscoord             aAvailableISize,
+                          const LogicalSize&  aMargin,
+                          const LogicalSize&  aBorder,
+                          const LogicalSize&  aPadding,
+                          ComputeSizeFlags    aFlags)
 {
   LogicalSize result =
     nsContainerFrame::ComputeSize(aRenderingContext, aWM,
@@ -1654,14 +1654,14 @@ nsTableFrame::TableShrinkISizeToFit(nsRenderingContext *aRenderingContext,
 
 /* virtual */
 LogicalSize
-nsTableFrame::ComputeAutoSize(nsRenderingContext *aRenderingContext,
-                              WritingMode aWM,
-                              const LogicalSize& aCBSize,
-                              nscoord aAvailableISize,
-                              const LogicalSize& aMargin,
-                              const LogicalSize& aBorder,
-                              const LogicalSize& aPadding,
-                              bool aShrinkWrap)
+nsTableFrame::ComputeAutoSize(nsRenderingContext* aRenderingContext,
+                              WritingMode         aWM,
+                              const LogicalSize&  aCBSize,
+                              nscoord             aAvailableISize,
+                              const LogicalSize&  aMargin,
+                              const LogicalSize&  aBorder,
+                              const LogicalSize&  aPadding,
+                              ComputeSizeFlags    aFlags)
 {
   // Tables always shrink-wrap.
   nscoord cbBased = aAvailableISize - aMargin.ISize(aWM) - aBorder.ISize(aWM) -
@@ -2431,7 +2431,7 @@ nsTableFrame::HomogenousInsertFrames(ChildListID     aListID,
       // over...  Oh, well.
       nsIFrame* pseudoFrame = aFrameList.FirstChild();
       nsIContent* parentContent = GetContent();
-      nsIContent* content;
+      nsIContent* content = nullptr;
       aPrevFrame = nullptr;
       while (pseudoFrame  && (parentContent ==
                               (content = pseudoFrame->GetContent()))) {
@@ -2441,7 +2441,7 @@ nsTableFrame::HomogenousInsertFrames(ChildListID     aListID,
       if (MOZ_LIKELY(container)) { // XXX need this null-check, see bug 411823.
         int32_t newIndex = container->IndexOf(content);
         nsIFrame* kidFrame;
-        nsTableColGroupFrame* lastColGroup;
+        nsTableColGroupFrame* lastColGroup = nullptr;
         if (isColGroup) {
           kidFrame = mColGroups.FirstChild();
           lastColGroup = nsTableColGroupFrame::GetLastRealColGroup(this);

@@ -46,7 +46,7 @@ SanitizeOriginKeys(const uint64_t& aSinceWhen, bool aOnlyPrivateBrowsing)
   if (XRE_GetProcessType() == GeckoProcessType_Default) {
     // Avoid opening MediaManager in this case, since this is called by
     // sanitize.js when cookies are cleared, which can happen on startup.
-    auto tmpParent = MakeUnique<Parent<NonE10s>>(true);
+    RefPtr<Parent<NonE10s>> tmpParent = new Parent<NonE10s>();
     tmpParent->RecvSanitizeOriginKeys(aSinceWhen, aOnlyPrivateBrowsing);
   } else {
     Child::Get()->SendSanitizeOriginKeys(aSinceWhen, aOnlyPrivateBrowsing);
@@ -84,18 +84,18 @@ void Child::ActorDestroy(ActorDestroyReason aWhy)
   mActorDestroyed = true;
 }
 
-bool
+mozilla::ipc::IPCResult
 Child::RecvGetOriginKeyResponse(const uint32_t& aRequestId, const nsCString& aKey)
 {
   RefPtr<MediaManager> mgr = MediaManager::GetInstance();
   if (!mgr) {
-    return false;
+    return IPC_FAIL_NO_REASON(this);
   }
   RefPtr<Pledge<nsCString>> pledge = mgr->mGetOriginKeyPledges.Remove(aRequestId);
   if (pledge) {
     pledge->Resolve(aKey);
   }
-  return true;
+  return IPC_OK();
 }
 
 PMediaChild*

@@ -17,7 +17,7 @@ def add_libdir_to_path():
 add_libdir_to_path()
 
 import jittests
-from tests import get_jitflags, get_cpu_count, get_environment_overlay, \
+from tests import get_jitflags, valid_jitflags, get_cpu_count, get_environment_overlay, \
                   change_env
 
 # Python 3.3 added shutil.which, but we can't use that yet.
@@ -31,6 +31,26 @@ def which(name):
             return os.path.abspath(full)
 
     return name
+
+def choose_item(jobs, max_items, display):
+    job_count = len(jobs)
+
+    # Don't present a choice if there are too many tests
+    if job_count > max_items:
+        raise Exception('Too many jobs.')
+
+    for i, job in enumerate(jobs, 1):
+        print("{}) {}".format(i, display(job)))
+
+    item = raw_input('Which one:\n')
+    try:
+        item = int(item)
+        if item > job_count or item < 1:
+            raise Exception('Input isn\'t between 1 and {}'.format(job_count))
+    except ValueError:
+        raise Exception('Unrecognized input')
+
+    return jobs[item - 1]
 
 def main(argv):
     # The [TESTS] optional arguments are paths of test files relative
@@ -75,6 +95,8 @@ def main(argv):
     op.add_option('-w', '--write-failures', dest='write_failures',
                   metavar='FILE',
                   help='Write a list of failed tests to [FILE]')
+    op.add_option('-C', '--check-output', action='store_true', dest='check_output',
+                  help='Run tests to check output for different jit-flags')
     op.add_option('-r', '--read-tests', dest='read_tests', metavar='FILE',
                   help='Run test files listed in [FILE]')
     op.add_option('-R', '--retest', dest='retest', metavar='FILE',
@@ -89,21 +111,21 @@ def main(argv):
                   help='Enable the |valgrind| flag, if valgrind is in $PATH.')
     op.add_option('--valgrind-all', dest='valgrind_all', action='store_true',
                   help='Run all tests with valgrind, if valgrind is in $PATH.')
-    op.add_option('--jitflags', dest='jitflags', default='none', type='string',
-                  help='IonMonkey option combinations. One of all, debug,'
-                  ' ion, and none (default %default).')
     op.add_option('--avoid-stdio', dest='avoid_stdio', action='store_true',
                   help='Use js-shell file indirection instead of piping stdio.')
     op.add_option('--write-failure-output', dest='write_failure_output',
                   action='store_true',
                   help='With --write-failures=FILE, additionally write the'
                   ' output of failed tests to [FILE]')
-    op.add_option('--ion', dest='ion', action='store_true',
+    op.add_option('--jitflags', dest='jitflags', default='none',
+                  choices=valid_jitflags(),
+                  help='IonMonkey option combinations. One of %s.' % ', '.join(valid_jitflags()))
+    op.add_option('--ion', dest='jitflags', action='store_const', const='ion',
                   help='Run tests once with --ion-eager and once with'
-                  ' --baseline-eager (ignores --jitflags)')
-    op.add_option('--tbpl', dest='tbpl', action='store_true',
+                  ' --baseline-eager (equivalent to --jitflags=ion)')
+    op.add_option('--tbpl', dest='jitflags', action='store_const', const='all',
                   help='Run tests with all IonMonkey option combinations'
-                  ' (ignores --jitflags)')
+                  ' (equivalent to --jitflags=all)')
     op.add_option('-j', '--worker-count', dest='max_jobs', type=int,
                   default=max(1, get_cpu_count()),
                   help='Number of tests to run in parallel (default %default)')
@@ -173,8 +195,19 @@ def main(argv):
     test_list = []
     read_all = True
 
-    # Forbid running several variants of the same asmjs test, when debugging.
-    options.can_test_also_noasmjs = not options.debugger
+    # No point in adding in noasmjs and wasm-baseline variants if the
+    # jitflags forbid asmjs in the first place. (This is to avoid getting a
+    # wasm-baseline run when requesting --jitflags=interp, but the test
+    # contains test-also-noasmjs.)
+    test_flags = get_jitflags(options.jitflags)
+    options.asmjs_enabled = True
+    options.wasm_enabled = True
+    if all(['--no-asmjs' in flags for flags in test_flags]):
+        options.asmjs_enabled = False
+        options.wasm_enabled = False
+    if all(['--no-wasm' in flags for flags in test_flags]):
+        options.asmjs_enabled = False
+        options.wasm_enabled = False
 
     if test_args:
         read_all = False
@@ -231,20 +264,20 @@ def main(argv):
         end = int(round(options.this_chunk * tests_per_chunk))
         test_list = test_list[start:end]
 
-    # The full test list is ready. Now create copies for each JIT configuration.
-    job_list = []
-    test_flags = []
-    if options.tbpl:
-        # Running all bits would take forever. Instead, we test a few
-        # interesting combinations.
-        test_flags = get_jitflags('all')
-    elif options.ion:
-        test_flags = get_jitflags('ion')
-    else:
-        test_flags = get_jitflags(options.jitflags)
+    if not test_list:
+        print("No tests found matching command line arguments after filtering.",
+              file=sys.stderr)
+        sys.exit(0)
 
-    job_list = [_ for test in test_list
-                for _ in test.copy_variants(test_flags)]
+    # The full test list is ready. Now create copies for each JIT configuration.
+    test_list = [_ for test in test_list for _ in test.copy_variants(test_flags)]
+
+    job_list = (test for test in test_list)
+    job_count = len(test_list)
+
+    if options.repeat:
+        job_list = (test for test in job_list for i in range(options.repeat))
+        job_count *= options.repeat
 
     if options.ignore_timeouts:
         read_all = False
@@ -270,14 +303,24 @@ def main(argv):
     os.mkdir(jittests.JS_CACHE_DIR)
 
     if options.debugger:
-        if len(job_list) > 1:
+        if job_count > 1:
             print('Multiple tests match command line'
                   ' arguments, debugger can only run one')
-            for tc in job_list:
-                print('    {}'.format(tc.path))
-            sys.exit(1)
+            jobs = list(job_list)
 
-        tc = job_list[0]
+            def display_job(job):
+                flags = ""
+                if len(job.jitflags) != 0:
+                    flags = "({})".format(' '.join(job.jitflags))
+                return '{} {}'.format(job.path, flags)
+
+            try:
+                tc = choose_item(jobs, max_items=50, display=display_job)
+            except Exception as e:
+                sys.exit(str(e))
+        else:
+            tc = job_list.next()
+
         if options.debugger == 'gdb':
             debug_cmd = ['gdb', '--args']
         elif options.debugger == 'lldb':
@@ -296,10 +339,10 @@ def main(argv):
     try:
         ok = None
         if options.remote:
-            ok = jittests.run_tests_remote(job_list, prefix, options)
+            ok = jittests.run_tests_remote(job_list, job_count, prefix, options)
         else:
             with change_env(test_environment):
-                ok = jittests.run_tests(job_list, prefix, options)
+                ok = jittests.run_tests(job_list, job_count, prefix, options)
         if not ok:
             sys.exit(2)
     except OSError:

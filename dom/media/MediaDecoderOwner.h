@@ -11,6 +11,7 @@
 namespace mozilla {
 
 class VideoFrameContainer;
+class MediaResult;
 
 namespace dom {
 class HTMLMediaElement;
@@ -67,7 +68,7 @@ public:
   // resource has a decode error during metadata loading or decoding.
   // The decoder owner should call Shutdown() on the decoder and drop the
   // reference to the decoder to prevent further calls into the decoder.
-  virtual void DecodeError() = 0;
+  virtual void DecodeError(const MediaResult& aError) = 0;
 
   // Return true if media element error attribute is not null.
   virtual bool HasError() const = 0;
@@ -142,13 +143,11 @@ public:
   // reference to the decoder to prevent further calls into the decoder.
   virtual void NotifyXPCOMShutdown() = 0;
 
-#ifdef MOZ_EME
   // Dispatches a "encrypted" event to the HTMLMediaElement, with the
   // provided init data. Actual dispatch may be delayed until HAVE_METADATA.
   // Main thread only.
   virtual void DispatchEncrypted(const nsTArray<uint8_t>& aInitData,
                                  const nsAString& aInitDataType) = 0;
-#endif // MOZ_EME
 };
 
 } // namespace mozilla

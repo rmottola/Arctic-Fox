@@ -23,6 +23,7 @@
 #include "nsContentUtils.h"
 #include "nsIPermissionManager.h"
 #include "nsIDocument.h"
+#include "nsIBlocklistService.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -42,9 +43,7 @@ nsPluginArray::Init()
   }
 }
 
-nsPluginArray::~nsPluginArray()
-{
-}
+nsPluginArray::~nsPluginArray() = default;
 
 static bool
 ResistFingerprinting() {
@@ -329,6 +328,12 @@ operator<(const RefPtr<nsPluginElement>& lhs,
   return lhs->PluginTag()->Name() < rhs->PluginTag()->Name();
 }
 
+static bool
+PluginShouldBeHidden(const nsCString& aName) {
+  // This only supports one hidden plugin
+  return Preferences::GetCString("plugins.navigator.hidden_ctp_plugin").Equals(aName);
+}
+
 void
 nsPluginArray::EnsurePlugins()
 {
@@ -354,10 +359,13 @@ nsPluginArray::EnsurePlugins()
       mPlugins.AppendElement(new nsPluginElement(mWindow, pluginTags[i]));
     } else if (pluginTag->IsActive()) {
       uint32_t permission = nsIPermissionManager::ALLOW_ACTION;
-      if (pluginTag->IsClicktoplay()) {
+      uint32_t blocklistState;
+      if (pluginTag->IsClicktoplay() &&
+          NS_SUCCEEDED(pluginTag->GetBlocklistState(&blocklistState)) &&
+          blocklistState == nsIBlocklistService::STATE_NOT_BLOCKED) {
         nsCString name;
         pluginTag->GetName(name);
-        if (NS_LITERAL_CSTRING("Shockwave Flash").Equals(name)) {
+        if (PluginShouldBeHidden(name)) {
           RefPtr<nsPluginHost> pluginHost = nsPluginHost::GetInst();
           nsCString permString;
           nsresult rv = pluginHost->GetPermissionStringForTag(pluginTag, 0, permString);
@@ -374,6 +382,12 @@ nsPluginArray::EnsurePlugins()
         mCTPPlugins.AppendElement(new nsPluginElement(mWindow, pluginTags[i]));
       }
     }
+  }
+
+  if (mPlugins.Length() == 0 && mCTPPlugins.Length() != 0) {
+    nsCOMPtr<nsPluginTag> hiddenTag = new nsPluginTag("Hidden Plugin", NULL, NULL, NULL, NULL,
+                                                      NULL, NULL, NULL, 0, 0, false);
+    mPlugins.AppendElement(new nsPluginElement(mWindow, hiddenTag));
   }
 
   // Alphabetize the enumeration order of non-hidden plugins to reduce
@@ -399,9 +413,7 @@ nsPluginElement::nsPluginElement(nsPIDOMWindowInner* aWindow,
 {
 }
 
-nsPluginElement::~nsPluginElement()
-{
-}
+nsPluginElement::~nsPluginElement() = default;
 
 nsPIDOMWindowInner*
 nsPluginElement::GetParentObject() const

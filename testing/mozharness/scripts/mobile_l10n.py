@@ -602,13 +602,13 @@ class MobileSingleLocale(MockMixin, LocalesMixin, ReleaseMixin,
 
         return os.path.join(apkdir, apks[0])
 
-    def query_is_release(self):
+    def query_is_release_or_beta(self):
 
-        return bool(self.config.get("is_release"))
+        return bool(self.config.get("is_release_or_beta"))
 
     def submit_to_balrog(self):
 
-        if not self.query_is_nightly() and not self.query_is_release():
+        if not self.query_is_nightly() and not self.query_is_release_or_beta():
             self.info("Not a nightly or release build, skipping balrog submission.")
             return
 

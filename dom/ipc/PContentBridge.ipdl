@@ -8,6 +8,8 @@ include protocol PBlob;
 include protocol PBrowser;
 include protocol PContent;
 include protocol PJavaScript;
+include protocol PFileDescriptorSet;
+include protocol PSendStream;
 
 include DOMTypes;
 include JavaScriptTypes;
@@ -30,13 +32,15 @@ namespace dom {
  * allocate the PContentBridgeChild.  This protocol allows these processes to
  * share PBrowsers and send messages to each other.
  */
-prio(normal upto urgent) sync protocol PContentBridge
+nested(upto inside_cpow) sync protocol PContentBridge
 {
     bridges PContent, PContent;
 
     manages PBlob;
     manages PBrowser;
+    manages PFileDescriptorSet;
     manages PJavaScript;
+    manages PSendStream;
 
 parent:
     sync SyncMessage(nsString aMessage, ClonedMessageData aData,
@@ -44,13 +48,18 @@ parent:
       returns (StructuredCloneData[] retval);
 
     async PJavaScript();
+
+    async PSendStream();
+
 both:
     // Both the parent and the child can construct the PBrowser.
     // See the comment in PContent::PBrowser().
     async PBrowser(TabId tabId, IPCTabContext context, uint32_t chromeFlags,
-                   ContentParentId cpId, bool isForApp, bool isForBrowser);
+                   ContentParentId cpId, bool isForBrowser);
 
     async PBlob(BlobConstructorParams params);
+
+    async PFileDescriptorSet(FileDescriptor fd);
 
     async AsyncMessage(nsString aMessage, CpowEntry[] aCpows,
                        Principal aPrincipal, ClonedMessageData aData);

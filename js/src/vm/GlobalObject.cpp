@@ -15,7 +15,6 @@
 #include "jsprototypes.h"
 #include "jsweakmap.h"
 
-#include "asmjs/WasmJS.h"
 #include "builtin/AtomicsObject.h"
 #include "builtin/Eval.h"
 #if EXPOSE_INTL_API
@@ -40,6 +39,7 @@
 #include "vm/RegExpStatics.h"
 #include "vm/RegExpStaticsObject.h"
 #include "vm/StopIterationObject.h"
+#include "wasm/WasmJS.h"
 
 #include "jscompartmentinlines.h"
 #include "jsobjinlines.h"
@@ -98,8 +98,8 @@ js::GlobalObject::getTypedObjectModule() const {
 /* static */ bool
 GlobalObject::skipDeselectedConstructor(JSContext* cx, JSProtoKey key)
 {
-    if (key == JSProto_Wasm || key == JSProto_WebAssembly)
-        return !cx->options().wasm();
+    if (key == JSProto_WebAssembly)
+        return !wasm::HasSupport(cx);
 
 #ifdef ENABLE_SHARED_ARRAY_BUFFER
     // Return true if the given constructor has been disabled at run-time.
@@ -220,19 +220,17 @@ GlobalObject::resolveConstructor(JSContext* cx, Handle<GlobalObject*> global, JS
     RootedId id(cx, NameToId(ClassName(key, cx)));
     if (isObjectOrFunction) {
         if (clasp->specShouldDefineConstructor()) {
-            if (!global->addDataProperty(cx, id, constructorPropertySlot(key), 0))
+            RootedValue ctorValue(cx, ObjectValue(*ctor));
+            if (!DefineProperty(cx, global, id, ctorValue, nullptr, nullptr, JSPROP_RESOLVING))
                 return false;
         }
 
         global->setConstructor(key, ObjectValue(*ctor));
-        global->setConstructorPropertySlot(key, ObjectValue(*ctor));
     }
 
-    // Define any specified functions and properties, unless we're a dependent
-    // standard class (in which case they live on the prototype), or we're
-    // operating on the self-hosting global, in which case we don't want any
+    // If we're operating on the self-hosting global, we don't want any
     // functions and properties on the builtins and their prototypes.
-    if (!StandardClassIsDependent(key) && !cx->runtime()->isSelfHostingGlobal(global)) {
+    if (!cx->runtime()->isSelfHostingGlobal(global)) {
         if (const JSFunctionSpec* funs = clasp->specPrototypeFunctions()) {
             if (!JS_DefineFunctions(cx, proto, funs))
                 return false;
@@ -267,21 +265,15 @@ GlobalObject::resolveConstructor(JSContext* cx, Handle<GlobalObject*> global, JS
 
         // Fallible operation that modifies the global object.
         if (clasp->specShouldDefineConstructor()) {
-            if (!global->addDataProperty(cx, id, constructorPropertySlot(key), 0))
+            RootedValue ctorValue(cx, ObjectValue(*ctor));
+            if (!DefineProperty(cx, global, id, ctorValue, nullptr, nullptr, JSPROP_RESOLVING))
                 return false;
         }
 
         // Infallible operations that modify the global object.
         global->setConstructor(key, ObjectValue(*ctor));
-        global->setConstructorPropertySlot(key, ObjectValue(*ctor));
         if (proto)
             global->setPrototype(key, ObjectValue(*proto));
-    }
-
-    if (clasp->specShouldDefineConstructor()) {
-        // Stash type information, so that what we do here is equivalent to
-        // initBuiltinConstructor.
-        AddTypePropertyId(cx, global, id, ObjectValue(*ctor));
     }
 
     return true;
@@ -299,14 +291,12 @@ GlobalObject::initBuiltinConstructor(JSContext* cx, Handle<GlobalObject*> global
     RootedId id(cx, NameToId(ClassName(key, cx)));
     MOZ_ASSERT(!global->lookup(cx, id));
 
-    if (!global->addDataProperty(cx, id, constructorPropertySlot(key), 0))
+    RootedValue ctorValue(cx, ObjectValue(*ctor));
+    if (!DefineProperty(cx, global, id, ctorValue, nullptr, nullptr, JSPROP_RESOLVING))
         return false;
 
     global->setConstructor(key, ObjectValue(*ctor));
     global->setPrototype(key, ObjectValue(*proto));
-    global->setConstructorPropertySlot(key, ObjectValue(*ctor));
-
-    AddTypePropertyId(cx, global, id, ObjectValue(*ctor));
     return true;
 }
 
@@ -417,7 +407,7 @@ GlobalObject::getOrCreateEval(JSContext* cx, Handle<GlobalObject*> global,
 }
 
 bool
-GlobalObject::valueIsEval(Value val)
+GlobalObject::valueIsEval(const Value& val)
 {
     Value eval = getSlot(EVAL);
     return eval.isObject() && eval == val;
@@ -544,7 +534,6 @@ GlobalObject::initSelfHostingBuiltins(JSContext* cx, Handle<GlobalObject*> globa
            InitBareBuiltinCtor(cx, global, JSProto_Int32Array) &&
            InitBareWeakMapCtor(cx, global) &&
            InitStopIterationClass(cx, global) &&
-           InitSelfHostingCollectionIteratorFunctions(cx, global) &&
            DefineFunctions(cx, global, builtins, AsIntrinsic);
 }
 
@@ -573,8 +562,8 @@ GlobalObject::warnOnceAbout(JSContext* cx, HandleObject obj, WarnOnceFlag flag,
     MOZ_ASSERT_IF(!v.isUndefined(), v.toInt32());
     int32_t flags = v.isUndefined() ? 0 : v.toInt32();
     if (!(flags & flag)) {
-        if (!JS_ReportErrorFlagsAndNumber(cx, JSREPORT_WARNING, GetErrorMessage, nullptr,
-                                          errorNumber))
+        if (!JS_ReportErrorFlagsAndNumberASCII(cx, JSREPORT_WARNING, GetErrorMessage, nullptr,
+                                               errorNumber))
         {
             return false;
         }
@@ -633,17 +622,18 @@ GlobalObject::createBlankPrototypeInheriting(JSContext* cx, const Class* clasp, 
 }
 
 bool
-js::LinkConstructorAndPrototype(JSContext* cx, JSObject* ctor_, JSObject* proto_)
+js::LinkConstructorAndPrototype(JSContext* cx, JSObject* ctor_, JSObject* proto_,
+                                unsigned prototypeAttrs, unsigned constructorAttrs)
 {
     RootedObject ctor(cx, ctor_), proto(cx, proto_);
 
     RootedValue protoVal(cx, ObjectValue(*proto));
     RootedValue ctorVal(cx, ObjectValue(*ctor));
 
-    return DefineProperty(cx, ctor, cx->names().prototype, protoVal,
-                          nullptr, nullptr, JSPROP_PERMANENT | JSPROP_READONLY) &&
-           DefineProperty(cx, proto, cx->names().constructor, ctorVal,
-                          nullptr, nullptr, 0);
+    return DefineProperty(cx, ctor, cx->names().prototype, protoVal, nullptr, nullptr,
+                          prototypeAttrs) &&
+           DefineProperty(cx, proto, cx->names().constructor, ctorVal, nullptr, nullptr,
+                          constructorAttrs);
 }
 
 bool
@@ -655,6 +645,14 @@ js::DefinePropertiesAndFunctions(JSContext* cx, HandleObject obj,
     if (fs && !JS_DefineFunctions(cx, obj, fs))
         return false;
     return true;
+}
+
+bool
+js::DefineToStringTag(JSContext *cx, HandleObject obj, JSAtom* tag)
+{
+    RootedId toStringTagId(cx, SYMBOL_TO_JSID(cx->wellKnownSymbols().toStringTag));
+    RootedValue tagString(cx, StringValue(tag));
+    return DefineProperty(cx, obj, toStringTagId, tagString, nullptr, nullptr, JSPROP_READONLY);
 }
 
 static void

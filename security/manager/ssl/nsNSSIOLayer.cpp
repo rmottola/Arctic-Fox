@@ -21,6 +21,7 @@
 #include "mozilla/Move.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
+#include "nsArray.h"
 #include "nsArrayUtils.h"
 #include "nsCharSeparatedTokenizer.h"
 #include "nsClientAuthRemember.h"
@@ -378,6 +379,10 @@ nsNSSSocketInfo::DriveHandshake()
 NS_IMETHODIMP
 nsNSSSocketInfo::IsAcceptableForHost(const nsACString& hostname, bool* _retval)
 {
+  NS_ENSURE_ARG(_retval);
+
+  *_retval = false;
+
   // If this is the same hostname then the certicate status does not
   // need to be considered. They are joinable.
   if (hostname.Equals(GetHostName())) {
@@ -443,11 +448,17 @@ nsNSSSocketInfo::IsAcceptableForHost(const nsACString& hostname, bool* _retval)
   nsAutoCString hostnameFlat(PromiseFlatCString(hostname));
   CertVerifier::Flags flags = CertVerifier::FLAG_LOCAL_ONLY;
   UniqueCERTCertList unusedBuiltChain;
-  SECStatus rv = certVerifier->VerifySSLServerCert(nssCert, nullptr,
-                                                   mozilla::pkix::Now(),
-                                                   nullptr, hostnameFlat.get(),
-                                                   unusedBuiltChain, false, flags);
-  if (rv != SECSuccess) {
+  mozilla::pkix::Result result =
+    certVerifier->VerifySSLServerCert(nssCert,
+                                      nullptr, // stapledOCSPResponse
+                                      nullptr, // sctsFromTLSExtension
+                                      mozilla::pkix::Now(),
+                                      nullptr, // pinarg
+                                      hostnameFlat.get(),
+                                      unusedBuiltChain,
+                                      false, // save intermediates
+                                      flags);
+  if (result != mozilla::pkix::Success) {
     return NS_OK;
   }
 
@@ -1849,6 +1860,7 @@ nsSSLIOLayerNewSocket(int32_t family,
                       const char* host,
                       int32_t port,
                       nsIProxyInfo *proxy,
+                      const nsACString& firstPartyDomain,
                       PRFileDesc** fd,
                       nsISupports** info,
                       bool forSTARTTLS,
@@ -1859,7 +1871,8 @@ nsSSLIOLayerNewSocket(int32_t family,
   if (!sock) return NS_ERROR_OUT_OF_MEMORY;
 
   nsresult rv = nsSSLIOLayerAddToSocket(family, host, port, proxy,
-                                        sock, info, forSTARTTLS, flags);
+                                        firstPartyDomain, sock, info,
+                                        forSTARTTLS, flags);
   if (NS_FAILED(rv)) {
     PR_Close(sock);
     return rv;
@@ -2426,10 +2439,6 @@ nsSSLIOLayerImportFD(PRFileDesc* fd,
     goto loser;
   }
 
-  // This is an optimization to make sure the identity info dataset is parsed
-  // and loaded on a separate thread and can be overlapped with network latency.
-  EnsureServerVerificationInitialized();
-
   return sslSock;
 loser:
   if (sslSock) {
@@ -2437,6 +2446,20 @@ loser:
   }
   return nullptr;
 }
+
+static const SSLSignatureScheme sEnabledSignatureSchemes[] = {
+  ssl_sig_ecdsa_secp256r1_sha256,
+  ssl_sig_ecdsa_secp384r1_sha384,
+  ssl_sig_ecdsa_secp521r1_sha512,
+  ssl_sig_rsa_pss_sha256,
+  ssl_sig_rsa_pss_sha384,
+  ssl_sig_rsa_pss_sha512,
+  ssl_sig_rsa_pkcs1_sha256,
+  ssl_sig_rsa_pkcs1_sha384,
+  ssl_sig_rsa_pkcs1_sha512,
+  ssl_sig_ecdsa_sha1,
+  ssl_sig_rsa_pkcs1_sha1,
+};
 
 static nsresult
 nsSSLIOLayerSetOptions(PRFileDesc* fd, bool forSTARTTLS,
@@ -2497,8 +2520,34 @@ nsSSLIOLayerSetOptions(PRFileDesc* fd, bool forSTARTTLS,
     }
   }
 
+  // Include a modest set of named groups.
+  const SSLNamedGroup namedGroups[] = {
+    ssl_grp_ec_curve25519, ssl_grp_ec_secp256r1, ssl_grp_ec_secp384r1,
+    ssl_grp_ec_secp521r1, ssl_grp_ffdhe_2048, ssl_grp_ffdhe_3072
+  };
+  if (SECSuccess != SSL_NamedGroupConfig(fd, namedGroups,
+                                         mozilla::ArrayLength(namedGroups))) {
+    return NS_ERROR_FAILURE;
+  }
+  // This ensures that we send key shares for X25519 and P-256 in TLS 1.3, so
+  // that servers are less likely to use HelloRetryRequest.
+  if (SECSuccess != SSL_SendAdditionalKeyShares(fd, 1)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  if (SECSuccess != SSL_SignatureSchemePrefSet(fd, sEnabledSignatureSchemes,
+                      mozilla::ArrayLength(sEnabledSignatureSchemes))) {
+    return NS_ERROR_FAILURE;
+  }
+
   bool enabled = infoObject->SharedState().IsOCSPStaplingEnabled();
   if (SECSuccess != SSL_OptionSet(fd, SSL_ENABLE_OCSP_STAPLING, enabled)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  bool sctsEnabled = infoObject->SharedState().IsSignedCertTimestampsEnabled();
+  if (SECSuccess != SSL_OptionSet(fd, SSL_ENABLE_SIGNED_CERT_TIMESTAMPS,
+      sctsEnabled)) {
     return NS_ERROR_FAILURE;
   }
 
@@ -2534,6 +2583,7 @@ nsSSLIOLayerAddToSocket(int32_t family,
                         const char* host,
                         int32_t port,
                         nsIProxyInfo* proxy,
+                        const nsACString& firstPartyDomain,
                         PRFileDesc* fd,
                         nsISupports** info,
                         bool forSTARTTLS,
@@ -2554,6 +2604,7 @@ nsSSLIOLayerAddToSocket(int32_t family,
   infoObject->SetForSTARTTLS(forSTARTTLS);
   infoObject->SetHostName(host);
   infoObject->SetPort(port);
+  infoObject->SetFirstPartyDomain(firstPartyDomain);
 
   bool haveProxy = false;
   if (proxy) {

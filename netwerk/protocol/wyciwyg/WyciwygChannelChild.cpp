@@ -92,6 +92,7 @@ WyciwygChannelChild::Init(nsIURI* uri)
   // propagate loadInfo
   mozilla::ipc::PrincipalInfo requestingPrincipalInfo;
   mozilla::ipc::PrincipalInfo triggeringPrincipalInfo;
+  mozilla::ipc::PrincipalInfo principalToInheritInfo;
   uint32_t securityFlags;
   uint32_t policyType;
   if (mLoadInfo) {
@@ -99,6 +100,8 @@ WyciwygChannelChild::Init(nsIURI* uri)
                                            &requestingPrincipalInfo);
     mozilla::ipc::PrincipalToPrincipalInfo(mLoadInfo->TriggeringPrincipal(),
                                            &triggeringPrincipalInfo);
+    mozilla::ipc::PrincipalToPrincipalInfo(mLoadInfo->PrincipalToInherit(),
+                                           &principalToInheritInfo);
     securityFlags = mLoadInfo->GetSecurityFlags();
     policyType = mLoadInfo->InternalContentPolicyType();
   }
@@ -108,6 +111,8 @@ WyciwygChannelChild::Init(nsIURI* uri)
                                            &requestingPrincipalInfo);
     mozilla::ipc::PrincipalToPrincipalInfo(nsContentUtils::GetSystemPrincipal(),
                                            &triggeringPrincipalInfo);
+    mozilla::ipc::PrincipalToPrincipalInfo(nsContentUtils::GetSystemPrincipal(),
+                                           &principalToInheritInfo);
     securityFlags = nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL;
     policyType = nsIContentPolicy::TYPE_OTHER;
   }
@@ -115,6 +120,7 @@ WyciwygChannelChild::Init(nsIURI* uri)
   SendInit(serializedUri,
            requestingPrincipalInfo,
            triggeringPrincipalInfo,
+           principalToInheritInfo,
            securityFlags,
            policyType);
   return NS_OK;
@@ -146,7 +152,7 @@ private:
   nsCString mSecurityInfo;
 };
 
-bool
+mozilla::ipc::IPCResult
 WyciwygChannelChild::RecvOnStartRequest(const nsresult& statusCode,
                                         const int64_t& contentLength,
                                         const int32_t& source,
@@ -156,7 +162,7 @@ WyciwygChannelChild::RecvOnStartRequest(const nsresult& statusCode,
   mEventQ->RunOrEnqueue(new WyciwygStartRequestEvent(this, statusCode,
                                                      contentLength, source,
                                                      charset, securityInfo));
-  return true;
+  return IPC_OK();
 }
 
 void
@@ -200,12 +206,12 @@ private:
   uint64_t mOffset;
 };
 
-bool
+mozilla::ipc::IPCResult
 WyciwygChannelChild::RecvOnDataAvailable(const nsCString& data,
                                          const uint64_t& offset)
 {
   mEventQ->RunOrEnqueue(new WyciwygDataAvailableEvent(this, data, offset));
-  return true;
+  return IPC_OK();
 }
 
 void
@@ -259,11 +265,11 @@ private:
   nsresult mStatusCode;
 };
 
-bool
+mozilla::ipc::IPCResult
 WyciwygChannelChild::RecvOnStopRequest(const nsresult& statusCode)
 {
   mEventQ->RunOrEnqueue(new WyciwygStopRequestEvent(this, statusCode));
-  return true;
+  return IPC_OK();
 }
 
 void
@@ -285,14 +291,14 @@ WyciwygChannelChild::OnStopRequest(const nsresult& statusCode)
 
     mListener->OnStopRequest(this, mListenerContext, statusCode);
 
-    mListener = 0;
-    mListenerContext = 0;
+    mListener = nullptr;
+    mListenerContext = nullptr;
 
     if (mLoadGroup)
       mLoadGroup->RemoveRequest(this, nullptr, mStatus);
 
-    mCallbacks = 0;
-    mProgressSink = 0;
+    mCallbacks = nullptr;
+    mProgressSink = nullptr;
   }
 
   if (mIPCOpen)
@@ -312,11 +318,11 @@ class WyciwygCancelEvent : public ChannelEvent
   nsresult mStatus;
 };
 
-bool
+mozilla::ipc::IPCResult
 WyciwygChannelChild::RecvCancelEarly(const nsresult& statusCode)
 {
   mEventQ->RunOrEnqueue(new WyciwygCancelEvent(this, statusCode));
-  return true;
+  return IPC_OK();
 }
 
 void WyciwygChannelChild::CancelEarly(const nsresult& statusCode)

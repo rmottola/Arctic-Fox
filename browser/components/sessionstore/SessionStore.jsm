@@ -811,12 +811,10 @@ var SessionStoreInternal = {
 
         // Restore the tab icon.
         if ("image" in tabData) {
-          // Using null as the loadingPrincipal because serializing
-          // the principal would be overkill. Within SetIcon we
-          // default to the systemPrincipal if aLoadingPrincipal is
-          // null which will allow the favicon to load.
-          win.gBrowser.setIcon(tab, tabData.image, null);
-          TabStateCache.update(browser, {image: null});
+          // Use the serialized contentPrincipal with the new icon load.
+          let loadingPrincipal = Utils.deserializePrincipal(tabData.iconLoadingPrincipal);
+          win.gBrowser.setIcon(tab, tabData.image, loadingPrincipal);
+          TabStateCache.update(browser, { image: null, iconLoadingPrincipal: null });
         }
 
         let event = win.document.createEvent("Events");
@@ -1775,6 +1773,7 @@ var SessionStoreInternal = {
       state: tabState,
       title: tabTitle,
       image: tabbrowser.getIcon(aTab),
+      iconLoadingPrincipal: Utils.serializePrincipal(aTab.linkedBrowser.contentPrincipal),
       pos: aTab._tPos,
       closedAt: Date.now()
     };
@@ -2555,7 +2554,13 @@ var SessionStoreInternal = {
       }
 
       let tabState = TabState.clone(tab);
-      let options = {restoreImmediately: true};
+      let options = {
+        restoreImmediately: true,
+        // We want to make sure that this information is passed to restoreTab
+        // whether or not a historyIndex is passed in. Thus, we extract it from
+        // the loadArguments.
+        reloadInFreshProcess: !!recentLoadArguments.reloadInFreshProcess,
+      };
 
       if (historyIndex >= 0) {
         tabState.index = historyIndex + 1;
@@ -3215,6 +3220,7 @@ var SessionStoreInternal = {
     let window = tab.ownerGlobal;
     let tabbrowser = window.gBrowser;
     let forceOnDemand = options.forceOnDemand;
+    let reloadInFreshProcess = options.reloadInFreshProcess;
 
     let willRestoreImmediately = restoreImmediately ||
                                  tabbrowser.selectedBrowser == browser ||
@@ -3321,6 +3327,7 @@ var SessionStoreInternal = {
       // When that's done it will be removed from the cache and we always
       // collect it in TabState._collectBaseTabData().
       image: tabData.image || "",
+      iconLoadingPrincipal: tabData.iconLoadingPrincipal || null,
       userTypedValue: tabData.userTypedValue || "",
       userTypedClear: tabData.userTypedClear || 0
     });
@@ -3336,7 +3343,7 @@ var SessionStoreInternal = {
     // This could cause us to ignore MAX_CONCURRENT_TAB_RESTORES a bit, but
     // it ensures each window will have its selected tab loaded.
     if (willRestoreImmediately) {
-      this.restoreTabContent(tab, loadArguments);
+      this.restoreTabContent(tab, loadArguments, reloadInFreshProcess);
     } else if (!forceOnDemand) {
       this.restoreNextTab();
     }
@@ -3352,11 +3359,10 @@ var SessionStoreInternal = {
    *        the tab to restore
    * @param aLoadArguments
    *        optional load arguments used for loadURI()
-   * @param aRemotenessSwitch
-   *        true if we're restoring a tab's content because we flipped
-   *        its remoteness (out-of-process) state.
+   * @param aReloadInFreshProcess
+   *        true if we want to reload into a fresh process
    */
-  restoreTabContent: function (aTab, aLoadArguments = null) {
+  restoreTabContent: function (aTab, aLoadArguments = null, aReloadInFreshProcess = false) {
     if (aTab.hasAttribute("customizemode")) {
       return;
     }
@@ -3381,7 +3387,13 @@ var SessionStoreInternal = {
     // flip the remoteness of any browser that is not being displayed.
     this.markTabAsRestoring(aTab);
 
-    let isRemotenessUpdate = tabbrowser.updateBrowserRemotenessByURL(browser, uri);
+    let isRemotenessUpdate = false;
+    if (aReloadInFreshProcess) {
+      isRemotenessUpdate = tabbrowser.switchBrowserIntoFreshProcess(browser);
+    } else {
+      isRemotenessUpdate = tabbrowser.updateBrowserRemotenessByURL(browser, uri);
+    }
+
     if (isRemotenessUpdate) {
       // We updated the remoteness, so we need to send the history down again.
       //

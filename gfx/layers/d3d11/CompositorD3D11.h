@@ -35,6 +35,7 @@ struct PixelShaderConstants
   float layerColor[4];
   float layerOpacity[4];
   int blendConfig[4];
+  float yuvColorMatrix[3][4];
 };
 
 struct DeviceAttachmentsD3D11;
@@ -113,12 +114,6 @@ public:
    * Flush the current frame to the screen.
    */
   virtual void EndFrame() override;
-
-  /**
-   * Post rendering stuff if the rendering is outside of this Compositor
-   * e.g., by Composer2D
-   */
-  virtual void EndFrameForExternalComposition(const gfx::Matrix& aTransform) override {}
 
   /**
    * Setup the viewport and projection matrix for rendering

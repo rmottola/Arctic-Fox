@@ -71,11 +71,11 @@ public:
 
   virtual void EndFrame() override;
 
-  virtual void EndFrameForExternalComposition(const gfx::Matrix& aTransform) override {}
-
   virtual void PrepareViewport(const gfx::IntSize& aSize);
 
   virtual bool SupportsPartialTextureUpdate() override{ return true; }
+
+  virtual bool SupportsEffect(EffectTypes aEffect) override;
 
 #ifdef MOZ_DUMP_PAINTING
   virtual const char* Name() const override { return "Direct3D9"; }

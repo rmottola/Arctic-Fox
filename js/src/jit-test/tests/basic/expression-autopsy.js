@@ -16,7 +16,7 @@ function check_one(expected, f, err) {
         throw new Error("didn't fail");
 }
 ieval = eval;
-function check(expr, expected=expr) {
+function check(expr, expected=expr, testStrict=true) {
     var end, err;
     for ([end, err] of [[".random_prop", " is undefined"], ["()", " is not a function"]]) {
         var statement = "o = {};" + expr + end, f;
@@ -42,22 +42,14 @@ function check(expr, expected=expr) {
             // Let in a switch
             Function("var x = 4; switch (x) { case 4: let o, undef;" + statement + "\ncase 6: break;}"),
             // Try-catch blocks
-            Function("o", "undef", "try { let q = 4; try { let p = 4; } catch (e) {} } catch (e) {} { let o, undef; " + statement + " }")
+            Function("o", "undef", "try { let q = 4; try { let p = 4; } catch (e) {} } catch (e) {} { let o, undef; " + statement + " }"),
+            // Let in for-in (uses with to prevent jit compilation: bug 942804, bug 831120 and bug 1041586)
+            Function("with ({}) {} var undef, o; for (let z in [1, 2]) { " + statement + " }"),
         ];
 
-        try {
-            // Let in for-in
-            check_one(expected,
-                      Function("var undef, o; for (let z in [1, 2]) { " + statement + " }"),
-                      err);
-        } catch (ex) {
-            // Bug 831120.  See bug 942804 comment 5.
-            if (expected == 'undef' && err == ' is undefined')
-                check_one(expected + end,
-                          Function("var undef, o; for (let z in [1, 2]) { " + statement + " }"),
-                          err);
-            else
-                throw ex;
+        if (testStrict) {
+            // Strict mode.
+            cases.push(Function("o", "undef", "\"use strict\";\n" + statement));
         }
 
         for (var f of cases) {
@@ -80,12 +72,15 @@ check("o[65536]");
 check("o[268435455]");
 check("o['1.1']");
 check("o[4 + 'h']", "o['4h']");
-check("this.x");
 check("ieval(undef)", "ieval(...)");
 check("ieval.call()", "ieval.call(...)");
 check("ieval(...[])", "ieval(...)");
 check("ieval(...[undef])", "ieval(...)");
 check("ieval(...[undef, undef])", "ieval(...)");
+check("(o[0] = 4).foo", "o[0].foo");
+// NOTE: This one produces different output in strict mode since "this" is
+// undefined in that case.
+check("this.x", "this.x", false);
 
 for (let tok of ["|", "^", "&", "==", "!==", "===", "!==", "<", "<=", ">", ">=",
                  ">>", "<<", ">>>", "+", "-", "*", "/", "%"]) {
@@ -100,6 +95,7 @@ check("o[- (o)]");
 
 // A few one off tests
 check_one("6", (function () { 6() }), " is not a function");
+check_one("4", (function() { (4||eval)(); }), " is not a function");
 check_one("0", (function () { Array.prototype.reverse.call('123'); }), " is read-only");
 check_one("(intermediate value)[Symbol.iterator](...).next(...).value",
           function () { ieval("{ let x; var [a, b, [c0, c1]] = [x, x, x]; }") }, " is undefined");
@@ -121,6 +117,21 @@ catch (e)
   assertEq(e instanceof TypeError, true,
            "expected TypeError, got " + e);
   assertEq(e.message, "can't convert null to object");
+}
+
+try {
+  (function() {
+    "use strict";
+    var o = [];
+    Object.freeze(o);
+    o[0] = "foo";
+  }());
+  throw new Error("didn't throw");
+} catch (e) {
+  assertEq(e instanceof TypeError, true,
+           "expected TypeError, got " + e);
+  assertEq(e.message,
+           "can't define array index property past the end of an array with non-writable length");
 }
 
 // Check fallback behavior

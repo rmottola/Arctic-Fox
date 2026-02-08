@@ -79,14 +79,14 @@ dictionary OriginAttributesDictionary {
   unsigned long userContextId = 0;
   boolean inIsolatedMozBrowser = false;
   DOMString addonId = "";
-  DOMString signedPkg = "";
   unsigned long privateBrowsingId = 0;
+  DOMString firstPartyDomain = "";
 };
 dictionary OriginAttributesPatternDictionary {
   unsigned long appId;
   unsigned long userContextId;
   boolean inIsolatedMozBrowser;
   DOMString addonId;
-  DOMString signedPkg;
   unsigned long privateBrowsingId;
+  DOMString firstPartyDomain;
 };

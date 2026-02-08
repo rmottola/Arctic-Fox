@@ -157,7 +157,7 @@ gfxTextRun::gfxTextRun(const gfxTextRunFactory::Parameters *aParams,
     MOZ_COUNT_CTOR(gfxTextRun);
     NS_ADDREF(mFontGroup);
 
-#ifndef RELEASE_BUILD
+#ifndef RELEASE_OR_BETA
     gfxTextPerfMetrics *tp = aFontGroup->GetTextPerfMetrics();
     if (tp) {
         tp->current.textrunConst++;
@@ -191,7 +191,7 @@ gfxTextRun::~gfxTextRun()
     // been told to release its reference to the group, so we mustn't do that
     // again here.
     if (!mReleasedFontGroup) {
-#ifndef RELEASE_BUILD
+#ifndef RELEASE_OR_BETA
         gfxTextPerfMetrics *tp = mFontGroup->GetTextPerfMetrics();
         if (tp) {
             tp->current.textrunDestr++;
@@ -838,6 +838,7 @@ gfxTextRun::BreakAndMeasureText(uint32_t aStart, uint32_t aMaxLength,
                                 PropertyProvider *aProvider,
                                 SuppressBreak aSuppressBreak,
                                 gfxFloat *aTrimWhitespace,
+                                bool aWhitespaceCanHang,
                                 Metrics *aMetrics,
                                 gfxFont::BoundingBoxType aBoundingBoxType,
                                 DrawTarget* aRefDrawTarget,
@@ -868,7 +869,7 @@ gfxTextRun::BreakAndMeasureText(uint32_t aStart, uint32_t aMaxLength,
 
     gfxFloat width = 0;
     gfxFloat advance = 0;
-    // The number of space characters that can be trimmed
+    // The number of space characters that can be trimmed or hang at a soft-wrap
     uint32_t trimmableChars = 0;
     // The amount of space removed by ignoring trimmableChars
     gfxFloat trimmableAdvance = 0;
@@ -951,7 +952,7 @@ gfxTextRun::BreakAndMeasureText(uint32_t aStart, uint32_t aMaxLength,
         }
         
         advance += charAdvance;
-        if (aTrimWhitespace) {
+        if (aTrimWhitespace || aWhitespaceCanHang) {
             if (mCharacterGlyphs[i].CharIsSpace()) {
                 ++trimmableChars;
                 trimmableAdvance += charAdvance;
@@ -985,13 +986,25 @@ gfxTextRun::BreakAndMeasureText(uint32_t aStart, uint32_t aMaxLength,
 
     if (aMetrics) {
         auto fitEnd = aStart + charsFit;
-        *aMetrics = MeasureText(Range(aStart, fitEnd), aBoundingBoxType,
-                                aRefDrawTarget, aProvider);
-        if (trimmableChars) {
-            Metrics trimMetrics =
+        // Initially, measure everything, so that our bounding box includes
+        // any trimmable or hanging whitespace.
+        *aMetrics = MeasureText(Range(aStart, fitEnd),
+                                aBoundingBoxType, aRefDrawTarget,
+                                aProvider);
+        if (aTrimWhitespace || aWhitespaceCanHang) {
+            // Measure trailing whitespace that is to be trimmed/hung.
+            Metrics trimOrHangMetrics =
                 MeasureText(Range(fitEnd - trimmableChars, fitEnd),
-                            aBoundingBoxType, aRefDrawTarget, aProvider);
-            aMetrics->mAdvanceWidth -= trimMetrics.mAdvanceWidth;
+                            aBoundingBoxType, aRefDrawTarget,
+                            aProvider);
+            if (aTrimWhitespace) {
+                aMetrics->mAdvanceWidth -= trimOrHangMetrics.mAdvanceWidth;
+            } else if (aMetrics->mAdvanceWidth > aWidth) {
+                // Restrict width of hanging whitespace so it doesn't overflow.
+                aMetrics->mAdvanceWidth =
+                    std::max(aWidth, aMetrics->mAdvanceWidth -
+                                     trimOrHangMetrics.mAdvanceWidth);
+            }
         }
     }
     if (aTrimWhitespace) {
@@ -1880,7 +1893,7 @@ gfxFontGroup::GetFirstMathFont()
     uint32_t count = mFonts.Length();
     for (uint32_t i = 0; i < count; ++i) {
         gfxFont* font = GetFontAt(i);
-        if (font && font->GetFontEntry()->TryGetMathTable()) {
+        if (font && font->TryGetMathTable()) {
             return font;
         }
     }
@@ -2889,7 +2902,7 @@ void gfxFontGroup::ComputeRanges(nsTArray<gfxTextRange>& aRanges,
             FindFontForChar(ch, prevCh, nextCh, aRunScript, prevFont,
                             &matchType);
 
-#ifndef RELEASE_BUILD
+#ifndef RELEASE_OR_BETA
         if (MOZ_UNLIKELY(mTextPerf)) {
             if (matchType == gfxTextRange::kPrefsFallback) {
                 mTextPerf->current.fallbackPrefs++;
@@ -2948,7 +2961,7 @@ void gfxFontGroup::ComputeRanges(nsTArray<gfxTextRange>& aRanges,
 
     aRanges[lastRangeIndex].end = aLength;
 
-#ifndef RELEASE_BUILD
+#ifndef RELEASE_OR_BETA
     LogModule* log = mStyle.systemFont
                    ? gfxPlatform::GetLog(eGfxLog_textrunui)
                    : gfxPlatform::GetLog(eGfxLog_textrun);

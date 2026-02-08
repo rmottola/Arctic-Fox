@@ -37,6 +37,7 @@ const OPEN_DEVICE_MODAL_VALUE = "OPEN_DEVICE_MODAL";
 const { _loadPreferredDevices } = require("devtools/client/responsive.html/actions/devices");
 const { getOwnerWindow } = require("sdk/tabs/utils");
 const asyncStorage = require("devtools/shared/async-storage");
+const { addDevice, removeDevice } = require("devtools/client/shared/devices");
 
 SimpleTest.requestCompleteLog();
 SimpleTest.waitForExplicitFinish();
@@ -142,7 +143,7 @@ var setViewportSize = Task.async(function* (ui, manager, width, height) {
        `set to: ${width} x ${height}`);
   if (size.width != width || size.height != height) {
     let resized = waitForViewportResizeTo(ui, width, height);
-    ui.setViewportSize(width, height);
+    ui.setViewportSize({ width, height });
     yield resized;
   }
 });
@@ -205,18 +206,37 @@ function openDeviceModal(ui) {
     "The device modal is displayed.");
 }
 
-function switchDevice(ui, device) {
-  let { document } = ui.toolWindow;
-  let select = document.querySelector(".viewport-device-selector");
-  select.scrollIntoView();
-  let deviceOption = [...select.options].filter(o => {
-    return o.value === device;
-  })[0];
-  EventUtils.synthesizeMouseAtCenter(select, {type: "mousedown"},
-    ui.toolWindow);
-  EventUtils.synthesizeMouseAtCenter(deviceOption, {type: "mouseup"},
-    ui.toolWindow);
-  is(select.selectedOptions[0], deviceOption, "Device should be selected");
+function switchSelector({ toolWindow }, selector, value) {
+  return new Promise(resolve => {
+    let select = toolWindow.document.querySelector(selector);
+    isnot(select, null, `selector "${selector}" should match an existing element.`);
+
+    let option = [...select.options].find(o => o.value === String(value));
+    isnot(option, undefined, `value "${value}" should match an existing option.`);
+
+    let event = new toolWindow.UIEvent("change", {
+      view: toolWindow,
+      bubbles: true,
+      cancelable: true
+    });
+
+    select.addEventListener("change", () => {
+      is(select.value, value,
+        `Select's option with value "${value}" should be selected.`);
+      resolve();
+    }, { once: true });
+
+    select.value = value;
+    select.dispatchEvent(event);
+  });
+}
+
+function switchDevice(ui, value) {
+  return switchSelector(ui, ".viewport-device-selector", value);
+}
+
+function switchNetworkThrottling(ui, value) {
+  return switchSelector(ui, "#global-network-throttling-selector", value);
 }
 
 function getSessionHistory(browser) {
@@ -273,4 +293,21 @@ function forward(browser) {
   let shown = waitForPageShow(browser);
   browser.goForward();
   return shown;
+}
+
+function addDeviceForTest(device) {
+  info(`Adding Test Device "${device.name}" to the list.`);
+  addDevice(device);
+
+  registerCleanupFunction(() => {
+    // Note that assertions in cleanup functions are not displayed unless they failed.
+    ok(removeDevice(device), `Removed Test Device "${device.name}" from the list.`);
+  });
+}
+
+function waitForClientClose(ui) {
+  return new Promise(resolve => {
+    info("RDM's debugger client is now closed");
+    ui.client.addOneTimeListener("closed", resolve);
+  });
 }

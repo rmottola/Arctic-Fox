@@ -45,8 +45,12 @@ parent:
 
   // Reports approval/veto of redirect by child process redirect observers
   async Redirect2Verify(nsresult result, RequestHeaderTuples changedHeaders,
-                        uint32_t loadFlags, OptionalURIParams apiRedirectTo,
-                        OptionalCorsPreflightArgs corsPreflightArgs);
+                        uint32_t loadFlags, uint32_t referrerPolicy,
+                        OptionalURIParams referrerUri,
+                        OptionalURIParams apiRedirectTo,
+                        OptionalCorsPreflightArgs corsPreflightArgs,
+                        bool forceHSTSPriming, bool mixedContentWouldBlock,
+                        bool chooseAppcache);
 
   // For document loads we keep this protocol open after child's
   // OnStopRequest, and send this msg (instead of __delete__) to allow
@@ -84,6 +88,10 @@ parent:
   async RemoveCorsPreflightCacheEntry(URIParams uri,
                                       PrincipalInfo requestingPrincipal);
 
+  // After receiving this message, the parent calls SendDeleteSelf, and makes
+  // sure not to send any more messages after that.
+  async DeletingChannel();
+
   async __delete__();
 
 child:
@@ -99,7 +107,8 @@ child:
                        NetAddr             selfAddr,
                        NetAddr             peerAddr,
                        int16_t             redirectCount,
-                       uint32_t            cacheKey);
+                       uint32_t            cacheKey,
+                       nsCString           altDataType);
 
   // Combines a single OnDataAvailable and its associated OnProgress &
   // OnStatus calls into one IPDL message
@@ -157,6 +166,13 @@ child:
 
   // Tell the child to issue a deprecation warning.
   async IssueDeprecationWarning(uint32_t warning, bool asError);
+
+both:
+  // After receiving this message, the parent also calls
+  // SendFinishInterceptedRedirect, and makes sure not to send any more messages
+  // after that. When receiving this message, the child will call
+  // Send__delete__() and complete the steps required to finish the redirect.
+  async FinishInterceptedRedirect();
 };
 
 

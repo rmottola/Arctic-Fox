@@ -171,6 +171,10 @@ ChromeProcessController::HandleTap(TapType aType,
     return;
   }
 
+  if (!mAPZEventState) {
+    return;
+  }
+
   nsCOMPtr<nsIPresShell> presShell = GetPresShell();
   if (!presShell) {
     return;
@@ -183,10 +187,13 @@ ChromeProcessController::HandleTap(TapType aType,
 
   switch (aType) {
   case TapType::eSingleTap:
-    mAPZEventState->ProcessSingleTap(point, scale, aModifiers, aGuid);
+    mAPZEventState->ProcessSingleTap(point, scale, aModifiers, aGuid, 1);
     break;
   case TapType::eDoubleTap:
     HandleDoubleTap(point, aModifiers, aGuid);
+    break;
+  case TapType::eSecondTap:
+    mAPZEventState->ProcessSingleTap(point, scale, aModifiers, aGuid, 2);
     break;
   case TapType::eLongTap:
     mAPZEventState->ProcessLongTap(presShell, point, scale, aModifiers, aGuid,
@@ -204,6 +211,28 @@ ChromeProcessController::HandleTap(TapType aType,
 }
 
 void
+ChromeProcessController::NotifyPinchGesture(PinchGestureInput::PinchGestureType aType,
+                                            const ScrollableLayerGuid& aGuid,
+                                            LayoutDeviceCoord aSpanChange,
+                                            Modifiers aModifiers)
+{
+  if (MessageLoop::current() != mUILoop) {
+    mUILoop->PostTask(NewRunnableMethod
+                      <PinchGestureInput::PinchGestureType,
+                       ScrollableLayerGuid,
+                       LayoutDeviceCoord,
+                       Modifiers>(this,
+                          &ChromeProcessController::NotifyPinchGesture,
+                          aType, aGuid, aSpanChange, aModifiers));
+    return;
+  }
+
+  if (mWidget) {
+    APZCCallbackHelper::NotifyPinchGesture(aType, aSpanChange, aModifiers, mWidget.get());
+  }
+}
+
+void
 ChromeProcessController::NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                                               APZStateChange aChange,
                                               int aArg)
@@ -217,7 +246,11 @@ ChromeProcessController::NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
     return;
   }
 
-  mAPZEventState->ProcessAPZStateChange(GetRootDocument(), aGuid.mScrollId, aChange, aArg);
+  if (!mAPZEventState) {
+    return;
+  }
+
+  mAPZEventState->ProcessAPZStateChange(aGuid.mScrollId, aChange, aArg);
 }
 
 void

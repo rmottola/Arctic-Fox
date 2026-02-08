@@ -38,6 +38,9 @@ public:
   // interfaces:
   NS_DECL_ISUPPORTS_INHERITED
 
+  // EventTarget
+  virtual void AsyncEventRunning(AsyncEventDispatcher* aEvent) override;
+
   virtual FilterPrimitiveDescription
     GetPrimitiveDescription(nsSVGFilterInstance* aInstance,
                             const IntRect& aFilterSubregion,
@@ -82,9 +85,9 @@ protected:
   virtual SVGAnimatedPreserveAspectRatio *GetPreserveAspectRatio() override;
   virtual StringAttributesInfo GetStringInfo() override;
 
-  enum { RESULT, HREF };
-  nsSVGString mStringAttributes[2];
-  static StringInfo sStringInfo[2];
+  enum { RESULT, HREF, XLINK_HREF };
+  nsSVGString mStringAttributes[3];
+  static StringInfo sStringInfo[3];
 
   SVGAnimatedPreserveAspectRatio mPreserveAspectRatio;
 };

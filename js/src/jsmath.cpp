@@ -719,16 +719,19 @@ JSCompartment::ensureRandomNumberGenerator()
     }
 }
 
+double
+js::math_random_impl(JSContext* cx)
+{
+    JSCompartment* comp = cx->compartment();
+    comp->ensureRandomNumberGenerator();
+    return comp->randomNumberGenerator.ref().nextDouble();
+}
+
 bool
 js::math_random(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-
-    JSCompartment* comp = cx->compartment();
-    comp->ensureRandomNumberGenerator();
-
-    double z = comp->randomNumberGenerator.ref().nextDouble();
-    args.rval().setDouble(z);
+    args.rval().setNumber(math_random_impl(cx));
     return true;
 }
 
@@ -852,9 +855,9 @@ js::math_sin(JSContext* cx, unsigned argc, Value* vp)
 void
 js::math_sincos_uncached(double x, double *sin, double *cos)
 {
-#if defined(__GLIBC__)
+#if defined(HAVE_SINCOS)
     sincos(x, sin, cos);
-#elif defined(HAVE_SINCOS)
+#elif defined(HAVE___SINCOS)
     __sincos(x, sin, cos);
 #else
     *sin = js::math_sin_uncached(x);
@@ -1384,6 +1387,8 @@ js::InitMathClass(JSContext* cx, HandleObject obj)
     if (!JS_DefineFunctions(cx, Math, math_static_methods))
         return nullptr;
     if (!JS_DefineConstDoubles(cx, Math, math_constants))
+        return nullptr;
+    if (!DefineToStringTag(cx, Math, cx->names().Math))
         return nullptr;
 
     obj->as<GlobalObject>().setConstructor(JSProto_Math, ObjectValue(*Math));

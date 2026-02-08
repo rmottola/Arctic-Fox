@@ -12,7 +12,7 @@
 
 namespace mp4_demuxer {
 
-class ByteReader
+class MOZ_RAII ByteReader
 {
 public:
   ByteReader() : mPtr(nullptr), mRemaining(0) {}
@@ -48,17 +48,11 @@ public:
 
   ~ByteReader()
   {
-    NS_ASSERTION(!mRemaining, "Not all bytes have been processed");
   }
 
   size_t Offset()
   {
     return mLength - mRemaining;
-  }
-
-  // Make it explicit if we're not using the extra bytes.
-  void DiscardRemaining() {
-    mRemaining = 0;
   }
 
   size_t Remaining() const { return mRemaining; }
@@ -331,6 +325,7 @@ private:
   size_t mRemaining;
   size_t mLength;
 };
-}
+
+} // namespace mp4_demuxer
 
 #endif

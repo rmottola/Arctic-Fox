@@ -46,6 +46,7 @@
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/EventStates.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/ImageTracker.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/Preferences.h"
 
@@ -55,6 +56,7 @@
 #endif
 
 using namespace mozilla;
+using namespace mozilla::dom;
 
 #ifdef DEBUG_chb
 static void PrintReqURL(imgIRequest* req) {
@@ -604,21 +606,21 @@ nsImageLoadingContent::GetCurrentURI(nsIURI** aURI)
   return result.StealNSResult();
 }
 
-already_AddRefed<nsIStreamListener>
+NS_IMETHODIMP
 nsImageLoadingContent::LoadImageWithChannel(nsIChannel* aChannel,
-                                            ErrorResult& aError)
+                                            nsIStreamListener** aListener)
 {
   imgLoader* loader =
     nsContentUtils::GetImgLoaderForChannel(aChannel, GetOurOwnerDoc());
   if (!loader) {
-    aError.Throw(NS_ERROR_NULL_POINTER);
-    return nullptr;
+    return NS_ERROR_NULL_POINTER;
   }
 
   nsCOMPtr<nsIDocument> doc = GetOurOwnerDoc();
   if (!doc) {
     // Don't bother
-    return nullptr;
+    *aListener = nullptr;
+    return NS_OK;
   }
 
   // XXX what should we do with content policies here, if anything?
@@ -629,38 +631,24 @@ nsImageLoadingContent::LoadImageWithChannel(nsIChannel* aChannel,
   AutoStateChanger changer(this, true);
 
   // Do the load.
-  nsCOMPtr<nsIStreamListener> listener;
   RefPtr<imgRequestProxy>& req = PrepareNextRequest(eImageLoadType_Normal);
   nsresult rv = loader->
-    LoadImageWithChannel(aChannel, this, doc,
-                         getter_AddRefs(listener),
-                         getter_AddRefs(req));
+    LoadImageWithChannel(aChannel, this, doc, aListener, getter_AddRefs(req));
   if (NS_SUCCEEDED(rv)) {
     TrackImage(req);
     ResetAnimationIfNeeded();
-  } else {
-    MOZ_ASSERT(!req, "Shouldn't have non-null request here");
-    // If we don't have a current URI, we might as well store this URI so people
-    // know what we tried (and failed) to load.
-    if (!mCurrentRequest)
-      aChannel->GetURI(getter_AddRefs(mCurrentURI));
-
-    FireEvent(NS_LITERAL_STRING("error"));
-    FireEvent(NS_LITERAL_STRING("loadend"));
-    aError.Throw(rv);
+    return NS_OK;
   }
-  return listener.forget();
-}
 
-NS_IMETHODIMP
-nsImageLoadingContent::LoadImageWithChannel(nsIChannel* aChannel,
-                                            nsIStreamListener** aListener)
-{
-  NS_ENSURE_ARG_POINTER(aListener);
+  MOZ_ASSERT(!req, "Shouldn't have non-null request here");
+  // If we don't have a current URI, we might as well store this URI so people
+  // know what we tried (and failed) to load.
+  if (!mCurrentRequest)
+    aChannel->GetURI(getter_AddRefs(mCurrentURI));
 
-  ErrorResult result;
-  *aListener = LoadImageWithChannel(aChannel, result).take();
-  return result.StealNSResult();
+  FireEvent(NS_LITERAL_STRING("error"));
+  FireEvent(NS_LITERAL_STRING("loadend"));
+  return rv;
 }
 
 void
@@ -766,6 +754,20 @@ nsImageLoadingContent::LoadImage(const nsAString& aNewURI,
     return NS_OK;
   }
 
+  // Pending load/error events need to be canceled in some situations. This
+  // is not documented in the spec, but can cause site compat problems if not
+  // done. See bug 1309461 and https://github.com/whatwg/html/issues/1872.
+  CancelPendingEvent();
+
+  if (aNewURI.IsEmpty()) {
+    // Cancel image requests and then fire only error event per spec.
+    CancelImageRequests(aNotify);
+    // Mark error event as cancelable only for src="" case, since only this
+    // error causes site compat problem (bug 1308069) for now.
+    FireEvent(NS_LITERAL_STRING("error"), true);
+    return NS_OK;
+  }
+
   // Fire loadstart event
   FireEvent(NS_LITERAL_STRING("loadstart"));
 
@@ -777,24 +779,6 @@ nsImageLoadingContent::LoadImage(const nsAString& aNewURI,
     CancelImageRequests(aNotify);
     FireEvent(NS_LITERAL_STRING("error"));
     FireEvent(NS_LITERAL_STRING("loadend"));
-    return NS_OK;
-  }
-
-  bool equal;
-
-  if (aNewURI.IsEmpty() &&
-      doc->GetDocumentURI() &&
-      NS_SUCCEEDED(doc->GetDocumentURI()->EqualsExceptRef(imageURI, &equal)) &&
-      equal)  {
-
-    // Loading an embedded img from the same URI as the document URI will not work
-    // as a resource cannot recursively embed itself. Attempting to do so generally
-    // results in having to pre-emptively close down an in-flight HTTP transaction
-    // and then incurring the significant cost of establishing a new TCP channel.
-    // This is generally triggered from <img src="">
-    // In light of that, just skip loading it..
-    // Do make sure to drop our existing image, if any
-    CancelImageRequests(aNotify);
     return NS_OK;
   }
 
@@ -812,6 +796,11 @@ nsImageLoadingContent::LoadImage(nsIURI* aNewURI,
                                  nsIDocument* aDocument,
                                  nsLoadFlags aLoadFlags)
 {
+  // Pending load/error events need to be canceled in some situations. This
+  // is not documented in the spec, but can cause site compat problems if not
+  // done. See bug 1309461 and https://github.com/whatwg/html/issues/1872.
+  CancelPendingEvent();
+
   // Fire loadstart event if required
   if (aLoadStart) {
     FireEvent(NS_LITERAL_STRING("loadstart"));
@@ -1174,7 +1163,7 @@ nsImageLoadingContent::StringToURI(const nsAString& aSpec,
 }
 
 nsresult
-nsImageLoadingContent::FireEvent(const nsAString& aEventType)
+nsImageLoadingContent::FireEvent(const nsAString& aEventType, bool aIsCancelable)
 {
   if (nsContentUtils::DocumentInactiveForImageLoads(GetOurOwnerDoc())) {
     // Don't bother to fire any events, especially error events.
@@ -1191,7 +1180,28 @@ nsImageLoadingContent::FireEvent(const nsAString& aEventType)
     new LoadBlockingAsyncEventDispatcher(thisNode, aEventType, false, false);
   loadBlockingAsyncDispatcher->PostDOMEvent();
 
+  if (aIsCancelable) {
+    mPendingEvent = loadBlockingAsyncDispatcher;
+  }
+
   return NS_OK;
+}
+
+void
+nsImageLoadingContent::AsyncEventRunning(AsyncEventDispatcher* aEvent)
+{
+  if (mPendingEvent == aEvent) {
+    mPendingEvent = nullptr;
+  }
+}
+
+void
+nsImageLoadingContent::CancelPendingEvent()
+{
+  if (mPendingEvent) {
+    mPendingEvent->Cancel();
+    mPendingEvent = nullptr;
+  }
 }
 
 RefPtr<imgRequestProxy>&
@@ -1507,11 +1517,11 @@ nsImageLoadingContent::TrackImage(imgIRequest* aImage)
 
   if (aImage == mCurrentRequest && !(mCurrentRequestFlags & REQUEST_IS_TRACKED)) {
     mCurrentRequestFlags |= REQUEST_IS_TRACKED;
-    doc->AddImage(mCurrentRequest);
+    doc->ImageTracker()->Add(mCurrentRequest);
   }
   if (aImage == mPendingRequest && !(mPendingRequestFlags & REQUEST_IS_TRACKED)) {
     mPendingRequestFlags |= REQUEST_IS_TRACKED;
-    doc->AddImage(mPendingRequest);
+    doc->ImageTracker()->Add(mPendingRequest);
   }
 }
 
@@ -1534,10 +1544,11 @@ nsImageLoadingContent::UntrackImage(imgIRequest* aImage,
   if (aImage == mCurrentRequest) {
     if (doc && (mCurrentRequestFlags & REQUEST_IS_TRACKED)) {
       mCurrentRequestFlags &= ~REQUEST_IS_TRACKED;
-      doc->RemoveImage(mCurrentRequest,
-                       aNonvisibleAction == Some(OnNonvisible::DISCARD_IMAGES)
-                         ? nsIDocument::REQUEST_DISCARD
-                         : 0);
+      doc->ImageTracker()->Remove(
+        mCurrentRequest,
+        aNonvisibleAction == Some(OnNonvisible::DISCARD_IMAGES)
+          ? ImageTracker::REQUEST_DISCARD
+          : 0);
     } else if (aNonvisibleAction == Some(OnNonvisible::DISCARD_IMAGES)) {
       // If we're not in the document we may still need to be discarded.
       aImage->RequestDiscard();
@@ -1546,10 +1557,11 @@ nsImageLoadingContent::UntrackImage(imgIRequest* aImage,
   if (aImage == mPendingRequest) {
     if (doc && (mPendingRequestFlags & REQUEST_IS_TRACKED)) {
       mPendingRequestFlags &= ~REQUEST_IS_TRACKED;
-      doc->RemoveImage(mPendingRequest,
-                       aNonvisibleAction == Some(OnNonvisible::DISCARD_IMAGES)
-                         ? nsIDocument::REQUEST_DISCARD
-                         : 0);
+      doc->ImageTracker()->Remove(
+        mPendingRequest,
+        aNonvisibleAction == Some(OnNonvisible::DISCARD_IMAGES)
+          ? ImageTracker::REQUEST_DISCARD
+          : 0);
     } else if (aNonvisibleAction == Some(OnNonvisible::DISCARD_IMAGES)) {
       // If we're not in the document we may still need to be discarded.
       aImage->RequestDiscard();

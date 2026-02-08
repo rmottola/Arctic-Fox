@@ -10,6 +10,7 @@
 #include "AccessibleCaretManager.h"
 #include "Layers.h"
 #include "gfxPrefs.h"
+#include "mozilla/AutoRestore.h"
 #include "mozilla/MouseEvents.h"
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
@@ -513,6 +514,16 @@ AccessibleCaretEventHub::HandleMouseEvent(WidgetMouseEvent* aEvent)
     (mActiveTouchId == kInvalidTouchId ? kDefaultTouchId : mActiveTouchId);
   nsPoint point = GetMouseEventPosition(aEvent);
 
+  if (aEvent->mMessage == eMouseDown ||
+      aEvent->mMessage == eMouseUp ||
+      aEvent->mMessage == eMouseClick ||
+      aEvent->mMessage == eMouseDoubleClick ||
+      aEvent->mMessage == eMouseLongTap) {
+    // Don't reset the source on mouse movement since that can
+    // happen anytime, even randomly during a touch sequence.
+    mManager->SetLastInputSource(aEvent->inputSource);
+  }
+
   switch (aEvent->mMessage) {
     case eMouseDown:
       AC_LOGV("Before eMouseDown, state: %s", mState->Name());
@@ -561,6 +572,8 @@ AccessibleCaretEventHub::HandleTouchEvent(WidgetTouchEvent* aEvent)
                                        : mActiveTouchId);
   nsPoint point = GetTouchEventPosition(aEvent, id);
 
+  mManager->SetLastInputSource(nsIDOMMouseEvent::MOZ_SOURCE_TOUCH);
+
   switch (aEvent->mMessage) {
     case eTouchStart:
       AC_LOGV("Before eTouchStart, state: %s", mState->Name());
@@ -595,6 +608,8 @@ AccessibleCaretEventHub::HandleTouchEvent(WidgetTouchEvent* aEvent)
 nsEventStatus
 AccessibleCaretEventHub::HandleKeyboardEvent(WidgetKeyboardEvent* aEvent)
 {
+  mManager->SetLastInputSource(nsIDOMMouseEvent::MOZ_SOURCE_KEYBOARD);
+
   switch (aEvent->mMessage) {
     case eKeyUp:
       AC_LOGV("eKeyUp, state: %s", mState->Name());
@@ -666,6 +681,13 @@ AccessibleCaretEventHub::Reflow(DOMHighResTimeStamp aStart,
 
   MOZ_ASSERT(mRefCnt.get() > 1, "Expect caller holds us as well!");
 
+  if (mIsInReflowCallback) {
+    return NS_OK;
+  }
+
+  AutoRestore<bool> autoRestoreIsInReflowCallback(mIsInReflowCallback);
+  mIsInReflowCallback = true;
+
   AC_LOG("%s, state: %s", __FUNCTION__, mState->Name());
   mState->OnReflow(this);
   return NS_OK;
@@ -675,12 +697,7 @@ NS_IMETHODIMP
 AccessibleCaretEventHub::ReflowInterruptible(DOMHighResTimeStamp aStart,
                                              DOMHighResTimeStamp aEnd)
 {
-  if (!mInitialized) {
-    return NS_OK;
-  }
-
-  MOZ_ASSERT(mRefCnt.get() > 1, "Expect caller holds us as well!");
-
+  // Defer the error checking to Reflow().
   return Reflow(aStart, aEnd);
 }
 

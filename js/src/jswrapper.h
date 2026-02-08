@@ -66,7 +66,7 @@ class JS_FRIEND_API(Wrapper) : public BaseProxyHandler
         mFlags(aFlags)
     { }
 
-    virtual bool finalizeInBackground(Value priv) const override;
+    virtual bool finalizeInBackground(const Value& priv) const override;
 
     /* Standard internal methods. */
     virtual bool getOwnPropertyDescriptor(JSContext* cx, HandleObject proxy, HandleId id,
@@ -215,6 +215,9 @@ class JS_FRIEND_API(CrossCompartmentWrapper) : public Wrapper
     virtual bool regexp_toShared(JSContext* cx, HandleObject proxy, RegExpGuard* g) const override;
     virtual bool boxedValue_unbox(JSContext* cx, HandleObject proxy, MutableHandleValue vp) const override;
 
+    // Allocate CrossCompartmentWrappers in the nursery.
+    virtual bool canNurseryAllocate() const override { return true; }
+
     static const CrossCompartmentWrapper singleton;
     static const CrossCompartmentWrapper singletonWithPrototype;
 };
@@ -325,7 +328,6 @@ class JS_FRIEND_API(SecurityWrapper) : public Base
     typedef SecurityWrapper<Base> Restrictive;
 };
 
-typedef SecurityWrapper<Wrapper> SameCompartmentSecurityWrapper;
 typedef SecurityWrapper<CrossCompartmentWrapper> CrossCompartmentSecurityWrapper;
 
 extern JSObject*

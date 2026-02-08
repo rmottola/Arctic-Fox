@@ -145,7 +145,8 @@ function eventSource(aProto) {
 const ThreadStateTypes = {
   "paused": "paused",
   "resumed": "attached",
-  "detached": "detached"
+  "detached": "detached",
+  "running": "attached"
 };
 
 /**
@@ -354,9 +355,17 @@ DebuggerClient.prototype = {
    *
    * @param aOnClosed function
    *        If specified, will be called when the debugging connection
-   *        has been closed.
+   *        has been closed. This parameter is deprecated - please use
+   *        the returned Promise.
+   * @return Promise
+   *         Resolves after the underlying transport is closed.
    */
   close: function (aOnClosed) {
+    let deferred = promise.defer();
+    if (aOnClosed) {
+      deferred.promise.then(aOnClosed);
+    }
+
     // Disable detach event notifications, because event handlers will be in a
     // cleared scope by the time they run.
     this._eventsEnabled = false;
@@ -371,17 +380,11 @@ DebuggerClient.prototype = {
     // as we won't be able to send any message.
     if (this._closed) {
       cleanup();
-      if (aOnClosed) {
-        aOnClosed();
-      }
-      return;
+      deferred.resolve();
+      return deferred.promise;
     }
 
-    if (aOnClosed) {
-      this.addOneTimeListener("closed", function (aEvent) {
-        aOnClosed();
-      });
-    }
+    this.addOneTimeListener("closed", deferred.resolve);
 
     // Call each client's `detach` method by calling
     // lastly registered ones first to give a chance
@@ -402,6 +405,8 @@ DebuggerClient.prototype = {
       detachClients();
     };
     detachClients();
+
+    return deferred.promise;
   },
 
   /*
@@ -1156,6 +1161,68 @@ DebuggerClient.prototype = {
     activeRequestsToReject.forEach(request => reject("active", request));
   },
 
+  /**
+   * Search for all requests in process for this client, including those made via
+   * protocol.js and wait all of them to complete.  Since the requests seen when this is
+   * first called may in turn trigger more requests, we keep recursing through this
+   * function until there is no more activity.
+   *
+   * This is a fairly heavy weight process, so it's only meant to be used in tests.
+   *
+   * @return Promise
+   *         Resolved when all requests have settled.
+   */
+  waitForRequestsToSettle() {
+    let requests = [];
+
+    // Gather all pending and active requests in this client
+    // The request object supports a Promise API for completion (it has .then())
+    this._pendingRequests.forEach(requestsForActor => {
+      // Each value is an array of pending requests
+      requests = requests.concat(requestsForActor);
+    });
+    this._activeRequests.forEach(requestForActor => {
+      // Each value is a single active request
+      requests = requests.concat(requestForActor);
+    });
+
+    // protocol.js
+    // Use a Set because some fronts (like domwalker) seem to have multiple parents.
+    let fronts = new Set();
+    let poolsToVisit = [...this._pools];
+
+    // With protocol.js, each front can potentially have it's own pools containing child
+    // fronts, forming a tree.  Descend through all the pools to locate all child fronts.
+    while (poolsToVisit.length) {
+      let pool = poolsToVisit.shift();
+      fronts.add(pool);
+      for (let child of pool.poolChildren()) {
+        poolsToVisit.push(child);
+      }
+    }
+
+    // For each front, wait for its requests to settle
+    for (let front of fronts) {
+      if (front.hasRequests()) {
+        requests.push(front.waitForRequestsToSettle());
+      }
+    }
+
+    // Abort early if there are no requests
+    if (!requests.length) {
+      return Promise.resolve();
+    }
+
+    return DevToolsUtils.settleAll(requests).catch(() => {
+      // One of the requests might have failed, but ignore that situation here and pipe
+      // both success and failure through the same path.  The important part is just that
+      // we waited.
+    }).then(() => {
+      // Repeat, more requests may have started in response to those we just waited for
+      return this.waitForRequestsToSettle();
+    });
+  },
+
   registerClient: function (client) {
     let actorID = client.actor;
     if (!actorID) {
@@ -1735,6 +1802,7 @@ ThreadClient.prototype = {
 
       // Put the client in a tentative "resuming" state so we can prevent
       // further requests that should only be sent in the paused state.
+      this._previousState = this._state;
       this._state = "resuming";
 
       if (this._pauseOnExceptions) {
@@ -1749,10 +1817,17 @@ ThreadClient.prototype = {
       return aPacket;
     },
     after: function (aResponse) {
-      if (aResponse.error) {
-        // There was an error resuming, back to paused state.
-        this._state = "paused";
+      if (aResponse.error && this._state == "resuming") {
+        // There was an error resuming, update the state to the new one
+        // reported by the server, if given (only on wrongState), otherwise
+        // reset back to the previous state.
+        if (aResponse.state) {
+          this._state = ThreadStateTypes[aResponse.state];
+        } else {
+          this._state = this._previousState;
+        }
       }
+      delete this._previousState;
       return aResponse;
     },
   }),
@@ -2880,7 +2955,7 @@ SourceClient.prototype = {
    * @param function aOnResponse
    *        Called with the thread's response.
    */
-  setBreakpoint: function ({ line, column, condition }, aOnResponse = noop) {
+  setBreakpoint: function ({ line, column, condition, noSliding }, aOnResponse = noop) {
     // A helper function that sets the breakpoint.
     let doSetBreakpoint = aCallback => {
       let root = this._client.mainRoot;
@@ -2893,7 +2968,8 @@ SourceClient.prototype = {
         to: this.actor,
         type: "setBreakpoint",
         location: location,
-        condition: condition
+        condition: condition,
+        noSliding: noSliding
       };
 
       // Backwards compatibility: send the breakpoint request to the

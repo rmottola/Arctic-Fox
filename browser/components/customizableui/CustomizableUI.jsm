@@ -1974,7 +1974,7 @@ var CustomizableUIInternal = {
       let restored = false;
       if (placementsPreexisted) {
         log.debug("Restoring " + aArea + " from pre-existing placements");
-        for (let [position, id] in Iterator(gPlacements.get(aArea))) {
+        for (let [position, id] of gPlacements.get(aArea).entries()) {
           this.moveWidgetWithinArea(id, position);
         }
         gDirty = false;
@@ -3230,7 +3230,17 @@ this.CustomizableUI = {
    * - onClick(aEvt): Attached to all widgets; a function that will be invoked
    *                  when the user clicks the widget.
    * - onViewShowing(aEvt): Only useful for views; a function that will be
-   *                  invoked when a user shows your view.
+   *                  invoked when a user shows your view. If any event
+   *                  handler calls aEvt.preventDefault(), the view will
+   *                  not be shown.
+   *
+   *                  The event's `detail` property is an object with an
+   *                  `addBlocker` method. Handlers which need to
+   *                  perform asynchronous operations before the view is
+   *                  shown may pass this method a Promise, which will
+   *                  prevent the view from showing until it resolves.
+   *                  Additionally, if the promise resolves to the exact
+   *                  value `false`, the view will not be shown.
    * - onViewHiding(aEvt): Only useful for views; a function that will be
    *                  invoked when a user hides your view.
    * - tooltiptext:   string to use for the tooltip of the widget

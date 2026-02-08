@@ -34,7 +34,6 @@
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
 - Bug 1263340 - finish to part 8
-- Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
 
 
 impacting download and shutdown:

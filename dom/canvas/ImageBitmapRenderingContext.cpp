@@ -51,6 +51,12 @@ ImageBitmapRenderingContext::ClipToIntrinsicSize()
 void
 ImageBitmapRenderingContext::TransferImageBitmap(ImageBitmap& aImageBitmap)
 {
+  TransferFromImageBitmap(aImageBitmap);
+}
+
+void
+ImageBitmapRenderingContext::TransferFromImageBitmap(ImageBitmap& aImageBitmap)
+{
   Reset();
   mImage = aImageBitmap.TransferAsImage();
 
@@ -109,7 +115,8 @@ ImageBitmapRenderingContext::MatchWithIntrinsicSize()
                                      temp->GetSize(),
                                      map.GetStride(),
                                      temp->GetFormat());
-  if (!dt) {
+  if (!dt || !dt->IsValid()) {
+    gfxWarning() << "ImageBitmapRenderingContext::MatchWithIntrinsicSize failed";
     return nullptr;
   }
 

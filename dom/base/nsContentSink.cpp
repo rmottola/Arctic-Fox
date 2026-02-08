@@ -207,7 +207,7 @@ nsContentSink::Init(nsIDocument* aDoc,
 }
 
 NS_IMETHODIMP
-nsContentSink::StyleSheetLoaded(StyleSheetHandle aSheet,
+nsContentSink::StyleSheetLoaded(StyleSheet* aSheet,
                                 bool aWasAlternate,
                                 nsresult aStatus)
 {
@@ -1492,7 +1492,7 @@ nsContentSink::DidBuildModelImpl(bool aTerminated)
                ("nsContentSink::DidBuildModel: canceling notification "
                 "timeout"));
     mNotificationTimer->Cancel();
-    mNotificationTimer = 0;
+    mNotificationTimer = nullptr;
   }	
 }
 

@@ -39,6 +39,7 @@
 #include "Layers.h"
 #include "gfxContext.h"
 #include "nsILoadContext.h"
+#include "nsDocShell.h"
 
 // for painting the background window
 #include "mozilla/LookAndFeel.h"
@@ -388,6 +389,12 @@ nsWebBrowser::SetIsActive(bool aIsActive)
   return NS_OK;
 }
 
+void
+nsWebBrowser::SetOriginAttributes(const DocShellOriginAttributes& aAttrs)
+{
+  mOriginAttributes = aAttrs;
+}
+
 //*****************************************************************************
 // nsWebBrowser::nsIDocShellTreeItem
 //*****************************************************************************
@@ -417,9 +424,8 @@ nsWebBrowser::SetName(const nsAString& aName)
 }
 
 NS_IMETHODIMP
-nsWebBrowser::NameEquals(const char16_t* aName, bool* aResult)
+nsWebBrowser::NameEquals(const nsAString& aName, bool* aResult)
 {
-  NS_ENSURE_ARG_POINTER(aName);
   NS_ENSURE_ARG_POINTER(aResult);
   if (mDocShell) {
     return mDocShell->NameEquals(aName, aResult);
@@ -512,7 +518,7 @@ nsWebBrowser::GetSameTypeRootTreeItem(nsIDocShellTreeItem** aRootTreeItem)
 }
 
 NS_IMETHODIMP
-nsWebBrowser::FindItemWithName(const char16_t* aName,
+nsWebBrowser::FindItemWithName(const nsAString& aName,
                                nsISupports* aRequestor,
                                nsIDocShellTreeItem* aOriginalRequestor,
                                nsIDocShellTreeItem** aResult)
@@ -592,7 +598,7 @@ nsWebBrowser::GetChildAt(int32_t aIndex, nsIDocShellTreeItem** aChild)
 }
 
 NS_IMETHODIMP
-nsWebBrowser::FindChildWithName(const char16_t* aName,
+nsWebBrowser::FindChildWithName(const nsAString& aName,
                                 bool aRecurse,
                                 bool aSameType,
                                 nsIDocShellTreeItem* aRequestor,
@@ -1193,6 +1199,7 @@ nsWebBrowser::Create()
   nsCOMPtr<nsIDocShell> docShell(
     do_CreateInstance("@mozilla.org/docshell;1", &rv));
   NS_ENSURE_SUCCESS(rv, rv);
+  nsDocShell::Cast(docShell)->SetOriginAttributes(mOriginAttributes);
   rv = SetDocShell(docShell);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1653,7 +1660,11 @@ nsWebBrowser::ScrollByPages(int32_t aNumPages)
 NS_IMETHODIMP
 nsWebBrowser::SetDocShell(nsIDocShell* aDocShell)
 {
+  // We need to keep the docshell alive while we perform the changes, but we
+  // don't need to call any methods on it.
   nsCOMPtr<nsIDocShell> kungFuDeathGrip(mDocShell);
+  mozilla::Unused << kungFuDeathGrip;
+
   if (aDocShell) {
     NS_ENSURE_TRUE(!mDocShell, NS_ERROR_FAILURE);
 

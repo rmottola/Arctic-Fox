@@ -16,7 +16,6 @@
 #include "nsCOMPtr.h"
 #include "nsIThread.h"
 #include "nsThreadUtils.h"
-#include "nsPIDOMWindow.h"
 #include "nsIDocument.h"
 #include "nsIWeakReference.h"
 #include "mozilla/AbstractThread.h"
@@ -25,31 +24,9 @@
 
 template <class> struct already_AddRefed;
 
-// For every GMP actor requested, the caller can specify a crash helper,
-// which is an object which supplies the nsPIDOMWindowInner to which we'll
-// dispatch the PluginCrashed event if the GMP crashes.
-// GMPCrashHelper has threadsafe refcounting. Its release method ensures
-// that instances are destroyed on the main thread.
-class GMPCrashHelper
-{
-public:
-  NS_METHOD_(MozExternalRefCountType) AddRef(void);
-  NS_METHOD_(MozExternalRefCountType) Release(void);
-
-  // Called on the main thread.
-  virtual already_AddRefed<nsPIDOMWindowInner> GetPluginCrashedEventTarget() = 0;
-
-protected:
-  virtual ~GMPCrashHelper()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-  }
-  void Destroy();
-  mozilla::ThreadSafeAutoRefCnt mRefCnt;
-  NS_DECL_OWNINGTHREAD
-};
-
 namespace mozilla {
+
+class GMPCrashHelper;
 
 extern LogModule* GetGMPLog();
 
@@ -69,12 +46,11 @@ public:
 
   // mozIGeckoMediaPluginService
   NS_IMETHOD GetThread(nsIThread** aThread) override;
-  NS_IMETHOD HasPluginForAPI(const nsACString& aAPI, nsTArray<nsCString>* aTags,
-                             bool *aRetVal) override;
-  NS_IMETHOD GetGMPVideoDecoder(GMPCrashHelper* aHelper,
-                                nsTArray<nsCString>* aTags,
-                                const nsACString& aNodeId,
-                                UniquePtr<GetGMPVideoDecoderCallback>&& aCallback)
+  NS_IMETHOD GetDecryptingGMPVideoDecoder(GMPCrashHelper* aHelper,
+                                          nsTArray<nsCString>* aTags,
+                                          const nsACString& aNodeId,
+                                          UniquePtr<GetGMPVideoDecoderCallback>&& aCallback,
+                                          uint32_t aDecryptorId)
     override;
   NS_IMETHOD GetGMPVideoEncoder(GMPCrashHelper* aHelper,
                                 nsTArray<nsCString>* aTags,
@@ -91,6 +67,16 @@ public:
                              const nsACString& aNodeId,
                              UniquePtr<GetGMPDecryptorCallback>&& aCallback)
     override;
+
+  // Helper for backwards compatibility with WebRTC/tests.
+  NS_IMETHOD
+  GetGMPVideoDecoder(GMPCrashHelper* aHelper,
+                     nsTArray<nsCString>* aTags,
+                     const nsACString& aNodeId,
+                     UniquePtr<GetGMPVideoDecoderCallback>&& aCallback) override
+  {
+    return GetDecryptingGMPVideoDecoder(aHelper, aTags, aNodeId, Move(aCallback), 0);
+  }
 
   int32_t AsyncShutdownTimeoutMs();
 

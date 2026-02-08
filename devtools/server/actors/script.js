@@ -983,7 +983,8 @@ const ThreadActor = ActorClassWithSpec(threadSpec, {
       return {
         error: "wrongState",
         message: "Can't resume when debuggee isn't paused. Current state is '"
-          + this._state + "'"
+          + this._state + "'",
+        state: this._state
       };
     }
 
@@ -1113,7 +1114,7 @@ const ThreadActor = ActorClassWithSpec(threadSpec, {
     let els = Cc["@mozilla.org/eventlistenerservice;1"]
                 .getService(Ci.nsIEventListenerService);
 
-    let targets = els.getEventTargetChainFor(eventTarget);
+    let targets = els.getEventTargetChainFor(eventTarget, true);
     let listeners = [];
 
     for (let target of targets) {

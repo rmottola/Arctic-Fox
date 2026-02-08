@@ -16,7 +16,6 @@
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/MessageEvent.h"
 #include "mozilla/dom/MessageEventBinding.h"
-#include "mozilla/dom/nsCSPService.h"
 #include "mozilla/dom/nsCSPContext.h"
 #include "mozilla/dom/nsCSPUtils.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -1570,27 +1569,28 @@ WebSocketImpl::Init(JSContext* aCx,
     }
 
     // The 'real' nsHttpChannel of the websocket gets opened in the parent.
-    // Since we don't serialize the CSP within child and parent we have to
-    // perform the CSP check here instead of AsyncOpen2().
+    // Since we don't serialize the CSP within child and parent and also not
+    // the context, we have to perform content policy checks here instead of
+    // AsyncOpen2().
     // Please note that websockets can't follow redirects, hence there is no
     // need to perform a CSP check after redirects.
-    nsCOMPtr<nsIContentPolicy> cspService = do_GetService(CSPSERVICE_CONTRACTID);
-    int16_t shouldLoad = nsIContentPolicy::REJECT_REQUEST;
-    aRv = cspService->ShouldLoad(nsIContentPolicy::TYPE_WEBSOCKET,
-                                 uri,
-                                 nullptr, // aRequestOrigin not used within CSP
-                                 originDoc,
-                                 EmptyCString(), // aMimeTypeGuess
-                                 nullptr, // aExtra
-                                 aPrincipal,
-                                 &shouldLoad);
+    int16_t shouldLoad = nsIContentPolicy::ACCEPT;
+    aRv = NS_CheckContentLoadPolicy(nsIContentPolicy::TYPE_WEBSOCKET,
+                                    uri,
+                                    aPrincipal,
+                                    originDoc,
+                                    EmptyCString(),
+                                    nullptr,
+                                    &shouldLoad,
+                                    nsContentUtils::GetContentPolicy(),
+                                    nsContentUtils::GetSecurityManager());
 
     if (NS_WARN_IF(aRv.Failed())) {
       return;
     }
 
     if (NS_CP_REJECTED(shouldLoad)) {
-      // Disallowed by CSP
+      // Disallowed by content policy
       aRv.Throw(NS_ERROR_CONTENT_BLOCKED);
       return;
     }
@@ -1975,9 +1975,14 @@ WebSocket::CreateAndDispatchMessageEvent(const nsACString& aData,
     if (mBinaryType == dom::BinaryType::Blob) {
       messageType = nsIWebSocketEventListener::TYPE_BLOB;
 
-      nsresult rv = nsContentUtils::CreateBlobBuffer(cx, GetOwner(), aData,
-                                                     &jsData);
-      NS_ENSURE_SUCCESS(rv, rv);
+      RefPtr<Blob> blob =
+        Blob::CreateStringBlob(GetOwner(), aData, EmptyString());
+      MOZ_ASSERT(blob);
+
+      if (!ToJSValue(cx, blob, &jsData)) {
+        return NS_ERROR_FAILURE;
+      }
+
     } else if (mBinaryType == dom::BinaryType::Arraybuffer) {
       messageType = nsIWebSocketEventListener::TYPE_ARRAYBUFFER;
 
@@ -2007,11 +2012,11 @@ WebSocket::CreateAndDispatchMessageEvent(const nsACString& aData,
   // create an event that uses the MessageEvent interface,
   // which does not bubble, is not cancelable, and has no default action
 
-  RefPtr<MessageEvent> event = NS_NewDOMMessageEvent(this, nullptr, nullptr);
+  RefPtr<MessageEvent> event = new MessageEvent(this, nullptr, nullptr);
 
   event->InitMessageEvent(nullptr, NS_LITERAL_STRING("message"), false, false,
                           jsData, mImpl->mUTF16Origin, EmptyString(), nullptr,
-                          nullptr);
+                          Sequence<OwningNonNull<MessagePort>>());
   event->SetTrusted(true);
 
   return DispatchDOMEvent(nullptr, static_cast<Event*>(event), nullptr,

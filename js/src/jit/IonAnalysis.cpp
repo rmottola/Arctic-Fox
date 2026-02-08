@@ -6,6 +6,8 @@
 
 #include "jit/IonAnalysis.h"
 
+#include "mozilla/SizePrintfMacros.h"
+
 #include "jit/AliasAnalysis.h"
 #include "jit/BaselineInspector.h"
 #include "jit/BaselineJIT.h"
@@ -33,7 +35,8 @@ using mozilla::DebugOnly;
 typedef Vector<MPhi*, 16, SystemAllocPolicy> MPhiVector;
 
 static bool
-FlagPhiInputsAsHavingRemovedUses(MBasicBlock* block, MBasicBlock* succ, MPhiVector& worklist)
+FlagPhiInputsAsHavingRemovedUses(MIRGenerator* mir, MBasicBlock* block, MBasicBlock* succ,
+                                 MPhiVector& worklist)
 {
     // When removing an edge between 2 blocks, we might remove the ability of
     // later phases to figure out that the uses of a Phi should be considered as
@@ -106,6 +109,9 @@ FlagPhiInputsAsHavingRemovedUses(MBasicBlock* block, MBasicBlock* succ, MPhiVect
     for (; it != end; it++) {
         MPhi* phi = *it;
 
+        if (mir->shouldCancel("FlagPhiInputsAsHavingRemovedUses outer loop"))
+            return false;
+
         // We are looking to mark the Phi inputs which are used across the edge
         // between the |block| and its successor |succ|.
         MDefinition* def = phi->getOperand(predIndex);
@@ -123,6 +129,10 @@ FlagPhiInputsAsHavingRemovedUses(MBasicBlock* block, MBasicBlock* succ, MPhiVect
         bool isUsed = false;
         for (size_t idx = 0; !isUsed && idx < worklist.length(); idx++) {
             phi = worklist[idx];
+
+            if (mir->shouldCancel("FlagPhiInputsAsHavingRemovedUses inner loop 1"))
+                return false;
+
             if (phi->isUseRemoved() || phi->isImplicitlyUsed()) {
                 // The phi is implicitly used.
                 isUsed = true;
@@ -132,6 +142,10 @@ FlagPhiInputsAsHavingRemovedUses(MBasicBlock* block, MBasicBlock* succ, MPhiVect
             MUseIterator usesEnd(phi->usesEnd());
             for (MUseIterator use(phi->usesBegin()); use != usesEnd; use++) {
                 MNode* consumer = (*use)->consumer();
+
+                if (mir->shouldCancel("FlagPhiInputsAsHavingRemovedUses inner loop 2"))
+                    return false;
+
                 if (consumer->isResumePoint()) {
                     MResumePoint* rp = consumer->toResumePoint();
                     if (rp->isObservableOperand(*use)) {
@@ -180,11 +194,14 @@ FlagPhiInputsAsHavingRemovedUses(MBasicBlock* block, MBasicBlock* succ, MPhiVect
 }
 
 static bool
-FlagAllOperandsAsHavingRemovedUses(MBasicBlock* block)
+FlagAllOperandsAsHavingRemovedUses(MIRGenerator* mir, MBasicBlock* block)
 {
     // Flag all instructions operands as having removed uses.
     MInstructionIterator end = block->end();
     for (MInstructionIterator it = block->begin(); it != end; it++) {
+        if (mir->shouldCancel("FlagAllOperandsAsHavingRemovedUses loop 1"))
+            return false;
+
         MInstruction* ins = *it;
         for (size_t i = 0, e = ins->numOperands(); i < e; i++)
             ins->getOperand(i)->setUseRemovedUnchecked();
@@ -194,6 +211,9 @@ FlagAllOperandsAsHavingRemovedUses(MBasicBlock* block)
             // Note: no need to iterate over the caller's of the resume point as
             // this is the same as the entry resume point.
             for (size_t i = 0, e = rp->numOperands(); i < e; i++) {
+                if (mir->shouldCancel("FlagAllOperandsAsHavingRemovedUses inner loop"))
+                    return false;
+
                 if (!rp->isObservableOperand(i))
                     continue;
                 rp->getOperand(i)->setUseRemovedUnchecked();
@@ -204,6 +224,9 @@ FlagAllOperandsAsHavingRemovedUses(MBasicBlock* block)
     // Flag observable operands of the entry resume point as having removed uses.
     MResumePoint* rp = block->entryResumePoint();
     while (rp) {
+        if (mir->shouldCancel("FlagAllOperandsAsHavingRemovedUses loop 2"))
+            return false;
+
         for (size_t i = 0, e = rp->numOperands(); i < e; i++) {
             if (!rp->isObservableOperand(i))
                 continue;
@@ -215,7 +238,10 @@ FlagAllOperandsAsHavingRemovedUses(MBasicBlock* block)
     // Flag Phi inputs of the successors has having removed uses.
     MPhiVector worklist;
     for (size_t i = 0, e = block->numSuccessors(); i < e; i++) {
-        if (!FlagPhiInputsAsHavingRemovedUses(block, block->getSuccessor(i), worklist))
+        if (mir->shouldCancel("FlagAllOperandsAsHavingRemovedUses loop 3"))
+            return false;
+
+        if (!FlagPhiInputsAsHavingRemovedUses(mir, block, block->getSuccessor(i), worklist))
             return false;
     }
 
@@ -257,13 +283,16 @@ ConvertToBailingBlock(TempAllocator& alloc, MBasicBlock* block)
 bool
 jit::PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph)
 {
-    MOZ_ASSERT(!mir->compilingAsmJS(), "AsmJS compilation have no code coverage support.");
+    MOZ_ASSERT(!mir->compilingWasm(), "wasm compilation has no code coverage support.");
 
     // We do a reverse-post-order traversal, marking basic blocks when the block
     // have to be converted into bailing blocks, and flagging block as
     // unreachable if all predecessors are flagged as bailing or unreachable.
     bool someUnreachable = false;
     for (ReversePostorderIterator block(graph.rpoBegin()); block != graph.rpoEnd(); block++) {
+        if (mir->shouldCancel("Prune unused branches (main loop)"))
+            return false;
+
         JitSpew(JitSpew_Prune, "Investigate Block %d:", block->id());
         JitSpewIndent indent(JitSpew_Prune);
 
@@ -280,6 +309,9 @@ jit::PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph)
         size_t numPred = block->numPredecessors();
         size_t i = 0;
         for (; i < numPred; i++) {
+            if (mir->shouldCancel("Prune unused branches (inner loop 1)"))
+                return false;
+
             MBasicBlock* pred = block->getPredecessor(i);
 
             // The backedge is visited after the loop header, but if the loop
@@ -311,6 +343,9 @@ jit::PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph)
             size_t numSuccessorsOfPreds = 1;
             bool isLoopExit = false;
             while (p--) {
+                if (mir->shouldCancel("Prune unused branches (inner loop 2)"))
+                    return false;
+
                 MBasicBlock* pred = block->getPredecessor(p);
                 if (pred->getHitState() == MBasicBlock::HitState::Count)
                     predCount += pred->getHitCount();
@@ -328,6 +363,9 @@ jit::PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph)
             size_t branchSpan = 0;
             ReversePostorderIterator it(block);
             do {
+                if (mir->shouldCancel("Prune unused branches (inner loop 3)"))
+                    return false;
+
                 // Iterate over dominated blocks, and visit exit blocks as well.
                 numInOutEdges -= it->numPredecessors();
                 if (numInOutEdges < 0)
@@ -409,9 +447,10 @@ jit::PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph)
                 shouldBailout = false;
 
             JitSpew(JitSpew_Prune, "info: block %d,"
-                    " predCount: %lu, domInst: %lu, span: %lu, effectful: %lu, "
-                    " isLoopExit: %s, numSuccessorsOfPred: %lu."
-                    " (score: %lu, shouldBailout: %s)",
+                    " predCount: %" PRIuSIZE ", domInst: %" PRIuSIZE
+                    ", span: %" PRIuSIZE ", effectful: %" PRIuSIZE ", "
+                    " isLoopExit: %s, numSuccessorsOfPred: %" PRIuSIZE "."
+                    " (score: %" PRIuSIZE ", shouldBailout: %s)",
                     block->id(), predCount, numDominatedInst, branchSpan, numEffectfulInst,
                     isLoopExit ? "true" : "false", numSuccessorsOfPreds,
                     score, shouldBailout ? "true" : "false");
@@ -452,16 +491,22 @@ jit::PruneUnusedBranches(MIRGenerator* mir, MIRGraph& graph)
     // As we are going to remove edges and basic block, we have to mark
     // instructions which would be needed by baseline if we were to bailout.
     for (PostorderIterator it(graph.poBegin()); it != graph.poEnd();) {
+        if (mir->shouldCancel("Prune unused branches (marking loop)"))
+            return false;
+
         MBasicBlock* block = *it++;
         if (!block->isMarked() && !block->unreachable())
             continue;
 
-        FlagAllOperandsAsHavingRemovedUses(block);
+        FlagAllOperandsAsHavingRemovedUses(mir, block);
     }
 
     // Remove the blocks in post-order such that consumers are visited before
     // the predecessors, the only exception being the Phi nodes of loop headers.
     for (PostorderIterator it(graph.poBegin()); it != graph.poEnd();) {
+        if (mir->shouldCancel("Prune unused branches (removal loop)"))
+            return false;
+
         MBasicBlock* block = *it++;
         if (!block->isMarked() && !block->unreachable())
             continue;
@@ -525,6 +570,20 @@ jit::SplitCriticalEdges(MIRGraph& graph)
             return false;
     }
     return true;
+}
+
+bool
+jit::IsUint32Type(const MDefinition* def)
+{
+    if (def->isBeta())
+        def = def->getOperand(0);
+
+    if (def->type() != MIRType::Int32)
+        return false;
+
+    return def->isUrsh() && def->getOperand(1)->isConstant() &&
+        def->getOperand(1)->toConstant()->type() == MIRType::Int32 &&
+        def->getOperand(1)->toConstant()->toInt32() == 0;
 }
 
 // Return whether a block simply computes the specified constant value.
@@ -1140,12 +1199,12 @@ jit::EliminatePhis(MIRGenerator* mir, MIRGraph& graph,
     // Add all observable phis to a worklist. We use the "in worklist" bit to
     // mean "this phi is live".
     for (PostorderIterator block = graph.poBegin(); block != graph.poEnd(); block++) {
-        if (mir->shouldCancel("Eliminate Phis (populate loop)"))
-            return false;
-
         MPhiIterator iter = block->phisBegin();
         while (iter != block->phisEnd()) {
             MPhi* phi = *iter++;
+
+            if (mir->shouldCancel("Eliminate Phis (populate loop)"))
+                return false;
 
             // Flag all as unused, only observable phis would be marked as used
             // when processed by the work list.
@@ -1431,6 +1490,9 @@ TypeAnalyzer::specializePhis()
             return false;
 
         for (MPhiIterator phi(block->phisBegin()); phi != block->phisEnd(); phi++) {
+            if (mir->shouldCancel("Specialize Phis (inner loop)"))
+                return false;
+
             bool hasInputsWithEmptyTypes;
             MIRType type = GuessPhiType(*phi, &hasInputsWithEmptyTypes);
             phi->specialize(type);
@@ -1831,10 +1893,10 @@ bool
 TypeAnalyzer::graphContainsFloat32()
 {
     for (ReversePostorderIterator block(graph.rpoBegin()); block != graph.rpoEnd(); ++block) {
-        if (mir->shouldCancel("Ensure Float32 commutativity - Graph contains Float32"))
-            return false;
-
         for (MDefinitionIterator def(*block); def; def++) {
+            if (mir->shouldCancel("Ensure Float32 commutativity - Graph contains Float32"))
+                return false;
+
             if (def->type() == MIRType::Float32)
                 return true;
         }
@@ -1847,7 +1909,7 @@ TypeAnalyzer::tryEmitFloatOperations()
 {
     // Asm.js uses the ahead of time type checks to specialize operations, no need to check
     // them again at this point.
-    if (mir->compilingAsmJS())
+    if (mir->compilingWasm())
         return true;
 
     // Check ahead of time that there is at least one definition typed as Float32, otherwise we
@@ -1984,8 +2046,24 @@ IsRegExpHoistableCall(MCall* call, MDefinition* def)
 }
 
 static bool
-CanCompareWithoutToPrimitive(MCompare* compare, MDefinition* def)
+CanCompareRegExp(MCompare* compare, MDefinition* def)
 {
+    MDefinition* value;
+    if (compare->lhs() == def) {
+        value = compare->rhs();
+    } else {
+        MOZ_ASSERT(compare->rhs() == def);
+        value = compare->lhs();
+    }
+
+    // Comparing two regexp that weren't cloned will give different result
+    // than if they were cloned.
+    if (value->mightBeType(MIRType::Object))
+        return false;
+
+    // Make sure @@toPrimitive is not called which could notice
+    // the difference between a not cloned/cloned regexp.
+
     JSOp op = compare->jsop();
     // Strict equality comparison won't invoke @@toPrimitive.
     if (op == JSOP_STRICTEQ || op == JSOP_STRICTNE)
@@ -1998,14 +2076,6 @@ CanCompareWithoutToPrimitive(MCompare* compare, MDefinition* def)
     }
 
     // Loose equality comparison can invoke @@toPrimitive.
-    MDefinition* value;
-    if (compare->lhs() == def) {
-        value = compare->rhs();
-    } else {
-        MOZ_ASSERT(compare->rhs() == def);
-        value = compare->lhs();
-    }
-
     if (value->mightBeType(MIRType::Boolean) || value->mightBeType(MIRType::String) ||
         value->mightBeType(MIRType::Int32) ||
         value->mightBeType(MIRType::Double) || value->mightBeType(MIRType::Float32) ||
@@ -2025,7 +2095,8 @@ SetNotInWorklist(MDefinitionVector& worklist)
 }
 
 static bool
-IsRegExpHoistable(MDefinition* regexp, MDefinitionVector& worklist, bool* hoistable)
+IsRegExpHoistable(MIRGenerator* mir, MDefinition* regexp, MDefinitionVector& worklist,
+                  bool* hoistable)
 {
     MOZ_ASSERT(worklist.length() == 0);
 
@@ -2035,7 +2106,13 @@ IsRegExpHoistable(MDefinition* regexp, MDefinitionVector& worklist, bool* hoista
 
     for (size_t i = 0; i < worklist.length(); i++) {
         MDefinition* def = worklist[i];
+        if (mir->shouldCancel("IsRegExpHoistable outer loop"))
+            return false;
+
         for (MUseIterator use = def->usesBegin(); use != def->usesEnd(); use++) {
+            if (mir->shouldCancel("IsRegExpHoistable inner loop"))
+                return false;
+
             // Ignore resume points. At this point all uses are listed.
             // No DCE or GVN or something has happened.
             if (use->consumer()->isResumePoint())
@@ -2064,7 +2141,7 @@ IsRegExpHoistable(MDefinition* regexp, MDefinitionVector& worklist, bool* hoista
             } else if (useDef->isLoadFixedSlot() || useDef->isTypeOf()) {
                 continue;
             } else if (useDef->isCompare()) {
-                if (CanCompareWithoutToPrimitive(useDef->toCompare(), def))
+                if (CanCompareRegExp(useDef->toCompare(), def))
                     continue;
             }
             // Instructions that modifies `lastIndex` property.
@@ -2109,14 +2186,20 @@ IsRegExpHoistable(MDefinition* regexp, MDefinitionVector& worklist, bool* hoista
 }
 
 bool
-jit::MakeMRegExpHoistable(MIRGraph& graph)
+jit::MakeMRegExpHoistable(MIRGenerator* mir, MIRGraph& graph)
 {
     MDefinitionVector worklist(graph.alloc());
 
     for (ReversePostorderIterator block(graph.rpoBegin()); block != graph.rpoEnd(); block++) {
+        if (mir->shouldCancel("MakeMRegExpHoistable outer loop"))
+            return false;
+
         for (MDefinitionIterator iter(*block); iter; iter++) {
             if (!*iter)
                 MOZ_CRASH("confirm bug 1263794.");
+
+            if (mir->shouldCancel("MakeMRegExpHoistable inner loop"))
+                return false;
 
             if (!iter->isRegExp())
                 continue;
@@ -2124,7 +2207,7 @@ jit::MakeMRegExpHoistable(MIRGraph& graph)
             MRegExp* regexp = iter->toRegExp();
 
             bool hoistable = false;
-            if (!IsRegExpHoistable(regexp, worklist, &hoistable))
+            if (!IsRegExpHoistable(mir, regexp, worklist, &hoistable))
                 return false;
 
             if (!hoistable)
@@ -2220,7 +2303,7 @@ jit::RemoveUnmarkedBlocks(MIRGenerator* mir, MIRGraph& graph, uint32_t numMarked
             if (!block->isMarked())
                 continue;
 
-            FlagAllOperandsAsHavingRemovedUses(block);
+            FlagAllOperandsAsHavingRemovedUses(mir, block);
         }
 
         // Find unmarked blocks and remove them.
@@ -3563,6 +3646,13 @@ jit::AddKeepAliveInstructions(MIRGraph& graph)
                     continue;
                 }
 
+                if (use->isFallibleStoreElement()) {
+                    // See StoreElementHole case above.
+                    MOZ_ASSERT_IF(!use->toFallibleStoreElement()->object()->isUnbox() && !ownerObject->isUnbox(),
+                                  use->toFallibleStoreElement()->object() == ownerObject);
+                    continue;
+                }
+
                 if (use->isInArray()) {
                     // See StoreElementHole case above.
                     MOZ_ASSERT_IF(!use->toInArray()->object()->isUnbox() && !ownerObject->isUnbox(),
@@ -3595,7 +3685,7 @@ LinearSum::multiply(int32_t scale)
 }
 
 bool
-LinearSum::divide(int32_t scale)
+LinearSum::divide(uint32_t scale)
 {
     MOZ_ASSERT(scale > 0);
 
@@ -4033,7 +4123,7 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, JSFunction* fun,
         return false;
 
     CompileInfo info(script, fun,
-                     /* osrPc = */ nullptr, /* constructing = */ false,
+                     /* osrPc = */ nullptr,
                      Analysis_DefiniteProperties,
                      script->needsArgsObj(),
                      inlineScriptTree);
@@ -4268,7 +4358,7 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
     }
 
     CompileInfo info(script, script->functionNonDelazifying(),
-                     /* osrPc = */ nullptr, /* constructing = */ false,
+                     /* osrPc = */ nullptr,
                      Analysis_ArgumentsUsage,
                      /* needsArgsObj = */ true,
                      inlineScriptTree);
@@ -4525,4 +4615,97 @@ jit::MakeLoopsContiguous(MIRGraph& graph)
     }
 
     return true;
+}
+
+MRootList::MRootList(TempAllocator& alloc)
+{
+#define INIT_VECTOR(name, _0, _1) \
+    roots_[JS::RootKind::name].emplace(alloc);
+JS_FOR_EACH_TRACEKIND(INIT_VECTOR)
+#undef INIT_VECTOR
+}
+
+template <typename T>
+static void
+TraceVector(JSTracer* trc, const MRootList::RootVector& vector, const char* name)
+{
+    for (auto ptr : vector) {
+        T ptrT = static_cast<T>(ptr);
+        TraceManuallyBarrieredEdge(trc, &ptrT, name);
+        MOZ_ASSERT(ptr == ptrT, "Shouldn't move without updating MIR pointers");
+    }
+}
+
+void
+MRootList::trace(JSTracer* trc)
+{
+#define TRACE_ROOTS(name, type, _) \
+    TraceVector<type*>(trc, *roots_[JS::RootKind::name], "mir-root-" #name);
+JS_FOR_EACH_TRACEKIND(TRACE_ROOTS)
+#undef TRACE_ROOTS
+}
+
+MOZ_MUST_USE bool
+jit::CreateMIRRootList(IonBuilder& builder)
+{
+    MOZ_ASSERT(!builder.info().isAnalysis());
+
+    TempAllocator& alloc = builder.alloc();
+    MIRGraph& graph = builder.graph();
+
+    MRootList* roots = new(alloc.fallible()) MRootList(alloc);
+    if (!roots)
+        return false;
+
+    JSScript* prevScript = nullptr;
+
+    for (ReversePostorderIterator block(graph.rpoBegin()); block != graph.rpoEnd(); block++) {
+
+        JSScript* script = block->info().script();
+        if (script != prevScript) {
+            if (!roots->append(script))
+                return false;
+            prevScript = script;
+        }
+
+        for (MInstructionIterator iter(block->begin()), end(block->end()); iter != end; iter++) {
+            if (!iter->appendRoots(*roots))
+                return false;
+        }
+    }
+
+    builder.setRootList(*roots);
+    return true;
+}
+
+static void
+DumpDefinition(GenericPrinter& out, MDefinition* def, size_t depth)
+{
+    MDefinition::PrintOpcodeName(out, def->op());
+
+    if (depth == 0)
+        return;
+
+    for (size_t i = 0; i < def->numOperands(); i++) {
+        out.printf(" (");
+        DumpDefinition(out, def->getOperand(i), depth - 1);
+        out.printf(")");
+    }
+}
+
+void
+jit::DumpMIRExpressions(MIRGraph& graph)
+{
+    if (!JitSpewEnabled(JitSpew_MIRExpressions))
+        return;
+
+    size_t depth = 2;
+
+    Fprinter& out = JitSpewPrinter();
+    for (ReversePostorderIterator block(graph.rpoBegin()); block != graph.rpoEnd(); block++) {
+        for (MInstructionIterator iter(block->begin()), end(block->end()); iter != end; iter++) {
+            DumpDefinition(out, *iter, depth);
+            out.printf("\n");
+        }
+    }
 }

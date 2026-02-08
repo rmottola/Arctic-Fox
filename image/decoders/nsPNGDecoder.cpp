@@ -34,16 +34,12 @@ namespace image {
 static LazyLogModule sPNGLog("PNGDecoder");
 static LazyLogModule sPNGDecoderAccountingLog("PNGDecoderAccounting");
 
-// Limit image dimensions. See also pnglibconf.h
+// limit image dimensions (bug #251381, #591822, #967656, and #1283961)
 #ifndef MOZ_PNG_MAX_WIDTH
-#  define MOZ_PNG_MAX_WIDTH 65535
+#  define MOZ_PNG_MAX_WIDTH 0x7fffffff // Unlimited
 #endif
 #ifndef MOZ_PNG_MAX_HEIGHT
-#  define MOZ_PNG_MAX_HEIGHT 65535
-#endif
-// Maximum area supported in pixels (W*H)
-#ifndef MOZ_PNG_MAX_PIX
-#  define MOZ_PNG_MAX_PIX 268435456 // 256 Mpix = 16Ki x 16Ki
+#  define MOZ_PNG_MAX_HEIGHT 0x7fffffff // Unlimited
 #endif
 
 nsPNGDecoder::AnimFrameInfo::AnimFrameInfo()
@@ -194,7 +190,8 @@ nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo)
   MOZ_ASSERT(!IsMetadataDecode());
 
   // Check if we have transparency, and send notifications if needed.
-  auto transparency = GetTransparencyType(aFrameInfo.mFormat, aFrameInfo.mFrameRect);
+  auto transparency = GetTransparencyType(aFrameInfo.mFormat,
+                                          aFrameInfo.mFrameRect);
   PostHasTransparencyIfNeeded(transparency);
   SurfaceFormat format = transparency == TransparencyType::eNone
                        ? SurfaceFormat::B8G8R8X8
@@ -328,6 +325,7 @@ nsPNGDecoder::InitInternal()
 #endif
 
 #ifdef PNG_SET_USER_LIMITS_SUPPORTED
+  png_set_user_limits(mPNG, MOZ_PNG_MAX_WIDTH, MOZ_PNG_MAX_HEIGHT);
   if (mCMSMode != eCMSMode_Off) {
     png_set_chunk_malloc_max(mPNG, 4000000L);
   }
@@ -571,13 +569,6 @@ nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr)
   png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
                &interlace_type, &compression_type, &filter_type);
 
-  // Check sizes against cap limits and W*H
-  if ((width > MOZ_PNG_MAX_WIDTH) ||
-      (height > MOZ_PNG_MAX_HEIGHT) ||
-      (width * height > MOZ_PNG_MAX_PIX)) {
-    png_longjmp(decoder->mPNG, 1);
-  }
-
   const IntRect frameRect(0, 0, width, height);
 
   // Post our size to the superclass
@@ -705,13 +696,15 @@ nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr)
 #endif
 
   if (decoder->IsMetadataDecode()) {
-    // If we are animated then the first frame rect is either: 1) the whole image
-    // if the IDAT chunk is part of the animation 2) the frame rect of the first
-    // fDAT chunk otherwise. If we are not animated then we want to make sure to
-    // call PostHasTransparency in the metadata decode if we need to. So it's okay
-    // to pass IntRect(0, 0, width, height) here for animated images; they will
-    // call with the proper first frame rect in the full decode.
-    auto transparency = decoder->GetTransparencyType(decoder->format, frameRect);
+    // If we are animated then the first frame rect is either:
+    // 1) the whole image if the IDAT chunk is part of the animation
+    // 2) the frame rect of the first fDAT chunk otherwise.
+    // If we are not animated then we want to make sure to call
+    // PostHasTransparency in the metadata decode if we need to. So it's
+    // okay to pass IntRect(0, 0, width, height) here for animated images;
+    // they will call with the proper first frame rect in the full decode.
+    auto transparency = decoder->GetTransparencyType(decoder->format,
+                                                     frameRect);
     decoder->PostHasTransparencyIfNeeded(transparency);
 
     // We have the metadata we're looking for, so stop here, before we allocate
@@ -776,7 +769,8 @@ static NextPixel<uint32_t>
 PackRGBPixelAndAdvance(uint8_t*& aRawPixelInOut)
 {
   const uint32_t pixel =
-    gfxPackedPixel(0xFF, aRawPixelInOut[0], aRawPixelInOut[1], aRawPixelInOut[2]);
+    gfxPackedPixel(0xFF, aRawPixelInOut[0], aRawPixelInOut[1],
+                   aRawPixelInOut[2]);
   aRawPixelInOut += 3;
   return AsVariant(pixel);
 }
@@ -850,7 +844,8 @@ nsPNGDecoder::row_callback(png_structp png_ptr, png_bytep new_row,
     decoder->mPass++;
   }
 
-  const png_uint_32 height = static_cast<png_uint_32>(decoder->mFrameRect.height);
+  const png_uint_32 height =
+    static_cast<png_uint_32>(decoder->mFrameRect.height);
 
   if (row_num >= height) {
     // Bail if we receive extra rows. This is especially important because if we
@@ -955,7 +950,8 @@ nsPNGDecoder::DoYield(png_structp aPNGStruct)
   // the data that was passed to png_process_data() have not been consumed yet.
   // We use this information to tell StreamingLexer where to place us in the
   // input stream when we come back from the yield.
-  png_size_t pendingBytes = png_process_data_pause(aPNGStruct, /* save = */ false);
+  png_size_t pendingBytes = png_process_data_pause(aPNGStruct,
+                                                   /* save = */ false);
 
   MOZ_ASSERT(pendingBytes < mLastChunkLength);
   size_t consumedBytes = mLastChunkLength - min(pendingBytes, mLastChunkLength);
@@ -994,6 +990,16 @@ nsPNGDecoder::frame_info_callback(png_structp png_ptr, png_uint_32 frame_num)
                           png_get_next_frame_width(png_ptr, decoder->mInfo),
                           png_get_next_frame_height(png_ptr, decoder->mInfo));
   const bool isInterlaced = bool(decoder->interlacebuf);
+
+#ifndef MOZ_EMBEDDED_LIBPNG
+  // if using system library, check frame_width and height against 0
+  if (frameRect.width == 0) {
+    png_error(png_ptr, "Frame width must not be 0");
+  }
+  if (frameRect.height == 0) {
+    png_error(png_ptr, "Frame height must not be 0");
+  }
+#endif
 
   const FrameInfo info { decoder->format, frameRect, isInterlaced };
 
@@ -1079,7 +1085,7 @@ nsPNGDecoder::IsValidICO() const
 
   // If there are errors in the call to png_get_IHDR, the error_callback in
   // nsPNGDecoder.cpp is called.  In this error callback we do a longjmp, so
-  // we need to save the jump buffer here. Oterwise we'll end up without a
+  // we need to save the jump buffer here. Otherwise we'll end up without a
   // proper callstack.
   if (setjmp(png_jmpbuf(mPNG))) {
     // We got here from a longjmp call indirectly from png_get_IHDR

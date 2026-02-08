@@ -55,23 +55,6 @@ CreateIframe(Element* aOpenerFrameElement, const nsAString& aName, bool aRemote)
 
   popupFrameElement->SetMozbrowser(true);
 
-  // Copy the opener frame's mozapp attribute to the popup frame.
-  if (aOpenerFrameElement->HasAttr(kNameSpaceID_None, nsGkAtoms::mozapp)) {
-    nsAutoString mozapp;
-    aOpenerFrameElement->GetAttr(kNameSpaceID_None, nsGkAtoms::mozapp, mozapp);
-    popupFrameElement->SetAttr(kNameSpaceID_None, nsGkAtoms::mozapp,
-                               mozapp, /* aNotify = */ false);
-  }
-
-  // Copy the opener frame's parentApp attribute to the popup frame.
-  if (aOpenerFrameElement->HasAttr(kNameSpaceID_None, nsGkAtoms::parentapp)) {
-    nsAutoString parentApp;
-    aOpenerFrameElement->GetAttr(kNameSpaceID_None, nsGkAtoms::parentapp,
-                                 parentApp);
-    popupFrameElement->SetAttr(kNameSpaceID_None, nsGkAtoms::parentapp,
-                               parentApp, /* aNotify = */ false);
-  }
-
   // Copy the window name onto the iframe.
   popupFrameElement->SetAttr(kNameSpaceID_None, nsGkAtoms::name,
                              aName, /* aNotify = */ false);
@@ -111,8 +94,8 @@ DispatchCustomDOMEvent(Element* aFrameElement, const nsAString& aEventName,
   ErrorResult res;
   event->InitCustomEvent(cx,
                          aEventName,
-                         /* bubbles = */ true,
-                         /* cancelable = */ true,
+                         /* aCanBubble = */ true,
+                         /* aCancelable = */ true,
                          aDetailValue,
                          res);
   if (res.Failed()) {
@@ -175,13 +158,6 @@ BrowserElementParent::DispatchOpenWindowEvent(Element* aOpenerFrameElement,
   if (!ToJSValue(cx, detail, &val)) {
     MOZ_CRASH("Failed to convert dictionary to JS::Value due to OOM.");
     return BrowserElementParent::OPEN_WINDOW_IGNORED;
-  }
-
-  // Do not dispatch a mozbrowseropenwindow event of a widget to its embedder
-  nsCOMPtr<nsIMozBrowserFrame> browserFrame =
-    do_QueryInterface(aOpenerFrameElement);
-  if (browserFrame && browserFrame->GetReallyIsWidget()) {
-    return BrowserElementParent::OPEN_WINDOW_CANCELLED;
   }
 
   nsEventStatus status = nsEventStatus_eIgnore;
@@ -263,6 +239,7 @@ BrowserElementParent::OpenWindowInProcess(nsPIDOMWindowOuter* aOpenerWindow,
                                           nsIURI* aURI,
                                           const nsAString& aName,
                                           const nsACString& aFeatures,
+                                          bool aForceNoOpener,
                                           mozIDOMWindowProxy** aReturnWindow)
 {
   *aReturnWindow = nullptr;
@@ -288,6 +265,12 @@ BrowserElementParent::OpenWindowInProcess(nsPIDOMWindowOuter* aOpenerWindow,
   nsAutoCString spec;
   if (aURI) {
     aURI->GetSpec(spec);
+  }
+
+  if (!aForceNoOpener) {
+    ErrorResult res;
+    popupFrameElement->PresetOpenerWindow(aOpenerWindow, res);
+    MOZ_ASSERT(!res.Failed());
   }
 
   OpenWindowResult opened =

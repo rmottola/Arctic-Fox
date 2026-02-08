@@ -93,6 +93,7 @@ enum UnaryOperator {
     UNOP_BITNOT,
     UNOP_TYPEOF,
     UNOP_VOID,
+    UNOP_AWAIT,
 
     UNOP_LIMIT
 };
@@ -162,7 +163,8 @@ static const char* const unopNames[] = {
     "!",       /* UNOP_NOT */
     "~",       /* UNOP_BITNOT */
     "typeof",  /* UNOP_TYPEOF */
-    "void"     /* UNOP_VOID */
+    "void",    /* UNOP_VOID */
+    "await"    /* UNOP_AWAIT */
 };
 
 static const char* const nodeTypeNames[] = {
@@ -193,7 +195,7 @@ typedef AutoValueVector NodeVector;
     JS_BEGIN_MACRO                                                                        \
         MOZ_ASSERT(expr);                                                                 \
         if (!(expr)) {                                                                    \
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);     \
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);\
             return false;                                                                 \
         }                                                                                 \
     JS_END_MACRO
@@ -201,7 +203,7 @@ typedef AutoValueVector NodeVector;
 #define LOCAL_NOT_REACHED(expr)                                                           \
     JS_BEGIN_MACRO                                                                        \
         MOZ_ASSERT(false);                                                                \
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);         \
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_PARSE_NODE);    \
         return false;                                                                     \
     JS_END_MACRO
 
@@ -254,7 +256,7 @@ class NodeBuilder
           userv(c)
     {}
 
-    bool init(HandleObject userobj = nullptr) {
+    MOZ_MUST_USE bool init(HandleObject userobj = nullptr) {
         if (src) {
             if (!atomValue(src, &srcval))
                 return false;
@@ -305,8 +307,8 @@ class NodeBuilder
     }
 
   private:
-    bool callbackHelper(HandleValue fun, const InvokeArgs& args, size_t i,
-                        TokenPos* pos, MutableHandleValue dst)
+    MOZ_MUST_USE bool callbackHelper(HandleValue fun, const InvokeArgs& args, size_t i,
+                                     TokenPos* pos, MutableHandleValue dst)
     {
         // The end of the implementation of callback(). All arguments except
         // loc have already been stored in range [0, i).
@@ -322,8 +324,8 @@ class NodeBuilder
     // that convert to HandleValue, so this isn't as template-y as it seems,
     // just variadic.
     template <typename... Arguments>
-    bool callbackHelper(HandleValue fun, const InvokeArgs& args, size_t i,
-                        HandleValue head, Arguments&&... tail)
+    MOZ_MUST_USE bool callbackHelper(HandleValue fun, const InvokeArgs& args, size_t i,
+                                     HandleValue head, Arguments&&... tail)
     {
         // Recursive loop to store the arguments into args. This eventually
         // bottoms out in a call to the non-template callbackHelper() above.
@@ -336,9 +338,9 @@ class NodeBuilder
     //     bool callback(HandleValue fun, HandleValue... args, TokenPos* pos,
     //                   MutableHandleValue dst);
     template <typename... Arguments>
-    bool callback(HandleValue fun, Arguments&&... args) {
+    MOZ_MUST_USE bool callback(HandleValue fun, Arguments&&... args) {
         InvokeArgs iargs(cx);
-        if (!iargs.init(sizeof...(args) - 2 + size_t(saveLoc)))
+        if (!iargs.init(cx, sizeof...(args) - 2 + size_t(saveLoc)))
             return false;
 
         return callbackHelper(fun, iargs, 0, Forward<Arguments>(args)...);
@@ -353,7 +355,7 @@ class NodeBuilder
         return v.isMagic(JS_SERIALIZE_NO_NODE) ? JS::UndefinedHandleValue : v;
     }
 
-    bool atomValue(const char* s, MutableHandleValue dst) {
+    MOZ_MUST_USE bool atomValue(const char* s, MutableHandleValue dst) {
         /*
          * Bug 575416: instead of Atomize, lookup constant atoms in tbl file
          */
@@ -365,7 +367,7 @@ class NodeBuilder
         return true;
     }
 
-    bool newObject(MutableHandleObject dst) {
+    MOZ_MUST_USE bool newObject(MutableHandleObject dst) {
         RootedPlainObject nobj(cx, NewBuiltinClassInstance<PlainObject>(cx));
         if (!nobj)
             return false;
@@ -374,11 +376,11 @@ class NodeBuilder
         return true;
     }
 
-    bool newArray(NodeVector& elts, MutableHandleValue dst);
+    MOZ_MUST_USE bool newArray(NodeVector& elts, MutableHandleValue dst);
 
-    bool createNode(ASTType type, TokenPos* pos, MutableHandleObject dst);
+    MOZ_MUST_USE bool createNode(ASTType type, TokenPos* pos, MutableHandleObject dst);
 
-    bool newNodeHelper(HandleObject obj, MutableHandleValue dst) {
+    MOZ_MUST_USE bool newNodeHelper(HandleObject obj, MutableHandleValue dst) {
         // The end of the implementation of newNode().
         MOZ_ASSERT(obj);
         dst.setObject(*obj);
@@ -386,8 +388,8 @@ class NodeBuilder
     }
 
     template <typename... Arguments>
-    bool newNodeHelper(HandleObject obj, const char *name, HandleValue value,
-                       Arguments&&... rest)
+    MOZ_MUST_USE bool newNodeHelper(HandleObject obj, const char *name, HandleValue value,
+                                    Arguments&&... rest)
     {
         // Recursive loop to define properties. Note that the newNodeHelper()
         // call below passes two fewer arguments than we received, as we omit
@@ -405,14 +407,14 @@ class NodeBuilder
     //                  {const char *name0, HandleValue value0,}...
     //                  MutableHandleValue dst);
     template <typename... Arguments>
-    bool newNode(ASTType type, TokenPos* pos, Arguments&&... args) {
+    MOZ_MUST_USE bool newNode(ASTType type, TokenPos* pos, Arguments&&... args) {
         RootedObject node(cx);
         return createNode(type, pos, &node) &&
                newNodeHelper(node, Forward<Arguments>(args)...);
     }
 
-    bool listNode(ASTType type, const char* propName, NodeVector& elts, TokenPos* pos,
-                  MutableHandleValue dst) {
+    MOZ_MUST_USE bool listNode(ASTType type, const char* propName, NodeVector& elts, TokenPos* pos,
+                               MutableHandleValue dst) {
         RootedValue array(cx);
         if (!newArray(elts, &array))
             return false;
@@ -424,7 +426,7 @@ class NodeBuilder
         return newNode(type, pos, propName, array, dst);
     }
 
-    bool defineProperty(HandleObject obj, const char* name, HandleValue val) {
+    MOZ_MUST_USE bool defineProperty(HandleObject obj, const char* name, HandleValue val) {
         MOZ_ASSERT_IF(val.isMagic(), val.whyMagic() == JS_SERIALIZE_NO_NODE);
 
         /*
@@ -439,9 +441,9 @@ class NodeBuilder
         return DefineProperty(cx, obj, atom->asPropertyName(), optVal);
     }
 
-    bool newNodeLoc(TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool newNodeLoc(TokenPos* pos, MutableHandleValue dst);
 
-    bool setNodeLoc(HandleObject node, TokenPos* pos);
+    MOZ_MUST_USE bool setNodeLoc(HandleObject node, TokenPos* pos);
 
   public:
     /*
@@ -457,175 +459,183 @@ class NodeBuilder
      * misc nodes
      */
 
-    bool program(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool program(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool literal(HandleValue val, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool literal(HandleValue val, TokenPos* pos, MutableHandleValue dst);
 
-    bool identifier(HandleValue name, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool identifier(HandleValue name, TokenPos* pos, MutableHandleValue dst);
 
-    bool function(ASTType type, TokenPos* pos,
-                  HandleValue id, NodeVector& args, NodeVector& defaults,
-                  HandleValue body, HandleValue rest, GeneratorStyle generatorStyle,
-                  bool isExpression, MutableHandleValue dst);
+    MOZ_MUST_USE bool function(ASTType type, TokenPos* pos,
+                               HandleValue id, NodeVector& args, NodeVector& defaults,
+                               HandleValue body, HandleValue rest, GeneratorStyle generatorStyle,
+                               bool isAsync, bool isExpression, MutableHandleValue dst);
 
-    bool variableDeclarator(HandleValue id, HandleValue init, TokenPos* pos,
-                            MutableHandleValue dst);
+    MOZ_MUST_USE bool variableDeclarator(HandleValue id, HandleValue init, TokenPos* pos,
+                                         MutableHandleValue dst);
 
-    bool switchCase(HandleValue expr, NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool switchCase(HandleValue expr, NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool catchClause(HandleValue var, HandleValue guard, HandleValue body, TokenPos* pos,
-                     MutableHandleValue dst);
+    MOZ_MUST_USE bool catchClause(HandleValue var, HandleValue guard, HandleValue body, TokenPos* pos,
+                                  MutableHandleValue dst);
 
-    bool prototypeMutation(HandleValue val, TokenPos* pos, MutableHandleValue dst);
-    bool propertyInitializer(HandleValue key, HandleValue val, PropKind kind, bool isShorthand,
-                             bool isMethod, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool prototypeMutation(HandleValue val, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool propertyInitializer(HandleValue key, HandleValue val, PropKind kind,
+                                          bool isShorthand, bool isMethod, TokenPos* pos,
+                                          MutableHandleValue dst);
 
 
     /*
      * statements
      */
 
-    bool blockStatement(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool blockStatement(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool expressionStatement(HandleValue expr, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool expressionStatement(HandleValue expr, TokenPos* pos, MutableHandleValue dst);
 
-    bool emptyStatement(TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool emptyStatement(TokenPos* pos, MutableHandleValue dst);
 
-    bool ifStatement(HandleValue test, HandleValue cons, HandleValue alt, TokenPos* pos,
+    MOZ_MUST_USE bool ifStatement(HandleValue test, HandleValue cons, HandleValue alt, TokenPos* pos,
                      MutableHandleValue dst);
 
-    bool breakStatement(HandleValue label, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool breakStatement(HandleValue label, TokenPos* pos, MutableHandleValue dst);
 
-    bool continueStatement(HandleValue label, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool continueStatement(HandleValue label, TokenPos* pos, MutableHandleValue dst);
 
-    bool labeledStatement(HandleValue label, HandleValue stmt, TokenPos* pos,
+    MOZ_MUST_USE bool labeledStatement(HandleValue label, HandleValue stmt, TokenPos* pos,
                           MutableHandleValue dst);
 
-    bool throwStatement(HandleValue arg, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool throwStatement(HandleValue arg, TokenPos* pos, MutableHandleValue dst);
 
-    bool returnStatement(HandleValue arg, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool returnStatement(HandleValue arg, TokenPos* pos, MutableHandleValue dst);
 
-    bool forStatement(HandleValue init, HandleValue test, HandleValue update, HandleValue stmt,
+    MOZ_MUST_USE bool forStatement(HandleValue init, HandleValue test, HandleValue update, HandleValue stmt,
                       TokenPos* pos, MutableHandleValue dst);
 
-    bool forInStatement(HandleValue var, HandleValue expr, HandleValue stmt,
-                        bool isForEach, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool forInStatement(HandleValue var, HandleValue expr, HandleValue stmt,
+                                     bool isForEach, TokenPos* pos, MutableHandleValue dst);
 
-    bool forOfStatement(HandleValue var, HandleValue expr, HandleValue stmt, TokenPos* pos,
-                        MutableHandleValue dst);
+    MOZ_MUST_USE bool forOfStatement(HandleValue var, HandleValue expr, HandleValue stmt, TokenPos* pos,
+                                     MutableHandleValue dst);
 
-    bool withStatement(HandleValue expr, HandleValue stmt, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool withStatement(HandleValue expr, HandleValue stmt, TokenPos* pos, MutableHandleValue dst);
 
-    bool whileStatement(HandleValue test, HandleValue stmt, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool whileStatement(HandleValue test, HandleValue stmt, TokenPos* pos, MutableHandleValue dst);
 
-    bool doWhileStatement(HandleValue stmt, HandleValue test, TokenPos* pos,
-                          MutableHandleValue dst);
+    MOZ_MUST_USE bool doWhileStatement(HandleValue stmt, HandleValue test, TokenPos* pos,
+                                       MutableHandleValue dst);
 
-    bool switchStatement(HandleValue disc, NodeVector& elts, bool lexical, TokenPos* pos,
-                         MutableHandleValue dst);
+    MOZ_MUST_USE bool switchStatement(HandleValue disc, NodeVector& elts, bool lexical, TokenPos* pos,
+                                      MutableHandleValue dst);
 
-    bool tryStatement(HandleValue body, NodeVector& guarded, HandleValue unguarded,
-                      HandleValue finally, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool tryStatement(HandleValue body, NodeVector& guarded, HandleValue unguarded,
+                                   HandleValue finally, TokenPos* pos, MutableHandleValue dst);
 
-    bool debuggerStatement(TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool debuggerStatement(TokenPos* pos, MutableHandleValue dst);
 
-    bool importDeclaration(NodeVector& elts, HandleValue moduleSpec, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool importDeclaration(NodeVector& elts, HandleValue moduleSpec, TokenPos* pos, MutableHandleValue dst);
 
-    bool importSpecifier(HandleValue importName, HandleValue bindingName, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool importSpecifier(HandleValue importName, HandleValue bindingName, TokenPos* pos, MutableHandleValue dst);
 
-    bool exportDeclaration(HandleValue decl, NodeVector& elts, HandleValue moduleSpec,
-                           HandleValue isDefault, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool exportDeclaration(HandleValue decl, NodeVector& elts, HandleValue moduleSpec,
+                                        HandleValue isDefault, TokenPos* pos, MutableHandleValue dst);
 
-    bool exportSpecifier(HandleValue bindingName, HandleValue exportName, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool exportSpecifier(HandleValue bindingName, HandleValue exportName, TokenPos* pos, MutableHandleValue dst);
 
-    bool exportBatchSpecifier(TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool exportBatchSpecifier(TokenPos* pos, MutableHandleValue dst);
 
-    bool classDefinition(bool expr, HandleValue name, HandleValue heritage, HandleValue block, TokenPos* pos,
-                         MutableHandleValue dst);
-    bool classMethods(NodeVector& methods, MutableHandleValue dst);
-    bool classMethod(HandleValue name, HandleValue body, PropKind kind, bool isStatic, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool classDefinition(bool expr, HandleValue name, HandleValue heritage,
+                                      HandleValue block, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool classMethods(NodeVector& methods, MutableHandleValue dst);
+    MOZ_MUST_USE bool classMethod(HandleValue name, HandleValue body, PropKind kind, bool isStatic,
+                                  TokenPos* pos, MutableHandleValue dst);
 
     /*
      * expressions
      */
 
-    bool binaryExpression(BinaryOperator op, HandleValue left, HandleValue right, TokenPos* pos,
-                          MutableHandleValue dst);
+    MOZ_MUST_USE bool binaryExpression(BinaryOperator op, HandleValue left, HandleValue right,
+                                       TokenPos* pos, MutableHandleValue dst);
 
-    bool unaryExpression(UnaryOperator op, HandleValue expr, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool unaryExpression(UnaryOperator op, HandleValue expr, TokenPos* pos,
+                                      MutableHandleValue dst);
 
-    bool assignmentExpression(AssignmentOperator op, HandleValue lhs, HandleValue rhs,
-                              TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool assignmentExpression(AssignmentOperator op, HandleValue lhs, HandleValue rhs,
+                                           TokenPos* pos, MutableHandleValue dst);
 
-    bool updateExpression(HandleValue expr, bool incr, bool prefix, TokenPos* pos,
-                          MutableHandleValue dst);
+    MOZ_MUST_USE bool updateExpression(HandleValue expr, bool incr, bool prefix, TokenPos* pos,
+                                       MutableHandleValue dst);
 
-    bool logicalExpression(bool lor, HandleValue left, HandleValue right, TokenPos* pos,
-                           MutableHandleValue dst);
+    MOZ_MUST_USE bool logicalExpression(bool lor, HandleValue left, HandleValue right, TokenPos* pos,
+                                        MutableHandleValue dst);
 
-    bool conditionalExpression(HandleValue test, HandleValue cons, HandleValue alt, TokenPos* pos,
-                               MutableHandleValue dst);
+    MOZ_MUST_USE bool conditionalExpression(HandleValue test, HandleValue cons, HandleValue alt,
+                                            TokenPos* pos, MutableHandleValue dst);
 
-    bool sequenceExpression(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool sequenceExpression(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool newExpression(HandleValue callee, NodeVector& args, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool newExpression(HandleValue callee, NodeVector& args, TokenPos* pos,
+                                    MutableHandleValue dst);
 
-    bool callExpression(HandleValue callee, NodeVector& args, TokenPos* pos,
-                        MutableHandleValue dst);
+    MOZ_MUST_USE bool callExpression(HandleValue callee, NodeVector& args, TokenPos* pos,
+                                     MutableHandleValue dst);
 
-    bool memberExpression(bool computed, HandleValue expr, HandleValue member, TokenPos* pos,
-                          MutableHandleValue dst);
+    MOZ_MUST_USE bool memberExpression(bool computed, HandleValue expr, HandleValue member,
+                                       TokenPos* pos, MutableHandleValue dst);
 
-    bool arrayExpression(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool arrayExpression(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool templateLiteral(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool templateLiteral(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool taggedTemplate(HandleValue callee, NodeVector& args, TokenPos* pos,
-                        MutableHandleValue dst);
+    MOZ_MUST_USE bool taggedTemplate(HandleValue callee, NodeVector& args, TokenPos* pos,
+                                     MutableHandleValue dst);
 
-    bool callSiteObj(NodeVector& raw, NodeVector& cooked, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool callSiteObj(NodeVector& raw, NodeVector& cooked, TokenPos* pos,
+                                  MutableHandleValue dst);
 
-    bool spreadExpression(HandleValue expr, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool spreadExpression(HandleValue expr, TokenPos* pos, MutableHandleValue dst);
 
-    bool computedName(HandleValue name, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool computedName(HandleValue name, TokenPos* pos, MutableHandleValue dst);
 
-    bool objectExpression(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool objectExpression(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool thisExpression(TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool thisExpression(TokenPos* pos, MutableHandleValue dst);
 
-    bool yieldExpression(HandleValue arg, YieldKind kind, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool yieldExpression(HandleValue arg, YieldKind kind, TokenPos* pos,
+                                      MutableHandleValue dst);
 
-    bool comprehensionBlock(HandleValue patt, HandleValue src, bool isForEach, bool isForOf, TokenPos* pos,
-                            MutableHandleValue dst);
-    bool comprehensionIf(HandleValue test, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool comprehensionBlock(HandleValue patt, HandleValue src, bool isForEach,
+                                         bool isForOf, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool comprehensionIf(HandleValue test, TokenPos* pos, MutableHandleValue dst);
 
-    bool comprehensionExpression(HandleValue body, NodeVector& blocks, HandleValue filter,
-                                 bool isLegacy, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool comprehensionExpression(HandleValue body, NodeVector& blocks,
+                                              HandleValue filter, bool isLegacy, TokenPos* pos,
+                                              MutableHandleValue dst);
 
-    bool generatorExpression(HandleValue body, NodeVector& blocks, HandleValue filter,
-                             bool isLegacy, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool generatorExpression(HandleValue body, NodeVector& blocks, HandleValue filter,
+                                          bool isLegacy, TokenPos* pos, MutableHandleValue dst);
 
-    bool metaProperty(HandleValue meta, HandleValue property, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool metaProperty(HandleValue meta, HandleValue property, TokenPos* pos,
+                                   MutableHandleValue dst);
 
-    bool super(TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool super(TokenPos* pos, MutableHandleValue dst);
 
     /*
      * declarations
      */
 
-    bool variableDeclaration(NodeVector& elts, VarDeclKind kind, TokenPos* pos,
-                             MutableHandleValue dst);
+    MOZ_MUST_USE bool variableDeclaration(NodeVector& elts, VarDeclKind kind, TokenPos* pos,
+                                          MutableHandleValue dst);
 
     /*
      * patterns
      */
 
-    bool arrayPattern(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool arrayPattern(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool objectPattern(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
+    MOZ_MUST_USE bool objectPattern(NodeVector& elts, TokenPos* pos, MutableHandleValue dst);
 
-    bool propertyPattern(HandleValue key, HandleValue patt, bool isShorthand, TokenPos* pos,
-                         MutableHandleValue dst);
+    MOZ_MUST_USE bool propertyPattern(HandleValue key, HandleValue patt, bool isShorthand,
+                                      TokenPos* pos, MutableHandleValue dst);
 };
 
 } /* anonymous namespace */
@@ -734,8 +744,7 @@ NodeBuilder::setNodeLoc(HandleObject node, TokenPos* pos)
 {
     if (!saveLoc) {
         RootedValue nullVal(cx, NullValue());
-        defineProperty(node, "loc", nullVal);
-        return true;
+        return defineProperty(node, "loc", nullVal);
     }
 
     RootedValue loc(cx);
@@ -1583,7 +1592,7 @@ bool
 NodeBuilder::function(ASTType type, TokenPos* pos,
                       HandleValue id, NodeVector& args, NodeVector& defaults,
                       HandleValue body, HandleValue rest,
-                      GeneratorStyle generatorStyle, bool isExpression,
+                      GeneratorStyle generatorStyle, bool isAsync, bool isExpression,
                       MutableHandleValue dst)
 {
     RootedValue array(cx), defarray(cx);
@@ -1594,6 +1603,7 @@ NodeBuilder::function(ASTType type, TokenPos* pos,
 
     bool isGenerator = generatorStyle != GeneratorStyle::None;
     RootedValue isGeneratorVal(cx, BooleanValue(isGenerator));
+    RootedValue isAsyncVal(cx, BooleanValue(isAsync));
     RootedValue isExpressionVal(cx, BooleanValue(isExpression));
 
     RootedValue cb(cx, callbacks[type]);
@@ -1617,6 +1627,7 @@ NodeBuilder::function(ASTType type, TokenPos* pos,
                        "body", body,
                        "rest", rest,
                        "generator", isGeneratorVal,
+                       "async", isAsyncVal,
                        "style", styleVal,
                        "expression", isExpressionVal,
                        dst);
@@ -1629,6 +1640,7 @@ NodeBuilder::function(ASTType type, TokenPos* pos,
                    "body", body,
                    "rest", rest,
                    "generator", isGeneratorVal,
+                   "async", isAsyncVal,
                    "expression", isExpressionVal,
                    dst);
 }
@@ -1797,6 +1809,7 @@ class ASTSerializer
 
     bool function(ParseNode* pn, ASTType type, MutableHandleValue dst);
     bool functionArgsAndBody(ParseNode* pn, NodeVector& args, NodeVector& defaults,
+                             bool isAsync, bool isExpression,
                              MutableHandleValue body, MutableHandleValue rest);
     bool functionBody(ParseNode* pn, TokenPos* pos, MutableHandleValue dst);
 
@@ -1870,8 +1883,11 @@ ASTSerializer::unop(ParseNodeKind kind, JSOp op)
     if (IsDeleteKind(kind))
         return UNOP_DELETE;
 
-    if (kind == PNK_TYPEOFNAME || kind == PNK_TYPEOFEXPR)
+    if (IsTypeofKind(kind))
         return UNOP_TYPEOF;
+
+    if (kind == PNK_AWAIT)
+        return UNOP_AWAIT;
 
     switch (op) {
       case JSOP_NEG:
@@ -2900,7 +2916,7 @@ ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst)
         return leftAssociate(pn, dst);
 
       case PNK_POW:
-	return rightAssociate(pn, dst);
+        return rightAssociate(pn, dst);
 
       case PNK_DELETENAME:
       case PNK_DELETEPROP:
@@ -2912,6 +2928,7 @@ ASTSerializer::expression(ParseNode* pn, MutableHandleValue dst)
       case PNK_NOT:
       case PNK_BITNOT:
       case PNK_POS:
+      case PNK_AWAIT:
       case PNK_NEG: {
         MOZ_ASSERT(pn->pn_pos.encloses(pn->pn_kid->pn_pos));
 
@@ -3389,6 +3406,7 @@ ASTSerializer::function(ParseNode* pn, ASTType type, MutableHandleValue dst)
            : GeneratorStyle::ES6)
         : GeneratorStyle::None;
 
+    bool isAsync = pn->pn_funbox->isAsync();
     bool isExpression =
 #if JS_HAS_EXPR_CLOSURES
         func->isExprBody();
@@ -3409,13 +3427,14 @@ ASTSerializer::function(ParseNode* pn, ASTType type, MutableHandleValue dst)
         rest.setUndefined();
     else
         rest.setNull();
-    return functionArgsAndBody(pn->pn_body, args, defaults, &body, &rest) &&
-        builder.function(type, &pn->pn_pos, id, args, defaults, body,
-                         rest, generatorStyle, isExpression, dst);
+    return functionArgsAndBody(pn->pn_body, args, defaults, isAsync, isExpression, &body, &rest) &&
+           builder.function(type, &pn->pn_pos, id, args, defaults, body,
+                            rest, generatorStyle, isAsync, isExpression, dst);
 }
 
 bool
 ASTSerializer::functionArgsAndBody(ParseNode* pn, NodeVector& args, NodeVector& defaults,
+                                   bool isAsync, bool isExpression,
                                    MutableHandleValue body, MutableHandleValue rest)
 {
     ParseNode* pnargs;
@@ -3447,6 +3466,14 @@ ASTSerializer::functionArgsAndBody(ParseNode* pn, NodeVector& args, NodeVector& 
         if (pnstart && pnstart->isKind(PNK_YIELD)) {
             MOZ_ASSERT(pnstart->getOp() == JSOP_INITIALYIELD);
             pnstart = pnstart->pn_next;
+        }
+
+        // Async arrow with expression body is converted into STATEMENTLIST
+        // to insert initial yield.
+        if (isAsync && isExpression) {
+            MOZ_ASSERT(pnstart->getKind() == PNK_RETURN);
+            return functionArgs(pn, pnargs, args, defaults, rest) &&
+                   expression(pnstart->pn_kid, body);
         }
 
         return functionArgs(pn, pnargs, args, defaults, rest) &&
@@ -3489,7 +3516,6 @@ ASTSerializer::functionArgs(ParseNode* pn, ParseNode* pnargs,
         if (!pattern(pat, &node))
             return false;
         if (rest.isUndefined() && arg->pn_next == pnargs->last()) {
-            MOZ_ASSERT(arg->isKind(PNK_NAME));
             rest.setObject(node.toObject());
         } else {
             if (!args.append(node))
@@ -3539,8 +3565,8 @@ reflect_parse(JSContext* cx, uint32_t argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() < 1) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
-                             "Reflect.parse", "0", "s");
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
+                                  "Reflect.parse", "0", "s");
         return false;
     }
 
@@ -3644,7 +3670,7 @@ reflect_parse(JSContext* cx, uint32_t argc, Value* vp)
         } else if (isModule) {
             target = ParseTarget::Module;
         } else {
-            JS_ReportError(cx, "Bad target value, expected 'script' or 'module'");
+            JS_ReportErrorASCII(cx, "Bad target value, expected 'script' or 'module'");
             return false;
         }
     }
@@ -3669,7 +3695,7 @@ reflect_parse(JSContext* cx, uint32_t argc, Value* vp)
     UsedNameTracker usedNames(cx);
     if (!usedNames.init())
         return false;
-    Parser<FullParseHandler> parser(cx, cx->tempLifoAlloc(), options, chars.start().get(),
+    Parser<FullParseHandler> parser(cx, cx->tempLifoAlloc(), options, chars.begin().get(),
                                     chars.length(), /* foldConstants = */ false, usedNames,
                                     nullptr, nullptr);
     if (!parser.checkOptions())
@@ -3717,7 +3743,7 @@ JS_InitReflectParse(JSContext* cx, HandleObject global)
     if (!GetProperty(cx, global, global, cx->names().Reflect, &reflectVal))
         return false;
     if (!reflectVal.isObject()) {
-        JS_ReportError(cx, "JS_InitReflectParse must be called during global initialization");
+        JS_ReportErrorASCII(cx, "JS_InitReflectParse must be called during global initialization");
         return false;
     }
 

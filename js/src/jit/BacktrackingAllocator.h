@@ -710,9 +710,10 @@ class BacktrackingAllocator : protected RegisterAllocator
     MOZ_MUST_USE bool tryAllocateNonFixed(LiveBundle* bundle, Requirement requirement,
                                           Requirement hint, bool* success, bool* pfixed,
                                           LiveBundleVector& conflicting);
-    MOZ_MUST_USE bool processBundle(LiveBundle* bundle);
+    MOZ_MUST_USE bool processBundle(MIRGenerator* mir, LiveBundle* bundle);
     MOZ_MUST_USE bool computeRequirement(LiveBundle* bundle, Requirement *prequirement,
                                          Requirement *phint);
+    bool hasFixedUseOverlap(LiveBundle* bundle, const LiveBundleVector& conflicting);
     MOZ_MUST_USE bool tryAllocateRegister(PhysicalRegister& r, LiveBundle* bundle, bool* success,
                                           bool* pfixed, LiveBundleVector& conflicting);
     MOZ_MUST_USE bool evictBundle(LiveBundle* bundle);
@@ -803,8 +804,8 @@ class BacktrackingAllocator : protected RegisterAllocator
                                                      bool* success);
     MOZ_MUST_USE bool splitAcrossCalls(LiveBundle* bundle);
 
-    bool compilingAsmJS() {
-        return mir->info().compilingAsmJS();
+    bool compilingWasm() {
+        return mir->info().compilingWasm();
     }
 
     void dumpVregs();

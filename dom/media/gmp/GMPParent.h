@@ -54,6 +54,14 @@ public:
   explicit GMPCapability(const GMPCapability& aOther) = default;
   nsCString mAPIName;
   nsTArray<nsCString> mAPITags;
+
+  static bool Supports(const nsTArray<GMPCapability>& aCapabilities,
+                       const nsCString& aAPI,
+                       const nsTArray<nsCString>& aTags);
+
+  static bool Supports(const nsTArray<GMPCapability>& aCapabilities,
+                       const nsCString& aAPI,
+                       const nsCString& aTag);
 };
 
 enum GMPState {
@@ -110,8 +118,6 @@ public:
   // This must not be called while we're in the middle of abnormal ActorDestroy
   void DeleteProcess();
 
-  bool SupportsAPI(const nsCString& aAPI, const nsCString& aTag);
-
   GMPState State() const;
   nsIThread* GMPThread();
 
@@ -160,6 +166,8 @@ public:
 
   bool Bridge(GMPServiceParent* aGMPServiceParent);
 
+  const nsTArray<GMPCapability>& GetCapabilities() const { return mCapabilities; }
+
 private:
   ~GMPParent();
 
@@ -178,21 +186,21 @@ private:
   PCrashReporterParent* AllocPCrashReporterParent(const NativeThreadId& aThread) override;
   bool DeallocPCrashReporterParent(PCrashReporterParent* aCrashReporter) override;
 
-  bool RecvPGMPStorageConstructor(PGMPStorageParent* actor) override;
+  mozilla::ipc::IPCResult RecvPGMPStorageConstructor(PGMPStorageParent* actor) override;
   PGMPStorageParent* AllocPGMPStorageParent() override;
   bool DeallocPGMPStorageParent(PGMPStorageParent* aActor) override;
 
   PGMPContentParent* AllocPGMPContentParent(Transport* aTransport,
                                             ProcessId aOtherPid) override;
 
-  bool RecvPGMPTimerConstructor(PGMPTimerParent* actor) override;
+  mozilla::ipc::IPCResult RecvPGMPTimerConstructor(PGMPTimerParent* actor) override;
   PGMPTimerParent* AllocPGMPTimerParent() override;
   bool DeallocPGMPTimerParent(PGMPTimerParent* aActor) override;
 
-  bool RecvAsyncShutdownComplete() override;
-  bool RecvAsyncShutdownRequired() override;
+  mozilla::ipc::IPCResult RecvAsyncShutdownComplete() override;
+  mozilla::ipc::IPCResult RecvAsyncShutdownRequired() override;
 
-  bool RecvPGMPContentChildDestroyed() override;
+  mozilla::ipc::IPCResult RecvPGMPContentChildDestroyed() override;
   bool IsUsed()
   {
     return mGMPContentChildCount > 0;

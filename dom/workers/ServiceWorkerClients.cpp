@@ -554,7 +554,7 @@ public:
     RefPtr<ResolveOpenWindowRunnable> resolveRunnable =
       new ResolveOpenWindowRunnable(mPromiseProxy, nullptr, rv);
 
-    NS_WARN_IF(!resolveRunnable->Dispatch());
+    Unused << NS_WARN_IF(!resolveRunnable->Dispatch());
 
     return NS_OK;
   }
@@ -606,7 +606,14 @@ private:
                            spec.get(),
                            nullptr,
                            nullptr,
-                           false, false, true, nullptr, nullptr, 1.0f, 0,
+                           false, false, true, nullptr,
+                           // Not a spammy popup; we got permission, we swear!
+                           /* aIsPopupSpam = */ false,
+                           // Don't force noopener.  We're not passing in an
+                           // opener anyway, and we _do_ want the returned
+                           // window.
+                           /* aForceNoOpener = */ false,
+                           /* aLoadInfp = */ nullptr,
                            getter_AddRefs(newWindow));
       nsCOMPtr<nsPIDOMWindowOuter> pwindow = nsPIDOMWindowOuter::From(newWindow);
       pwindow.forget(aWindow);
@@ -675,7 +682,7 @@ ServiceWorkerClients::Get(const nsAString& aClientId, ErrorResult& aRv)
 
   RefPtr<GetRunnable> r =
     new GetRunnable(promiseProxy, aClientId);
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
+  MOZ_ALWAYS_SUCCEEDS(workerPrivate->DispatchToMainThread(r.forget()));
   return promise.forget();
 }
 
@@ -711,7 +718,7 @@ ServiceWorkerClients::MatchAll(const ClientQueryOptions& aOptions,
     new MatchAllRunnable(promiseProxy,
                          NS_ConvertUTF16toUTF8(scope),
                          aOptions.mIncludeUncontrolled);
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
+  MOZ_ALWAYS_SUCCEEDS(workerPrivate->DispatchToMainThread(r.forget()));
   return promise.forget();
 }
 
@@ -751,8 +758,8 @@ ServiceWorkerClients::OpenWindow(const nsAString& aUrl,
   mWorkerScope->GetScope(scope);
 
   RefPtr<OpenWindowRunnable> r = new OpenWindowRunnable(promiseProxy,
-                                                          aUrl, scope);
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
+                                                        aUrl, scope);
+  MOZ_ALWAYS_SUCCEEDS(workerPrivate->DispatchToMainThread(r.forget()));
 
   return promise.forget();
 }
@@ -781,6 +788,6 @@ ServiceWorkerClients::Claim(ErrorResult& aRv)
   RefPtr<ClaimRunnable> runnable =
     new ClaimRunnable(promiseProxy, NS_ConvertUTF16toUTF8(scope));
 
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable));
+  MOZ_ALWAYS_SUCCEEDS(workerPrivate->DispatchToMainThread(runnable.forget()));
   return promise.forget();
 }

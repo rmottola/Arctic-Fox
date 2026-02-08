@@ -227,8 +227,7 @@ nsInvalidPluginTag::nsInvalidPluginTag(const char* aFullPath, int64_t aLastModif
   mSeen(false)
 {}
 
-nsInvalidPluginTag::~nsInvalidPluginTag()
-{}
+nsInvalidPluginTag::~nsInvalidPluginTag() = default;
 
 // Helper to check for a MIME in a comma-delimited preference
 static bool
@@ -1694,7 +1693,7 @@ public:
   nsPluginHost* host;
   NS_DECLARE_STATIC_IID_ACCESSOR(ClearDataFromSitesClosure_CID)
   private:
-  virtual ~ClearDataFromSitesClosure() {}
+  virtual ~ClearDataFromSitesClosure() = default;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(ClearDataFromSitesClosure, ClearDataFromSitesClosure_CID)
@@ -1800,8 +1799,7 @@ public:
   nsresult retVal;
   NS_DECLARE_STATIC_IID_ACCESSOR(GetSitesClosure_CID)
   private:
-  virtual ~GetSitesClosure() {
-  }
+  virtual ~GetSitesClosure() = default;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(GetSitesClosure, GetSitesClosure_CID)
@@ -1866,15 +1864,6 @@ nsPluginHost::GetSpecialType(const nsACString & aMIMEType)
       aMIMEType.LowerCaseEqualsASCII("application/x-silverlight-2") ||
       aMIMEType.LowerCaseEqualsASCII("application/x-silverlight-test")) {
     return eSpecialType_Silverlight;
-  }
-
-  if (aMIMEType.LowerCaseEqualsASCII("audio/x-pn-realaudio-plugin")) {
-    NS_WARNING("You are loading RealPlayer");
-    return eSpecialType_RealPlayer;
-  }
-
-  if (aMIMEType.LowerCaseEqualsASCII("application/pdf")) {
-    return eSpecialType_PDF;
   }
 
   if (aMIMEType.LowerCaseEqualsASCII("application/vnd.unity")) {
@@ -2557,8 +2546,7 @@ nsresult nsPluginHost::FindPlugins(bool aCreatePluginList, bool * aPluginsChange
   // Scan the installation paths of our popular plugins if the prefs are enabled
 
   // This table controls the order of scanning
-  const char* const prefs[] = {NS_WIN_ACROBAT_SCAN_KEY,
-                               NS_WIN_QUICKTIME_SCAN_KEY,
+  const char* const prefs[] = {NS_WIN_QUICKTIME_SCAN_KEY,
                                NS_WIN_WMP_SCAN_KEY};
 
   uint32_t size = sizeof(prefs) / sizeof(prefs[0]);
@@ -4185,7 +4173,7 @@ public:
     PR_APPEND_LINK(this, &sRunnableListHead);
   }
 
-  virtual ~nsPluginDestroyRunnable()
+  ~nsPluginDestroyRunnable() override
   {
     PR_REMOVE_LINK(this);
   }

@@ -120,11 +120,15 @@ RenderFrameParent::Init(nsFrameLoader* aFrameLoader)
     // and we'll keep an indirect reference to that tree.
     browser->Manager()->AsContentParent()->AllocateLayerTreeId(browser, &mLayersId);
     if (lm && lm->AsClientLayerManager()) {
-      lm->AsClientLayerManager()->GetRemoteRenderer()->SendNotifyChildCreated(mLayersId);
+      if (!lm->AsClientLayerManager()->GetRemoteRenderer()->SendNotifyChildCreated(mLayersId)) {
+        return false;
+      }
     }
   } else if (XRE_IsContentProcess()) {
     ContentChild::GetSingleton()->SendAllocateLayerTreeId(browser->Manager()->ChildID(), browser->GetTabId(), &mLayersId);
-    CompositorBridgeChild::Get()->SendNotifyChildCreated(mLayersId);
+    if (!CompositorBridgeChild::Get()->SendNotifyChildCreated(mLayersId)) {
+      return false;
+    }
   }
 
   mInitted = true;
@@ -221,7 +225,7 @@ RenderFrameParent::ActorDestroy(ActorDestroyReason why)
 {
   if (mLayersId != 0) {
     if (XRE_IsParentProcess()) {
-      GPUProcessManager::Get()->DeallocateLayerTreeId(mLayersId);
+      GPUProcessManager::Get()->UnmapLayerTreeId(mLayersId, OtherPid());
     } else if (XRE_IsContentProcess()) {
       ContentChild::GetSingleton()->SendDeallocateLayerTreeId(mLayersId);
     }
@@ -230,18 +234,11 @@ RenderFrameParent::ActorDestroy(ActorDestroyReason why)
   mFrameLoader = nullptr;
 }
 
-bool
+mozilla::ipc::IPCResult
 RenderFrameParent::RecvNotifyCompositorTransaction()
 {
   TriggerRepaint();
-  return true;
-}
-
-bool
-RenderFrameParent::RecvUpdateHitRegion(const nsRegion& aRegion)
-{
-  mTouchRegion = aRegion;
-  return true;
+  return IPC_OK();
 }
 
 void
@@ -284,12 +281,6 @@ RenderFrameParent::BuildDisplayList(nsDisplayListBuilder* aBuilder,
     new (aBuilder) nsDisplayRemote(aBuilder, aFrame, this));
 }
 
-bool
-RenderFrameParent::HitTest(const nsRect& aRect)
-{
-  return mTouchRegion.Contains(aRect);
-}
-
 void
 RenderFrameParent::GetTextureFactoryIdentifier(TextureFactoryIdentifier* aTextureFactoryIdentifier)
 {
@@ -322,11 +313,20 @@ RenderFrameParent::TakeFocusForClickFromTap()
                         nsIFocusManager::FLAG_NOSCROLL);
 }
 
-bool
-RenderFrameParent::RecvTakeFocusForClickFromTap()
+void
+RenderFrameParent::EnsureLayersConnected()
 {
-  TakeFocusForClickFromTap();
-  return true;
+  RefPtr<LayerManager> lm = GetFrom(mFrameLoader);
+  if (!lm) {
+    return;
+  }
+
+  ClientLayerManager* client = lm->AsClientLayerManager();
+  if (!client) {
+    return;
+  }
+
+  client->GetRemoteRenderer()->SendNotifyChildRecreated(mLayersId);
 }
 
 } // namespace layout
@@ -341,7 +341,6 @@ nsDisplayRemote::nsDisplayRemote(nsDisplayListBuilder* aBuilder,
 {
   if (aBuilder->IsBuildingLayerEventRegions()) {
     bool frameIsPointerEventsNone =
-      !aFrame->PassPointerEventsToChildren() &&
       aFrame->StyleUserInterface()->GetEffectivePointerEvents(aFrame) ==
         NS_STYLE_POINTER_EVENTS_NONE;
     if (aBuilder->IsInsidePointerEventsNoneDoc() || frameIsPointerEventsNone) {
@@ -367,13 +366,3 @@ nsDisplayRemote::BuildLayer(nsDisplayListBuilder* aBuilder,
   }
   return layer.forget();
 }
-
-void
-nsDisplayRemote::HitTest(nsDisplayListBuilder* aBuilder, const nsRect& aRect,
-                         HitTestState* aState, nsTArray<nsIFrame*> *aOutFrames)
-{
-  if (mRemoteFrame->HitTest(aRect)) {
-    aOutFrames->AppendElement(mFrame);
-  }
-}
-

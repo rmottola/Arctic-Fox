@@ -101,10 +101,11 @@ public:
 
   void UpdateRenderBounds(const gfx::IntRect& aRect);
 
-  virtual void BeginTransaction() override;
-  virtual void BeginTransactionWithTarget(gfxContext* aTarget) override
+  virtual bool BeginTransaction() override;
+  virtual bool BeginTransactionWithTarget(gfxContext* aTarget) override
   {
     MOZ_CRASH("GFX: Use BeginTransactionWithDrawTarget");
+    return false;
   }
   void BeginTransactionWithDrawTarget(gfx::DrawTarget* aTarget,
                                       const gfx::IntRect& aRect);
@@ -280,8 +281,6 @@ public:
     mDisabledApzWarning = true;
   }
 
-  bool LastFrameMissedHWC() { return mLastFrameMissedHWC; }
-
   bool AsyncPanZoomEnabled() const override;
 
   void AppendImageCompositeNotification(const ImageCompositeNotification& aNotification)
@@ -326,7 +325,7 @@ private:
    * Render the current layer tree to the active target.
    */
   void Render(const nsIntRegion& aInvalidRegion, const nsIntRegion& aOpaqueRegion);
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
   void RenderToPresentationSurface();
 #endif
 
@@ -380,10 +379,6 @@ private:
   RefPtr<CompositingRenderTarget> mTwoPassTmpTarget;
   RefPtr<TextRenderer> mTextRenderer;
   bool mGeometryChanged;
-
-  // Testing property. If hardware composer is supported, this will return
-  // true if the last frame was deemed 'too complicated' to be rendered.
-  bool mLastFrameMissedHWC;
 
   bool mWindowOverlayChanged;
   TimeDuration mLastPaintTime;

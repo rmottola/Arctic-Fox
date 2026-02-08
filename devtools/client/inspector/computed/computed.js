@@ -18,9 +18,6 @@ const {OutputParser} = require("devtools/client/shared/output-parser");
 const {PrefObserver, PREF_ORIG_SOURCES} = require("devtools/client/styleeditor/utils");
 const {createChild} = require("devtools/client/inspector/shared/utils");
 const {gDevTools} = require("devtools/client/framework/devtools");
-/* eslint-disable mozilla/reject-some-requires */
-const {XPCOMUtils} = require("resource://gre/modules/XPCOMUtils.jsm");
-/* eslint-enable mozilla/reject-some-requires */
 const {getCssProperties} = require("devtools/shared/fronts/css-properties");
 
 const overlays = require("devtools/client/inspector/shared/style-inspector-overlays");
@@ -29,13 +26,9 @@ const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
 const {LayoutView} = require("devtools/client/inspector/layout/layout");
 const clipboardHelper = require("devtools/shared/platform/clipboard");
 
-XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
-                                  "resource://gre/modules/PluralForm.jsm");
-
-XPCOMUtils.defineLazyGetter(CssComputedView, "_strings", function () {
-  return Services.strings.createBundle(
-    "chrome://devtools-shared/locale/styleinspector.properties");
-});
+const STYLE_INSPECTOR_PROPERTIES = "devtools-shared/locale/styleinspector.properties";
+const {LocalizationHelper} = require("devtools/shared/l10n");
+const STYLE_INSPECTOR_L10N = new LocalizationHelper(STYLE_INSPECTOR_PROPERTIES);
 
 const FILTER_CHANGED_TIMEOUT = 150;
 const HTML_NS = "http://www.w3.org/1999/xhtml";
@@ -210,7 +203,7 @@ function CssComputedView(inspector, document, pageStyle) {
 }
 
 /**
- * Memoized lookup of a l10n string from a string bundle.
+ * Lookup a l10n string in the shared styleinspector string bundle.
  *
  * @param {String} name
  *        The key to lookup.
@@ -218,7 +211,7 @@ function CssComputedView(inspector, document, pageStyle) {
  */
 CssComputedView.l10n = function (name) {
   try {
-    return CssComputedView._strings.GetStringFromName(name);
+    return STYLE_INSPECTOR_L10N.getStr(name);
   } catch (ex) {
     console.log("Error reading '" + name + "'");
     throw new Error("l10n error with " + name);

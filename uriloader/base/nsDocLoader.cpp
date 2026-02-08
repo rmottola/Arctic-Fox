@@ -35,6 +35,7 @@
 #include "nsPresContext.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
 
+using mozilla::DebugOnly;
 using mozilla::LogLevel;
 
 static NS_DEFINE_CID(kThisImplCID, NS_THIS_DOCLOADER_IMPL_CID);
@@ -345,8 +346,8 @@ nsDocLoader::Destroy()
   // Remove the document loader from the parent list of loaders...
   if (mParent)
   {
-    nsresult rv = mParent->RemoveChildLoader(this);
-    NS_WARN_IF(NS_FAILED(rv));
+    DebugOnly<nsresult> rv = mParent->RemoveChildLoader(this);
+    NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "RemoveChildLoader failed");
   }
 
   // Release all the information about network requests...
@@ -355,7 +356,7 @@ nsDocLoader::Destroy()
   mListenerInfoList.Clear();
   mListenerInfoList.Compact();
 
-  mDocumentRequest = 0;
+  mDocumentRequest = nullptr;
 
   if (mLoadGroup)
     mLoadGroup->SetGroupObserver(nullptr);
@@ -377,8 +378,9 @@ nsDocLoader::DestroyChildren()
     if (loader) {
       // This is a safe cast, as we only put nsDocLoader objects into the
       // array
-      nsresult rv = static_cast<nsDocLoader*>(loader)->SetDocLoaderParent(nullptr);
-      NS_WARN_IF(NS_FAILED(rv));
+      DebugOnly<nsresult> rv =
+        static_cast<nsDocLoader*>(loader)->SetDocLoaderParent(nullptr);
+      NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "SetDocLoaderParent failed");
     }
   }
   mChildList.Clear();
@@ -697,7 +699,7 @@ void nsDocLoader::DocLoaderIsEmpty(bool aFlushLayout)
 
       nsCOMPtr<nsIRequest> docRequest = mDocumentRequest;
 
-      mDocumentRequest = 0;
+      mDocumentRequest = nullptr;
       mIsLoadingDocument = false;
 
       // Update the progress status state - the document is done
@@ -940,7 +942,6 @@ int64_t nsDocLoader::GetMaxTotalProgress()
   int64_t newMaxTotal = 0;
 
   uint32_t count = mChildList.Length();
-  nsCOMPtr<nsIWebProgress> webProgress;
   for (uint32_t i=0; i < count; i++)
   {
     int64_t individualProgress = 0;

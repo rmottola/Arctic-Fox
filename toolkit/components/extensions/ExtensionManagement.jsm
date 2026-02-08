@@ -20,6 +20,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "ExtensionUtils",
 
 XPCOMUtils.defineLazyGetter(this, "console", () => ExtensionUtils.getConsole());
 
+XPCOMUtils.defineLazyGetter(this, "UUIDMap", () => {
+  let {UUIDMap} = Cu.import("resource://gre/modules/Extension.jsm", {});
+  return UUIDMap;
+});
+
 /*
  * This file should be kept short and simple since it's loaded even
  * when no extensions are running.
@@ -40,7 +45,7 @@ var Frames = {
     }
 
     Services.mm.addMessageListener("Extension:TopWindowID", this);
-    Services.mm.addMessageListener("Extension:RemoveTopWindowID", this);
+    Services.mm.addMessageListener("Extension:RemoveTopWindowID", this, true);
   },
 
   isTopWindowId(windowId) {
@@ -110,6 +115,15 @@ var APIs = {
   },
 };
 
+function getURLForExtension(id, path = "") {
+  let uuid = UUIDMap.get(id, false);
+  if (!uuid) {
+    Cu.reportError(`Called getURLForExtension on unmapped extension ${id}`);
+    return null;
+  }
+  return `moz-extension://${uuid}/${path}`;
+}
+
 // This object manages various platform-level issues related to
 // moz-extension:// URIs. It lives here so that it can be used in both
 // the parent and child processes.
@@ -142,16 +156,6 @@ var Service = {
     }
 
     // Create the moz-extension://uuid mapping.
-    // On b2g, in content processes we can't load jar:file:/// content, so we
-    // switch to jar:remoteopenfile:/// instead
-    // This is mostly exercised by generated extensions in tests. Installed
-    // extensions in b2g get an app: uri that also maps to the right jar: uri.
-    if (AppConstants.MOZ_B2G &&
-        Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT &&
-        uri.spec.startsWith("jar:file://")) {
-      uri = Services.io.newURI("jar:remoteopen" + uri.spec.substr("jar:".length), null, null);
-    }
-
     let handler = Services.io.getProtocolHandler("moz-extension");
     handler.QueryInterface(Ci.nsISubstitutingProtocolHandler);
     handler.setSubstitution(uuid, uri);
@@ -279,6 +283,14 @@ function getAPILevelForWindow(window, addonId) {
       return FULL_PRIVILEGES;
     }
 
+    // The addon iframes embedded in a addon page from with the same addonId
+    // should have the same privileges of the sameTypeParent.
+    // (see Bug 1258347 for rationale)
+    let parentSameAddonPrivileges = getAPILevelForWindow(parentWindow, addonId);
+    if (parentSameAddonPrivileges > NO_PRIVILEGES) {
+      return parentSameAddonPrivileges;
+    }
+
     // In all the other cases, WebExtension URLs loaded into sub-frame UI
     // will have "content script API level privileges".
     // (see Bug 1214658 for rationale)
@@ -298,6 +310,8 @@ this.ExtensionManagement = {
 
   getFrameId: Frames.getId.bind(Frames),
   getParentFrameId: Frames.getParentId.bind(Frames),
+
+  getURLForExtension,
 
   // exported API Level Helpers
   getAddonIdForWindow,

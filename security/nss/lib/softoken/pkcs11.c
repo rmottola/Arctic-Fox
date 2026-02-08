@@ -3305,6 +3305,15 @@ NSC_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)
         }
     }
 
+    /* If there is no key database, this is for example the case when NSS was
+     * initialized with NSS_NoDbInit(), then there won't be any point in
+     * requesting a PIN. Set the CKF_USER_PIN_INITIALIZED bit so that
+     * PK11_NeedUserInit() doesn't indicate that a PIN is needed.
+     */
+    if (slot->keyDB == NULL) {
+        pInfo->flags |= CKF_USER_PIN_INITIALIZED;
+    }
+
     /* ok we really should read it out of the keydb file. */
     /* pInfo->hardwareVersion.major = NSSLOWKEY_DB_FILE_VERSION; */
     pInfo->hardwareVersion.major = SOFTOKEN_VMAJOR;
@@ -3566,7 +3575,6 @@ NSC_InitToken(CK_SLOT_ID slotID, CK_CHAR_PTR pPin,
 {
     SFTKSlot *slot = sftk_SlotFromID(slotID, PR_FALSE);
     SFTKDBHandle *handle;
-    SFTKDBHandle *certHandle;
     SECStatus rv;
     unsigned int i;
     SFTKObject *object;
@@ -3614,19 +3622,16 @@ NSC_InitToken(CK_SLOT_ID slotID, CK_CHAR_PTR pPin,
     }
 
     rv = sftkdb_ResetKeyDB(handle);
+    /* clear the password */
+    sftkdb_ClearPassword(handle);
+    /* update slot->needLogin (should be true now since no password is set) */
+    sftk_checkNeedLogin(slot, handle);
     sftk_freeDB(handle);
     if (rv != SECSuccess) {
         return CKR_DEVICE_ERROR;
     }
 
-    /* finally  mark all the user certs as non-user certs */
-    certHandle = sftk_getCertDB(slot);
-    if (certHandle == NULL)
-        return CKR_OK;
-
-    sftk_freeDB(certHandle);
-
-    return CKR_OK; /*is this the right function for not implemented*/
+    return CKR_OK;
 }
 
 /* NSC_InitPIN initializes the normal user's PIN. */
@@ -3792,7 +3797,10 @@ NSC_SetPIN(CK_SESSION_HANDLE hSession, CK_CHAR_PTR pOldPin,
 
     /* Now update our local copy of the pin */
     if (rv == SECSuccess) {
+        PZ_Lock(slot->slotLock);
         slot->needLogin = (PRBool)(ulNewLen != 0);
+        slot->isLoggedIn = (PRBool)(sftkdb_PWCached(handle) == SECSuccess);
+        PZ_Unlock(slot->slotLock);
         /* Reset login flags. */
         if (ulNewLen == 0) {
             PRBool tokenRemoved = PR_FALSE;

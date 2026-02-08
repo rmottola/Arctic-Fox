@@ -16,6 +16,7 @@
 #include "nsContentCreatorFunctions.h"
 #include "mozilla/ErrorResult.h"
 #include "nsIDOMHTMLMenuElement.h"
+#include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/DOMRect.h"
 #include "mozilla/dom/ValidityState.h"
 #include "mozilla/dom/ElementInlines.h"
@@ -103,7 +104,7 @@ public:
   {
     SetHTMLBoolAttr(nsGkAtoms::hidden, aHidden, aError);
   }
-  virtual void Click();
+  void Click(mozilla::dom::CallerType aCallerType);
   void GetAccessKey(nsString& aAccessKey)
   {
     GetHTMLAttr(nsGkAtoms::accesskey, aAccessKey);
@@ -275,10 +276,6 @@ protected:
   virtual ~nsGenericHTMLElement() {}
 
 public:
-  virtual already_AddRefed<mozilla::dom::UndoManager> GetUndoManager() override;
-  virtual bool UndoScope() override;
-  virtual void SetUndoScope(bool aUndoScope, mozilla::ErrorResult& aError) override;
-
   /**
    * Get width and height, using given image request if attributes are unset.
    * Pass a reference to the image request, since the method may change the
@@ -430,10 +427,6 @@ public:
   }
   NS_IMETHOD GetOffsetHeight(int32_t* aOffsetHeight) final override {
     *aOffsetHeight = OffsetHeight();
-    return NS_OK;
-  }
-  NS_IMETHOD DOMClick() final override {
-    Click();
     return NS_OK;
   }
   NS_IMETHOD GetTabIndex(int32_t* aTabIndex) final override {
@@ -1067,20 +1060,6 @@ protected:
   }
 
   /**
-   * This method works like GetURIAttr, except that it supports multiple
-   * URIs separated by whitespace (one or more U+0020 SPACE characters).
-   *
-   * Gets the absolute URI values of an attribute, by resolving any relative
-   * URIs in the attribute against the baseuri of the element. If a substring
-   * isn't a relative URI, the substring is returned as is. Only works for
-   * attributes in null namespace.
-   *
-   * @param aAttr    name of attribute.
-   * @param aResult  result value [out]
-   */
-  nsresult GetURIListAttr(nsIAtom* aAttr, nsAString& aResult);
-
-  /**
    * Locates the nsIEditor associated with this node.  In general this is
    * equivalent to GetEditorInternal(), but for designmode or contenteditable,
    * this may need to get an editor that's not actually on this element's
@@ -1150,8 +1129,6 @@ protected:
    * made editable through contentEditable or designMode.
    */
   bool IsEditableRoot() const;
-
-  nsresult SetUndoScopeInternal(bool aUndoScope);
 
 private:
   void ChangeEditableState(int32_t aChange);

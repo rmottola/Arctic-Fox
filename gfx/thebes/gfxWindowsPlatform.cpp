@@ -67,7 +67,6 @@
 #include "d3dkmtQueryStatistics.h"
 
 #include "base/thread.h"
-#include "SurfaceCache.h"
 #include "gfxPrefs.h"
 #include "gfxConfig.h"
 #include "VsyncSource.h"
@@ -111,12 +110,6 @@ DCFromDrawTarget::DCFromDrawTarget(DrawTarget& aDrawTarget)
     mNeedsRelease = true;
   }
 }
-
-static const char *kFeatureLevelPref =
-  "gfx.direct3d.last_used_feature_level_idx";
-static const int kSupportedFeatureLevels[] =
-  { D3D10_FEATURE_LEVEL_10_1, D3D10_FEATURE_LEVEL_10_0 };
-
 
 class GfxD2DVramReporter final : public nsIMemoryReporter
 {
@@ -317,9 +310,6 @@ NS_IMPL_ISUPPORTS(D3DSharedTexturesReporter, nsIMemoryReporter)
 
 gfxWindowsPlatform::gfxWindowsPlatform()
   : mRenderMode(RENDER_GDI)
-  , mHasDeviceReset(false)
-  , mHasFakeDeviceReset(false)
-  , mHasD3D9DeviceReset(false)
 {
   mUseClearTypeForDownloadableFonts = UNINITIALIZED_VALUE;
   mUseClearTypeAlways = UNINITIALIZED_VALUE;
@@ -387,6 +377,9 @@ bool
 gfxWindowsPlatform::CanUseHardwareVideoDecoding()
 {
   DeviceManagerDx* dm = DeviceManagerDx::Get();
+  if (!dm) {
+    return false;
+  }
   if (!gfxPrefs::LayersPreferD3D9() && !dm->TextureSharingWorks()) {
     return false;
   }
@@ -439,19 +432,12 @@ gfxWindowsPlatform::HandleDeviceReset()
     return false;
   }
 
-  if (!mHasFakeDeviceReset) {
+  if (resetReason != DeviceResetReason::FORCED_RESET) {
     Telemetry::Accumulate(Telemetry::DEVICE_RESET_REASON, uint32_t(resetReason));
   }
 
   // Remove devices and adapters.
   DeviceManagerDx::Get()->ResetDevices();
-
-  // Reset local state. Note: we leave feature status variables as-is. They
-  // will be recomputed by InitializeDevices().
-  mHasDeviceReset = false;
-  mHasFakeDeviceReset = false;
-  mHasD3D9DeviceReset = false;
-  mDeviceResetReason = DeviceResetReason::OK;
 
   imgLoader::NormalLoader()->ClearCache(true);
   imgLoader::NormalLoader()->ClearCache(false);
@@ -515,15 +501,6 @@ gfxWindowsPlatform::UpdateRenderMode()
       MOZ_CRASH("GFX: Failed to update reference draw target after device reset");
     }
   }
-}
-
-void
-gfxWindowsPlatform::ForceDeviceReset(ForcedDeviceResetReason aReason)
-{
-  Telemetry::Accumulate(Telemetry::FORCED_DEVICE_RESET_REASON, uint32_t(aReason));
-
-  mDeviceResetReason = DeviceResetReason::FORCED_RESET;
-  mHasDeviceReset = true;
 }
 
 mozilla::gfx::BackendType
@@ -592,6 +569,10 @@ already_AddRefed<gfxASurface>
 gfxWindowsPlatform::CreateOffscreenSurface(const IntSize& aSize,
                                            gfxImageFormat aFormat)
 {
+    if (!Factory::AllowedSurfaceSize(aSize)) {
+        return nullptr;
+    }
+
     RefPtr<gfxASurface> surf = nullptr;
 
 #ifdef CAIRO_HAS_WIN32_SURFACE
@@ -912,57 +893,21 @@ gfxWindowsPlatform::IsFontFormatSupported(nsIURI *aFontURI, uint32_t aFormatFlag
     return true;
 }
 
-void
-gfxWindowsPlatform::CompositorUpdated()
-{
-  ForceDeviceReset(ForcedDeviceResetReason::COMPOSITOR_UPDATED);
-  UpdateRenderMode();
-}
-
-void
-gfxWindowsPlatform::TestDeviceReset(DeviceResetReason aReason)
-{
-  if (mHasDeviceReset) {
-    return;
-  }
-  mHasDeviceReset = true;
-  mHasFakeDeviceReset = true;
-  mDeviceResetReason = aReason;
-}
-
 bool
 gfxWindowsPlatform::DidRenderingDeviceReset(DeviceResetReason* aResetReason)
 {
-  if (mHasDeviceReset) {
-    if (aResetReason) {
-      *aResetReason = mDeviceResetReason;
-    }
-    return true;
+  DeviceManagerDx* dm = DeviceManagerDx::Get();
+  if (!dm) {
+    return false;
   }
-  if (aResetReason) {
-    *aResetReason = DeviceResetReason::OK;
-  }
+  return dm->HasDeviceReset(aResetReason);
+}
 
-  if (DeviceManagerDx::Get()->GetAnyDeviceRemovedReason(&mDeviceResetReason)) {
-    mHasDeviceReset = true;
-    if (aResetReason) {
-      *aResetReason = mDeviceResetReason;
-    }
-    return true;
-  }
-
-  if (mHasD3D9DeviceReset) {
-    return true;
-  }
-  if (XRE_IsParentProcess() && gfxPrefs::DeviceResetForTesting()) {
-    TestDeviceReset((DeviceResetReason)gfxPrefs::DeviceResetForTesting());
-    if (aResetReason) {
-      *aResetReason = mDeviceResetReason;
-    }
-    gfxPrefs::SetDeviceResetForTesting(0);
-    return true;
-  }
-  return false;
+void
+gfxWindowsPlatform::CompositorUpdated()
+{
+  DeviceManagerDx::Get()->ForceDeviceReset(ForcedDeviceResetReason::COMPOSITOR_UPDATED);
+  UpdateRenderMode();
 }
 
 BOOL CALLBACK
@@ -983,12 +928,14 @@ gfxWindowsPlatform::SchedulePaintIfDeviceReset()
     return;
   }
 
+  gfxCriticalNote << "(gfxWindowsPlatform) Detected device reset: " << (int)resetReason;
+
   // Trigger an ::OnPaint for each window.
   ::EnumThreadWindows(GetCurrentThreadId(),
                       InvalidateWindowForDeviceReset,
                       0);
 
-  gfxCriticalNote << "Detected rendering device reset on refresh: " << (int)resetReason;
+  gfxCriticalNote << "(gfxWindowsPlatform) Finished device reset.";
 }
 
 void
@@ -1326,11 +1273,6 @@ gfxWindowsPlatform::SetupClearTypeParams()
     }
 }
 
-void
-gfxWindowsPlatform::D3D9DeviceReset() {
-  mHasD3D9DeviceReset = true;
-}
-
 ReadbackManagerD3D11*
 gfxWindowsPlatform::GetReadbackManager()
 {
@@ -1505,18 +1447,22 @@ gfxWindowsPlatform::RecordContentDeviceFailure(TelemetryDeviceCode aDevice)
 void
 gfxWindowsPlatform::InitializeDevices()
 {
-  // If acceleration is disabled, we refuse to initialize anything.
-  if (!gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
-    return;
-  }
-
   MOZ_ASSERT(!InSafeMode());
 
-  // If we're the UI process, and the GPU process is enabled, then we don't
-  // initialize any DirectX devices. We do leave them enabled in gfxConfig
-  // though. If the GPU process fails to create these devices it will send
-  // a message back and we'll update their status.
-  if (gfxConfig::IsEnabled(Feature::GPU_PROCESS) && XRE_IsParentProcess()) {
+  if (XRE_IsParentProcess()) {
+    // If we're the UI process, and the GPU process is enabled, then we don't
+    // initialize any DirectX devices. We do leave them enabled in gfxConfig
+    // though. If the GPU process fails to create these devices it will send
+    // a message back and we'll update their status.
+    if (InitGPUProcessSupport()) {
+      return;
+    }
+
+    // No GPU process, continue initializing devices as normal.
+  }
+
+  // If acceleration is disabled, we refuse to initialize anything.
+  if (!gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
     return;
   }
 
@@ -1663,6 +1609,49 @@ gfxWindowsPlatform::InitializeD2D()
 }
 
 bool
+gfxWindowsPlatform::InitGPUProcessSupport()
+{
+  FeatureState& gpuProc = gfxConfig::GetFeature(Feature::GPU_PROCESS);
+
+  if (!gpuProc.IsEnabled()) {
+    return false;
+  }
+
+  if (!gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING)) {
+    // Don't use the GPU process if not using D3D11.
+    gpuProc.Disable(
+      FeatureStatus::Unavailable,
+      "Not using GPU Process since D3D11 is unavailable",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_NO_D3D11"));
+  } else if (!IsWin7SP1OrLater()) {
+    // For Windows XP, we simply don't care enough to support this
+    // configuration. On Windows Vista and 7 Pre-SP1, DXGI 1.2 is not
+    // available and remote presentation for D3D11 will not work. Rather
+    // than take a regression and use D3D9, we revert back to in-process
+    // rendering.
+    gpuProc.Disable(
+      FeatureStatus::Unavailable,
+      "Windows XP, Vista, and 7 Pre-SP1 cannot use the GPU process",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_OLD_WINDOWS"));
+  } else if (!IsWin8OrLater()) {
+    // Windows 7 SP1 can have DXGI 1.2 only via the Platform Update, so we
+    // explicitly check for that here.
+    if (!DeviceManagerDx::Get()->CheckRemotePresentSupport()) {
+      gpuProc.Disable(
+        FeatureStatus::Unavailable,
+        "GPU Process requires the Windows 7 Platform Update",
+        NS_LITERAL_CSTRING("FEATURE_FAILURE_PLATFORM_UPDATE"));
+    } else {
+      // Clear anything cached by the above call since we don't need it.
+      DeviceManagerDx::Get()->ResetDevices();
+    }
+  }
+
+  // If we're still enabled at this point, the user set the force-enabled pref.
+  return gpuProc.IsEnabled();
+}
+
+bool
 gfxWindowsPlatform::DwmCompositionEnabled()
 {
   if (!IsVistaOrLater()) {
@@ -1693,8 +1682,6 @@ public:
         , mVsyncEnabled(false)
       {
         mVsyncThread = new base::Thread("WindowsVsyncThread");
-        const double rate = 1000 / 60.0;
-        mSoftwareVsyncRate = TimeDuration::FromMilliseconds(rate);
         MOZ_RELEASE_ASSERT(mVsyncThread->Start(), "GFX: Could not start Windows vsync thread");
         SetVsyncRate();
       }
@@ -1773,7 +1760,7 @@ public:
         MOZ_ASSERT(IsInVsyncThread());
         NS_WARNING("DwmComposition dynamically disabled, falling back to software timers");
 
-        TimeStamp nextVsync = aVsyncTimestamp + mSoftwareVsyncRate;
+        TimeStamp nextVsync = aVsyncTimestamp + mVsyncRate;
         TimeDuration delay = nextVsync - TimeStamp::Now();
         if (delay.ToMilliseconds() < 0) {
           delay = mozilla::TimeDuration::FromMilliseconds(0);
@@ -1784,16 +1771,30 @@ public:
             delay.ToMilliseconds());
       }
 
-      TimeStamp GetAdjustedVsyncTimeStamp(LARGE_INTEGER& aFrequency,
-                                          QPC_TIME& aQpcVblankTime)
+      // Returns the timestamp for the just happened vsync
+      TimeStamp GetVBlankTime()
       {
         TimeStamp vsync = TimeStamp::Now();
+        TimeStamp now = vsync;
+
+        DWM_TIMING_INFO vblankTime;
+        // Make sure to init the cbSize, otherwise
+        // GetCompositionTiming will fail
+        vblankTime.cbSize = sizeof(DWM_TIMING_INFO);
+        HRESULT hr = WinUtils::dwmGetCompositionTimingInfoPtr(0, &vblankTime);
+        if (!SUCCEEDED(hr)) {
+            return vsync;
+        }
+
+        LARGE_INTEGER frequency;
+        QueryPerformanceFrequency(&frequency);
+
         LARGE_INTEGER qpcNow;
         QueryPerformanceCounter(&qpcNow);
 
         const int microseconds = 1000000;
-        int64_t adjust = qpcNow.QuadPart - aQpcVblankTime;
-        int64_t usAdjust = (adjust * microseconds) / aFrequency.QuadPart;
+        int64_t adjust = qpcNow.QuadPart - vblankTime.qpcVBlank;
+        int64_t usAdjust = (adjust * microseconds) / frequency.QuadPart;
         vsync -= TimeDuration::FromMicroseconds((double) usAdjust);
 
         if (IsWin10OrLater()) {
@@ -1807,26 +1808,19 @@ public:
           // all over the place once in a while. Most of the time,
           // it reports the upcoming vsync. Sometimes, that upcoming
           // vsync is in the past. Sometimes that upcoming vsync is before
-          // the previously seen vsync. Sometimes, the previous vsync
-          // is still in the future. In these error cases,
-          // we try to normalize to Now().
-          TimeStamp upcomingVsync = vsync;
-          if (upcomingVsync < mPrevVsync) {
-            // Windows can report a vsync that's before
-            // the previous one. So update it to sometime in the future.
-            upcomingVsync = TimeStamp::Now() + TimeDuration::FromMilliseconds(1);
+          // the previously seen vsync.
+          // In these error cases, normalize to Now();
+          if (vsync >= now) {
+            vsync = vsync - mVsyncRate;
+            return vsync <= now ? vsync : now;
           }
-
-          vsync = mPrevVsync;
-          mPrevVsync = upcomingVsync;
         }
+
         // On Windows 7 and 8, DwmFlush wakes up AFTER qpcVBlankTime
         // from DWMGetCompositionTimingInfo. We can return the adjusted vsync.
-
-        // Once in a while, the reported vsync timestamp can be in the future.
-        // Normalize the reported timestamp to now.
-        if (vsync >= TimeStamp::Now()) {
-          vsync = TimeStamp::Now();
+        // If we got here on Windows 10, it means we got a weird timestamp.
+        if (vsync >= now) {
+            vsync = now;
         }
         return vsync;
       }
@@ -1836,18 +1830,10 @@ public:
         MOZ_ASSERT(IsInVsyncThread());
         MOZ_ASSERT(sizeof(int64_t) == sizeof(QPC_TIME));
 
-        DWM_TIMING_INFO vblankTime;
-        // Make sure to init the cbSize, otherwise GetCompositionTiming will fail
-        vblankTime.cbSize = sizeof(DWM_TIMING_INFO);
-
-        LARGE_INTEGER frequency;
-        QueryPerformanceFrequency(&frequency);
         TimeStamp vsync = TimeStamp::Now();
-        // On Windows 10, DwmGetCompositionInfo returns the upcoming vsync.
-        // See GetAdjustedVsyncTimestamp.
-        // On start, set mPrevVsync to the "next" vsync
-        // So we'll use this timestamp on the 2nd loop iteration.
-        mPrevVsync = vsync + mSoftwareVsyncRate;
+        mPrevVsync = TimeStamp();
+        TimeStamp flushTime = TimeStamp::Now();
+        TimeDuration longVBlank = mVsyncRate * 2;
 
         for (;;) {
           { // scope lock
@@ -1869,21 +1855,40 @@ public:
             return;
           }
 
-          // Use a combination of DwmFlush + DwmGetCompositionTimingInfoPtr
-          // Using WaitForVBlank, the whole system dies :/
+          // Using WaitForVBlank, the whole system dies because WaitForVBlank
+          // only works if it's run on the same thread as the Present();
           HRESULT hr = WinUtils::dwmFlushProcPtr();
           if (!SUCCEEDED(hr)) {
-            // We don't actually know how long we had to wait on DWMFlush
-            // Instead of trying to calculate how long DwmFlush actually took
-            // Fallback to software vsync.
+            // DWMFlush isn't working, fallback to software vsync.
             ScheduleSoftwareVsync(TimeStamp::Now());
             return;
           }
 
-          hr = WinUtils::dwmGetCompositionTimingInfoPtr(0, &vblankTime);
-          vsync = SUCCEEDED(hr) ?
-                    GetAdjustedVsyncTimeStamp(frequency, vblankTime.qpcVBlank) :
-                    TimeStamp::Now();
+          TimeStamp now = TimeStamp::Now();
+          TimeDuration flushDiff = now - flushTime;
+          flushTime = now;
+          if ((flushDiff > longVBlank) || mPrevVsync.IsNull()) {
+            // Our vblank took longer than 2 intervals, readjust our timestamps
+            vsync = GetVBlankTime();
+            mPrevVsync = vsync;
+          } else {
+            // Instead of giving the actual vsync time, a constant interval
+            // between vblanks instead of the noise generated via hardware
+            // is actually what we want. Most apps just care about the diff
+            // between vblanks to animate, so a clean constant interval is
+            // smoother.
+            vsync = mPrevVsync + mVsyncRate;
+            if (vsync > now) {
+              // DWMFlush woke up very early, so readjust our times again
+              vsync = GetVBlankTime();
+            }
+
+            if (vsync <= mPrevVsync) {
+              vsync = TimeStamp::Now();
+            }
+
+            mPrevVsync = vsync;
+          }
         } // end for
       }
 
@@ -1898,8 +1903,7 @@ public:
         return mVsyncThread->thread_id() == PlatformThread::CurrentId();
       }
 
-      TimeDuration mSoftwareVsyncRate;
-      TimeStamp mPrevVsync; // Only used on Windows 10
+      TimeStamp mPrevVsync;
       Monitor mVsyncEnabledLock;
       base::Thread* mVsyncThread;
       TimeDuration mVsyncRate;
@@ -1984,7 +1988,7 @@ gfxWindowsPlatform::ImportGPUDeviceData(const mozilla::gfx::GPUDeviceData& aData
 
   DeviceManagerDx* dm = DeviceManagerDx::Get();
   if (gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING)) {
-    dm->ImportDeviceInfo(aData.d3d11Device());
+    dm->ImportDeviceInfo(aData.gpuDevice().get_D3D11DeviceStatus());
   } else {
     // There should be no devices, so this just takes away the device status.
     dm->ResetDevices();
@@ -1998,6 +2002,10 @@ gfxWindowsPlatform::ImportGPUDeviceData(const mozilla::gfx::GPUDeviceData& aData
         NS_LITERAL_CSTRING("FEATURE_FAILURE_D2D_D3D11_COMP"));
     }
   }
+
+  // CanUseHardwareVideoDecoding depends on d3d11 state, so update
+  // the cached value now.
+  UpdateCanUseHardareVideoDecoding();
 
   // For completeness (and messaging in about:support). Content recomputes this
   // on its own, and we won't use ANGLE in the UI process if we're using a GPU

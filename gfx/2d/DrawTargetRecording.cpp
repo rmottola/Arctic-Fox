@@ -299,12 +299,13 @@ DrawTargetRecording::DrawTargetRecording(DrawEventRecorder *aRecorder, DrawTarge
 }
 
 DrawTargetRecording::DrawTargetRecording(const DrawTargetRecording *aDT,
-                                         const IntSize &aSize,
-                                         SurfaceFormat aFormat)
+                                         DrawTarget *aSimilarDT)
   : mRecorder(aDT->mRecorder)
-  , mFinalDT(aDT->mFinalDT->CreateSimilarDrawTarget(aSize, aFormat))
+  , mFinalDT(aSimilarDT)
 {
-  mRecorder->RecordEvent(RecordedCreateSimilarDrawTarget(this, aSize, aFormat));
+  mRecorder->RecordEvent(RecordedCreateSimilarDrawTarget(this,
+                                                         mFinalDT->GetSize(),
+                                                         mFinalDT->GetFormat()));
   mFormat = mFinalDT->GetFormat();
 }
 
@@ -372,10 +373,7 @@ void RecordingFontUserDataDestroyFunc(void *aUserData)
   RecordingFontUserData *userData =
     static_cast<RecordingFontUserData*>(aUserData);
 
-  // TODO support font in b2g recordings
-#ifndef MOZ_WIDGET_GONK
   userData->recorder->RecordEvent(RecordedScaledFontDestruction(userData->refPtr));
-#endif
 
   delete userData;
 }
@@ -390,8 +388,6 @@ DrawTargetRecording::FillGlyphs(ScaledFont *aFont,
   EnsurePatternDependenciesStored(aPattern);
 
   if (!aFont->GetUserData(reinterpret_cast<UserDataKey*>(mRecorder.get()))) {
-  // TODO support font in b2g recordings
-#ifndef MOZ_WIDGET_GONK
     RecordedFontData fontData(aFont);
     RecordedFontDetails fontDetails;
     if (fontData.GetFontDetails(fontDetails)) {
@@ -412,7 +408,6 @@ DrawTargetRecording::FillGlyphs(ScaledFont *aFont,
         gfxWarning() << "DrawTargetRecording::FillGlyphs failed to serialise ScaledFont";
       }
     }
-#endif
     RecordingFontUserData *userData = new RecordingFontUserData;
     userData->refPtr = aFont;
     userData->recorder = mRecorder;
@@ -420,10 +415,7 @@ DrawTargetRecording::FillGlyphs(ScaledFont *aFont,
                        &RecordingFontUserDataDestroyFunc);
   }
 
-  // TODO support font in b2g recordings
-#ifndef MOZ_WIDGET_GONK
   mRecorder->RecordEvent(RecordedFillGlyphs(this, aFont, aPattern, aOptions, aBuffer.mGlyphs, aBuffer.mNumGlyphs));
-#endif
   mFinalDT->FillGlyphs(aFont, aBuffer, aPattern, aOptions, aRenderingOptions);
 }
 
@@ -649,7 +641,14 @@ DrawTargetRecording::CreateSourceSurfaceFromNativeSurface(const NativeSurface &a
 already_AddRefed<DrawTarget>
 DrawTargetRecording::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFormat) const
 {
-  return MakeAndAddRef<DrawTargetRecording>(this, aSize, aFormat);
+  RefPtr<DrawTarget> similarDT =
+    mFinalDT->CreateSimilarDrawTarget(aSize, aFormat);
+  if (!similarDT) {
+    return nullptr;
+  }
+
+  similarDT = new DrawTargetRecording(this, similarDT);
+  return similarDT.forget();
 }
 
 already_AddRefed<PathBuilder>

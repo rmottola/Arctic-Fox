@@ -143,8 +143,14 @@
  * Use only one arena by default.  Mozilla does not currently make extensive
  * use of concurrent allocation, so the increased fragmentation associated with
  * multiple arenas is not warranted.
+ *
+ * When using the Servo style system, we do indeed make use of significant
+ * concurrent allocation, and the overhead matters. Bug 1291355 tracks
+ * investigating the fragmentation overhead of turning this on for users.
  */
-// #define	MOZ_MEMORY_NARENAS_DEFAULT_ONE
+#ifndef MOZ_STYLO
+#define MOZ_MEMORY_NARENAS_DEFAULT_ONE
+#endif
 
 /*
  * Pass this set of options to jemalloc as its default. It does not override
@@ -1434,6 +1440,7 @@ static malloc_zone_t * szone = (malloc_zone_t*)(&l_szone);
 static lion_malloc_introspection l_ozone_introspect;
 static malloc_introspection_t * const ozone_introspect =
 	(malloc_introspection_t*)(&l_ozone_introspect);
+static malloc_zone_t *get_default_zone();
 static void szone2ozone(malloc_zone_t *zone, size_t size);
 static size_t zone_version_size(int version);
 #else
@@ -5827,7 +5834,7 @@ MALLOC_OUT:
 	/*
 	* Overwrite the default memory allocator to use jemalloc everywhere.
 	*/
-	default_zone = malloc_default_zone();
+	default_zone = get_default_zone();
 
 	/*
 	 * We only use jemalloc with MacOS 10.6 and 10.7.  jemalloc is disabled
@@ -6800,6 +6807,32 @@ zone_version_size(int version)
         case LION_MALLOC_ZONE_T_VERSION:
             return sizeof(lion_malloc_zone);
     }
+}
+
+static malloc_zone_t *get_default_zone()
+{
+  malloc_zone_t **zones = NULL;
+  unsigned int num_zones = 0;
+
+  /*
+   * On OSX 10.12, malloc_default_zone returns a special zone that is not
+   * present in the list of registered zones. That zone uses a "lite zone"
+   * if one is present (apparently enabled when malloc stack logging is
+   * enabled), or the first registered zone otherwise. In practice this
+   * means unless malloc stack logging is enabled, the first registered
+   * zone is the default.
+   * So get the list of zones to get the first one, instead of relying on
+   * malloc_default_zone.
+   */
+  if (KERN_SUCCESS != malloc_get_all_zones(0, NULL, (vm_address_t**) &zones,
+                                           &num_zones)) {
+    /* Reset the value in case the failure happened after it was set. */
+    num_zones = 0;
+  }
+  if (num_zones) {
+    return zones[0];
+  }
+  return malloc_default_zone();
 }
 
 /*

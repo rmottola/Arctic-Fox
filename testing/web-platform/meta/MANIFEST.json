@@ -15353,10 +15353,6 @@
         "url": "/html/dom/documents/dom-tree-accessors/document.title-03.html"
       },
       {
-        "path": "domparsing/innerhtml-02.html",
-        "url": "/domparsing/innerhtml-02.html"
-      },
-      {
         "path": "html/dom/documents/dom-tree-accessors/document.title-04.xhtml",
         "url": "/html/dom/documents/dom-tree-accessors/document.title-04.xhtml"
       },
@@ -23864,6 +23860,54 @@
             "url": "/html/semantics/forms/the-form-element/form-submission-sandbox.html"
           }
         ],
+        "svg/linking/scripted/href-animate-element.html": [
+          {
+            "path": "svg/linking/scripted/href-animate-element.html",
+            "url": "/svg/linking/scripted/href-animate-element.html"
+          }
+        ],
+        "svg/linking/scripted/href-mpath-element.html": [
+          {
+            "path": "svg/linking/scripted/href-mpath-element.html",
+            "url": "/svg/linking/scripted/href-mpath-element.html"
+          }
+        ],
+        "svg/linking/scripted/href-script-element-markup.html": [
+          {
+            "path": "svg/linking/scripted/href-script-element-markup.html",
+            "url": "/svg/linking/scripted/href-script-element-markup.html"
+          }
+        ],
+        "svg/linking/scripted/href-script-element.html": [
+          {
+            "path": "svg/linking/scripted/href-script-element.html",
+            "url": "/svg/linking/scripted/href-script-element.html"
+          }
+        ],
+        "html/semantics/links/links-created-by-a-and-area-elements/htmlanchorelement_noopener.html": [
+          {
+            "path": "html/semantics/links/links-created-by-a-and-area-elements/htmlanchorelement_noopener.html",
+            "url": "/html/semantics/links/links-created-by-a-and-area-elements/htmlanchorelement_noopener.html"
+          }
+        ],
+        "html/semantics/scripting-1/the-script-element/script-onerror-insertion-point-1.html": [
+          {
+            "path": "html/semantics/scripting-1/the-script-element/script-onerror-insertion-point-1.html",
+            "url": "/html/semantics/scripting-1/the-script-element/script-onerror-insertion-point-1.html"
+          }
+        ],
+        "html/semantics/scripting-1/the-script-element/script-onerror-insertion-point-2.html": [
+          {
+            "path": "html/semantics/scripting-1/the-script-element/script-onerror-insertion-point-2.html",
+            "url": "/html/semantics/scripting-1/the-script-element/script-onerror-insertion-point-2.html"
+          }
+        ],
+        "html/semantics/scripting-1/the-script-element/script-onload-insertion-point.html": [
+          {
+            "path": "html/semantics/scripting-1/the-script-element/script-onload-insertion-point.html",
+            "url": "/html/semantics/scripting-1/the-script-element/script-onload-insertion-point.html"
+          }
+        ],
         "web-animations/interfaces/Animation/effect.html": [
           {
             "path": "web-animations/interfaces/Animation/effect.html",
@@ -23892,6 +23936,126 @@
           {
             "path": "web-animations/timing-model/animations/updating-the-finished-state.html",
             "url": "/web-animations/timing-model/animations/updating-the-finished-state.html"
+          }
+        ],
+        "pointerevents/pointerevent_element_haspointercapture_release_pending_capture-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_element_haspointercapture_release_pending_capture-manual.html",
+            "url": "/pointerevents/pointerevent_element_haspointercapture_release_pending_capture-manual.html"
+          }
+        ],
+        "pointerevents/pointerevent_releasepointercapture_release_right_after_capture-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_releasepointercapture_release_right_after_capture-manual.html",
+            "url": "/pointerevents/pointerevent_releasepointercapture_release_right_after_capture-manual.html"
+          }
+        ],
+        "pointerevents/pointerevent_setpointercapture_override_pending_capture_element-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_setpointercapture_override_pending_capture_element-manual.html",
+            "url": "/pointerevents/pointerevent_setpointercapture_override_pending_capture_element-manual.html"
+          }
+        ],
+        "pointerevents/pointerevent_setpointercapture_to_same_element_twice-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_setpointercapture_to_same_element_twice-manual.html",
+            "url": "/pointerevents/pointerevent_setpointercapture_to_same_element_twice-manual.html"
+          }
+        ],
+        "svg/linking/reftests/href-a-element-attr-change.html": [
+          {
+            "path": "svg/linking/reftests/href-a-element-attr-change.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-a-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-a-element-attr-change.html"
+          }
+        ],
+        "svg/linking/reftests/href-feImage-element.html": [
+          {
+            "path": "svg/linking/reftests/href-feImage-element.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-feImage-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-feImage-element.html"
+          }
+        ],
+        "svg/linking/reftests/href-filter-element.html": [
+          {
+            "path": "svg/linking/reftests/href-filter-element.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-filter-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-filter-element.html"
+          }
+        ],
+        "svg/linking/reftests/href-gradient-element.html": [
+          {
+            "path": "svg/linking/reftests/href-gradient-element.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-gradient-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-gradient-element.html"
+          }
+        ],
+        "svg/linking/reftests/href-image-element.html": [
+          {
+            "path": "svg/linking/reftests/href-image-element.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-image-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-image-element.html"
+          }
+        ],
+        "svg/linking/reftests/href-pattern-element.html": [
+          {
+            "path": "svg/linking/reftests/href-pattern-element.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-pattern-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-pattern-element.html"
+          }
+        ],
+        "svg/linking/reftests/href-textPath-element.html": [
+          {
+            "path": "svg/linking/reftests/href-textPath-element.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-textPath-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-textPath-element.html"
+          }
+        ],
+        "svg/linking/reftests/href-use-element.html": [
+          {
+            "path": "svg/linking/reftests/href-use-element.html",
+            "references": [
+              [
+                "/svg/linking/reftests/href-use-element-ref.html",
+                "=="
+              ]
+            ],
+            "url": "/svg/linking/reftests/href-use-element.html"
           }
         ]
       }
@@ -23955,6 +24119,102 @@
             ]
           ],
           "url": "/compat/webkit-text-fill-color-property-006.html"
+        }
+      ],
+      "svg/linking/reftests/href-a-element-attr-change.html": [
+        {
+          "path": "svg/linking/reftests/href-a-element-attr-change.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-a-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-a-element-attr-change.html"
+        }
+      ],
+      "svg/linking/reftests/href-feImage-element.html": [
+        {
+          "path": "svg/linking/reftests/href-feImage-element.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-feImage-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-feImage-element.html"
+        }
+      ],
+      "svg/linking/reftests/href-filter-element.html": [
+        {
+          "path": "svg/linking/reftests/href-filter-element.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-filter-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-filter-element.html"
+        }
+      ],
+      "svg/linking/reftests/href-gradient-element.html": [
+        {
+          "path": "svg/linking/reftests/href-gradient-element.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-gradient-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-gradient-element.html"
+        }
+      ],
+      "svg/linking/reftests/href-image-element.html": [
+        {
+          "path": "svg/linking/reftests/href-image-element.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-image-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-image-element.html"
+        }
+      ],
+      "svg/linking/reftests/href-pattern-element.html": [
+        {
+          "path": "svg/linking/reftests/href-pattern-element.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-pattern-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-pattern-element.html"
+        }
+      ],
+      "svg/linking/reftests/href-textPath-element.html": [
+        {
+          "path": "svg/linking/reftests/href-textPath-element.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-textPath-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-textPath-element.html"
+        }
+      ],
+      "svg/linking/reftests/href-use-element.html": [
+        {
+          "path": "svg/linking/reftests/href-use-element.html",
+          "references": [
+            [
+              "/svg/linking/reftests/href-use-element-ref.html",
+              "=="
+            ]
+          ],
+          "url": "/svg/linking/reftests/href-use-element.html"
         }
       ]
     }

@@ -9,15 +9,19 @@ include "ipc/nsGUIEventIPC.h";
 include protocol PCompositorBridge;
 
 using CSSRect from "Units.h";
+using LayoutDeviceCoord from "Units.h";
 using LayoutDeviceIntPoint from "Units.h";
+using mozilla::LayoutDevicePoint from "Units.h";
 using ScreenPoint from "Units.h";
 using struct mozilla::layers::ScrollableLayerGuid from "FrameMetrics.h";
 using mozilla::layers::MaybeZoomConstraints from "FrameMetrics.h";
 using mozilla::layers::TouchBehaviorFlags from "mozilla/layers/APZUtils.h";
 using mozilla::layers::AsyncDragMetrics from "mozilla/layers/AsyncDragMetrics.h";
+using mozilla::layers::GeckoContentController::TapType from "mozilla/layers/GeckoContentController.h";
 
 using nsEventStatus from "mozilla/EventForwards.h";
 using EventMessage from "mozilla/EventForwards.h";
+using mozilla::Modifiers from "mozilla/EventForwards.h";
 using class mozilla::WidgetInputEvent from "mozilla/BasicEvents.h";
 using class mozilla::WidgetMouseEventBase from "mozilla/MouseEvents.h";
 using mozilla::WidgetMouseEvent::Reason from "mozilla/MouseEvents.h";
@@ -28,12 +32,22 @@ using class mozilla::MultiTouchInput from "InputData.h";
 using class mozilla::MouseInput from "InputData.h";
 using class mozilla::PanGestureInput from "InputData.h";
 using class mozilla::PinchGestureInput from "InputData.h";
+using mozilla::PinchGestureInput::PinchGestureType from "InputData.h";
 using class mozilla::TapGestureInput from "InputData.h";
 using class mozilla::ScrollWheelInput from "InputData.h";
 
 namespace mozilla {
 namespace layers {
 
+/**
+ * PAPZCTreeManager is a protocol for remoting an IAPZCTreeManager. PAPZCTreeManager
+ * lives on the PCompositorBridge protocol which either connects to the compositor
+ * thread in the main process, or to the compositor thread in the gpu processs.
+ *
+ * PAPZCTreeManagerParent lives in the compositor thread, while PAPZCTreeManagerChild
+ * lives in the main thread of the main or the content process. APZCTreeManagerParent
+ * and APZCTreeManagerChild implement this protocol.
+ */
 sync protocol PAPZCTreeManager
 {
 manager PCompositorBridge;
@@ -111,6 +125,14 @@ parent:
              ScrollableLayerGuid    aOutTargetGuid);
 
   async __delete__();
+
+child:
+
+  async HandleTap(TapType aType, LayoutDevicePoint point, Modifiers aModifiers,
+                  ScrollableLayerGuid aGuid, uint64_t aInputBlockId);
+
+  async NotifyPinchGesture(PinchGestureType aType, ScrollableLayerGuid aGuid,
+                           LayoutDeviceCoord aSpanChange, Modifiers aModifiers);
 };
 
 } // namespace gfx

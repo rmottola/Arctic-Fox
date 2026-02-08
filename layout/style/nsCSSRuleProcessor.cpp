@@ -1102,18 +1102,6 @@ InitSystemMetrics()
   }
 
   metricResult =
-    LookAndFeel::GetInt(LookAndFeel::eIntID_ImagesInMenus);
-  if (metricResult) {
-    sSystemMetrics->AppendElement(nsGkAtoms::images_in_menus);
-  }
-
-  metricResult =
-    LookAndFeel::GetInt(LookAndFeel::eIntID_ImagesInButtons);
-  if (metricResult) {
-    sSystemMetrics->AppendElement(nsGkAtoms::images_in_buttons);
-  }
-
-  metricResult =
     LookAndFeel::GetInt(LookAndFeel::eIntID_UseOverlayScrollbars);
   if (metricResult) {
     sSystemMetrics->AppendElement(nsGkAtoms::overlay_scrollbars);
@@ -1274,7 +1262,7 @@ nsCSSRuleProcessor::GetContentState(Element* aElement, const TreeMatchContext& a
 
 /* static */
 bool
-nsCSSRuleProcessor::IsLink(Element* aElement)
+nsCSSRuleProcessor::IsLink(const Element* aElement)
 {
   EventStates state = aElement->StyleState();
   return state.HasAtLeastOneOfStates(NS_EVENT_STATE_VISITED | NS_EVENT_STATE_UNVISITED);
@@ -1463,12 +1451,8 @@ static inline bool
 edgeChildMatches(Element* aElement, TreeMatchContext& aTreeMatchContext,
                  bool checkFirst, bool checkLast)
 {
-  nsIContent *parent = aElement->GetParent();
-  if (!parent) {
-    return false;
-  }
-
-  if (aTreeMatchContext.mForStyling)
+  nsIContent* parent = aElement->GetParent();
+  if (parent && aTreeMatchContext.mForStyling)
     parent->SetFlags(NODE_HAS_EDGE_CHILD_SELECTOR);
 
   return (!checkFirst ||
@@ -1485,12 +1469,8 @@ nthChildGenericMatches(Element* aElement,
                        nsPseudoClassList* pseudoClass,
                        bool isOfType, bool isFromEnd)
 {
-  nsIContent *parent = aElement->GetParent();
-  if (!parent) {
-    return false;
-  }
-
-  if (aTreeMatchContext.mForStyling) {
+  nsIContent* parent = aElement->GetParent();
+  if (parent && aTreeMatchContext.mForStyling) {
     if (isFromEnd)
       parent->SetFlags(NODE_HAS_SLOW_SELECTOR);
     else
@@ -1527,11 +1507,7 @@ edgeOfTypeMatches(Element* aElement, TreeMatchContext& aTreeMatchContext,
                   bool checkFirst, bool checkLast)
 {
   nsIContent *parent = aElement->GetParent();
-  if (!parent) {
-    return false;
-  }
-
-  if (aTreeMatchContext.mForStyling) {
+  if (parent && aTreeMatchContext.mForStyling) {
     if (checkLast)
       parent->SetFlags(NODE_HAS_SLOW_SELECTOR);
     else
@@ -1943,7 +1919,7 @@ static bool SelectorMatches(Element* aElement,
           if (parent) {
             if (aTreeMatchContext.mForStyling)
               parent->SetFlags(NODE_HAS_EDGE_CHILD_SELECTOR);
-            
+
             uint32_t index = parent->GetChildCount();
             do {
               lastNode = parent->GetChildAt(--index);
@@ -2106,7 +2082,7 @@ static bool SelectorMatches(Element* aElement,
           nsCOMPtr<nsIMozBrowserFrame>
             browserFrame = do_QueryInterface(aElement);
           if (!browserFrame ||
-              !browserFrame->GetReallyIsBrowserOrApp()) {
+              !browserFrame->GetReallyIsBrowser()) {
             return false;
           }
         }

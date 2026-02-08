@@ -57,6 +57,7 @@
 #include "mozilla/AnimationComparator.h"
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/ContentEvents.h"
+#include "mozilla/DeclarationBlockInlines.h"
 #include "mozilla/EffectSet.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventListenerManager.h"
@@ -124,7 +125,6 @@
 #include "nsCSSParser.h"
 #include "prprf.h"
 #include "nsDOMMutationObserver.h"
-#include "nsSVGFeatures.h"
 #include "nsWrapperCacheInlines.h"
 #include "xpcpublic.h"
 #include "nsIScriptError.h"
@@ -150,6 +150,7 @@
 #include "mozilla/Preferences.h"
 #include "nsComputedDOMStyle.h"
 #include "nsDOMStringMap.h"
+#include "DOMIntersectionObserver.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -1743,7 +1744,7 @@ Element::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   // So for now, we just mark nodes as dirty when they're inserted into a
   // document or shadow tree.
   if (IsStyledByServo() && IsInComposedDoc()) {
-    MOZ_ASSERT(!ServoData().get());
+    MOZ_ASSERT(!HasServoData());
     SetIsDirtyForServo();
   }
 
@@ -1858,10 +1859,10 @@ Element::UnbindFromTree(bool aDeep, bool aNullParent)
   // Computed styled data isn't useful for detached nodes, and we'll need to
   // recomputed it anyway if we ever insert the nodes back into a document.
   if (IsStyledByServo()) {
-    ServoData().reset();
+    ClearServoData();
   } else {
 #ifdef MOZ_STYLO
-    MOZ_ASSERT(!ServoData());
+    MOZ_ASSERT(!HasServoData());
 #endif
   }
 
@@ -1967,7 +1968,7 @@ Element::GetSMILOverrideStyle()
   return slots->mSMILOverrideStyle;
 }
 
-css::Declaration*
+DeclarationBlock*
 Element::GetSMILOverrideStyleDeclaration()
 {
   Element::nsDOMSlots *slots = GetExistingDOMSlots();
@@ -1975,7 +1976,7 @@ Element::GetSMILOverrideStyleDeclaration()
 }
 
 nsresult
-Element::SetSMILOverrideStyleDeclaration(css::Declaration* aDeclaration,
+Element::SetSMILOverrideStyleDeclaration(DeclarationBlock* aDeclaration,
                                          bool aNotify)
 {
   Element::nsDOMSlots *slots = DOMSlots();
@@ -2015,14 +2016,14 @@ Element::IsInteractiveHTMLContent(bool aIgnoreTabindex) const
   return false;
 }
 
-css::Declaration*
+DeclarationBlock*
 Element::GetInlineStyleDeclaration()
 {
   return nullptr;
 }
 
 nsresult
-Element::SetInlineStyleDeclaration(css::Declaration* aDeclaration,
+Element::SetInlineStyleDeclaration(DeclarationBlock* aDeclaration,
                                    const nsAString* aSerialized,
                                    bool aNotify)
 {
@@ -2814,9 +2815,9 @@ Element::DescribeAttribute(uint32_t index, nsAString& aOutDescription) const
   aOutDescription.AppendLiteral("=\"");
   nsAutoString value;
   mAttrsAndChildren.AttrAt(index)->ToString(value);
-  for (int i = value.Length(); i >= 0; --i) {
-    if (value[i] == char16_t('"'))
-      value.Insert(char16_t('\\'), uint32_t(i));
+  for (uint32_t i = value.Length(); i > 0; --i) {
+    if (value[i - 1] == char16_t('"'))
+      value.Insert(char16_t('\\'), i - 1);
   }
   aOutDescription.Append(value);
   aOutDescription.Append('"');
@@ -3311,14 +3312,6 @@ Element::AttrValueToCORSMode(const nsAttrValue* aValue)
 static const char*
 GetFullScreenError(nsIDocument* aDoc)
 {
-  if (aDoc->NodePrincipal()->GetAppStatus() >= nsIPrincipal::APP_STATUS_INSTALLED) {
-    // Request is in a web app and in the same origin as the web app.
-    // Don't enforce as strict security checks for web apps, the user
-    // is supposed to have trust in them. However documents cross-origin
-    // to the web app must still confirm to the normal security checks.
-    return nullptr;
-  }
-
   if (!nsContentUtils::IsRequestFullScreenAllowed()) {
     return "FullscreenDeniedNotInputDriven";
   }
@@ -3327,7 +3320,7 @@ GetFullScreenError(nsIDocument* aDoc)
 }
 
 void
-Element::RequestFullscreen(ErrorResult& aError)
+Element::RequestFullscreen(CallerType aCallerType, ErrorResult& aError)
 {
   // Only grant full-screen requests if this is called from inside a trusted
   // event handler (i.e. inside an event handler for a user initiated event).
@@ -3342,15 +3335,15 @@ Element::RequestFullscreen(ErrorResult& aError)
   }
 
   auto request = MakeUnique<FullscreenRequest>(this);
-  request->mIsCallerChrome = nsContentUtils::IsCallerChrome();
+  request->mIsCallerChrome = (aCallerType == CallerType::System);
 
   OwnerDoc()->AsyncRequestFullScreen(Move(request));
 }
 
 void
-Element::RequestPointerLock()
+Element::RequestPointerLock(CallerType aCallerType)
 {
-  OwnerDoc()->RequestPointerLock(this);
+  OwnerDoc()->RequestPointerLock(this, aCallerType);
 }
 
 void
@@ -3891,3 +3884,44 @@ Element::ClearDataset()
   slots->mDataset = nullptr;
 }
 
+nsTArray<Element::nsDOMSlots::IntersectionObserverRegistration>*
+Element::RegisteredIntersectionObservers()
+{
+  nsDOMSlots* slots = DOMSlots();
+  return &slots->mRegisteredIntersectionObservers;
+}
+
+void
+Element::RegisterIntersectionObserver(DOMIntersectionObserver* aObserver)
+{
+  RegisteredIntersectionObservers()->AppendElement(
+    nsDOMSlots::IntersectionObserverRegistration { aObserver, -1 });
+}
+
+void
+Element::UnregisterIntersectionObserver(DOMIntersectionObserver* aObserver)
+{
+  nsTArray<nsDOMSlots::IntersectionObserverRegistration>* observers =
+    RegisteredIntersectionObservers();
+  for (uint32_t i = 0; i < observers->Length(); ++i) {
+    nsDOMSlots::IntersectionObserverRegistration reg = observers->ElementAt(i);
+    if (reg.observer == aObserver) {
+      observers->RemoveElementAt(i);
+      break;
+    }
+  }
+}
+
+bool
+Element::UpdateIntersectionObservation(DOMIntersectionObserver* aObserver, int32_t aThreshold)
+{
+  nsTArray<nsDOMSlots::IntersectionObserverRegistration>* observers =
+    RegisteredIntersectionObservers();
+  for (auto& reg : *observers) {
+    if (reg.observer == aObserver && reg.previousThreshold != aThreshold) {
+      reg.previousThreshold = aThreshold;
+      return true;
+    }
+  }
+  return false;
+}

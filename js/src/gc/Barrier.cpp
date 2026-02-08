@@ -9,7 +9,6 @@
 #include "jscompartment.h"
 #include "jsobj.h"
 
-#include "asmjs/WasmJS.h"
 #include "builtin/TypedObject.h"
 #include "gc/Policy.h"
 #include "gc/Zone.h"
@@ -18,12 +17,19 @@
 #include "vm/EnvironmentObject.h"
 #include "vm/SharedArrayObject.h"
 #include "vm/Symbol.h"
+#include "wasm/WasmJS.h"
 
 namespace js {
 
+bool
+RuntimeFromMainThreadIsHeapMajorCollecting(JS::shadow::Zone* shadowZone)
+{
+    return shadowZone->runtimeFromMainThread()->isHeapMajorCollecting();
+}
+
 #ifdef DEBUG
 
-static bool
+bool
 IsMarkedBlack(NativeObject* obj)
 {
     // Note: we assume conservatively that Nursery things will be live.
@@ -55,12 +61,6 @@ HeapSlot::preconditionForWriteBarrierPost(NativeObject* obj, Kind kind, uint32_t
     bool isBlackToGray = target.isMarkable() &&
                          IsMarkedBlack(obj) && JS::GCThingIsMarkedGray(JS::GCCellPtr(target));
     return isCorrectSlot && !isBlackToGray;
-}
-
-bool
-RuntimeFromMainThreadIsHeapMajorCollecting(JS::shadow::Zone* shadowZone)
-{
-    return shadowZone->runtimeFromMainThread()->isHeapMajorCollecting();
 }
 
 bool

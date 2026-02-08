@@ -71,7 +71,6 @@
 #include "WebGLSampler.h"
 #include "WebGLShader.h"
 #include "WebGLSync.h"
-#include "WebGLTimerQuery.h"
 #include "WebGLTransformFeedback.h"
 #include "WebGLVertexArray.h"
 #include "WebGLVertexAttribData.h"
@@ -246,21 +245,22 @@ WebGLContext::DestroyResourcesAndContext()
     mBoundCopyWriteBuffer = nullptr;
     mBoundPixelPackBuffer = nullptr;
     mBoundPixelUnpackBuffer = nullptr;
-    mBoundTransformFeedbackBuffer = nullptr;
     mBoundUniformBuffer = nullptr;
     mCurrentProgram = nullptr;
     mActiveProgramLinkInfo = nullptr;
     mBoundDrawFramebuffer = nullptr;
     mBoundReadFramebuffer = nullptr;
-    mActiveOcclusionQuery = nullptr;
     mBoundRenderbuffer = nullptr;
     mBoundVertexArray = nullptr;
     mDefaultVertexArray = nullptr;
     mBoundTransformFeedback = nullptr;
     mDefaultTransformFeedback = nullptr;
 
-    mBoundTransformFeedbackBuffers.Clear();
-    mBoundUniformBuffers.Clear();
+    mQuerySlot_SamplesPassed = nullptr;
+    mQuerySlot_TFPrimsWritten = nullptr;
+    mQuerySlot_TimeElapsed = nullptr;
+
+    mIndexedUniformBufferBindings.clear();
 
     //////
 
@@ -273,7 +273,6 @@ WebGLContext::DestroyResourcesAndContext()
     ClearLinkedList(mShaders);
     ClearLinkedList(mSyncs);
     ClearLinkedList(mTextures);
-    ClearLinkedList(mTimerQueries);
     ClearLinkedList(mTransformFeedbacks);
     ClearLinkedList(mVertexArrays);
 
@@ -570,7 +569,7 @@ BaseCaps(const WebGLContextOptions& options, WebGLContext* webgl)
         if (!forwarder)
             break;
 
-        baseCaps.surfaceAllocator = static_cast<layers::ISurfaceAllocator*>(forwarder);
+        baseCaps.surfaceAllocator = forwarder->GetTextureForwarder();
     } while (false);
 #endif
 
@@ -685,8 +684,11 @@ WebGLContext::CreateAndInitGLWith(FnCreateGL_T fnCreateGL,
 
         fallbackCaps.pop();
     }
-    if (!potentialGL)
+    if (!potentialGL) {
+        out_failReasons->push_back(FailureReason("FEATURE_FAILURE_WEBGL_EXHAUSTED_CAPS",
+                                                 "Exhausted GL driver caps."));
         return false;
+    }
 
     FailureReason reason;
 
@@ -1632,23 +1634,16 @@ WebGLContext::DummyReadFramebufferOperation(const char* funcName)
     if (!mBoundReadFramebuffer)
         return; // Infallible.
 
-    nsCString fbStatusInfo;
-    const auto status = mBoundReadFramebuffer->CheckFramebufferStatus(&fbStatusInfo);
+    const auto status = mBoundReadFramebuffer->CheckFramebufferStatus(funcName);
 
     if (status != LOCAL_GL_FRAMEBUFFER_COMPLETE) {
-        nsCString errorText("Incomplete framebuffer");
-
-        if (fbStatusInfo.Length()) {
-            errorText += ": ";
-            errorText += fbStatusInfo;
-        }
-
-        ErrorInvalidFramebufferOperation("%s: %s.", funcName, errorText.BeginReading());
+        ErrorInvalidFramebufferOperation("%s: Framebuffer must be complete.",
+                                         funcName);
     }
 }
 
 bool
-WebGLContext::HasTimestampBits() const
+WebGLContext::Has64BitTimestamps() const
 {
     // 'sync' provides glGetInteger64v either by supporting ARB_sync, GL3+, or GLES3+.
     return gl->IsSupported(GLFeature::sync);
@@ -1946,8 +1941,18 @@ WebGLContext::GetSurfaceSnapshot(bool* out_premultAlpha)
     {
         ScopedBindFramebuffer autoFB(gl, 0);
         ClearBackbufferIfNeeded();
-        // TODO: Save, override, then restore glReadBuffer if present.
+
+        // Save, override, then restore glReadBuffer.
+        const GLenum readBufferMode = gl->Screen()->GetReadBufferMode();
+
+        if (readBufferMode != LOCAL_GL_BACK) {
+            gl->fReadBuffer(LOCAL_GL_BACK);
+        }
         ReadPixelsIntoDataSurface(gl, surf);
+
+        if (readBufferMode != LOCAL_GL_BACK) {
+            gl->fReadBuffer(readBufferMode);
+        }
     }
 
     if (out_premultAlpha) {
@@ -2073,6 +2078,30 @@ WebGLContext::ScopedMaskWorkaround::HasDepthButNoStencil(const WebGLFramebuffer*
 
 ////////////////////////////////////////
 
+IndexedBufferBinding::IndexedBufferBinding()
+    : mRangeStart(0)
+    , mRangeSize(0)
+{ }
+
+uint64_t
+IndexedBufferBinding::ByteCount() const
+{
+    if (!mBufferBinding)
+        return 0;
+
+    uint64_t bufferSize = mBufferBinding->ByteLength();
+    if (!mRangeSize) // BindBufferBase
+        return bufferSize;
+
+    if (mRangeStart >= bufferSize)
+        return 0;
+    bufferSize -= mRangeStart;
+
+    return std::min(bufferSize, mRangeSize);
+}
+
+////////////////////////////////////////
+
 ScopedUnpackReset::ScopedUnpackReset(WebGLContext* webgl)
     : ScopedGLWrapper<ScopedUnpackReset>(webgl->gl)
     , mWebGL(webgl)
@@ -2108,6 +2137,57 @@ ScopedUnpackReset::UnwrapImpl()
         }
 
         mGL->fBindBuffer(LOCAL_GL_PIXEL_UNPACK_BUFFER, pbo);
+    }
+}
+
+////////////////////
+
+void
+ScopedFBRebinder::UnwrapImpl()
+{
+    const auto fnName = [&](WebGLFramebuffer* fb) {
+        return fb ? fb->mGLName : 0;
+    };
+
+    if (mWebGL->IsWebGL2()) {
+        mGL->fBindFramebuffer(LOCAL_GL_DRAW_FRAMEBUFFER, fnName(mWebGL->mBoundDrawFramebuffer));
+        mGL->fBindFramebuffer(LOCAL_GL_READ_FRAMEBUFFER, fnName(mWebGL->mBoundReadFramebuffer));
+    } else {
+        MOZ_ASSERT(mWebGL->mBoundDrawFramebuffer == mWebGL->mBoundReadFramebuffer);
+        mGL->fBindFramebuffer(LOCAL_GL_FRAMEBUFFER, fnName(mWebGL->mBoundDrawFramebuffer));
+    }
+}
+
+////////////////////
+
+static GLenum
+TargetIfLazy(GLenum target)
+{
+    switch (target) {
+    case LOCAL_GL_PIXEL_PACK_BUFFER:
+    case LOCAL_GL_PIXEL_UNPACK_BUFFER:
+        return target;
+
+    default:
+        return 0;
+    }
+}
+
+ScopedLazyBind::ScopedLazyBind(gl::GLContext* gl, GLenum target, const WebGLBuffer* buf)
+    : ScopedGLWrapper<ScopedLazyBind>(gl)
+    , mTarget(buf ? TargetIfLazy(target) : 0)
+    , mBuf(buf)
+{
+    if (mTarget) {
+        mGL->fBindBuffer(mTarget, mBuf->mGLName);
+    }
+}
+
+void
+ScopedLazyBind::UnwrapImpl()
+{
+    if (mTarget) {
+        mGL->fBindBuffer(mTarget, 0);
     }
 }
 
@@ -2420,7 +2500,60 @@ WebGLContext::StartVRPresentation()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+bool
+WebGLContext::ValidateArrayBufferView(const char* funcName,
+                                      const dom::ArrayBufferView& view, GLuint elemOffset,
+                                      GLuint elemCountOverride, uint8_t** const out_bytes,
+                                      size_t* const out_byteLen)
+{
+    view.ComputeLengthAndData();
+    uint8_t* const bytes = view.DataAllowShared();
+    const size_t byteLen = view.LengthAllowShared();
+
+    const auto& elemType = view.Type();
+    const auto& elemSize = js::Scalar::byteSize(elemType);
+
+    size_t elemCount = byteLen / elemSize;
+    if (elemOffset > elemCount) {
+        ErrorInvalidValue("%s: Invalid offset into ArrayBufferView.", funcName);
+        return false;
+    }
+    elemCount -= elemOffset;
+
+    if (elemCountOverride) {
+        if (elemCountOverride > elemCount) {
+            ErrorInvalidValue("%s: Invalid sub-length for ArrayBufferView.", funcName);
+            return false;
+        }
+        elemCount = elemCountOverride;
+    }
+
+    *out_bytes = bytes + (elemOffset * elemSize);
+    *out_byteLen = elemCount * elemSize;
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // XPCOM goop
+
+void
+ImplCycleCollectionTraverse(nsCycleCollectionTraversalCallback& callback,
+                            const std::vector<IndexedBufferBinding>& field,
+                            const char* name, uint32_t flags)
+{
+    for (const auto& cur : field) {
+        ImplCycleCollectionTraverse(callback, cur.mBufferBinding, name, flags);
+    }
+}
+
+void
+ImplCycleCollectionUnlink(std::vector<IndexedBufferBinding>& field)
+{
+    field.clear();
+}
+
+////
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(WebGLContext)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(WebGLContext)
@@ -2439,7 +2572,7 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(WebGLContext,
   mBoundCopyWriteBuffer,
   mBoundPixelPackBuffer,
   mBoundPixelUnpackBuffer,
-  mBoundTransformFeedbackBuffer,
+  mBoundTransformFeedback,
   mBoundUniformBuffer,
   mCurrentProgram,
   mBoundDrawFramebuffer,
@@ -2447,8 +2580,9 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(WebGLContext,
   mBoundRenderbuffer,
   mBoundVertexArray,
   mDefaultVertexArray,
-  mActiveOcclusionQuery,
-  mActiveTransformFeedbackQuery)
+  mQuerySlot_SamplesPassed,
+  mQuerySlot_TFPrimsWritten,
+  mQuerySlot_TimeElapsed)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(WebGLContext)
     NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY

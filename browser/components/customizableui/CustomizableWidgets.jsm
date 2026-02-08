@@ -61,7 +61,7 @@ XPCOMUtils.defineLazyGetter(this, "log", () => {
 
 function setAttributes(aNode, aAttrs) {
   let doc = aNode.ownerDocument;
-  for (let [name, value] of Iterator(aAttrs)) {
+  for (let [name, value] of Object.entries(aAttrs)) {
     if (!value) {
       if (aNode.hasAttribute(name))
         aNode.removeAttribute(name);
@@ -181,7 +181,7 @@ const CustomizableWidgets = [
     onViewShowing: function(aEvent) {
       // Populate our list of history
       const kMaxResults = 15;
-      let doc = aEvent.detail.ownerDocument;
+      let doc = aEvent.target.ownerDocument;
       let win = doc.defaultView;
 
       let options = PlacesUtils.history.getNewQueryOptions();
@@ -916,7 +916,7 @@ const CustomizableWidgets = [
       }
     },
     onViewShowing: function(aEvent) {
-      let doc = aEvent.detail.ownerDocument;
+      let doc = aEvent.target.ownerDocument;
       let container = doc.getElementById("PanelUI-feeds");
       let gotView = doc.defaultView.FeedHandler.buildFeedList(container, true);
 
@@ -1135,7 +1135,7 @@ const CustomizableWidgets = [
       }
     },
     onViewShowing: function(aEvent) {
-      let doc = aEvent.detail.ownerDocument;
+      let doc = aEvent.target.ownerDocument;
 
       let items = doc.getElementById("PanelUI-containersItems");
 
@@ -1271,8 +1271,9 @@ if (AppConstants.E10S_TESTING_ONLY) {
       id: "e10s-button",
       defaultArea: CustomizableUI.AREA_PANEL,
       onBuild: function(aDocument) {
-          node.setAttribute("label", CustomizableUI.getLocalizedProperty(this, "label"));
-          node.setAttribute("tooltiptext", CustomizableUI.getLocalizedProperty(this, "tooltiptext"));
+        let node = aDocument.createElementNS(kNSXUL, "toolbarbutton");
+        node.setAttribute("label", CustomizableUI.getLocalizedProperty(this, "label"));
+        node.setAttribute("tooltiptext", CustomizableUI.getLocalizedProperty(this, "tooltiptext"));
       },
       onCommand: function(aEvent) {
         let win = aEvent.view;

@@ -30,11 +30,11 @@ class JSObject2WrappedJSMap
     using Map = js::HashMap<JS::Heap<JSObject*>,
                             nsXPCWrappedJS*,
                             js::MovableCellHasher<JS::Heap<JSObject*>>,
-                            js::SystemAllocPolicy>;
+                            InfallibleAllocPolicy>;
 
 public:
     static JSObject2WrappedJSMap* newMap(int length) {
-        JSObject2WrappedJSMap* map = new JSObject2WrappedJSMap();
+        auto* map = new JSObject2WrappedJSMap();
         if (!map->mTable.init(length)) {
             // This is a decent estimate of the size of the hash table's
             // entry storage. The |2| is because on average the capacity is
@@ -83,7 +83,7 @@ public:
             r.front().value()->DebugDump(depth);
     }
 
-    void UpdateWeakPointersAfterGC(XPCJSRuntime* runtime);
+    void UpdateWeakPointersAfterGC(XPCJSContext* context);
 
     void ShutdownMarker();
 
@@ -278,7 +278,12 @@ public:
     struct Entry : public PLDHashEntryHdr
     {
         nsIClassInfo* key;
-        XPCNativeSet* value;
+        XPCNativeSet* value; // strong reference
+        static const PLDHashTableOps sOps;
+
+    private:
+        static bool Match(const PLDHashEntryHdr* aEntry, const void* aKey);
+        static void Clear(PLDHashTable* aTable, PLDHashEntryHdr* aEntry);
     };
 
     static ClassInfo2NativeSetMap* newMap(int length);
@@ -298,7 +303,7 @@ public:
         if (entry->key)
             return entry->value;
         entry->key = info;
-        entry->value = set;
+        NS_ADDREF(entry->value = set);
         return set;
     }
 
@@ -310,11 +315,9 @@ public:
 
     inline uint32_t Count() { return mTable.EntryCount(); }
 
-    PLDHashTable::Iterator Iter() { return mTable.Iter(); }
-
     // ClassInfo2NativeSetMap holds pointers to *some* XPCNativeSets.
     // So we don't want to count those XPCNativeSets, because they are better
-    // counted elsewhere (i.e. in XPCJSRuntime::mNativeSetMap, which holds
+    // counted elsewhere (i.e. in XPCJSContext::mNativeSetMap, which holds
     // pointers to *all* XPCNativeSets).  Hence the "Shallow".
     size_t ShallowSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
 
@@ -413,11 +416,25 @@ public:
         return set;
     }
 
+    bool AddNew(const XPCNativeSetKey* key, XPCNativeSet* set)
+    {
+        XPCNativeSet* set2 = Add(key, set);
+        if (!set2) {
+            return false;
+        }
+#ifdef DEBUG
+        XPCNativeSetKey key2(set);
+        MOZ_ASSERT(key->Hash() == key2.Hash());
+        MOZ_ASSERT(set2 == set, "Should not have found an existing entry");
+#endif
+        return true;
+    }
+
     inline void Remove(XPCNativeSet* set)
     {
         MOZ_ASSERT(set, "bad param");
 
-        XPCNativeSetKey key(set, nullptr, 0);
+        XPCNativeSetKey key(set);
         mTable.Remove(&key);
     }
 
@@ -575,7 +592,7 @@ class JSObject2JSObjectMap
 
 public:
     static JSObject2JSObjectMap* newMap(int length) {
-        JSObject2JSObjectMap* map = new JSObject2JSObjectMap();
+        auto* map = new JSObject2JSObjectMap();
         if (!map->mTable.init(length)) {
             // This is a decent estimate of the size of the hash table's
             // entry storage. The |2| is because on average the capacity is

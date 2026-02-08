@@ -10,6 +10,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/RangedPtr.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/TypeTraits.h"
 #include "mozilla/Unused.h"
 
@@ -187,7 +188,7 @@ JSString::dumpRepresentationHeader(FILE* fp, int indent, const char* subclass) c
     uint32_t flags = d.u1.flags;
     // Print the string's address as an actual C++ expression, to facilitate
     // copy-and-paste into a debugger.
-    fprintf(fp, "((%s*) %p) length: %zu  flags: 0x%x", subclass, this, length(), flags);
+    fprintf(fp, "((%s*) %p) length: %" PRIuSIZE "  flags: 0x%x", subclass, this, length(), flags);
     if (flags & FLAT_BIT)               fputs(" FLAT", fp);
     if (flags & HAS_BASE_BIT)           fputs(" HAS_BASE", fp);
     if (flags & INLINE_CHARS_BIT)       fputs(" INLINE_CHARS", fp);
@@ -644,7 +645,7 @@ template JSString*
 js::ConcatStrings<CanGC>(ExclusiveContext* cx, HandleString left, HandleString right);
 
 template JSString*
-js::ConcatStrings<NoGC>(ExclusiveContext* cx, JSString* left, JSString* right);
+js::ConcatStrings<NoGC>(ExclusiveContext* cx, JSString* const& left, JSString* const& right);
 
 template <typename CharT>
 JSFlatString*
@@ -688,7 +689,7 @@ JSDependentString::dumpRepresentation(FILE* fp, int indent) const
     dumpRepresentationHeader(fp, indent, "JSDependentString");
     indent += 2;
 
-    fprintf(fp, "%*soffset: %zu\n", indent, "", baseOffset());
+    fprintf(fp, "%*soffset: %" PRIuSIZE "\n", indent, "", baseOffset());
     fprintf(fp, "%*sbase: ", indent, "");
     base()->dumpRepresentation(fp, indent);
 }
@@ -1303,6 +1304,42 @@ NewStringCopyN<CanGC>(ExclusiveContext* cx, const Latin1Char* s, size_t n);
 template JSFlatString*
 NewStringCopyN<NoGC>(ExclusiveContext* cx, const Latin1Char* s, size_t n);
 
+
+template <js::AllowGC allowGC>
+JSFlatString*
+NewStringCopyUTF8N(JSContext* cx, const JS::UTF8Chars utf8)
+{
+    JS::SmallestEncoding encoding = JS::FindSmallestEncoding(utf8);
+    if (encoding == JS::SmallestEncoding::ASCII)
+        return NewStringCopyN<allowGC>(cx, utf8.begin().get(), utf8.length());
+
+    size_t length;
+    if (encoding == JS::SmallestEncoding::Latin1) {
+        Latin1Char* latin1 = UTF8CharsToNewLatin1CharsZ(cx, utf8, &length).get();
+        if (!latin1)
+            return nullptr;
+
+        JSFlatString* result = NewString<allowGC>(cx, latin1, length);
+        if (!result)
+            js_free((void*)latin1);
+        return result;
+    }
+
+    MOZ_ASSERT(encoding == JS::SmallestEncoding::UTF16);
+
+    char16_t* utf16 = UTF8CharsToNewTwoByteCharsZ(cx, utf8, &length).get();
+    if (!utf16)
+        return nullptr;
+
+    JSFlatString* result = NewString<allowGC>(cx, utf16, length);
+    if (!result)
+        js_free((void*)utf16);
+    return result;
+}
+
+template JSFlatString*
+NewStringCopyUTF8N<CanGC>(JSContext* cx, const JS::UTF8Chars utf8);
+
 } /* namespace js */
 
 #ifdef DEBUG
@@ -1312,7 +1349,7 @@ JSExtensibleString::dumpRepresentation(FILE* fp, int indent) const
     dumpRepresentationHeader(fp, indent, "JSExtensibleString");
     indent += 2;
 
-    fprintf(fp, "%*scapacity: %zu\n", indent, "", capacity());
+    fprintf(fp, "%*scapacity: %" PRIuSIZE "\n", indent, "", capacity());
     dumpRepresentationChars(fp, indent);
 }
 

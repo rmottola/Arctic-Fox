@@ -184,7 +184,7 @@ MacroAssembler::add64(Imm64 imm, Register64 dest)
 void
 MacroAssembler::addConstantDouble(double d, FloatRegister dest)
 {
-    Double* dbl = getDouble(d);
+    Double* dbl = getDouble(wasm::RawF64(d));
     if (!dbl)
         return;
     masm.vaddsd_mr(nullptr, dest.encoding(), dest.encoding());
@@ -611,6 +611,17 @@ MacroAssembler::popcnt64(Register64 src, Register64 dest, Register tmp)
 }
 
 // ===============================================================
+// Condition functions
+
+template <typename T1, typename T2>
+void
+MacroAssembler::cmpPtrSet(Condition cond, T1 lhs, T2 rhs, Register dest)
+{
+    cmpPtr(lhs, rhs);
+    emitSet(cond, dest);
+}
+
+// ===============================================================
 // Branch functions
 
 void
@@ -953,6 +964,25 @@ MacroAssembler::truncateDoubleToUInt64(Address src, Address dest, Register temp,
     store32(temp, Address(dest.base, dest.offset + INT64HIGH_OFFSET));
 
     bind(&done);
+}
+
+// ========================================================================
+// wasm support
+
+template <class L>
+void
+MacroAssembler::wasmBoundsCheck(Condition cond, Register index, L label)
+{
+    CodeOffset off = cmp32WithPatch(index, Imm32(0));
+    append(wasm::BoundsCheck(off.offset()));
+
+    j(cond, label);
+}
+
+void
+MacroAssembler::wasmPatchBoundsCheck(uint8_t* patchAt, uint32_t limit)
+{
+    reinterpret_cast<uint32_t*>(patchAt)[-1] = limit;
 }
 
 //}}} check_macroassembler_style

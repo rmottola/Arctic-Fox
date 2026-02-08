@@ -22,7 +22,7 @@ loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", 
 loader.lazyRequireGetter(this, "showDoorhanger", "devtools/client/shared/doorhanger", true);
 loader.lazyRequireGetter(this, "viewSource", "devtools/client/shared/view-source");
 
-const STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
+const STRINGS_URI = "devtools/locale/webconsole.properties";
 var l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 
 const BROWSER_CONSOLE_WINDOW_FEATURES = "chrome,titlebar,toolbar,centerscreen,resizable,dialog=no";
@@ -698,7 +698,7 @@ BrowserConsole.prototype = extend(WebConsole.prototype, {
 
     let chromeWindow = this.chromeWindow;
     this.$destroy().then(() =>
-      this.target.client.close(() => {
+      this.target.client.close().then(() => {
         HUDService._browserConsoleID = null;
         chromeWindow.close();
         this._bc_destroyer.resolve(null);

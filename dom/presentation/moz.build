@@ -32,6 +32,7 @@ EXPORTS.mozilla.dom += [
 ]
 
 UNIFIED_SOURCES += [
+    'AvailabilityCollection.cpp',
     'ControllerConnectionCollection.cpp',
     'DCPresentationChannelDescription.cpp',
     'ipc/PresentationBuilderChild.cpp',
@@ -49,11 +50,11 @@ UNIFIED_SOURCES += [
     'PresentationReceiver.cpp',
     'PresentationRequest.cpp',
     'PresentationService.cpp',
-    'PresentationServiceBase.cpp',
     'PresentationSessionInfo.cpp',
     'PresentationSessionRequest.cpp',
     'PresentationTCPSessionTransport.cpp',
     'PresentationTerminateRequest.cpp',
+    'PresentationTransportBuilderConstructor.cpp'
 ]
 
 EXTRA_COMPONENTS += [

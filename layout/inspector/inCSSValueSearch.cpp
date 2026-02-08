@@ -4,7 +4,7 @@
 
 #include "inCSSValueSearch.h"
 
-#include "mozilla/CSSStyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 #include "mozilla/dom/StyleSheetList.h"
 #include "nsIComponentManager.h"
 #include "nsIServiceManager.h"
@@ -98,7 +98,7 @@ inCSSValueSearch::SearchSync()
 
   uint32_t length = sheets->Length();
   for (uint32_t i = 0; i < length; ++i) {
-    RefPtr<CSSStyleSheet> sheet = sheets->Item(i);
+    RefPtr<StyleSheet> sheet = sheets->Item(i);
     SearchStyleSheet(sheet, baseURI);
   }
 
@@ -361,7 +361,8 @@ inCSSValueSearch::SearchStyleValue(const nsAFlatString& aValue, nsIURI* aBaseURL
     nsresult rv = NS_NewURI(getter_AddRefs(uri), url, nullptr, aBaseURL);
     NS_ENSURE_SUCCESS(rv, rv);
     nsAutoCString spec;
-    uri->GetSpec(spec);
+    rv = uri->GetSpec(spec);
+    NS_ENSURE_SUCCESS(rv, rv);
     nsAutoString *result = new NS_ConvertUTF8toUTF16(spec);
     if (mReturnRelativeURLs)
       EqualizeURL(result);

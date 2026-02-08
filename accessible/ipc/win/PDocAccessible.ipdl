@@ -4,6 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+include protocol PFileDescriptorSet;
 include protocol PBrowser;
 
 using mozilla::a11y::IAccessibleHolder from "mozilla/a11y/COMPtrTypes.h";
@@ -14,10 +15,10 @@ namespace a11y {
 struct AccessibleData
 {
   uint64_t ID;
+  int32_t MsaaID;
   uint32_t Role;
   uint32_t ChildrenCount;
   uint32_t Interfaces;
-  IAccessibleHolder COMProxy;
 };
 
 struct ShowEventData
@@ -45,7 +46,7 @@ parent:
    * event.
    */
   async Event(uint64_t aID, uint32_t type);
-  async ShowEvent(ShowEventData data, bool aFromuser);
+  async ShowEvent(ShowEventData data, bool aFromUser);
   async HideEvent(uint64_t aRootID, bool aFromUser);
   async StateChangeEvent(uint64_t aID, uint64_t aState, bool aEnabled);
   async CaretMoveEvent(uint64_t aID, int32_t aOffset);

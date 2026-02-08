@@ -15,6 +15,8 @@
 
 #include "nsDebug.h"
 
+#include "mozilla/Sprintf.h"
+
 @interface CALayer (ContentsScale)
 - (double)contentsScale;
 - (void)setContentsScale:(double)scale;
@@ -26,14 +28,10 @@ using namespace mozilla::plugins::PluginUtilsOSX;
   DrawPluginFunc mDrawFunc;
   void* mPluginInstance;
   nsIntRect mUpdateRect;
-  BOOL mAvoidCGCrashes;
-  CGContextRef mLastCGContext;
 }
 - (void)setDrawFunc:(DrawPluginFunc)aFunc
-     pluginInstance:(void*)aPluginInstance
-     avoidCGCrashes:(BOOL)aAvoidCGCrashes;
+     pluginInstance:(void*)aPluginInstance;
 - (void)updateRect:(nsIntRect)aRect;
-- (void)protectLastCGContext;
 
 @end
 
@@ -61,43 +59,9 @@ CGBitmapContextSetDataFunc CGBitmapContextSetDataPtr = NULL;
 
 - (void) setDrawFunc:(DrawPluginFunc)aFunc
       pluginInstance:(void*)aPluginInstance
-      avoidCGCrashes:(BOOL)aAvoidCGCrashes
 {
   mDrawFunc = aFunc;
   mPluginInstance = aPluginInstance;
-  mAvoidCGCrashes = aAvoidCGCrashes;
-  mLastCGContext = nil;
-}
-
-// The Flash plugin, in very unusual circumstances, can (in CoreGraphics
-// mode) try to access the CGContextRef from -[CGBridgeLayer drawInContext:]
-// outside of any call to NPP_HandleEvent(NPCocoaEventDrawRect).  This usually
-// crashes the plugin process (probably because it tries to access deleted
-// memory).  We stop these crashes from happening by holding a reference to
-// the CGContextRef, and also by ensuring that it's data won't get deleted.
-// The CGContextRef won't "work" in this form.  But this won't cause trouble
-// for plugins that do things correctly (that don't access this CGContextRef
-// outside of the call to NPP_HandleEvent() that passes it to the plugin).
-// The OS may reuse this CGContextRef (it may get passed to other calls to
-// -[CGBridgeLayer drawInContext:]).  But before each call the OS calls
-// CGBitmapContextSetData() to replace its data, which undoes the changes
-// we make here.  See bug 804606.
-- (void)protectLastCGContext
-{
-  if (!mAvoidCGCrashes || !mLastCGContext) {
-    return;
-  }
-
-  static char ensuredData[128] = {0};
-
-  if (!CGBitmapContextSetDataPtr) {
-    CGBitmapContextSetDataPtr = (CGBitmapContextSetDataFunc)
-      dlsym(RTLD_DEFAULT, "CGBitmapContextSetData");
-  }
-
-  if (CGBitmapContextSetDataPtr && (GetContextType(mLastCGContext) == CG_CONTEXT_TYPE_BITMAP)) {
-    CGBitmapContextSetDataPtr(mLastCGContext, 0, 0, 1, 1, ensuredData, 8, 32, 64);
-  }
 }
 
 - (void)drawInContext:(CGContextRef)aCGContext
@@ -106,36 +70,20 @@ CGBitmapContextSetDataFunc CGBitmapContextSetDataPtr = NULL;
   ::CGContextTranslateCTM(aCGContext, 0, self.bounds.size.height);
   ::CGContextScaleCTM(aCGContext, (CGFloat) 1, (CGFloat) -1);
 
-  mUpdateRect = nsIntRect(0, 0, self.bounds.size.width, self.bounds.size.height);
+  mUpdateRect = nsIntRect::Truncate(0, 0, self.bounds.size.width, self.bounds.size.height);
 
   mDrawFunc(aCGContext, mPluginInstance, mUpdateRect);
 
   ::CGContextRestoreGState(aCGContext);
 
-  if (mAvoidCGCrashes) {
-    if (mLastCGContext) {
-      ::CGContextRelease(mLastCGContext);
-    }
-    mLastCGContext = aCGContext;
-    ::CGContextRetain(mLastCGContext);
-  }
-
   mUpdateRect.SetEmpty();
-}
-
-- (void)dealloc
-{
-  if (mLastCGContext) {
-    ::CGContextRelease(mLastCGContext);
-  }
-  [super dealloc];
 }
 
 @end
 
-void* mozilla::plugins::PluginUtilsOSX::GetCGLayer(DrawPluginFunc aFunc, void* aPluginInstance,
-                                                   bool aAvoidCGCrashes, double aContentsScaleFactor)
-{
+void* mozilla::plugins::PluginUtilsOSX::GetCGLayer(DrawPluginFunc aFunc, 
+                                                   void* aPluginInstance, 
+                                                   double aContentsScaleFactor) {
   CGBridgeLayer *bridgeLayer = [[CGBridgeLayer alloc] init];
 
   // We need to make bridgeLayer behave properly when its superlayer changes
@@ -165,8 +113,7 @@ void* mozilla::plugins::PluginUtilsOSX::GetCGLayer(DrawPluginFunc aFunc, void* a
 #endif
 
   [bridgeLayer setDrawFunc:aFunc
-            pluginInstance:aPluginInstance
-            avoidCGCrashes:aAvoidCGCrashes];
+            pluginInstance:aPluginInstance];
   return bridgeLayer;
 }
 
@@ -182,7 +129,6 @@ void mozilla::plugins::PluginUtilsOSX::Repaint(void *caLayer, nsIntRect aRect) {
   [bridgeLayer setNeedsDisplay];
   [bridgeLayer displayIfNeeded];
   [CATransaction commit];
-  [bridgeLayer protectLastCGContext];
 }
 
 @interface EventProcessor : NSObject {
@@ -278,12 +224,11 @@ bool mozilla::plugins::PluginUtilsOSX::SetProcessName(const char* aProcessName) 
     return false;
   }
 
-  NSString *currentName = [[[NSBundle mainBundle] localizedInfoDictionary] 
+  NSString *currentName = [[[NSBundle mainBundle] localizedInfoDictionary]
                               objectForKey:(NSString *)kCFBundleNameKey];
 
   char formattedName[1024];
-  snprintf(formattedName, sizeof(formattedName), 
-      "%s %s", [currentName UTF8String], aProcessName);
+  SprintfLiteral(formattedName, "%s %s", [currentName UTF8String], aProcessName);
 
   aProcessName = formattedName;
 

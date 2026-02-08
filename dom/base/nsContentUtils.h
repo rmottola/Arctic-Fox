@@ -85,7 +85,6 @@ class nsIScriptContext;
 class nsIScriptSecurityManager;
 class nsIStringBundle;
 class nsIStringBundleService;
-class nsISupportsArray;
 class nsISupportsHashKey;
 class nsIURI;
 class nsIUUIDGenerator;
@@ -129,6 +128,7 @@ struct LifecycleCallbackArgs;
 class NodeInfo;
 class nsIContentChild;
 class nsIContentParent;
+class TabChild;
 class Selection;
 class TabParent;
 } // namespace dom
@@ -785,6 +785,18 @@ public:
                                uint32_t *aArgCount, const char*** aArgNames);
 
   /**
+   * Returns origin attributes of the document.
+   **/
+  static mozilla::PrincipalOriginAttributes
+  GetOriginAttributes(nsIDocument* aDoc);
+
+  /**
+   * Returns origin attributes of the load group.
+   **/
+  static mozilla::PrincipalOriginAttributes
+  GetOriginAttributes(nsILoadGroup* aLoadGroup);
+
+  /**
    * Returns true if this document is in a Private Browsing window.
    */
   static bool IsInPrivateBrowsing(nsIDocument* aDoc);
@@ -1017,7 +1029,8 @@ public:
    */
   static bool GetWrapperSafeScriptFilename(nsIDocument *aDocument,
                                              nsIURI *aURI,
-                                             nsACString& aScriptURI);
+                                             nsACString& aScriptURI,
+                                             nsresult* aRv);
 
 
   /**
@@ -1850,11 +1863,6 @@ public:
   static nsresult CreateArrayBuffer(JSContext *aCx, const nsACString& aData,
                                     JSObject** aResult);
 
-  static nsresult CreateBlobBuffer(JSContext* aCx,
-                                   nsISupports* aParent,
-                                   const nsACString& aData,
-                                   JS::MutableHandle<JS::Value> aBlob);
-
   static void StripNullChars(const nsAString& aInStr, nsAString& aOutStr);
 
   /**
@@ -1952,10 +1960,6 @@ public:
    */
   static already_AddRefed<mozilla::layers::LayerManager>
   PersistentLayerManagerForDocument(nsIDocument *aDoc);
-
-  /* static */
-  static bool AppendLFInSerialization()
-    { return sAppendLFInSerialization; }
 
   /**
    * Determine whether a content node is focused or not,
@@ -2366,18 +2370,6 @@ public:
   static nsIEditor* GetHTMLEditor(nsPresContext* aPresContext);
 
   /**
-   * Check whether a spec feature/version is supported.
-   * @param aObject the object, which should support the feature,
-   *        for example nsIDOMNode or nsIDOMDOMImplementation
-   * @param aFeature the feature ("Views", "Core", "HTML", "Range" ...)
-   * @param aVersion the version ("1.0", "2.0", ...)
-   * @return whether the feature is supported or not
-   */
-  static bool InternalIsSupported(nsISupports* aObject,
-                                  const nsAString& aFeature,
-                                  const nsAString& aVersion);
-
-  /**
    * Returns true if the browser.dom.window.dump.enabled pref is set.
    */
   static bool DOMWindowDumpEnabled();
@@ -2495,7 +2487,14 @@ public:
    */
   static bool IsFlavorImage(const nsACString& aFlavor);
 
-  static void TransferablesToIPCTransferables(nsISupportsArray* aTransferables,
+  static nsresult IPCTransferableToTransferable(const mozilla::dom::IPCDataTransfer& aDataTransfer,
+                                                const bool& aIsPrivateData,
+                                                nsIPrincipal* aRequestingPrincipal,
+                                                nsITransferable* aTransferable,
+                                                mozilla::dom::nsIContentParent* aContentParent,
+                                                mozilla::dom::TabChild* aTabChild);
+
+  static void TransferablesToIPCTransferables(nsIArray* aTransferables,
                                               nsTArray<mozilla::dom::IPCDataTransfer>& aIPC,
                                               bool aInSyncMessage,
                                               mozilla::dom::nsIContentChild* aChild,
@@ -2551,7 +2550,7 @@ public:
    * Synthesize a mouse event to the given widget
    * (see nsIDOMWindowUtils.sendMouseEvent).
    */
-  static nsresult SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
+  static nsresult SendMouseEvent(const nsCOMPtr<nsIPresShell>& aPresShell,
                                  const nsAString& aType,
                                  float aX,
                                  float aY,
@@ -2706,6 +2705,8 @@ public:
                                  nsIAtom* aAtom,
                                  JS::MutableHandle<JSObject*> prototype);
 
+  static bool AttemptLargeAllocationLoad(nsIHttpChannel* aChannel);
+
 private:
   static bool InitializeEventTable();
 
@@ -2815,7 +2816,6 @@ private:
   static bool sGettersDecodeURLHash;
   static bool sPrivacyResistFingerprinting;
   static bool sSendPerformanceTimingNotifications;
-  static bool sAppendLFInSerialization;
   static bool sUseActivityCursor;
   static uint32_t sCookiesLifetimePolicy;
   static uint32_t sCookiesBehavior;

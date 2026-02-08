@@ -423,7 +423,6 @@ public:
     mIsSolidColorInVisibleRegion(false),
     mFontSmoothingBackgroundColor(NS_RGBA(0,0,0,0)),
     mSingleItemFixedToViewport(false),
-    mIsCaret(false),
     mNeedComponentAlpha(false),
     mForceTransparentSurface(false),
     mHideAllLayersBelow(false),
@@ -587,10 +586,6 @@ public:
    */
   bool mSingleItemFixedToViewport;
   /**
-   * True if the layer contains exactly one item for the caret.
-   */
-  bool mIsCaret;
-  /**
    * True if there is any text visible in the layer that's over
    * transparent pixels in the layer.
    */
@@ -683,8 +678,6 @@ struct NewLayerEntry {
     , mOpaqueForAnimatedGeometryRootParent(false)
     , mPropagateComponentAlphaFlattening(true)
     , mUntransformedVisibleRegion(false)
-    , mIsCaret(false)
-    , mIsPerspectiveItem(false)
   {}
   // mLayer is null if the previous entry is for a PaintedLayer that hasn't
   // been optimized to some other form (yet).
@@ -720,8 +713,6 @@ struct NewLayerEntry {
   // mVisibleRegion is relative to the associated frame before
   // transform.
   bool mUntransformedVisibleRegion;
-  bool mIsCaret;
-  bool mIsPerspectiveItem;
 };
 
 class PaintedLayerDataTree;
@@ -1600,6 +1591,9 @@ public:
         mDrawTarget) {
       RefPtr<SourceSurface> surface = mDrawTarget->Snapshot();
       RefPtr<SourceSurfaceImage> image = new SourceSurfaceImage(mSize, surface);
+      // Disallow BIGIMAGE (splitting into multiple textures) for mask
+      // layer images
+      image->SetTextureFlags(TextureFlags::DISALLOW_BIGIMAGE);
       return image.forget();
     }
 
@@ -2126,7 +2120,6 @@ ContainerState::CreateOrRecycleMaskImageLayerFor(const MaskLayerKey& aKey)
     if (!result)
       return nullptr;
     result->SetUserData(&gMaskLayerUserData, new MaskLayerUserData());
-    result->SetDisallowBigImage(true);
   }
 
   return result.forget();
@@ -3087,7 +3080,6 @@ void ContainerState::FinishPaintedLayerData(PaintedLayerData& aData, FindOpaqueB
       newLayerEntry->mLayer = layer;
       newLayerEntry->mAnimatedGeometryRoot = data->mAnimatedGeometryRoot;
       newLayerEntry->mScrollClip = data->mScrollClip;
-      newLayerEntry->mIsCaret = data->mIsCaret;
 
       // Hide the PaintedLayer. We leave it in the layer tree so that we
       // can find and recycle it later.
@@ -3536,13 +3528,11 @@ ContainerState::NewPaintedLayerData(nsDisplayItem* aItem,
   data.mReferenceFrame = aItem->ReferenceFrame();
   data.mSingleItemFixedToViewport = aShouldFixToViewport;
   data.mBackfaceHidden = aItem->Frame()->In3DContextAndBackfaceIsHidden();
-  data.mIsCaret = aItem->GetType() == nsDisplayItem::TYPE_CARET;
 
   data.mNewChildLayersIndex = mNewChildLayers.Length();
   NewLayerEntry* newLayerEntry = mNewChildLayers.AppendElement();
   newLayerEntry->mAnimatedGeometryRoot = aAnimatedGeometryRoot;
   newLayerEntry->mScrollClip = aScrollClip;
-  newLayerEntry->mIsCaret = data.mIsCaret;
   // newLayerEntry->mOpaqueRegion is filled in later from
   // paintedLayerData->mOpaqueRegion, if necessary.
 
@@ -3601,8 +3591,13 @@ PaintInactiveLayer(nsDisplayListBuilder* aBuilder,
   basic->BeginTransaction();
   basic->SetTarget(context);
 
-  if (aItem->GetType() == nsDisplayItem::TYPE_SVG_EFFECTS) {
-    static_cast<nsDisplaySVGEffects*>(aItem)->PaintAsLayer(aBuilder, aCtx, basic);
+  if (aItem->GetType() == nsDisplayItem::TYPE_MASK) {
+    static_cast<nsDisplayMask*>(aItem)->PaintAsLayer(aBuilder, aCtx, basic);
+    if (basic->InTransaction()) {
+      basic->AbortTransaction();
+    }
+  } else if (aItem->GetType() == nsDisplayItem::TYPE_FILTER){
+    static_cast<nsDisplayFilter*>(aItem)->PaintAsLayer(aBuilder, aCtx, basic);
     if (basic->InTransaction()) {
       basic->AbortTransaction();
     }
@@ -3771,6 +3766,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
     js::ProfileEntry::Category::GRAPHICS);
 
   AnimatedGeometryRoot* lastAnimatedGeometryRoot = mContainerAnimatedGeometryRoot;
+  nsPoint lastAGRTopLeft;
   nsPoint topLeft(0,0);
 
   // When NO_COMPONENT_ALPHA is set, items will be flattened into a single
@@ -3778,7 +3774,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
   // items.
   if (mFlattenToSingleLayer) {
     if (ChooseAnimatedGeometryRoot(*aList, &lastAnimatedGeometryRoot)) {
-      topLeft = (*lastAnimatedGeometryRoot)->GetOffsetToCrossDoc(mContainerReferenceFrame);
+      lastAGRTopLeft = (*lastAnimatedGeometryRoot)->GetOffsetToCrossDoc(mContainerReferenceFrame);
     }
   }
 
@@ -3850,6 +3846,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
     if (mFlattenToSingleLayer && layerState != LAYER_ACTIVE_FORCE) {
       forceInactive = true;
       animatedGeometryRoot = lastAnimatedGeometryRoot;
+      topLeft = lastAGRTopLeft;
     } else {
       forceInactive = false;
       if (mManager->IsWidgetLayerManager()) {
@@ -4165,9 +4162,6 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       newLayerEntry->mAnimatedGeometryRoot = animatedGeometryRoot;
       newLayerEntry->mScrollClip = agrScrollClip;
       newLayerEntry->mLayerState = layerState;
-      if (itemType == nsDisplayItem::TYPE_PERSPECTIVE) {
-        newLayerEntry->mIsPerspectiveItem = true;
-      }
 
       // Don't attempt to flatten compnent alpha layers that are within
       // a forced active layer, or an active transform;
@@ -4175,7 +4169,6 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
           layerState == LAYER_ACTIVE_FORCE) {
         newLayerEntry->mPropagateComponentAlphaFlattening = false;
       }
-      newLayerEntry->mIsCaret = itemType == nsDisplayItem::TYPE_CARET;
       // nsDisplayTransform::BuildLayer must set layerContentsVisibleRect.
       // We rely on this to ensure 3D transforms compute a reasonable
       // layer visible region.

@@ -40,6 +40,8 @@
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRunnable.h"
 #include "nsThreadUtils.h"
+#include "nsStreamUtils.h"
+#include "SlicedInputStream.h"
 
 namespace mozilla {
 namespace dom {
@@ -187,6 +189,16 @@ Blob::Create(nsISupports* aParent, const nsAString& aContentType,
 }
 
 /* static */ already_AddRefed<Blob>
+Blob::CreateStringBlob(nsISupports* aParent, const nsACString& aData,
+                       const nsAString& aContentType)
+{
+  RefPtr<Blob> blob = Blob::Create(aParent,
+    new BlobImplString(aData, aContentType));
+  MOZ_ASSERT(!blob->mImpl->IsFile());
+  return blob.forget();
+}
+
+/* static */ already_AddRefed<Blob>
 Blob::CreateMemoryBlob(nsISupports* aParent, void* aMemoryBuffer,
                        uint64_t aLength, const nsAString& aContentType)
 {
@@ -261,7 +273,7 @@ Blob::ToFile(const nsAString& aName, ErrorResult& aRv) const
   mImpl->GetType(contentType);
 
   RefPtr<MultipartBlobImpl> impl =
-    MultipartBlobImpl::Create(blobImpls, aName, contentType, aRv);
+    MultipartBlobImpl::Create(Move(blobImpls), aName, contentType, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -276,7 +288,7 @@ Blob::CreateSlice(uint64_t aStart, uint64_t aLength,
                   ErrorResult& aRv)
 {
   RefPtr<BlobImpl> impl = mImpl->CreateSlice(aStart, aLength,
-                                               aContentType, aRv);
+                                             aContentType, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -1037,6 +1049,28 @@ EmptyBlobImpl::GetInternalStream(nsIInputStream** aStream,
 }
 
 ////////////////////////////////////////////////////////////////////////////
+// BlobImplString implementation
+
+NS_IMPL_ISUPPORTS_INHERITED0(BlobImplString, BlobImpl)
+
+already_AddRefed<BlobImpl>
+BlobImplString::CreateSlice(uint64_t aStart, uint64_t aLength,
+                            const nsAString& aContentType,
+                            ErrorResult& aRv)
+{
+  RefPtr<BlobImpl> impl =
+    new BlobImplString(Substring(mData, aStart, aLength),
+                       aContentType);
+  return impl.forget();
+}
+
+void
+BlobImplString::GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv)
+{
+  aRv = NS_NewCStringInputStream(aStream, mData);
+}
+
+////////////////////////////////////////////////////////////////////////////
 // BlobImplMemory implementation
 
 NS_IMPL_ISUPPORTS_INHERITED0(BlobImplMemory, BlobImpl)
@@ -1136,10 +1170,11 @@ public:
         NS_LITERAL_CSTRING("explicit/dom/memory-file-data/small"),
         KIND_HEAP, UNITS_BYTES, smallObjectsTotal,
         nsPrintfCString(
-          "Memory used to back small memory files (less than %d bytes each).\n\n"
+          "Memory used to back small memory files (i.e. those taking up less "
+          "than %zu bytes of memory each).\n\n"
           "Note that the allocator may round up a memory file's length -- "
           "that is, an N-byte memory file may take up more than N bytes of "
-          "memory."),
+          "memory.", LARGE_OBJECT_MIN_SIZE),
         aData);
     }
 
@@ -1190,6 +1225,76 @@ BlobImplTemporaryBlob::GetInternalStream(nsIInputStream** aStream,
   nsCOMPtr<nsIInputStream> stream =
     new nsTemporaryFileInputStream(mFileDescOwner, mStartPos, mStartPos + mLength);
   stream.forget(aStream);
+}
+
+////////////////////////////////////////////////////////////////////////////
+// BlobImplStream implementation
+
+NS_IMPL_ISUPPORTS_INHERITED0(BlobImplStream, BlobImpl)
+
+BlobImplStream::BlobImplStream(nsIInputStream* aInputStream,
+                               const nsAString& aContentType,
+                               uint64_t aLength)
+  : BlobImplBase(aContentType, aLength)
+  , mInputStream(aInputStream)
+{
+  mImmutable = true;
+}
+
+BlobImplStream::BlobImplStream(BlobImplStream* aOther,
+                               const nsAString& aContentType,
+                               uint64_t aStart, uint64_t aLength)
+  : BlobImplBase(aContentType, aOther->mStart + aStart, aLength)
+  , mInputStream(new SlicedInputStream(aOther->mInputStream, aStart, aLength))
+{
+  mImmutable = true;
+}
+
+BlobImplStream::BlobImplStream(nsIInputStream* aInputStream,
+                               const nsAString& aName,
+                               const nsAString& aContentType,
+                               int64_t aLastModifiedDate,
+                               uint64_t aLength)
+  : BlobImplBase(aName, aContentType, aLength, aLastModifiedDate)
+  , mInputStream(aInputStream)
+{
+  mImmutable = true;
+}
+
+BlobImplStream::~BlobImplStream()
+{}
+
+void
+BlobImplStream::GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv)
+{
+  nsCOMPtr<nsIInputStream> clonedStream;
+  nsCOMPtr<nsIInputStream> replacementStream;
+
+  aRv = NS_CloneInputStream(mInputStream, getter_AddRefs(clonedStream),
+                            getter_AddRefs(replacementStream));
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  if (replacementStream) {
+    mInputStream = replacementStream.forget();
+  }
+
+  clonedStream.forget(aStream);
+}
+
+already_AddRefed<BlobImpl>
+BlobImplStream::CreateSlice(uint64_t aStart, uint64_t aLength,
+                            const nsAString& aContentType, ErrorResult& aRv)
+{
+  if (!aLength) {
+    RefPtr<BlobImpl> impl = new EmptyBlobImpl(aContentType);
+    return impl.forget();
+  }
+
+  RefPtr<BlobImpl> impl =
+    new BlobImplStream(this, aContentType, aStart, aLength);
+  return impl.forget();
 }
 
 } // namespace dom

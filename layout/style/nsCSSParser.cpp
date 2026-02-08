@@ -27,7 +27,7 @@
 #include "nsCSSRules.h"
 #include "mozilla/css/NameSpaceRule.h"
 #include "nsTArray.h"
-#include "mozilla/CSSStyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 #include "mozilla/css/Declaration.h"
 #include "nsStyleConsts.h"
 #include "nsNetUtil.h"
@@ -108,6 +108,12 @@ enum class GridTrackSizeFlags {
   eFixedTrackSize   = 0x1, // parse a <fixed-size> instead of <track-size>
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(GridTrackSizeFlags)
+
+enum class GridTrackListFlags {
+  eDefaultTrackList  = 0x0, // parse a <track-list>
+  eExplicitTrackList = 0x1, // parse an <explicit-track-list> instead
+};
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(GridTrackListFlags)
 
 namespace {
 
@@ -225,6 +231,12 @@ public:
                         uint32_t aLineNumber, // for error reporting
                         nsCSSValue& aValue,
                         bool aSuppressErrors /* false */);
+
+  bool ParseMarginString(const nsSubstring& aBuffer,
+                         nsIURI* aURL, // for error reporting
+                         uint32_t aLineNumber, // for error reporting
+                         nsCSSValue& aValue,
+                         bool aSuppressErrors /* false */);
 
   nsresult ParseSelectorString(const nsSubstring& aSelectorString,
                                nsIURI* aURL, // for error reporting
@@ -981,9 +993,11 @@ protected:
   // starting with a <line-names> (which is itself a list)
   // and alternating between that and <track-size>.
   bool ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
-                                            const nsCSSValue& aFirstLineNames);
+    const nsCSSValue& aFirstLineNames,
+    GridTrackListFlags aFlags = GridTrackListFlags::eDefaultTrackList);
 
-  bool ParseGridTrackList(nsCSSPropertyID aPropID);
+  bool ParseGridTrackList(nsCSSPropertyID aPropID,
+    GridTrackListFlags aFlags = GridTrackListFlags::eDefaultTrackList);
   bool ParseGridTemplateColumnsRows(nsCSSPropertyID aPropID);
 
   // |aAreaIndices| is a lookup table to help us parse faster,
@@ -1150,7 +1164,8 @@ protected:
   void AppendValue(nsCSSPropertyID aPropID, const nsCSSValue& aValue);
   bool ParseBoxProperties(const nsCSSPropertyID aPropIDs[]);
   bool ParseGroupedBoxProperty(int32_t aVariantMask,
-                               nsCSSValue& aValue);
+                               nsCSSValue& aValue,
+                               uint32_t aRestrictions);
   bool ParseBoxCornerRadius(const nsCSSPropertyID aPropID);
   bool ParseBoxCornerRadiiInternals(nsCSSValue array[]);
   bool ParseBoxCornerRadii(const nsCSSPropertyID aPropIDs[]);
@@ -1170,6 +1185,12 @@ protected:
   bool ParseColorOpacity(float& aOpacity);
   bool ParseEnum(nsCSSValue& aValue,
                  const KTableEntry aKeywordTable[]);
+
+  // A special ParseEnum for the CSS Box Alignment properties that have
+  // 'baseline' values.  In addition to the keywords in aKeywordTable, it also
+  // parses 'first baseline' and 'last baseline' as a single value.
+  // (aKeywordTable must contain 'baseline')
+  bool ParseAlignEnum(nsCSSValue& aValue, const KTableEntry aKeywordTable[]);
 
   // Variant parsing methods
   CSSParseResult ParseVariant(nsCSSValue& aValue,
@@ -2063,8 +2084,8 @@ CSSParserImpl::ParseVariable(const nsAString& aVariableName,
     OUTPUT_ERROR();
   } else {
     CLEAR_ERROR();
-    aDeclaration->AddVariableDeclaration(aVariableName, variableType,
-                                         variableValue, aIsImportant, true);
+    aDeclaration->AddVariable(aVariableName, variableType,
+                              variableValue, aIsImportant, true);
     *aChanged = true;
   }
 
@@ -2232,6 +2253,32 @@ CSSParserImpl::ParseColorString(const nsSubstring& aBuffer,
 
   ReleaseScanner();
   return colorParsed;
+}
+
+bool
+CSSParserImpl::ParseMarginString(const nsSubstring& aBuffer,
+                                 nsIURI* aURI, // for error reporting
+                                 uint32_t aLineNumber, // for error reporting
+                                 nsCSSValue& aValue,
+                                 bool aSuppressErrors /* false */)
+{
+  nsCSSScanner scanner(aBuffer, aLineNumber);
+  css::ErrorReporter reporter(scanner, mSheet, mChildLoader, aURI);
+  InitScanner(scanner, reporter, aURI, aURI, nullptr);
+
+  nsAutoSuppressErrors suppressErrors(this, aSuppressErrors);
+
+  // Parse a margin, and check that there's nothing else after it.
+  bool marginParsed = ParseGroupedBoxProperty(VARIANT_LP, aValue, 0) && !GetToken(true);
+
+  if (aSuppressErrors) {
+    CLEAR_ERROR();
+  } else {
+    OUTPUT_ERROR();
+  }
+
+  ReleaseScanner();
+  return marginParsed;
 }
 
 bool
@@ -7398,8 +7445,8 @@ CSSParserImpl::ParseDeclaration(css::Declaration* aDeclaration,
                          CSS_CUSTOM_NAME_PREFIX_LENGTH).EqualsLiteral("--"));
     // remove '--'
     nsDependentString varName(propertyName, CSS_CUSTOM_NAME_PREFIX_LENGTH);
-    aDeclaration->AddVariableDeclaration(varName, variableType, variableValue,
-                                         status == ePriority_Important, false);
+    aDeclaration->AddVariable(varName, variableType, variableValue,
+                              status == ePriority_Important, false);
   } else {
     *aChanged |= mData.TransferFromBlock(mTempData, propID, EnabledState(),
                                          status == ePriority_Important,
@@ -7478,6 +7525,44 @@ CSSParserImpl::ParseEnum(nsCSSValue& aValue,
   return false;
 }
 
+bool
+CSSParserImpl::ParseAlignEnum(nsCSSValue& aValue,
+                              const KTableEntry aKeywordTable[])
+{
+  MOZ_ASSERT(nsCSSProps::ValueToKeywordEnum(NS_STYLE_ALIGN_BASELINE,
+                                            aKeywordTable) !=
+               eCSSKeyword_UNKNOWN,
+             "Please use ParseEnum instead");
+  nsSubstring* ident = NextIdent();
+  if (!ident) {
+    return false;
+  }
+  nsCSSKeyword baselinePrefix = eCSSKeyword_first;
+  nsCSSKeyword keyword = nsCSSKeywords::LookupKeyword(*ident);
+  if (keyword == eCSSKeyword_first || keyword == eCSSKeyword_last) {
+    baselinePrefix = keyword;
+    ident = NextIdent();
+    if (!ident) {
+      return false;
+    }
+    keyword = nsCSSKeywords::LookupKeyword(*ident);
+  }
+  if (eCSSKeyword_UNKNOWN < keyword) {
+    int32_t value;
+    if (nsCSSProps::FindKeyword(keyword, aKeywordTable, value)) {
+      if (baselinePrefix == eCSSKeyword_last &&
+          keyword == eCSSKeyword_baseline) {
+        value = NS_STYLE_ALIGN_LAST_BASELINE;
+      }
+      aValue.SetIntValue(value, eCSSUnit_Enumerated);
+      return true;
+    }
+  }
+
+  // Put the unknown identifier back and return
+  UngetToken();
+  return false;
+}
 
 struct UnitInfo {
   char name[6];  // needs to be long enough for the longest unit, with
@@ -8009,10 +8094,14 @@ CSSParserImpl::ParseVariant(nsCSSValue& aValue,
   }
   if ((aVariantMask & VARIANT_CALC) &&
       IsCSSTokenCalcFunction(*tk)) {
-    // calc() currently allows only lengths and percents and number inside it.
-    // And note that in current implementation, number cannot be mixed with
-    // length and percent.
-    if (!ParseCalc(aValue, aVariantMask & VARIANT_LPN)) {
+    // calc() currently allows only lengths, percents, numbers, and integers.
+    //
+    // Note that VARIANT_NUMBER can be mixed with VARIANT_LENGTH and
+    // VARIANT_PERCENTAGE in the list of allowed types (numbers can be used as
+    // coefficients).
+    // However, the the resulting type is not a mixed type with number.
+    // VARIANT_INTEGER can't be mixed with anything else.
+    if (!ParseCalc(aValue, aVariantMask & (VARIANT_LPN | VARIANT_INTEGER))) {
       return CSSParseResult::Error;
     }
     return CSSParseResult::Ok;
@@ -8752,8 +8841,18 @@ CSSParserImpl::ParseGridTrackSize(nsCSSValue& aValue,
       !aValue.IsLengthPercentCalcUnit()) {
     result = CSSParseResult::Error;
   }
-  if (result == CSSParseResult::Ok ||
-      result == CSSParseResult::Error) {
+  if (result == CSSParseResult::Error) {
+    return result;
+  }
+  if (result == CSSParseResult::Ok) {
+    if (aValue.GetUnit() == eCSSUnit_FlexFraction) {
+      // Single value <flex> is represented internally as minmax(auto, <flex>).
+      nsCSSValue minmax;
+      nsCSSValue::Array* func = minmax.InitFunction(eCSSKeyword_minmax, 2);
+      func->Item(1).SetAutoValue();
+      func->Item(2) = aValue;
+      aValue = minmax;
+    }
     return result;
   }
 
@@ -8789,7 +8888,7 @@ CSSParserImpl::ParseGridTrackSize(nsCSSValue& aValue,
         !func->Item(2).IsLengthPercentCalcUnit()) {
       return CSSParseResult::Error;
     }
-    // Reject 'fr' min-sizing.
+    // Reject <flex> min-sizing.
     if (func->Item(1).GetUnit() == eCSSUnit_FlexFraction) {
       return CSSParseResult::Error;
     }
@@ -8813,7 +8912,8 @@ CSSParserImpl::ParseGridAutoColumnsRows(nsCSSPropertyID aPropID)
 
 bool
 CSSParserImpl::ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
-                                                    const nsCSSValue& aFirstLineNames)
+                                                    const nsCSSValue& aFirstLineNames,
+                                                    GridTrackListFlags aFlags)
 {
   nsCSSValueList* firstLineNamesItem = aValue.SetListValue();
   firstLineNamesItem->mValue = aFirstLineNames;
@@ -8821,6 +8921,7 @@ CSSParserImpl::ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
   // This function is trying to parse <track-list>, which is
   //   [ <line-names>? [ <track-size> | <repeat()> ] ]+ <line-names>?
   // and we're already past the first "<line-names>?".
+  // If aFlags contains eExplicitTrackList then <repeat()> is disallowed.
   //
   // Each iteration of the following loop attempts to parse either a
   // repeat() or a <track-size> expression, and then an (optional)
@@ -8836,7 +8937,8 @@ CSSParserImpl::ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
     if (!GetToken(true)) {
       break;
     }
-    if (mToken.mType == eCSSToken_Function &&
+    if (!(aFlags & GridTrackListFlags::eExplicitTrackList) &&
+        mToken.mType == eCSSToken_Function &&
         mToken.mIdent.LowerCaseEqualsLiteral("repeat")) {
       nsCSSValueList* startOfRepeat = item;
       if (!ParseGridTrackListRepeat(&item)) {
@@ -9181,12 +9283,13 @@ CSSParserImpl::ParseGridTrackListRepeat(nsCSSValueList** aTailPtr)
 }
 
 bool
-CSSParserImpl::ParseGridTrackList(nsCSSPropertyID aPropID)
+CSSParserImpl::ParseGridTrackList(nsCSSPropertyID aPropID,
+                                  GridTrackListFlags aFlags)
 {
   nsCSSValue value;
   nsCSSValue firstLineNames;
   if (ParseGridLineNames(firstLineNames) == CSSParseResult::Error ||
-      !ParseGridTrackListWithFirstLineNames(value, firstLineNames)) {
+      !ParseGridTrackListWithFirstLineNames(value, firstLineNames, aFlags)) {
     return false;
   }
   AppendValue(aPropID, value);
@@ -9365,7 +9468,7 @@ CSSParserImpl::ParseGridTemplate(bool aForGridShorthand)
   // none |
   // subgrid |
   // <'grid-template-rows'> / <'grid-template-columns'> |
-  // [ <line-names>? <string> <track-size>? <line-names>? ]+ [ / <track-list>]?
+  // [ <line-names>? <string> <track-size>? <line-names>? ]+ [ / <explicit-track-list>]?
   // or additionally when aForGridShorthand is true:
   // <'grid-template-rows'> / [ auto-flow && dense? ] <'grid-auto-columns'>?
   nsCSSValue value;
@@ -9431,9 +9534,10 @@ CSSParserImpl::ParseGridTemplate(bool aForGridShorthand)
     if (!ParseGridTemplateAfterString(firstLineNames)) {
       return false;
     }
-    // Parse an optional [ / <track-list> ] as the columns value.
+    // Parse an optional [ / <explicit-track-list> ] as the columns value.
     if (ExpectSymbol('/', true)) {
-      return ParseGridTrackList(eCSSProperty_grid_template_columns);
+      return ParseGridTrackList(eCSSProperty_grid_template_columns,
+                                GridTrackListFlags::eExplicitTrackList);
     }
     value.SetNoneValue(); // absent means 'none'
     AppendValue(eCSSProperty_grid_template_columns, value);
@@ -9940,7 +10044,7 @@ CSSParserImpl::ParseJustifyItems()
       value.SetIntValue(value.GetIntValue() | legacy.GetIntValue(),
                         eCSSUnit_Enumerated);
     } else {
-      if (!ParseEnum(value, nsCSSProps::kAlignAutoNormalStretchBaseline)) {
+      if (!ParseAlignEnum(value, nsCSSProps::kAlignAutoNormalStretchBaseline)) {
         if (!ParseAlignJustifyPosition(value, nsCSSProps::kAlignSelfPosition) ||
             value.GetUnit() == eCSSUnit_Null) {
           return false;
@@ -9969,7 +10073,7 @@ CSSParserImpl::ParseAlignItems()
 {
   nsCSSValue value;
   if (!ParseSingleTokenVariant(value, VARIANT_INHERIT, nullptr)) {
-    if (!ParseEnum(value, nsCSSProps::kAlignNormalStretchBaseline)) {
+    if (!ParseAlignEnum(value, nsCSSProps::kAlignNormalStretchBaseline)) {
       if (!ParseAlignJustifyPosition(value, nsCSSProps::kAlignSelfPosition) ||
           value.GetUnit() == eCSSUnit_Null) {
         return false;
@@ -9987,7 +10091,7 @@ CSSParserImpl::ParseAlignJustifySelf(nsCSSPropertyID aPropID)
 {
   nsCSSValue value;
   if (!ParseSingleTokenVariant(value, VARIANT_INHERIT, nullptr)) {
-    if (!ParseEnum(value, nsCSSProps::kAlignAutoNormalStretchBaseline)) {
+    if (!ParseAlignEnum(value, nsCSSProps::kAlignAutoNormalStretchBaseline)) {
       if (!ParseAlignJustifyPosition(value, nsCSSProps::kAlignSelfPosition) ||
           value.GetUnit() == eCSSUnit_Null) {
         return false;
@@ -10006,7 +10110,7 @@ CSSParserImpl::ParseAlignJustifyContent(nsCSSPropertyID aPropID)
 {
   nsCSSValue value;
   if (!ParseSingleTokenVariant(value, VARIANT_INHERIT, nullptr)) {
-    if (!ParseEnum(value, nsCSSProps::kAlignNormalBaseline)) {
+    if (!ParseAlignEnum(value, nsCSSProps::kAlignNormalBaseline)) {
       nsCSSValue fallbackValue;
       if (!ParseEnum(value, nsCSSProps::kAlignContentDistribution)) {
         if (!ParseAlignJustifyPosition(fallbackValue,
@@ -11109,10 +11213,11 @@ CSSParserImpl::ParseBoxProperties(const nsCSSPropertyID aPropIDs[])
 }
 
 // Similar to ParseBoxProperties, except there is only one property
-// with the result as its value, not four. Requires values be nonnegative.
+// with the result as its value, not four.
 bool
 CSSParserImpl::ParseGroupedBoxProperty(int32_t aVariantMask,
-                                       /** outparam */ nsCSSValue& aValue)
+                                       /** outparam */ nsCSSValue& aValue,
+                                       uint32_t aRestrictions)
 {
   nsCSSRect& result = aValue.SetRectValue();
 
@@ -11121,7 +11226,7 @@ CSSParserImpl::ParseGroupedBoxProperty(int32_t aVariantMask,
     CSSParseResult parseResult =
       ParseVariantWithRestrictions(result.*(nsCSSRect::sides[index]),
                                    aVariantMask, nullptr,
-                                   CSS_PROPERTY_VALUE_NONNEGATIVE);
+                                   aRestrictions);
     if (parseResult == CSSParseResult::NotFound) {
       break;
     }
@@ -12171,20 +12276,12 @@ CSSParserImpl::ParseImageLayersItem(
   if (eCSSProperty_mask == aTable[nsStyleImageLayers::shorthand]) {
     aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_BORDER,
                                        eCSSUnit_Enumerated);
-    aState.mRepeat->mXValue.SetIntValue(NS_STYLE_IMAGELAYER_REPEAT_NO_REPEAT,
-                                        eCSSUnit_Enumerated);
-
-    positionXArr->Item(1).SetPercentValue(0.5f);
-    positionYArr->Item(1).SetPercentValue(0.5f);
   } else {
     aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_PADDING,
                                        eCSSUnit_Enumerated);
-    aState.mRepeat->mXValue.SetIntValue(NS_STYLE_IMAGELAYER_REPEAT_REPEAT,
-                                        eCSSUnit_Enumerated);
-
-    positionXArr->Item(1).SetPercentValue(0.0f);
-    positionYArr->Item(1).SetPercentValue(0.0f);
   }
+  positionXArr->Item(1).SetPercentValue(0.0f);
+  positionYArr->Item(1).SetPercentValue(0.0f);
 
   aState.mSize->mXValue.SetAutoValue();
   aState.mSize->mYValue.SetAutoValue();
@@ -13135,7 +13232,8 @@ CSSParserImpl::ParseBorderImageSlice(bool aAcceptsInherit,
 
   // Parse the box dimensions.
   nsCSSValue imageSliceBoxValue;
-  if (!ParseGroupedBoxProperty(VARIANT_PN, imageSliceBoxValue)) {
+  if (!ParseGroupedBoxProperty(VARIANT_PN, imageSliceBoxValue,
+                               CSS_PROPERTY_VALUE_NONNEGATIVE)) {
     if (!hasFill && aConsumedTokens) {
       *aConsumedTokens = false;
     }
@@ -13179,7 +13277,7 @@ CSSParserImpl::ParseBorderImageWidth(bool aAcceptsInherit)
   }
 
   // Parse the box dimensions.
-  if (!ParseGroupedBoxProperty(VARIANT_ALPN, value)) {
+  if (!ParseGroupedBoxProperty(VARIANT_ALPN, value, CSS_PROPERTY_VALUE_NONNEGATIVE)) {
     return false;
   }
 
@@ -13202,7 +13300,7 @@ CSSParserImpl::ParseBorderImageOutset(bool aAcceptsInherit)
   }
 
   // Parse the box dimensions.
-  if (!ParseGroupedBoxProperty(VARIANT_LN, value)) {
+  if (!ParseGroupedBoxProperty(VARIANT_LN, value, CSS_PROPERTY_VALUE_NONNEGATIVE)) {
     return false;
   }
 
@@ -13384,7 +13482,7 @@ CSSParserImpl::ParseBorderSide(const nsCSSPropertyID aPropIDs[],
     values[1].SetIntValue(NS_STYLE_BORDER_STYLE_NONE, eCSSUnit_Enumerated);
   }
   if ((found & 4) == 0) { // text color will be used
-    values[2].SetIntValue(NS_STYLE_COLOR_MOZ_USE_TEXT_COLOR, eCSSUnit_Enumerated);
+    values[2].SetIntValue(NS_COLOR_CURRENTCOLOR, eCSSUnit_EnumColor);
   }
 
   if (aSetAllSides) {
@@ -13457,8 +13555,8 @@ CSSParserImpl::ParseBorderColors(nsCSSPropertyID aProperty)
                                nullptr)) {
     nsCSSValueList *cur = value.SetListValue();
     for (;;) {
-      if (ParseVariant(cur->mValue, VARIANT_COLOR | VARIANT_KEYWORD,
-                       nsCSSProps::kBorderColorKTable) != CSSParseResult::Ok) {
+      if (ParseVariant(cur->mValue, VARIANT_COLOR, nullptr) !=
+          CSSParseResult::Ok) {
         return false;
       }
       if (CheckEndProperty()) {
@@ -13481,6 +13579,9 @@ CSSParserImpl::ParseCalc(nsCSSValue &aValue, uint32_t aVariantMask)
   // This can be done without lookahead when we assume that the property
   // values cannot themselves be numbers.
   MOZ_ASSERT(aVariantMask != 0, "unexpected variant mask");
+  MOZ_ASSERT(!(aVariantMask & VARIANT_LPN) != !(aVariantMask & VARIANT_INTEGER),
+             "variant mask must intersect with exactly one of VARIANT_LPN "
+             "or VARIANT_INTEGER");
 
   bool oldUnitlessLengthQuirk = mUnitlessLengthQuirk;
   mUnitlessLengthQuirk = false;
@@ -13551,21 +13652,6 @@ CSSParserImpl::ParseCalcAdditiveExpression(nsCSSValue& aValue,
   }
 }
 
-struct ReduceNumberCalcOps : public mozilla::css::BasicFloatCalcOps,
-                             public mozilla::css::CSSValueInputCalcOps
-{
-  result_type ComputeLeafValue(const nsCSSValue& aValue)
-  {
-    MOZ_ASSERT(aValue.GetUnit() == eCSSUnit_Number, "unexpected unit");
-    return aValue.GetFloatValue();
-  }
-
-  float ComputeNumber(const nsCSSValue& aValue)
-  {
-    return mozilla::css::ComputeCalc(aValue, *this);
-  }
-};
-
 //  * If aVariantMask is VARIANT_NUMBER, this function parses the
 //    <number-multiplicative-expression> production.
 //  * If aVariantMask does not contain VARIANT_NUMBER, this function
@@ -13591,9 +13677,18 @@ CSSParserImpl::ParseCalcMultiplicativeExpression(nsCSSValue& aValue,
   nsCSSValue *storage = &aValue;
   for (;;) {
     uint32_t variantMask;
-    if (afterDivision || gotValue) {
+    if (aVariantMask & VARIANT_INTEGER) {
+      MOZ_ASSERT(aVariantMask == VARIANT_INTEGER,
+                 "integers in calc expressions can't be mixed with anything "
+                 "else.");
+      variantMask = aVariantMask;
+    } else if (afterDivision || gotValue) {
+      // At this point in the calc expression, we expect a coefficient or a
+      // divisor, which must be a number. (Not a length/%/etc.)
       variantMask = VARIANT_NUMBER;
     } else {
+      // At this point in the calc expression, we'll accept a coefficient
+      // (a number) or a value of whatever type |aVariantMask| specifies.
       variantMask = aVariantMask | VARIANT_NUMBER;
     }
     if (!ParseCalcTerm(*storage, variantMask))
@@ -13607,7 +13702,7 @@ CSSParserImpl::ParseCalcMultiplicativeExpression(nsCSSValue& aValue,
     if (variantMask & VARIANT_NUMBER) {
       // Simplify the value immediately so we can check for division by
       // zero.
-      ReduceNumberCalcOps ops;
+      mozilla::css::ReduceNumberCalcOps ops;
       float number = mozilla::css::ComputeCalc(*storage, ops);
       if (number == 0.0 && afterDivision)
         return false;
@@ -13621,9 +13716,15 @@ CSSParserImpl::ParseCalcMultiplicativeExpression(nsCSSValue& aValue,
         MOZ_ASSERT(storage == &aValue.GetArrayValue()->Item(1),
                    "unexpected relationship to current storage");
         nsCSSValue &leftValue = aValue.GetArrayValue()->Item(0);
-        ReduceNumberCalcOps ops;
-        float number = mozilla::css::ComputeCalc(leftValue, ops);
-        leftValue.SetFloatValue(number, eCSSUnit_Number);
+        if (variantMask & VARIANT_INTEGER) {
+          mozilla::css::ReduceIntegerCalcOps ops;
+          int integer = mozilla::css::ComputeCalc(leftValue, ops);
+          leftValue.SetIntValue(integer, eCSSUnit_Integer);
+        } else {
+          mozilla::css::ReduceNumberCalcOps ops;
+          float number = mozilla::css::ComputeCalc(leftValue, ops);
+          leftValue.SetFloatValue(number, eCSSUnit_Number);
+        }
       }
     }
 
@@ -13637,6 +13738,19 @@ CSSParserImpl::ParseCalcMultiplicativeExpression(nsCSSValue& aValue,
       unit = gotValue ? eCSSUnit_Calc_Times_R : eCSSUnit_Calc_Times_L;
       afterDivision = false;
     } else if (mToken.IsSymbol('/')) {
+      if (variantMask & VARIANT_INTEGER) {
+        // Integers aren't mixed with anything else (see the assert at the top
+        // of CSSParserImpl::ParseCalc).
+        // We don't allow division at all in calc()s for expressions where an
+        // integer is expected, because calc() division can't be resolved to
+        // an integer, as implied by spec text about '/' here:
+        // https://drafts.csswg.org/css-values-3/#calc-type-checking
+        // We've consumed the '/' token, but it doesn't matter as we're in an
+        // error-handling situation where we've already consumed a lot of
+        // other tokens (e.g. the token before the '/'). ParseVariant will
+        // indicate this with CSSParseResult::Error.
+        return false;
+      }
       unit = eCSSUnit_Calc_Divided;
       afterDivision = true;
     } else {
@@ -13696,15 +13810,24 @@ CSSParserImpl::ParseCalcTerm(nsCSSValue& aValue, uint32_t& aVariantMask)
   }
   // ... or just a value
   UngetToken();
-  // Always pass VARIANT_NUMBER to ParseVariant so that unitless zero
-  // always gets picked up
-  if (ParseVariant(aValue, aVariantMask | VARIANT_NUMBER, nullptr) !=
-      CSSParseResult::Ok) {
-    return false;
-  }
-  // ...and do the VARIANT_NUMBER check ourselves.
-  if (!(aVariantMask & VARIANT_NUMBER) && aValue.GetUnit() == eCSSUnit_Number) {
-    return false;
+  if (aVariantMask & VARIANT_INTEGER) {
+    // Integers aren't mixed with anything else (see the assert at the
+    // top of CSSParserImpl::ParseCalc).
+    if (ParseVariant(aValue, aVariantMask, nullptr) != CSSParseResult::Ok) {
+      return false;
+    }
+  } else {
+    // Always pass VARIANT_NUMBER to ParseVariant so that unitless zero
+    // always gets picked up (we want to catch unitless zeroes using
+    // VARIANT_NUMBER and then error out)
+    if (ParseVariant(aValue, aVariantMask | VARIANT_NUMBER, nullptr) !=
+        CSSParseResult::Ok) {
+      return false;
+    }
+    // ...and do the VARIANT_NUMBER check ourselves.
+    if (!(aVariantMask & VARIANT_NUMBER) && aValue.GetUnit() == eCSSUnit_Number) {
+      return false;
+    }
   }
   // If we did the value parsing, we need to adjust aVariantMask to
   // reflect which option we took (see above).
@@ -15179,7 +15302,7 @@ CSSParserImpl::ParseOutline()
 
   // Provide default values
   if ((found & 1) == 0) { // Provide default outline-color
-    values[0].SetIntValue(NS_STYLE_COLOR_MOZ_USE_TEXT_COLOR, eCSSUnit_Enumerated);
+    values[0].SetIntValue(NS_COLOR_CURRENTCOLOR, eCSSUnit_EnumColor);
   }
   if ((found & 2) == 0) { // Provide default outline-style
     values[1].SetIntValue(NS_STYLE_BORDER_STYLE_NONE, eCSSUnit_Enumerated);
@@ -15289,8 +15412,7 @@ CSSParserImpl::ParseTextDecoration()
                           eCSSUnit_Enumerated);
   }
   if ((found & 4) == 0) { // Provide default text-decoration-color
-    values[2].SetIntValue(NS_STYLE_COLOR_MOZ_USE_TEXT_COLOR,
-                          eCSSUnit_Enumerated);
+    values[2].SetIntValue(NS_COLOR_CURRENTCOLOR, eCSSUnit_EnumColor);
   }
 
   for (int32_t index = 0; index < numProps; index++) {
@@ -17918,6 +18040,17 @@ nsCSSParser::ParseColorString(const nsSubstring& aBuffer,
 {
   return static_cast<CSSParserImpl*>(mImpl)->
     ParseColorString(aBuffer, aURI, aLineNumber, aValue, aSuppressErrors);
+}
+
+bool
+nsCSSParser::ParseMarginString(const nsSubstring& aBuffer,
+                               nsIURI*            aURI,
+                               uint32_t           aLineNumber,
+                               nsCSSValue&        aValue,
+                               bool               aSuppressErrors /* false */)
+{
+  return static_cast<CSSParserImpl*>(mImpl)->
+    ParseMarginString(aBuffer, aURI, aLineNumber, aValue, aSuppressErrors);
 }
 
 nsresult

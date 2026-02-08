@@ -2,6 +2,9 @@ setJitCompilerOption("baseline.warmup.trigger", 10);
 setJitCompilerOption("ion.warmup.trigger", 20);
 var i;
 
+var config = getBuildConfiguration();
+var max = 200;
+
 // Check that we are able to remove the operation inside recover test functions (denoted by "rop..."),
 // when we inline the first version of uceFault, and ensure that the bailout is correct
 // when uceFault is replaced (which cause an invalidation bailout)
@@ -1285,6 +1288,18 @@ function rhypot_object_4args(i) {
     return i;
 }
 
+var uceFault_random = eval(uneval(uceFault).replace('uceFault', 'uceFault_random'));
+function rrandom(i) {
+    // setRNGState() exists only in debug builds
+    if(config.debug) setRNGState(2, 1+i);
+
+    var x = Math.random();
+    if (uceFault_random(i) || uceFault_random(i))
+        assertEq(x, config.debug ? setRNGState(2, 1+i) || Math.random() : x);
+    assertRecoveredOnBailout(x, true);
+    return i;
+}
+
 var uceFault_sin_number = eval(uneval(uceFault).replace('uceFault', 'uceFault_sin_number'));
 function rsin_number(i) {
     var x = Math.sin(i);
@@ -1327,7 +1342,8 @@ function rlog_object(i) {
     return i;
 }
 
-for (i = 0; i < 100; i++) {
+for (j = 100 - max; j < 100; j++) {
+    let i = j < 2 ? (Math.abs(j) % 50) + 2 : j;
     rbitnot_number(i);
     rbitnot_object(i);
     rbitand_number(i);
@@ -1443,6 +1459,7 @@ for (i = 0; i < 100; i++) {
     rhypot_object_2args(i);
     rhypot_object_3args(i);
     rhypot_object_4args(i);
+    rrandom(i);
     rsin_number(i);
     rsin_object(i);
     rlog_number(i);

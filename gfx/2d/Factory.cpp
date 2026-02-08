@@ -190,6 +190,7 @@ void
 Factory::ShutDown()
 {
   if (sConfig) {
+    delete sConfig->mLogForwarder;
     delete sConfig;
     sConfig = nullptr;
   }
@@ -406,8 +407,9 @@ Factory::CreateDrawTargetForData(BackendType aBackend,
     {
       RefPtr<DrawTargetSkia> newTarget;
       newTarget = new DrawTargetSkia();
-      newTarget->Init(aData, aSize, aStride, aFormat, aUninitialized);
-      retVal = newTarget;
+      if (newTarget->Init(aData, aSize, aStride, aFormat, aUninitialized)) {
+        retVal = newTarget;
+      }
       break;
     }
 #endif
@@ -713,13 +715,15 @@ Factory::D2DCleanup()
 }
 
 already_AddRefed<ScaledFont>
-Factory::CreateScaledFontForDWriteFont(IDWriteFont* aFont,
-                                       IDWriteFontFamily* aFontFamily,
-                                       IDWriteFontFace* aFontFace,
+Factory::CreateScaledFontForDWriteFont(IDWriteFontFace* aFontFace,
+                                       const gfxFontStyle* aStyle,
                                        float aSize,
-                                       bool aUseEmbeddedBitmap)
+                                       bool aUseEmbeddedBitmap,
+                                       bool aForceGDIMode)
 {
-  return MakeAndAddRef<ScaledFontDWrite>(aFont, aFontFamily, aFontFace, aSize, aUseEmbeddedBitmap);
+  return MakeAndAddRef<ScaledFontDWrite>(aFontFace, aSize,
+                                         aUseEmbeddedBitmap, aForceGDIMode,
+                                         aStyle);
 }
 
 #endif // XP_WIN
@@ -739,6 +743,18 @@ Factory::CreateDrawTargetSkiaWithGrContext(GrContext* aGrContext,
 
 #endif // USE_SKIA_GPU
 
+#ifdef USE_SKIA
+already_AddRefed<DrawTarget>
+Factory::CreateDrawTargetWithSkCanvas(SkCanvas* aCanvas)
+{
+  RefPtr<DrawTargetSkia> newTarget = new DrawTargetSkia();
+  if (!newTarget->Init(aCanvas)) {
+    return nullptr;
+  }
+  return newTarget.forget();
+}
+#endif
+
 void
 Factory::PurgeAllCaches()
 {
@@ -747,6 +763,10 @@ Factory::PurgeAllCaches()
 already_AddRefed<DrawTarget>
 Factory::CreateDrawTargetForCairoSurface(cairo_surface_t* aSurface, const IntSize& aSize, SurfaceFormat* aFormat)
 {
+  if (!AllowedSurfaceSize(aSize)) {
+    gfxWarning() << "Allowing surface with invalid size (Cairo) " << aSize;
+  }
+
   RefPtr<DrawTarget> retVal;
 
 #ifdef USE_CAIRO
@@ -782,6 +802,11 @@ Factory::CreateSourceSurfaceForCairoSurface(cairo_surface_t* aSurface, const Int
 already_AddRefed<DrawTarget>
 Factory::CreateDrawTargetForCairoCGContext(CGContextRef cg, const IntSize& aSize)
 {
+  if (!AllowedSurfaceSize(aSize)) {
+    gfxCriticalError(LoggerOptionsBasedOnSize(aSize)) << "Failed to allocate a surface due to invalid size (CG) " << aSize;
+    return nullptr;
+  }
+
   RefPtr<DrawTarget> retVal;
 
   RefPtr<DrawTargetCG> newTarget = new DrawTargetCG();
@@ -811,7 +836,7 @@ Factory::CreateWrappingDataSourceSurface(uint8_t *aData,
                                          SourceSurfaceDeallocator aDeallocator /* = nullptr */,
                                          void* aClosure /* = nullptr */)
 {
-  if (aSize.width <= 0 || aSize.height <= 0) {
+  if (!AllowedSurfaceSize(aSize)) {
     return nullptr;
   }
   if (!aDeallocator && aClosure) {
@@ -855,7 +880,8 @@ Factory::CreateDataSourceSurfaceWithStride(const IntSize &aSize,
                                            int32_t aStride,
                                            bool aZero)
 {
-  if (aStride < aSize.width * BytesPerPixel(aFormat)) {
+  if (!AllowedSurfaceSize(aSize) ||
+      aStride < aSize.width * BytesPerPixel(aFormat)) {
     gfxCriticalError(LoggerOptionsBasedOnSize(aSize)) << "CreateDataSourceSurfaceWithStride failed with bad stride " << aStride << ", " << aSize << ", " << aFormat;
     return nullptr;
   }
@@ -975,13 +1001,6 @@ Factory::SetGlobalEventRecorder(DrawEventRecorder *aRecorder)
 {
   mRecorder = aRecorder;
 }
-
-// static
-void
-Factory::SetLogForwarder(LogForwarder* aLogFwd) {
-  sConfig->mLogForwarder = aLogFwd;
-}
-
 
 // static
 void

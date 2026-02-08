@@ -66,13 +66,13 @@ class CanvasRenderingContext2D final :
   virtual ~CanvasRenderingContext2D();
 
 public:
-  CanvasRenderingContext2D();
+  explicit CanvasRenderingContext2D(layers::LayersBackend aCompositorBackend);
 
   virtual JSObject* WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto) override;
 
   HTMLCanvasElement* GetCanvas() const
   {
-    if (mCanvasElement->IsInNativeAnonymousSubtree()) {
+    if (!mCanvasElement || mCanvasElement->IsInNativeAnonymousSubtree()) {
       return nullptr;
     }
 
@@ -365,10 +365,6 @@ public:
                                      mozilla::ErrorResult& aError);
   void GetFillRule(nsAString& aFillRule);
   void SetFillRule(const nsAString& aFillRule);
-  void GetMozDash(JSContext* aCx, JS::MutableHandle<JS::Value> aRetval,
-                  mozilla::ErrorResult& aError);
-  void SetMozDash(JSContext* aCx, const JS::Value& aMozDash,
-                  mozilla::ErrorResult& aError);
 
   void SetLineDash(const Sequence<double>& aSegments,
                    mozilla::ErrorResult& aRv);
@@ -376,12 +372,6 @@ public:
 
   void SetLineDashOffset(double aOffset);
   double LineDashOffset() const;
-
-  double MozDashOffset()
-  {
-    return CurrentState().dashOffset;
-  }
-  void SetMozDashOffset(double aMozDashOffset);
 
   void GetMozTextStyle(nsAString& aMozTextStyle)
   {
@@ -548,6 +538,10 @@ public:
   bool GetHitRegionRect(Element* aElement, nsRect& aRect) override;
 
   void OnShutdown();
+
+  // Check the global setup, as well as the compositor type:
+  bool AllowOpenGLCanvas() const;
+
 protected:
   nsresult GetImageDataArray(JSContext* aCx, int32_t aX, int32_t aY,
                              uint32_t aWidth, uint32_t aHeight,
@@ -755,6 +749,8 @@ protected:
 
   RenderingMode mRenderingMode;
 
+  layers::LayersBackend mCompositorBackend;
+
   // Member vars
   int32_t mWidth, mHeight;
 
@@ -888,8 +884,21 @@ protected:
     */
   bool NeedToApplyFilter()
   {
+    return EnsureUpdatedFilter().mPrimitives.Length() > 0;
+  }
+
+  /**
+   * Calls UpdateFilter if the canvas's WriteOnly state has changed between the
+   * last call to UpdateFilter and now.
+   */
+  const gfx::FilterDescription& EnsureUpdatedFilter() {
     const ContextState& state = CurrentState();
-    return state.filter.mPrimitives.Length() > 0;
+    bool isWriteOnly = mCanvasElement && mCanvasElement->IsWriteOnly();
+    if (state.filterSourceGraphicTainted != isWriteOnly) {
+      UpdateFilter();
+    }
+    MOZ_ASSERT(state.filterSourceGraphicTainted == isWriteOnly);
+    return state.filter;
   }
 
   bool NeedToCalculateBounds()
@@ -981,7 +990,7 @@ protected:
                      lineCap(mozilla::gfx::CapStyle::BUTT),
                      lineJoin(mozilla::gfx::JoinStyle::MITER_OR_BEVEL),
                      filterString(u"none"),
-                     updateFilterOnWriteOnly(false),
+                     filterSourceGraphicTainted(false),
                      imageSmoothingEnabled(true),
                      fontExplicitLanguage(false)
     { }
@@ -1014,7 +1023,7 @@ protected:
           filterChainObserver(aOther.filterChainObserver),
           filter(aOther.filter),
           filterAdditionalImages(aOther.filterAdditionalImages),
-          updateFilterOnWriteOnly(aOther.updateFilterOnWriteOnly),
+          filterSourceGraphicTainted(aOther.filterSourceGraphicTainted),
           imageSmoothingEnabled(aOther.imageSmoothingEnabled),
           fontExplicitLanguage(aOther.fontExplicitLanguage)
     { }
@@ -1092,7 +1101,7 @@ protected:
     RefPtr<nsSVGFilterChainObserver> filterChainObserver;
     mozilla::gfx::FilterDescription filter;
     nsTArray<RefPtr<mozilla::gfx::SourceSurface>> filterAdditionalImages;
-    bool updateFilterOnWriteOnly;
+    bool filterSourceGraphicTainted;
 
     bool imageSmoothingEnabled;
     bool fontExplicitLanguage;

@@ -15,7 +15,6 @@ XPIDL_SOURCES += [
     'nsICertBlocklist.idl',
     'nsICertificateDialogs.idl',
     'nsICertOverrideService.idl',
-    'nsICertPickDialogs.idl',
     'nsIClientAuthDialogs.idl',
     'nsIContentSignatureVerifier.idl',
     'nsIDataSignatureVerifier.idl',
@@ -40,7 +39,6 @@ XPIDL_SOURCES += [
     'nsITokenDialogs.idl',
     'nsITokenPasswordDialogs.idl',
     'nsIU2FToken.idl',
-    'nsIUserCertPicker.idl',
     'nsIWeakCryptoOverride.idl',
     'nsIX509Cert.idl',
     'nsIX509CertDB.idl',
@@ -54,6 +52,11 @@ if CONFIG['MOZ_XUL']:
     ]
 
 XPIDL_MODULE = 'pipnss'
+
+EXTRA_JS_MODULES.psm += [
+    'DER.jsm',
+    'X509.jsm',
+]
 
 EXPORTS += [
     'CryptoTask.h',
@@ -93,7 +96,6 @@ UNIFIED_SOURCES += [
     'DataStorage.cpp',
     'LocalCertService.cpp',
     'nsCertOverrideService.cpp',
-    'nsCertPicker.cpp',
     'nsClientAuthRemember.cpp',
     'nsCrypto.cpp',
     'nsCryptoHash.cpp',
@@ -122,7 +124,6 @@ UNIFIED_SOURCES += [
     'nsPKCS11Slot.cpp',
     'nsPKCS12Blob.cpp',
     'nsProtectedAuthThread.cpp',
-    'nsPSMBackgroundThread.cpp',
     'nsRandomGenerator.cpp',
     'nsSecureBrowserUIImpl.cpp',
     'nsSecurityHeaderParser.cpp',

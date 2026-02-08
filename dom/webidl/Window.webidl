@@ -14,6 +14,7 @@
  * https://dvcs.w3.org/hg/webcrypto-api/raw-file/tip/spec/Overview.html
  * http://dvcs.w3.org/hg/speech-api/raw-file/tip/speechapi.html
  * https://w3c.github.io/webappsec-secure-contexts/#monkey-patching-global-object
+ * https://w3c.github.io/requestidlecallback/
  */
 
 interface ApplicationCache;
@@ -36,8 +37,8 @@ typedef any Transferable;
   [PutForwards=href, Unforgeable, Throws,
    CrossOriginReadable, CrossOriginWritable] readonly attribute Location? location;
   [Throws] readonly attribute History history;
-  [Func="CustomElementsRegistry::IsCustomElementsEnabled"]
-  readonly attribute CustomElementsRegistry customElements;
+  [Func="CustomElementRegistry::IsCustomElementEnabled"]
+  readonly attribute CustomElementRegistry customElements;
   [Replaceable, Throws] readonly attribute BarProp locationbar;
   [Replaceable, Throws] readonly attribute BarProp menubar;
   [Replaceable, Throws] readonly attribute BarProp personalbar;
@@ -59,7 +60,7 @@ typedef any Transferable;
   [Throws, CrossOriginReadable] attribute any opener;
   //[Throws] readonly attribute WindowProxy parent;
   [Replaceable, Throws, CrossOriginReadable] readonly attribute WindowProxy? parent;
-  [Throws] readonly attribute Element? frameElement;
+  [Throws, NeedsSubjectPrincipal] readonly attribute Element? frameElement;
   //[Throws] WindowProxy open(optional DOMString url = "about:blank", optional DOMString target = "_blank", [TreatNullAs=EmptyString] optional DOMString features = "", optional boolean replace = false);
   [Throws, UnsafeInPrerendering] WindowProxy? open(optional DOMString url = "", optional DOMString target = "", [TreatNullAs=EmptyString] optional DOMString features = "");
   // We think the indexed getter is a bug in the spec, it actually needs to live
@@ -75,47 +76,28 @@ typedef any Transferable;
   [Throws, Pref="browser.cache.offline.enable"] readonly attribute ApplicationCache applicationCache;
 
   // user prompts
-  [Throws, UnsafeInPrerendering] void alert();
-  [Throws, UnsafeInPrerendering] void alert(DOMString message);
-  [Throws, UnsafeInPrerendering] boolean confirm(optional DOMString message = "");
-  [Throws, UnsafeInPrerendering] DOMString? prompt(optional DOMString message = "", optional DOMString default = "");
+  [Throws, UnsafeInPrerendering, NeedsSubjectPrincipal] void alert();
+  [Throws, UnsafeInPrerendering, NeedsSubjectPrincipal] void alert(DOMString message);
+  [Throws, UnsafeInPrerendering, NeedsSubjectPrincipal] boolean confirm(optional DOMString message = "");
+  [Throws, UnsafeInPrerendering, NeedsSubjectPrincipal] DOMString? prompt(optional DOMString message = "", optional DOMString default = "");
   [Throws, UnsafeInPrerendering] void print();
   //[Throws] any showModalDialog(DOMString url, optional any argument);
-  [Throws, Func="nsGlobalWindow::IsShowModalDialogEnabled", UnsafeInPrerendering]
+  [Throws, Func="nsGlobalWindow::IsShowModalDialogEnabled", UnsafeInPrerendering, NeedsSubjectPrincipal]
   any showModalDialog(DOMString url, optional any argument, optional DOMString options = "");
 
-  [Throws, CrossOriginCallable] void postMessage(any message, DOMString targetOrigin, optional sequence<Transferable> transfer);
+  [Throws, CrossOriginCallable, NeedsSubjectPrincipal]
+  void postMessage(any message, DOMString targetOrigin, optional sequence<Transferable> transfer);
 
   // also has obsolete members
 };
 Window implements GlobalEventHandlers;
 Window implements WindowEventHandlers;
 
-// https://w3c.github.io/manifest/#oninstall-attribute
+// https://www.w3.org/TR/appmanifest/#onappinstalled-attribute
 partial interface Window {
-  [Pref="dom.manifest.oninstall"]
-  attribute EventHandler oninstall;
+  [Pref="dom.manifest.onappinstalled"]
+  attribute EventHandler onappinstalled;
 };
-
-// http://www.whatwg.org/specs/web-apps/current-work/
-[NoInterfaceObject, Exposed=(Window,Worker)]
-interface WindowTimers {
-  [Throws] long setTimeout(Function handler, optional long timeout = 0, any... arguments);
-  [Throws] long setTimeout(DOMString handler, optional long timeout = 0, any... unused);
-  void clearTimeout(optional long handle = 0);
-  [Throws] long setInterval(Function handler, optional long timeout, any... arguments);
-  [Throws] long setInterval(DOMString handler, optional long timeout, any... unused);
-  void clearInterval(optional long handle = 0);
-};
-Window implements WindowTimers;
-
-// http://www.whatwg.org/specs/web-apps/current-work/
-[NoInterfaceObject, Exposed=(Window,Worker)]
-interface WindowBase64 {
-  [Throws] DOMString btoa(DOMString btoa);
-  [Throws] DOMString atob(DOMString atob);
-};
-Window implements WindowBase64;
 
 // http://www.whatwg.org/specs/web-apps/current-work/
 [NoInterfaceObject]
@@ -271,8 +253,11 @@ Window implements SpeechSynthesisGetter;
 // http://www.whatwg.org/specs/web-apps/current-work/
 [NoInterfaceObject]
 interface WindowModal {
-  [Throws, Func="nsGlobalWindow::IsModalContentWindow"] readonly attribute any dialogArguments;
-  [Throws, Func="nsGlobalWindow::IsModalContentWindow"] attribute any returnValue;
+  [Throws, Func="nsGlobalWindow::IsModalContentWindow", NeedsSubjectPrincipal]
+  readonly attribute any dialogArguments;
+
+  [Throws, Func="nsGlobalWindow::IsModalContentWindow", NeedsSubjectPrincipal]
+  attribute any returnValue;
 };
 Window implements WindowModal;
 
@@ -421,11 +406,6 @@ partial interface Window {
 };
 #endif
 
-// https://w3c.github.io/webappsec-secure-contexts/#monkey-patching-global-object
-partial interface Window {
-  readonly attribute boolean isSecureContext;
-};
-
 #ifdef HAVE_SIDEBAR
 // Mozilla extension
 partial interface Window {
@@ -512,6 +492,25 @@ partial interface Window {
   attribute EventHandler onvrdisplaypresentchange;
 };
 
+// For testing worklet only
+partial interface Window {
+  [Pref="dom.worklet.testing.enabled", Throws]
+  Worklet createWorklet();
+};
+
 Window implements ChromeWindow;
-Window implements GlobalFetch;
-Window implements ImageBitmapFactories;
+Window implements WindowOrWorkerGlobalScope;
+
+partial interface Window {
+  [Throws, Pref="dom.requestIdleCallback.enabled"]
+  unsigned long requestIdleCallback(IdleRequestCallback callback,
+                                    optional IdleRequestOptions options);
+  [Pref="dom.requestIdleCallback.enabled"]
+  void          cancelIdleCallback(unsigned long handle);
+};
+
+dictionary IdleRequestOptions {
+  unsigned long timeout;
+};
+
+callback IdleRequestCallback = void (IdleDeadline deadline);

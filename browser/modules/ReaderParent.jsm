@@ -13,12 +13,13 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils","resource://gre/modules/PlacesUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils", "resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderMode", "resource://gre/modules/ReaderMode.jsm");
 
 const gStringBundle = Services.strings.createBundle("chrome://global/locale/aboutReader.properties");
 
 var ReaderParent = {
+  _readerModeInfoPanelOpen: false,
 
   MESSAGES: [
     "Reader:ArticleGet",
@@ -101,7 +102,32 @@ var ReaderParent = {
       command.setAttribute("label", enterText);
       command.setAttribute("hidden", !browser.isArticle);
     }
-    command.setAttribute("accesskey", gStringBundle.GetStringFromName("readerView.accesskey"));
+
+    let currentUriHost = browser.currentURI && browser.currentURI.asciiHost;
+    if (browser.isArticle &&
+        !Services.prefs.getBoolPref("browser.reader.detectedFirstArticle") &&
+        currentUriHost && !currentUriHost.endsWith("mozilla.org")) {
+      this.showReaderModeInfoPanel(browser);
+      Services.prefs.setBoolPref("browser.reader.detectedFirstArticle", true);
+      this._readerModeInfoPanelOpen = true;
+    } else if (this._readerModeInfoPanelOpen) {
+      if (UITour.isInfoOnTarget(win, "readerMode-urlBar")) {
+        UITour.hideInfo(win);
+      }
+      this._readerModeInfoPanelOpen = false;
+    }
+  },
+
+  forceShowReaderIcon: function(browser) {
+    browser.isArticle = true;
+    this.updateReaderButton(browser);
+  },
+
+  buttonClick(event) {
+    if (event.button != 0) {
+      return;
+    }
+    this.toggleReaderMode(event);
   },
 
   toggleReaderMode: function(event) {

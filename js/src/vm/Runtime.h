@@ -23,9 +23,10 @@
 #include "jsscript.h"
 
 #ifdef XP_DARWIN
-# include "asmjs/WasmSignalHandlers.h"
+# include "wasm/WasmSignalHandlers.h"
 #endif
 #include "builtin/AtomicsObject.h"
+#include "builtin/Promise.h"
 #include "ds/FixedSizeHash.h"
 #include "frontend/NameCollections.h"
 #include "gc/GCRuntime.h"
@@ -66,8 +67,7 @@ class EnterDebuggeeNoExecute;
 class TraceLoggerThread;
 #endif
 
-class PromiseTask;
-typedef Vector<PromiseTask*, 0, SystemAllocPolicy> PromiseTaskPtrVector;
+typedef Vector<UniquePtr<PromiseTask>, 0, SystemAllocPolicy> PromiseTaskPtrVector;
 
 /* Thread Local Storage slot for storing the runtime for a thread. */
 extern MOZ_THREAD_LOCAL(PerThreadData*) TlsPerThreadData;
@@ -298,7 +298,15 @@ class PerThreadData
     // any pointers into the nursery.
     bool ionCompilingSafeForMinorGC;
 
-    // Whether this thread is currently sweeping GC things.
+    // Whether this thread is currently performing GC.  This thread could be the
+    // main thread or a helper thread while the main thread is running the
+    // collector.
+    bool performingGC;
+
+    // Whether this thread is currently sweeping GC things.  This thread could
+    // be the main thread or a helper thread while the main thread is running
+    // the mutator.  This is used to assert that destruction of GCPtr only
+    // happens when we are sweeping.
     bool gcSweeping;
 #endif
 
@@ -616,11 +624,11 @@ struct JSRuntime : public JS::shadow::Runtime,
         return &interrupt_;
     }
 
-    // Set when handling a segfault in the asm.js signal handler.
+    // Set when handling a segfault in the wasm signal handler.
     bool handlingSegFault;
 
   private:
-    // Set when we're handling an interrupt of JIT/asm.js code in
+    // Set when we're handling an interrupt of JIT/wasm code in
     // InterruptRunningJitCode.
     mozilla::Atomic<bool> handlingJitInterrupt_;
 
@@ -638,7 +646,9 @@ struct JSRuntime : public JS::shadow::Runtime,
         return handlingJitInterrupt_;
     }
 
-    JSInterruptCallback interruptCallback;
+    using InterruptCallbackVector = js::Vector<JSInterruptCallback, 2, js::SystemAllocPolicy>;
+    InterruptCallbackVector interruptCallbacks;
+    bool interruptCallbackDisabled;
 
     JSGetIncumbentGlobalCallback getIncumbentGlobalCallback;
     JSEnqueuePromiseJobCallback enqueuePromiseJobCallback;
@@ -699,7 +709,7 @@ struct JSRuntime : public JS::shadow::Runtime,
     /* See comment for JS_AbortIfWrongThread in jsapi.h. */
     js::Thread::Id ownerThread_;
     size_t ownerThreadNative_;
-    friend bool js::CurrentThreadCanAccessRuntime(JSRuntime* rt);
+    friend bool js::CurrentThreadCanAccessRuntime(const JSRuntime* rt);
   public:
 
     size_t ownerThreadNative() const {
@@ -920,7 +930,7 @@ struct JSRuntime : public JS::shadow::Runtime,
      */
     JSCList             onNewGlobalObjectWatchers;
 
-#if defined(XP_DARWIN) && defined(ASMJS_MAY_USE_SIGNAL_HANDLERS)
+#if defined(XP_DARWIN)
     js::wasm::MachExceptionHandler wasmMachExceptionHandler;
 #endif
 
@@ -1263,6 +1273,31 @@ struct JSRuntime : public JS::shadow::Runtime,
 
     void ionLazyLinkListRemove(js::jit::IonBuilder* builder);
     void ionLazyLinkListAdd(js::jit::IonBuilder* builder);
+
+  private:
+    /* The stack format for the current runtime.  Only valid on non-child
+     * runtimes. */
+    mozilla::Atomic<js::StackFormat, mozilla::ReleaseAcquire> stackFormat_;
+
+  public:
+    js::StackFormat stackFormat() const {
+        const JSRuntime* rt = this;
+        while (rt->parentRuntime) {
+            MOZ_ASSERT(rt->stackFormat_ == js::StackFormat::Default);
+            rt = rt->parentRuntime;
+        }
+        MOZ_ASSERT(rt->stackFormat_ != js::StackFormat::Default);
+        return rt->stackFormat_;
+    }
+    void setStackFormat(js::StackFormat format) {
+        MOZ_ASSERT(!parentRuntime);
+        MOZ_ASSERT(format != js::StackFormat::Default);
+        stackFormat_ = format;
+    }
+
+    // For inherited heap state accessors.
+    friend class js::gc::AutoTraceSession;
+    friend class JS::AutoEnterCycleCollection;
 };
 
 namespace js {
@@ -1613,6 +1648,29 @@ class MOZ_RAII AutoEnterIonCompilation
 
 namespace gc {
 
+// In debug builds, set/unset the performing GC flag for the current thread.
+struct MOZ_RAII AutoSetThreadIsPerformingGC
+{
+#ifdef DEBUG
+    AutoSetThreadIsPerformingGC()
+      : threadData_(js::TlsPerThreadData.get())
+    {
+        MOZ_ASSERT(!threadData_->performingGC);
+        threadData_->performingGC = true;
+    }
+
+    ~AutoSetThreadIsPerformingGC() {
+        MOZ_ASSERT(threadData_->performingGC);
+        threadData_->performingGC = false;
+    }
+
+  private:
+    PerThreadData* threadData_;
+#else
+    AutoSetThreadIsPerformingGC() {}
+#endif
+};
+
 // In debug builds, set/unset the GC sweeping flag for the current thread.
 struct MOZ_RAII AutoSetThreadIsSweeping
 {
@@ -1654,7 +1712,7 @@ struct GCManagedDeletePolicy
     void operator()(const T* ptr) {
         if (ptr) {
             JSRuntime* rt = TlsPerThreadData.get()->runtimeIfOnOwnerThread();
-            if (rt) {
+            if (rt && rt->gc.nursery.isEnabled()) {
                 // The object may contain nursery pointers and must only be
                 // destroyed after a minor GC.
                 rt->gc.callAfterMinorGC(deletePtr, const_cast<T*>(ptr));

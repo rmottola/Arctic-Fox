@@ -182,12 +182,12 @@ public:
   virtual void UnsuppressPainting() override;
 
   virtual nsresult GetAgentStyleSheets(
-      nsTArray<mozilla::StyleSheetHandle::RefPtr>& aSheets) override;
+      nsTArray<RefPtr<mozilla::StyleSheet>>& aSheets) override;
   virtual nsresult SetAgentStyleSheets(
-      const nsTArray<mozilla::StyleSheetHandle::RefPtr>& aSheets) override;
+      const nsTArray<RefPtr<mozilla::StyleSheet>>& aSheets) override;
 
-  virtual nsresult AddOverrideStyleSheet(mozilla::StyleSheetHandle aSheet) override;
-  virtual nsresult RemoveOverrideStyleSheet(mozilla::StyleSheetHandle aSheet) override;
+  virtual nsresult AddOverrideStyleSheet(mozilla::StyleSheet* aSheet) override;
+  virtual nsresult RemoveOverrideStyleSheet(mozilla::StyleSheet* aSheet) override;
 
   virtual nsresult HandleEventWithTarget(
                                  mozilla::WidgetEvent* aEvent,
@@ -212,14 +212,14 @@ public:
   virtual already_AddRefed<SourceSurface>
   RenderNode(nsIDOMNode* aNode,
              nsIntRegion* aRegion,
-             nsIntPoint& aPoint,
-             nsIntRect* aScreenRect,
+             const mozilla::LayoutDeviceIntPoint aPoint,
+             mozilla::LayoutDeviceIntRect* aScreenRect,
              uint32_t aFlags) override;
 
   virtual already_AddRefed<SourceSurface>
   RenderSelection(nsISelection* aSelection,
-                  nsIntPoint& aPoint,
-                  nsIntRect* aScreenRect,
+                  const mozilla::LayoutDeviceIntPoint aPoint,
+                  mozilla::LayoutDeviceIntRect* aScreenRect,
                   uint32_t aFlags) override;
 
   virtual already_AddRefed<nsPIDOMWindowOuter> GetRootWindow() override;
@@ -369,7 +369,7 @@ public:
 
   virtual nscolor ComputeBackstopColor(nsView* aDisplayRoot) override;
 
-  virtual nsresult SetIsActive(bool aIsActive, bool aIsHidden = true) override;
+  virtual nsresult SetIsActive(bool aIsActive) override;
 
   virtual bool GetIsViewportOverridden() override {
     return (mMobileViewportManager != nullptr);
@@ -534,7 +534,6 @@ protected:
 
   bool mCaretEnabled;
 
-  bool mIsHidden;
 #ifdef DEBUG
   nsStyleSet* CloneStyleSet(nsStyleSet* aSet);
   bool VerifyIncrementalReflow();
@@ -542,7 +541,7 @@ protected:
   void ShowEventTargetDebug();
 #endif
 
-  void RecordStyleSheetChange(mozilla::StyleSheetHandle aStyleSheet);
+  void RecordStyleSheetChange(mozilla::StyleSheet* aStyleSheet);
 
   void RemovePreferenceStyles();
 
@@ -578,8 +577,8 @@ protected:
                       nsISelection* aSelection,
                       nsIntRegion* aRegion,
                       nsRect aArea,
-                      nsIntPoint& aPoint,
-                      nsIntRect* aScreenRect,
+                      const mozilla::LayoutDeviceIntPoint aPoint,
+                      mozilla::LayoutDeviceIntRect* aScreenRect,
                       uint32_t aFlags);
 
   /**
@@ -863,7 +862,7 @@ protected:
   mozilla::layers::ScrollableLayerGuid mMouseEventTargetGuid;
 
   // mStyleSet owns it but we maintain a ref, may be null
-  mozilla::StyleSheetHandle::RefPtr mPrefStyleSheet;
+  RefPtr<mozilla::StyleSheet> mPrefStyleSheet;
 
   // Set of frames that we should mark with NS_FRAME_HAS_DIRTY_CHILDREN after
   // we finish reflowing mCurrentReflowRoot.

@@ -25,11 +25,8 @@ class ProxyAccessible : public ProxyAccessibleBase<ProxyAccessible>
 {
 public:
   ProxyAccessible(uint64_t aID, ProxyAccessible* aParent,
-                  DocAccessibleParent* aDoc, role aRole, uint32_t aInterfaces,
-                  const RefPtr<IAccessible>& aIAccessible)
+                  DocAccessibleParent* aDoc, role aRole, uint32_t aInterfaces)
     : ProxyAccessibleBase(aID, aParent, aDoc, aRole, aInterfaces)
-    , mCOMProxy(aIAccessible)
-
   {
     MOZ_COUNT_CTOR(ProxyAccessible);
   }
@@ -39,34 +36,7 @@ public:
     MOZ_COUNT_DTOR(ProxyAccessible);
   }
 
-  /*
-   * Return the states for the proxied accessible.
-   */
-  uint64_t State() const;
-
-  /*
-   * Set aName to the name of the proxied accessible.
-   */
-  void Name(nsString& aName) const;
-
-  /*
-   * Set aValue to the value of the proxied accessible.
-   */
-  void Value(nsString& aValue) const;
-
-  /**
-   * Set aDesc to the description of the proxied accessible.
-   */
-  void Description(nsString& aDesc) const;
-
-  /**
-   * Get the set of attributes on the proxied accessible.
-   */
-  void Attributes(nsTArray<Attribute> *aAttrs) const;
-
-  nsIntRect Bounds();
-
-  void Language(nsString& aLocale);
+#include "mozilla/a11y/ProxyAccessibleShared.h"
 
   bool GetCOMInterface(void** aOutAccessible) const;
 

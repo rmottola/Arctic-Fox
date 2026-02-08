@@ -684,8 +684,8 @@ public:
 
   explicit WidgetPointerEvent(const WidgetMouseEvent& aEvent)
     : WidgetMouseEvent(aEvent)
-    , mWidth(0)
-    , mHeight(0)
+    , mWidth(1)
+    , mHeight(1)
     , mIsPrimary(true)
   {
     mClass = ePointerEventClass;

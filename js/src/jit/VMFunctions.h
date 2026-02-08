@@ -628,6 +628,7 @@ JSString* ArrayJoin(JSContext* cx, HandleObject array, HandleString sep);
 MOZ_MUST_USE bool
 CharCodeAt(JSContext* cx, HandleString str, int32_t index, uint32_t* code);
 JSFlatString* StringFromCharCode(JSContext* cx, int32_t code);
+JSString* StringFromCodePoint(JSContext* cx, int32_t codePoint);
 
 MOZ_MUST_USE bool
 SetProperty(JSContext* cx, HandleObject obj, HandlePropertyName name, HandleValue value,
@@ -785,6 +786,8 @@ bool ObjectIsConstructor(JSObject* obj);
 
 MOZ_MUST_USE bool
 ThrowRuntimeLexicalError(JSContext* cx, unsigned errorNumber);
+MOZ_MUST_USE bool
+ThrowReadOnlyError(JSContext* cx, HandleObject obj);
 MOZ_MUST_USE bool
 BaselineThrowUninitializedThis(JSContext* cx, BaselineFrame* frame);
 MOZ_MUST_USE bool

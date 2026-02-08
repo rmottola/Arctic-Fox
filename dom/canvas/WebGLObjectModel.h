@@ -267,7 +267,7 @@ class WebGLContextBoundObject
 public:
     explicit WebGLContextBoundObject(WebGLContext* webgl);
 
-    bool IsCompatibleWithContext(WebGLContext* other);
+    bool IsCompatibleWithContext(const WebGLContext* other) const;
 
     WebGLContext* const mContext;
 protected:
@@ -331,7 +331,7 @@ ImplCycleCollectionUnlink(mozilla::WebGLRefPtr<T>& field)
 template <typename T>
 inline void
 ImplCycleCollectionTraverse(nsCycleCollectionTraversalCallback& callback,
-                            mozilla::WebGLRefPtr<T>& field,
+                            const mozilla::WebGLRefPtr<T>& field,
                             const char* name,
                             uint32_t flags = 0)
 {

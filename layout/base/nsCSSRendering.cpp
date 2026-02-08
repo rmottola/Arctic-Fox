@@ -667,25 +667,16 @@ nsCSSRendering::PaintBorder(nsPresContext* aPresContext,
   }
 
   nsStyleBorder newStyleBorder(*styleBorder);
-  // We could do something fancy to avoid the TrackImage/UntrackImage
-  // work, but it doesn't seem worth it.  (We need to call TrackImage
-  // since we're not going through nsRuleNode::ComputeBorderData.)
-  newStyleBorder.TrackImage(aPresContext);
 
   NS_FOR_CSS_SIDES(side) {
-    newStyleBorder.SetBorderColor(side,
-      aStyleContext->GetVisitedDependentColor(
-        nsCSSProps::SubpropertyEntryFor(eCSSProperty_border_color)[side]));
+    nscolor color = aStyleContext->GetVisitedDependentColor(
+      nsCSSProps::SubpropertyEntryFor(eCSSProperty_border_color)[side]);
+    newStyleBorder.mBorderColor[side] = StyleComplexColor::FromColor(color);
   }
   DrawResult result =
     PaintBorderWithStyleBorder(aPresContext, aRenderingContext, aForFrame,
                                aDirtyRect, aBorderArea, newStyleBorder,
                                aStyleContext, aFlags, aSkipSides);
-
-  // We could do something fancy to avoid the TrackImage/UntrackImage
-  // work, but it doesn't seem worth it.  (We need to call UntrackImage
-  // since we're not going through nsStyleBorder::Destroy.)
-  newStyleBorder.UntrackImage(aPresContext);
 
   return result;
 }
@@ -804,13 +795,9 @@ nsCSSRendering::PaintBorderWithStyleBorder(nsPresContext* aPresContext,
 
   // pull out styles, colors, composite colors
   NS_FOR_CSS_SIDES (i) {
-    bool foreground;
     borderStyles[i] = aStyleBorder.GetBorderStyle(i);
-    aStyleBorder.GetBorderColor(i, borderColors[i], foreground);
+    borderColors[i] = ourColor->CalcComplexColor(aStyleBorder.mBorderColor[i]);
     aStyleBorder.GetCompositeColors(i, &compositeColors[i]);
-
-    if (foreground)
-      borderColors[i] = ourColor->mColor;
   }
 
   PrintAsFormatString(" borderStyles: %d %d %d %d\n", borderStyles[0], borderStyles[1], borderStyles[2], borderStyles[3]);
@@ -876,7 +863,7 @@ nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
   MOZ_ASSERT(ourOutline != NS_STYLE_BORDER_STYLE_NONE,
              "shouldn't have created nsDisplayOutline item");
 
-  uint8_t outlineStyle = ourOutline->GetOutlineStyle();
+  uint8_t outlineStyle = ourOutline->mOutlineStyle;
   nscoord width = ourOutline->GetOutlineWidth();
 
   if (width == 0 && outlineStyle != NS_STYLE_BORDER_STYLE_AUTO) {
@@ -1696,11 +1683,8 @@ nsCSSRendering::PaintBGParams::ForAllLayers(nsPresContext& aPresCtx,
 {
   MOZ_ASSERT(aFrame);
 
-  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea);
-
-  result.frame = aFrame;
-  result.paintFlags = aPaintFlags;
-  result.layer = -1;
+  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea, aFrame,
+    aPaintFlags, -1, CompositionOp::OP_OVER);
 
   return result;
 }
@@ -1718,13 +1702,8 @@ nsCSSRendering::PaintBGParams::ForSingleLayer(nsPresContext& aPresCtx,
 {
   MOZ_ASSERT(aFrame && (aLayer != -1));
 
-  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea);
-
-  result.frame = aFrame;
-  result.paintFlags = aPaintFlags;
-
-  result.layer = aLayer;
-  result.compositionOp = aCompositionOp;
+  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea, aFrame,
+    aPaintFlags, aLayer, aCompositionOp);
 
   return result;
 }
@@ -1783,16 +1762,13 @@ IsOpaqueBorderEdge(const nsStyleBorder& aBorder, mozilla::css::Side aSide)
   if (aBorder.mBorderImageSource.GetType() != eStyleImageType_Null)
     return false;
 
-  nscolor color;
-  bool isForeground;
-  aBorder.GetBorderColor(aSide, color, isForeground);
-
+  StyleComplexColor color = aBorder.mBorderColor[aSide];
   // We don't know the foreground color here, so if it's being used
   // we must assume it might be transparent.
-  if (isForeground)
+  if (!color.IsNumericColor()) {
     return false;
-
-  return NS_GET_A(color) == 255;
+  }
+  return NS_GET_A(color.mColor) == 255;
 }
 
 /**
@@ -3044,6 +3020,30 @@ nsCSSRendering::PaintGradient(nsPresContext* aPresContext,
   }
 }
 
+static CompositionOp
+DetermineCompositionOp(const nsCSSRendering::PaintBGParams& aParams,
+                       const nsStyleImageLayers& aLayers,
+                       uint32_t aLayerIndex)
+{
+  if (aParams.layer >= 0) {
+    // When drawing a single layer, use the specified composition op.
+    return aParams.compositionOp;
+  }
+
+  const nsStyleImageLayers::Layer& layer = aLayers.mLayers[aLayerIndex];
+  // When drawing all layers, get the compositon op from each image layer.
+  if (aParams.paintFlags & nsCSSRendering::PAINTBG_MASK_IMAGE) {
+    // Always using OP_OVER mode while drawing the bottom mask layer.
+    if (aLayerIndex == (aLayers.mImageCount - 1)) {
+      return CompositionOp::OP_OVER;
+    }
+
+    return nsCSSRendering::GetGFXCompositeMode(layer.mComposite);
+  }
+
+  return nsCSSRendering::GetGFXBlendMode(layer.mBlendMode);
+}
+
 DrawResult
 nsCSSRendering::PaintBackgroundWithSC(const PaintBGParams& aParams,
                                       nsStyleContext *aBackgroundSC,
@@ -3222,7 +3222,8 @@ nsCSSRendering::PaintBackgroundWithSC(const PaintBGParams& aParams,
           clipSet = true;
           if (!clipBorderArea.IsEqualEdges(aParams.borderArea)) {
             // We're drawing the background for the joined continuation boxes
-            // so we need to clip that to the slice that we want for this frame.
+            // so we need to clip that to the slice that we want for this
+            // frame.
             gfxRect clip =
               nsLayoutUtils::RectToGfxRect(aParams.borderArea, appUnitsPerPixel);
             autoSR.EnsureSaved(ctx);
@@ -3234,23 +3235,17 @@ nsCSSRendering::PaintBackgroundWithSC(const PaintBGParams& aParams,
       }
       if ((aParams.layer < 0 || i == (uint32_t)startLayer) &&
           !clipState.mDirtyRectGfx.IsEmpty()) {
-        // When we're drawing a single layer, use the specified composition op,
-        // otherwise get the compositon op from the image layer.
-        CompositionOp co = (aParams.layer >= 0) ? aParams.compositionOp :
-          (paintMask ? GetGFXCompositeMode(layer.mComposite) :
-                       GetGFXBlendMode(layer.mBlendMode));
+        CompositionOp co = DetermineCompositionOp(aParams, layers, i);
         nsBackgroundLayerState state =
           PrepareImageLayer(&aParams.presCtx, aParams.frame,
                             aParams.paintFlags, paintBorderArea, clipState.mBGClipArea,
-                            layer, nullptr, co);
+                            layer, nullptr);
         result &= state.mImageRenderer.PrepareResult();
         if (!state.mFillArea.IsEmpty()) {
-          // Always using OP_OVER mode while drawing the bottom mask layer.
-          bool isBottomMaskLayer = paintMask ?
-                                   (i == (layers.mImageCount - 1)) : false;
-          if (co != CompositionOp::OP_OVER && !isBottomMaskLayer) {
+          if (co != CompositionOp::OP_OVER) {
             NS_ASSERTION(ctx->CurrentOp() == CompositionOp::OP_OVER,
-                         "It is assumed the initial op is OP_OVER, when it is restored later");
+                         "It is assumed the initial op is OP_OVER, when it is "
+                         "restored later");
             ctx->SetOp(co);
           }
 
@@ -3329,6 +3324,9 @@ nsCSSRendering::ComputeImageLayerPositioningArea(nsPresContext* aPresContext,
 
   // Background images are tiled over the 'background-clip' area
   // but the origin of the tiling is based on the 'background-origin' area
+  // XXX: Bug 1303623 will bring in new origin value, we should iterate from
+  // NS_STYLE_IMAGELAYER_ORIGIN_MARGIN instead of
+  // NS_STYLE_IMAGELAYER_ORIGIN_BORDER.
   if (aLayer.mOrigin != NS_STYLE_IMAGELAYER_ORIGIN_BORDER && geometryFrame) {
     nsMargin border = geometryFrame->GetUsedBorder();
     if (aLayer.mOrigin != NS_STYLE_IMAGELAYER_ORIGIN_PADDING) {
@@ -3520,8 +3518,7 @@ nsCSSRendering::PrepareImageLayer(nsPresContext* aPresContext,
                                   const nsRect& aBorderArea,
                                   const nsRect& aBGClipRect,
                                   const nsStyleImageLayers::Layer& aLayer,
-                                  bool* aOutIsTransformedFixed,
-                                  CompositionOp aCompositonOp)
+                                  bool* aOutIsTransformedFixed)
 {
   /*
    * The properties we need to keep in mind when drawing style image
@@ -3597,6 +3594,9 @@ nsCSSRendering::PrepareImageLayer(nsPresContext* aPresContext,
   nsBackgroundLayerState state(aForFrame, &aLayer.mImage, irFlags);
   if (!state.mImageRenderer.PrepareImage()) {
     // There's no image or it's not ready to be painted.
+    if (aOutIsTransformedFixed) {
+      *aOutIsTransformedFixed = false;
+    }
     return state;
   }
 
@@ -5023,8 +5023,13 @@ ShouldTreatAsCompleteDueToSyncDecode(const nsStyleImage* aImage,
     return false;
   }
 
+  imgRequestProxy* req = aImage->GetImageData();
+  if (!req) {
+    return false;
+  }
+
   uint32_t status = 0;
-  if (NS_FAILED(aImage->GetImageData()->GetImageStatus(&status))) {
+  if (NS_FAILED(req->GetImageStatus(&status))) {
     return false;
   }
 
@@ -5032,7 +5037,7 @@ ShouldTreatAsCompleteDueToSyncDecode(const nsStyleImage* aImage,
     // The image is "complete" since it's a corrupt image. If we created an
     // imgIContainer at all, return true.
     nsCOMPtr<imgIContainer> image;
-    aImage->GetImageData()->GetImage(getter_AddRefs(image));
+    req->GetImage(getter_AddRefs(image));
     return bool(image);
   }
 
@@ -5069,8 +5074,9 @@ nsImageRenderer::PrepareImage()
   }
 
   switch (mType) {
-    case eStyleImageType_Image:
-    {
+    case eStyleImageType_Image: {
+      MOZ_ASSERT(mImage->GetImageData(),
+                 "must have image data, since we checked IsEmpty above");
       nsCOMPtr<imgIContainer> srcImage;
       DebugOnly<nsresult> rv =
         mImage->GetImageData()->GetImage(getter_AddRefs(srcImage));

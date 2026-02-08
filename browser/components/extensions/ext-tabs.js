@@ -21,67 +21,47 @@ var {
 
 // This function is pretty tightly tied to Extension.jsm.
 // Its job is to fill in the |tab| property of the sender.
-function getSender(context, target, sender) {
-  // The message was sent from a content script to a <browser> element.
-  // We can just get the |tab| from |target|.
-  if (target instanceof Ci.nsIDOMXULElement) {
-    // The message came from a content script.
-    let tabbrowser = target.ownerGlobal.gBrowser;
-    if (!tabbrowser) {
-      return;
-    }
-    let tab = tabbrowser.getTabForBrowser(target);
-
-    sender.tab = TabManager.convert(context.extension, tab);
-  } else if ("tabId" in sender) {
+function getSender(extension, target, sender) {
+  if ("tabId" in sender) {
     // The message came from an ExtensionContext. In that case, it should
     // include a tabId property (which is filled in by the page-open
     // listener below).
-    sender.tab = TabManager.convert(context.extension, TabManager.getTab(sender.tabId));
+    let tab = TabManager.getTab(sender.tabId, null, null);
     delete sender.tabId;
-  }
-}
-
-function getDocShellOwner(docShell) {
-  let browser = docShell.chromeEventHandler;
-
-  let xulWindow = browser.ownerGlobal;
-
-  let {gBrowser} = xulWindow;
-  if (gBrowser) {
-    let tab = gBrowser.getTabForBrowser(browser);
-
-    return {xulWindow, tab};
-  }
-
-  return {};
-}
-
-/* eslint-disable mozilla/balanced-listeners */
-// This listener fires whenever an extension page opens in a tab
-// (either initiated by the extension or the user). Its job is to fill
-// in some tab-specific details and keep data around about the
-// ExtensionContext.
-extensions.on("page-load", (type, context, params, sender, delegate) => {
-  if (params.type == "tab" || params.type == "popup") {
-    let {xulWindow, tab} = getDocShellOwner(params.docShell);
-
-    // FIXME: Handle tabs being moved between windows.
-    context.windowId = WindowManager.getId(xulWindow);
     if (tab) {
-      sender.tabId = TabManager.getId(tab);
-      context.tabId = TabManager.getId(tab);
+      sender.tab = TabManager.convert(extension, tab);
+      return;
     }
   }
+  if (target instanceof Ci.nsIDOMXULElement) {
+    // If the message was sent from a content script to a <browser> element,
+    // then we can just get the `tab` from `target`.
+    let tabbrowser = target.ownerGlobal.gBrowser;
+    if (tabbrowser) {
+      let tab = tabbrowser.getTabForBrowser(target);
 
-  delegate.getSender = getSender;
-});
+      // `tab` can be `undefined`, e.g. for extension popups. This condition is
+      // reached if `getSender` is called for a popup without a valid `tabId`.
+      if (tab) {
+        sender.tab = TabManager.convert(extension, tab);
+      }
+    }
+  }
+}
+
+// Used by Extension.jsm
+global.tabGetSender = getSender;
+
+/* eslint-disable mozilla/balanced-listeners */
 
 extensions.on("page-shutdown", (type, context) => {
-  if (context.type == "tab") {
-    let {xulWindow, tab} = getDocShellOwner(context.docShell);
-    if (tab) {
-      xulWindow.gBrowser.removeTab(tab);
+  if (context.viewType == "tab") {
+    let {gBrowser} = context.xulBrowser.ownerGlobal;
+    if (gBrowser) {
+      let tab = gBrowser.getTabForBrowser(context.xulBrowser);
+      if (tab) {
+        gBrowser.removeTab(tab);
+      }
     }
   }
 });
@@ -98,8 +78,8 @@ extensions.on("fill-browser-data", (type, browser, data, result) => {
 /* eslint-enable mozilla/balanced-listeners */
 
 global.currentWindow = function(context) {
-  let {xulWindow} = getDocShellOwner(context.docShell);
-  if (xulWindow) {
+  let {xulWindow} = context;
+  if (xulWindow && context.viewType != "background") {
     return xulWindow;
   }
   return WindowManager.topWindow;
@@ -263,7 +243,7 @@ let tabListener = {
   },
 };
 
-extensions.registerSchemaAPI("tabs", context => {
+extensions.registerSchemaAPI("tabs", "addon_parent", context => {
   let {extension} = context;
   let self = {
     tabs: {
@@ -552,7 +532,7 @@ extensions.registerSchemaAPI("tabs", context => {
         }
 
         for (let tabId of tabs) {
-          let tab = TabManager.getTab(tabId);
+          let tab = TabManager.getTab(tabId, context);
           tab.ownerGlobal.gBrowser.removeTab(tab);
         }
 
@@ -560,11 +540,7 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       update: function(tabId, updateProperties) {
-        let tab = tabId !== null ? TabManager.getTab(tabId) : TabManager.activeTab;
-
-        if (!tab) {
-          return Promise.reject({message: `No tab found with tabId: ${tabId}`});
-        }
+        let tab = tabId !== null ? TabManager.getTab(tabId, context) : TabManager.activeTab;
 
         let tabbrowser = tab.ownerGlobal.gBrowser;
 
@@ -603,7 +579,8 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       reload: function(tabId, reloadProperties) {
-        let tab = tabId !== null ? TabManager.getTab(tabId) : TabManager.activeTab;
+        let tab = tabId !== null ? TabManager.getTab(tabId, context) : TabManager.activeTab;
+
         let flags = Ci.nsIWebNavigation.LOAD_FLAGS_NONE;
         if (reloadProperties && reloadProperties.bypassCache) {
           flags |= Ci.nsIWebNavigation.LOAD_FLAGS_BYPASS_CACHE;
@@ -614,14 +591,15 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       get: function(tabId) {
-        let tab = TabManager.getTab(tabId);
+        let tab = TabManager.getTab(tabId, context);
+
         return Promise.resolve(TabManager.convert(extension, tab));
       },
 
       getCurrent() {
         let tab;
         if (context.tabId) {
-          tab = TabManager.convert(extension, TabManager.getTab(context.tabId));
+          tab = TabManager.convert(extension, TabManager.getTab(context.tabId, context));
         }
         return Promise.resolve(tab);
       },
@@ -737,10 +715,7 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       detectLanguage: function(tabId) {
-        let tab = tabId !== null ? TabManager.getTab(tabId) : TabManager.activeTab;
-        if (!tab) {
-          return Promise.reject({message: `Invalid tab ID: ${tabId}`});
-        }
+        let tab = tabId !== null ? TabManager.getTab(tabId, context) : TabManager.activeTab;
 
         let browser = tab.linkedBrowser;
         let recipient = {innerWindowID: browser.innerWindowID};
@@ -751,7 +726,7 @@ extensions.registerSchemaAPI("tabs", context => {
 
       // Used to executeScript, insertCSS and removeCSS.
       _execute: function(tabId, details, kind, method) {
-        let tab = tabId !== null ? TabManager.getTab(tabId) : TabManager.activeTab;
+        let tab = tabId !== null ? TabManager.getTab(tabId, context) : TabManager.activeTab;
         let mm = tab.linkedBrowser.messageManager;
 
         let options = {
@@ -814,41 +789,11 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       insertCSS: function(tabId, details) {
-        return self.tabs._execute(tabId, details, "css", "insertCSS");
+        return self.tabs._execute(tabId, details, "css", "insertCSS").then(() => {});
       },
 
       removeCSS: function(tabId, details) {
-        return self.tabs._execute(tabId, details, "css", "removeCSS");
-      },
-
-      connect: function(tabId, connectInfo) {
-        let tab = TabManager.getTab(tabId);
-        let mm = tab.linkedBrowser.messageManager;
-
-        let name = "";
-        if (connectInfo && connectInfo.name !== null) {
-          name = connectInfo.name;
-        }
-        let recipient = {extensionId: extension.id};
-        if (connectInfo && connectInfo.frameId !== null) {
-          recipient.frameId = connectInfo.frameId;
-        }
-        return context.messenger.connect(mm, name, recipient);
-      },
-
-      sendMessage: function(tabId, message, options, responseCallback) {
-        let tab = TabManager.getTab(tabId);
-        if (!tab) {
-          // ignore sendMessage to non existent tab id
-          return;
-        }
-        let mm = tab.linkedBrowser.messageManager;
-
-        let recipient = {extensionId: extension.id};
-        if (options && options.frameId !== null) {
-          recipient.frameId = options.frameId;
-        }
-        return context.messenger.sendMessage(mm, message, recipient, responseCallback);
+        return self.tabs._execute(tabId, details, "css", "removeCSS").then(() => {});
       },
 
       move: function(tabIds, moveProperties) {
@@ -876,13 +821,8 @@ extensions.registerSchemaAPI("tabs", context => {
         */
         let indexMap = new Map();
 
-        for (let tabId of tabIds) {
-          let tab = TabManager.getTab(tabId);
-          // Ignore invalid tab ids.
-          if (!tab) {
-            continue;
-          }
-
+        let tabs = tabIds.map(tabId => TabManager.getTab(tabId, context));
+        for (let tab of tabs) {
           // If the window is not specified, use the window from the tab.
           let window = destinationWindow || tab.ownerGlobal;
           let gBrowser = window.gBrowser;
@@ -920,10 +860,7 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       duplicate: function(tabId) {
-        let tab = TabManager.getTab(tabId);
-        if (!tab) {
-          return Promise.reject({message: `Invalid tab ID: ${tabId}`});
-        }
+        let tab = TabManager.getTab(tabId, context);
 
         let gBrowser = tab.ownerGlobal.gBrowser;
         let newTab = gBrowser.duplicateTab(tab);
@@ -953,7 +890,7 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       getZoom(tabId) {
-        let tab = tabId ? TabManager.getTab(tabId) : TabManager.activeTab;
+        let tab = tabId ? TabManager.getTab(tabId, context) : TabManager.activeTab;
 
         let {ZoomManager} = tab.ownerGlobal;
         let zoom = ZoomManager.getZoomForBrowser(tab.linkedBrowser);
@@ -962,7 +899,7 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       setZoom(tabId, zoom) {
-        let tab = tabId ? TabManager.getTab(tabId) : TabManager.activeTab;
+        let tab = tabId ? TabManager.getTab(tabId, context) : TabManager.activeTab;
 
         let {FullZoom, ZoomManager} = tab.ownerGlobal;
 
@@ -981,7 +918,7 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       _getZoomSettings(tabId) {
-        let tab = tabId ? TabManager.getTab(tabId) : TabManager.activeTab;
+        let tab = tabId ? TabManager.getTab(tabId, context) : TabManager.activeTab;
 
         let {FullZoom} = tab.ownerGlobal;
 
@@ -997,7 +934,7 @@ extensions.registerSchemaAPI("tabs", context => {
       },
 
       setZoomSettings(tabId, settings) {
-        let tab = tabId ? TabManager.getTab(tabId) : TabManager.activeTab;
+        let tab = tabId ? TabManager.getTab(tabId, context) : TabManager.activeTab;
 
         let currentSettings = this._getZoomSettings(tab.id);
 

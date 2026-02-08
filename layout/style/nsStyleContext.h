@@ -11,6 +11,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/RestyleLogging.h"
 #include "mozilla/StyleContextSource.h"
+#include "nsCSSAnonBoxes.h"
 #include "nsStyleSet.h"
 
 class nsIAtom;
@@ -19,6 +20,15 @@ class nsPresContext;
 namespace mozilla {
 enum class CSSPseudoElementType : uint8_t;
 } // namespace mozilla
+
+extern "C" {
+#define STYLE_STRUCT(name_, checkdata_cb_)     \
+  struct nsStyle##name_;                       \
+  const nsStyle##name_* Servo_GetStyle##name_( \
+    ServoComputedValuesBorrowedOrNull computed_values);
+#include "nsStyleStructList.h"
+#undef STYLE_STRUCT
+}
 
 /**
  * An nsStyleContext represents the computed style data for an element.
@@ -31,7 +41,7 @@ enum class CSSPseudoElementType : uint8_t;
  * (with a few exceptions, like system color changes), the data in an
  * nsStyleContext are also immutable (with the additional exception of
  * GetUniqueStyleData).  When style data change,
- * nsFrameManager::ReResolveStyleContext creates a new style context.
+ * ElementRestyler::Restyle creates a new style context.
  *
  * Style contexts are reference counted.  References are generally held
  * by:
@@ -177,32 +187,6 @@ public:
                      mozilla::NonOwningStyleContextSource aSource,
                      mozilla::NonOwningStyleContextSource aSourceIfVisited,
                      bool aRelevantLinkVisited);
-  /**
-   * Get the color property that should be used to fill text.
-   */
-  nsCSSPropertyID GetTextFillColorProp() {
-    return StyleText()->mWebkitTextFillColorForeground
-           ? eCSSProperty_color : eCSSProperty__webkit_text_fill_color;
-  }
-
-  /**
-   * Get the color that should be used to fill text: either
-   * the current foreground color, or a separately-specified text fill color.
-   */
-  nscolor GetTextFillColor() {
-    return (GetTextFillColorProp() == eCSSProperty_color)
-           ? StyleColor()->mColor : StyleText()->mWebkitTextFillColor;
-  }
-
-  /**
-   * Get the color that should be used to stroke text: either
-   * the current foreground color, or a separately-specified text stroke color.
-   */
-  nscolor GetTextStrokeColor() {
-    const nsStyleText* textStyle = StyleText();
-    return textStyle->mWebkitTextStrokeColorForeground
-           ? StyleColor()->mColor : textStyle->mWebkitTextStrokeColor;
-  }
 
   // Does this style context or any of its ancestors have text
   // decoration lines?
@@ -408,7 +392,7 @@ public:
    * Like the above, but allows comparing ServoComputedValues instead of needing
    * a full-fledged style context.
    */
-  nsChangeHint CalcStyleDifference(ServoComputedValues* aNewComputedValues,
+  nsChangeHint CalcStyleDifference(const ServoComputedValues* aNewComputedValues,
                                    nsChangeHint aParentHintsNotHandledForDescendants,
                                    uint32_t* aEqualStructs,
                                    uint32_t* aSamePointerStructs);
@@ -428,9 +412,6 @@ public:
    * aProperty must be a color-valued property that StyleAnimationValue
    * knows how to extract.  It must also be a property that we know to
    * do change handling for in nsStyleContext::CalcDifference.
-   *
-   * Note that if aProperty is eCSSProperty_border_*_color, this
-   * function handles -moz-use-text-color.
    */
   nscolor GetVisitedDependentColor(nsCSSPropertyID aProperty);
 
@@ -540,7 +521,7 @@ public:
   void StoreChangeHint(nsChangeHint aHint)
   {
     MOZ_ASSERT(!IsShared());
-    mStoredChangeHint |= aHint;
+    mStoredChangeHint = aHint;
 #ifdef DEBUG
     mConsumedChangeHint = false;
 #endif
@@ -655,8 +636,54 @@ private:
         newData = mSource.AsGeckoRuleNode()->                           \
           GetStyle##name_<aComputeData>(this, mBits);                   \
       } else {                                                          \
-        newData =                                                       \
-          Servo_GetStyle##name_(mSource.AsServoComputedValues());       \
+        /**                                                             \
+         * Reach the parent to grab the inherited style struct if       \
+         * we're a text node.                                           \
+         *                                                              \
+         * This causes the parent element's style context to cache any  \
+         * inherited structs we request for a text node, which means we \
+         * don't have to compute change hints for the text node, as     \
+         * handling the change on the parent element is sufficient.     \
+         *                                                              \
+         * Note that adding the inherit bit is ok, because the struct   \
+         * pointer returned by the parent and the child is owned by     \
+         * Servo. This is fine if the pointers are the same (as it      \
+         * should, read below), because both style context sources will \
+         * hold it.                                                     \
+         *                                                              \
+         * In the case of a mishandled frame, we could end up with the  \
+         * pointer to and old parent style, but that's fine too, since  \
+         * the parent style context will remain alive until we reframe, \
+         * in which case we'll discard both style contexts. Also, we    \
+         * hold a strong reference to the parent style context, which   \
+         * makes it a non-issue.                                        \
+         *                                                              \
+         * Also, note that the assertion below should be true, except   \
+         * for those frames we still don't handle correctly, like       \
+         * anonymous table wrappers, in which case the pointers will    \
+         * differ.                                                      \
+         *                                                              \
+         * That means we're not going to restyle correctly text frames  \
+         * of anonymous table wrappers, for example. It's kind of       \
+         * embarrassing, but I think it's not worth it to add more      \
+         * logic here unconditionally, given that's going to be fixed.  \
+         *                                                              \
+         * TODO(emilio): Convert to a strong assertion once we support  \
+         * all kinds of random frames. In fact, this can be a great     \
+         * assertion to debug them.                                     \
+         */                                                             \
+        if (mPseudoTag == nsCSSAnonBoxes::mozText) {                    \
+          MOZ_ASSERT(mParent);                                          \
+          newData = mParent->DoGetStyle##name_<true>();                 \
+          NS_WARNING_ASSERTION(                                         \
+            newData == Servo_GetStyle##name_(mSource.AsServoComputedValues()), \
+            "bad newData");                                             \
+        } else {                                                        \
+          newData =                                                     \
+            Servo_GetStyle##name_(mSource.AsServoComputedValues());     \
+        }                                                               \
+        /* perform any remaining main thread work on the struct */      \
+        const_cast<nsStyle##name_*>(newData)->FinishStyle(PresContext());\
         /* the Servo-backed StyleContextSource owns the struct */       \
         AddStyleBit(NS_STYLE_INHERIT_BIT(name_));                       \
       }                                                                 \
@@ -685,6 +712,8 @@ private:
       } else {                                                          \
         newData =                                                       \
           Servo_GetStyle##name_(mSource.AsServoComputedValues());       \
+        /* perform any remaining main thread work on the struct */      \
+        const_cast<nsStyle##name_*>(newData)->FinishStyle(PresContext());\
         /* The Servo-backed StyleContextSource owns the struct.         \
          *                                                              \
          * XXXbholley: Unconditionally caching reset structs here       \

@@ -7,6 +7,7 @@ from mozprocess import processhandler
 
 here = os.path.dirname(os.path.abspath(__file__))
 
+
 class ProcTestMisc(proctest.ProcTest):
     """ Class to test misc operations """
 
@@ -15,7 +16,7 @@ class ProcTestMisc(proctest.ProcTest):
         Process is started, then processOutput is called a second time explicitly
         """
         p = processhandler.ProcessHandler([self.python, self.proclaunch,
-                                          "process_waittimeout_10s_python.ini"],
+                                           "process_waittimeout_10s_python.ini"],
                                           cwd=here)
 
         p.run()

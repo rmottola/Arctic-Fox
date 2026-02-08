@@ -46,6 +46,7 @@ const PREF_SELECTED_LOCALE            = "general.useragent.locale";
 const UNKNOWN_XPCOM_ABI               = "unknownABI";
 
 const PREF_MIN_WEBEXT_PLATFORM_VERSION = "extensions.webExtensionsMinPlatformVersion";
+const PREF_WEBAPI_TESTING             = "extensions.webapi.testing";
 
 const UPDATE_REQUEST_VERSION          = 2;
 const CATEGORY_UPDATE_PARAMS          = "extension-update-params";
@@ -65,6 +66,14 @@ var PREF_EM_CHECK_COMPATIBILITY = MOZ_COMPATIBILITY_NIGHTLY ?
 const TOOLKIT_ID                      = "toolkit@mozilla.org";
 
 const VALID_TYPES_REGEXP = /^[\w\-]+$/;
+
+const WEBAPI_INSTALL_HOSTS = ["addons.mozilla.org", "addons.cdn.mozilla.net", "testpilot.firefox.com"];
+const WEBAPI_TEST_INSTALL_HOSTS = [
+  "addons.allizom.org", "addons-stage-cdn.allizom.org",
+  "addons-dev.allizom.org", "addons-dev-cdn-allizom.org",
+  "testpilot.stage.mozaws.net", "testpilot.dev.mozaws.net",
+  "example.com",
+];
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -679,6 +688,7 @@ var AddonManagerInternal = {
   startupChanges: {},
   // Store telemetry details per addon provider
   telemetryDetails: {},
+  upgradeListeners: new Map(),
 
   recordTimestamp: function(name, value) {
     this.TelemetryTimestamps.add(name, value);
@@ -1462,7 +1472,7 @@ var AddonManagerInternal = {
                     AddonManager.shouldAutoUpdate(aAddon)) {
                   // XXX we really should resolve when this install is done,
                   // not when update-available check completes, no?
-                  logger.debug("Starting install of ${id}", aAddon);
+                  logger.debug(`Starting upgrade install of ${aAddon.id}`);
                   aInstall.install();
                 }
               },
@@ -2248,6 +2258,56 @@ var AddonManagerInternal = {
         pos++;
     }
   },
+  /*
+   * Adds new or overrides existing UpgradeListener.
+   *
+   * @param  aInstanceID
+   *         The instance ID of an addon to register a listener for.
+   * @param  aCallback
+   *         The callback to invoke when updates are available for this addon.
+   * @throws if there is no addon matching the instanceID
+   */
+  addUpgradeListener: function(aInstanceID, aCallback) {
+   if (!aInstanceID || typeof aInstanceID != "symbol")
+     throw Components.Exception("aInstanceID must be a symbol",
+                                Cr.NS_ERROR_INVALID_ARG);
+
+  if (!aCallback || typeof aCallback != "function")
+    throw Components.Exception("aCallback must be a function",
+                               Cr.NS_ERROR_INVALID_ARG);
+
+   this.getAddonByInstanceID(aInstanceID).then(wrapper => {
+     if (!wrapper) {
+       throw Error("No addon matching instanceID:", aInstanceID.toString());
+     }
+     let addonId = wrapper.addonId();
+     logger.debug(`Registering upgrade listener for ${addonId}`);
+     this.upgradeListeners.set(addonId, aCallback);
+   });
+  },
+
+  /**
+   * Removes an UpgradeListener if the listener is registered.
+   *
+   * @param  aInstanceID
+   *         The instance ID of the addon to remove
+   */
+  removeUpgradeListener: function(aInstanceID) {
+    if (!aInstanceID || typeof aInstanceID != "symbol")
+      throw Components.Exception("aInstanceID must be a symbol",
+                                 Cr.NS_ERROR_INVALID_ARG);
+
+    this.getAddonByInstanceID(aInstanceID).then(addon => {
+      if (!addon) {
+        throw Error("No addon for instanceID:", aInstanceID.toString());
+      }
+      if (this.upgradeListeners.has(addon.id)) {
+        this.upgradeListeners.delete(addon.id);
+      } else {
+        throw Error("No upgrade listener registered for addon ID:", addon.id);
+      }
+    });
+  },
 
   /**
    * Installs a temporary add-on from a local file or directory.
@@ -2845,7 +2905,29 @@ var AddonManagerInternal = {
     },
 
     createInstall(target, options) {
-      return new Promise((resolve) => {
+      // Throw an appropriate error if the given URL is not valid
+      // as an installation source.  Return silently if it is okay.
+      function checkInstallUrl(url) {
+        let host = Services.io.newURI(options.url, null, null).host;
+        if (WEBAPI_INSTALL_HOSTS.includes(host)) {
+          return;
+        }
+        if (Services.prefs.getBoolPref(PREF_WEBAPI_TESTING)
+            && WEBAPI_TEST_INSTALL_HOSTS.includes(host)) {
+          return;
+        }
+
+        throw new Error(`Install from ${host} not permitted`);
+      }
+
+      return new Promise((resolve, reject) => {
+        try {
+          checkInstallUrl(options.url);
+        } catch (err) {
+          reject({message: err.message});
+          return;
+        }
+
         let newInstall = install => {
           let id = this.nextInstall++;
           let listener = this.makeListener(id, target);
@@ -3072,6 +3154,14 @@ this.AddonManagerPrivate = {
   get webExtensionsMinPlatformVersion() {
     return gWebExtensionsMinPlatformVersion;
   },
+
+  hasUpgradeListener: function(aId) {
+    return AddonManagerInternal.upgradeListeners.has(aId);
+  },
+
+  getUpgradeListener: function(aId) {
+    return AddonManagerInternal.upgradeListeners.get(aId);
+  },
 };
 
 /**
@@ -3092,14 +3182,16 @@ this.AddonManager = {
     ["STATE_DOWNLOADED", 3],
     // The download failed.
     ["STATE_DOWNLOAD_FAILED", 4],
+    // The install has been postponed.
+    ["STATE_POSTPONED", 5],
     // The add-on is being installed.
-    ["STATE_INSTALLING", 5],
+    ["STATE_INSTALLING", 6],
     // The add-on has been installed.
-    ["STATE_INSTALLED", 6],
+    ["STATE_INSTALLED", 7],
     // The install failed.
-    ["STATE_INSTALL_FAILED", 7],
+    ["STATE_INSTALL_FAILED", 8],
     // The install has been cancelled.
-    ["STATE_CANCELLED", 8],
+    ["STATE_CANCELLED", 9],
   ]),
 
   // Constants representing different types of errors while downloading an
@@ -3430,6 +3522,18 @@ this.AddonManager = {
 
   removeInstallListener: function(aListener) {
     AddonManagerInternal.removeInstallListener(aListener);
+  },
+
+  getUpgradeListener: function(aId) {
+    return AddonManagerInternal.upgradeListeners.get(aId);
+  },
+
+  addUpgradeListener: function(aInstanceID, aCallback) {
+    AddonManagerInternal.addUpgradeListener(aInstanceID, aCallback);
+  },
+
+  removeUpgradeListener: function(aInstanceID) {
+    AddonManagerInternal.removeUpgradeListener(aInstanceID);
   },
 
   addAddonListener: function(aListener) {

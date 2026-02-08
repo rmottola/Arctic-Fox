@@ -23,6 +23,8 @@
 #include "webrtc/video_engine/include/vie_errors.h"
 #include "webrtc/video_engine/vie_defines.h"
 
+#include "mozilla/Unused.h"
+
 #ifdef MOZ_WIDGET_ANDROID
 #include "AndroidJNIWrapper.h"
 #endif
@@ -95,6 +97,8 @@ WebrtcVideoConduit::WebrtcVideoConduit():
   mStartBitrate(0),
   mMaxBitrate(0),
   mMinBitrateEstimate(0),
+  mRtpStreamIdEnabled(false),
+  mRtpStreamIdExtId(0),
   mCodecMode(webrtc::kRealtimeVideo)
 {}
 
@@ -275,18 +279,24 @@ WebrtcVideoConduit::InitMain()
     if (branch)
     {
       int32_t temp;
-      (void) NS_WARN_IF(NS_FAILED(branch->GetBoolPref("media.video.test_latency", &mVideoLatencyTestEnable)));
-      (void) NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.min_bitrate", &temp)));
-      if (temp >= 0) {
-        mMinBitrate = temp;
+      Unused << NS_WARN_IF(NS_FAILED(branch->GetBoolPref("media.video.test_latency", &mVideoLatencyTestEnable)));
+      if (!NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.min_bitrate", &temp))))
+      {
+         if (temp >= 0) {
+            mMinBitrate = temp;
+         }
       }
-      (void) NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.start_bitrate", &temp)));
-      if (temp >= 0) {
-        mStartBitrate = temp;
+      if (!NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.start_bitrate", &temp))))
+      {
+         if (temp >= 0) {
+         mStartBitrate = temp;
+         }
       }
-      (void) NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.max_bitrate", &temp)));
-      if (temp >= 0) {
-        mMaxBitrate = temp;
+      if (!NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.max_bitrate", &temp))))
+      {
+        if (temp >= 0) {
+          mMaxBitrate = temp;
+        }
       }
       if (mMinBitrate != 0 && mMinBitrate < webrtc::kViEMinCodecBitrate) {
         mMinBitrate = webrtc::kViEMinCodecBitrate;
@@ -297,14 +307,18 @@ WebrtcVideoConduit::InitMain()
       if (mStartBitrate > mMaxBitrate) {
         mStartBitrate = mMaxBitrate;
       }
-      (void) NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.min_bitrate_estimate", &temp)));
-      if (temp >= 0) {
-        mMinBitrateEstimate = temp;
+      if (!NS_WARN_IF(NS_FAILED(branch->GetIntPref("media.peerconnection.video.min_bitrate_estimate", &temp))))
+      {
+        if (temp >= 0) {
+          mMinBitrateEstimate = temp;
+        }
       }
       bool use_loadmanager = false;
-      (void) NS_WARN_IF(NS_FAILED(branch->GetBoolPref("media.navigator.load_adapt", &use_loadmanager)));
-      if (use_loadmanager) {
-        mLoadManager = LoadManagerBuild();
+      if (!NS_WARN_IF(NS_FAILED(branch->GetBoolPref("media.navigator.load_adapt", &use_loadmanager))))
+      {
+        if (use_loadmanager) {
+          mLoadManager = LoadManagerBuild();
+        }
       }
     }
   }
@@ -661,6 +675,9 @@ WebrtcVideoConduit::ConfigureSendMediaCodec(const VideoCodecConfig* codecConfig)
     return condError;
   }
 
+  if (mRtpStreamIdEnabled) {
+    video_codec.ridId = mRtpStreamIdExtId;
+  }
   if (mExternalSendCodec &&
       codecConfig->mType == mExternalSendCodec->mType) {
     CSFLogError(logTag, "%s Configuring External H264 Send Codec", __FUNCTION__);
@@ -709,6 +726,24 @@ WebrtcVideoConduit::ConfigureSendMediaCodec(const VideoCodecConfig* codecConfig)
   }
   // Note: only for overriding parameters from GetCodec()!
   CodecConfigToWebRTCCodec(codecConfig, video_codec);
+  if (mSendingWidth != 0) {
+    // We're already in a call and are reconfiguring (perhaps due to
+    // ReplaceTrack).  Set to match the last frame we sent.
+
+    // We could also set mLastWidth to 0, to force immediate reconfig -
+    // more expensive, but perhaps less risk of missing something.  Really
+    // on ReplaceTrack we should just call ConfigureCodecMode(), and if the
+    // mode changed, we re-configure.
+    // Do this after CodecConfigToWebRTCCodec() to avoid messing up simulcast
+    video_codec.width = mSendingWidth;
+    video_codec.height = mSendingHeight;
+    video_codec.maxFramerate = mSendingFramerate;
+  } else {
+    mSendingWidth = 0;
+    mSendingHeight = 0;
+    mSendingFramerate = video_codec.maxFramerate;
+  }
+
   video_codec.mode = mCodecMode;
 
   if(mPtrViECodec->SetSendCodec(mChannel, video_codec) == -1)
@@ -738,13 +773,9 @@ WebrtcVideoConduit::ConfigureSendMediaCodec(const VideoCodecConfig* codecConfig)
   }
   mVideoCodecStat->Register(true);
 
-  mSendingWidth = 0;
-  mSendingHeight = 0;
-  mSendingFramerate = video_codec.maxFramerate;
-
   // See Bug 1297058, enabling FEC when NACK is set on H.264 is problematic
   bool use_fec = codecConfig->RtcpFbFECIsSet();
-  if (mExternalSendCodec && codecConfig->mType == mExternalSendCodec->mType
+  if ((mExternalSendCodec && codecConfig->mType == mExternalSendCodec->mType)
       || codecConfig->mType == webrtc::kVideoCodecH264) {
     if(codecConfig->RtcpFbNackIsSet("")) {
       use_fec = false;
@@ -1360,6 +1391,10 @@ WebrtcVideoConduit::ReconfigureSendCodec(unsigned short width,
               "%s: Requesting resolution change to %ux%u (from %ux%u)",
               __FUNCTION__, width, height, vie_codec.width, vie_codec.height);
 
+  if (mRtpStreamIdEnabled) {
+    vie_codec.ridId = mRtpStreamIdExtId;
+  }
+
   vie_codec.width = width;
   vie_codec.height = height;
   vie_codec.maxFramerate = mSendingFramerate;
@@ -1512,6 +1547,13 @@ WebrtcVideoConduit::SetExternalRecvCodec(VideoCodecConfig* config,
 }
 
 MediaConduitErrorCode
+WebrtcVideoConduit::EnableRTPStreamIdExtension(bool enabled, uint8_t id) {
+  mRtpStreamIdEnabled = enabled;
+  mRtpStreamIdExtId = id;
+  return kMediaConduitNoError;
+}
+
+MediaConduitErrorCode
 WebrtcVideoConduit::SendVideoFrame(unsigned char* video_frame,
                                    unsigned int video_frame_length,
                                    unsigned short width,
@@ -1552,7 +1594,7 @@ WebrtcVideoConduit::SendVideoFrame(webrtc::I420VideoFrame& frame)
 {
   CSFLogDebug(logTag,  "%s ", __FUNCTION__);
   // See if we need to recalculate what we're sending.
-  // Don't compate mSendingWidth/Height, since those may not be the same as the input.
+  // Don't compare mSendingWidth/Height, since those may not be the same as the input.
   {
     MutexAutoLock lock(mCodecMutex);
     if (mInReconfig) {
@@ -1958,7 +2000,8 @@ WebrtcVideoConduit::CodecConfigToWebRTCCodec(const VideoCodecConfig* codecInfo,
   }
   // Init mSimulcastEncodings always since they hold info from setParameters.
   // TODO(bug 1210175): H264 doesn't support simulcast yet.
-  for (size_t i = 0; i < codecInfo->mSimulcastEncodings.size(); ++i) {
+  size_t numberOfSimulcastEncodings = std::min(codecInfo->mSimulcastEncodings.size(), (size_t)webrtc::kMaxSimulcastStreams);
+  for (size_t i = 0; i < numberOfSimulcastEncodings; ++i) {
     const VideoCodecConfig::SimulcastEncoding& encoding =
       codecInfo->mSimulcastEncodings[i];
     // Make sure the constraints on the whole stream are reflected.
@@ -2002,10 +2045,10 @@ WebrtcVideoConduit::CodecConfigToWebRTCCodec(const VideoCodecConfig* codecInfo,
     }
     // webrtc.org expects simulcast streams to be ordered by increasing
     // fidelity, our jsep code does the opposite.
-    cinst.simulcastStream[codecInfo->mSimulcastEncodings.size()-i-1] = stream;
+    cinst.simulcastStream[numberOfSimulcastEncodings-i-1] = stream;
   }
 
-  cinst.numberOfSimulcastStreams = codecInfo->mSimulcastEncodings.size();
+  cinst.numberOfSimulcastStreams = numberOfSimulcastEncodings;
 }
 
 /**

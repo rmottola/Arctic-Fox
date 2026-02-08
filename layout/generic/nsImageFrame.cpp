@@ -870,13 +870,10 @@ nsImageFrame::ComputeSize(nsRenderingContext *aRenderingContext,
     }
   }
 
-  return nsLayoutUtils::ComputeSizeWithIntrinsicDimensions(aWM,
-                            aRenderingContext, this,
-                            intrinsicSize, mIntrinsicRatio,
-                            aCBSize,
-                            aMargin,
-                            aBorder,
-                            aPadding);
+  return ComputeSizeWithIntrinsicDimensions(aRenderingContext, aWM,
+                                            intrinsicSize, mIntrinsicRatio,
+                                            aCBSize, aMargin, aBorder, aPadding,
+                                            aFlags);
 }
 
 // XXXdholbert This function's clients should probably just be calling
@@ -1265,9 +1262,7 @@ struct nsRecessedBorder : public nsStyleBorder {
     : nsStyleBorder(aPresContext)
   {
     NS_FOR_CSS_SIDES(side) {
-      // Note: use SetBorderColor here because we want to make sure
-      // the "special" flags are unset.
-      SetBorderColor(side, NS_RGB(0, 0, 0));
+      mBorderColor[side] = StyleComplexColor::FromColor(NS_RGB(0, 0, 0));
       mBorder.Side(side) = aBorderWidth;
       // Note: use SetBorderStyle here because we want to affect
       // mComputedBorder
@@ -2019,11 +2014,15 @@ nsImageFrame::HandleEvent(nsPresContext* aPresContext,
           // mouse is over the border.
           if (p.x < 0) p.x = 0;
           if (p.y < 0) p.y = 0;
+
           nsAutoCString spec;
-          uri->GetSpec(spec);
+          nsresult rv = uri->GetSpec(spec);
+          NS_ENSURE_SUCCESS(rv, rv);
+
           spec += nsPrintfCString("?%d,%d", p.x, p.y);
-          uri->SetSpec(spec);                
-          
+          rv = uri->SetSpec(spec);
+          NS_ENSURE_SUCCESS(rv, rv);
+
           bool clicked = false;
           if (aEvent->mMessage == eMouseClick && !aEvent->DefaultPrevented()) {
             *aEventStatus = nsEventStatus_eConsumeDoDefault;

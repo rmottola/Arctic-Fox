@@ -11,14 +11,68 @@
 namespace mozilla {
 namespace dom {
 
-/* static */ already_AddRefed<GetFilesHelper>
+namespace {
+
+// This class is used in the DTOR of GetFilesHelper to release resources in the
+// correct thread.
+class ReleaseRunnable final : public Runnable
+{
+public:
+  static void
+  MaybeReleaseOnMainThread(nsTArray<RefPtr<Promise>>& aPromises,
+                           nsTArray<RefPtr<GetFilesCallback>>& aCallbacks)
+  {
+    if (NS_IsMainThread()) {
+      return;
+    }
+
+    if (!aPromises.IsEmpty() || !aCallbacks.IsEmpty()) {
+      RefPtr<ReleaseRunnable> runnable =
+        new ReleaseRunnable(aPromises, aCallbacks);
+      NS_DispatchToMainThread(runnable);
+    }
+  }
+
+  NS_IMETHOD
+  Run() override
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+
+    mPromises.Clear();
+    mCallbacks.Clear();
+
+    return NS_OK;
+  }
+
+private:
+  ReleaseRunnable(nsTArray<RefPtr<Promise>>& aPromises,
+                  nsTArray<RefPtr<GetFilesCallback>>& aCallbacks)
+  {
+    mPromises.SwapElements(aPromises);
+    mCallbacks.SwapElements(aCallbacks);
+  }
+
+  nsTArray<RefPtr<Promise>> mPromises;
+  nsTArray<RefPtr<GetFilesCallback>> mCallbacks;
+};
+
+} // anonymous
+
+///////////////////////////////////////////////////////////////////////////////
+// GetFilesHelper Base class
+
+already_AddRefed<GetFilesHelper>
 GetFilesHelper::Create(nsIGlobalObject* aGlobal,
                        const nsTArray<OwningFileOrDirectory>& aFilesOrDirectory,
                        bool aRecursiveFlag, ErrorResult& aRv)
 {
-  MOZ_ASSERT(aGlobal);
+  RefPtr<GetFilesHelper> helper;
 
-  RefPtr<GetFilesHelper> helper = new GetFilesHelper(aGlobal, aRecursiveFlag);
+  if (XRE_IsParentProcess()) {
+    helper = new GetFilesHelper(aGlobal, aRecursiveFlag);
+  } else {
+    helper = new GetFilesHelperChild(aGlobal, aRecursiveFlag);
+  }
 
   nsAutoString directoryPath;
 
@@ -56,11 +110,7 @@ GetFilesHelper::Create(nsIGlobalObject* aGlobal,
   MOZ_ASSERT(helper->mFiles.IsEmpty());
   helper->SetDirectoryPath(directoryPath);
 
-  nsCOMPtr<nsIEventTarget> target =
-    do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID);
-  MOZ_ASSERT(target);
-
-  aRv = target->Dispatch(helper, NS_DISPATCH_NORMAL);
+  helper->Work(aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -69,14 +119,18 @@ GetFilesHelper::Create(nsIGlobalObject* aGlobal,
 }
 
 GetFilesHelper::GetFilesHelper(nsIGlobalObject* aGlobal, bool aRecursiveFlag)
-  : mGlobal(aGlobal)
-  , mRecursiveFlag(aRecursiveFlag)
+  : GetFilesHelperBase(aRecursiveFlag)
+  , mGlobal(aGlobal)
   , mListingCompleted(false)
   , mErrorResult(NS_OK)
   , mMutex("GetFilesHelper::mMutex")
   , mCanceled(false)
 {
-  MOZ_ASSERT(aGlobal);
+}
+
+GetFilesHelper::~GetFilesHelper()
+{
+  ReleaseRunnable::MaybeReleaseOnMainThread(mPromises, mCallbacks);
 }
 
 void
@@ -117,8 +171,12 @@ GetFilesHelper::Unlink()
   mPromises.Clear();
   mCallbacks.Clear();
 
-  MutexAutoLock lock(mMutex);
-  mCanceled = true;
+  {
+    MutexAutoLock lock(mMutex);
+    mCanceled = true;
+  }
+
+  Cancel();
 }
 
 void
@@ -128,6 +186,16 @@ GetFilesHelper::Traverse(nsCycleCollectionTraversalCallback &cb)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mGlobal);
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFiles);
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPromises);
+}
+
+void
+GetFilesHelper::Work(ErrorResult& aRv)
+{
+  nsCOMPtr<nsIEventTarget> target =
+    do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID);
+  MOZ_ASSERT(target);
+
+  aRv = target->Dispatch(this, NS_DISPATCH_NORMAL);
 }
 
 NS_IMETHODIMP
@@ -158,6 +226,13 @@ GetFilesHelper::Run()
 
   RunMainThread();
 
+  OperationCompleted();
+  return NS_OK;
+}
+
+void
+GetFilesHelper::OperationCompleted()
+{
   // We mark the operation as completed here.
   mListingCompleted = true;
 
@@ -176,8 +251,6 @@ GetFilesHelper::Run()
   for (uint32_t i = 0; i < callbacks.Length(); ++i) {
     RunCallback(callbacks[i]);
   }
-
-  return NS_OK;
 }
 
 void
@@ -238,7 +311,7 @@ GetFilesHelper::RunMainThread()
 }
 
 nsresult
-GetFilesHelper::ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile)
+GetFilesHelperBase::ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile)
 {
   MOZ_ASSERT(!NS_IsMainThread());
   MOZ_ASSERT(aFile);
@@ -248,8 +321,13 @@ GetFilesHelper::ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile)
     return NS_OK;
   }
 
+  nsresult rv = AddExploredDirectory(aFile);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
   nsCOMPtr<nsISimpleEnumerator> entries;
-  nsresult rv = aFile->GetDirectoryEntries(getter_AddRefs(entries));
+  rv = aFile->GetDirectoryEntries(getter_AddRefs(entries));
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -271,13 +349,18 @@ GetFilesHelper::ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile)
     bool isLink, isSpecial, isFile, isDir;
     if (NS_WARN_IF(NS_FAILED(currFile->IsSymlink(&isLink)) ||
                    NS_FAILED(currFile->IsSpecial(&isSpecial))) ||
-        isLink || isSpecial) {
+        isSpecial) {
       continue;
     }
 
     if (NS_WARN_IF(NS_FAILED(currFile->IsFile(&isFile)) ||
                    NS_FAILED(currFile->IsDirectory(&isDir))) ||
         !(isFile || isDir)) {
+      continue;
+    }
+
+    // We don't want to explore loops of links.
+    if (isDir && isLink && !ShouldFollowSymLink(currFile)) {
       continue;
     }
 
@@ -323,6 +406,69 @@ GetFilesHelper::ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile)
   return NS_OK;
 }
 
+nsresult
+GetFilesHelperBase::AddExploredDirectory(nsIFile* aDir)
+{
+  nsresult rv;
+
+#ifdef DEBUG
+  bool isDir;
+  rv = aDir->IsDirectory(&isDir);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  MOZ_ASSERT(isDir, "Why are we here?");
+#endif
+
+  bool isLink;
+  rv = aDir->IsSymlink(&isLink);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  nsAutoCString path;
+
+  if (!isLink) {
+    nsAutoString path16;
+    rv = aDir->GetPath(path16);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    path = NS_ConvertUTF16toUTF8(path16);
+  } else {
+    rv = aDir->GetNativeTarget(path);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  mExploredDirectories.PutEntry(path);
+  return NS_OK;
+}
+
+bool
+GetFilesHelperBase::ShouldFollowSymLink(nsIFile* aDir)
+{
+#ifdef DEBUG
+  bool isLink, isDir;
+  if (NS_WARN_IF(NS_FAILED(aDir->IsSymlink(&isLink)) ||
+                 NS_FAILED(aDir->IsDirectory(&isDir)))) {
+    return false;
+  }
+
+  MOZ_ASSERT(isLink && isDir, "Why are we here?");
+#endif
+
+  nsAutoCString targetPath;
+  if (NS_WARN_IF(NS_FAILED(aDir->GetNativeTarget(targetPath)))) {
+    return false;
+  }
+
+  return !mExploredDirectories.Contains(targetPath);
+}
+
 void
 GetFilesHelper::ResolveOrRejectPromise(Promise* aPromise)
 {
@@ -347,6 +493,143 @@ GetFilesHelper::RunCallback(GetFilesCallback* aCallback)
   MOZ_ASSERT(aCallback);
 
   aCallback->Callback(mErrorResult, mFiles);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// GetFilesHelperChild class
+
+void
+GetFilesHelperChild::Work(ErrorResult& aRv)
+{
+  ContentChild* cc = ContentChild::GetSingleton();
+  if (NS_WARN_IF(!cc)) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return;
+  }
+
+  aRv = nsContentUtils::GenerateUUIDInPlace(mUUID);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  mPendingOperation = true;
+  cc->CreateGetFilesRequest(mDirectoryPath, mRecursiveFlag, mUUID, this);
+}
+
+void
+GetFilesHelperChild::Cancel()
+{
+  if (!mPendingOperation) {
+    return;
+  }
+
+  ContentChild* cc = ContentChild::GetSingleton();
+  if (NS_WARN_IF(!cc)) {
+    return;
+  }
+
+  mPendingOperation = false;
+  cc->DeleteGetFilesRequest(mUUID, this);
+}
+
+bool
+GetFilesHelperChild::AppendBlobImpl(BlobImpl* aBlobImpl)
+{
+  MOZ_ASSERT(mPendingOperation);
+  MOZ_ASSERT(aBlobImpl);
+  MOZ_ASSERT(aBlobImpl->IsFile());
+
+  RefPtr<File> file = File::Create(mGlobal, aBlobImpl);
+  MOZ_ASSERT(file);
+
+  return mFiles.AppendElement(file, fallible);
+}
+
+void
+GetFilesHelperChild::Finished(nsresult aError)
+{
+  MOZ_ASSERT(mPendingOperation);
+  MOZ_ASSERT(NS_SUCCEEDED(mErrorResult));
+
+  mPendingOperation = false;
+  mErrorResult = aError;
+
+  OperationCompleted();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// GetFilesHelperParent class
+
+class GetFilesHelperParentCallback final : public GetFilesCallback
+{
+public:
+  explicit GetFilesHelperParentCallback(GetFilesHelperParent* aParent)
+    : mParent(aParent)
+  {
+    MOZ_ASSERT(aParent);
+  }
+
+  void
+  Callback(nsresult aStatus, const Sequence<RefPtr<File>>& aFiles) override
+  {
+    if (NS_FAILED(aStatus)) {
+      mParent->mContentParent->SendGetFilesResponseAndForget(mParent->mUUID,
+                                                             GetFilesResponseFailure(aStatus));
+      return;
+    }
+
+    GetFilesResponseSuccess success;
+    nsTArray<PBlobParent*>& blobsParent = success.blobsParent();
+    blobsParent.SetLength(aFiles.Length());
+
+    for (uint32_t i = 0; i < aFiles.Length(); ++i) {
+      blobsParent[i] =
+        mParent->mContentParent->GetOrCreateActorForBlob(aFiles[i]);
+      if (!blobsParent[i]) {
+        mParent->mContentParent->SendGetFilesResponseAndForget(mParent->mUUID,
+                                                               GetFilesResponseFailure(NS_ERROR_OUT_OF_MEMORY));
+        return;
+      }
+    }
+
+    mParent->mContentParent->SendGetFilesResponseAndForget(mParent->mUUID,
+                                                           success);
+  }
+
+private:
+  // Raw pointer because this callback is kept alive by this parent object.
+  GetFilesHelperParent* mParent;
+};
+
+GetFilesHelperParent::GetFilesHelperParent(const nsID& aUUID,
+                                           ContentParent* aContentParent,
+                                           bool aRecursiveFlag)
+  : GetFilesHelper(nullptr, aRecursiveFlag)
+  , mContentParent(aContentParent)
+  , mUUID(aUUID)
+{}
+
+/* static */ already_AddRefed<GetFilesHelperParent>
+GetFilesHelperParent::Create(const nsID& aUUID, const nsAString& aDirectoryPath,
+                             bool aRecursiveFlag, ContentParent* aContentParent,
+                             ErrorResult& aRv)
+{
+  MOZ_ASSERT(aContentParent);
+
+  RefPtr<GetFilesHelperParent> helper =
+    new GetFilesHelperParent(aUUID, aContentParent, aRecursiveFlag);
+  helper->SetDirectoryPath(aDirectoryPath);
+
+  helper->Work(aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  RefPtr<GetFilesHelperParentCallback> callback =
+    new GetFilesHelperParentCallback(helper);
+  helper->AddCallback(callback);
+
+  return helper.forget();
 }
 
 } // dom namespace

@@ -7,6 +7,7 @@
 #include "jit/BaselineCompiler.h"
 
 #include "mozilla/Casting.h"
+#include "mozilla/SizePrintfMacros.h"
 
 #include "jit/BaselineIC.h"
 #include "jit/BaselineJIT.h"
@@ -21,6 +22,7 @@
 #include "jit/SharedICHelpers.h"
 #include "jit/VMFunctions.h"
 #include "js/UniquePtr.h"
+#include "vm/AsyncFunction.h"
 #include "vm/EnvironmentObject.h"
 #include "vm/Interpreter.h"
 #include "vm/TraceLogging.h"
@@ -82,10 +84,10 @@ BaselineCompiler::addPCMappingEntry(bool addIndexEntry)
 MethodStatus
 BaselineCompiler::compile()
 {
-    JitSpew(JitSpew_BaselineScripts, "Baseline compiling script %s:%d (%p)",
+    JitSpew(JitSpew_BaselineScripts, "Baseline compiling script %s:%" PRIuSIZE " (%p)",
             script->filename(), script->lineno(), script);
 
-    JitSpew(JitSpew_Codegen, "# Emitting baseline code for script %s:%d",
+    JitSpew(JitSpew_Codegen, "# Emitting baseline code for script %s:%" PRIuSIZE,
             script->filename(), script->lineno());
 
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
@@ -196,20 +198,18 @@ BaselineCompiler::compile()
 
     // Note: There is an extra entry in the bytecode type map for the search hint, see below.
     size_t bytecodeTypeMapEntries = script->nTypeSets() + 1;
-
     UniquePtr<BaselineScript> baselineScript(
         BaselineScript::New(script, prologueOffset_.offset(),
                             epilogueOffset_.offset(),
                             profilerEnterFrameToggleOffset_.offset(),
                             profilerExitFrameToggleOffset_.offset(),
-                            traceLoggerEnterToggleOffset_.offset(),
-                            traceLoggerExitToggleOffset_.offset(),
                             postDebugPrologueOffset_.offset(),
                             icEntries_.length(),
                             pcMappingIndexEntries.length(),
                             pcEntries.length(),
                             bytecodeTypeMapEntries,
-                            yieldOffsets_.length()),
+                            yieldOffsets_.length(),
+                            traceLoggerToggleOffsets_.length()),
         JS::DeletePolicy<BaselineScript>(cx->runtime()));
     if (!baselineScript) {
         ReportOutOfMemory(cx);
@@ -219,7 +219,7 @@ BaselineCompiler::compile()
     baselineScript->setMethod(code);
     baselineScript->setTemplateEnvironment(templateEnv);
 
-    JitSpew(JitSpew_BaselineScripts, "Created BaselineScript %p (raw %p) for %s:%d",
+    JitSpew(JitSpew_BaselineScripts, "Created BaselineScript %p (raw %p) for %s:%" PRIuSIZE,
             (void*) baselineScript.get(), (void*) code->raw(),
             script->filename(), script->lineno());
 
@@ -252,7 +252,7 @@ BaselineCompiler::compile()
     for (size_t i = 0; i < icLoadLabels_.length(); i++) {
         CodeOffset label = icLoadLabels_[i].label;
         size_t icEntry = icLoadLabels_[i].icEntry;
-        ICEntry* entryAddr = &(baselineScript->icEntry(icEntry));
+        BaselineICEntry* entryAddr = &(baselineScript->icEntry(icEntry));
         Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, label),
                                            ImmPtr(entryAddr),
                                            ImmPtr((void*)-1));
@@ -263,7 +263,7 @@ BaselineCompiler::compile()
 
 #ifdef JS_TRACE_LOGGING
     // Initialize the tracelogger instrumentation.
-    baselineScript->initTraceLogger(cx->runtime(), script);
+    baselineScript->initTraceLogger(cx->runtime(), script, traceLoggerToggleOffsets_);
 #endif
 
     uint32_t* bytecodeMap = baselineScript->bytecodeTypeMap();
@@ -281,7 +281,7 @@ BaselineCompiler::compile()
     // Always register a native => bytecode mapping entry, since profiler can be
     // turned on with baseline jitcode on stack, and baseline jitcode cannot be invalidated.
     {
-        JitSpew(JitSpew_Profiling, "Added JitcodeGlobalEntry for baseline script %s:%d (%p)",
+        JitSpew(JitSpew_Profiling, "Added JitcodeGlobalEntry for baseline script %s:%" PRIuSIZE " (%p)",
                     script->filename(), script->lineno(), baselineScript.get());
 
         // Generate profiling string.
@@ -501,7 +501,7 @@ BaselineCompiler::emitOutOfLinePostBarrierSlot()
 bool
 BaselineCompiler::emitIC(ICStub* stub, ICEntry::Kind kind)
 {
-    ICEntry* entry = allocateICEntry(stub, kind);
+    BaselineICEntry* entry = allocateICEntry(stub, kind);
     if (!entry)
         return false;
 
@@ -842,7 +842,8 @@ BaselineCompiler::emitTraceLoggerEnter()
     Register scriptReg = regs.takeAnyGeneral();
 
     Label noTraceLogger;
-    traceLoggerEnterToggleOffset_ = masm.toggledJump(&noTraceLogger);
+    if (!traceLoggerToggleOffsets_.append(masm.toggledJump(&noTraceLogger)))
+        return false;
 
     masm.Push(loggerReg);
     masm.Push(scriptReg);
@@ -875,7 +876,8 @@ BaselineCompiler::emitTraceLoggerExit()
     Register loggerReg = regs.takeAnyGeneral();
 
     Label noTraceLogger;
-    traceLoggerExitToggleOffset_ = masm.toggledJump(&noTraceLogger);
+    if (!traceLoggerToggleOffsets_.append(masm.toggledJump(&noTraceLogger)))
+        return false;
 
     masm.Push(loggerReg);
     masm.movePtr(ImmPtr(logger), loggerReg);
@@ -884,6 +886,32 @@ BaselineCompiler::emitTraceLoggerExit()
     masm.tracelogStopId(loggerReg, TraceLogger_Scripts, /* force = */ true);
 
     masm.Pop(loggerReg);
+
+    masm.bind(&noTraceLogger);
+
+    return true;
+}
+
+bool
+BaselineCompiler::emitTraceLoggerResume(Register baselineScript, AllocatableGeneralRegisterSet& regs)
+{
+    Register scriptId = regs.takeAny();
+    Register loggerReg = regs.takeAny();
+
+    Label noTraceLogger;
+    if (!traceLoggerToggleOffsets_.append(masm.toggledJump(&noTraceLogger)))
+        return false;
+
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    masm.movePtr(ImmPtr(logger), loggerReg);
+
+    Address scriptEvent(baselineScript, BaselineScript::offsetOfTraceLoggerScriptEvent());
+    masm.computeEffectiveAddress(scriptEvent, scriptId);
+    masm.tracelogStartEvent(loggerReg, scriptId);
+    masm.tracelogStartId(loggerReg, TraceLogger_Baseline, /* force = */ true);
+
+    regs.add(loggerReg);
+    regs.add(scriptId);
 
     masm.bind(&noTraceLogger);
 
@@ -2723,15 +2751,14 @@ static const VMFunction DefFunOperationInfo =
 bool
 BaselineCompiler::emit_JSOP_DEFFUN()
 {
-    RootedFunction fun(cx, script->getFunction(GET_UINT32_INDEX(pc)));
-
-    frame.syncStack(0);
-    masm.loadPtr(frame.addressOfEnvironmentChain(), R0.scratchReg());
+    frame.popRegsAndSync(1);
+    masm.unboxObject(R0, R0.scratchReg());
+    masm.loadPtr(frame.addressOfEnvironmentChain(), R1.scratchReg());
 
     prepareVMCall();
 
-    pushArg(ImmGCPtr(fun));
     pushArg(R0.scratchReg());
+    pushArg(R1.scratchReg());
     pushArg(ImmGCPtr(script));
 
     return callVM(DefFunOperationInfo);
@@ -3781,6 +3808,27 @@ BaselineCompiler::emit_JSOP_TOID()
     return true;
 }
 
+typedef JSObject* (*ToAsyncFn)(JSContext*, HandleFunction);
+static const VMFunction ToAsyncInfo = FunctionInfo<ToAsyncFn>(js::WrapAsyncFunction, "ToAsync");
+
+bool
+BaselineCompiler::emit_JSOP_TOASYNC()
+{
+    frame.syncStack(0);
+    masm.unboxObject(frame.addressOfStackValue(frame.peek(-1)), R0.scratchReg());
+
+    prepareVMCall();
+    pushArg(R0.scratchReg());
+
+    if (!callVM(ToAsyncInfo))
+        return false;
+
+    masm.tagValue(JSVAL_TYPE_OBJECT, ReturnReg, R0);
+    frame.pop();
+    frame.push(R0);
+    return true;
+}
+
 typedef bool (*ThrowObjectCoercibleFn)(JSContext*, HandleValue);
 static const VMFunction ThrowObjectCoercibleInfo =
     FunctionInfo<ThrowObjectCoercibleFn>(ThrowObjectCoercible, "ThrowObjectCoercible");
@@ -4222,6 +4270,11 @@ BaselineCompiler::emit_JSOP_RESUME()
     Label interpret;
     masm.loadPtr(Address(scratch1, JSScript::offsetOfBaselineScript()), scratch1);
     masm.branchPtr(Assembler::BelowOrEqual, scratch1, ImmPtr(BASELINE_DISABLED_SCRIPT), &interpret);
+
+#ifdef JS_TRACE_LOGGING
+    if (!emitTraceLoggerResume(scratch1, regs))
+        return false;
+#endif
 
     Register constructing = regs.takeAny();
     ValueOperand newTarget = regs.takeAnyValue();

@@ -12,6 +12,7 @@
 
 #include "ds/IdValuePair.h"
 #include "gc/Barrier.h"
+#include "js/CharacterEncoding.h"
 #include "js/GCHashTable.h"
 #include "vm/TaggedProto.h"
 #include "vm/TypeInference.h"
@@ -45,6 +46,12 @@ enum NewObjectKind {
      * singleton and is allocated in the tenured heap.
      */
     SingletonObject,
+
+    /*
+     * CrossCompartmentWrappers use the common Proxy class, but are allowed
+     * to have nursery lifetime.
+     */
+    NurseryAllocatedProxy,
 
     /*
      * Objects which will not benefit from being allocated in the nursery
@@ -96,6 +103,7 @@ class ObjectGroup : public gc::TenuredCell
     }
 
     void setClasp(const Class* clasp) {
+        MOZ_ASSERT(JS::StringIsASCII(clasp->name));
         clasp_ = clasp;
     }
 

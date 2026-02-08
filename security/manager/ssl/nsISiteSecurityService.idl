@@ -115,10 +115,13 @@ interface nsISiteSecurityService : nsISupports
      * @param aHost the hostname (punycode) to query for state.
      * @param aFlags  options for this request as defined in nsISocketProvider:
      *                  NO_PERMANENT_STORAGE
+     * @param aCached true if we have cached information regarding whether or not
+     *                  the host is HSTS, false otherwise.
      */
     boolean isSecureHost(in uint32_t aType,
                          in string aHost,
-                         in uint32_t aFlags);
+                         in uint32_t aFlags,
+                         [optional] out boolean aCached);
 
     /**
      * Checks whether or not the URI's hostname has a given security state set.
@@ -133,13 +136,22 @@ interface nsISiteSecurityService : nsISupports
      * @param aURI the URI to query for STS state.
      * @param aFlags  options for this request as defined in nsISocketProvider:
      *                  NO_PERMANENT_STORAGE
+     * @param aCached true if we have cached information regarding whether or not
+     *                  the host is HSTS, false otherwise.
      */
-    boolean isSecureURI(in uint32_t aType, in nsIURI aURI, in uint32_t aFlags);
+    boolean isSecureURI(in uint32_t aType, in nsIURI aURI, in uint32_t aFlags,
+                        [optional] out boolean aCached);
 
     /**
-     * Removes all security state by resetting to factory-original settings.
+     * Removes all non-preloaded security state by resetting to factory-original
+     * settings.
      */
     void clearAll();
+
+    /**
+     * Removes all preloaded security state.
+     */
+    void clearPreloads();
 
     /**
      * Returns an array of sha256-hashed key pins for the given domain, if any.
@@ -166,14 +178,25 @@ interface nsISiteSecurityService : nsISupports
      *
      * @param aHost the hostname (punycode) that pins will apply to
      * @param aIncludeSubdomains whether these pins also apply to subdomains
-     * @param aMaxAge lifetime (in seconds) of this pin set
+     * @param aExpires the time this pin should expire (millis since epoch)
      * @param aPinCount number of keys being pinnned
      * @param aSha256Pins array of hashed key fingerprints (SHA-256, base64)
+     * @param aIsPreload are these key pins for a preload entry? (false by
+     *        default)
      */
      boolean setKeyPins(in string aHost, in boolean aIncludeSubdomains,
-                        in unsigned long aMaxAge, in unsigned long aPinCount,
-                        [array, size_is(aPinCount)] in string aSha256Pins);
+                        in int64_t aExpires, in unsigned long aPinCount,
+                        [array, size_is(aPinCount)] in string aSha256Pins,
+                        [optional] in boolean aIsPreload);
 
+    /**
+     * Mark a host as declining to provide a given security state so that features
+     * such as HSTS priming will not flood a server with requests.
+     *
+     * @param aURI the nsIURI that this applies to
+     * @param aMaxAge lifetime (in seconds) of this negative cache
+     */
+    [noscript] void cacheNegativeHSTSResult(in nsIURI aURI, in unsigned long long aMaxAge);
 };
 
 %{C++

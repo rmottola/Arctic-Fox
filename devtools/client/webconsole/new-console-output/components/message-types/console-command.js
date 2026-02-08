@@ -12,13 +12,12 @@ const {
   DOM: dom,
   PropTypes
 } = require("devtools/client/shared/vendor/react");
-const { ConsoleCommand: ConsoleCommandType } = require("devtools/client/webconsole/new-console-output/types");
 const MessageIcon = createFactory(require("devtools/client/webconsole/new-console-output/components/message-icon").MessageIcon);
 
 ConsoleCommand.displayName = "ConsoleCommand";
 
 ConsoleCommand.propTypes = {
-  message: PropTypes.instanceOf(ConsoleCommandType).isRequired,
+  message: PropTypes.object.isRequired,
 };
 
 /**
@@ -47,8 +46,12 @@ function ConsoleCommand(props) {
     // @TODO add timestamp
     // @TODO add indent if necessary
     icon,
-    dom.span({className: "message-body-wrapper message-body devtools-monospace"},
-      dom.span({}, message.messageText)
+    dom.span({ className: "message-body-wrapper" },
+      dom.span({ className: "message-flex-body" },
+        dom.span({ className: "message-body devtools-monospace" },
+          message.messageText
+        )
+      )
     )
   );
 }

@@ -116,14 +116,6 @@ var DoPreloadPostfork = function(aCallback) {
     // the chrome process in its init() function.
     Cu.import("resource://gre/modules/AppsServiceChild.jsm");
 
-    // Load UserCustomizations.jsm after fork since it sends an async message to
-    // the chrome process in its init() function.
-    try {
-      if (Services.prefs.getBoolPref("dom.apps.customization.enabled")) {
-        Cu.import("resource://gre/modules/UserCustomizations.jsm");
-      }
-    } catch(e) {}
-
     // Load nsIAppsService after fork since its implementation loads
     // AppsServiceChild.jsm
     Cc["@mozilla.org/AppsService;1"].getService(Ci["nsIAppsService"]);
@@ -135,9 +127,6 @@ var DoPreloadPostfork = function(aCallback) {
     // Load nsIPermissionManager after fork since it sends a message to the
     // chrome process to read permissions.
     Cc["@mozilla.org/permissionmanager;1"].getService(Ci["nsIPermissionManager"]);
-
-    // Create this instance after fork since it loads AppsServiceChild.jsm
-    Cc["@mozilla.org/webapps;1"].createInstance(Ci["nsISupports"]);
 
     // Load nsIProtocolProxyService after fork since it asynchronously accesses
     // the "Proxy Resolution" thread after it's frozen.

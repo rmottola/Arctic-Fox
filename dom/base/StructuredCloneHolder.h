@@ -9,6 +9,7 @@
 #include "js/StructuredClone.h"
 #include "mozilla/Move.h"
 #include "mozilla/UniquePtr.h"
+#include "mozilla/dom/BindingDeclarations.h"
 #include "nsISupports.h"
 #include "nsTArray.h"
 
@@ -89,10 +90,12 @@ public:
   bool Write(JSContext* aCx,
              JS::Handle<JS::Value> aValue);
 
-  // Like Write() but it supports the transferring of objects.
+  // Like Write() but it supports the transferring of objects and handling
+  // of cloning policy.
   bool Write(JSContext* aCx,
              JS::Handle<JS::Value> aValue,
-             JS::Handle<JS::Value> aTransfer);
+             JS::Handle<JS::Value> aTransfer,
+             JS::CloneDataPolicy cloneDataPolicy);
 
   // If Write() has been called, this method retrieves data and stores it into
   // aValue.
@@ -163,6 +166,7 @@ public:
   void Write(JSContext* aCx,
              JS::Handle<JS::Value> aValue,
              JS::Handle<JS::Value> aTransfer,
+             JS::CloneDataPolicy cloneDataPolicy,
              ErrorResult &aRv);
 
   void Read(nsISupports* aParent,
@@ -203,6 +207,11 @@ public:
     MOZ_ASSERT(mSupportsTransferring);
     return Move(mTransferredPorts);
   }
+
+  // This method uses TakeTransferredPorts() to populate a sequence of
+  // MessagePorts for WebIDL binding classes.
+  bool
+  TakeTransferredPortsAsSequence(Sequence<OwningNonNull<mozilla::dom::MessagePort>>& aPorts);
 
   nsTArray<MessagePortIdentifier>& PortIdentifiers() const
   {

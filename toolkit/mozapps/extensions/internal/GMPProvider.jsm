@@ -61,8 +61,19 @@ const GMP_PLUGINS = [
     licenseURL:      "http://help.adobe.com/en_US/primetime/drm/HTML5_CDM_EULA/index.html",
     homepageURL:     "http://help.adobe.com/en_US/primetime/drm/HTML5_CDM",
     optionsURL:      "chrome://mozapps/content/extensions/gmpPrefs.xul",
+    isEME:           true,
+  },
+  {
+    id:              WIDEVINE_ID,
+    name:            "widevine_description",
+    // Describe the purpose of both CDMs in the same way.
+    description:     "eme-adobe_description",
+    licenseURL:      "https://www.google.com/policies/privacy/",
+    homepageURL:     "https://www.widevine.com/",
+    optionsURL:      "chrome://mozapps/content/extensions/gmpPrefs.xul",
     isEME:           true
   }];
+XPCOMUtils.defineConstant(this, "GMP_PLUGINS", GMP_PLUGINS);
 
 XPCOMUtils.defineLazyGetter(this, "pluginsBundle",
   () => Services.strings.createBundle("chrome://global/locale/plugins.properties"));
@@ -154,7 +165,11 @@ GMPWrapper.prototype = {
   get version() { return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_VERSION, null,
                                       this._plugin.id); },
 
-  get isActive() { return !this.appDisabled && !this.userDisabled; },
+  get isActive() {
+    return !this.appDisabled &&
+           !this.userDisabled &&
+           !GMPUtils.isPluginHidden(this._plugin.id);
+  },
   get appDisabled() {
     if (this._plugin.isEME && !GMPPrefs.get(GMPPrefs.KEY_EME_ENABLED, true)) {
       // If "media.eme.enabled" is false, all EME plugins are disabled.
@@ -460,10 +475,16 @@ GMPWrapper.prototype = {
 
     let id = this._plugin.id.substring(4);
     let libName = AppConstants.DLL_PREFIX + id + AppConstants.DLL_SUFFIX;
+    let infoName;
+    if (this._plugin.id == WIDEVINE_ID) {
+      infoName = "manifest.json";
+    } else {
+      infoName = id + ".info";
+    }
 
     return {
       libraryMissing: !fileExists(this.gmpPath, libName),
-      infoMissing: !fileExists(this.gmpPath, id + ".info"),
+      infoMissing: !fileExists(this.gmpPath, infoName),
       voucherMissing: this._plugin.id == EME_ADOBE_ID
                       && !fileExists(this.gmpPath, id + ".voucher"),
     };
@@ -543,13 +564,15 @@ var GMPProvider = {
           wrapper.uninstallPlugin();
           continue;
         }
-        if (validation.installed) {
+        if (validation.installed && wrapper.missingFilesKey) {
           telemetryService.getHistogramById(wrapper.missingFilesKey).add(validation.telemetry);
         }
         if (!validation.valid) {
           this._log.info("startup - gmp " + plugin.id +
                          " missing [" + validation.missing + "], uninstalling");
-          telemetryService.getHistogramById(wrapper.missingKey).add(true);
+          if (wrapper.missingKey) {
+            telemetryService.getHistogramById(wrapper.missingKey).add(true);
+          }
           wrapper.uninstallPlugin();
           continue;
         }

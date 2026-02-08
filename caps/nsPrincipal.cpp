@@ -31,7 +31,6 @@
 #include "mozilla/HashFunctions.h"
 
 #include "nsIAppsService.h"
-#include "mozIApplication.h"
 
 using namespace mozilla;
 
@@ -99,10 +98,10 @@ nsPrincipal::Init(nsIURI *aCodebase, const PrincipalOriginAttributes& aOriginAtt
   return NS_OK;
 }
 
-void
+nsresult
 nsPrincipal::GetScriptLocation(nsACString &aStr)
 {
-  mCodebase->GetSpec(aStr);
+  return mCodebase->GetSpec(aStr);
 }
 
 /* static */ nsresult
@@ -220,9 +219,9 @@ nsPrincipal::SubsumesInternal(nsIPrincipal* aOther,
     }
   }
 
-    nsCOMPtr<nsIURI> otherURI;
-    rv = aOther->GetURI(getter_AddRefs(otherURI));
-    NS_ENSURE_SUCCESS(rv, false);
+  nsCOMPtr<nsIURI> otherURI;
+  rv = aOther->GetURI(getter_AddRefs(otherURI));
+  NS_ENSURE_SUCCESS(rv, false);
 
   // Compare codebases.
   return nsScriptSecurityManager::SecurityCompareURIs(mCodebase, otherURI);
@@ -674,7 +673,8 @@ struct OriginComparator
   }
 };
 
-nsExpandedPrincipal::nsExpandedPrincipal(nsTArray<nsCOMPtr <nsIPrincipal> > &aWhiteList)
+nsExpandedPrincipal::nsExpandedPrincipal(nsTArray<nsCOMPtr<nsIPrincipal>> &aWhiteList,
+                                         const PrincipalOriginAttributes& aAttrs)
 {
   // We force the principals to be sorted by origin so that nsExpandedPrincipal
   // origins can have a canonical form.
@@ -682,6 +682,7 @@ nsExpandedPrincipal::nsExpandedPrincipal(nsTArray<nsCOMPtr <nsIPrincipal> > &aWh
   for (size_t i = 0; i < aWhiteList.Length(); ++i) {
     mPrincipals.InsertElementSorted(aWhiteList[i], c);
   }
+  mOriginAttributes = aAttrs;
 }
 
 nsExpandedPrincipal::~nsExpandedPrincipal()
@@ -806,7 +807,7 @@ nsExpandedPrincipal::IsOnCSSUnprefixingWhitelist()
 }
 
 
-void
+nsresult
 nsExpandedPrincipal::GetScriptLocation(nsACString& aStr)
 {
   aStr.Assign("[Expanded Principal [");
@@ -816,12 +817,14 @@ nsExpandedPrincipal::GetScriptLocation(nsACString& aStr)
     }
 
     nsAutoCString spec;
-    nsJSPrincipals::get(mPrincipals.ElementAt(i))->GetScriptLocation(spec);
+    nsresult rv =
+      nsJSPrincipals::get(mPrincipals.ElementAt(i))->GetScriptLocation(spec);
+    NS_ENSURE_SUCCESS(rv, rv);
 
     aStr.Append(spec);
-
   }
   aStr.Append("]]");
+  return NS_OK;
 }
 
 //////////////////////////////////////////

@@ -509,6 +509,14 @@ ToAtomSlow(ExclusiveContext* cx, typename MaybeRooted<Value, allowGC>::HandleTyp
         return v.toBoolean() ? cx->names().true_ : cx->names().false_;
     if (v.isNull())
         return cx->names().null;
+    if (v.isSymbol()) {
+        if (cx->shouldBeJSContext() && allowGC) {
+            JS_ReportErrorNumberASCII(cx->asJSContext(), GetErrorMessage, nullptr,
+                                      JSMSG_SYMBOL_TO_STRING);
+        }
+        return nullptr;
+    }
+    MOZ_ASSERT(v.isUndefined());
     return cx->names().undefined;
 }
 
@@ -535,7 +543,7 @@ template JSAtom*
 js::ToAtom<CanGC>(ExclusiveContext* cx, HandleValue v);
 
 template JSAtom*
-js::ToAtom<NoGC>(ExclusiveContext* cx, Value v);
+js::ToAtom<NoGC>(ExclusiveContext* cx, const Value& v);
 
 template<XDRMode mode>
 bool
@@ -565,12 +573,16 @@ js::XDRAtom(XDRState<mode>* xdr, MutableHandleAtom atomp)
     JSContext* cx = xdr->cx();
     JSAtom* atom;
     if (latin1) {
-        const Latin1Char* chars = reinterpret_cast<const Latin1Char*>(xdr->buf.read(length));
+        const Latin1Char* chars = nullptr;
+        if (length)
+            chars = reinterpret_cast<const Latin1Char*>(xdr->buf.read(length));
         atom = AtomizeChars(cx, chars, length);
     } else {
-#if IS_LITTLE_ENDIAN
+#if MOZ_LITTLE_ENDIAN
         /* Directly access the little endian chars in the XDR buffer. */
-        const char16_t* chars = reinterpret_cast<const char16_t*>(xdr->buf.read(length * sizeof(char16_t)));
+        const char16_t* chars = nullptr;
+        if (length)
+            chars = reinterpret_cast<const char16_t*>(xdr->buf.read(length * sizeof(char16_t)));
         atom = AtomizeChars(cx, chars, length);
 #else
         /*
@@ -596,7 +608,7 @@ js::XDRAtom(XDRState<mode>* xdr, MutableHandleAtom atomp)
         atom = AtomizeChars(cx, chars, length);
         if (chars != stackChars)
             js_free(chars);
-#endif /* !IS_LITTLE_ENDIAN */
+#endif /* !MOZ_LITTLE_ENDIAN */
     }
 
     if (!atom)

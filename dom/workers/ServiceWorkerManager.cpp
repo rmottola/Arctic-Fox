@@ -45,6 +45,7 @@
 #include "mozilla/dom/PromiseNativeHandler.h"
 #include "mozilla/dom/Request.h"
 #include "mozilla/dom/RootedDictionary.h"
+#include "mozilla/dom/TypedArray.h"
 #include "mozilla/ipc/BackgroundChild.h"
 #include "mozilla/ipc/PBackgroundChild.h"
 #include "mozilla/ipc/PBackgroundSharedTypes.h"
@@ -81,10 +82,6 @@
 #include "WorkerRunnable.h"
 #include "WorkerScope.h"
 
-#ifndef MOZ_SIMPLEPUSH
-#include "mozilla/dom/TypedArray.h"
-#endif
-
 #ifdef PostMessage
 #undef PostMessage
 #endif
@@ -97,7 +94,7 @@ BEGIN_WORKERS_NAMESPACE
 
 #define PURGE_DOMAIN_DATA "browser:purge-domain-data"
 #define PURGE_SESSION_HISTORY "browser:purge-session-history"
-#define CLEAR_ORIGIN_DATA "clear-origin-data"
+#define CLEAR_ORIGIN_DATA "clear-origin-attributes-data"
 
 static_assert(nsIHttpChannelInternal::CORS_MODE_SAME_ORIGIN == static_cast<uint32_t>(RequestMode::Same_origin),
               "RequestMode enumeration value should match Necko CORS mode value.");
@@ -927,9 +924,6 @@ ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
                                     const nsAString& aMessageId,
                                     const Maybe<nsTArray<uint8_t>>& aData)
 {
-#ifdef MOZ_SIMPLEPUSH
-  return NS_ERROR_NOT_AVAILABLE;
-#else
   PrincipalOriginAttributes attrs;
   if (!attrs.PopulateFromSuffix(aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
@@ -945,16 +939,12 @@ ServiceWorkerManager::SendPushEvent(const nsACString& aOriginAttributes,
 
   return serviceWorker->WorkerPrivate()->SendPushEvent(aMessageId, aData,
                                                        registration);
-#endif // MOZ_SIMPLEPUSH
 }
 
 NS_IMETHODIMP
 ServiceWorkerManager::SendPushSubscriptionChangeEvent(const nsACString& aOriginAttributes,
                                                       const nsACString& aScope)
 {
-#ifdef MOZ_SIMPLEPUSH
-  return NS_ERROR_NOT_AVAILABLE;
-#else
   PrincipalOriginAttributes attrs;
   if (!attrs.PopulateFromSuffix(aOriginAttributes)) {
     return NS_ERROR_INVALID_ARG;
@@ -965,7 +955,6 @@ ServiceWorkerManager::SendPushSubscriptionChangeEvent(const nsACString& aOriginA
     return NS_ERROR_FAILURE;
   }
   return info->WorkerPrivate()->SendPushSubscriptionChangeEvent();
-#endif
 }
 
 nsresult
@@ -3763,6 +3752,31 @@ public:
 };
 
 NS_IMPL_ISUPPORTS(UpdateTimerCallback, nsITimerCallback)
+
+bool
+ServiceWorkerManager::MayHaveActiveServiceWorkerInstance(ContentParent* aContent,
+                                                         nsIPrincipal* aPrincipal)
+{
+  AssertIsOnMainThread();
+  MOZ_ASSERT(aPrincipal);
+
+  if (mShuttingDown) {
+    return false;
+  }
+
+  nsAutoCString scopeKey;
+  nsresult rv = PrincipalToScopeKey(aPrincipal, scopeKey);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return false;
+  }
+
+  RegistrationDataPerPrincipal* data;
+  if (!mRegistrationInfos.Get(scopeKey, &data)) {
+    return false;
+  }
+
+  return true;
+}
 
 void
 ServiceWorkerManager::ScheduleUpdateTimer(nsIPrincipal* aPrincipal,

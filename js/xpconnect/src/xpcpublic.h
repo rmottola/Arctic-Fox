@@ -187,15 +187,6 @@ xpc_FastGetCachedWrapper(JSContext* cx, nsWrapperCache* cache, JS::MutableHandle
     return nullptr;
 }
 
-inline JSScript*
-xpc_UnmarkGrayScript(JSScript* script)
-{
-    if (script)
-        JS::ExposeScriptToActiveJS(script);
-
-    return script;
-}
-
 // If aVariant is an XPCVariant, this marks the object to be in aGeneration.
 // This also unmarks the gray JSObject.
 extern void
@@ -341,7 +332,7 @@ StringToJsval(JSContext* cx, const nsAString& str, JS::MutableHandleValue rval)
 /**
  * As above, but for mozilla::dom::DOMString.
  */
-MOZ_ALWAYS_INLINE
+inline
 bool NonVoidStringToJsval(JSContext* cx, mozilla::dom::DOMString& str,
                           JS::MutableHandleValue rval)
 {
@@ -525,7 +516,7 @@ class ErrorReport {
                   , mIsMuted(false)
     {}
 
-    void Init(JSErrorReport* aReport, const char* aFallbackMessage,
+    void Init(JSErrorReport* aReport, const char* aToStringResult,
               bool aIsChrome, uint64_t aWindowID);
     void Init(JSContext* aCx, mozilla::dom::Exception* aException,
               bool aIsChrome, uint64_t aWindowID);

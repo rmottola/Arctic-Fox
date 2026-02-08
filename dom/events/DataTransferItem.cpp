@@ -74,12 +74,6 @@ DataTransferItem::Clone(DataTransfer* aDataTransfer) const
 }
 
 void
-DataTransferItem::SetType(const nsAString& aType)
-{
-  mType = aType;
-}
-
-void
 DataTransferItem::SetData(nsIVariant* aData)
 {
   // Invalidate our file cache, we will regenerate it with the new data
@@ -103,9 +97,13 @@ DataTransferItem::SetData(nsIVariant* aData)
     return;
   }
 
-  mKind = KIND_OTHER;
   mData = aData;
+  mKind = KindFromData(mData);
+}
 
+/* static */ DataTransferItem::eKind
+DataTransferItem::KindFromData(nsIVariant* aData)
+{
   nsCOMPtr<nsISupports> supports;
   nsresult rv = aData->GetAsISupports(getter_AddRefs(supports));
   if (NS_SUCCEEDED(rv) && supports) {
@@ -113,8 +111,7 @@ DataTransferItem::SetData(nsIVariant* aData)
     if (nsCOMPtr<nsIDOMBlob>(do_QueryInterface(supports)) ||
         nsCOMPtr<BlobImpl>(do_QueryInterface(supports)) ||
         nsCOMPtr<nsIFile>(do_QueryInterface(supports))) {
-      mKind = KIND_FILE;
-      return;
+      return KIND_FILE;
     }
   }
 
@@ -126,8 +123,10 @@ DataTransferItem::SetData(nsIVariant* aData)
   // consider it a string, by calling GetAsAString, and checking for success.
   rv = aData->GetAsAString(string);
   if (NS_SUCCEEDED(rv)) {
-    mKind = KIND_STRING;
+    return KIND_STRING;
   }
+
+  return KIND_OTHER;
 }
 
 void
@@ -225,36 +224,38 @@ DataTransferItem::FillInExternalData()
 
   SetData(variant);
 
-#ifdef DEBUG
   if (oldKind != Kind()) {
     NS_WARNING("Clipboard data provided by the OS does not match predicted kind");
+    mDataTransfer->TypesListMayHaveChanged();
   }
-#endif
 }
 
 already_AddRefed<File>
-DataTransferItem::GetAsFile(ErrorResult& aRv)
+DataTransferItem::GetAsFile(nsIPrincipal& aSubjectPrincipal,
+                            ErrorResult& aRv)
 {
   if (mKind != KIND_FILE) {
     return nullptr;
   }
 
-  nsCOMPtr<nsIVariant> data = Data(nsContentUtils::SubjectPrincipal(), aRv);
+  // This is done even if we have an mCachedFile, as it performs the necessary
+  // permissions checks to ensure that we are allowed to access this type.
+  nsCOMPtr<nsIVariant> data = Data(&aSubjectPrincipal, aRv);
   if (NS_WARN_IF(!data || aRv.Failed())) {
-    return nullptr;
-  }
-
-  nsCOMPtr<nsISupports> supports;
-  aRv = data->GetAsISupports(getter_AddRefs(supports));
-  MOZ_ASSERT(!aRv.Failed() && supports,
-             "File objects should be stored as nsISupports variants");
-  if (aRv.Failed() || !supports) {
     return nullptr;
   }
 
   // Generate the dom::File from the stored data, caching it so that the
   // same object is returned in the future.
   if (!mCachedFile) {
+    nsCOMPtr<nsISupports> supports;
+    aRv = data->GetAsISupports(getter_AddRefs(supports));
+    MOZ_ASSERT(!aRv.Failed() && supports,
+               "File objects should be stored as nsISupports variants");
+    if (aRv.Failed() || !supports) {
+      return nullptr;
+    }
+
     if (nsCOMPtr<nsIDOMBlob> domBlob = do_QueryInterface(supports)) {
       Blob* blob = static_cast<Blob*>(domBlob.get());
       mCachedFile = blob->ToFile();
@@ -273,9 +274,10 @@ DataTransferItem::GetAsFile(ErrorResult& aRv)
 }
 
 already_AddRefed<FileSystemEntry>
-DataTransferItem::GetAsEntry(ErrorResult& aRv)
+DataTransferItem::GetAsEntry(nsIPrincipal& aSubjectPrincipal,
+                             ErrorResult& aRv)
 {
-  RefPtr<File> file = GetAsFile(aRv);
+  RefPtr<File> file = GetAsFile(aSubjectPrincipal, aRv);
   if (NS_WARN_IF(aRv.Failed()) || !file) {
     return nullptr;
   }
@@ -319,9 +321,9 @@ DataTransferItem::GetAsEntry(ErrorResult& aRv)
     }
 
     RefPtr<Directory> directory = Directory::Create(global, directoryFile);
-    entry = new FileSystemDirectoryEntry(global, directory, fs);
+    entry = new FileSystemDirectoryEntry(global, directory, nullptr, fs);
   } else {
-    entry = new FileSystemFileEntry(global, file, fs);
+    entry = new FileSystemFileEntry(global, file, nullptr, fs);
   }
 
   Sequence<RefPtr<FileSystemEntry>> entries;
@@ -373,6 +375,7 @@ DataTransferItem::CreateFileFromInputStream(nsIInputStream* aStream)
 
 void
 DataTransferItem::GetAsString(FunctionStringCallback* aCallback,
+                              nsIPrincipal& aSubjectPrincipal,
                               ErrorResult& aRv)
 {
   if (!aCallback || mKind != KIND_STRING) {
@@ -382,7 +385,7 @@ DataTransferItem::GetAsString(FunctionStringCallback* aCallback,
   // Theoretically this should be done inside of the runnable, as it might be an
   // expensive operation on some systems, however we wouldn't get access to the
   // NS_ERROR_DOM_SECURITY_ERROR messages which may be raised by this method.
-  nsCOMPtr<nsIVariant> data = Data(nsContentUtils::SubjectPrincipal(), aRv);
+  nsCOMPtr<nsIVariant> data = Data(&aSubjectPrincipal, aRv);
   if (NS_WARN_IF(!data || aRv.Failed())) {
     return;
   }
@@ -406,7 +409,7 @@ DataTransferItem::GetAsString(FunctionStringCallback* aCallback,
     {
       ErrorResult rv;
       mCallback->Call(mStringData, rv);
-      NS_WARN_IF(rv.Failed());
+      NS_WARNING_ASSERTION(!rv.Failed(), "callback failed");
       return rv.StealNSResult();
     }
   private:

@@ -398,21 +398,31 @@ SystemClockDriver::WaitForNextIteration()
 
   PRIntervalTime timeout = PR_INTERVAL_NO_TIMEOUT;
   TimeStamp now = TimeStamp::Now();
-  if (mGraphImpl->mNeedAnotherIteration) {
+
+  // This lets us avoid hitting the Atomic twice when we know we won't sleep
+  bool another = mGraphImpl->mNeedAnotherIteration; // atomic
+  if (!another) {
+    mGraphImpl->mGraphDriverAsleep = true; // atomic
+    mWaitState = WAITSTATE_WAITING_INDEFINITELY;
+  }
+  // NOTE: mNeedAnotherIteration while also atomic may have changed before
+  // we could set mGraphDriverAsleep, so we must re-test it.
+  // (EnsureNextIteration sets mNeedAnotherIteration, then tests
+  // mGraphDriverAsleep
+  if (another || mGraphImpl->mNeedAnotherIteration) { // atomic
     int64_t timeoutMS = MEDIA_GRAPH_TARGET_PERIOD_MS -
       int64_t((now - mCurrentTimeStamp).ToMilliseconds());
     // Make sure timeoutMS doesn't overflow 32 bits by waking up at
     // least once a minute, if we need to wake up at all
     timeoutMS = std::max<int64_t>(0, std::min<int64_t>(timeoutMS, 60*1000));
     timeout = PR_MillisecondsToInterval(uint32_t(timeoutMS));
-    STREAM_LOG(LogLevel::Verbose, ("Waiting for next iteration; at %f, timeout=%f", (now - mInitialTimeStamp).ToSeconds(), timeoutMS/1000.0));
+    STREAM_LOG(LogLevel::Verbose,
+               ("Waiting for next iteration; at %f, timeout=%f",
+                (now - mInitialTimeStamp).ToSeconds(), timeoutMS/1000.0));
     if (mWaitState == WAITSTATE_WAITING_INDEFINITELY) {
       mGraphImpl->mGraphDriverAsleep = false; // atomic
     }
     mWaitState = WAITSTATE_WAITING_FOR_NEXT_ITERATION;
-  } else {
-    mGraphImpl->mGraphDriverAsleep = true; // atomic
-    mWaitState = WAITSTATE_WAITING_INDEFINITELY;
   }
   if (timeout > 0) {
     mGraphImpl->GetMonitor().Wait(timeout);
@@ -424,13 +434,19 @@ SystemClockDriver::WaitForNextIteration()
   if (mWaitState == WAITSTATE_WAITING_INDEFINITELY) {
     mGraphImpl->mGraphDriverAsleep = false; // atomic
   }
+  // Note: this can race against the EnsureNextIteration setting
+  // WAITSTATE_RUNNING and setting mGraphDriverAsleep to false, so you can
+  // have an iteration with WAITSTATE_WAKING_UP instead of RUNNING.
   mWaitState = WAITSTATE_RUNNING;
-  mGraphImpl->mNeedAnotherIteration = false;
+  mGraphImpl->mNeedAnotherIteration = false; // atomic
 }
 
 void SystemClockDriver::WakeUp()
 {
   mGraphImpl->GetMonitor().AssertCurrentThreadOwns();
+  // Note: this can race against the thread setting WAITSTATE_RUNNING and
+  // setting mGraphDriverAsleep to false, so you can have an iteration
+  // with WAITSTATE_WAKING_UP instead of RUNNING.
   mWaitState = WAITSTATE_WAKING_UP;
   mGraphImpl->mGraphDriverAsleep = false; // atomic
   mGraphImpl->GetMonitor().Notify();
@@ -569,9 +585,44 @@ AudioCallbackDriver::~AudioCallbackDriver()
   MOZ_ASSERT(mPromisesForOperation.IsEmpty());
 }
 
+bool IsMacbookOrMacbookAir()
+{
+#ifdef XP_MACOSX
+  size_t len = 0;
+  sysctlbyname("hw.model", NULL, &len, NULL, 0);
+  if (len) {
+    UniquePtr<char[]> model(new char[len]);
+    // This string can be
+    // MacBook%d,%d for a normal MacBook
+    // MacBookPro%d,%d for a MacBook Pro
+    // MacBookAir%d,%d for a Macbook Air
+    sysctlbyname("hw.model", model.get(), &len, NULL, 0);
+    char* substring = strstr(model.get(), "MacBook");
+    if (substring) {
+      const size_t offset = strlen("MacBook");
+      if (strncmp(model.get() + offset, "Air", len - offset) ||
+          isdigit(model[offset + 1])) {
+        return true;
+      }
+    }
+    return false;
+  }
+#endif
+  return false;
+}
+
 void
 AudioCallbackDriver::Init()
 {
+  cubeb* cubebContext = CubebUtils::GetCubebContext();
+  if (!cubebContext) {
+    NS_WARNING("Could not get cubeb context.");
+    if (!mFromFallback) {
+      CubebUtils::ReportCubebStreamInitFailure(true);
+    }
+    return;
+  }
+
   cubeb_stream_params output;
   cubeb_stream_params input;
   uint32_t latency_frames;
@@ -603,10 +654,22 @@ AudioCallbackDriver::Init()
     output.format = CUBEB_SAMPLE_FLOAT32NE;
   }
 
-  if (cubeb_get_min_latency(CubebUtils::GetCubebContext(), output, &latency_frames) != CUBEB_OK) {
-    NS_WARNING("Could not get minimal latency from cubeb.");
-    return;
+  Maybe<uint32_t> latencyPref = CubebUtils::GetCubebMSGLatencyInFrames();
+  if (latencyPref) {
+    latency_frames = latencyPref.value();
+  } else {
+    if (cubeb_get_min_latency(cubebContext, output, &latency_frames) != CUBEB_OK) {
+      NS_WARNING("Could not get minimal latency from cubeb.");
+      return;
+    }
   }
+
+  // Macbook and MacBook air don't have enough CPU to run very low latency
+  // MediaStreamGraphs, cap the minimal latency to 512 frames int this case.
+  if (IsMacbookOrMacbookAir()) {
+    latency_frames = std::max((uint32_t) 512, latency_frames);
+  }
+
 
   input = output;
   input.channels = mInputChannels; // change to support optional stereo capture
@@ -634,7 +697,7 @@ AudioCallbackDriver::Init()
         // XXX Only pass input input if we have an input listener.  Always
         // set up output because it's easier, and it will just get silence.
         // XXX Add support for adding/removing an input listener later.
-        cubeb_stream_init(CubebUtils::GetCubebContext(), &stream,
+        cubeb_stream_init(cubebContext, &stream,
                           "AudioCallbackDriver",
                           input_id,
                           mGraphImpl->mInputWanted ? &input : nullptr,

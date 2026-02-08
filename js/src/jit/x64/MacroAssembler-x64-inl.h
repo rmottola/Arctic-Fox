@@ -90,6 +90,12 @@ MacroAssembler::orPtr(Imm32 imm, Register dest)
 }
 
 void
+MacroAssembler::and64(Register64 src, Register64 dest)
+{
+    andq(src.reg, dest.reg);
+}
+
+void
 MacroAssembler::or64(Register64 src, Register64 dest)
 {
     orq(src.reg, dest.reg);
@@ -450,6 +456,17 @@ MacroAssembler::rotateRight64(Imm32 count, Register64 src, Register64 dest, Regi
 }
 
 // ===============================================================
+// Condition functions
+
+template <typename T1, typename T2>
+void
+MacroAssembler::cmpPtrSet(Condition cond, T1 lhs, T2 rhs, Register dest)
+{
+    cmpPtr(lhs, rhs);
+    emitSet(cond, dest);
+}
+
+// ===============================================================
 // Bit counting functions
 
 void
@@ -797,6 +814,22 @@ MacroAssembler::truncateDoubleToUInt64(Address src, Address dest, Register temp,
     storePtr(temp, dest);
 
     bind(&done);
+}
+
+// ========================================================================
+// wasm support
+
+template <class L>
+void
+MacroAssembler::wasmBoundsCheck(Condition cond, Register index, L label)
+{
+    MOZ_CRASH("x64 should never emit a bounds check");
+}
+
+void
+MacroAssembler::wasmPatchBoundsCheck(uint8_t* patchAt, uint32_t limit)
+{
+    MOZ_CRASH("x64 should never emit a bounds check");
 }
 
 //}}} check_macroassembler_style

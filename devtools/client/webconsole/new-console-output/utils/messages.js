@@ -7,7 +7,7 @@
 "use strict";
 
 const WebConsoleUtils = require("devtools/client/webconsole/utils").Utils;
-const STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
+const STRINGS_URI = "devtools/locale/webconsole.properties";
 const l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 
 const {
@@ -15,7 +15,10 @@ const {
   MESSAGE_TYPE,
   MESSAGE_LEVEL,
 } = require("../constants");
-const { ConsoleMessage } = require("../types");
+const {
+  ConsoleMessage,
+  NetworkEventMessage,
+} = require("../types");
 
 function prepareMessage(packet, idGenerator) {
   // This packet is already in the expected packet structure. Simply return.
@@ -78,13 +81,26 @@ function transformPacket(packet) {
             type = MESSAGE_TYPE.NULL_MESSAGE;
           }
           break;
+        case "table":
+          const supportedClasses = [
+            "Array", "Object", "Map", "Set", "WeakMap", "WeakSet"];
+          if (
+            !Array.isArray(parameters) ||
+            parameters.length === 0 ||
+            !supportedClasses.includes(parameters[0].class)
+          ) {
+            // If the class of the first parameter is not supported,
+            // we handle the call as a simple console.log
+            type = "log";
+          }
+          break;
       }
 
-      const frame = {
-        source: message.filename || null,
-        line: message.lineNumber || null,
-        column: message.columnNumber || null
-      };
+      const frame = message.filename ? {
+        source: message.filename,
+        line: message.lineNumber,
+        column: message.columnNumber,
+      } : null;
 
       return new ConsoleMessage({
         source: MESSAGE_SOURCE.CONSOLE_API,
@@ -116,11 +132,30 @@ function transformPacket(packet) {
         level = MESSAGE_LEVEL.INFO;
       }
 
+      const frame = pageError.sourceName ? {
+        source: pageError.sourceName,
+        line: pageError.lineNumber,
+        column: pageError.columnNumber
+      } : null;
+
       return new ConsoleMessage({
         source: MESSAGE_SOURCE.JAVASCRIPT,
         type: MESSAGE_TYPE.LOG,
         level,
         messageText: pageError.errorMessage,
+        stacktrace: pageError.stacktrace ? pageError.stacktrace : null,
+        frame,
+      });
+    }
+
+    case "networkEvent": {
+      let { networkEvent } = packet;
+
+      return new NetworkEventMessage({
+        actor: networkEvent.actor,
+        isXHR: networkEvent.isXHR,
+        request: networkEvent.request,
+        response: networkEvent.response,
       });
     }
 
@@ -158,6 +193,9 @@ function convertCachedPacket(packet) {
   } else if ("_navPayload" in packet) {
     convertPacket.type = "navigationMessage";
     convertPacket.message = packet;
+  } else if (packet._type === "NetworkEvent") {
+    convertPacket.networkEvent = packet;
+    convertPacket.type = "networkEvent";
   } else {
     throw new Error("Unexpected packet type");
   }

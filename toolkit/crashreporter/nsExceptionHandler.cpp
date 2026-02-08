@@ -11,6 +11,7 @@
 #include "nsDataHashtable.h"
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/dom/CrashReporterChild.h"
+#include "mozilla/ipc/CrashReporterClient.h"
 #include "mozilla/Services.h"
 #include "nsIObserverService.h"
 #include "mozilla/Unused.h"
@@ -111,6 +112,7 @@ using google_breakpad::MinidumpDescriptor;
 using namespace mozilla;
 using mozilla::dom::CrashReporterChild;
 using mozilla::dom::PCrashReporterChild;
+using mozilla::ipc::CrashReporterClient;
 
 namespace CrashReporter {
 
@@ -551,13 +553,6 @@ Concat(XP_CHAR* str, const XP_CHAR* toAppend, int* size)
   return str;
 }
 
-static const char* gMozCrashReason = nullptr;
-
-void AnnotateMozCrashReason(const char* aReason)
-{
-  gMozCrashReason = aReason;
-}
-
 static size_t gOOMAllocationSize = 0;
 
 void AnnotateOOMAllocationSize(size_t size)
@@ -570,6 +565,22 @@ static size_t gTexturesSize = 0;
 void AnnotateTexturesSize(size_t size)
 {
   gTexturesSize = size;
+}
+
+static size_t gNumOfPendingIPC = 0;
+static uint32_t gTopPendingIPCCount = 0;
+static const char* gTopPendingIPCName = nullptr;
+static uint32_t gTopPendingIPCType = 0;
+
+void AnnotatePendingIPC(size_t aNumOfPendingIPC,
+                        uint32_t aTopPendingIPCCount,
+                        const char* aTopPendingIPCName,
+                        uint32_t aTopPendingIPCType)
+{
+  gNumOfPendingIPC = aNumOfPendingIPC;
+  gTopPendingIPCCount = aTopPendingIPCCount;
+  gTopPendingIPCName = aTopPendingIPCName;
+  gTopPendingIPCType = aTopPendingIPCType;
 }
 
 #ifndef XP_WIN
@@ -873,6 +884,19 @@ bool MinidumpCallback(
     XP_STOA(gTexturesSize, texturesSizeBuffer, 10);
   }
 
+  char numOfPendingIPCBuffer[32] = "";
+  char topPendingIPCCountBuffer[32] = "";
+  char topPendingIPCTypeBuffer[11] = "0x";
+  if (gNumOfPendingIPC) {
+    XP_STOA(gNumOfPendingIPC, numOfPendingIPCBuffer, 10);
+    if (gTopPendingIPCCount) {
+      XP_STOA(gTopPendingIPCCount, topPendingIPCCountBuffer, 10);
+    }
+    if (gTopPendingIPCType) {
+      XP_STOA(gTopPendingIPCType, &topPendingIPCTypeBuffer[2], 16);
+    }
+  }
+
   // calculate time since last crash (if possible), and store
   // the time of this crash.
   time_t crashTime;
@@ -1021,6 +1045,23 @@ bool MinidumpCallback(
       WriteAnnotation(eventFile, "TextureUsage", texturesSizeBuffer);
     }
 
+    if (numOfPendingIPCBuffer[0]) {
+      WriteAnnotation(apiData, "NumberOfPendingIPC", numOfPendingIPCBuffer);
+      WriteAnnotation(eventFile, "NumberOfPendingIPC", numOfPendingIPCBuffer);
+      if (topPendingIPCCountBuffer[0]) {
+        WriteAnnotation(apiData, "TopPendingIPCCount", topPendingIPCCountBuffer);
+        WriteAnnotation(eventFile, "TopPendingIPCCount", topPendingIPCCountBuffer);
+      }
+      if (gTopPendingIPCName) {
+        WriteAnnotation(apiData, "TopPendingIPCName", gTopPendingIPCName);
+        WriteAnnotation(eventFile, "TopPendingIPCName", gTopPendingIPCName);
+      }
+      if (topPendingIPCTypeBuffer[2]) {
+        WriteAnnotation(apiData, "TopPendingIPCType", topPendingIPCTypeBuffer);
+        WriteAnnotation(eventFile, "TopPendingIPCType", topPendingIPCTypeBuffer);
+      }
+    }
+
     if (memoryReportPath) {
       WriteLiteral(apiData, "ContainsMemoryReport=1\n");
       WriteLiteral(eventFile, "ContainsMemoryReport=1\n");
@@ -1133,12 +1174,14 @@ bool MinidumpCallback(
   return returnValue;
 }
 
-#if defined(XP_MACOSX) || defined(__ANDROID__)
+#if defined(XP_MACOSX) || defined(__ANDROID__) || defined(XP_LINUX)
 static size_t
 EnsureTrailingSlash(XP_CHAR* aBuf, size_t aBufLen)
 {
   size_t len = XP_STRLEN(aBuf);
-  if ((len + 2) < aBufLen && aBuf[len - 1] != XP_PATH_SEPARATOR_CHAR) {
+  if ((len + 1) < aBufLen
+      && len > 0
+      && aBuf[len - 1] != XP_PATH_SEPARATOR_CHAR) {
     aBuf[len] = XP_PATH_SEPARATOR_CHAR;
     ++len;
     aBuf[len] = 0;
@@ -1211,11 +1254,14 @@ BuildTempPath(char* aBuf, size_t aBufLen)
 static size_t
 BuildTempPath(char* aBuf, size_t aBufLen)
 {
-  // we assume it's always /tmp on unix systems
-  NS_NAMED_LITERAL_CSTRING(tmpPath, "/tmp/");
+  const char *tempenv = PR_GetEnv("TMPDIR");
+  const char *tmpPath = "/tmp/";
+  if (!tempenv) {
+    tempenv = tmpPath;
+  }
   int size = (int)aBufLen;
-  Concat(aBuf, tmpPath.get(), &size);
-  return tmpPath.Length();
+  Concat(aBuf, tempenv, &size);
+  return EnsureTrailingSlash(aBuf, aBufLen);
 }
 
 #else
@@ -2017,17 +2063,19 @@ nsresult UnsetExceptionHandler()
 static void ReplaceChar(nsCString& str, const nsACString& character,
                         const nsACString& replacement)
 {
-  nsCString::const_iterator start, end;
+  nsCString::const_iterator iter, end;
 
-  str.BeginReading(start);
+  str.BeginReading(iter);
   str.EndReading(end);
 
-  while (FindInReadable(character, start, end)) {
-    int32_t pos = end.size_backward();
+  while (FindInReadable(character, iter, end)) {
+    nsCString::const_iterator start;
+    str.BeginReading(start);
+    int32_t pos = end - start;
     str.Replace(pos - 1, 1, replacement);
 
-    str.BeginReading(start);
-    start.advance(pos + replacement.Length() - 1);
+    str.BeginReading(iter);
+    iter.advance(pos + replacement.Length() - 1);
     str.EndReading(end);
   }
 }
@@ -2140,20 +2188,27 @@ nsresult AnnotateCrashReport(const nsACString& key, const nsACString& data)
   if (!GetEnabled())
     return NS_ERROR_NOT_INITIALIZED;
 
-  bool isParentProcess = XRE_IsParentProcess();
-  if (!isParentProcess && !NS_IsMainThread()) {
-    // Child process needs to handle this in the main thread:
-    nsCOMPtr<nsIRunnable> r = new CrashReporterHelperRunnable(key, data);
-    NS_DispatchToMainThread(r);
-    return NS_OK;
-  }
-
   nsCString escapedData;
   nsresult rv = EscapeAnnotation(key, data, escapedData);
   if (NS_FAILED(rv))
     return rv;
 
-  if (!isParentProcess) {
+  if (!XRE_IsParentProcess()) {
+    // The newer CrashReporterClient can be used from any thread.
+    if (RefPtr<CrashReporterClient> client = CrashReporterClient::GetSingleton()) {
+      client->AnnotateCrashReport(nsCString(key), escapedData);
+      return NS_OK;
+    }
+
+    // Otherwise, we have to handle this on the main thread since we will go
+    // through IPDL.
+    if (!NS_IsMainThread()) {
+      // Child process needs to handle this in the main thread:
+      nsCOMPtr<nsIRunnable> r = new CrashReporterHelperRunnable(key, data);
+      NS_DispatchToMainThread(r);
+      return NS_OK;
+    }
+
     MOZ_ASSERT(NS_IsMainThread());
     PCrashReporterChild* reporter = CrashReporterChild::GetCrashReporter();
     if (!reporter) {
@@ -2218,22 +2273,7 @@ nsresult AppendAppNotesToCrashReport(const nsACString& data)
   if (DoFindInReadable(data, NS_LITERAL_CSTRING("\0")))
     return NS_ERROR_INVALID_ARG;
 
-  bool isParentProcess = XRE_IsParentProcess();
-  if (!isParentProcess && !NS_IsMainThread()) {
-    // Child process needs to handle this in the main thread:
-    nsCOMPtr<nsIRunnable> r = new CrashReporterHelperRunnable(data);
-    NS_DispatchToMainThread(r);
-    return NS_OK;
-  }
-
   if (!XRE_IsParentProcess()) {
-    MOZ_ASSERT(NS_IsMainThread());
-    PCrashReporterChild* reporter = CrashReporterChild::GetCrashReporter();
-    if (!reporter) {
-      EnqueueDelayedNote(new DelayedNote(data));
-      return NS_OK;
-    }
-
     // Since we don't go through AnnotateCrashReport in the parent process,
     // we must ensure that the data is escaped and valid before the parent
     // sees it.
@@ -2241,6 +2281,25 @@ nsresult AppendAppNotesToCrashReport(const nsACString& data)
     nsresult rv = EscapeAnnotation(NS_LITERAL_CSTRING("Notes"), data, escapedData);
     if (NS_FAILED(rv))
       return rv;
+
+    if (RefPtr<CrashReporterClient> client = CrashReporterClient::GetSingleton()) {
+      client->AppendAppNotes(escapedData);
+      return NS_OK;
+    }
+
+    if (!NS_IsMainThread()) {
+      // Child process needs to handle this in the main thread:
+      nsCOMPtr<nsIRunnable> r = new CrashReporterHelperRunnable(data);
+      NS_DispatchToMainThread(r);
+      return NS_OK;
+    }
+
+    MOZ_ASSERT(NS_IsMainThread());
+    PCrashReporterChild* reporter = CrashReporterChild::GetCrashReporter();
+    if (!reporter) {
+      EnqueueDelayedNote(new DelayedNote(data));
+      return NS_OK;
+    }
 
     if (!reporter->SendAppendAppNotes(escapedData))
       return NS_ERROR_FAILURE;

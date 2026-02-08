@@ -27,6 +27,9 @@ class Principal;
 
 namespace mozilla {
 namespace ipc {
+class FileDescriptor;
+class PFileDescriptorSetChild;
+class PSendStreamChild;
 class Shmem;
 } // namespace ipc
 
@@ -66,8 +69,13 @@ public:
                           const IPCTabContext& aContext,
                           const uint32_t& aChromeFlags,
                           const ContentParentId& aCpID,
-                          const bool& aIsForApp,
                           const bool& aIsForBrowser) = 0;
+
+  virtual mozilla::ipc::PFileDescriptorSetChild*
+  SendPFileDescriptorSetConstructor(const mozilla::ipc::FileDescriptor&) = 0;
+
+  virtual mozilla::ipc::PSendStreamChild*
+  SendPSendStreamConstructor(mozilla::ipc::PSendStreamChild*) = 0;
 
 protected:
   virtual jsipc::PJavaScriptChild* AllocPJavaScriptChild();
@@ -77,7 +85,6 @@ protected:
                                             const IPCTabContext& aContext,
                                             const uint32_t& aChromeFlags,
                                             const ContentParentId& aCpId,
-                                            const bool& aIsForApp,
                                             const bool& aIsForBrowser);
   virtual bool DeallocPBrowserChild(PBrowserChild*);
 
@@ -85,10 +92,20 @@ protected:
 
   virtual bool DeallocPBlobChild(PBlobChild* aActor);
 
-  virtual bool RecvAsyncMessage(const nsString& aMsg,
-                                InfallibleTArray<jsipc::CpowEntry>&& aCpows,
-                                const IPC::Principal& aPrincipal,
-                                const ClonedMessageData& aData);
+  virtual mozilla::ipc::PSendStreamChild* AllocPSendStreamChild();
+
+  virtual bool DeallocPSendStreamChild(mozilla::ipc::PSendStreamChild* aActor);
+
+  virtual mozilla::ipc::PFileDescriptorSetChild*
+  AllocPFileDescriptorSetChild(const mozilla::ipc::FileDescriptor& aFD);
+
+  virtual bool
+  DeallocPFileDescriptorSetChild(mozilla::ipc::PFileDescriptorSetChild* aActor);
+
+  virtual mozilla::ipc::IPCResult RecvAsyncMessage(const nsString& aMsg,
+                                                   InfallibleTArray<jsipc::CpowEntry>&& aCpows,
+                                                   const IPC::Principal& aPrincipal,
+                                                   const ClonedMessageData& aData);
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsIContentChild, NS_ICONTENTCHILD_IID)

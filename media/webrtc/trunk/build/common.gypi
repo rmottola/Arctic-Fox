@@ -978,7 +978,7 @@
         # The Mac SDK is set for iOS builds and passed through to Mac
         # sub-builds. This allows the Mac sub-build SDK in an iOS build to be
         # overridden from the command line the same way it is for a Mac build.
-        'mac_sdk%': '<!(<(PYTHON) <(DEPTH)/build/mac/find_sdk.py 10.5)',
+        'mac_sdk%': '<!(<(PYTHON) <(DEPTH)/build/mac/find_sdk.py 10.6)',
 
         # iOS SDK and deployment target support.  The iOS 5.0 SDK is actually
         # what is required, but the value is left blank so when it is set in
@@ -1026,6 +1026,10 @@
                     'android_app_abi%': 'armeabi-v7a',
                   }],
                 ],
+              }],
+              ['target_arch=="arm64"', {
+                'android_app_abi%': 'arm64-v8a',
+                'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-21/arch-arm64',
               }],
             ],
           },

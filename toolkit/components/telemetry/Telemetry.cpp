@@ -44,6 +44,7 @@
 #include "TelemetryCommon.h"
 #include "TelemetryHistogram.h"
 #include "TelemetryScalar.h"
+#include "TelemetryEvent.h"
 #include "WebrtcTelemetry.h"
 #include "nsTHashtable.h"
 #include "nsHashKeys.h"
@@ -701,8 +702,7 @@ public:
   typedef nsBaseHashtableET<nsCStringHashKey, StmtStats> SlowSQLEntryType;
 
   static void RecordIceCandidates(const uint32_t iceCandidateBitmask,
-                                  const bool success,
-                                  const bool loop);
+                                  const bool success);
 private:
   TelemetryImpl();
   ~TelemetryImpl();
@@ -1030,27 +1030,6 @@ TelemetryImpl::InitMemoryReporter() {
   RegisterWeakMemoryReporter(this);
 }
 
-NS_IMETHODIMP
-TelemetryImpl::NewHistogram(const nsACString &name, const nsACString &expiration, uint32_t histogramType,
-                            uint32_t min, uint32_t max, uint32_t bucketCount, JSContext *cx,
-                            uint8_t optArgCount, JS::MutableHandle<JS::Value> ret)
-{
-  return TelemetryHistogram::NewHistogram(name, expiration, histogramType,
-                                          min, max, bucketCount,
-                                          cx, optArgCount, ret);
-}
-
-NS_IMETHODIMP
-TelemetryImpl::NewKeyedHistogram(const nsACString &name, const nsACString &expiration, uint32_t histogramType,
-                            uint32_t min, uint32_t max, uint32_t bucketCount, JSContext *cx,
-                            uint8_t optArgCount, JS::MutableHandle<JS::Value> ret)
-{
-  return TelemetryHistogram::NewKeyedHistogram(name, expiration, histogramType,
-                                               min, max, bucketCount,
-                                               cx, optArgCount, ret);
-}
-
-
 bool
 TelemetryImpl::ReflectSQL(const SlowSQLEntryType *entry,
                           const Stat *stat,
@@ -1223,7 +1202,7 @@ TelemetryImpl::GetWebrtcStats(JSContext *cx, JS::MutableHandle<JS::Value> ret)
 NS_IMETHODIMP
 TelemetryImpl::GetMaximalNumberOfConcurrentThreads(uint32_t *ret)
 {
-  *ret = nsThreadManager::get()->GetHighestNumberOfThreads();
+  *ret = nsThreadManager::get().GetHighestNumberOfThreads();
   return NS_OK;
 }
 
@@ -1891,6 +1870,7 @@ NS_IMETHODIMP
 TelemetryImpl::SetCanRecordBase(bool canRecord) {
   TelemetryHistogram::SetCanRecordBase(canRecord);
   TelemetryScalar::SetCanRecordBase(canRecord);
+  TelemetryEvent::SetCanRecordBase(canRecord);
   return NS_OK;
 }
 
@@ -1911,6 +1891,7 @@ NS_IMETHODIMP
 TelemetryImpl::SetCanRecordExtended(bool canRecord) {
   TelemetryHistogram::SetCanRecordExtended(canRecord);
   TelemetryScalar::SetCanRecordExtended(canRecord);
+  TelemetryEvent::SetCanRecordExtended(canRecord);
   return NS_OK;
 }
 
@@ -1930,13 +1911,22 @@ TelemetryImpl::CreateTelemetryInstance()
 {
   MOZ_ASSERT(sTelemetry == nullptr, "CreateTelemetryInstance may only be called once, via GetService()");
 
+  bool useTelemetry = false;
+  if (XRE_IsParentProcess() ||
+      XRE_IsContentProcess() ||
+      XRE_IsGPUProcess())
+  {
+    useTelemetry = true;
+  }
+
   // First, initialize the TelemetryHistogram and TelemetryScalar global states.
-  TelemetryHistogram::InitializeGlobalState(
-                        XRE_IsParentProcess() || XRE_IsContentProcess(),
-                        XRE_IsParentProcess() || XRE_IsContentProcess());
+  TelemetryHistogram::InitializeGlobalState(useTelemetry, useTelemetry);
 
   // Only record scalars from the parent process.
   TelemetryScalar::InitializeGlobalState(XRE_IsParentProcess(), XRE_IsParentProcess());
+
+  // Only record events from the parent process.
+  TelemetryEvent::InitializeGlobalState(XRE_IsParentProcess(), XRE_IsParentProcess());
 
   // Now, create and initialize the Telemetry global state.
   sTelemetry = new TelemetryImpl();
@@ -1963,6 +1953,7 @@ TelemetryImpl::ShutdownTelemetry()
   // so as to release any heap storage that would otherwise be kept alive by it.
   TelemetryHistogram::DeInitializeGlobalState();
   TelemetryScalar::DeInitializeGlobalState();
+  TelemetryEvent::DeInitializeGlobalState();
 }
 
 void
@@ -2232,12 +2223,12 @@ TelemetryImpl::RecordSlowStatement(const nsACString &sql,
 
 void
 TelemetryImpl::RecordIceCandidates(const uint32_t iceCandidateBitmask,
-                                   const bool success, const bool loop)
+                                   const bool success)
 {
   if (!sTelemetry || !TelemetryHistogram::CanRecordExtended())
     return;
 
-  sTelemetry->mWebrtcTelemetry.RecordIceCandidateMask(iceCandidateBitmask, success, loop);
+  sTelemetry->mWebrtcTelemetry.RecordIceCandidateMask(iceCandidateBitmask, success);
 }
 
 #if defined(MOZ_ENABLE_PROFILER_SPS)
@@ -2285,12 +2276,12 @@ NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsITelemetry, TelemetryImpl::CreateTele
 NS_DEFINE_NAMED_CID(NS_TELEMETRY_CID);
 
 const Module::CIDEntry kTelemetryCIDs[] = {
-  { &kNS_TELEMETRY_CID, false, nullptr, nsITelemetryConstructor },
+  { &kNS_TELEMETRY_CID, false, nullptr, nsITelemetryConstructor, Module::ALLOW_IN_GPU_PROCESS },
   { nullptr }
 };
 
 const Module::ContractIDEntry kTelemetryContracts[] = {
-  { "@mozilla.org/base/telemetry;1", &kNS_TELEMETRY_CID },
+  { "@mozilla.org/base/telemetry;1", &kNS_TELEMETRY_CID, Module::ALLOW_IN_GPU_PROCESS },
   { nullptr }
 };
 
@@ -2301,7 +2292,8 @@ const Module kTelemetryModule = {
   nullptr,
   nullptr,
   nullptr,
-  TelemetryImpl::ShutdownTelemetry
+  TelemetryImpl::ShutdownTelemetry,
+  Module::ALLOW_IN_GPU_PROCESS
 };
 
 NS_IMETHODIMP
@@ -2326,13 +2318,7 @@ TelemetryImpl::GetFileIOReports(JSContext *cx, JS::MutableHandleValue ret)
 NS_IMETHODIMP
 TelemetryImpl::MsSinceProcessStart(double* aResult)
 {
-  bool error;
-  *aResult = (TimeStamp::NowLoRes() -
-              TimeStamp::ProcessCreation(error)).ToMilliseconds();
-  if (error) {
-    return NS_ERROR_NOT_AVAILABLE;
-  }
-  return NS_OK;
+  return Telemetry::Common::MsSinceProcessStart(aResult);
 }
 
 // Telemetry Scalars IDL Implementation
@@ -2363,9 +2349,70 @@ TelemetryImpl::SnapshotScalars(unsigned int aDataset, bool aClearScalars, JSCont
 }
 
 NS_IMETHODIMP
+TelemetryImpl::KeyedScalarAdd(const nsACString& aName, const nsAString& aKey,
+                              JS::HandleValue aVal, JSContext* aCx)
+{
+  return TelemetryScalar::Add(aName, aKey, aVal, aCx);
+}
+
+NS_IMETHODIMP
+TelemetryImpl::KeyedScalarSet(const nsACString& aName, const nsAString& aKey,
+                              JS::HandleValue aVal, JSContext* aCx)
+{
+  return TelemetryScalar::Set(aName, aKey, aVal, aCx);
+}
+
+NS_IMETHODIMP
+TelemetryImpl::KeyedScalarSetMaximum(const nsACString& aName, const nsAString& aKey,
+                              JS::HandleValue aVal, JSContext* aCx)
+{
+  return TelemetryScalar::SetMaximum(aName, aKey, aVal, aCx);
+}
+
+NS_IMETHODIMP
+TelemetryImpl::SnapshotKeyedScalars(unsigned int aDataset, bool aClearScalars, JSContext* aCx,
+                                    uint8_t optional_argc, JS::MutableHandleValue aResult)
+{
+  return TelemetryScalar::CreateKeyedSnapshots(aDataset, aClearScalars, aCx, optional_argc,
+                                               aResult);
+}
+
+NS_IMETHODIMP
 TelemetryImpl::ClearScalars()
 {
   TelemetryScalar::ClearScalars();
+  return NS_OK;
+}
+
+// Telemetry Event IDL implementation.
+
+NS_IMETHODIMP
+TelemetryImpl::RecordEvent(const nsACString & aCategory, const nsACString & aMethod,
+                           const nsACString & aObject, JS::HandleValue aValue,
+                           JS::HandleValue aExtra, JSContext* aCx, uint8_t optional_argc)
+{
+  return TelemetryEvent::RecordEvent(aCategory, aMethod, aObject, aValue, aExtra, aCx, optional_argc);
+}
+
+NS_IMETHODIMP
+TelemetryImpl::SnapshotBuiltinEvents(uint32_t aDataset, bool aClear, JSContext* aCx,
+                                     uint8_t optional_argc, JS::MutableHandleValue aResult)
+{
+  return TelemetryEvent::CreateSnapshots(aDataset, aClear, aCx, optional_argc, aResult);
+}
+
+NS_IMETHODIMP
+TelemetryImpl::ClearEvents()
+{
+  TelemetryEvent::ClearEvents();
+  return NS_OK;
+}
+
+
+NS_IMETHODIMP
+TelemetryImpl::FlushBatchedChildTelemetry()
+{
+  TelemetryHistogram::IPCTimerFired(nullptr, nullptr);
   return NS_OK;
 }
 
@@ -2400,6 +2447,7 @@ TelemetryImpl::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
 
   n += TelemetryHistogram::GetHistogramSizesofIncludingThis(aMallocSizeOf);
   n += TelemetryScalar::GetScalarSizesOfIncludingThis(aMallocSizeOf);
+  n += TelemetryEvent::SizeOfIncludingThis(aMallocSizeOf);
 
   return n;
 }
@@ -2815,9 +2863,17 @@ AccumulateTimeDelta(ID aHistogram, TimeStamp start, TimeStamp end)
 }
 
 void
-ClearHistogram(ID aId)
+AccumulateChild(GeckoProcessType aProcessType,
+                const nsTArray<Accumulation>& aAccumulations)
 {
-  TelemetryHistogram::ClearHistogram(aId);
+  TelemetryHistogram::AccumulateChild(aProcessType, aAccumulations);
+}
+
+void
+AccumulateChildKeyed(GeckoProcessType aProcessType,
+                     const nsTArray<KeyedAccumulation>& aAccumulations)
+{
+  TelemetryHistogram::AccumulateChildKeyed(aProcessType, aAccumulations);
 }
 
 const char*
@@ -2848,9 +2904,9 @@ RecordSlowSQLStatement(const nsACString &statement,
 
 void
 RecordWebrtcIceCandidates(const uint32_t iceCandidateBitmask,
-                          const bool success, const bool loop)
+                          const bool success)
 {
-  TelemetryImpl::RecordIceCandidates(iceCandidateBitmask, success, loop);
+  TelemetryImpl::RecordIceCandidates(iceCandidateBitmask, success);
 }
 
 void Init()
@@ -2969,52 +3025,58 @@ void DestroyStatisticsRecorder()
 
 // Scalar API C++ Endpoints
 
-/**
- * Adds the value to the given scalar.
- *
- * @param aId The scalar enum id.
- * @param aValue The unsigned value to add to the scalar.
- */
 void
 ScalarAdd(mozilla::Telemetry::ScalarID aId, uint32_t aVal)
 {
   TelemetryScalar::Add(aId, aVal);
 }
 
-/**
- * Sets the scalar to the given value.
- *
- * @param aId The scalar enum id.
- * @param aValue The numeric, unsigned value to set the scalar to.
- */
 void
 ScalarSet(mozilla::Telemetry::ScalarID aId, uint32_t aVal)
 {
   TelemetryScalar::Set(aId, aVal);
 }
 
-/**
- * Sets the scalar to the given value.
- *
- * @param aId The scalar enum id.
- * @param aValue The string value to set the scalar to.
- */
+void
+ScalarSet(mozilla::Telemetry::ScalarID aId, bool aVal)
+{
+  TelemetryScalar::Set(aId, aVal);
+}
+
 void
 ScalarSet(mozilla::Telemetry::ScalarID aId, const nsAString& aVal)
 {
   TelemetryScalar::Set(aId, aVal);
 }
 
-/**
- * Sets the scalar to the maximum of the current and the passed value.
- *
- * @param aId The scalar enum id.
- * @param aValue The unsigned value to set the scalar to.
- */
 void
 ScalarSetMaximum(mozilla::Telemetry::ScalarID aId, uint32_t aVal)
 {
   TelemetryScalar::SetMaximum(aId, aVal);
+}
+
+void
+ScalarAdd(mozilla::Telemetry::ScalarID aId, const nsAString& aKey, uint32_t aVal)
+{
+  TelemetryScalar::Add(aId, aKey, aVal);
+}
+
+void
+ScalarSet(mozilla::Telemetry::ScalarID aId, const nsAString& aKey, uint32_t aVal)
+{
+  TelemetryScalar::Set(aId, aKey, aVal);
+}
+
+void
+ScalarSet(mozilla::Telemetry::ScalarID aId, const nsAString& aKey, bool aVal)
+{
+  TelemetryScalar::Set(aId, aKey, aVal);
+}
+
+void
+ScalarSetMaximum(mozilla::Telemetry::ScalarID aId, const nsAString& aKey, uint32_t aVal)
+{
+  TelemetryScalar::SetMaximum(aId, aKey, aVal);
 }
 
 } // namespace Telemetry

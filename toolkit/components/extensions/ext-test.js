@@ -25,7 +25,7 @@ extensions.on("test-message", (type, extension, ...args) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerSchemaAPI("test", context => {
+function testApiFactory(context) {
   let {extension} = context;
   return {
     test: {
@@ -54,15 +54,21 @@ extensions.registerSchemaAPI("test", context => {
       },
 
       assertTrue: function(value, msg) {
-        extension.emit("test-result", Boolean(value), msg);
+        extension.emit("test-result", Boolean(value), String(msg));
       },
 
       assertFalse: function(value, msg) {
-        extension.emit("test-result", !value, msg);
+        extension.emit("test-result", !value, String(msg));
       },
 
       assertEq: function(expected, actual, msg) {
-        extension.emit("test-eq", expected === actual, msg, String(expected), String(actual));
+        let equal = expected === actual;
+        expected += "";
+        actual += "";
+        if (!equal && expected === actual) {
+          actual += " (different)";
+        }
+        extension.emit("test-eq", equal, String(msg), expected, actual);
       },
 
       onMessage: new EventManager(context, "test.onMessage", fire => {
@@ -75,4 +81,6 @@ extensions.registerSchemaAPI("test", context => {
       }).api(),
     },
   };
-});
+}
+extensions.registerSchemaAPI("test", "addon_parent", testApiFactory);
+extensions.registerSchemaAPI("test", "content_parent", testApiFactory);

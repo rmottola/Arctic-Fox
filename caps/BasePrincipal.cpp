@@ -12,6 +12,7 @@
 #endif
 #include "nsIAddonPolicyService.h"
 #include "nsIContentSecurityPolicy.h"
+#include "nsIEffectiveTLDService.h"
 #include "nsIObjectInputStream.h"
 #include "nsIObjectOutputStream.h"
 
@@ -41,12 +42,8 @@ PrincipalOriginAttributes::InheritFromDocShellToDoc(const DocShellOriginAttribut
   // addonId is computed from the principal URI and never propagated
   mUserContextId = aAttrs.mUserContextId;
 
-  // TODO:
-  // Bug 1225349 - PrincipalOriginAttributes should inherit mSignedPkg
-  // accordingly by URI
-  mSignedPkg = aAttrs.mSignedPkg;
-
   mPrivateBrowsingId = aAttrs.mPrivateBrowsingId;
+  mFirstPartyDomain = aAttrs.mFirstPartyDomain;
 }
 
 void
@@ -57,9 +54,9 @@ PrincipalOriginAttributes::InheritFromNecko(const NeckoOriginAttributes& aAttrs)
 
   // addonId is computed from the principal URI and never propagated
   mUserContextId = aAttrs.mUserContextId;
-  mSignedPkg = aAttrs.mSignedPkg;
 
   mPrivateBrowsingId = aAttrs.mPrivateBrowsingId;
+  mFirstPartyDomain = aAttrs.mFirstPartyDomain;
 }
 
 void
@@ -71,12 +68,8 @@ DocShellOriginAttributes::InheritFromDocToChildDocShell(const PrincipalOriginAtt
   // addonId is computed from the principal URI and never propagated
   mUserContextId = aAttrs.mUserContextId;
 
-  // TODO:
-  // Bug 1225353 - DocShell/NeckoOriginAttributes should inherit
-  // mSignedPkg accordingly by mSignedPkgInBrowser
-  mSignedPkg = aAttrs.mSignedPkg;
-
   mPrivateBrowsingId = aAttrs.mPrivateBrowsingId;
+  mFirstPartyDomain = aAttrs.mFirstPartyDomain;
 }
 
 void
@@ -88,15 +81,14 @@ NeckoOriginAttributes::InheritFromDocToNecko(const PrincipalOriginAttributes& aA
   // addonId is computed from the principal URI and never propagated
   mUserContextId = aAttrs.mUserContextId;
 
-  // TODO:
-  // Bug 1225353 - DocShell/NeckoOriginAttributes should inherit
-  // mSignedPkg accordingly by mSignedPkgInBrowser
-
   mPrivateBrowsingId = aAttrs.mPrivateBrowsingId;
+  mFirstPartyDomain = aAttrs.mFirstPartyDomain;
 }
 
 void
-NeckoOriginAttributes::InheritFromDocShellToNecko(const DocShellOriginAttributes& aAttrs)
+NeckoOriginAttributes::InheritFromDocShellToNecko(const DocShellOriginAttributes& aAttrs,
+                                                  const bool aIsTopLevelDocument,
+                                                  nsIURI* aURI)
 {
   mAppId = aAttrs.mAppId;
   mInIsolatedMozBrowser = aAttrs.mInIsolatedMozBrowser;
@@ -104,11 +96,25 @@ NeckoOriginAttributes::InheritFromDocShellToNecko(const DocShellOriginAttributes
   // addonId is computed from the principal URI and never propagated
   mUserContextId = aAttrs.mUserContextId;
 
-  // TODO:
-  // Bug 1225353 - DocShell/NeckoOriginAttributes should inherit
-  // mSignedPkg accordingly by mSignedPkgInBrowser
-
   mPrivateBrowsingId = aAttrs.mPrivateBrowsingId;
+
+  bool isFirstPartyEnabled = IsFirstPartyEnabled();
+
+  // When the pref is on, we also compute the firstPartyDomain attribute
+  // if this is for top-level document.
+  if (isFirstPartyEnabled && aIsTopLevelDocument) {
+    nsCOMPtr<nsIEffectiveTLDService> tldService = do_GetService(NS_EFFECTIVETLDSERVICE_CONTRACTID);
+    MOZ_ASSERT(tldService);
+    if (!tldService) {
+      return;
+    }
+
+    nsAutoCString baseDomain;
+    tldService->GetBaseDomain(aURI, 0, baseDomain);
+    mFirstPartyDomain = NS_ConvertUTF8toUTF16(baseDomain);
+  } else {
+    mFirstPartyDomain = aAttrs.mFirstPartyDomain;
+  }
 }
 
 void
@@ -150,15 +156,16 @@ OriginAttributes::CreateSuffix(nsACString& aStr) const
     params->Set(NS_LITERAL_STRING("userContextId"), value);
   }
 
-  if (!mSignedPkg.IsEmpty()) {
-    MOZ_RELEASE_ASSERT(mSignedPkg.FindCharInSet(dom::quota::QuotaManager::kReplaceChars) == kNotFound);
-    params->Set(NS_LITERAL_STRING("signedPkg"), mSignedPkg);
-  }
 
   if (mPrivateBrowsingId) {
     value.Truncate();
     value.AppendInt(mPrivateBrowsingId);
     params->Set(NS_LITERAL_STRING("privateBrowsingId"), value);
+  }
+
+  if (!mFirstPartyDomain.IsEmpty()) {
+    MOZ_RELEASE_ASSERT(mFirstPartyDomain.FindCharInSet(dom::quota::QuotaManager::kReplaceChars) == kNotFound);
+    params->Set(NS_LITERAL_STRING("firstPartyDomain"), mFirstPartyDomain);
   }
 
   aStr.Truncate();
@@ -231,12 +238,6 @@ public:
       return true;
     }
 
-    if (aName.EqualsLiteral("signedPkg")) {
-      MOZ_RELEASE_ASSERT(mOriginAttributes->mSignedPkg.IsEmpty());
-      mOriginAttributes->mSignedPkg.Assign(aValue);
-      return true;
-    }
-
     if (aName.EqualsLiteral("privateBrowsingId")) {
       nsresult rv;
       int64_t val = aValue.ToInteger64(&rv);
@@ -244,6 +245,12 @@ public:
       NS_ENSURE_TRUE(val >= 0 && val <= UINT32_MAX, false);
       mOriginAttributes->mPrivateBrowsingId = static_cast<uint32_t>(val);
 
+      return true;
+    }
+
+    if (aName.EqualsLiteral("firstPartyDomain")) {
+      MOZ_RELEASE_ASSERT(mOriginAttributes->mFirstPartyDomain.IsEmpty());
+      mOriginAttributes->mFirstPartyDomain.Assign(aValue);
       return true;
     }
 
@@ -305,8 +312,23 @@ OriginAttributes::SetFromGenericAttributes(const GenericOriginAttributes& aAttrs
   mInIsolatedMozBrowser = aAttrs.mInIsolatedMozBrowser;
   mAddonId = aAttrs.mAddonId;
   mUserContextId = aAttrs.mUserContextId;
-  mSignedPkg = aAttrs.mSignedPkg;
   mPrivateBrowsingId = aAttrs.mPrivateBrowsingId;
+  mFirstPartyDomain = aAttrs.mFirstPartyDomain;
+}
+
+/* static */
+bool
+OriginAttributes::IsFirstPartyEnabled()
+{
+  // Cache the privacy.firstparty.isolate pref.
+  static bool sFirstPartyIsolation = false;
+  static bool sCachedFirstPartyPref = false;
+  if (!sCachedFirstPartyPref) {
+    sCachedFirstPartyPref = true;
+    Preferences::AddBoolVarCache(&sFirstPartyIsolation, "privacy.firstparty.isolate");
+  }
+
+  return sFirstPartyIsolation;
 }
 
 BasePrincipal::BasePrincipal()
@@ -510,13 +532,6 @@ NS_IMETHODIMP
 BasePrincipal::GetIsSystemPrincipal(bool* aResult)
 {
   *aResult = Kind() == eSystemPrincipal;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-BasePrincipal::GetJarPrefix(nsACString& aJarPrefix)
-{
-  mozilla::GetJarPrefix(mOriginAttributes.mAppId, mOriginAttributes.mInIsolatedMozBrowser, aJarPrefix);
   return NS_OK;
 }
 

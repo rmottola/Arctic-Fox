@@ -6,14 +6,18 @@
 
 #include "PresentationRequest.h"
 
+#include "AvailabilityCollection.h"
 #include "ControllerConnectionCollection.h"
 #include "mozilla/BasePrincipal.h"
+#include "mozilla/dom/Navigator.h"
 #include "mozilla/dom/PresentationRequestBinding.h"
 #include "mozilla/dom/PresentationConnectionAvailableEvent.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/Move.h"
 #include "mozIThirdPartyUtil.h"
 #include "nsContentSecurityManager.h"
 #include "nsCycleCollectionParticipant.h"
+#include "nsGlobalWindow.h"
 #include "nsIDocument.h"
 #include "nsIPresentationService.h"
 #include "nsIURI.h"
@@ -21,14 +25,14 @@
 #include "nsNetUtil.h"
 #include "nsSandboxFlags.h"
 #include "nsServiceManagerUtils.h"
+#include "Presentation.h"
 #include "PresentationAvailability.h"
 #include "PresentationCallbacks.h"
+#include "PresentationLog.h"
+#include "PresentationTransportBuilderConstructor.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
-
-NS_IMPL_CYCLE_COLLECTION_INHERITED(PresentationRequest, DOMEventTargetHelper,
-                                   mAvailability)
 
 NS_IMPL_ADDREF_INHERITED(PresentationRequest, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(PresentationRequest, DOMEventTargetHelper)
@@ -66,37 +70,51 @@ PresentationRequest::Constructor(const GlobalObject& aGlobal,
                                  const nsAString& aUrl,
                                  ErrorResult& aRv)
 {
+  Sequence<nsString> urls;
+  urls.AppendElement(aUrl, fallible);
+  return Constructor(aGlobal, urls, aRv);
+}
+
+/* static */ already_AddRefed<PresentationRequest>
+PresentationRequest::Constructor(const GlobalObject& aGlobal,
+                                 const Sequence<nsString>& aUrls,
+                                 ErrorResult& aRv)
+{
   nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(aGlobal.GetAsSupports());
   if (!window) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
 
-  // Ensure the URL is not empty.
-  if (NS_WARN_IF(aUrl.IsEmpty())) {
-    aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+  if (aUrls.IsEmpty()) {
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return nullptr;
   }
 
   // Resolve relative URL to absolute URL
   nsCOMPtr<nsIURI> baseUri = window->GetDocBaseURI();
+  nsTArray<nsString> urls;
+  for (const auto& url : aUrls) {
+    nsAutoString absoluteUrl;
+    nsresult rv =
+      GetAbsoluteURL(url, baseUri, window->GetExtantDoc(), absoluteUrl);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+      return nullptr;
+    }
 
-  nsAutoString absoluteUrl;
-  nsresult rv = GetAbsoluteURL(aUrl, baseUri, window->GetExtantDoc(), absoluteUrl);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    aRv.Throw(NS_ERROR_UNEXPECTED);
-    return nullptr;
+    urls.AppendElement(absoluteUrl);
   }
 
   RefPtr<PresentationRequest> request =
-    new PresentationRequest(window, absoluteUrl);
+    new PresentationRequest(window, Move(urls));
   return NS_WARN_IF(!request->Init()) ? nullptr : request.forget();
 }
 
 PresentationRequest::PresentationRequest(nsPIDOMWindowInner* aWindow,
-                                         const nsAString& aUrl)
+                                         nsTArray<nsString>&& aUrls)
   : DOMEventTargetHelper(aWindow)
-  , mUrl(aUrl)
+  , mUrls(Move(aUrls))
 {
 }
 
@@ -107,11 +125,6 @@ PresentationRequest::~PresentationRequest()
 bool
 PresentationRequest::Init()
 {
-  mAvailability = PresentationAvailability::Create(GetOwner());
-  if (NS_WARN_IF(!mAvailability)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -158,13 +171,29 @@ PresentationRequest::StartWithDevice(const nsAString& aDeviceId,
   }
 
   if (IsProhibitMixedSecurityContexts(doc) &&
-      !IsPrioriAuthenticatedURL(mUrl)) {
+      !IsAllURLAuthenticated()) {
     promise->MaybeReject(NS_ERROR_DOM_SECURITY_ERR);
     return promise.forget();
   }
 
   if (doc->GetSandboxFlags() & SANDBOXED_PRESENTATION) {
     promise->MaybeReject(NS_ERROR_DOM_SECURITY_ERR);
+    return promise.forget();
+  }
+
+  RefPtr<Navigator> navigator =
+    nsGlobalWindow::Cast(GetOwner())->GetNavigator(aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  RefPtr<Presentation> presentation = navigator->GetPresentation(aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  if (presentation->IsStartSessionUnsettled()) {
+    promise->MaybeReject(NS_ERROR_DOM_OPERATION_ERR);
     return promise.forget();
   }
 
@@ -190,11 +219,29 @@ PresentationRequest::StartWithDevice(const nsAString& aDeviceId,
     return promise.forget();
   }
 
+  presentation->SetStartSessionUnsettled(true);
+
+  // Get xul:browser element in parent process or nsWindowRoot object in child
+  // process. If it's in child process, the corresponding xul:browser element
+  // will be obtained at PresentationRequestParent::DoRequest in its parent
+  // process.
+  nsCOMPtr<nsIDOMEventTarget> handler =
+    do_QueryInterface(GetOwner()->GetChromeEventHandler());
   nsCOMPtr<nsIPresentationServiceCallback> callback =
-    new PresentationRequesterCallback(this, mUrl, id, promise);
-  rv = service->StartSession(mUrl, id, origin, aDeviceId, GetOwner()->WindowID(), callback);
+    new PresentationRequesterCallback(this, id, promise);
+  nsCOMPtr<nsIPresentationTransportBuilderConstructor> constructor =
+    PresentationTransportBuilderConstructor::Create();
+  rv = service->StartSession(mUrls,
+                             id,
+                             origin,
+                             aDeviceId,
+                             GetOwner()->WindowID(),
+                             handler,
+                             callback,
+                             constructor);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     promise->MaybeReject(NS_ERROR_DOM_OPERATION_ERR);
+    NotifyPromiseSettled();
   }
 
   return promise.forget();
@@ -222,7 +269,7 @@ PresentationRequest::Reconnect(const nsAString& aPresentationId,
   }
 
   if (IsProhibitMixedSecurityContexts(doc) &&
-      !IsPrioriAuthenticatedURL(mUrl)) {
+      !IsAllURLAuthenticated()) {
     promise->MaybeReject(NS_ERROR_DOM_SECURITY_ERR);
     return promise.forget();
   }
@@ -268,7 +315,7 @@ PresentationRequest::FindOrCreatePresentationConnection(
   if (connection) {
     nsAutoString url;
     connection->GetUrl(url);
-    if (url.Equals(mUrl)) {
+    if (mUrls.Contains(url)) {
       switch (connection->State()) {
         case PresentationConnectionState::Closed:
           // We found the matched connection.
@@ -299,13 +346,12 @@ PresentationRequest::FindOrCreatePresentationConnection(
 
   nsCOMPtr<nsIPresentationServiceCallback> callback =
     new PresentationReconnectCallback(this,
-                                      mUrl,
                                       aPresentationId,
                                       aPromise,
                                       connection);
 
   nsresult rv =
-    service->ReconnectSession(mUrl,
+    service->ReconnectSession(mUrls,
                               aPresentationId,
                               nsIPresentationService::ROLE_CONTROLLER,
                               callback);
@@ -317,6 +363,7 @@ PresentationRequest::FindOrCreatePresentationConnection(
 already_AddRefed<Promise>
 PresentationRequest::GetAvailability(ErrorResult& aRv)
 {
+  PRES_DEBUG("%s\n", __func__);
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(GetOwner());
   if (NS_WARN_IF(!global)) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
@@ -335,7 +382,7 @@ PresentationRequest::GetAvailability(ErrorResult& aRv)
   }
 
   if (IsProhibitMixedSecurityContexts(doc) &&
-      !IsPrioriAuthenticatedURL(mUrl)) {
+      !IsAllURLAuthenticated()) {
     promise->MaybeReject(NS_ERROR_DOM_SECURITY_ERR);
     return promise.forget();
   }
@@ -345,8 +392,49 @@ PresentationRequest::GetAvailability(ErrorResult& aRv)
     return promise.forget();
   }
 
-  promise->MaybeResolve(mAvailability);
+  FindOrCreatePresentationAvailability(promise);
+
   return promise.forget();
+}
+
+void
+PresentationRequest::FindOrCreatePresentationAvailability(RefPtr<Promise>& aPromise)
+{
+  MOZ_ASSERT(aPromise);
+
+  if (NS_WARN_IF(!GetOwner())) {
+    aPromise->MaybeReject(NS_ERROR_DOM_OPERATION_ERR);
+    return;
+  }
+
+  AvailabilityCollection* collection = AvailabilityCollection::GetSingleton();
+  if (NS_WARN_IF(!collection)) {
+    aPromise->MaybeReject(NS_ERROR_DOM_OPERATION_ERR);
+    return;
+  }
+
+  RefPtr<PresentationAvailability> availability =
+    collection->Find(GetOwner()->WindowID(), mUrls);
+
+  if (!availability) {
+    availability = PresentationAvailability::Create(GetOwner(), mUrls, aPromise);
+  } else {
+    PRES_DEBUG(">resolve with same object\n");
+
+    // Fetching cached available devices is asynchronous in our implementation,
+    // we need to ensure the promise is resolved in order.
+    if (availability->IsCachedValueReady()) {
+      aPromise->MaybeResolve(availability);
+      return;
+    }
+
+    availability->EnqueuePromise(aPromise);
+  }
+
+  if (!availability) {
+    aPromise->MaybeReject(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return;
+  }
 }
 
 nsresult
@@ -367,6 +455,29 @@ PresentationRequest::DispatchConnectionAvailableEvent(PresentationConnection* aC
   RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(this, event);
   return asyncDispatcher->PostDOMEvent();
+}
+
+void
+PresentationRequest::NotifyPromiseSettled()
+{
+  PRES_DEBUG("%s\n", __func__);
+
+  if (!GetOwner()) {
+    return;
+  }
+
+  ErrorResult rv;
+  RefPtr<Navigator> navigator =
+    nsGlobalWindow::Cast(GetOwner())->GetNavigator(rv);
+  if (!navigator) {
+    return;
+  }
+
+  RefPtr<Presentation> presentation = navigator->GetPresentation(rv);
+
+  if (presentation) {
+    presentation->SetStartSessionUnsettled(false);
+  }
 }
 
 bool
@@ -435,4 +546,16 @@ PresentationRequest::IsPrioriAuthenticatedURL(const nsAString& aUrl)
   bool isTrustworthyOrigin = false;
   csm->IsOriginPotentiallyTrustworthy(principal, &isTrustworthyOrigin);
   return isTrustworthyOrigin;
+}
+
+bool
+PresentationRequest::IsAllURLAuthenticated()
+{
+  for (const auto& url : mUrls) {
+    if (!IsPrioriAuthenticatedURL(url)) {
+      return false;
+    }
+  }
+
+  return true;
 }

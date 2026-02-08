@@ -87,7 +87,7 @@ GamepadPlatformService::AddGamepad(const char* aID,
 
   uint32_t index = ++mGamepadIndex;
   GamepadAdded a(NS_ConvertUTF8toUTF16(nsDependentCString(aID)), index,
-                 (uint32_t)aMapping, aNumButtons, aNumAxes);
+                 static_cast<uint32_t>(aMapping), GamepadServiceType::Standard, aNumButtons, aNumAxes);
   NotifyGamepadChange<GamepadAdded>(a);
   return index;
 }
@@ -99,7 +99,7 @@ GamepadPlatformService::RemoveGamepad(uint32_t aIndex)
   // platform-dependent backends
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(!NS_IsMainThread());
-  GamepadRemoved a(aIndex);
+  GamepadRemoved a(aIndex, GamepadServiceType::Standard);
   NotifyGamepadChange<GamepadRemoved>(a);
 }
 
@@ -111,7 +111,8 @@ GamepadPlatformService::NewButtonEvent(uint32_t aIndex, uint32_t aButton,
   // platform-dependent backends
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(!NS_IsMainThread());
-  GamepadButtonInformation a(aIndex, aButton, aPressed, aValue);
+  GamepadButtonInformation a(aIndex, GamepadServiceType::Standard,
+                             aButton, aPressed, aValue);
   NotifyGamepadChange<GamepadButtonInformation>(a);
 }
 
@@ -135,7 +136,8 @@ GamepadPlatformService::NewAxisMoveEvent(uint32_t aIndex, uint32_t aAxis,
   // platform-dependent backends
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(!NS_IsMainThread());
-  GamepadAxisInformation a(aIndex, aAxis, aValue);
+  GamepadAxisInformation a(aIndex, GamepadServiceType::Standard,
+                           aAxis, aValue);
   NotifyGamepadChange<GamepadAxisInformation>(a);
 }
 

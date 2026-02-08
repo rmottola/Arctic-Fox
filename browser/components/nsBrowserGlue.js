@@ -33,6 +33,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "AlertsService", "@mozilla.org/alerts-s
   ["ContentClick", "resource:///modules/ContentClick.jsm"],
   ["ContentPrefServiceParent", "resource://gre/modules/ContentPrefServiceParent.jsm"],
   ["ContentSearch", "resource:///modules/ContentSearch.jsm"],
+  ["DateTimePickerHelper", "resource://gre/modules/DateTimePickerHelper.jsm"],
   ["DirectoryLinksProvider", "resource:///modules/DirectoryLinksProvider.jsm"],
   ["Feeds", "resource:///modules/Feeds.jsm"],
   ["FileUtils", "resource://gre/modules/FileUtils.jsm"],
@@ -610,9 +611,6 @@ BrowserGlue.prototype = {
 
     this._setUpUserAgentOverrides();
 
-    // Evaluate Webapps.jsm early to resolve ts_paint regression bug 1256667.
-    Cu.import("resource://gre/modules/Webapps.jsm", {});
-
     PageThumbs.init();
     webrtcUI.init();
     AboutHome.init();
@@ -648,7 +646,7 @@ BrowserGlue.prototype = {
     // Ensure we keep track of places/pw-mananager undo by init'ing this early.
     Cu.import("resource:///modules/AutoMigrate.jsm");
 
-    if (!AppConstants.RELEASE_BUILD) {
+    if (!AppConstants.RELEASE_OR_BETA) {
       let themeName = gBrowserBundle.GetStringFromName("deveditionTheme.name");
       let vendorShortName = gBrandBundle.GetStringFromName("vendorShortName");
 
@@ -786,7 +784,7 @@ BrowserGlue.prototype = {
 
     if (samples >= Services.prefs.getIntPref("browser.slowStartup.maxSamples")) {
       if (averageTime > Services.prefs.getIntPref("browser.slowStartup.timeThreshold"))
-        this._showSlowStartupNotification();
+        this._calculateProfileAgeInDays().then(this._showSlowStartupNotification, null);
       averageTime = 0;
       samples = 0;
     }
@@ -795,7 +793,25 @@ BrowserGlue.prototype = {
     Services.prefs.setIntPref("browser.slowStartup.samples", samples);
   },
 
-  _showSlowStartupNotification: function () {
+  _calculateProfileAgeInDays: Task.async(function* () {
+    let ProfileAge = Cu.import("resource://gre/modules/ProfileAge.jsm", {}).ProfileAge;
+    let profileAge = new ProfileAge(null, null);
+
+    let creationDate = yield profileAge.created;
+    let resetDate = yield profileAge.reset;
+
+    // if the profile was reset, consider the
+    // reset date for its age.
+    let profileDate = resetDate || creationDate;
+
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    return (Date.now() - profileDate) / ONE_DAY;
+  }),
+
+  _showSlowStartupNotification: function (profileAge) {
+    if (profileAge < 90) // 3 months
+      return;
+
     let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win)
       return;
@@ -988,13 +1004,14 @@ BrowserGlue.prototype = {
       }
     }
 
-    if (!AppConstants.RELEASE_BUILD) {
+    if (!AppConstants.RELEASE_OR_BETA) {
       this.checkForPendingCrashReports();
     }
 
     CaptivePortalWatcher.init();
 
     AutoCompletePopup.init();
+    DateTimePickerHelper.init();
 
     this._firstWindowTelemetry(aWindow);
     this._firstWindowLoaded();
@@ -1026,6 +1043,7 @@ BrowserGlue.prototype = {
     webrtcUI.uninit();
     FormValidationHandler.uninit();
     AutoCompletePopup.uninit();
+    DateTimePickerHelper.uninit();
     if (AppConstants.NIGHTLY_BUILD) {
       AddonWatcher.uninit();
     }
@@ -1116,7 +1134,7 @@ BrowserGlue.prototype = {
                                              ShellService.shouldCheckDefaultBrowser;
       let promptCount;
       let skipDefaultBrowserCheck = false;
-      if (!AppConstants.RELEASE_BUILD) {
+      if (!AppConstants.RELEASE_OR_BETA) {
         promptCount =
           Services.prefs.getIntPref("browser.shell.defaultBrowserCheckCount");
         skipDefaultBrowserCheck =
@@ -1161,7 +1179,7 @@ BrowserGlue.prototype = {
         }
       }
 
-      if (!AppConstants.RELEASE_BUILD) {
+      if (!AppConstants.RELEASE_OR_BETA) {
         if (willPrompt) {
           Services.prefs.setIntPref("browser.shell.defaultBrowserCheckCount",
                                     promptCount);
@@ -2351,8 +2369,12 @@ BrowserGlue.prototype = {
       } else {
         title = bundle.GetStringFromName("tabsArrivingNotification.title");
         const tabArrivingBody = URIs.every(URI => URI.clientId == URIs[0].clientId) ?
-                                "tabsArrivingNotification.body" : "tabsArrivingNotificationMultiple.body";
-        body = bundle.formatStringFromName(tabArrivingBody, [URIs.length, deviceName], 2);
+                                "unnamedTabsArrivingNotification.body" :
+                                "unnamedTabsArrivingNotificationMultiple.body";
+        body = bundle.GetStringFromName(tabArrivingBody);
+        body = PluralForm.get(URIs.length, body);
+        body = body.replace("#1", URIs.length);
+        body = body.replace("#2", deviceName);
       }
 
       const clickCallback = (subject, topic, data) => {
@@ -2360,7 +2382,13 @@ BrowserGlue.prototype = {
           win.gBrowser.selectedTab = firstTab;
         }
       }
-      AlertsService.showAlertNotification(null, title, body, true, null, clickCallback);
+
+      // Specify an icon because on Windows no icon is shown at the moment
+      let imageURL;
+      if (AppConstants.platform == "win") {
+        imageURL = "chrome://branding/content/icon64.png";
+      }
+      AlertsService.showAlertNotification(imageURL, title, body, true, null, clickCallback);
     } catch (ex) {
       Cu.reportError("Error displaying tab(s) received by Sync: " + ex);
     }
@@ -2565,6 +2593,45 @@ ContentPermissionPrompt.prototype = {
                      "geo-notification-icon", options);
   },
 
+  _promptFlyWebPublishServer : function(aRequest) {
+    var message = "Would you like to let this site start a server accessible to nearby devices and people?";
+    var actions = [
+      {
+        stringId: "flyWebPublishServer.allowPublishServer",
+        action: Ci.nsIPermissionManager.ALLOW_ACTION,
+        expireType: Ci.nsIPermissionManager.EXPIRE_SESSION
+      },
+      {
+        stringId: "flyWebPublishServer.denyPublishServer",
+        action: Ci.nsIPermissionManager.DENY_ACTION,
+        expireType: Ci.nsIPermissionManager.EXPIRE_SESSION
+      }
+    ];
+
+    let options = {
+      learnMoreURL: "https://flyweb.github.io",
+      popupIconURL: "chrome://flyweb/skin/icon-64.png"
+    };
+
+    let browser = this._getBrowserForRequest(aRequest);
+    let chromeDoc = browser.ownerDocument;
+    let iconElem = chromeDoc.getElementById("flyweb-publish-server-notification-icon");
+    if (!iconElem) {
+      let notificationPopupBox = chromeDoc.getElementById("notification-popup-box");
+      let notificationIcon = chromeDoc.createElement("image");
+      notificationIcon.setAttribute("id", "flyweb-publish-server-notification-icon");
+      notificationIcon.setAttribute("src", "chrome://flyweb/skin/icon-64.png");
+      notificationIcon.setAttribute("class", "notification-anchor-icon flyweb-publish-server-icon");
+      notificationIcon.setAttribute("style", "filter: url(chrome://browser/skin/filters.svg#fill); fill: currentColor; opacity: .4;");
+      notificationIcon.setAttribute("role", "button");
+      notificationIcon.setAttribute("aria-label", "View the publish-server request");
+      notificationPopupBox.appendChild(notificationIcon);
+    }
+
+    this._showPrompt(aRequest, message, "flyweb-publish-server", actions, "flyweb-publish-server",
+                     "flyweb-publish-server-notification-icon", options);
+  },
+
   _promptWebNotifications : function(aRequest) {
     var message = gBrowserBundle.GetStringFromName("webNotifications.receiveFromSite");
 
@@ -2629,7 +2696,8 @@ ContentPermissionPrompt.prototype = {
     let perm = types.queryElementAt(0, Ci.nsIContentPermissionType);
 
     const kFeatureKeys = { "geolocation" : "geo",
-                           "desktop-notification" : "desktop-notification"
+                           "desktop-notification" : "desktop-notification",
+                           "flyweb-publish-server": "flyweb-publish-server"
                          };
 
     // Make sure that we support the request.
@@ -2671,6 +2739,11 @@ ContentPermissionPrompt.prototype = {
       break;
     case "desktop-notification":
       this._promptWebNotifications(request);
+      break;
+    case "flyweb-publish-server":
+      if (AppConstants.NIGHTLY_BUILD) {
+        this._promptFlyWebPublishServer(request);
+      }
       break;
     }
   },

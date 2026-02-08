@@ -6,6 +6,8 @@
 #include "nsContentUtils.h"
 #include "nsCORSListenerProxy.h"
 #include "nsIStreamListener.h"
+#include "nsIDocument.h"
+#include "nsMixedContentBlocker.h"
 
 #include "mozilla/dom/Element.h"
 
@@ -49,6 +51,7 @@ static bool IsImageLoadInEditorAppType(nsILoadInfo* aLoadInfo)
   nsContentPolicyType type = aLoadInfo->InternalContentPolicyType();
   if (type != nsIContentPolicy::TYPE_INTERNAL_IMAGE  &&
       type != nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD &&
+      type != nsIContentPolicy::TYPE_INTERNAL_IMAGE_FAVICON &&
       type != nsIContentPolicy::TYPE_IMAGESET) {
     return false;
   }
@@ -381,6 +384,14 @@ DoContentSecurityChecks(nsIChannel* aChannel, nsILoadInfo* aLoadInfo)
   if (NS_CP_REJECTED(shouldLoad)) {
     return NS_ERROR_CONTENT_BLOCKED;
   }
+
+  if (nsMixedContentBlocker::sSendHSTSPriming) {
+    rv = nsMixedContentBlocker::MarkLoadInfoForPriming(uri,
+                                                       requestingContext,
+                                                       aLoadInfo);
+    return rv;
+  }
+
   return NS_OK;
 }
 
@@ -489,7 +500,7 @@ nsContentSecurityManager::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
       rv = nsContentUtils::GetSecurityManager()->
         CheckLoadURIWithPrincipal(oldPrincipal, newOriginalURI, flags);
   }
-  NS_ENSURE_SUCCESS(rv, rv);  
+  NS_ENSURE_SUCCESS(rv, rv);
 
   aCb->OnRedirectVerifyCallback(NS_OK);
   return NS_OK;

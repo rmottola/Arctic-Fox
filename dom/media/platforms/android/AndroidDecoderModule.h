@@ -6,6 +6,7 @@
 #define AndroidDecoderModule_h_
 
 #include "PlatformDecoderModule.h"
+#include "mozilla/MediaDrmCDMProxy.h"
 
 #include "MediaCodec.h"
 #include "SurfaceTexture.h"
@@ -28,7 +29,7 @@ public:
   CreateAudioDecoder(const CreateDecoderParams& aParams) override;
 
 
-  AndroidDecoderModule() {}
+  AndroidDecoderModule(CDMProxy* aProxy = nullptr);
   virtual ~AndroidDecoderModule() {}
 
   bool SupportsMimeType(const nsACString& aMimeType,
@@ -36,6 +37,9 @@ public:
 
   ConversionRequired
   DecoderNeedsConversion(const TrackInfo& aConfig) const override;
+
+private:
+  RefPtr<MediaDrmCDMProxy> mProxy;
 };
 
 class MediaCodecDataDecoder : public MediaDataDecoder {

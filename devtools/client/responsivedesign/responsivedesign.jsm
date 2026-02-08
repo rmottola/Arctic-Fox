@@ -18,7 +18,7 @@ var flags = require("devtools/shared/flags");
 var Services = require("Services");
 var EventEmitter = require("devtools/shared/event-emitter");
 var {ViewHelpers} = require("devtools/client/shared/widgets/view-helpers");
-var { LocalizationHelper } = require("devtools/client/shared/l10n");
+var { LocalizationHelper } = require("devtools/shared/l10n");
 var { EmulationFront } = require("devtools/shared/fronts/emulation");
 
 loader.lazyImporter(this, "SystemAppProxy",
@@ -62,7 +62,7 @@ var Manager = {
     if (this.isActiveForTab(aTab)) {
       ActiveTabs.get(aTab).close();
     } else {
-      this.runIfNeeded(aWindow, aTab);
+      this.openIfNeeded(aWindow, aTab);
     }
   },
 
@@ -73,7 +73,7 @@ var Manager = {
    * @param aTab the tab targeted.
    * @returns {ResponsiveUI} the instance of ResponsiveUI for the current tab.
    */
-  runIfNeeded: Task.async(function* (aWindow, aTab) {
+  openIfNeeded: Task.async(function* (aWindow, aTab) {
     let ui;
     if (!this.isActiveForTab(aTab)) {
       ui = new ResponsiveUI(aWindow, aTab);
@@ -111,11 +111,11 @@ var Manager = {
   handleGcliCommand: Task.async(function* (aWindow, aTab, aCommand, aArgs) {
     switch (aCommand) {
       case "resize to":
-        let ui = yield this.runIfNeeded(aWindow, aTab);
-        ui.setSize(aArgs.width, aArgs.height);
+        let ui = yield this.openIfNeeded(aWindow, aTab);
+        ui.setViewportSize(aArgs);
         break;
       case "resize on":
-        this.runIfNeeded(aWindow, aTab);
+        this.openIfNeeded(aWindow, aTab);
         break;
       case "resize off":
         if (this.isActiveForTab(aTab)) {
@@ -388,10 +388,8 @@ ResponsiveUI.prototype = {
       this.touchEventSimulator.stop();
     }
 
-    yield new Promise((resolve, reject) => {
-      this.client.close(resolve);
-      this.client = this.emulationFront = null;
-    });
+    yield this.client.close();
+    this.client = this.emulationFront = null;
 
     this._telemetry.toolClosed("responsive");
 
@@ -419,7 +417,7 @@ ResponsiveUI.prototype = {
    * Emit an event when the content has been resized. Only used in tests.
    */
   onContentResize: function (msg) {
-    ResponsiveUIManager.emit("contentResize", {
+    ResponsiveUIManager.emit("content-resize", {
       tab: this.tab,
       width: msg.data.width,
       height: msg.data.height,
@@ -443,6 +441,10 @@ ResponsiveUI.prototype = {
         }
         break;
     }
+  },
+
+  getViewportBrowser() {
+    return this.browser;
   },
 
   /**
@@ -675,7 +677,10 @@ ResponsiveUI.prototype = {
     let h = this.customPreset.height = parseInt(value[2], 10);
 
     this.saveCustomSize();
-    this.setSize(w, h);
+    this.setViewportSize({
+      width: w,
+      height: h,
+    });
   },
 
   /**
@@ -757,11 +762,9 @@ ResponsiveUI.prototype = {
 
   /**
    * Apply a preset.
-   *
-   * @param aPreset preset to apply.
    */
-  loadPreset: function RUI_loadPreset(aPreset) {
-    this.setSize(aPreset.width, aPreset.height);
+  loadPreset(preset) {
+    this.setViewportSize(preset);
   },
 
   /**
@@ -847,7 +850,10 @@ ResponsiveUI.prototype = {
     this.menulist.selectedItem = menuitem;
     this.currentPresetKey = this.customPreset.key;
 
-    this.setSize(w, h);
+    this.setViewportSize({
+      width: w,
+      height: h,
+    });
 
     this.savePresets();
   },
@@ -860,7 +866,10 @@ ResponsiveUI.prototype = {
     let width = this.rotateValue ? selectedPreset.height : selectedPreset.width;
     let height = this.rotateValue ? selectedPreset.width : selectedPreset.height;
 
-    this.setSize(height, width);
+    this.setViewportSize({
+      width: height,
+      height: width,
+    });
 
     if (selectedPreset.custom) {
       this.saveCustomSize();
@@ -1001,15 +1010,16 @@ ResponsiveUI.prototype = {
   },
 
   /**
-   * Change the size of the browser.
-   *
-   * @param aWidth width of the browser.
-   * @param aHeight height of the browser.
+   * Change the size of the viewport.
    */
-  setSize: function RUI_setSize(aWidth, aHeight) {
-    debug(`SET SIZE TO ${aWidth} x ${aHeight}`);
-    this.setWidth(aWidth);
-    this.setHeight(aHeight);
+  setViewportSize({ width, height }) {
+    debug(`SET SIZE TO ${width} x ${height}`);
+    if (width) {
+      this.setWidth(width);
+    }
+    if (height) {
+      this.setHeight(height);
+    }
   },
 
   setWidth: function RUI_setWidth(aWidth) {
@@ -1124,7 +1134,7 @@ ResponsiveUI.prototype = {
       this.lastScreenY = screenY;
     }
 
-    this.setSize(width, height);
+    this.setViewportSize({ width, height });
   },
 
   /**

@@ -341,7 +341,6 @@ IDBRequest::GetResult(JS::MutableHandle<JS::Value> aResult,
     return;
   }
 
-  JS::ExposeValueToActiveJS(mResultVal);
   aResult.set(mResultVal);
 }
 

@@ -153,7 +153,6 @@
 @RESPATH@/components/dom.xpt
 @RESPATH@/components/dom_activities.xpt
 @RESPATH@/components/dom_apps.xpt
-@RESPATH@/components/dom_newapps.xpt
 @RESPATH@/components/dom_audiochannel.xpt
 @RESPATH@/components/dom_base.xpt
 @RESPATH@/components/dom_system.xpt
@@ -161,19 +160,7 @@
 @RESPATH@/components/dom_wifi.xpt
 @RESPATH@/components/dom_system_gonk.xpt
 #endif
-#ifdef MOZ_B2G_RIL
-@RESPATH@/components/dom_wappush.xpt
-@RESPATH@/components/dom_mobileconnection.xpt
-#endif
-#ifdef MOZ_B2G_BT
-@RESPATH@/components/dom_bluetooth.xpt
-#endif
-#ifdef MOZ_B2G_CAMERA
-@RESPATH@/components/dom_camera.xpt
-#endif
 @RESPATH@/components/dom_canvas.xpt
-@RESPATH@/components/dom_contacts.xpt
-@RESPATH@/components/dom_alarm.xpt
 @RESPATH@/components/dom_core.xpt
 @RESPATH@/components/dom_css.xpt
 @RESPATH@/components/dom_events.xpt
@@ -182,9 +169,6 @@
 @RESPATH@/components/dom_network.xpt
 #ifdef MOZ_SECUREELEMENT
 @RESPATH@/components/dom_secureelement.xpt
-#endif
-#ifdef MOZ_NFC
-@RESPATH@/components/dom_nfc.xpt
 #endif
 @RESPATH@/components/dom_notification.xpt
 @RESPATH@/components/dom_html.xpt
@@ -204,13 +188,11 @@
 @RESPATH@/components/dom_mobilemessage.xpt
 @RESPATH@/components/dom_storage.xpt
 @RESPATH@/components/dom_stylesheets.xpt
-@RESPATH@/components/dom_telephony.xpt
 @RESPATH@/components/dom_threads.xpt
 @RESPATH@/components/dom_traversal.xpt
 @RESPATH@/components/dom_tv.xpt
 @RESPATH@/components/dom_inputport.xpt
 @RESPATH@/components/dom_views.xpt
-@RESPATH@/components/dom_voicemail.xpt
 #ifdef MOZ_WEBSPEECH
 @RESPATH@/components/dom_webspeechrecognition.xpt
 #endif
@@ -347,16 +329,12 @@
 @RESPATH@/components/zipwriter.xpt
 
 ; JavaScript components
-@RESPATH@/components/ChromeNotifications.js
-@RESPATH@/components/ChromeNotifications.manifest
 @RESPATH@/components/ConsoleAPI.manifest
 @RESPATH@/components/ConsoleAPIStorage.js
 @RESPATH@/components/BrowserElementParent.manifest
 @RESPATH@/components/BrowserElementParent.js
 @RESPATH@/components/BrowserElementProxy.manifest
 @RESPATH@/components/BrowserElementProxy.js
-@RESPATH@/components/ContactManager.js
-@RESPATH@/components/ContactManager.manifest
 @RESPATH@/components/PhoneNumberService.js
 @RESPATH@/components/PhoneNumberService.manifest
 @RESPATH@/components/NotificationStorage.js
@@ -365,12 +343,8 @@
 @RESPATH@/components/PermissionSettings.manifest
 @RESPATH@/components/PermissionPromptService.js
 @RESPATH@/components/PermissionPromptService.manifest
-@RESPATH@/components/AlarmsManager.js
-@RESPATH@/components/AlarmsManager.manifest
 @RESPATH@/components/FeedProcessor.manifest
 @RESPATH@/components/FeedProcessor.js
-@RESPATH@/components/PackagedAppUtils.manifest
-@RESPATH@/components/PackagedAppUtils.js
 @RESPATH@/components/BrowserFeeds.manifest
 @RESPATH@/components/FeedConverter.js
 @RESPATH@/components/FeedWriter.js
@@ -456,12 +430,6 @@
 @RESPATH@/components/WifiWorker.manifest
 #endif // MOZ_WIDGET_GONK
 
-; Camera
-#ifdef MOZ_B2G_CAMERA
-@RESPATH@/components/CameraTestHardware.js
-@RESPATH@/components/CameraTestHardware.manifest
-#endif // MOZ_B2G_CAMERA
-
 ; Tethering
 #ifdef MOZ_WIDGET_GONK
 @RESPATH@/components/TetheringManager.js
@@ -491,8 +459,6 @@
 #ifndef DISABLE_MOZ_RIL_GEOLOC
 @RESPATH@/components/DataCallInterfaceService.js
 @RESPATH@/components/DataCallInterfaceService.manifest
-@RESPATH@/components/MobileConnectionService.js
-@RESPATH@/components/MobileConnectionService.manifest
 @RESPATH@/components/RadioInterfaceLayer.js
 @RESPATH@/components/RadioInterfaceLayer.manifest
 @RESPATH@/components/SmsService.js
@@ -502,15 +468,7 @@
 @RESPATH@/components/StkCmdFactory.manifest
 @RESPATH@/components/RILSystemMessengerHelper.js
 @RESPATH@/components/RILSystemMessengerHelper.manifest
-@RESPATH@/components/TelephonyAudioService.js
-@RESPATH@/components/TelephonyAudioService.manifest
-@RESPATH@/components/USSDReceivedWrapper.js
-@RESPATH@/components/USSDReceivedWrapper.manifest
 #ifndef DISABLE_MOZ_RIL_GEOLOC
-@RESPATH@/components/TelephonyService.js
-@RESPATH@/components/TelephonyService.manifest
-@RESPATH@/components/VoicemailService.js
-@RESPATH@/components/VoicemailService.manifest
 #endif
 #endif // MOZ_WIDGET_GONK && MOZ_B2G_RIL
 
@@ -581,14 +539,6 @@
 @RESPATH@/components/webvtt.xpt
 @RESPATH@/components/WebVTT.manifest
 @RESPATH@/components/WebVTTParserWrapper.js
-#ifdef MOZ_NFC
-@RESPATH@/components/nsNfc.manifest
-@RESPATH@/components/nsNfc.js
-@RESPATH@/components/Nfc.manifest
-@RESPATH@/components/Nfc.js
-@RESPATH@/components/NfcContentHelper.manifest
-@RESPATH@/components/NfcContentHelper.js
-#endif
 #ifdef MOZ_SECUREELEMENT
 @RESPATH@/components/DOMSecureElement.manifest
 @RESPATH@/components/DOMSecureElement.js
@@ -608,17 +558,11 @@
 @RESPATH@/components/TelemetryStartup.manifest
 @RESPATH@/components/XULStore.js
 @RESPATH@/components/XULStore.manifest
-@RESPATH@/components/Webapps.js
-@RESPATH@/components/Webapps.manifest
 @RESPATH@/components/AppsService.js
 @RESPATH@/components/AppsService.manifest
 @RESPATH@/components/Push.js
 @RESPATH@/components/Push.manifest
-#ifdef MOZ_SIMPLEPUSH
 @RESPATH@/components/PushComponents.js
-#else
-@RESPATH@/components/PushServiceLauncher.js
-#endif
 
 @BINPATH@/components/nsDOMIdentity.js
 @BINPATH@/components/nsIDService.js
@@ -655,9 +599,6 @@
 @RESPATH@/components/TestInterfaceJSMaplike.js
 #endif
 
-@RESPATH@/components/PACGenerator.js
-@RESPATH@/components/PACGenerator.manifest
-
 ; Modules
 @RESPATH@/modules/*
 
@@ -676,10 +617,6 @@
 ; Security Reports
 @RESPATH@/components/SecurityReporter.manifest
 @RESPATH@/components/SecurityReporter.js
-
-; Signed Packaged Content
-@RESPATH@/components/InstallPackagedWebapp.manifest
-@RESPATH@/components/InstallPackagedWebapp.js
 
 ; ANGLE on Win32
 #ifdef XP_WIN32
@@ -858,7 +795,6 @@ bin/libfreebl_32int64_3.so
 #ifdef MOZ_UPDATER
 @RESPATH@/components/UpdatePrompt.js
 #endif
-@RESPATH@/components/WebappsUpdateTimer.js
 @RESPATH@/components/DirectoryProvider.js
 @RESPATH@/components/ProcessGlobal.js
 @RESPATH@/components/OMAContentHandler.js
@@ -901,10 +837,8 @@ bin/libfreebl_32int64_3.so
 #endif
 
 ; media
-#ifdef MOZ_EME
 @RESPATH@/gmp-clearkey/0.1/@DLL_PREFIX@clearkey@DLL_SUFFIX@
 @RESPATH@/gmp-clearkey/0.1/clearkey.info
-#endif
 
 #ifdef PKG_LOCALE_MANIFEST
 #include @PKG_LOCALE_MANIFEST@

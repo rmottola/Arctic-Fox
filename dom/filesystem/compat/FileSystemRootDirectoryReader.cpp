@@ -56,14 +56,14 @@ NS_IMPL_RELEASE_INHERITED(FileSystemRootDirectoryReader,
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(FileSystemRootDirectoryReader)
 NS_INTERFACE_MAP_END_INHERITING(FileSystemDirectoryReader)
 
-FileSystemRootDirectoryReader::FileSystemRootDirectoryReader(nsIGlobalObject* aGlobal,
+FileSystemRootDirectoryReader::FileSystemRootDirectoryReader(FileSystemDirectoryEntry* aParentEntry,
                                                              FileSystem* aFileSystem,
                                                              const Sequence<RefPtr<FileSystemEntry>>& aEntries)
-  : FileSystemDirectoryReader(aGlobal, aFileSystem, nullptr)
+  : FileSystemDirectoryReader(aParentEntry, aFileSystem, nullptr)
   , mEntries(aEntries)
   , mAlreadyRead(false)
 {
-  MOZ_ASSERT(aGlobal);
+  MOZ_ASSERT(aParentEntry);
   MOZ_ASSERT(aFileSystem);
 }
 
@@ -79,7 +79,7 @@ FileSystemRootDirectoryReader::ReadEntries(FileSystemEntriesCallback& aSuccessCa
     RefPtr<EmptyEntriesCallbackRunnable> runnable =
       new EmptyEntriesCallbackRunnable(&aSuccessCallback);
     aRv = NS_DispatchToMainThread(runnable);
-    NS_WARN_IF(aRv.Failed());
+    NS_WARNING_ASSERTION(!aRv.Failed(), "NS_DispatchToMainThread failed");
     return;
   }
 
@@ -89,7 +89,7 @@ FileSystemRootDirectoryReader::ReadEntries(FileSystemEntriesCallback& aSuccessCa
   RefPtr<EntriesCallbackRunnable> runnable =
     new EntriesCallbackRunnable(&aSuccessCallback, mEntries);
   aRv = NS_DispatchToMainThread(runnable);
-  NS_WARN_IF(aRv.Failed());
+  NS_WARNING_ASSERTION(!aRv.Failed(), "NS_DispatchToMainThread failed");
 }
 
 } // dom namespace

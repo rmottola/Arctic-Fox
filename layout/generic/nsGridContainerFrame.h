@@ -15,6 +15,14 @@
 #include "nsHashKeys.h"
 #include "nsTHashtable.h"
 
+// https://drafts.csswg.org/css-align-3/#baseline-sharing-group
+enum BaselineSharingGroup
+{
+  // NOTE Used as an array index so must be 0 and 1.
+  eFirst = 0,
+  eLast = 1,
+};
+
 /**
  * Factory function.
  * @return a newly allocated nsGridContainerFrame (infallible)
@@ -34,7 +42,9 @@ struct ComputedGridTrackInfo
                         uint32_t aEndFragmentTrack,
                         nsTArray<nscoord>&& aPositions,
                         nsTArray<nscoord>&& aSizes,
-                        nsTArray<uint32_t>&& aStates)
+                        nsTArray<uint32_t>&& aStates,
+                        nsTArray<bool>&& aRemovedRepeatTracks,
+                        uint32_t aRepeatFirstTrack)
     : mNumLeadingImplicitTracks(aNumLeadingImplicitTracks)
     , mNumExplicitTracks(aNumExplicitTracks)
     , mStartFragmentTrack(aStartFragmentTrack)
@@ -42,6 +52,8 @@ struct ComputedGridTrackInfo
     , mPositions(aPositions)
     , mSizes(aSizes)
     , mStates(aStates)
+    , mRemovedRepeatTracks(aRemovedRepeatTracks)
+    , mRepeatFirstTrack(aRepeatFirstTrack)
   {}
   uint32_t mNumLeadingImplicitTracks;
   uint32_t mNumExplicitTracks;
@@ -50,14 +62,22 @@ struct ComputedGridTrackInfo
   nsTArray<nscoord> mPositions;
   nsTArray<nscoord> mSizes;
   nsTArray<uint32_t> mStates;
+  nsTArray<bool> mRemovedRepeatTracks;
+  uint32_t mRepeatFirstTrack;
 };
 
 struct ComputedGridLineInfo
 {
-  explicit ComputedGridLineInfo(nsTArray<nsTArray<nsString>>&& aNames)
+  explicit ComputedGridLineInfo(nsTArray<nsTArray<nsString>>&& aNames,
+                                const nsTArray<nsString>& aNamesBefore,
+                                const nsTArray<nsString>& aNamesAfter)
     : mNames(aNames)
+    , mNamesBefore(aNamesBefore)
+    , mNamesAfter(aNamesAfter)
   {}
   nsTArray<nsTArray<nsString>> mNames;
+  nsTArray<nsString> mNamesBefore;
+  nsTArray<nsString> mNamesAfter;
 };
 } // namespace mozilla
 
@@ -89,6 +109,13 @@ public:
                         const nsRect&           aDirtyRect,
                         const nsDisplayListSet& aLists) override;
 
+  nscoord GetLogicalBaseline(mozilla::WritingMode aWM) const override
+  {
+    nscoord b;
+    GetBBaseline(BaselineSharingGroup::eFirst, &b);
+    return b;
+  }
+
 #ifdef DEBUG_FRAME_DUMP
   nsresult GetFrameName(nsAString& aResult) const override;
 #endif
@@ -99,6 +126,9 @@ public:
   void InsertFrames(ChildListID aListID, nsIFrame* aPrevFrame,
                     nsFrameList& aFrameList) override;
   void RemoveFrame(ChildListID aListID, nsIFrame* aOldFrame) override;
+  uint16_t CSSAlignmentForAbsPosChild(
+            const ReflowInput& aChildRI,
+            mozilla::LogicalAxis aLogicalAxis) const override;
 
 #ifdef DEBUG
   void SetInitialChildList(ChildListID  aListID,
@@ -151,7 +181,9 @@ public:
     return info;
   }
 
-  typedef nsTHashtable<nsStringHashKey> ImplicitNamedAreas;
+  typedef nsBaseHashtable<nsStringHashKey,
+                          mozilla::css::GridNamedArea,
+                          mozilla::css::GridNamedArea> ImplicitNamedAreas;
   NS_DECLARE_FRAME_PROPERTY_DELETABLE(ImplicitNamedAreasProperty,
                                       ImplicitNamedAreas)
   ImplicitNamedAreas* GetImplicitNamedAreas() const {
@@ -175,6 +207,18 @@ public:
   struct TrackSize;
   struct GridItemInfo;
   struct GridReflowInput;
+  template<typename Iterator> class GridItemCSSOrderIteratorT;
+  typedef GridItemCSSOrderIteratorT<nsFrameList::iterator>
+    GridItemCSSOrderIterator;
+  typedef GridItemCSSOrderIteratorT<nsFrameList::reverse_iterator>
+    ReverseGridItemCSSOrderIterator;
+  struct FindItemInGridOrderResult
+  {
+    // The first(last) item in (reverse) grid order.
+    const GridItemInfo* mItem;
+    // Does the above item span the first(last) track?
+    bool mIsInEdgeTrack;
+  };
 protected:
   static const uint32_t kAutoLine;
   // The maximum line number, in the zero-based translated grid.
@@ -188,7 +232,6 @@ protected:
   typedef nsLayoutUtils::IntrinsicISizeType IntrinsicISizeType;
   struct Grid;
   struct GridArea;
-  class GridItemCSSOrderIterator;
   class LineNameMap;
   struct LineRange;
   struct SharedGridData;
@@ -201,7 +244,12 @@ protected:
     : nsContainerFrame(aContext)
     , mCachedMinISize(NS_INTRINSIC_WIDTH_UNKNOWN)
     , mCachedPrefISize(NS_INTRINSIC_WIDTH_UNKNOWN)
-  {}
+  {
+    mBaseline[0][0] = NS_INTRINSIC_WIDTH_UNKNOWN;
+    mBaseline[0][1] = NS_INTRINSIC_WIDTH_UNKNOWN;
+    mBaseline[1][0] = NS_INTRINSIC_WIDTH_UNKNOWN;
+    mBaseline[1][1] = NS_INTRINSIC_WIDTH_UNKNOWN;
+  }
 
   /**
    * XXX temporary - move the ImplicitNamedAreas stuff to the style system.
@@ -235,6 +283,82 @@ protected:
   void MergeSortedOverflow(nsFrameList& aList);
   // Helper to move child frames into the kExcessOverflowContainersList:.
   void MergeSortedExcessOverflowContainers(nsFrameList& aList);
+
+  bool GetBBaseline(BaselineSharingGroup aBaselineGroup, nscoord* aResult) const
+  {
+    *aResult = mBaseline[mozilla::eLogicalAxisBlock][aBaselineGroup];
+    return true;
+  }
+  bool GetIBaseline(BaselineSharingGroup aBaselineGroup, nscoord* aResult) const
+  {
+    *aResult = mBaseline[mozilla::eLogicalAxisInline][aBaselineGroup];
+    return true;
+  }
+
+  /**
+   * Calculate this grid container's baselines.
+   * @param aBaselineSet which baseline(s) to derive from a baseline-group or
+   * items; a baseline not included is synthesized from the border-box instead.
+   * @param aFragmentStartTrack is the first track in this fragment in the same
+   * axis as aMajor.  Pass zero if that's not the axis we're fragmenting in.
+   * @param aFirstExcludedTrack should be the first track in the next fragment
+   * or one beyond the final track in the last fragment, in aMajor's axis.
+   * Pass the number of tracks if that's not the axis we're fragmenting in.
+   */
+  enum BaselineSet : uint32_t {
+    eNone =  0x0,
+    eFirst = 0x1,
+    eLast  = 0x2,
+    eBoth  = eFirst | eLast,
+  };
+  void CalculateBaselines(BaselineSet                   aBaselineSet,
+                          GridItemCSSOrderIterator*     aIter,
+                          const nsTArray<GridItemInfo>* aGridItems,
+                          const Tracks&    aTracks,
+                          uint32_t         aFragmentStartTrack,
+                          uint32_t         aFirstExcludedTrack,
+                          WritingMode      aWM,
+                          const nsSize&    aCBPhysicalSize,
+                          nscoord          aCBBorderPaddingStart,
+                          nscoord          aCBBorderPaddingStartEnd,
+                          nscoord          aCBSize);
+
+  /**
+   * Synthesize a Grid container baseline for aGroup.
+   */
+  nscoord SynthesizeBaseline(const FindItemInGridOrderResult& aItem,
+                             mozilla::LogicalAxis aAxis,
+                             BaselineSharingGroup aGroup,
+                             const nsSize&        aCBPhysicalSize,
+                             nscoord              aCBSize,
+                             WritingMode          aCBWM);
+  /**
+   * Find the first item in Grid Order in this fragment.
+   * https://drafts.csswg.org/css-grid/#grid-order
+   * @param aFragmentStartTrack is the first track in this fragment in the same
+   * axis as aMajor.  Pass zero if that's not the axis we're fragmenting in.
+   */
+  static FindItemInGridOrderResult
+  FindFirstItemInGridOrder(GridItemCSSOrderIterator& aIter,
+                           const nsTArray<GridItemInfo>& aGridItems,
+                           LineRange GridArea::* aMajor,
+                           LineRange GridArea::* aMinor,
+                           uint32_t aFragmentStartTrack);
+  /**
+   * Find the last item in Grid Order in this fragment.
+   * @param aFragmentStartTrack is the first track in this fragment in the same
+   * axis as aMajor.  Pass zero if that's not the axis we're fragmenting in.
+   * @param aFirstExcludedTrack should be the first track in the next fragment
+   * or one beyond the final track in the last fragment, in aMajor's axis.
+   * Pass the number of tracks if that's not the axis we're fragmenting in.
+   */
+  static FindItemInGridOrderResult
+  FindLastItemInGridOrder(ReverseGridItemCSSOrderIterator& aIter,
+                          const nsTArray<GridItemInfo>& aGridItems,
+                          LineRange GridArea::* aMajor,
+                          LineRange GridArea::* aMinor,
+                          uint32_t aFragmentStartTrack,
+                          uint32_t aFirstExcludedTrack);
 
 #ifdef DEBUG
   void SanityCheckGridItemsBeforeReflow() const;
@@ -307,6 +431,9 @@ private:
    */
   nscoord mCachedMinISize;
   nscoord mCachedPrefISize;
+
+  // Our baselines, one per BaselineSharingGroup per axis.
+  nscoord mBaseline[2/*LogicalAxis*/][2/*BaselineSharingGroup*/];
 
 #ifdef DEBUG
   // If true, NS_STATE_GRID_DID_PUSH_ITEMS may be set even though all pushed

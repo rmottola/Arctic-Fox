@@ -75,19 +75,6 @@ enum DOM4ErrorTypeCodeMap {
   /* WebCrypto errors https://dvcs.w3.org/hg/webcrypto-api/raw-file/tip/spec/Overview.html#dfn-DataError */
   OperationError           = 0,
 
-  /* Bluetooth API errors */
-  BtFailError              = 0,
-  BtNotReadyError          = 0,
-  BtNoMemError             = 0,
-  BtBusyError              = 0,
-  BtDoneError              = 0,
-  BtUnsupportedError       = 0,
-  BtParmInvalidError       = 0,
-  BtUnhandledError         = 0,
-  BtAuthFailureError       = 0,
-  BtRmtDevDownError        = 0,
-  BtAuthRejectedError      = 0,
-
   /* Push API errors */
   NotAllowedError          = 0,
 };
@@ -201,7 +188,6 @@ Exception::Exception(const nsACString& aMessage,
                      nsIStackFrame *aLocation,
                      nsISupports *aData)
 : mResult(NS_OK),
-  mLineNumber(0),
   mInitialized(false),
   mHoldingJSVal(false)
 {
@@ -223,7 +209,6 @@ Exception::Exception(const nsACString& aMessage,
 
 Exception::Exception()
   : mResult(NS_OK),
-    mLineNumber(-1),
     mInitialized(false),
     mHoldingJSVal(false)
 {
@@ -316,7 +301,7 @@ Exception::GetFilename(JSContext* aCx, nsAString& aFilename)
     return mLocation->GetFilename(aCx, aFilename);
   }
 
-  aFilename.Assign(mFilename);
+  aFilename.Truncate();
   return NS_OK;
 }
 
@@ -333,7 +318,7 @@ Exception::GetLineNumber(JSContext* aCx, uint32_t *aLineNumber)
     return rv;
   }
 
-  *aLineNumber = mLineNumber;
+  *aLineNumber = 0;
   return NS_OK;
 }
 
@@ -484,7 +469,7 @@ Exception::LineNumber(JSContext* aCx) const
     return 0;
   }
 
-  return mLineNumber;
+  return 0;
 }
 
 uint32_t

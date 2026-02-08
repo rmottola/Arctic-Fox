@@ -1,4 +1,8 @@
+// |jit-test| slow
+
 const USE_ASM = '"use asm";';
+if (!('oomTest' in this))
+    quit();
 function asmCompile() {
     var f = Function.apply(null, arguments);
 }

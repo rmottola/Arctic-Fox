@@ -26,6 +26,7 @@
 #endif
 #include "GMPDecoderModule.h"
 
+#include "mozilla/CDMProxy.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/SharedThreadPool.h"
 #include "mozilla/StaticPtr.h"
@@ -38,16 +39,14 @@
 #include "H264Converter.h"
 
 #include "AgnosticDecoderModule.h"
-
-#ifdef MOZ_EME
 #include "EMEDecoderModule.h"
-#include "mozilla/CDMProxy.h"
-#endif
 
 #include "DecoderDoctorDiagnostics.h"
 
 #include "MP4Decoder.h"
+#include "mozilla/dom/RemoteVideoDecoder.h"
 
+#include "mp4_demuxer/H264.h"
 
 namespace mozilla {
 
@@ -70,12 +69,90 @@ public:
 #ifdef MOZ_FFMPEG
     FFmpegRuntimeLinker::Init();
 #endif
-    GMPDecoderModule::Init();
   }
 };
 
 StaticAutoPtr<PDMFactoryImpl> PDMFactory::sInstance;
 StaticMutex PDMFactory::sMonitor;
+
+class SupportChecker
+{
+public:
+  enum class Reason : uint8_t
+  {
+    kSupported,
+    kVideoFormatNotSupported,
+    kAudioFormatNotSupported,
+    kUnknown,
+  };
+
+  struct CheckResult
+  {
+    explicit CheckResult(Reason aReason,
+                         MediaResult aResult = MediaResult(NS_OK))
+      : mReason(aReason),
+        mMediaResult(mozilla::Move(aResult))
+    {}
+    CheckResult(const CheckResult& aOther) = default;
+    CheckResult(CheckResult&& aOther) = default;
+    CheckResult& operator=(const CheckResult& aOther) = default;
+    CheckResult& operator=(CheckResult&& aOther) = default;
+
+    Reason mReason;
+    MediaResult mMediaResult;
+  };
+
+  template<class Func>
+  void
+  AddToCheckList(Func&& aChecker)
+  {
+    mCheckerList.AppendElement(mozilla::Forward<Func>(aChecker));
+  }
+
+  void
+  AddMediaFormatChecker(const TrackInfo& aTrackConfig)
+  {
+    if (aTrackConfig.IsVideo()) {
+    auto mimeType = aTrackConfig.GetAsVideoInfo()->mMimeType;
+    RefPtr<MediaByteBuffer> extraData = aTrackConfig.GetAsVideoInfo()->mExtraData;
+    AddToCheckList(
+      [mimeType, extraData]() {
+        if (MP4Decoder::IsH264(mimeType)) {
+          mp4_demuxer::SPSData spsdata;
+          // WMF H.264 Video Decoder and Apple ATDecoder
+          // do not support YUV444 format.
+          // For consistency, all decoders should be checked.
+          if (mp4_demuxer::H264::DecodeSPSFromExtraData(extraData, spsdata) &&
+              spsdata.chroma_format_idc == PDMFactory::kYUV444) {
+            return CheckResult(SupportChecker::Reason::kVideoFormatNotSupported,
+                               MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                                           RESULT_DETAIL("Decoder may not have the capability to handle"
+                                                         " the requested video format"
+                                                         " with YUV444 chroma subsampling.")));
+          }
+        }
+        return CheckResult(SupportChecker::Reason::kSupported);
+      });
+    }
+  }
+
+  SupportChecker::CheckResult
+  Check()
+  {
+    for (auto& checker : mCheckerList) {
+      auto result = checker();
+        if (result.mReason != SupportChecker::Reason::kSupported) {
+          return result;
+      }
+    }
+    return CheckResult(SupportChecker::Reason::kSupported);
+  }
+
+  void Clear() { mCheckerList.Clear(); }
+
+private:
+  nsTArray<mozilla::function<CheckResult()>> mCheckerList;
+}; // SupportChecker
 
 PDMFactory::PDMFactory()
 {
@@ -167,14 +244,41 @@ PDMFactory::CreateDecoderWithPDM(PlatformDecoderModule* aPDM,
 {
   MOZ_ASSERT(aPDM);
   RefPtr<MediaDataDecoder> m;
+  MediaResult* result = aParams.mError;
 
+  SupportChecker supportChecker;
   const TrackInfo& config = aParams.mConfig;
+  supportChecker.AddMediaFormatChecker(config);
+
+  auto checkResult = supportChecker.Check();
+  if (checkResult.mReason != SupportChecker::Reason::kSupported) {
+    DecoderDoctorDiagnostics* diagnostics = aParams.mDiagnostics;
+    if (checkResult.mReason == SupportChecker::Reason::kVideoFormatNotSupported) {
+      if (diagnostics) {
+        diagnostics->SetVideoNotSupported();
+      }
+      if (result) {
+        *result = checkResult.mMediaResult;
+      }
+    } else if (checkResult.mReason == SupportChecker::Reason::kAudioFormatNotSupported) {
+      if (diagnostics) {
+        diagnostics->SetAudioNotSupported();
+      }
+      if (result) {
+        *result = checkResult.mMediaResult;
+      }
+    }
+    return nullptr;
+  }
+
   if (config.IsAudio()) {
     m = aPDM->CreateAudioDecoder(aParams);
     return m.forget();
   }
 
   if (!config.IsVideo()) {
+    *result = MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                          RESULT_DETAIL("Decoder configuration error, expected audio or video."));
     return nullptr;
   }
 
@@ -215,10 +319,21 @@ bool
 PDMFactory::SupportsMimeType(const nsACString& aMimeType,
                              DecoderDoctorDiagnostics* aDiagnostics) const
 {
-  if (mEMEPDM) {
-    return mEMEPDM->SupportsMimeType(aMimeType, aDiagnostics);
+  UniquePtr<TrackInfo> trackInfo = CreateTrackInfoWithMIMEType(aMimeType);
+  if (!trackInfo) {
+    return false;
   }
-  RefPtr<PlatformDecoderModule> current = GetDecoder(aMimeType, aDiagnostics);
+  return Supports(*trackInfo, aDiagnostics);
+}
+
+bool
+PDMFactory::Supports(const TrackInfo& aTrackInfo,
+                     DecoderDoctorDiagnostics* aDiagnostics) const
+{
+  if (mEMEPDM) {
+    return mEMEPDM->Supports(aTrackInfo, aDiagnostics);
+  }
+  RefPtr<PlatformDecoderModule> current = GetDecoder(aTrackInfo, aDiagnostics);
   return !!current;
 }
 
@@ -246,7 +361,11 @@ PDMFactory::CreatePDMs()
 #ifdef XP_WIN
   if (MediaPrefs::PDMWMFEnabled()) {
     m = new WMFDecoderModule();
-    mWMFFailedToLoad = !StartupPDM(m);
+    RefPtr<PlatformDecoderModule> remote = new dom::RemoteDecoderModule(m);
+    mWMFFailedToLoad = !StartupPDM(remote);
+    if (mWMFFailedToLoad) {
+      mWMFFailedToLoad = !StartupPDM(m);
+    }
   } else {
     mWMFFailedToLoad = MediaPrefs::DecoderDoctorWMFDisabledIsFailure();
   }
@@ -311,7 +430,7 @@ PDMFactory::StartupPDM(PlatformDecoderModule* aPDM)
 }
 
 already_AddRefed<PlatformDecoderModule>
-PDMFactory::GetDecoder(const nsACString& aMimeType,
+PDMFactory::GetDecoder(const TrackInfo& aTrackInfo,
                        DecoderDoctorDiagnostics* aDiagnostics) const
 {
   if (aDiagnostics) {
@@ -330,7 +449,7 @@ PDMFactory::GetDecoder(const nsACString& aMimeType,
 
   RefPtr<PlatformDecoderModule> pdm;
   for (auto& current : mCurrentPDMs) {
-    if (current->SupportsMimeType(aMimeType, aDiagnostics)) {
+    if (current->Supports(aTrackInfo, aDiagnostics)) {
       pdm = current;
       break;
     }
@@ -338,13 +457,19 @@ PDMFactory::GetDecoder(const nsACString& aMimeType,
   return pdm.forget();
 }
 
-#ifdef MOZ_EME
 void
 PDMFactory::SetCDMProxy(CDMProxy* aProxy)
 {
+  MOZ_ASSERT(aProxy);
+
+#ifdef MOZ_WIDGET_ANDROID
+  if (IsWidevineKeySystem(aProxy->KeySystem())) {
+    mEMEPDM = new AndroidDecoderModule(aProxy);
+    return;
+  }
+#endif
   RefPtr<PDMFactory> m = new PDMFactory();
   mEMEPDM = new EMEDecoderModule(aProxy, m);
 }
-#endif
 
 }  // namespace mozilla

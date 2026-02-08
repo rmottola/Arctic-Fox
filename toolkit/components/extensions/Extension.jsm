@@ -54,16 +54,12 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
                                   "resource://gre/modules/PrivateBrowsingUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
                                   "resource://gre/modules/Preferences.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "require",
+                                  "resource://devtools/shared/Loader.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Schemas",
                                   "resource://gre/modules/Schemas.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
-
-XPCOMUtils.defineLazyGetter(this, "require", () => {
-  let obj = {};
-  Cu.import("resource://devtools/shared/Loader.jsm", obj);
-  return obj.require;
-});
 
 Cu.import("resource://gre/modules/ExtensionContent.jsm");
 Cu.import("resource://gre/modules/ExtensionManagement.jsm");
@@ -78,21 +74,21 @@ const CATEGORY_EXTENSION_SCRIPTS = "webextension-scripts";
 
 let schemaURLs = new Set();
 
-if (!AppConstants.RELEASE_BUILD) {
+if (!AppConstants.RELEASE_OR_BETA) {
   schemaURLs.add("chrome://extensions/content/schemas/experiments.json");
 }
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   BaseContext,
+  defineLazyGetter,
   EventEmitter,
+  SchemaAPIManager,
   LocaleData,
-  Messenger,
   instanceOf,
+  LocalAPIImplementation,
   flushJarCache,
 } = ExtensionUtils;
-
-XPCOMUtils.defineLazyGetter(this, "console", ExtensionUtils.getConsole);
 
 const LOGGER_ID_BASE = "addons.webextension.";
 const UUID_MAP_PREF = "extensions.webextensions.uuids";
@@ -103,24 +99,22 @@ const COMMENT_REGEXP = new RegExp(String.raw`
     ^
     (
       (?:
-        [^"] |
-        " (?:[^"\\] | \\.)* "
+        [^"\n] |
+        " (?:[^"\\\n] | \\.)* "
       )*?
     )
 
     //.*
   `.replace(/\s+/g, ""), "gm");
 
-var scriptScope = this;
-
-var ExtensionContext, GlobalManager;
+var GlobalManager;
 
 // This object loads the ext-*.js scripts that define the extension API.
-var Management = {
-  initialized: null,
-  scopes: [],
-  schemaApis: [],
-  emitter: new EventEmitter(),
+var Management = new class extends SchemaAPIManager {
+  constructor() {
+    super("main");
+    this.initialized = null;
+  }
 
   // Loads all the ext-*.js scripts currently registered.
   lazyInit() {
@@ -142,217 +136,255 @@ var Management = {
     });
 
     for (let [/* name */, value] of XPCOMUtils.enumerateCategoryEntries(CATEGORY_EXTENSION_SCRIPTS)) {
-      let scope = {
-        get console() { return console; },
-        extensions: this,
-        global: scriptScope,
-        require,
-      };
-      Services.scriptloader.loadSubScript(value, scope, "UTF-8");
-
-      // Save the scope to avoid it being garbage collected.
-      this.scopes.push(scope);
+      this.loadScript(value);
     }
 
     this.initialized = promise;
     return this.initialized;
+  }
+
+  registerSchemaAPI(namespace, envType, getAPI) {
+    if (envType == "addon_parent" || envType == "content_parent") {
+      super.registerSchemaAPI(namespace, envType, getAPI);
+    }
+  }
+}();
+
+// Subscribes to messages related to the extension messaging API and forwards it
+// to the relevant message manager. The "sender" field for the `onMessage` and
+// `onConnect` events are updated if needed.
+let ProxyMessenger = {
+  _initialized: false,
+  init() {
+    if (this._initialized) {
+      return;
+    }
+    this._initialized = true;
+
+    // TODO(robwu): When addons move to a separate process, we should use the
+    // parent process manager(s) of the addon process(es) instead of the
+    // in-process one.
+    let pipmm = Services.ppmm.getChildAt(0);
+    // Listen on the global frame message manager because content scripts send
+    // and receive extension messages via their frame.
+    // Listen on the parent process message manager because `runtime.connect`
+    // and `runtime.sendMessage` requests must be delivered to all frames in an
+    // addon process (by the API contract).
+    // And legacy addons are not associated with a frame, so that is another
+    // reason for having a parent process manager here.
+    let messageManagers = [Services.mm, pipmm];
+
+    MessageChannel.addListener(messageManagers, "Extension:Connect", this);
+    MessageChannel.addListener(messageManagers, "Extension:Message", this);
+    MessageChannel.addListener(messageManagers, "Extension:Port:Disconnect", this);
+    MessageChannel.addListener(messageManagers, "Extension:Port:PostMessage", this);
+  },
+
+  receiveMessage({target, messageName, channelId, sender, recipient, data, responseType}) {
+    let extension = GlobalManager.extensionMap.get(sender.extensionId);
+    let receiverMM = this._getMessageManagerForRecipient(recipient);
+    if (!extension || !receiverMM) {
+      return Promise.reject({
+        result: MessageChannel.RESULT_NO_HANDLER,
+        message: "No matching message handler for the given recipient.",
+      });
+    }
+
+    if ((messageName == "Extension:Message" ||
+         messageName == "Extension:Connect") &&
+        Management.global.tabGetSender) {
+      // From ext-tabs.js, undefined on Android.
+      Management.global.tabGetSender(extension, target, sender);
+    }
+    return MessageChannel.sendMessage(receiverMM, messageName, data, {
+      sender,
+      recipient,
+      responseType,
+    });
   },
 
   /**
-   * Called by an ext-*.js script to register an API.
-   *
-   * @param {string} namespace The API namespace.
-   *     Used to determine whether the API should be generated when the caller
-   *     requests a subset of the available APIs (e.g. in content scripts).
-   * @param {function(BaseContext)} getAPI A function that returns an object
-   *     that will be merged with |chrome| and |browser|. The next example adds
-   *     the create, update and remove methods to the tabs API.
-   *
-   *     registerSchemaAPI("tabs", (context) => ({
-   *       tabs: { create, update },
-   *     }));
-   *     registerSchemaAPI("tabs", (context) => ({
-   *       tabs: { remove },
-   *     }));
+   * @param {object} recipient An object that was passed to
+   *     `MessageChannel.sendMessage`.
+   * @returns {object|null} The message manager matching the recipient if found.
    */
-  registerSchemaAPI(namespace, getAPI) {
-    this.schemaApis.push({namespace, getAPI});
-  },
-
-  // Mash together all the APIs from apis into obj.
-  generateAPIs(context, apis, obj, namespaces = null) {
-    // Recursively copy properties from source to dest.
-    function copy(dest, source) {
-      for (let prop in source) {
-        let desc = Object.getOwnPropertyDescriptor(source, prop);
-        if (typeof(desc.value) == "object") {
-          if (!(prop in dest)) {
-            dest[prop] = {};
-          }
-          copy(dest[prop], source[prop]);
-        } else {
-          Object.defineProperty(dest, prop, desc);
-        }
-      }
+  _getMessageManagerForRecipient(recipient) {
+    let {extensionId, tabId} = recipient;
+    // tabs.sendMessage / tabs.connect
+    if (tabId) {
+      // `tabId` being set implies that the tabs API is supported, so we don't
+      // need to check whether `TabManager` exists.
+      let tab = Management.global.TabManager.getTab(tabId, null, null);
+      return tab && tab.linkedBrowser.messageManager;
     }
 
-    for (let api of apis) {
-      if (namespaces && !namespaces.includes(api.namespace)) {
-        continue;
-      }
-      if (api.permission) {
-        if (!context.extension.hasPermission(api.permission)) {
-          continue;
-        }
-      }
-
-      api = api.getAPI(context);
-      copy(obj, api);
+    // runtime.sendMessage / runtime.connect
+    if (extensionId) {
+      // TODO(robwu): map the extensionId to the addon parent process's message
+      // manager when they run in a separate process.
+      let pipmm = Services.ppmm.getChildAt(0);
+      return pipmm;
     }
-  },
 
-  // The ext-*.js scripts can ask to be notified for certain hooks.
-  on(hook, callback) {
-    this.emitter.on(hook, callback);
-  },
-
-  // Ask to run all the callbacks that are registered for a given hook.
-  emit(hook, ...args) {
-    return this.emitter.emit(hook, ...args);
-  },
-
-  off(hook, callback) {
-    this.emitter.off(hook, callback);
+    // Note: No special handling for sendNativeMessage / connectNative because
+    // native messaging runs in the chrome process, so it never needs a proxy.
+    return null;
   },
 };
 
-// An extension page is an execution context for any extension content
-// that runs in the chrome process. It's used for background pages
-// (type="background"), popups (type="popup"), and any extension
-// content loaded into browser tabs (type="tab").
-//
-// |params| is an object with the following properties:
-// |type| is one of "background", "popup", or "tab".
-// |contentWindow| is the DOM window the content runs in.
-// |uri| is the URI of the content (optional).
-// |docShell| is the docshell the content runs in (optional).
-// |incognito| is the content running in a private context (default: false).
-ExtensionContext = class extends BaseContext {
-  constructor(extension, params) {
-    super(extension);
+class BrowserDocshellFollower {
+  /**
+   * Follows the <browser> belonging to the `xulBrowser`'s current docshell.
+   *
+   * @param {XULElement} xulBrowser A <browser> tag.
+   * @param {function} onBrowserChange Called when the <browser> changes.
+   */
+  constructor(xulBrowser, onBrowserChange) {
+    this.xulBrowser = xulBrowser;
+    this.onBrowserChange = onBrowserChange;
 
-    let {type, uri} = params;
-    this.type = type;
-    this.uri = uri || extension.baseURI;
-    this.incognito = params.incognito || false;
-
-    if (params.contentWindow) {
-      this.setContentWindow(params.contentWindow);
-    }
-
-    // This is the MessageSender property passed to extension.
-    // It can be augmented by the "page-open" hook.
-    let sender = {id: extension.uuid};
-    if (uri) {
-      sender.url = uri.spec;
-    }
-    let delegate = {
-      getSender() {},
-    };
-    Management.emit("page-load", this, params, sender, delegate);
-
-    // Properties in |filter| must match those in the |recipient|
-    // parameter of sendMessage.
-    let filter = {extensionId: extension.id};
-    this.messenger = new Messenger(this, [Services.mm, Services.ppmm], sender, filter, delegate);
-
-    if (this.externallyVisible) {
-      this.extension.views.add(this);
-    }
+    xulBrowser.addEventListener("SwapDocShells", this);
   }
 
-  get cloneScope() {
-    return this.contentWindow;
+  destroy() {
+    this.xulBrowser.removeEventListener("SwapDocShells", this);
+    this.xulBrowser = null;
   }
 
-  get principal() {
-    return this.contentWindow.document.nodePrincipal;
+  handleEvent({detail: otherBrowser}) {
+    this.xulBrowser.removeEventListener("SwapDocShells", this);
+    this.xulBrowser = otherBrowser;
+    this.xulBrowser.addEventListener("SwapDocShells", this);
+    this.onBrowserChange(otherBrowser);
   }
+}
 
-  get externallyVisible() {
-    return true;
-  }
+class ProxyContext extends BaseContext {
+  constructor(envType, extension, params, xulBrowser, principal) {
+    super(envType, extension);
 
-  // Called when the extension shuts down.
-  shutdown() {
-    Management.emit("page-shutdown", this);
-    this.unload();
-  }
+    this.uri = NetUtil.newURI(params.url);
 
-  // This method is called when an extension page navigates away or
-  // its tab is closed.
-  unload() {
-    // Note that without this guard, we end up running unload code
-    // multiple times for tab pages closed by the "page-unload" handlers
-    // triggered below.
-    if (this.unloaded) {
-      return;
-    }
+    // This message manager is used by ParentAPIManager to send messages and to
+    // close the ProxyContext if the underlying message manager closes. This
+    // message manager object may change when `xulBrowser` swaps docshells, e.g.
+    // when a tab is moved to a different window.
+    this.currentMessageManager = xulBrowser.messageManager;
+    this._docShellTracker = new BrowserDocshellFollower(xulBrowser,
+        this.onBrowserChange.bind(this));
 
-    super.unload();
-
-    Management.emit("page-unload", this);
-
-    if (this.externallyVisible) {
-      this.extension.views.delete(this);
-    }
-  }
-};
-
-class ProxyContext extends ExtensionContext {
-  constructor(extension, params, messageManager, principal) {
-    params.contentWindow = null;
-    params.uri = NetUtil.newURI(params.url);
-
-    super(extension, params);
-    this.messageManager = messageManager;
-    this.principal_ = principal;
-
-    this.apiObj = {};
-    GlobalManager.injectInObject(this, null, this.apiObj, ["storage", "test"]);
+    Object.defineProperty(this, "principal", {
+      value: principal, enumerable: true, configurable: true,
+    });
 
     this.listenerProxies = new Map();
 
-    this.sandbox = Cu.Sandbox(principal, {});
-  }
-
-  get principal() {
-    return this.principal_;
+    Management.emit("proxy-context-load", this);
   }
 
   get cloneScope() {
     return this.sandbox;
   }
 
-  get externallyVisible() {
-    return false;
+  onBrowserChange(browser) {
+    // Make sure that the message manager is set. Otherwise the ProxyContext may
+    // never be destroyed because the ParentAPIManager would fail to detect that
+    // the message manager is closed.
+    if (!browser.messageManager) {
+      throw new Error("BrowserDocshellFollower: The new browser has no message manager");
+    }
+
+    this.currentMessageManager = browser.messageManager;
+  }
+
+  shutdown() {
+    this.unload();
+  }
+
+  unload() {
+    if (this.unloaded) {
+      return;
+    }
+    this._docShellTracker.destroy();
+    super.unload();
+    Management.emit("proxy-context-unload", this);
   }
 }
 
-function findPathInObject(obj, path) {
-  // Split any nested namespace (e.g devtools.inspectedWindow) element
-  // and concatenate them into a flatten array.
-  path = path.reduce((acc, el) => {
-    return acc.concat(el.split("."));
-  }, []);
+defineLazyGetter(ProxyContext.prototype, "apiObj", function() {
+  let obj = {};
+  GlobalManager.injectInObject(this, false, obj);
+  return obj;
+});
 
-  for (let elt of path) {
+defineLazyGetter(ProxyContext.prototype, "sandbox", function() {
+  return Cu.Sandbox(this.principal);
+});
+
+// The parent ProxyContext of an ExtensionContext in ExtensionChild.jsm.
+class ExtensionChildProxyContext extends ProxyContext {
+  constructor(envType, extension, params, xulBrowser) {
+    super(envType, extension, params, xulBrowser, extension.principal);
+
+    this.viewType = params.viewType;
+    // WARNING: The xulBrowser may change when docShells are swapped, e.g. when
+    // the tab moves to a different window.
+    this.xulBrowser = xulBrowser;
+  }
+
+  // The window that contains this context. This may change due to moving tabs.
+  get xulWindow() {
+    return this.xulBrowser.ownerGlobal;
+  }
+
+  get windowId() {
+    if (!Management.global.WindowManager || this.viewType == "background") {
+      return;
+    }
+    // viewType popup or tab:
+    return Management.global.WindowManager.getId(this.xulWindow);
+  }
+
+  get tabId() {
+    if (!Management.global.TabManager) {
+      return;  // Not yet supported on Android.
+    }
+    let {gBrowser} = this.xulBrowser.ownerGlobal;
+    let tab = gBrowser && gBrowser.getTabForBrowser(this.xulBrowser);
+    return tab && Management.global.TabManager.getId(tab);
+  }
+
+  onBrowserChange(browser) {
+    super.onBrowserChange(browser);
+    this.xulBrowser = browser;
+  }
+
+  shutdown() {
+    Management.emit("page-shutdown", this);
+    super.shutdown();
+  }
+}
+
+function findPathInObject(obj, path, printErrors = true) {
+  for (let elt of path.split(".")) {
     // If we get a null object before reaching the requested path
     // (e.g. the API object is returned only on particular kind of contexts instead
     // of based on WebExtensions permissions, like it happens for the devtools APIs),
     // stop searching and return undefined.
+    // TODO(robwu): This should never be reached. If an API is not available for
+    // a context, it should be declared as such in the schema and enforced by
+    // `shouldInject`, for instance using the same logic that is used to opt-in
+    // to APIs in content scripts.
+    // If this check is kept, then there is a discrepancy between APIs depending
+    // on whether it is generated locally or remotely: Non-existing local APIs
+    // are excluded in `shouldInject` by this check, but remote APIs do not have
+    // this information and will therefore cause the schema API generator to
+    // create an API that proxies to a non-existing API implementation.
     if (!obj || !(elt in obj)) {
-      return undefined;
+      if (printErrors) {
+        Cu.reportError(`WebExtension API ${path} not found (it may be unimplemented by Firefox).`);
+      }
+      return null;
     }
 
     obj = obj[elt];
@@ -361,7 +393,7 @@ function findPathInObject(obj, path) {
   return obj;
 }
 
-let ParentAPIManager = {
+var ParentAPIManager = {
   proxyContexts: new Map(),
 
   init() {
@@ -378,8 +410,17 @@ let ParentAPIManager = {
   observe(subject, topic, data) {
     let mm = subject;
     for (let [childId, context] of this.proxyContexts) {
-      if (context.messageManager == mm) {
+      if (context.currentMessageManager == mm) {
         this.closeProxyContext(childId);
+      }
+    }
+  },
+
+  shutdownExtension(extensionId) {
+    for (let [childId, context] of this.proxyContexts) {
+      if (context.extension.id == extensionId) {
+        context.shutdown();
+        this.proxyContexts.delete(childId);
       }
     }
   },
@@ -409,28 +450,59 @@ let ParentAPIManager = {
   },
 
   createProxyContext(data, target) {
-    let {extensionId, childId, principal} = data;
+    let {envType, extensionId, childId, principal} = data;
+    if (this.proxyContexts.has(childId)) {
+      Cu.reportError("A WebExtension context with the given ID already exists!");
+      return;
+    }
     let extension = GlobalManager.getExtension(extensionId);
+    if (!extension) {
+      Cu.reportError(`No WebExtension found with ID ${extensionId}`);
+      return;
+    }
 
-    let context = new ProxyContext(extension, data, target.messageManager, principal);
+    let context;
+    if (envType == "addon_parent") {
+      // Privileged addon contexts can only be loaded in documents whose main
+      // frame is also the same addon.
+      if (principal.URI.prePath != extension.baseURI.prePath ||
+          !target.contentPrincipal.subsumes(principal)) {
+        Cu.reportError(`Refused to create privileged WebExtension context for ${principal.URI.spec}`);
+        return;
+      }
+      context = new ExtensionChildProxyContext(envType, extension, data, target);
+    } else if (envType == "content_parent") {
+      context = new ProxyContext(envType, extension, data, target, principal);
+    } else {
+      Cu.reportError(`Invalid WebExtension context envType: ${envType}`);
+      return;
+    }
     this.proxyContexts.set(childId, context);
   },
 
   closeProxyContext(childId) {
-    if (!this.proxyContexts.has(childId)) {
+    let context = this.proxyContexts.get(childId);
+    if (!context) {
       return;
     }
-    let context = this.proxyContexts.get(childId);
     context.unload();
     this.proxyContexts.delete(childId);
   },
 
   call(data, target) {
     let context = this.proxyContexts.get(data.childId);
+    if (!context) {
+      Cu.reportError("WebExtension context not found!");
+      return;
+    }
+    if (context.currentMessageManager !== target.messageManager) {
+      Cu.reportError("WebExtension warning: Message manager unexpectedly changed");
+    }
+
     function callback(...cbArgs) {
       let lastError = context.lastError;
 
-      target.messageManager.sendAsyncMessage("API:CallResult", {
+      context.currentMessageManager.sendAsyncMessage("API:CallResult", {
         childId: data.childId,
         callId: data.callId,
         args: cbArgs,
@@ -444,10 +516,10 @@ let ParentAPIManager = {
       args = args.concat(callback);
     }
     try {
-      findPathInObject(context.apiObj, data.path)[data.name](...args);
+      findPathInObject(context.apiObj, data.path)(...args);
     } catch (e) {
       let msg = e.message || "API failed";
-      target.messageManager.sendAsyncMessage("API:CallResult", {
+      context.currentMessageManager.sendAsyncMessage("API:CallResult", {
         childId: data.childId,
         callId: data.callId,
         lastError: msg,
@@ -457,28 +529,35 @@ let ParentAPIManager = {
 
   addListener(data, target) {
     let context = this.proxyContexts.get(data.childId);
+    if (!context) {
+      Cu.reportError("WebExtension context not found!");
+      return;
+    }
+    if (context.currentMessageManager !== target.messageManager) {
+      Cu.reportError("WebExtension warning: Message manager unexpectedly changed");
+    }
 
     function listener(...listenerArgs) {
-      target.messageManager.sendAsyncMessage("API:RunListener", {
+      context.currentMessageManager.sendAsyncMessage("API:RunListener", {
         childId: data.childId,
         path: data.path,
-        name: data.name,
         args: listenerArgs,
       });
     }
 
-    let ref = data.path.concat(data.name).join(".");
-    context.listenerProxies.set(ref, listener);
+    context.listenerProxies.set(data.path, listener);
 
     let args = Cu.cloneInto(data.args, context.sandbox);
-    findPathInObject(context.apiObj, data.path)[data.name].addListener(listener, ...args);
+    findPathInObject(context.apiObj, data.path).addListener(listener, ...args);
   },
 
   removeListener(data) {
     let context = this.proxyContexts.get(data.childId);
-    let ref = data.path.concat(data.name).join(".");
-    let listener = context.listenerProxies.get(ref);
-    findPathInObject(context.apiObj, data.path)[data.name].removeListener(listener);
+    if (!context) {
+      Cu.reportError("WebExtension context not found!");
+    }
+    let listener = context.listenerProxies.get(data.path);
+    findPathInObject(context.apiObj, data.path).removeListener(listener);
   },
 };
 
@@ -579,7 +658,7 @@ var UninstallObserver = {
 
       // Clear localStorage created by the extension
       let attrs = JSON.stringify({addonId: addon.id});
-      Services.obs.notifyObservers(null, "clear-origin-data", attrs);
+      Services.obs.notifyObservers(null, "clear-origin-attributes-data", attrs);
     }
 
     if (!this.leaveUuid) {
@@ -598,8 +677,9 @@ GlobalManager = {
 
   init(extension) {
     if (this.extensionMap.size == 0) {
-      Services.obs.addObserver(this, "document-element-inserted", false);
       UninstallObserver.init();
+      ProxyMessenger.init();
+      Management.on("extension-browser-inserted", this._onExtensionBrowser);
       this.initialized = true;
     }
 
@@ -610,23 +690,41 @@ GlobalManager = {
     this.extensionMap.delete(extension.id);
 
     if (this.extensionMap.size == 0 && this.initialized) {
-      Services.obs.removeObserver(this, "document-element-inserted");
+      Management.off("extension-browser-inserted", this._onExtensionBrowser);
       this.initialized = false;
     }
+  },
+
+  _onExtensionBrowser(type, browser) {
+    // TODO(robwu): Move this logic inside a frame script.
+    let global = browser.docShell
+      .QueryInterface(Ci.nsIInterfaceRequestor)
+      .getInterface(Ci.nsIContentFrameMessageManager);
+    ExtensionContent.init(global);
+    /* eslint-disable mozilla/balanced-listeners */
+    global.addEventListener("unload", function() {
+      ExtensionContent.uninit(this);
+    });
+    /* eslint-enable mozilla/balanced-listeners */
   },
 
   getExtension(extensionId) {
     return this.extensionMap.get(extensionId);
   },
 
-  injectInObject(context, defaultCallback, dest, namespaces = null) {
+  injectInObject(context, isChromeCompat, dest) {
     let apis = {
       extensionTypes: {},
     };
-    Management.generateAPIs(context, Management.schemaApis, apis, namespaces);
-    Management.generateAPIs(context, context.extension.apis, apis, namespaces);
+    Management.generateAPIs(context, apis);
+    SchemaAPIManager.generateAPIs(context, context.extension.apis, apis);
+
+    // For testing only.
+    context._unwrappedAPIs = apis;
 
     let schemaWrapper = {
+      isChromeCompat,
+
       get principal() {
         return context.principal;
       },
@@ -639,160 +737,20 @@ GlobalManager = {
         return context.extension.hasPermission(permission);
       },
 
-      callFunction(path, name, args) {
-        return findPathInObject(apis, path)[name](...args);
-      },
-
-      callFunctionNoReturn(path, name, args) {
-        findPathInObject(apis, path)[name](...args);
-      },
-
-      callAsyncFunction(path, name, args, callback) {
-        // We pass an empty stub function as a default callback for
-        // the `chrome` API, so promise objects are not returned,
-        // and lastError values are reported immediately.
-        if (callback === null) {
-          callback = defaultCallback;
-        }
-
-        let promise;
-        try {
-          promise = findPathInObject(apis, path)[name](...args);
-        } catch (e) {
-          promise = Promise.reject(e);
-        }
-
-        return context.wrapPromise(promise || Promise.resolve(), callback);
-      },
-
-      shouldInject(namespace, name) {
-        if (namespaces && !namespaces.includes(namespace)) {
+      shouldInject(namespace, name, allowedContexts) {
+        // Do not generate content script APIs, unless explicitly allowed.
+        if (context.envType === "content_parent" && !allowedContexts.includes("content")) {
           return false;
         }
-        return findPathInObject(apis, [namespace]) != null;
+        return findPathInObject(apis, namespace, false) !== null;
       },
 
-      getProperty(path, name) {
-        return findPathInObject(apis, path)[name];
-      },
-
-      setProperty(path, name, value) {
-        findPathInObject(apis, path)[name] = value;
-      },
-
-      addListener(path, name, listener, args) {
-        findPathInObject(apis, path)[name].addListener.call(null, listener, ...args);
-      },
-      removeListener(path, name, listener) {
-        findPathInObject(apis, path)[name].removeListener.call(null, listener);
-      },
-      hasListener(path, name, listener) {
-        return findPathInObject(apis, path)[name].hasListener.call(null, listener);
+      getImplementation(namespace, name) {
+        let pathObj = findPathInObject(apis, namespace);
+        return new LocalAPIImplementation(pathObj, name, context);
       },
     };
     Schemas.inject(dest, schemaWrapper);
-  },
-
-  observe(document, topic, data) {
-    let contentWindow = document.defaultView;
-    if (!contentWindow) {
-      return;
-    }
-
-    let inject = context => {
-      // We create two separate sets of bindings, one for the `chrome`
-      // global, and one for the `browser` global. The latter returns
-      // Promise objects if a callback is not passed, while the former
-      // does not.
-      let injectObject = (name, defaultCallback) => {
-        let browserObj = Cu.createObjectIn(contentWindow, {defineAs: name});
-        this.injectInObject(context, defaultCallback, browserObj);
-      };
-
-      injectObject("browser", null);
-      injectObject("chrome", () => {});
-    };
-
-    let id = ExtensionManagement.getAddonIdForWindow(contentWindow);
-
-    // We don't inject privileged APIs into sub-frames of a UI page.
-    const {FULL_PRIVILEGES} = ExtensionManagement.API_LEVELS;
-    if (ExtensionManagement.getAPILevelForWindow(contentWindow, id) !== FULL_PRIVILEGES) {
-      return;
-    }
-
-    // We don't inject privileged APIs if the addonId is null
-    // or doesn't exist.
-    if (!this.extensionMap.has(id)) {
-      return;
-    }
-
-    let docShell = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
-                                .getInterface(Ci.nsIDocShell);
-
-    let parentDocument = docShell.parent.QueryInterface(Ci.nsIDocShell)
-                                 .contentViewer.DOMDocument;
-
-    let browser = docShell.chromeEventHandler;
-    // If this is a sub-frame of the add-on manager, use that <browser>
-    // element rather than the top-level chrome event handler.
-    if (contentWindow.frameElement && parentDocument.documentURI == "about:addons") {
-      browser = contentWindow.frameElement;
-    }
-
-    let type = "tab";
-    if (browser.hasAttribute("webextension-view-type")) {
-      type = browser.getAttribute("webextension-view-type");
-    } else if (browser.classList.contains("inline-options-browser")) {
-      // Options pages are currently displayed inline, but in Chrome
-      // and in our UI mock-ups for a later milestone, they're
-      // pop-ups.
-      type = "popup";
-    }
-
-    let extension = this.extensionMap.get(id);
-    let uri = document.documentURIObject;
-    let incognito = PrivateBrowsingUtils.isContentWindowPrivate(contentWindow);
-
-    let context = new ExtensionContext(extension, {type, contentWindow, uri, docShell, incognito});
-    inject(context);
-    if (type == "background") {
-      this._initializeBackgroundPage(contentWindow);
-    }
-
-    let innerWindowID = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
-      .getInterface(Ci.nsIDOMWindowUtils).currentInnerWindowID;
-
-    let onUnload = subject => {
-      let windowId = subject.QueryInterface(Ci.nsISupportsPRUint64).data;
-      if (windowId == innerWindowID) {
-        Services.obs.removeObserver(onUnload, "inner-window-destroyed");
-        context.unload();
-      }
-    };
-    Services.obs.addObserver(onUnload, "inner-window-destroyed", false);
-  },
-
-  _initializeBackgroundPage(contentWindow) {
-    // Override the `alert()` method inside background windows;
-    // we alias it to console.log().
-    // See: https://bugzilla.mozilla.org/show_bug.cgi?id=1203394
-    let alertDisplayedWarning = false;
-    let alertOverwrite = text => {
-      if (!alertDisplayedWarning) {
-        require("devtools/client/framework/devtools-browser");
-
-        let hudservice = require("devtools/client/webconsole/hudservice");
-        hudservice.openBrowserConsoleOrFocus();
-
-        contentWindow.console.warn("alert() is not supported in background windows; please use console.log instead.");
-
-        alertDisplayedWarning = true;
-      }
-
-      contentWindow.console.log(text);
-    };
-    Cu.exportFunction(alertOverwrite, contentWindow, {defineAs: "alert"});
   },
 };
 
@@ -883,20 +841,14 @@ this.ExtensionData = class {
         return results;
       }
 
-      if (!(this.rootURI instanceof Ci.nsIJARURI &&
-            this.rootURI.JARFile instanceof Ci.nsIFileURL)) {
-        // This currently happens for app:// URLs passed to us by
-        // UserCustomizations.jsm
-        return [];
-      }
-
       // FIXME: We need a way to do this without main thread IO.
 
-      let file = this.rootURI.JARFile.file;
-      let zipReader = Cc["@mozilla.org/libjar/zip-reader;1"].createInstance(Ci.nsIZipReader);
-      try {
-        zipReader.open(file);
+      this.rootURI.QueryInterface(Ci.nsIJARURI);
 
+      let file = this.rootURI.JARFile.QueryInterface(Ci.nsIFileURL).file;
+      let zipReader = Cc["@mozilla.org/libjar/zip-reader;1"].createInstance(Ci.nsIZipReader);
+      zipReader.open(file);
+      try {
         let results = [];
 
         // Normalize the directory path.
@@ -1262,8 +1214,6 @@ this.Extension = class extends ExtensionData {
     this.baseURI = NetUtil.newURI(this.getURL("")).QueryInterface(Ci.nsIURL);
     this.principal = this.createPrincipal();
 
-    this.views = new Set();
-
     this.onStartup = null;
 
     this.hasShutdown = false;
@@ -1466,7 +1416,7 @@ this.Extension = class extends ExtensionData {
 
   readManifest() {
     return super.readManifest().then(manifest => {
-      if (AppConstants.RELEASE_BUILD) {
+      if (AppConstants.RELEASE_OR_BETA) {
         return manifest;
       }
 
@@ -1498,6 +1448,7 @@ this.Extension = class extends ExtensionData {
       whiteListedHosts: this.whiteListedHosts.serialize(),
       localeData: this.localeData.serialize(),
       permissions: this.permissions,
+      principal: this.principal,
     };
   }
 
@@ -1591,11 +1542,7 @@ this.Extension = class extends ExtensionData {
       }
     }).then(() => {
       if (this.errors.length) {
-        // b2g add-ons generate manifest errors that we've silently
-        // ignoring prior to adding this check.
-        if (!this.rootURI.schemeIs("app")) {
-          return Promise.reject({errors: this.errors});
-        }
+        return Promise.reject({errors: this.errors});
       }
 
       if (this.hasShutdown) {
@@ -1604,6 +1551,11 @@ this.Extension = class extends ExtensionData {
 
       GlobalManager.init(this);
 
+      // The "startup" Management event sent on the extension instance itself
+      // is emitted just before the Management "startup" event,
+      // and it is used to run code that needs to be executed before
+      // any of the "startup" listeners.
+      this.emit("startup", this);
       Management.emit("startup", this);
 
       return this.runManifest(this.manifest);
@@ -1653,10 +1605,6 @@ this.Extension = class extends ExtensionData {
 
     GlobalManager.uninit(this);
 
-    for (let view of this.views) {
-      view.shutdown();
-    }
-
     for (let obj of this.onShutdown) {
       obj.close();
     }
@@ -1664,6 +1612,8 @@ this.Extension = class extends ExtensionData {
     for (let api of this.apis) {
       api.destroy();
     }
+
+    ParentAPIManager.shutdownExtension(this.id);
 
     Management.emit("shutdown", this);
 

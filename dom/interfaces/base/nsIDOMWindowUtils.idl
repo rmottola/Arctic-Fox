@@ -49,7 +49,7 @@ interface nsIJSRAIIHelper;
 interface nsIContentPermissionRequest;
 interface nsIObserver;
 
-[scriptable, uuid(46b44e33-13c2-4eb3-bf80-76a4e0857ccc)]
+[scriptable, uuid(c471d440-004b-4c50-a6f2-747db5f443b6)]
 interface nsIDOMWindowUtils : nsISupports {
 
   /**
@@ -280,8 +280,8 @@ interface nsIDOMWindowUtils : nsISupports {
   const long MODIFIER_OS         = 0x1000;
 
   /** Synthesize a mouse event. The event types supported are:
-   *    mousedown, mouseup, mousemove, mouseover, mouseout, contextmenu,
-   *    MozMouseHittest
+   *    mousedown, mouseup, mousemove, mouseover, mouseout, mousecancel,
+   *    contextmenu, MozMouseHittest
    *
    * Events are sent in coordinates offset by aX and aY from the window.
    *
@@ -300,6 +300,11 @@ interface nsIDOMWindowUtils : nsISupports {
    * The event is dispatched via the toplevel window, so it could go to any
    * window under the toplevel window, in some cases it could never reach this
    * window at all.
+   *
+   * NOTE: mousecancel is used to represent the vanishing of an input device
+   * such as a pen leaving its digitizer by synthesizing a WidgetMouseEvent,
+   * whose mMessage is eMouseExitFromWidget and mExitFrom is
+   * WidgetMouseEvent::eTopLevel.
    *
    * @param aType event type
    * @param aX x offset in CSS pixels
@@ -1798,8 +1803,6 @@ interface nsIDOMWindowUtils : nsISupports {
    * Supported properties:
    *   "overdraw": Report a percentage between 0 and 999 indicate how many times
    *               each pixels on the destination window have been touched.
-   *   "missed_hwc": Report a bool if hardware composer is supported but was
-   *                 not used for the last frame.
    */
   float requestCompositorProperty(in AString aProperty);
 
@@ -1952,6 +1955,16 @@ interface nsIDOMWindowUtils : nsISupports {
    * can be used by tests to force execution of the interrupted reflow codepaths.
    */
   void forceReflowInterrupt();
+
+  /**
+   * Terminate the GPU process. Used for testing GPU process restarts.
+   */
+  void terminateGPUProcess();
+
+  /**
+    * Returns the GPU process pid, or -1 if there is no GPU process.
+    */
+  readonly attribute int32_t gpuProcessPid;
 
   const long MOUSE_BUTTONS_NO_BUTTON = 0x00;
   const long MOUSE_BUTTONS_LEFT_BUTTON = 0x01;

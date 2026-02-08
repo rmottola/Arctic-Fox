@@ -346,6 +346,7 @@ class BuildOptionParser(object):
         'b2g-debug': 'b2g/releng_sub_%s_configs/%s_debug.py',
         'cross-debug': 'builds/releng_sub_%s_configs/%s_cross_debug.py',
         'cross-opt': 'builds/releng_sub_%s_configs/%s_cross_opt.py',
+        'cross-universal': 'builds/releng_sub_%s_configs/%s_cross_universal.py',
         'debug': 'builds/releng_sub_%s_configs/%s_debug.py',
         'asan-and-debug': 'builds/releng_sub_%s_configs/%s_asan_and_debug.py',
         'stat-and-debug': 'builds/releng_sub_%s_configs/%s_stat_and_debug.py',

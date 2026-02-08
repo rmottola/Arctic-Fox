@@ -34,8 +34,8 @@
 #include "jit/arm/Architecture-arm.h"
 #include "jit/arm/disasm/Disasm-arm.h"
 #include "jit/IonTypes.h"
-#include "threading/Mutex.h"
 #include "threading/Thread.h"
+#include "vm/MutexIDs.h"
 
 namespace js {
 namespace jit {
@@ -100,12 +100,12 @@ class Simulator
     };
 
     // Returns nullptr on OOM.
-    static Simulator* Create();
+    static Simulator* Create(JSContext* cx);
 
     static void Destroy(Simulator* simulator);
 
     // Constructor/destructor are for internal use only; use the static methods above.
-    Simulator();
+    explicit Simulator(JSContext* cx);
     ~Simulator();
 
     // The currently executing Simulator instance. Potentially there can be one
@@ -115,6 +115,29 @@ class Simulator
     static inline uintptr_t StackLimit() {
         return Simulator::Current()->stackLimit();
     }
+
+    // Disassemble some instructions starting at instr and print them
+    // on stdout.  Useful for working within GDB after a MOZ_CRASH(),
+    // among other things.
+    //
+    // Typical use within a crashed instruction decoding method is simply:
+    //
+    //   call Simulator::disassemble(instr, 1)
+    //
+    // or use one of the more convenient inline methods below.
+    static void disassemble(SimInstruction* instr, size_t n);
+
+    // Disassemble one instruction.
+    // "call disasm(instr)"
+    void disasm(SimInstruction* instr);
+
+    // Disassemble n instructions starting at instr.
+    // "call disasm(instr, 3)"
+    void disasm(SimInstruction* instr, size_t n);
+
+    // Skip backwards m instructions before starting, then disassemble n instructions.
+    // "call disasm(instr, 3, 7)"
+    void disasm(SimInstruction* instr, size_t m, size_t n);
 
     uintptr_t* addressOfStackLimit();
 
@@ -259,6 +282,9 @@ class Simulator
     inline void increaseStopCounter(uint32_t bkpt_code);
     void printStopInfo(uint32_t code);
 
+    // Handle any wasm faults, returning true if the fault was handled.
+    inline bool handleWasmFault(int32_t addr, unsigned numBytes);
+
     // Read and write memory.
     inline uint8_t readBU(int32_t addr);
     inline int8_t readB(int32_t addr);
@@ -279,6 +305,9 @@ class Simulator
 
     inline int readW(int32_t addr, SimInstruction* instr, UnalignedPolicy f = ForbidUnaligned);
     inline void writeW(int32_t addr, int value, SimInstruction* instr, UnalignedPolicy f = ForbidUnaligned);
+
+    inline uint64_t readQ(int32_t addr, SimInstruction* instr, UnalignedPolicy f = ForbidUnaligned);
+    inline void writeQ(int32_t addr, uint64_t value, SimInstruction* instr, UnalignedPolicy f = ForbidUnaligned);
 
     inline int readExW(int32_t addr, SimInstruction* instr);
     inline int writeExW(int32_t addr, int value, SimInstruction* instr);
@@ -348,6 +377,8 @@ class Simulator
     void setVFPRegister(int reg_index, const InputType& value);
 
     void callInternal(uint8_t* entry);
+
+    JSContext* const cx_;
 
     // Architecture state.
     // Saturating instructions require a Q flag to indicate saturation.

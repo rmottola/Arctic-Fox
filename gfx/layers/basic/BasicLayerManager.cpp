@@ -209,9 +209,7 @@ BasicLayerManager::PopGroupForLayer(PushedGroup &group)
 static IntRect
 ToInsideIntRect(const gfxRect& aRect)
 {
-  gfxRect r = aRect;
-  r.RoundIn();
-  return IntRect(r.X(), r.Y(), r.Width(), r.Height());
+  return IntRect::RoundIn(aRect.X(), aRect.Y(), aRect.Width(), aRect.Height());
 }
 
 // A context helper for BasicLayerManager::PaintLayer() that holds all the
@@ -348,15 +346,15 @@ BasicLayerManager::SetDefaultTargetConfiguration(BufferMode aDoubleBuffering, Sc
   mDoubleBuffering = aDoubleBuffering;
 }
 
-void
+bool
 BasicLayerManager::BeginTransaction()
 {
   mInTransaction = true;
   mUsingDefaultTarget = true;
-  BeginTransactionWithTarget(mDefaultTarget);
+  return BeginTransactionWithTarget(mDefaultTarget);
 }
 
-void
+bool
 BasicLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
 {
   mInTransaction = true;
@@ -369,6 +367,7 @@ BasicLayerManager::BeginTransactionWithTarget(gfxContext* aTarget)
   NS_ASSERTION(!InTransaction(), "Nested transactions not allowed");
   mPhase = PHASE_CONSTRUCTION;
   mTarget = aTarget;
+  return true;
 }
 
 static void

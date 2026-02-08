@@ -12,6 +12,8 @@
 #include "nsINetworkInterceptController.h"
 #include "nsIOutputStream.h"
 #include "nsIScriptError.h"
+#include "nsIUnicodeDecoder.h"
+#include "nsIUnicodeEncoder.h"
 #include "nsContentPolicyUtils.h"
 #include "nsContentUtils.h"
 #include "nsComponentManagerUtils.h"
@@ -26,29 +28,21 @@
 
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/dom/BodyUtil.h"
 #include "mozilla/dom/DOMException.h"
 #include "mozilla/dom/DOMExceptionBinding.h"
+#include "mozilla/dom/EncodingUtils.h"
 #include "mozilla/dom/FetchEventBinding.h"
 #include "mozilla/dom/MessagePort.h"
-#include "mozilla/dom/MessagePortList.h"
 #include "mozilla/dom/PromiseNativeHandler.h"
+#include "mozilla/dom/PushEventBinding.h"
+#include "mozilla/dom/PushMessageDataBinding.h"
+#include "mozilla/dom/PushUtil.h"
 #include "mozilla/dom/Request.h"
+#include "mozilla/dom/TypedArray.h"
 #include "mozilla/dom/Response.h"
 #include "mozilla/dom/WorkerScope.h"
 #include "mozilla/dom/workers/bindings/ServiceWorker.h"
-
-#ifndef MOZ_SIMPLEPUSH
-#include "mozilla/dom/PushEventBinding.h"
-#include "mozilla/dom/PushMessageDataBinding.h"
-
-#include "nsIUnicodeDecoder.h"
-#include "nsIUnicodeEncoder.h"
-
-#include "mozilla/dom/BodyUtil.h"
-#include "mozilla/dom/EncodingUtils.h"
-#include "mozilla/dom/PushUtil.h"
-#include "mozilla/dom/TypedArray.h"
-#endif
 
 #include "js/Conversions.h"
 #include "js/TypeDecls.h"
@@ -154,6 +148,7 @@ FetchEvent::Constructor(const GlobalObject& aGlobal,
   bool trusted = e->Init(owner);
   e->InitEvent(aType, aOptions.mBubbles, aOptions.mCancelable);
   e->SetTrusted(trusted);
+  e->SetComposed(aOptions.mComposed);
   e->mRequest = aOptions.mRequest;
   e->mClientId = aOptions.mClientId;
   e->mIsReload = aOptions.mIsReload;
@@ -399,7 +394,13 @@ void RespondWithCopyComplete(void* aClosure, nsresult aStatus)
                                data->mScriptSpec,
                                data->mResponseURLSpec);
   }
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(event));
+  // In theory this can happen after the worker thread is terminated.
+  WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+  if (worker) {
+    MOZ_ALWAYS_SUCCEEDS(worker->DispatchToMainThread(event.forget()));
+  } else {
+    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(event.forget()));
+  }
 }
 
 namespace {
@@ -425,7 +426,7 @@ ExtractErrorValues(JSContext* aCx, JS::Handle<JS::Value> aValue,
       // this report anywhere.
       RefPtr<xpc::ErrorReport> report = new xpc::ErrorReport();
       report->Init(err,
-                   "<unknown>", // fallback message
+                   "<unknown>", // toString result
                    false,       // chrome
                    0);          // window ID
 
@@ -729,7 +730,13 @@ RespondWithHandler::CancelRequest(nsresult aStatus)
 {
   nsCOMPtr<nsIRunnable> runnable =
     new CancelChannelRunnable(mInterceptedChannel, mRegistration, aStatus);
-  NS_DispatchToMainThread(runnable);
+  // Note, this may run off the worker thread during worker termination.
+  WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+  if (worker) {
+    MOZ_ALWAYS_SUCCEEDS(worker->DispatchToMainThread(runnable.forget()));
+  } else {
+    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable.forget()));
+  }
   mRequestWasHandled = true;
 }
 
@@ -772,9 +779,11 @@ FetchEvent::RespondWith(JSContext* aCx, Promise& aArg, ErrorResult& aRv)
 }
 
 void
-FetchEvent::PreventDefault(JSContext* aCx)
+FetchEvent::PreventDefault(JSContext* aCx, CallerType aCallerType)
 {
   MOZ_ASSERT(aCx);
+  MOZ_ASSERT(aCallerType != CallerType::System,
+             "Since when do we support system-principal service workers?");
 
   if (mPreventDefaultScriptSpec.IsEmpty()) {
     // Note when the FetchEvent might have been canceled by script, but don't
@@ -787,7 +796,7 @@ FetchEvent::PreventDefault(JSContext* aCx)
                                   &mPreventDefaultColumnNumber);
   }
 
-  Event::PreventDefault(aCx);
+  Event::PreventDefault(aCx, aCallerType);
 }
 
 void
@@ -862,8 +871,8 @@ public:
       mColumn = column;
     }
 
-    MOZ_ALWAYS_SUCCEEDS(
-      NS_DispatchToMainThread(NewRunnableMethod(this, &WaitUntilHandler::ReportOnMainThread)));
+    MOZ_ALWAYS_SUCCEEDS(mWorkerPrivate->DispatchToMainThread(
+        NewRunnableMethod(this, &WaitUntilHandler::ReportOnMainThread)));
   }
 
   void
@@ -961,8 +970,6 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(ExtendableEvent)
 NS_INTERFACE_MAP_END_INHERITING(Event)
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ExtendableEvent, Event, mPromises)
-
-#ifndef MOZ_SIMPLEPUSH
 
 namespace {
 nsresult
@@ -1136,6 +1143,7 @@ PushEvent::Constructor(mozilla::dom::EventTarget* aOwner,
   bool trusted = e->Init(aOwner);
   e->InitEvent(aType, aOptions.mBubbles, aOptions.mCancelable);
   e->SetTrusted(trusted);
+  e->SetComposed(aOptions.mComposed);
   if(aOptions.mData.WasPassed()){
     nsTArray<uint8_t> bytes;
     nsresult rv = ExtractBytesFromData(aOptions.mData.Value(), bytes);
@@ -1162,8 +1170,6 @@ PushEvent::WrapObjectInternal(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
   return mozilla::dom::PushEventBinding::Wrap(aCx, this, aGivenProto);
 }
 
-#endif /* ! MOZ_SIMPLEPUSH */
-
 ExtendableMessageEvent::ExtendableMessageEvent(EventTarget* aOwner)
   : ExtendableEvent(aOwner)
   , mData(JS::UndefinedValue())
@@ -1182,7 +1188,6 @@ ExtendableMessageEvent::GetData(JSContext* aCx,
                                 JS::MutableHandle<JS::Value> aData,
                                 ErrorResult& aRv)
 {
-  JS::ExposeValueToActiveJS(mData);
   aData.set(mData);
   if (!JS_WrapValue(aCx, aData)) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -1229,41 +1234,24 @@ ExtendableMessageEvent::Constructor(mozilla::dom::EventTarget* aEventTarget,
   event->mOrigin = aOptions.mOrigin;
   event->mLastEventId = aOptions.mLastEventId;
 
-  if (aOptions.mSource.WasPassed() && !aOptions.mSource.Value().IsNull()) {
-    if (aOptions.mSource.Value().Value().IsClient()) {
-      event->mClient = aOptions.mSource.Value().Value().GetAsClient();
-    } else if (aOptions.mSource.Value().Value().IsServiceWorker()){
-      event->mServiceWorker = aOptions.mSource.Value().Value().GetAsServiceWorker();
-    } else if (aOptions.mSource.Value().Value().IsMessagePort()){
-      event->mMessagePort = aOptions.mSource.Value().Value().GetAsMessagePort();
+  if (!aOptions.mSource.IsNull()) {
+    if (aOptions.mSource.Value().IsClient()) {
+      event->mClient = aOptions.mSource.Value().GetAsClient();
+    } else if (aOptions.mSource.Value().IsServiceWorker()){
+      event->mServiceWorker = aOptions.mSource.Value().GetAsServiceWorker();
+    } else if (aOptions.mSource.Value().IsMessagePort()){
+      event->mMessagePort = aOptions.mSource.Value().GetAsMessagePort();
     }
-    MOZ_ASSERT(event->mClient || event->mServiceWorker || event->mMessagePort);
   }
 
-  if (aOptions.mPorts.WasPassed() && !aOptions.mPorts.Value().IsNull()) {
-    nsTArray<RefPtr<MessagePort>> ports;
-    const Sequence<OwningNonNull<MessagePort>>& portsParam =
-      aOptions.mPorts.Value().Value();
-    for (uint32_t i = 0, len = portsParam.Length(); i < len; ++i) {
-      ports.AppendElement(portsParam[i].get());
-    }
-    event->mPorts = new MessagePortList(static_cast<EventBase*>(event), ports);
-  }
-
+  event->mPorts.AppendElements(aOptions.mPorts);
   return event.forget();
 }
 
-MessagePortList*
-ExtendableMessageEvent::GetPorts() const
-{
-  return mPorts;
-}
-
 void
-ExtendableMessageEvent::SetPorts(MessagePortList* aPorts)
+ExtendableMessageEvent::GetPorts(nsTArray<RefPtr<MessagePort>>& aPorts)
 {
-  MOZ_ASSERT(!mPorts && aPorts);
-  mPorts = aPorts;
+  aPorts = mPorts;
 }
 
 void

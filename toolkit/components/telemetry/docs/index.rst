@@ -1,3 +1,5 @@
+.. _telemetry:
+
 =========
 Telemetry
 =========
@@ -23,4 +25,7 @@ Client-side, this consists of:
    core-ping
    deletion-ping
    uitour-ping
+   heartbeat-ping
+   sync-ping
    preferences
+   crashes

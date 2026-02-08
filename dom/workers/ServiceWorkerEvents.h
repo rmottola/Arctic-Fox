@@ -11,13 +11,10 @@
 #include "mozilla/dom/ExtendableEventBinding.h"
 #include "mozilla/dom/ExtendableMessageEventBinding.h"
 #include "mozilla/dom/FetchEventBinding.h"
+#include "mozilla/dom/File.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/Response.h"
 #include "mozilla/dom/workers/bindings/ServiceWorker.h"
-
-#ifndef MOZ_SIMPLEPUSH
-#include "mozilla/dom/File.h"
-#endif
 
 #include "nsProxyRelease.h"
 #include "nsContentUtils.h"
@@ -28,7 +25,6 @@ namespace mozilla {
 namespace dom {
 class Blob;
 class MessagePort;
-class MessagePortList;
 class Request;
 class ResponseOrPromise;
 
@@ -80,6 +76,7 @@ public:
     bool trusted = e->Init(aOwner);
     e->InitEvent(aType, aOptions.mBubbles, aOptions.mCancelable);
     e->SetTrusted(trusted);
+    e->SetComposed(aOptions.mComposed);
     return e.forget();
   }
 
@@ -126,7 +123,7 @@ public:
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(FetchEvent, ExtendableEvent)
 
   // Note, we cannot use NS_FORWARD_TO_EVENT because we want a different
-  // PreventDefault(JSContext*) override.
+  // PreventDefault(JSContext*, CallerType) override.
   NS_FORWARD_NSIDOMEVENT(Event::)
 
   virtual JSObject* WrapObjectInternal(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override
@@ -179,13 +176,11 @@ public:
   Default();
 
   void
-  PreventDefault(JSContext* aCx) override;
+  PreventDefault(JSContext* aCx, CallerType aCallerType) override;
 
   void
   ReportCanceled();
 };
-
-#ifndef MOZ_SIMPLEPUSH
 
 class PushMessageData final : public nsISupports,
                               public nsWrapperCache
@@ -255,7 +250,6 @@ public:
     return mData;
   }
 };
-#endif /* ! MOZ_SIMPLEPUSH */
 
 class ExtendableMessageEvent final : public ExtendableEvent
 {
@@ -265,7 +259,7 @@ class ExtendableMessageEvent final : public ExtendableEvent
   RefPtr<ServiceWorkerClient> mClient;
   RefPtr<ServiceWorker> mServiceWorker;
   RefPtr<MessagePort> mMessagePort;
-  RefPtr<MessagePortList> mPorts;
+  nsTArray<RefPtr<MessagePort>> mPorts;
 
 protected:
   explicit ExtendableMessageEvent(EventTarget* aOwner);
@@ -313,9 +307,7 @@ public:
     return NS_OK;
   }
 
-  MessagePortList* GetPorts() const;
-
-  void SetPorts(MessagePortList* aPorts);
+  void GetPorts(nsTArray<RefPtr<MessagePort>>& aPorts);
 
   void SetSource(ServiceWorkerClient* aClient);
 

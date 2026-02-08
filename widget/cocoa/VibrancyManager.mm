@@ -14,6 +14,10 @@ void
 VibrancyManager::UpdateVibrantRegion(VibrancyType aType,
                                      const LayoutDeviceIntRegion& aRegion)
 {
+  if (aRegion.IsEmpty()) {
+    mVibrantRegions.Remove(uint32_t(aType));
+    return;
+  }
   auto& vr = *mVibrantRegions.LookupOrAdd(uint32_t(aType));
   vr.UpdateRegion(aRegion, mCoordinateConverter, mContainerView, ^() {
     return this->CreateEffectView(aType);
@@ -143,6 +147,8 @@ AppearanceForVibrancyType(VibrancyType aType)
     case VibrancyType::HIGHLIGHTED_MENUITEM:
     case VibrancyType::SHEET:
     case VibrancyType::SOURCE_LIST:
+    case VibrancyType::SOURCE_LIST_SELECTION:
+    case VibrancyType::ACTIVE_SOURCE_LIST_SELECTION:
       return [NSAppearanceClass performSelector:@selector(appearanceNamed:)
                                      withObject:@"NSAppearanceNameVibrantLight"];
     case VibrancyType::DARK:
@@ -230,9 +236,12 @@ VibrancyManager::CreateEffectView(VibrancyType aType)
                                                      : NSVisualEffectMaterialTitlebar];
   } else if (aType == VibrancyType::SOURCE_LIST && canUseElCapitanMaterials) {
     [effectView setMaterial:NSVisualEffectMaterialSidebar];
-  } else if (aType == VibrancyType::HIGHLIGHTED_MENUITEM) {
+  } else if (aType == VibrancyType::HIGHLIGHTED_MENUITEM ||
+             aType == VibrancyType::SOURCE_LIST_SELECTION ||
+             aType == VibrancyType::ACTIVE_SOURCE_LIST_SELECTION) {
     [effectView setMaterial:NSVisualEffectMaterialMenuItem];
-    if ([effectView respondsToSelector:@selector(setEmphasized:)]) {
+    if ([effectView respondsToSelector:@selector(setEmphasized:)] &&
+        aType != VibrancyType::SOURCE_LIST_SELECTION) {
       [effectView setEmphasized:YES];
     }
   }

@@ -8,6 +8,9 @@
 
 #include "mozilla/TelemetryHistogramEnums.h"
 
+#include "mozilla/TelemetryComms.h"
+#include "nsXULAppAPI.h"
+
 // This module is internal to Telemetry.  It encapsulates Telemetry's
 // histogram accumulation and storage logic.  It should only be used by
 // Telemetry.cpp.  These functions should not be used anywhere else.
@@ -42,8 +45,10 @@ void Accumulate(const char* name, const nsCString& key, uint32_t sample);
 
 void AccumulateCategorical(mozilla::Telemetry::ID aId, const nsCString& aLabel);
 
-void
-ClearHistogram(mozilla::Telemetry::ID aId);
+void AccumulateChild(GeckoProcessType aProcessType,
+                     const nsTArray<mozilla::Telemetry::Accumulation>& aAccumulations);
+void AccumulateChildKeyed(GeckoProcessType aProcessType,
+                          const nsTArray<mozilla::Telemetry::KeyedAccumulation>& aAccumulations);
 
 nsresult
 GetHistogramById(const nsACString &name, JSContext *cx,
@@ -55,18 +60,6 @@ GetKeyedHistogramById(const nsACString &name, JSContext *cx,
 
 const char*
 GetHistogramName(mozilla::Telemetry::ID id);
-
-nsresult
-NewHistogram(const nsACString &name, const nsACString &expiration,
-             uint32_t histogramType, uint32_t min, uint32_t max,
-             uint32_t bucketCount, JSContext *cx,
-             uint8_t optArgCount, JS::MutableHandle<JS::Value> ret);
-
-nsresult
-NewKeyedHistogram(const nsACString &name, const nsACString &expiration,
-                  uint32_t histogramType, uint32_t min, uint32_t max,
-                  uint32_t bucketCount, JSContext *cx,
-                  uint8_t optArgCount, JS::MutableHandle<JS::Value> ret);
 
 nsresult
 HistogramFrom(const nsACString &name, const nsACString &existing_name,
@@ -108,6 +101,8 @@ GetMapShallowSizesOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf);
 size_t
 GetHistogramSizesofIncludingThis(mozilla::MallocSizeOf aMallocSizeOf);
 
+void
+IPCTimerFired(nsITimer* aTimer, void* aClosure);
 } // namespace TelemetryHistogram
 
 #endif // TelemetryHistogram_h__

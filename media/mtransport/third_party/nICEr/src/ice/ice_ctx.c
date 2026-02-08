@@ -514,6 +514,16 @@ static void nr_ice_ctx_destroy_cb(NR_SOCKET s, int how, void *cb_arg)
     RFREE(ctx);
   }
 
+void nr_ice_ctx_add_flags(nr_ice_ctx *ctx, UINT4 flags)
+  {
+    ctx->flags |= flags;
+  }
+
+void nr_ice_ctx_remove_flags(nr_ice_ctx *ctx, UINT4 flags)
+  {
+    ctx->flags &= ~flags;
+  }
+
 int nr_ice_ctx_destroy(nr_ice_ctx **ctxp)
   {
     if(!ctxp || !*ctxp)
@@ -662,7 +672,7 @@ static int nr_ice_get_default_local_address(nr_ice_ctx *ctx, int ip_version, nr_
     if ((r=nr_ice_get_default_address(ctx, ip_version, &default_addr)))
         ABORT(r);
 
-    for(i=0; i<addr_ct; ++i) {
+    for (i=0; i < addr_ct; ++i) {
       if (!nr_transport_addr_cmp(&default_addr, &addrs[i].addr,
                                  NR_TRANSPORT_ADDR_CMP_MODE_ADDR)) {
         if ((r=nr_local_addr_copy(addrp, &addrs[i])))
@@ -670,8 +680,12 @@ static int nr_ice_get_default_local_address(nr_ice_ctx *ctx, int ip_version, nr_
         break;
       }
     }
-    if (i==addr_ct)
-      ABORT(R_NOT_FOUND);
+
+    if (i == addr_ct) {
+      if ((r=nr_transport_addr_copy(&addrp->addr, &default_addr)))
+        ABORT(r);
+      strlcpy(addrp->addr.ifname, "default route", sizeof(addrp->addr.ifname));
+    }
 
     _status=0;
   abort:
@@ -690,11 +704,10 @@ static int nr_ice_get_local_addresses(nr_ice_ctx *ctx)
     if (!ctx->local_addrs) {
       /* First, gather all the local addresses we have */
       if((r=nr_stun_find_local_addresses(local_addrs,MAXADDRS,&addr_ct))) {
-        r_log(LOG_ICE,LOG_ERR,"ICE(%s): unable to find local addresses",ctx->label);
-        ABORT(r);
+        r_log(LOG_ICE,LOG_ERR,"ICE(%s): unable to gather local addresses, trying default route",ctx->label);
       }
 
-      if (ctx->force_net_interface[0]) {
+      if (ctx->force_net_interface[0] && addr_ct) {
         /* Limit us to only addresses on a single interface */
         int force_addr_ct = 0;
         for(i=0;i<addr_ct;i++){
@@ -711,7 +724,7 @@ static int nr_ice_get_local_addresses(nr_ice_ctx *ctx)
         addr_ct = force_addr_ct;
       }
 
-      if (ctx->flags & NR_ICE_CTX_FLAGS_ONLY_DEFAULT_ADDRS) {
+      if ((!addr_ct) || (ctx->flags & NR_ICE_CTX_FLAGS_ONLY_DEFAULT_ADDRS)) {
         /* Get just the default IPv4 and IPv6 addrs */
         if(!nr_ice_get_default_local_address(ctx, NR_IPV4, local_addrs, addr_ct,
                                              &default_addrs[default_addr_ct])) {
@@ -720,6 +733,10 @@ static int nr_ice_get_local_addresses(nr_ice_ctx *ctx)
         if(!nr_ice_get_default_local_address(ctx, NR_IPV6, local_addrs, addr_ct,
                                              &default_addrs[default_addr_ct])) {
           ++default_addr_ct;
+        }
+        if (!default_addr_ct) {
+          r_log(LOG_ICE,LOG_ERR,"ICE(%s): failed to find default addresses",ctx->label);
+          ABORT(R_FAILED);
         }
         addrs = default_addrs;
         addr_ct = default_addr_ct;
@@ -992,7 +1009,7 @@ int nr_ice_ctx_hide_candidate(nr_ice_ctx *ctx, nr_ice_candidate *cand)
       return 1;
     }
 
-    if (ctx->flags & NR_ICE_CTX_FLAGS_ONLY_DEFAULT_ADDRS) {
+    if (ctx->flags & NR_ICE_CTX_FLAGS_HIDE_HOST_CANDIDATES) {
       if (cand->type == HOST)
         return 1;
     }

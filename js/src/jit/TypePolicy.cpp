@@ -382,9 +382,15 @@ bool
 PowPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
 {
     MIRType specialization = ins->typePolicySpecialization();
-    MOZ_ASSERT(specialization == MIRType::Int32 || specialization == MIRType::Double);
+    MOZ_ASSERT(specialization == MIRType::Int32 ||
+               specialization == MIRType::Double ||
+               specialization == MIRType::None);
 
-    // Input must be a double.
+    // Inputs will be boxed if either is non-numeric.
+    if (specialization == MIRType::None)
+        return BoxInputsPolicy::staticAdjustInputs(alloc, ins);
+
+    // Otherwise, input must be a double.
     if (!DoublePolicy<0>::staticAdjustInputs(alloc, ins))
         return false;
 
@@ -646,11 +652,7 @@ BoxExceptPolicy<Op, Type>::staticAdjustInputs(TempAllocator& alloc, MInstruction
     return BoxPolicy<Op>::staticAdjustInputs(alloc, ins);
 }
 
-template bool BoxExceptPolicy<0, MIRType::String>::staticAdjustInputs(TempAllocator& alloc,
-                                                                     MInstruction* ins);
-template bool BoxExceptPolicy<1, MIRType::String>::staticAdjustInputs(TempAllocator& alloc,
-                                                                     MInstruction* ins);
-template bool BoxExceptPolicy<2, MIRType::String>::staticAdjustInputs(TempAllocator& alloc,
+template bool BoxExceptPolicy<0, MIRType::Object>::staticAdjustInputs(TempAllocator& alloc,
                                                                      MInstruction* ins);
 
 template <unsigned Op>
@@ -1212,7 +1214,7 @@ FilterTypeSetPolicy::adjustInputs(TempAllocator& alloc, MInstruction* ins)
     _(TypeBarrierPolicy)
 
 #define TEMPLATE_TYPE_POLICY_LIST(_)                                    \
-    _(BoxExceptPolicy<0, MIRType::String>)                               \
+    _(BoxExceptPolicy<0, MIRType::Object>)                              \
     _(BoxPolicy<0>)                                                     \
     _(ConvertToInt32Policy<0>)                                          \
     _(ConvertToStringPolicy<0>)                                         \

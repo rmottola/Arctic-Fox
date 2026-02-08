@@ -63,6 +63,7 @@ NS_EVENT_MESSAGE(eScroll)
 
 // Application installation
 NS_EVENT_MESSAGE(eInstall)
+NS_EVENT_MESSAGE(eAppInstalled)
 
 // A plugin was clicked or otherwise focused. ePluginActivate should be
 // used when the window is not active. ePluginFocus should be used when
@@ -128,6 +129,8 @@ NS_EVENT_MESSAGE(eFormInvalid)
 //Need separate focus/blur notifications for non-native widgets
 NS_EVENT_MESSAGE(eFocus)
 NS_EVENT_MESSAGE(eBlur)
+NS_EVENT_MESSAGE(eFocusIn)
+NS_EVENT_MESSAGE(eFocusOut)
 
 NS_EVENT_MESSAGE(eDragEnter)
 NS_EVENT_MESSAGE(eDragOver)
@@ -332,6 +335,8 @@ NS_EVENT_MESSAGE(eGestureNotify)
 NS_EVENT_MESSAGE(eScrolledAreaChanged)
 
 // CSS Transition & Animation events:
+NS_EVENT_MESSAGE(eTransitionStart)
+NS_EVENT_MESSAGE(eTransitionRun)
 NS_EVENT_MESSAGE(eTransitionEnd)
 NS_EVENT_MESSAGE(eAnimationStart)
 NS_EVENT_MESSAGE(eAnimationEnd)
@@ -419,9 +424,6 @@ NS_EVENT_MESSAGE(eNetworkDownload)
 NS_EVENT_MESSAGE(eMediaRecorderDataAvailable)
 NS_EVENT_MESSAGE(eMediaRecorderWarning)
 NS_EVENT_MESSAGE(eMediaRecorderStop)
-
-// SpeakerManager events
-NS_EVENT_MESSAGE(eSpeakerForcedChange)
 
 #ifdef MOZ_GAMEPAD
 // Gamepad input events

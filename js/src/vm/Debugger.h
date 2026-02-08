@@ -18,7 +18,7 @@
 #include "jsweakmap.h"
 #include "jswrapper.h"
 
-#include "asmjs/WasmJS.h"
+#include "builtin/Promise.h"
 #include "ds/TraceableFifo.h"
 #include "gc/Barrier.h"
 #include "js/Debug.h"
@@ -26,6 +26,7 @@
 #include "js/HashTable.h"
 #include "vm/GlobalObject.h"
 #include "vm/SavedStacks.h"
+#include "wasm/WasmJS.h"
 
 enum JSTrapStatus {
     JSTRAP_ERROR,
@@ -558,20 +559,16 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     JSTrapStatus processHandlerResult(mozilla::Maybe<AutoCompartment>& ac, bool OK, const Value& rv,
                                       AbstractFramePtr frame, jsbytecode* pc, MutableHandleValue vp);
 
-    /*
-     * When we run the onEnterFrame hook, the |this| slot hasn't been fully
-     * initialized, because the initialzation happens in the function's
-     * prologue. To combat this, we pass the this for the primitive return
-     * check directly. When bug 1249193 is fixed, this overload should be
-     * removed.
-     */
-    JSTrapStatus processHandlerResult(mozilla::Maybe<AutoCompartment>& ac, bool OK, const Value& rv,
-                                      const Value& thisVForCheck, AbstractFramePtr frame,
-                                      MutableHandleValue vp);
-
-    JSTrapStatus processHandlerResultHelper(mozilla::Maybe<AutoCompartment>& ac, bool ok, const Value& rv,
-                                            const mozilla::Maybe<HandleValue>& thisVForCheck, AbstractFramePtr frame,
+    JSTrapStatus processParsedHandlerResult(mozilla::Maybe<AutoCompartment>& ac,
+                                            AbstractFramePtr frame, jsbytecode* pc,
+                                            bool success, JSTrapStatus status,
                                             MutableHandleValue vp);
+
+    JSTrapStatus processParsedHandlerResultHelper(mozilla::Maybe<AutoCompartment>& ac,
+                                                  AbstractFramePtr frame,
+                                                  const mozilla::Maybe<HandleValue>& maybeThisv,
+                                                  bool success, JSTrapStatus status,
+                                                  MutableHandleValue vp);
 
     bool processResumptionValue(mozilla::Maybe<AutoCompartment>& ac, AbstractFramePtr frame,
                                 const mozilla::Maybe<HandleValue>& maybeThis, HandleValue rval,
@@ -585,12 +582,14 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     void markCrossCompartmentEdges(JSTracer* tracer);
 
     static const ClassOps classOps_;
+
+  public:
     static const Class class_;
 
+  private:
     static MOZ_MUST_USE bool getHookImpl(JSContext* cx, CallArgs& args, Debugger& dbg, Hook which);
     static MOZ_MUST_USE bool setHookImpl(JSContext* cx, CallArgs& args, Debugger& dbg, Hook which);
 
-    static Debugger* fromThisValue(JSContext* cx, const CallArgs& ca, const char* fnname);
     static bool getEnabled(JSContext* cx, unsigned argc, Value* vp);
     static bool setEnabled(JSContext* cx, unsigned argc, Value* vp);
     static bool getOnDebuggerStatement(JSContext* cx, unsigned argc, Value* vp);
@@ -716,7 +715,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
 
     JSTrapStatus fireDebuggerStatement(JSContext* cx, MutableHandleValue vp);
     JSTrapStatus fireExceptionUnwind(JSContext* cx, MutableHandleValue vp);
-    JSTrapStatus fireEnterFrame(JSContext* cx, AbstractFramePtr frame, MutableHandleValue vp);
+    JSTrapStatus fireEnterFrame(JSContext* cx, MutableHandleValue vp);
     JSTrapStatus fireNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global, MutableHandleValue vp);
     JSTrapStatus firePromiseHook(JSContext* cx, Hook hook, HandleObject promise, MutableHandleValue vp);
 
@@ -1020,7 +1019,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * and |value|. |value| should be the return value or exception value, not
      * wrapped as a debuggee value. |cx| must be in the debugger compartment.
      */
-    MOZ_MUST_USE bool newCompletionValue(JSContext* cx, JSTrapStatus status, Value value,
+    MOZ_MUST_USE bool newCompletionValue(JSContext* cx, JSTrapStatus status, const Value& value,
                                          MutableHandleValue result);
 
     /*
@@ -1125,8 +1124,6 @@ class DebuggerEnvironment : public NativeObject
 
     Debugger* owner() const;
 
-    static DebuggerEnvironment* checkThis(JSContext* cx, const CallArgs& args, const char* fnname,
-                                          bool requireDebuggee);
     bool requireDebuggee(JSContext* cx) const;
 
     static MOZ_MUST_USE bool construct(JSContext* cx, unsigned argc, Value* vp);
@@ -1171,8 +1168,6 @@ class DebuggerFrame : public NativeObject
     static NativeObject* initClass(JSContext* cx, HandleObject dbgCtor, HandleObject objProto);
     static DebuggerFrame* create(JSContext* cx, HandleObject proto, AbstractFramePtr referent,
                                  const ScriptFrameIter* maybeIter, HandleNativeObject debugger);
-    static DebuggerFrame* checkThis(JSContext* cx, const CallArgs& args, const char* fnname,
-                                    bool checkLive);
 
     static MOZ_MUST_USE bool getCallee(JSContext* cx, HandleDebuggerFrame frame,
                                        MutableHandleDebuggerObject result);
@@ -1202,7 +1197,6 @@ class DebuggerFrame : public NativeObject
     static const JSPropertySpec properties_[];
     static const JSFunctionSpec methods_[];
 
-    static MOZ_MUST_USE bool requireLive(JSContext* cx, HandleDebuggerFrame frame);
     static AbstractFramePtr getReferent(HandleDebuggerFrame frame);
     static MOZ_MUST_USE bool getScriptFrameIter(JSContext* cx, HandleDebuggerFrame frame,
                                                 mozilla::Maybe<ScriptFrameIter>& result);
@@ -1252,10 +1246,20 @@ class DebuggerObject : public NativeObject
                                             MutableHandleObject result);
     static MOZ_MUST_USE bool getErrorMessageName(JSContext* cx, HandleDebuggerObject object,
                                                  MutableHandleString result);
-    static MOZ_MUST_USE bool scriptedProxyTarget(JSContext* cx, HandleDebuggerObject object,
-                                                 MutableHandleDebuggerObject result);
-    static MOZ_MUST_USE bool scriptedProxyHandler(JSContext* cx, HandleDebuggerObject object,
-                                                  MutableHandleDebuggerObject result);
+    static MOZ_MUST_USE bool getErrorLineNumber(JSContext* cx, HandleDebuggerObject object,
+                                                MutableHandleValue result);
+    static MOZ_MUST_USE bool getErrorColumnNumber(JSContext* cx, HandleDebuggerObject object,
+                                                  MutableHandleValue result);
+    static MOZ_MUST_USE bool getScriptedProxyTarget(JSContext* cx, HandleDebuggerObject object,
+                                                    MutableHandleDebuggerObject result);
+    static MOZ_MUST_USE bool getScriptedProxyHandler(JSContext* cx, HandleDebuggerObject object,
+                                                     MutableHandleDebuggerObject result);
+#ifdef SPIDERMONKEY_PROMISE
+    static MOZ_MUST_USE bool getPromiseValue(JSContext* cx, HandleDebuggerObject object,
+                                             MutableHandleValue result);
+    static MOZ_MUST_USE bool getPromiseReason(JSContext* cx, HandleDebuggerObject object,
+                                              MutableHandleValue result);
+#endif // SPIDERMONKEY_PROMISE
 
     // Methods
     static MOZ_MUST_USE bool isExtensible(JSContext* cx, HandleDebuggerObject object,
@@ -1296,8 +1300,6 @@ class DebuggerObject : public NativeObject
                                                MutableHandleObject result);
     static MOZ_MUST_USE bool unwrap(JSContext* cx, HandleDebuggerObject object,
                                     MutableHandleDebuggerObject result);
-    static MOZ_MUST_USE bool isPromise(JSContext* cx, HandleDebuggerObject object,
-                                       bool& result);
 
     // Infallible properties
     bool isCallable() const;
@@ -1307,8 +1309,16 @@ class DebuggerObject : public NativeObject
     bool isArrowFunction() const;
     bool isGlobal() const;
     bool isScriptedProxy() const;
+#ifdef SPIDERMONKEY_PROMISE
+    bool isPromise() const;
+#endif // SPIDERMONKEY_PROMISE
     JSAtom* name() const;
     JSAtom* displayName() const;
+#ifdef SPIDERMONKEY_PROMISE
+    JS::PromiseState promiseState() const;
+    double promiseLifetime() const;
+    double promiseTimeToResolution() const;
+#endif // SPIDERMONKEY_PROMISE
 
   private:
     enum {
@@ -1333,8 +1343,14 @@ class DebuggerObject : public NativeObject
 
     Debugger* owner() const;
 
-    static DebuggerObject* checkThis(JSContext* cx, const CallArgs& args, const char* fnname);
+#ifdef SPIDERMONKEY_PROMISE
+    PromiseObject* promise() const;
+#endif // SPIDERMONKEY_PROMISE
+
     static MOZ_MUST_USE bool requireGlobal(JSContext* cx, HandleDebuggerObject object);
+#ifdef SPIDERMONKEY_PROMISE
+    static MOZ_MUST_USE bool requirePromise(JSContext* cx, HandleDebuggerObject object);
+#endif // SPIDERMONKEY_PROMISE
 
     static MOZ_MUST_USE bool construct(JSContext* cx, unsigned argc, Value* vp);
 
@@ -1355,12 +1371,16 @@ class DebuggerObject : public NativeObject
     static MOZ_MUST_USE bool globalGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool allocationSiteGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool errorMessageNameGetter(JSContext* cx, unsigned argc, Value* vp);
+    static MOZ_MUST_USE bool errorLineNumberGetter(JSContext* cx, unsigned argc, Value* vp);
+    static MOZ_MUST_USE bool errorColumnNumberGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool isProxyGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool proxyTargetGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool proxyHandlerGetter(JSContext* cx, unsigned argc, Value* vp);
 #ifdef SPIDERMONKEY_PROMISE
     static MOZ_MUST_USE bool isPromiseGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool promiseStateGetter(JSContext* cx, unsigned argc, Value* vp);
+    static MOZ_MUST_USE bool promiseValueGetter(JSContext* cx, unsigned argc, Value* vp);
+    static MOZ_MUST_USE bool promiseReasonGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool promiseLifetimeGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool promiseTimeToResolutionGetter(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool promiseAllocationSiteGetter(JSContext* cx, unsigned argc, Value* vp);
@@ -1391,6 +1411,8 @@ class DebuggerObject : public NativeObject
     static MOZ_MUST_USE bool makeDebuggeeValueMethod(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool unsafeDereferenceMethod(JSContext* cx, unsigned argc, Value* vp);
     static MOZ_MUST_USE bool unwrapMethod(JSContext* cx, unsigned argc, Value* vp);
+    static MOZ_MUST_USE bool getErrorReport(JSContext* cx, HandleObject maybeError,
+                                            JSErrorReport*& report);
 };
 
 class BreakpointSite {

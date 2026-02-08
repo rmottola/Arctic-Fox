@@ -2041,6 +2041,15 @@ toolbar[iconsize="small"] .toolbarbutton-badge-container {
   padding: 0;
 }
 
+.webextension-popup-browser {
+  margin-right: -1px;
+  border-radius: inherit;
+}
+
+#PanelUI-popup .webextension-popup-browser {
+  margin: 0;
+}
+
 .menuitem-iconic[command="Browser:NewUserContextTab"] > .menu-iconic-left > .menu-iconic-icon {
   visibility: visible;
 }

@@ -35,7 +35,6 @@
 #include "mozilla/Services.h"
 #include "mozilla/Telemetry.h"
 #include "gfxSVGGlyphs.h"
-#include "gfxMathTable.h"
 #include "gfx2DGlue.h"
 
 #if defined(XP_MACOSX)
@@ -77,7 +76,6 @@ gfxFontEntry::gfxFontEntry() :
     mIgnoreGDEF(false),
     mIgnoreGSUB(false),
     mSVGInitialized(false),
-    mMathInitialized(false),
     mHasSpaceFeaturesInitialized(false),
     mHasSpaceFeatures(false),
     mHasSpaceFeaturesKerning(false),
@@ -117,7 +115,6 @@ gfxFontEntry::gfxFontEntry(const nsAString& aName, bool aIsStandardFace) :
     mIgnoreGDEF(false),
     mIgnoreGSUB(false),
     mSVGInitialized(false),
-    mMathInitialized(false),
     mHasSpaceFeaturesInitialized(false),
     mHasSpaceFeatures(false),
     mHasSpaceFeaturesKerning(false),
@@ -284,7 +281,8 @@ gfxFontEntry::FindOrMakeFont(const gfxFontStyle *aStyle,
                              gfxCharacterMap* aUnicodeRangeMap)
 {
     // the font entry name is the psname, not the family name
-    RefPtr<gfxFont> font = gfxFontCache::GetCache()->Lookup(this, aStyle);
+    RefPtr<gfxFont> font =
+        gfxFontCache::GetCache()->Lookup(this, aStyle, aUnicodeRangeMap);
 
     if (!font) {
         gfxFont *newFont = CreateFontInstance(aStyle, aNeedsBold);
@@ -407,78 +405,6 @@ gfxFontEntry::NotifyGlyphsChanged()
         gfxFont* font = mFontsUsingSVGGlyphs[i];
         font->NotifyGlyphsChanged();
     }
-}
-
-bool
-gfxFontEntry::TryGetMathTable()
-{
-    if (!mMathInitialized) {
-        mMathInitialized = true;
-
-        // If UnitsPerEm is not known/valid, we can't use MATH table
-        if (UnitsPerEm() == kInvalidUPEM) {
-            return false;
-        }
-
-        // We don't use AutoTable here because we'll pass ownership of this
-        // blob to the gfxMathTable, once we've confirmed the table exists
-        hb_blob_t *mathTable = GetFontTable(TRUETYPE_TAG('M','A','T','H'));
-        if (!mathTable) {
-            return false;
-        }
-
-        // gfxMathTable will hb_blob_destroy() the table when it is finished
-        // with it.
-        mMathTable = MakeUnique<gfxMathTable>(mathTable);
-        if (!mMathTable->HasValidHeaders()) {
-            mMathTable.reset(nullptr);
-            return false;
-        }
-    }
-
-    return !!mMathTable;
-}
-
-gfxFloat
-gfxFontEntry::GetMathConstant(gfxFontEntry::MathConstant aConstant)
-{
-    NS_ASSERTION(mMathTable, "Math data has not yet been loaded. TryGetMathData() first.");
-    gfxFloat value = mMathTable->GetMathConstant(aConstant);
-    if (aConstant == gfxFontEntry::ScriptPercentScaleDown ||
-        aConstant == gfxFontEntry::ScriptScriptPercentScaleDown ||
-        aConstant == gfxFontEntry::RadicalDegreeBottomRaisePercent) {
-        return value / 100.0;
-    }
-    return value / mUnitsPerEm;
-}
-
-bool
-gfxFontEntry::GetMathItalicsCorrection(uint32_t aGlyphID,
-                                       gfxFloat* aItalicCorrection)
-{
-    NS_ASSERTION(mMathTable, "Math data has not yet been loaded. TryGetMathData() first.");
-    int16_t italicCorrection;
-    if (!mMathTable->GetMathItalicsCorrection(aGlyphID, &italicCorrection)) {
-        return false;
-    }
-    *aItalicCorrection = gfxFloat(italicCorrection) / mUnitsPerEm;
-    return true;
-}
-
-uint32_t
-gfxFontEntry::GetMathVariantsSize(uint32_t aGlyphID, bool aVertical,
-                                  uint16_t aSize)
-{
-    NS_ASSERTION(mMathTable, "Math data has not yet been loaded. TryGetMathData() first.");
-    return mMathTable->GetMathVariantsSize(aGlyphID, aVertical, aSize);
-}
-
-bool
-gfxFontEntry::GetMathVariantsParts(uint32_t aGlyphID, bool aVertical,
-                                   uint32_t aGlyphs[4])
-{
-    NS_ASSERTION(mMathTable, "Math data has not yet been loaded. TryGetMathData() first.");
-    return mMathTable->GetMathVariantsParts(aGlyphID, aVertical, aGlyphs);
 }
 
 bool
@@ -1089,10 +1015,6 @@ gfxFontEntry::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
     if (mSVGGlyphs) {
         aSizes->mFontTableCacheSize +=
             mSVGGlyphs->SizeOfIncludingThis(aMallocSizeOf);
-    }
-    if (mMathTable) {
-        aSizes->mFontTableCacheSize +=
-            mMathTable->SizeOfIncludingThis(aMallocSizeOf);
     }
     if (mSupportedFeatures) {
         aSizes->mFontTableCacheSize +=

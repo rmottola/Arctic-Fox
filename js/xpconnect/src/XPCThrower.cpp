@@ -50,17 +50,16 @@ Throw(JSContext* cx, nsresult rv)
 bool
 XPCThrower::CheckForPendingException(nsresult result, JSContext* cx)
 {
-    nsCOMPtr<nsIException> e = XPCJSRuntime::Get()->GetPendingException();
+    nsCOMPtr<nsIException> e = XPCJSContext::Get()->GetPendingException();
     if (!e)
         return false;
-    XPCJSRuntime::Get()->SetPendingException(nullptr);
+    XPCJSContext::Get()->SetPendingException(nullptr);
 
     nsresult e_result;
     if (NS_FAILED(e->GetResult(&e_result)) || e_result != result)
         return false;
 
-    if (!ThrowExceptionObject(cx, e))
-        JS_ReportOutOfMemory(cx);
+    ThrowExceptionObject(cx, e);
     return true;
 }
 
@@ -117,9 +116,9 @@ XPCThrower::ThrowBadResult(nsresult rv, nsresult result, XPCCallContext& ccx)
         format = "";
 
     if (nsXPCException::NameAndFormatForNSResult(result, &name, nullptr) && name)
-        sz = JS_smprintf("%s 0x%x (%s)", format, result, name);
+        sz = JS_smprintf("%s 0x%x (%s)", format, (unsigned) result, name);
     else
-        sz = JS_smprintf("%s 0x%x", format, result);
+        sz = JS_smprintf("%s 0x%x", format, (unsigned) result);
     NS_ENSURE_TRUE_VOID(sz);
 
     if (sz && sVerbose)

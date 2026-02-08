@@ -41,6 +41,8 @@ user_pref("security.default_personal_cert", "Select Automatically"); // Need to 
 user_pref("network.http.prompt-temp-redirect", false);
 user_pref("media.cache_size", 1000);
 user_pref("media.volume_scale", "0.01");
+user_pref("media.test.dumpDebugInfo", true);
+user_pref("media.dormant-on-pause-timeout-ms", -1); // Disable dormant for it breaks some tests.
 user_pref("security.warn_viewing_mixed", false);
 user_pref("app.update.enabled", false);
 user_pref("app.update.staging.enabled", false);
@@ -49,7 +51,6 @@ user_pref("app.update.url.android", "");
 user_pref("media.gmp-manager.url.override", "http://%(server)s/dummy-gmp-manager.xml");
 user_pref("dom.w3c_touch_events.enabled", 1);
 user_pref("layout.accessiblecaret.enabled_on_touch", false);
-user_pref("dom.undo_manager.enabled", true);
 user_pref("dom.webcomponents.enabled", true);
 user_pref("dom.webcomponents.customelements.enabled", true);
 user_pref("dom.htmlimports.enabled", true);
@@ -232,6 +233,8 @@ user_pref("browser.webapps.checkForUpdates", 0);
 
 // Enable debug logging in the tcp presentation server.
 user_pref("dom.presentation.tcp_server.debug", true);
+// Enable debug logging in the presentation core service.
+pref("logging.Presentation", "debug");
 
 // Don't connect to Yahoo! for RSS feed tests.
 // en-US only uses .types.0.uri, but set all of them just to be sure.
@@ -286,9 +289,6 @@ user_pref("browser.translation.bing.translateArrayURL", "http://%(server)s/brows
 // Make sure we don't try to load snippets from the network.
 user_pref("browser.aboutHomeSnippets.updateUrl", "nonexistent://test");
 
-// Enable apps customizations
-user_pref("dom.apps.customization.enabled", true);
-
 // Don't fetch or send directory tiles data from real servers
 user_pref("browser.newtabpage.directory.source", 'data:application/json,{"testing":1}');
 user_pref("browser.newtabpage.directory.ping", "");
@@ -309,10 +309,6 @@ user_pref("browser.selfsupport.url", "https://%(server)s/selfsupport-dummy/");
 
 user_pref("media.eme.enabled", true);
 
-#if defined(XP_WIN)
-user_pref("media.decoder.heuristic.dormant.timeout", 0);
-#endif
-
 // Don't use auto-enabled e10s
 user_pref("browser.tabs.remote.autostart.1", false);
 user_pref("browser.tabs.remote.autostart.2", false);
@@ -324,10 +320,6 @@ user_pref("browser.readinglist.introShown", true);
 
 // Don't block old libavcodec libraries when testing.
 user_pref("media.libavcodec.allow-obsolete", true);
-
-// Don't let PAC generator to set PAC, as mochitest framework has its own PAC
-// rules during testing.
-user_pref("network.proxy.pac_generator", false);
 
 // Make tests run consistently on DevEdition (which has a lightweight theme
 // selected by default).
@@ -348,4 +340,3 @@ user_pref("dom.audiochannel.mutedByDefault", false);
 
 user_pref("webextensions.tests", true);
 user_pref("startup.homepage_welcome_url", "about:blank");
-user_pref("dom.html_fragment_serialisation.appendLF", true);

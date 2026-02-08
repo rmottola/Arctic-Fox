@@ -10,6 +10,7 @@
 
 #include "gfxRect.h"
 #include "nsFont.h"
+#include "mozilla/MacroArgs.h" // for MOZ_CONCAT
 #include "X11UndefineNone.h"
 
 // XXX fold this into nsStyleContext and group by nsStyleXXX struct
@@ -19,7 +20,17 @@ namespace css {
 typedef mozilla::Side Side;
 } // namespace css
 
-#define NS_FOR_CSS_SIDES(var_) for (mozilla::css::Side var_ = NS_SIDE_TOP; var_ <= NS_SIDE_LEFT; var_++)
+// Creates a for loop that walks over the four mozilla::css::Side values.
+// We use an int32_t helper variable (instead of a Side) for our loop counter,
+// to avoid triggering undefined behavior just before we exit the loop (at
+// which point the counter is incremented beyond the largest valid Side value).
+#define NS_FOR_CSS_SIDES(var_)                                           \
+  int32_t MOZ_CONCAT(var_,__LINE__) = NS_SIDE_TOP;                       \
+  for (mozilla::css::Side var_;                                          \
+       MOZ_CONCAT(var_,__LINE__) <= NS_SIDE_LEFT &&                      \
+         ((var_ = mozilla::css::Side(MOZ_CONCAT(var_,__LINE__))), true); \
+       MOZ_CONCAT(var_,__LINE__)++)
+
 static inline css::Side operator++(css::Side& side, int) {
     NS_PRECONDITION(side >= NS_SIDE_TOP &&
                     side <= NS_SIDE_LEFT, "Out of range side");
@@ -201,26 +212,34 @@ enum class StyleUserSelect : uint8_t {
 };
 
 // user-input
-#define NS_STYLE_USER_INPUT_NONE      0
-#define NS_STYLE_USER_INPUT_ENABLED   1
-#define NS_STYLE_USER_INPUT_DISABLED  2
-#define NS_STYLE_USER_INPUT_AUTO      3
+enum class StyleUserInput : uint8_t {
+  None,
+  Enabled,
+  Disabled,
+  Auto,
+};
 
 // user-modify
-#define NS_STYLE_USER_MODIFY_READ_ONLY   0
-#define NS_STYLE_USER_MODIFY_READ_WRITE  1
-#define NS_STYLE_USER_MODIFY_WRITE_ONLY  2
+enum class StyleUserModify : uint8_t {
+  ReadOnly,
+  ReadWrite,
+  WriteOnly,
+};
 
 // -moz-window-dragging
-#define NS_STYLE_WINDOW_DRAGGING_DEFAULT 0
-#define NS_STYLE_WINDOW_DRAGGING_DRAG    1
-#define NS_STYLE_WINDOW_DRAGGING_NO_DRAG 2
+enum class StyleWindowDragging : uint8_t {
+  Default,
+  Drag,
+  NoDrag,
+};
 
 // orient
-#define NS_STYLE_ORIENT_INLINE     0
-#define NS_STYLE_ORIENT_BLOCK      1
-#define NS_STYLE_ORIENT_HORIZONTAL 2
-#define NS_STYLE_ORIENT_VERTICAL   3
+enum class StyleOrient : uint8_t {
+  Inline,
+  Block,
+  Horizontal,
+  Vertical,
+};
 
 #define NS_RADIUS_FARTHEST_SIDE 0
 #define NS_RADIUS_CLOSEST_SIDE  1
@@ -292,7 +311,6 @@ enum class StyleUserSelect : uint8_t {
 #define NS_STYLE_VOLUME_X_LOUD            5
 
 // See nsStyleColor
-#define NS_STYLE_COLOR_MOZ_USE_TEXT_COLOR 1
 #define NS_STYLE_COLOR_INHERIT_FROM_BODY  2  /* Can't come from CSS directly */
 
 // See nsStyleColor

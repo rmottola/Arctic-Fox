@@ -30,6 +30,11 @@ class PJavaScriptParent;
 class CpowEntry;
 } // namespace jsipc
 
+namespace ipc {
+class PFileDescriptorSetParent;
+class PSendStreamParent;
+}
+
 namespace dom {
 
 class Blob;
@@ -56,7 +61,6 @@ public:
   BlobParent* GetOrCreateActorForBlobImpl(BlobImpl* aImpl);
 
   virtual ContentParentId ChildID() const = 0;
-  virtual bool IsForApp() const = 0;
   virtual bool IsForBrowser() const = 0;
 
   MOZ_MUST_USE virtual PBlobParent*
@@ -69,7 +73,6 @@ public:
                           const IPCTabContext& context,
                           const uint32_t& chromeFlags,
                           const ContentParentId& aCpId,
-                          const bool& aIsForApp,
                           const bool& aIsForBrowser) = 0;
 
   virtual bool IsContentParent() const { return false; }
@@ -95,7 +98,6 @@ protected: // IPDL methods
                                               const IPCTabContext& aContext,
                                               const uint32_t& aChromeFlags,
                                               const ContentParentId& aCpId,
-                                              const bool& aIsForApp,
                                               const bool& aIsForBrowser);
   virtual bool DeallocPBrowserParent(PBrowserParent* frame);
 
@@ -103,20 +105,30 @@ protected: // IPDL methods
 
   virtual bool DeallocPBlobParent(PBlobParent* aActor);
 
-  virtual bool RecvSyncMessage(const nsString& aMsg,
-                               const ClonedMessageData& aData,
-                               InfallibleTArray<jsipc::CpowEntry>&& aCpows,
-                               const IPC::Principal& aPrincipal,
-                               nsTArray<ipc::StructuredCloneData>* aRetvals);
-  virtual bool RecvRpcMessage(const nsString& aMsg,
-                              const ClonedMessageData& aData,
-                              InfallibleTArray<jsipc::CpowEntry>&& aCpows,
-                              const IPC::Principal& aPrincipal,
-                              nsTArray<ipc::StructuredCloneData>* aRetvals);
-  virtual bool RecvAsyncMessage(const nsString& aMsg,
-                                InfallibleTArray<jsipc::CpowEntry>&& aCpows,
-                                const IPC::Principal& aPrincipal,
-                                const ClonedMessageData& aData);
+  virtual mozilla::ipc::PFileDescriptorSetParent*
+  AllocPFileDescriptorSetParent(const mozilla::ipc::FileDescriptor& aFD);
+
+  virtual bool
+  DeallocPFileDescriptorSetParent(mozilla::ipc::PFileDescriptorSetParent* aActor);
+
+  virtual mozilla::ipc::PSendStreamParent* AllocPSendStreamParent();
+
+  virtual bool DeallocPSendStreamParent(mozilla::ipc::PSendStreamParent* aActor);
+
+  virtual mozilla::ipc::IPCResult RecvSyncMessage(const nsString& aMsg,
+                                                  const ClonedMessageData& aData,
+                                                  InfallibleTArray<jsipc::CpowEntry>&& aCpows,
+                                                  const IPC::Principal& aPrincipal,
+                                                  nsTArray<ipc::StructuredCloneData>* aRetvals);
+  virtual mozilla::ipc::IPCResult RecvRpcMessage(const nsString& aMsg,
+                                                 const ClonedMessageData& aData,
+                                                 InfallibleTArray<jsipc::CpowEntry>&& aCpows,
+                                                 const IPC::Principal& aPrincipal,
+                                                 nsTArray<ipc::StructuredCloneData>* aRetvals);
+  virtual mozilla::ipc::IPCResult RecvAsyncMessage(const nsString& aMsg,
+                                                   InfallibleTArray<jsipc::CpowEntry>&& aCpows,
+                                                   const IPC::Principal& aPrincipal,
+                                                   const ClonedMessageData& aData);
 
 protected: // members
   RefPtr<nsFrameMessageManager> mMessageManager;

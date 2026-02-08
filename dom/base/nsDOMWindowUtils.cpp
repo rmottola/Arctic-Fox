@@ -109,7 +109,8 @@
 #include "mozilla/css/ImageLoader.h"
 #include "mozilla/layers/APZCTreeManager.h" // for layers::ZoomToRectBehavior
 #include "mozilla/dom/Promise.h"
-#include "mozilla/CSSStyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
+#include "mozilla/gfx/GPUProcessManager.h"
 
 #ifdef XP_WIN
 #undef GetClassName
@@ -151,7 +152,7 @@ public:
 private:
   explicit OldWindowSize(nsIWeakReference* aWindowRef, const nsSize& aSize)
     : mWindowRef(aWindowRef), mSize(aSize) { }
-  ~OldWindowSize() { };
+  ~OldWindowSize() = default;;
 
   static OldWindowSize* GetItem(nsIWeakReference* aWindowRef)
   {
@@ -1668,7 +1669,7 @@ nsDOMWindowUtils::SuppressEventHandling(bool aSuppress)
 }
 
 static nsresult
-getScrollXYAppUnits(nsWeakPtr aWindow, bool aFlushLayout, nsPoint& aScrollPos) {
+getScrollXYAppUnits(const nsWeakPtr& aWindow, bool aFlushLayout, nsPoint& aScrollPos) {
   nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(aWindow);
   nsCOMPtr<nsIDocument> doc = window ? window->GetExtantDoc() : nullptr;
   NS_ENSURE_STATE(doc);
@@ -2091,7 +2092,7 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
   nsresult rv = targetWidget->DispatchEvent(&queryEvent, status);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsQueryContentEventResult* result = new nsQueryContentEventResult();
+  auto* result = new nsQueryContentEventResult();
   result->SetEventResult(widget, queryEvent);
   NS_ADDREF(*aResult = result);
   return NS_OK;
@@ -2279,7 +2280,10 @@ nsDOMWindowUtils::SuspendTimeouts()
   nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(mWindow);
   NS_ENSURE_TRUE(window, NS_ERROR_FAILURE);
 
-  window->SuspendTimeouts(1, true, false);
+  nsCOMPtr<nsPIDOMWindowInner> inner = window->GetCurrentInnerWindow();
+  NS_ENSURE_TRUE(inner, NS_ERROR_FAILURE);
+
+  inner->Suspend();
 
   return NS_OK;
 }
@@ -2290,7 +2294,10 @@ nsDOMWindowUtils::ResumeTimeouts()
   nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(mWindow);
   NS_ENSURE_TRUE(window, NS_ERROR_FAILURE);
 
-  window->ResumeTimeouts(true, false);
+  nsCOMPtr<nsPIDOMWindowInner> inner = window->GetCurrentInnerWindow();
+  NS_ENSURE_TRUE(inner, NS_ERROR_FAILURE);
+
+  inner->Resume();
 
   return NS_OK;
 }
@@ -2340,7 +2347,7 @@ nsDOMWindowUtils::GetSupportsHardwareH264Decoding(JS::MutableHandle<JS::Value> a
   LayerManager *mgr = widget->GetLayerManager();
   NS_ENSURE_STATE(mgr);
   RefPtr<Promise> promise =
-    MP4Decoder::IsVideoAccelerated(mgr->GetCompositorBackendType(), parentObject);
+    MP4Decoder::IsVideoAccelerated(mgr->AsShadowForwarder(), parentObject);
   NS_ENSURE_STATE(promise);
   aPromise.setObject(*promise->PromiseObj());
 #else
@@ -2703,13 +2710,19 @@ nsDOMWindowUtils::ComputeAnimationDistance(nsIDOMElement* aElement,
              "should not have shorthand");
 
   StyleAnimationValue v1, v2;
+  Element* element = content->AsElement();
   if (property == eCSSProperty_UNKNOWN ||
-      !ComputeAnimationValue(property, content->AsElement(), aValue1, v1) ||
-      !ComputeAnimationValue(property, content->AsElement(), aValue2, v2)) {
+      !ComputeAnimationValue(property, element, aValue1, v1) ||
+      !ComputeAnimationValue(property, element, aValue2, v2)) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
 
-  if (!StyleAnimationValue::ComputeDistance(property, v1, v2, *aResult)) {
+  nsIPresShell* shell = element->GetUncomposedDoc()->GetShell();
+  RefPtr<nsStyleContext> styleContext = shell
+    ? nsComputedDOMStyle::GetStyleContextForElement(element, nullptr, shell)
+    : nullptr;
+  if (!StyleAnimationValue::ComputeDistance(property, v1, v2, styleContext,
+                                            *aResult)) {
     return NS_ERROR_FAILURE;
   }
 
@@ -4064,6 +4077,29 @@ nsDOMWindowUtils::ForceReflowInterrupt()
     return NS_ERROR_NOT_AVAILABLE;
   }
   pc->SetPendingInterruptFromTest();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::TerminateGPUProcess()
+{
+  GPUProcessManager* pm = GPUProcessManager::Get();
+  if (pm) {
+    pm->KillProcess();
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetGpuProcessPid(int32_t* aPid)
+{
+  GPUProcessManager* pm = GPUProcessManager::Get();
+  if (pm) {
+    *aPid = pm->GPUProcessPid();
+  } else {
+    *aPid = -1;
+  }
+
   return NS_OK;
 }
 

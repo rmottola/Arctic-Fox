@@ -497,8 +497,12 @@ public:
   void PassByteString(const nsCString&);
   void PassNullableByteString(const nsCString&);
   void PassOptionalByteString(const Optional<nsCString>&);
+  void PassOptionalByteStringWithDefaultValue(const nsCString&);
   void PassOptionalNullableByteString(const Optional<nsCString>&);
+  void PassOptionalNullableByteStringWithDefaultValue(const nsCString&);
   void PassVariadicByteString(const Sequence<nsCString>&);
+  void PassOptionalUnionByteString(const Optional<ByteStringOrLong>&);
+  void PassOptionalUnionByteStringWithDefaultValue(const ByteStringOrLong&);
 
   // USVString types
   void PassUSVS(const nsAString&);
@@ -669,7 +673,7 @@ public:
   //void PassUnionWithInterfacesAndNullable(const TestInterfaceOrNullOrTestExternalInterface& arg);
   void PassUnionWithArrayBuffer(const ArrayBufferOrLong&);
   void PassUnionWithString(JSContext*, const StringOrObject&);
-  //void PassUnionWithEnum(JSContext*, const TestEnumOrObject&);
+  void PassUnionWithEnum(JSContext*, const SupportedTypeOrObject&);
   //void PassUnionWithCallback(JSContext*, const TestCallbackOrLong&);
   void PassUnionWithObject(JSContext*, const ObjectOrLong&);
 
@@ -686,7 +690,12 @@ public:
   void PassUnionWithDefaultValue11(const UnrestrictedFloatOrString& arg);
   void PassUnionWithDefaultValue12(const UnrestrictedFloatOrString& arg);
   void PassUnionWithDefaultValue13(const UnrestrictedFloatOrString& arg);
-  void PassUnionWithDefaultValue14(const UnrestrictedFloatOrString& arg);
+  void PassUnionWithDefaultValue14(const DoubleOrByteString& arg);
+  void PassUnionWithDefaultValue15(const DoubleOrByteString& arg);
+  void PassUnionWithDefaultValue16(const DoubleOrByteString& arg);
+  void PassUnionWithDefaultValue17(const DoubleOrSupportedType& arg);
+  void PassUnionWithDefaultValue18(const DoubleOrSupportedType& arg);
+  void PassUnionWithDefaultValue19(const DoubleOrSupportedType& arg);
 
   void PassNullableUnionWithDefaultValue1(const Nullable<DoubleOrString>& arg);
   void PassNullableUnionWithDefaultValue2(const Nullable<DoubleOrString>& arg);
@@ -700,6 +709,14 @@ public:
   void PassNullableUnionWithDefaultValue10(const Nullable<UnrestrictedFloatOrString>& arg);
   void PassNullableUnionWithDefaultValue11(const Nullable<UnrestrictedFloatOrString>& arg);
   void PassNullableUnionWithDefaultValue12(const Nullable<UnrestrictedFloatOrString>& arg);
+  void PassNullableUnionWithDefaultValue13(const Nullable<DoubleOrByteString>& arg);
+  void PassNullableUnionWithDefaultValue14(const Nullable<DoubleOrByteString>& arg);
+  void PassNullableUnionWithDefaultValue15(const Nullable<DoubleOrByteString>& arg);
+  void PassNullableUnionWithDefaultValue16(const Nullable<DoubleOrByteString>& arg);
+  void PassNullableUnionWithDefaultValue17(const Nullable<DoubleOrSupportedType>& arg);
+  void PassNullableUnionWithDefaultValue18(const Nullable<DoubleOrSupportedType>& arg);
+  void PassNullableUnionWithDefaultValue19(const Nullable<DoubleOrSupportedType>& arg);
+  void PassNullableUnionWithDefaultValue20(const Nullable<DoubleOrSupportedType>& arg);
 
   void PassSequenceOfUnions(const Sequence<OwningCanvasPatternOrCanvasGradient>&);
   void PassSequenceOfUnions2(JSContext*, const Sequence<OwningObjectOrLong>&);
@@ -788,11 +805,11 @@ public:
   int8_t DeprecatedAttribute();
   int8_t SetDeprecatedAttribute(int8_t);
   int8_t DeprecatedMethod();
-  int8_t DeprecatedMethodWithContext(JSContext*, JS::Value);
+  int8_t DeprecatedMethodWithContext(JSContext*, const JS::Value&);
 
   // Static methods and attributes
   static void StaticMethod(const GlobalObject&, bool);
-  static void StaticMethodWithContext(const GlobalObject&, JS::Value);
+  static void StaticMethodWithContext(const GlobalObject&, const JS::Value&);
   static bool StaticAttribute(const GlobalObject&);
   static void SetStaticAttribute(const GlobalObject&, bool);
   static void Assert(const GlobalObject&, bool);
@@ -801,7 +818,7 @@ public:
   static int8_t StaticDeprecatedAttribute(const GlobalObject&);
   static int8_t SetStaticDeprecatedAttribute(const GlobalObject&, int8_t);
   static int8_t StaticDeprecatedMethod(const GlobalObject&);
-  static int8_t StaticDeprecatedMethodWithContext(const GlobalObject&, JS::Value);
+  static int8_t StaticDeprecatedMethodWithContext(const GlobalObject&, const JS::Value&);
 
   // Overload resolution tests
   bool Overload1(TestInterface&);
@@ -916,7 +933,13 @@ public:
   void SetThrowingGetterAttr(bool arg);
   bool ThrowingSetterAttr() const;
   void SetThrowingSetterAttr(bool arg, ErrorResult& aRv);
-  int16_t LegacyCall(JS::Value, uint32_t, TestInterface&);
+  void NeedsSubjectPrincipalMethod(nsIPrincipal&);
+  bool NeedsSubjectPrincipalAttr(nsIPrincipal&);
+  void SetNeedsSubjectPrincipalAttr(bool, nsIPrincipal&);
+  void NeedsCallerTypeMethod(CallerType);
+  bool NeedsCallerTypeAttr(CallerType);
+  void SetNeedsCallerTypeAttr(bool, CallerType);
+  int16_t LegacyCall(const JS::Value&, uint32_t, TestInterface&);
   void PassArgsWithDefaults(JSContext*, const Optional<int32_t>&,
                             TestInterface*, const Dict&, double,
                             const Optional<float>&);
@@ -1089,7 +1112,9 @@ private:
   void PassByteString(nsCString&) = delete;
   void PassNullableByteString(nsCString&) = delete;
   void PassOptionalByteString(Optional<nsCString>&) = delete;
+  void PassOptionalByteStringWithDefaultValue(nsCString&) = delete;
   void PassOptionalNullableByteString(Optional<nsCString>&) = delete;
+  void PassOptionalNullableByteStringWithDefaultValue(nsCString&) = delete;
   void PassVariadicByteString(Sequence<nsCString>&) = delete;
 
   // Make sure dictionary arguments are always const
@@ -1285,40 +1310,6 @@ public:
   int32_t Volatile();
 };
 
-class TestIndexedDeleterInterface : public nsISupports,
-                                    public nsWrapperCache
-{
-public:
-  NS_DECL_ISUPPORTS
-
-  // We need a GetParentObject to make binding codegen happy
-  virtual nsISupports* GetParentObject();
-
-  void IndexedDeleter(uint32_t, bool&);
-  void IndexedDeleter(uint32_t) = delete;
-  long IndexedGetter(uint32_t, bool&);
-  uint32_t Length();
-  void DelItem(uint32_t);
-  void DelItem(uint32_t, bool&) = delete;
-};
-
-class TestIndexedDeleterWithRetvalInterface : public nsISupports,
-                                              public nsWrapperCache
-{
-public:
-  NS_DECL_ISUPPORTS
-
-  // We need a GetParentObject to make binding codegen happy
-  virtual nsISupports* GetParentObject();
-
-  bool IndexedDeleter(uint32_t, bool&);
-  bool IndexedDeleter(uint32_t) = delete;
-  long IndexedGetter(uint32_t, bool&);
-  uint32_t Length();
-  bool DelItem(uint32_t);
-  bool DelItem(uint32_t, bool&) = delete;
-};
-
 class TestNamedDeleterInterface : public nsISupports,
                                   public nsWrapperCache
 {
@@ -1347,27 +1338,6 @@ public:
   long NamedGetter(const nsAString&, bool&);
   bool DelNamedItem(const nsAString&);
   bool DelNamedItem(const nsAString&, bool&) = delete;
-  void GetSupportedNames(nsTArray<nsString>&);
-};
-
-class TestIndexedAndNamedDeleterInterface : public nsISupports,
-                                            public nsWrapperCache
-{
-public:
-  NS_DECL_ISUPPORTS
-
-  // We need a GetParentObject to make binding codegen happy
-  virtual nsISupports* GetParentObject();
-
-  void IndexedDeleter(uint32_t, bool&);
-  long IndexedGetter(uint32_t, bool&);
-  uint32_t Length();
-
-  void NamedDeleter(const nsAString&, bool&);
-  void NamedDeleter(const nsAString&) = delete;
-  long NamedGetter(const nsAString&, bool&);
-  void DelNamedItem(const nsAString&);
-  void DelNamedItem(const nsAString&, bool&) = delete;
   void GetSupportedNames(nsTArray<nsString>&);
 };
 
@@ -1436,6 +1406,23 @@ class TestRenamedNamespace {
 };
 
 class TestProtoObjectHackedNamespace {
+};
+
+class TestWorkerExposedInterface : public nsISupports,
+                                   public nsWrapperCache
+{
+public:
+  NS_DECL_ISUPPORTS
+
+  // We need a GetParentObject to make binding codegen happy
+  nsISupports* GetParentObject();
+
+  void NeedsSubjectPrincipalMethod(Maybe<nsIPrincipal*>);
+  bool NeedsSubjectPrincipalAttr(Maybe<nsIPrincipal*>);
+  void SetNeedsSubjectPrincipalAttr(bool, Maybe<nsIPrincipal*>);
+  void NeedsCallerTypeMethod(CallerType);
+  bool NeedsCallerTypeAttr(CallerType);
+  void SetNeedsCallerTypeAttr(bool, CallerType);
 };
 
 } // namespace dom

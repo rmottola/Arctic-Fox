@@ -499,7 +499,7 @@ ContentCacheInChild::SetSelection(nsIWidget* aWidget,
   if (NS_WARN_IF(!CacheCaret(aWidget))) {
     return;
   }
-  NS_WARN_IF(!CacheTextRects(aWidget));
+  Unused << NS_WARN_IF(!CacheTextRects(aWidget));
 }
 
 /*****************************************************************************
@@ -528,10 +528,10 @@ ContentCacheInParent::AssignContent(const ContentCache& aOther,
   mEditorRect = aOther.mEditorRect;
 
   if (mIsComposing) {
-    NS_WARN_IF(mCompositionStart == UINT32_MAX);
+    NS_WARNING_ASSERTION(mCompositionStart != UINT32_MAX, "mCompositionStart");
     IMEStateManager::MaybeStartOffsetUpdatedInChild(aWidget, mCompositionStart);
   } else {
-    NS_WARN_IF(mCompositionStart != UINT32_MAX);
+    NS_WARNING_ASSERTION(mCompositionStart == UINT32_MAX, "mCompositionStart");
   }
 
   MOZ_LOG(sContentCacheLog, LogLevel::Info,
@@ -569,11 +569,23 @@ ContentCacheInParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent,
   // So, we don't support to query contents relative to composition start
   // offset with XP linebreaks.
   if (NS_WARN_IF(!aEvent.mUseNativeLineBreak)) {
+    MOZ_LOG(sContentCacheLog, LogLevel::Error,
+      ("0x%p HandleQueryContentEvent(), FAILED due to query with XP linebreaks",
+       this));
     return false;
   }
 
-  if (NS_WARN_IF(!aEvent.mInput.IsValidOffset()) ||
-      NS_WARN_IF(!aEvent.mInput.IsValidEventMessage(aEvent.mMessage))) {
+  if (NS_WARN_IF(!aEvent.mInput.IsValidOffset())) {
+    MOZ_LOG(sContentCacheLog, LogLevel::Error,
+      ("0x%p HandleQueryContentEvent(), FAILED due to invalid offset",
+       this));
+    return false;
+  }
+
+  if (NS_WARN_IF(!aEvent.mInput.IsValidEventMessage(aEvent.mMessage))) {
+    MOZ_LOG(sContentCacheLog, LogLevel::Error,
+      ("0x%p HandleQueryContentEvent(), FAILED due to invalid event message",
+       this));
     return false;
   }
 
@@ -581,15 +593,40 @@ ContentCacheInParent::HandleQueryContentEvent(WidgetQueryContentEvent& aEvent,
   if (isRelativeToInsertionPoint) {
     if (aWidget->PluginHasFocus()) {
       if (NS_WARN_IF(!aEvent.mInput.MakeOffsetAbsolute(0))) {
+        MOZ_LOG(sContentCacheLog, LogLevel::Error,
+          ("0x%p HandleQueryContentEvent(), FAILED due to "
+           "aEvent.mInput.MakeOffsetAbsolute(0) failure, aEvent={ mMessage=%s, "
+           "mInput={ mOffset=%d, mLength=%d } }",
+           this, ToChar(aEvent.mMessage), aEvent.mInput.mOffset,
+           aEvent.mInput.mLength));
         return false;
       }
     } else if (mIsComposing) {
       if (NS_WARN_IF(!aEvent.mInput.MakeOffsetAbsolute(mCompositionStart))) {
+        MOZ_LOG(sContentCacheLog, LogLevel::Error,
+          ("0x%p HandleQueryContentEvent(), FAILED due to "
+           "aEvent.mInput.MakeOffsetAbsolute(mCompositionStart) failure, "
+           "mCompositionStart=%d, aEvent={ mMessage=%s, "
+           "mInput={ mOffset=%d, mLength=%d } }",
+           this, mCompositionStart, ToChar(aEvent.mMessage),
+           aEvent.mInput.mOffset, aEvent.mInput.mLength));
         return false;
       }
-    } else if (NS_WARN_IF(!mSelection.IsValid()) ||
-               NS_WARN_IF(!aEvent.mInput.MakeOffsetAbsolute(
+    } else if (NS_WARN_IF(!mSelection.IsValid())) {
+      MOZ_LOG(sContentCacheLog, LogLevel::Error,
+        ("0x%p HandleQueryContentEvent(), FAILED due to mSelection is invalid",
+         this));
+      return false;
+    } else if (NS_WARN_IF(!aEvent.mInput.MakeOffsetAbsolute(
                                            mSelection.StartOffset()))) {
+      MOZ_LOG(sContentCacheLog, LogLevel::Error,
+        ("0x%p HandleQueryContentEvent(), FAILED due to "
+         "aEvent.mInput.MakeOffsetAbsolute(mSelection.StartOffset()) "
+         "failure, mSelection={ StartOffset()=%d, Length()=%d }, "
+         "aEvent={ mMessage=%s, mInput={ mOffset=%d, mLength=%d } }",
+         this, mSelection.StartOffset(), mSelection.Length(),
+         ToChar(aEvent.mMessage), aEvent.mInput.mOffset,
+         aEvent.mInput.mLength));
       return false;
     }
   }
@@ -799,27 +836,31 @@ ContentCacheInParent::GetTextRect(uint32_t aOffset,
      mSelection.mAnchor, mSelection.mFocus));
 
   if (!aOffset) {
-    NS_WARN_IF(mFirstCharRect.IsEmpty());
+    NS_WARNING_ASSERTION(!mFirstCharRect.IsEmpty(), "empty rect");
     aTextRect = mFirstCharRect;
     return !aTextRect.IsEmpty();
   }
   if (aOffset == mSelection.mAnchor) {
-    NS_WARN_IF(mSelection.mAnchorCharRects[eNextCharRect].IsEmpty());
+    NS_WARNING_ASSERTION(!mSelection.mAnchorCharRects[eNextCharRect].IsEmpty(),
+                         "empty rect");
     aTextRect = mSelection.mAnchorCharRects[eNextCharRect];
     return !aTextRect.IsEmpty();
   }
   if (mSelection.mAnchor && aOffset == mSelection.mAnchor - 1) {
-    NS_WARN_IF(mSelection.mAnchorCharRects[ePrevCharRect].IsEmpty());
+    NS_WARNING_ASSERTION(!mSelection.mAnchorCharRects[ePrevCharRect].IsEmpty(),
+                         "empty rect");
     aTextRect = mSelection.mAnchorCharRects[ePrevCharRect];
     return !aTextRect.IsEmpty();
   }
   if (aOffset == mSelection.mFocus) {
-    NS_WARN_IF(mSelection.mFocusCharRects[eNextCharRect].IsEmpty());
+    NS_WARNING_ASSERTION(!mSelection.mFocusCharRects[eNextCharRect].IsEmpty(),
+                         "empty rect");
     aTextRect = mSelection.mFocusCharRects[eNextCharRect];
     return !aTextRect.IsEmpty();
   }
   if (mSelection.mFocus && aOffset == mSelection.mFocus - 1) {
-    NS_WARN_IF(mSelection.mFocusCharRects[ePrevCharRect].IsEmpty());
+    NS_WARNING_ASSERTION(!mSelection.mFocusCharRects[ePrevCharRect].IsEmpty(),
+                         "empty rect");
     aTextRect = mSelection.mFocusCharRects[ePrevCharRect];
     return !aTextRect.IsEmpty();
   }
@@ -871,34 +912,38 @@ ContentCacheInParent::GetUnionTextRects(
 
   if (!mSelection.Collapsed() &&
       aOffset == mSelection.StartOffset() && aLength == mSelection.Length()) {
-    NS_WARN_IF(mSelection.mRect.IsEmpty());
+    NS_WARNING_ASSERTION(!mSelection.mRect.IsEmpty(), "empty rect");
     aUnionTextRect = mSelection.mRect;
     return !aUnionTextRect.IsEmpty();
   }
 
   if (aLength == 1) {
     if (!aOffset) {
-      NS_WARN_IF(mFirstCharRect.IsEmpty());
+      NS_WARNING_ASSERTION(!mFirstCharRect.IsEmpty(), "empty rect");
       aUnionTextRect = mFirstCharRect;
       return !aUnionTextRect.IsEmpty();
     }
     if (aOffset == mSelection.mAnchor) {
-      NS_WARN_IF(mSelection.mAnchorCharRects[eNextCharRect].IsEmpty());
+      NS_WARNING_ASSERTION(
+        !mSelection.mAnchorCharRects[eNextCharRect].IsEmpty(), "empty rect");
       aUnionTextRect = mSelection.mAnchorCharRects[eNextCharRect];
       return !aUnionTextRect.IsEmpty();
     }
     if (mSelection.mAnchor && aOffset == mSelection.mAnchor - 1) {
-      NS_WARN_IF(mSelection.mAnchorCharRects[ePrevCharRect].IsEmpty());
+      NS_WARNING_ASSERTION(
+        !mSelection.mAnchorCharRects[ePrevCharRect].IsEmpty(), "empty rect");
       aUnionTextRect = mSelection.mAnchorCharRects[ePrevCharRect];
       return !aUnionTextRect.IsEmpty();
     }
     if (aOffset == mSelection.mFocus) {
-      NS_WARN_IF(mSelection.mFocusCharRects[eNextCharRect].IsEmpty());
+      NS_WARNING_ASSERTION(
+        !mSelection.mFocusCharRects[eNextCharRect].IsEmpty(), "empty rect");
       aUnionTextRect = mSelection.mFocusCharRects[eNextCharRect];
       return !aUnionTextRect.IsEmpty();
     }
     if (mSelection.mFocus && aOffset == mSelection.mFocus - 1) {
-      NS_WARN_IF(mSelection.mFocusCharRects[ePrevCharRect].IsEmpty());
+      NS_WARNING_ASSERTION(
+        !mSelection.mFocusCharRects[ePrevCharRect].IsEmpty(), "empty rect");
       aUnionTextRect = mSelection.mFocusCharRects[ePrevCharRect];
       return !aUnionTextRect.IsEmpty();
     }
@@ -1274,10 +1319,9 @@ ContentCache::TextRectArray::GetUnionRectAsFarAsPossible(
                                uint32_t aLength,
                                bool aRoundToExistingOffset) const
 {
-  MOZ_ASSERT(HasRects());
-
   LayoutDeviceIntRect rect;
-  if (!aRoundToExistingOffset && !IsOverlappingWith(aOffset, aLength)) {
+  if (!HasRects() ||
+      (!aRoundToExistingOffset && !IsOverlappingWith(aOffset, aLength))) {
     return rect;
   }
   uint32_t startOffset = std::max(aOffset, mStart);
@@ -1287,6 +1331,9 @@ ContentCache::TextRectArray::GetUnionRectAsFarAsPossible(
   uint32_t endOffset = std::min(aOffset + aLength, EndOffset());
   if (aRoundToExistingOffset && endOffset < mStart + 1) {
     endOffset = mStart + 1;
+  }
+  if (NS_WARN_IF(endOffset < startOffset)) {
+    return rect;
   }
   for (uint32_t i = 0; i < endOffset - startOffset; i++) {
     rect = rect.Union(mRects[startOffset - mStart + i]);

@@ -37,6 +37,7 @@
 #include "nsITransport.h"
 #include "nsIOService.h"
 #include "nsIRequestContext.h"
+#include "nsIHttpAuthenticator.h"
 #include <algorithm>
 
 #ifdef MOZ_WIDGET_GONK
@@ -104,6 +105,7 @@ nsHttpTransaction::nsHttpTransaction()
     , mPipelinePosition(0)
     , mHttpVersion(NS_HTTP_VERSION_UNKNOWN)
     , mHttpResponseCode(0)
+    , mCurrentHttpResponseHeaderSize(0)
     , mCapsToClear(0)
     , mResponseIsComplete(false)
     , mClosed(false)
@@ -157,7 +159,9 @@ nsHttpTransaction::nsHttpTransaction()
 nsHttpTransaction::~nsHttpTransaction()
 {
     LOG(("Destroying nsHttpTransaction @%p\n", this));
-
+    if (mTransactionObserver) {
+        mTransactionObserver->Complete(this, NS_OK);
+    }
     if (mPushedStream) {
         mPushedStream->OnPushFailed();
         mPushedStream = nullptr;
@@ -974,6 +978,11 @@ nsHttpTransaction::Close(nsresult reason)
         return;
     }
 
+    if (mTransactionObserver) {
+        mTransactionObserver->Complete(this, reason);
+        mTransactionObserver = nullptr;
+    }
+
     if (mTokenBucketCancel) {
         mTokenBucketCancel->Cancel(reason);
         mTokenBucketCancel = nullptr;
@@ -1322,7 +1331,7 @@ nsHttpTransaction::Restart()
         seekable->Seek(nsISeekableStream::NS_SEEK_SET, 0);
 
     // clear old connection state...
-    mSecurityInfo = 0;
+    mSecurityInfo = nullptr;
     if (mConnection) {
         if (!mReuseOnRestart) {
             mConnection->DontReuse();
@@ -1885,6 +1894,13 @@ nsHttpTransaction::ProcessData(char *buf, uint32_t count, uint32_t *countRead)
             bytesConsumed += localBytesConsumed;
         } while (rv == NS_ERROR_NET_INTERRUPT);
 
+        mCurrentHttpResponseHeaderSize += bytesConsumed;
+        if (mCurrentHttpResponseHeaderSize >
+            gHttpHandler->MaxHttpResponseHeaderSize()) {
+            LOG(("nsHttpTransaction %p The response header exceeds the limit.\n",
+                 this));
+            return NS_ERROR_FILE_TOO_BIG;
+        }
         count -= bytesConsumed;
 
         // if buf has some content in it, shift bytes to top of buf.

@@ -471,14 +471,14 @@ nsTextControlFrame::GetMinISize(nsRenderingContext* aRenderingContext)
 }
 
 LogicalSize
-nsTextControlFrame::ComputeAutoSize(nsRenderingContext *aRenderingContext,
-                                    WritingMode aWM,
-                                    const LogicalSize& aCBSize,
-                                    nscoord aAvailableISize,
-                                    const LogicalSize& aMargin,
-                                    const LogicalSize& aBorder,
-                                    const LogicalSize& aPadding,
-                                    bool aShrinkWrap)
+nsTextControlFrame::ComputeAutoSize(nsRenderingContext* aRenderingContext,
+                                    WritingMode         aWM,
+                                    const LogicalSize&  aCBSize,
+                                    nscoord             aAvailableISize,
+                                    const LogicalSize&  aMargin,
+                                    const LogicalSize&  aBorder,
+                                    const LogicalSize&  aPadding,
+                                    ComputeSizeFlags    aFlags)
 {
   float inflation = nsLayoutUtils::FontSizeInflationFor(this);
   LogicalSize autoSize(aWM);
@@ -497,7 +497,7 @@ nsTextControlFrame::ComputeAutoSize(nsRenderingContext *aRenderingContext,
         nsContainerFrame::ComputeAutoSize(aRenderingContext, aWM,
                                           aCBSize, aAvailableISize,
                                           aMargin, aBorder,
-                                          aPadding, aShrinkWrap);
+                                          aPadding, aFlags);
       // Disabled when there's inflation; see comment in GetXULPrefSize.
       MOZ_ASSERT(inflation != 1.0f ||
                  ancestorAutoSize.ISize(aWM) == autoSize.ISize(aWM),
@@ -769,10 +769,11 @@ nsTextControlFrame::SetSelectionInternal(nsIDOMNode *aStartNode,
   // isIncreasing checks to avoid possible errors.
 
   RefPtr<nsRange> range = new nsRange(mContent);
-  nsresult rv = range->SetStart(aStartNode, aStartOffset);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = range->SetEnd(aEndNode, aEndOffset);
+  // Be careful to use internal nsRange methods which do not check to make sure
+  // we have access to the node.
+  nsCOMPtr<nsINode> start = do_QueryInterface(aStartNode);
+  nsCOMPtr<nsINode> end = do_QueryInterface(aEndNode);
+  nsresult rv = range->Set(start, aStartOffset, end, aEndOffset);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Get the selection, clear it and add the new range to it!

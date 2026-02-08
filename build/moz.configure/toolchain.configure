@@ -62,12 +62,6 @@ set_config('HAVE_YASM', have_yasm)
 # Until the YASM variable is not necessary in old-configure.
 add_old_configure_assignment('YASM', have_yasm)
 
-@dependable
-def extra_toolchain_flags():
-    # This value will be overriden for android builds, where
-    # extra flags are required to do basic checks.
-    return []
-
 # Android NDK
 # ==============================================================
 
@@ -75,7 +69,7 @@ def extra_toolchain_flags():
 def compiling_android(compile_env, build_project, gonkdir, _):
     return compile_env and (gonkdir or build_project in ('mobile/android', 'js'))
 
-include_when('android-ndk.configure', when=compiling_android)
+include('android-ndk.configure', when=compiling_android)
 
 # MacOS deployment target version
 # ==============================================================
@@ -162,18 +156,23 @@ set_config('MOZ_USING_COMPILER_WRAPPER', using_compiler_wrapper)
 js_option('--with-toolchain-prefix', env='TOOLCHAIN_PREFIX', nargs=1,
           help='Prefix for the target toolchain')
 
-@depends('--with-toolchain-prefix', target, host, cross_compiling)
-def toolchain_prefix(value, target, host, cross_compiling):
+@depends('--with-toolchain-prefix', target, cross_compiling)
+def toolchain_prefix(value, target, cross_compiling):
     if value:
-        return value[0]
-    # Special case x86-64 <-> x86 cross compiling until we have the right tests
-    # in moz.configure land.
-    if cross_compiling and not all(i.cpu in ('x86_64', 'x86')
-                                   for i in (target, host)):
-        return '%s-' % target.toolchain
+        return tuple(value)
+    if cross_compiling:
+        return ('%s-' % target.toolchain, '%s-' % target.alias)
 
-set_config('TOOLCHAIN_PREFIX', toolchain_prefix)
-add_old_configure_assignment('TOOLCHAIN_PREFIX', toolchain_prefix)
+@depends(toolchain_prefix, target)
+def first_toolchain_prefix(toolchain_prefix, target):
+    # Pass TOOLCHAIN_PREFIX down to the build system if it was given from the
+    # command line/environment (in which case there's only one value in the tuple),
+    # or when cross-compiling for Android.
+    if toolchain_prefix and (target.os == 'Android' or len(toolchain_prefix) == 1):
+        return toolchain_prefix[0]
+
+set_config('TOOLCHAIN_PREFIX', first_toolchain_prefix)
+add_old_configure_assignment('TOOLCHAIN_PREFIX', first_toolchain_prefix)
 
 
 # Compilers
@@ -213,19 +212,19 @@ def get_compiler_info(compiler, language):
     check = dedent('''\
         #if defined(_MSC_VER)
         #if defined(__clang__)
-        %COMPILER clang-cl
+        %COMPILER "clang-cl"
         %VERSION _MSC_FULL_VER
         #else
-        %COMPILER msvc
+        %COMPILER "msvc"
         %VERSION _MSC_FULL_VER
         #endif
         #elif defined(__clang__)
-        %COMPILER clang
+        %COMPILER "clang"
         #  if !__cplusplus || __has_feature(cxx_alignof)
         %VERSION __clang_major__.__clang_minor__.__clang_patchlevel__
         #  endif
         #elif defined(__GNUC__)
-        %COMPILER gcc
+        %COMPILER "gcc"
         %VERSION __GNUC__.__GNUC_MINOR__.__GNUC_PATCHLEVEL__
         #endif
 
@@ -248,7 +247,7 @@ def get_compiler_info(compiler, language):
         for n, (value, condition) in enumerate(preprocessor_checks.iteritems()):
             check += dedent('''\
                 #%(if)s %(condition)s
-                %%%(name)s %(value)s
+                %%%(name)s "%(value)s"
             ''' % {
                 'if': 'elif' if n else 'if',
                 'condition': condition,
@@ -262,9 +261,9 @@ def get_compiler_info(compiler, language):
     # by the preprocessor, except MSVC, which only supports little endian.
     check += dedent('''\
         #if _MSC_VER || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-        %ENDIANNESS little
+        %ENDIANNESS "little"
         #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-        %ENDIANNESS big
+        %ENDIANNESS "big"
         #endif
     ''')
 
@@ -274,12 +273,14 @@ def get_compiler_info(compiler, language):
         raise FatalCheckError(
             'Unknown compiler or compiler not supported.')
 
+    # Metadata emitted by preprocessors such as GCC with LANG=ja_JP.utf-8 may
+    # have non-ASCII characters. Treat the output as bytearray.
     data = {}
     for line in result.splitlines():
-        if line.startswith('%'):
+        if line.startswith(b'%'):
             k, _, v = line.partition(' ')
             k = k.lstrip('%')
-            data[k] = v.replace(' ', '')
+            data[k] = v.replace(' ', '').lstrip('"').rstrip('"')
             log.debug('%s = %s', k, data[k])
 
     try:
@@ -343,16 +344,20 @@ def check_compiler(compiler, language, target):
     # Note: MSVC, while supporting C++11, still reports 199711L for __cplusplus.
     # Note: this is a strict version check because we used to always add
     # -std=gnu++11.
-    if info.language == 'C++' and info.language_version != 201103:
-        if info.type in ('clang-cl', 'clang', 'gcc'):
+    if info.language == 'C++':
+        if info.type in ('clang', 'gcc') and info.language_version != 201103:
             append_flag('-std=gnu++11')
+        # MSVC 2015 headers include C++14 features, but don't guard them
+        # with appropriate checks.
+        if info.type == 'clang-cl' and info.language_version != 201402:
+            append_flag('-std=c++14')
 
-    # We force clang-cl to emulate Visual C++ 2013 Update 3 with fallback to
+    # We force clang-cl to emulate Visual C++ 2015 Update 2 with fallback to
     # cl.exe.
-    if info.type == 'clang-cl' and info.version != '18.00.30723':
+    if info.type == 'clang-cl' and info.version != '19.00.23918':
         # Those flags are direct clang-cl flags that don't need -Xclang, add
         # them directly.
-        flags.append('-fms-compatibility-version=18.00.30723')
+        flags.append('-fms-compatibility-version=19.00.23918')
         flags.append('-fallback')
 
     # Check compiler target
@@ -463,15 +468,17 @@ def default_c_compilers(host_or_target):
     '''
     assert host_or_target in (host, target)
 
-    @depends(host_or_target, host, toolchain_prefix)
-    def default_c_compilers(host_or_target, host, toolchain_prefix):
+    @depends(host_or_target, target, toolchain_prefix)
+    def default_c_compilers(host_or_target, target, toolchain_prefix):
+        gcc = ('gcc',)
+        if toolchain_prefix and host_or_target is target:
+            gcc = tuple('%sgcc' % p for p in toolchain_prefix) + gcc
+
         if host_or_target.kernel == 'WINNT':
-            return ('cl', 'clang-cl', 'gcc', 'clang')
+            return ('cl', 'clang-cl') + gcc + ('clang',)
         if host_or_target.kernel == 'Darwin':
             return ('clang',)
-        if host_or_target != host:  # cross compilation
-            return ('%sgcc' % toolchain_prefix, 'gcc', 'clang')
-        return ('gcc', 'clang')
+        return gcc + ('clang',)
 
     return default_c_compilers
 
@@ -760,6 +767,23 @@ def compiler(language, host_or_target, c_compiler=None, other_compiler=None,
     valid_compiler.try_compile(check_msg='%s works' % what,
                                onerror=compiler_error)
 
+
+    # Set CPP/CXXCPP for both the build system and old-configure. We don't
+    # need to check this works for preprocessing, because we already relied
+    # on $CC -E/$CXX -E doing preprocessing work to validate the compiler
+    # in the first place.
+    if host_or_target == target:
+        pp_var = {
+            'C': 'CPP',
+            'C++': 'CXXCPP',
+        }[language]
+
+        preprocessor = depends_if(valid_compiler)(
+                lambda x: list(x.wrapper) + [x.compiler, '-E'] + list(x.flags))
+
+        set_config(pp_var, preprocessor)
+        add_old_configure_assignment(pp_var, preprocessor)
+
     return valid_compiler
 
 
@@ -769,6 +793,10 @@ host_c_compiler = compiler('C', host, other_compiler=c_compiler)
 host_cxx_compiler = compiler('C++', host, c_compiler=host_c_compiler,
                              other_compiler=cxx_compiler,
                              other_c_compiler=c_compiler)
+
+# Generic compiler-based conditions.
+non_msvc_compiler = depends(c_compiler)(lambda info: info.type != 'msvc')
+building_with_gcc = depends(c_compiler)(lambda info: info.type == 'gcc')
 
 include('compile-checks.configure')
 
@@ -784,7 +812,7 @@ def check_have_64_bit(have_64_bit, compiler_have_64_bit):
 @depends(c_compiler)
 def default_debug_flags(compiler_info):
     # Debug info is ON by default.
-    if compiler_info.type == 'msvc':
+    if compiler_info.type in ('msvc', 'clang-cl'):
         return '-Zi'
     return '-g'
 
@@ -816,6 +844,27 @@ def debug_flags(env_debug_flags, enable_debug_flags, default_debug_flags):
 
 set_config('MOZ_DEBUG_FLAGS', debug_flags)
 add_old_configure_assignment('MOZ_DEBUG_FLAGS', debug_flags)
+
+@depends(c_compiler)
+def color_cflags(info):
+    # We could test compiling with flags. By why incur the overhead when
+    # color support should always be present in a specific toolchain
+    # version?
+
+    # Code for auto-adding this flag to compiler invocations needs to
+    # determine if an existing flag isn't already present. That is likely
+    # using exact string matching on the returned value. So if the return
+    # value changes to e.g. "<x>=always", exact string match may fail and
+    # multiple color flags could be added. So examine downstream consumers
+    # before adding flags to return values.
+    if info.type == 'gcc' and info.version >= '4.9.0':
+        return '-fdiagnostics-color'
+    elif info.type == 'clang':
+        return '-fcolor-diagnostics'
+    else:
+        return ''
+
+set_config('COLOR_CFLAGS', color_cflags)
 
 # Some standard library headers (notably bionic on Android) declare standard
 # functions (e.g. getchar()) and also #define macros for those standard
@@ -860,6 +909,27 @@ def libcxx_inline_visibility(c_compiler, target):
 
 set_define('_LIBCPP_INLINE_VISIBILITY', libcxx_inline_visibility)
 set_define('_LIBCPP_INLINE_VISIBILITY_EXCEPT_GCC49', libcxx_inline_visibility)
+
+@depends(target, check_build_environment)
+def visibility_flags(target, env):
+    if target.os != 'WINNT':
+        if target.kernel == 'Darwin':
+            return ('-fvisibility=hidden', '-fvisibility-inlines-hidden')
+        return ('-I%s/system_wrappers' % os.path.join(env.dist),
+                '-include',
+                '%s/config/gcc_hidden.h' % env.topsrcdir)
+
+@depends(target, visibility_flags)
+def wrap_system_includes(target, visibility_flags):
+    if visibility_flags and target.kernel != 'Darwin':
+        return True
+
+set_define('HAVE_VISIBILITY_HIDDEN_ATTRIBUTE',
+           depends(visibility_flags)(lambda v: bool(v) or None))
+set_define('HAVE_VISIBILITY_ATTRIBUTE',
+           depends(visibility_flags)(lambda v: bool(v) or None))
+set_config('WRAP_SYSTEM_INCLUDES', wrap_system_includes)
+set_config('VISIBILITY_FLAGS', visibility_flags)
 
 include('windows.configure')
 include('rust.configure')

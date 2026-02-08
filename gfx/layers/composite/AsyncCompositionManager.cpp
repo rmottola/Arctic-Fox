@@ -573,18 +573,16 @@ SampleValue(float aPortion, Animation& aAnimation,
       aCurrentIteration > 0) {
     // FIXME: Bug 1293492: Add a utility function to calculate both of
     // below StyleAnimationValues.
-    DebugOnly<bool> accumulateResult =
+    startValue =
       StyleAnimationValue::Accumulate(aAnimation.property(),
-                                      startValue,
                                       aLastValue,
+                                      Move(startValue),
                                       aCurrentIteration);
-    MOZ_ASSERT(accumulateResult, "could not accumulate value");
-    accumulateResult =
+    endValue =
       StyleAnimationValue::Accumulate(aAnimation.property(),
-                                      endValue,
                                       aLastValue,
+                                      Move(endValue),
                                       aCurrentIteration);
-    MOZ_ASSERT(accumulateResult, "could not accumulate value");
   }
 
   StyleAnimationValue interpolatedValue;
@@ -652,33 +650,14 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
                      "Failed to resolve start time of pending animations");
           TimeDuration elapsedDuration =
             (aPoint - animation.startTime()).MultDouble(animation.playbackRate());
-          // Skip animations that are yet to start.
-          //
-          // Currently, this should only happen when the refresh driver is under test
-          // control and is made to produce a time in the past or is restored from
-          // test control causing it to jump backwards in time.
-          //
-          // Since activeAnimations is true, this could mean we keep compositing
-          // unnecessarily during the delay, but so long as this only happens while
-          // the refresh driver is under test control that should be ok.
-          if (elapsedDuration.ToSeconds() < 0) {
-            continue;
-          }
-
           TimingParams timing;
           timing.mDuration.emplace(animation.duration());
-          // Currently animations run on the compositor have their delay factored
-          // into their start time, hence the delay is effectively zero.
-          timing.mDelay = TimeDuration(0);
+          timing.mDelay = animation.delay();
           timing.mIterations = animation.iterations();
           timing.mIterationStart = animation.iterationStart();
           timing.mDirection =
             static_cast<dom::PlaybackDirection>(animation.direction());
-          // Animations typically only run on the compositor during their active
-          // interval but if we end up sampling them outside that range (for
-          // example, while they are waiting to be removed) we currently just
-          // assume that we should fill.
-          timing.mFill = dom::FillMode::Both;
+          timing.mFill = static_cast<dom::FillMode>(animation.fillMode());
           timing.mFunction =
             AnimationUtils::TimingFunctionToComputedTimingFunction(
               animation.easingFunction());
@@ -688,8 +667,9 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
               Nullable<TimeDuration>(elapsedDuration), timing,
               animation.playbackRate());
 
-          MOZ_ASSERT(!computedTiming.mProgress.IsNull(),
-                     "iteration progress should not be null");
+          if (computedTiming.mProgress.IsNull()) {
+            continue;
+          }
 
           uint32_t segmentIndex = 0;
           size_t segmentSize = animation.segments().Length();
@@ -747,15 +727,16 @@ static bool
 SampleAPZAnimations(const LayerMetricsWrapper& aLayer, TimeStamp aSampleTime)
 {
   bool activeAnimations = false;
-  for (LayerMetricsWrapper child = aLayer.GetFirstChild(); child;
-        child = child.GetNextSibling()) {
-    activeAnimations |= SampleAPZAnimations(child, aSampleTime);
-  }
 
-  if (AsyncPanZoomController* apzc = aLayer.GetApzc()) {
-    apzc->ReportCheckerboard(aSampleTime);
-    activeAnimations |= apzc->AdvanceAnimations(aSampleTime);
-  }
+  ForEachNodePostOrder<ForwardIterator>(aLayer,
+      [&activeAnimations, &aSampleTime](LayerMetricsWrapper aLayerMetrics)
+      {
+        if (AsyncPanZoomController* apzc = aLayerMetrics.GetApzc()) {
+          apzc->ReportCheckerboard(aSampleTime);
+          activeAnimations |= apzc->AdvanceAnimations(aSampleTime);
+        }
+      }
+  );
 
   return activeAnimations;
 }
@@ -1306,36 +1287,13 @@ ApplyAsyncTransformToScrollbarForContent(Layer* aScrollbar,
 }
 
 static LayerMetricsWrapper
-FindScrolledLayerRecursive(Layer* aScrollbar, const LayerMetricsWrapper& aSubtreeRoot)
-{
-  if (LayerIsScrollbarTarget(aSubtreeRoot, aScrollbar)) {
-    return aSubtreeRoot;
-  }
-
-  for (LayerMetricsWrapper child = aSubtreeRoot.GetFirstChild();
-       child;
-       child = child.GetNextSibling())
-  {
-    // Do not recurse into RefLayers, since our initial aSubtreeRoot is the
-    // root (or RefLayer root) of a single layer space to search.
-    if (child.AsRefLayer()) {
-      continue;
-    }
-
-    LayerMetricsWrapper target = FindScrolledLayerRecursive(aScrollbar, child);
-    if (target) {
-      return target;
-    }
-  }
-  return LayerMetricsWrapper();
-}
-
-static LayerMetricsWrapper
 FindScrolledLayerForScrollbar(Layer* aScrollbar, bool* aOutIsAncestor)
 {
   // First check if the scrolled layer is an ancestor of the scrollbar layer.
   LayerMetricsWrapper root(aScrollbar->Manager()->GetRoot());
   LayerMetricsWrapper prevAncestor(aScrollbar);
+  LayerMetricsWrapper scrolledLayer;
+
   for (LayerMetricsWrapper ancestor(aScrollbar); ancestor; ancestor = ancestor.GetParent()) {
     // Don't walk into remote layer trees; the scrollbar will always be in
     // the same layer space.
@@ -1352,7 +1310,23 @@ FindScrolledLayerForScrollbar(Layer* aScrollbar, bool* aOutIsAncestor)
   }
 
   // Search the entire layer space of the scrollbar.
-  return FindScrolledLayerRecursive(aScrollbar, root);
+  ForEachNode<ForwardIterator>(
+      root,
+      [&root, &scrolledLayer, &aScrollbar](LayerMetricsWrapper aLayerMetrics)
+      {
+        // Do not recurse into RefLayers, since our initial aSubtreeRoot is the
+        // root (or RefLayer root) of a single layer space to search.
+        if (root != aLayerMetrics && aLayerMetrics.AsRefLayer()) {
+          return TraversalFlag::Skip;
+        }
+        if (LayerIsScrollbarTarget(aLayerMetrics, aScrollbar)) {
+          scrolledLayer = aLayerMetrics;
+          return TraversalFlag::Abort;
+        }
+        return TraversalFlag::Continue;
+      }
+  );
+  return scrolledLayer;
 }
 
 void

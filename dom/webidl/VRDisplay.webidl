@@ -116,23 +116,24 @@ interface VRStageParameters {
 
 [Pref="dom.vr.enabled",
  HeaderFile="mozilla/dom/VRDisplay.h"]
-interface VRPose {
+interface VRPose : Pose
+{
+
+};
+
+[Constructor,
+ Pref="dom.vr.enabled",
+ HeaderFile="mozilla/dom/VRDisplay.h"]
+interface VRFrameData {
   readonly attribute DOMHighResTimeStamp timestamp;
 
-  /**
-   * position, linearVelocity, and linearAcceleration are 3-component vectors.
-   * position is relative to a sitting space. Transforming this point with
-   * VRStageParameters.sittingToStandingTransform converts this to standing space.
-   */
-  [Constant, Throws] readonly attribute Float32Array? position;
-  [Constant, Throws] readonly attribute Float32Array? linearVelocity;
-  [Constant, Throws] readonly attribute Float32Array? linearAcceleration;
+  [Throws, Pure] readonly attribute Float32Array leftProjectionMatrix;
+  [Throws, Pure] readonly attribute Float32Array leftViewMatrix;
 
-  /* orientation is a 4-entry array representing the components of a quaternion. */
-  [Constant, Throws] readonly attribute Float32Array? orientation;
-  /* angularVelocity and angularAcceleration are the components of 3-dimensional vectors. */
-  [Constant, Throws] readonly attribute Float32Array? angularVelocity;
-  [Constant, Throws] readonly attribute Float32Array? angularAcceleration;
+  [Throws, Pure] readonly attribute Float32Array rightProjectionMatrix;
+  [Throws, Pure] readonly attribute Float32Array rightViewMatrix;
+
+  [Pure] readonly attribute VRPose pose;
 };
 
 [Pref="dom.vr.enabled",
@@ -190,6 +191,12 @@ interface VRDisplay : EventTarget {
   [Constant] readonly attribute DOMString displayName;
 
   /**
+   * Populates the passed VRFrameData with the information required to render
+   * the current frame.
+   */
+  boolean getFrameData(VRFrameData frameData);
+
+  /**
    * Return a VRPose containing the future predicted pose of the VRDisplay
    * when the current frame will be presented. Subsequent calls to getPose()
    * MUST return a VRPose with the same values until the next call to
@@ -199,13 +206,6 @@ interface VRDisplay : EventTarget {
    * and acceleration of each of these properties.
    */
   [NewObject] VRPose getPose();
-
-  /**
-   * Return the current instantaneous pose of the VRDisplay, with no
-   * prediction applied.  Every call to getImmediatePose() may
-   * return a different value, even within a single frame.
-   */
-  [NewObject] VRPose getImmediatePose();
 
   /**
    * Reset the pose for this display, treating its current position and
@@ -269,5 +269,5 @@ interface VRDisplay : EventTarget {
    * canvas as any other operation that uses its source image, and canvases
    * created without preserveDrawingBuffer set to true will be cleared.
    */
-  void submitFrame(optional VRPose pose);
+  void submitFrame();
 };

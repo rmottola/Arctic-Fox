@@ -648,11 +648,10 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_AXIS |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     Size,
@@ -669,22 +668,20 @@ CSS_PROP_SHORTHAND(
     border-block-end,
     border_block_end,
     BorderBlockEnd,
-    CSS_PROPERTY_PARSE_FUNCTION |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS,
-    "layout.css.vertical-text.enabled")
+    CSS_PROPERTY_PARSE_FUNCTION,
+    "")
 CSS_PROP_LOGICAL(
     border-block-end-color,
     border_block_end_color,
     BorderBlockEndColor,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS |
         CSS_PROPERTY_LOGICAL_END_EDGE,
-    "layout.css.vertical-text.enabled",
-    VARIANT_HCK,
-    kBorderColorKTable,
+    "",
+    VARIANT_HC,
+    nullptr,
     BorderColor,
     Border,
     CSS_PROP_NO_OFFSET,
@@ -695,11 +692,10 @@ CSS_PROP_LOGICAL(
     BorderBlockEndStyle,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS |
         CSS_PROPERTY_LOGICAL_END_EDGE,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HK,
     kBorderStyleKTable,
     BorderStyle,
@@ -714,11 +710,10 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS |
         CSS_PROPERTY_LOGICAL_END_EDGE,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HKL | VARIANT_CALC,
     kBorderWidthKTable,
     BorderWidth,
@@ -729,21 +724,19 @@ CSS_PROP_SHORTHAND(
     border-block-start,
     border_block_start,
     BorderBlockStart,
-    CSS_PROPERTY_PARSE_FUNCTION |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS,
-    "layout.css.vertical-text.enabled")
+    CSS_PROPERTY_PARSE_FUNCTION,
+    "")
 CSS_PROP_LOGICAL(
     border-block-start-color,
     border_block_start_color,
     BorderBlockStartColor,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
-    VARIANT_HCK,
-    kBorderColorKTable,
+    "",
+    VARIANT_HC,
+    nullptr,
     BorderColor,
     Border,
     CSS_PROP_NO_OFFSET,
@@ -754,10 +747,9 @@ CSS_PROP_LOGICAL(
     BorderBlockStartStyle,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HK,
     kBorderStyleKTable,
     BorderStyle,
@@ -772,10 +764,9 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HKL | VARIANT_CALC,
     kBorderWidthKTable,
     BorderWidth,
@@ -797,10 +788,10 @@ CSS_PROP_BORDER(
         CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED |
         CSS_PROPERTY_HASHLESS_COLOR_QUIRK,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleBorder, mBorderBottomColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-bottom-colors,
     border_bottom_colors,
@@ -960,8 +951,8 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_END_EDGE,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
+    VARIANT_HC,
+    nullptr,
     BorderColor,
     Border,
     CSS_PROP_NO_OFFSET,
@@ -1012,8 +1003,8 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
         CSS_PROPERTY_LOGICAL,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
+    VARIANT_HC,
+    nullptr,
     BorderColor,
     Border,
     CSS_PROP_NO_OFFSET,
@@ -1063,10 +1054,10 @@ CSS_PROP_BORDER(
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
         CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleBorder, mBorderLeftColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-left-colors,
     border_left_colors,
@@ -1125,10 +1116,10 @@ CSS_PROP_BORDER(
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER |
         CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleBorder, mBorderRightColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-right-colors,
     border_right_colors,
@@ -1199,10 +1190,10 @@ CSS_PROP_BORDER(
         CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED |
         CSS_PROPERTY_HASHLESS_COLOR_QUIRK,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleBorder, mBorderTopColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-top-colors,
     border_top_colors,
@@ -1421,7 +1412,8 @@ CSS_PROP_SVGRESET(
     ClipPath,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_VALUE_PARSER_FUNCTION |
-        CSS_PROPERTY_CREATES_STACKING_CONTEXT,
+        CSS_PROPERTY_CREATES_STACKING_CONTEXT |
+        CSS_PROPERTY_STORES_CALC,
     "",
     0,
     nullptr,
@@ -1482,9 +1474,9 @@ CSS_PROP_SVG(
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_Discrete)
 CSS_PROP_COLUMN(
-    -moz-column-count,
+    column-count,
     column_count,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnCount),
+    ColumnCount,
     CSS_PROPERTY_PARSE_VALUE |
         // Need to reject 0 in addition to negatives.  If we accept 0, we
         // need to change NS_STYLE_COLUMN_COUNT_AUTO to something else.
@@ -1495,9 +1487,9 @@ CSS_PROP_COLUMN(
     offsetof(nsStyleColumn, mColumnCount),
     eStyleAnimType_Custom)
 CSS_PROP_COLUMN(
-    -moz-column-fill,
+    column-fill,
     column_fill,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnFill),
+    ColumnFill,
     CSS_PROPERTY_PARSE_VALUE,
     "",
     VARIANT_HK,
@@ -1505,9 +1497,9 @@ CSS_PROP_COLUMN(
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
 CSS_PROP_COLUMN(
-    -moz-column-gap,
+    column-gap,
     column_gap,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnGap),
+    ColumnGap,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_VALUE_NONNEGATIVE,
     "",
@@ -1516,26 +1508,26 @@ CSS_PROP_COLUMN(
     offsetof(nsStyleColumn, mColumnGap),
     eStyleAnimType_Coord)
 CSS_PROP_SHORTHAND(
-    -moz-column-rule,
+    column-rule,
     column_rule,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnRule),
+    ColumnRule,
     CSS_PROPERTY_PARSE_FUNCTION,
     "")
 CSS_PROP_COLUMN(
-    -moz-column-rule-color,
+    column-rule-color,
     column_rule_color,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnRuleColor),
+    ColumnRuleColor,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleColumn, mColumnRuleColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_COLUMN(
-    -moz-column-rule-style,
+    column-rule-style,
     column_rule_style,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnRuleStyle),
+    ColumnRuleStyle,
     CSS_PROPERTY_PARSE_VALUE,
     "",
     VARIANT_HK,
@@ -1543,9 +1535,9 @@ CSS_PROP_COLUMN(
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
 CSS_PROP_COLUMN(
-    -moz-column-rule-width,
+    column-rule-width,
     column_rule_width,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnRuleWidth),
+    ColumnRuleWidth,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_VALUE_NONNEGATIVE,
     "",
@@ -1554,9 +1546,9 @@ CSS_PROP_COLUMN(
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_Custom)
 CSS_PROP_COLUMN(
-    -moz-column-width,
+    column-width,
     column_width,
-    CSS_PROP_DOMPROP_PREFIXED(ColumnWidth),
+    ColumnWidth,
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_VALUE_NONNEGATIVE,
     "",
@@ -1565,9 +1557,9 @@ CSS_PROP_COLUMN(
     offsetof(nsStyleColumn, mColumnWidth),
     eStyleAnimType_Coord)
 CSS_PROP_SHORTHAND(
-    -moz-columns,
     columns,
-    CSS_PROP_DOMPROP_PREFIXED(Columns),
+    columns,
+    Columns,
     CSS_PROPERTY_PARSE_FUNCTION,
     "")
 CSS_PROP_DISPLAY(
@@ -1805,7 +1797,7 @@ CSS_PROP_POSITION(
     eStyleAnimType_Discrete)
 CSS_PROP_DISPLAY(
     float,
-    float,
+    float_,
     CSS_PROP_PUBLIC_OR_PRIVATE(CssFloat, Float),
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_APPLIES_TO_FIRST_LETTER,
@@ -2329,10 +2321,9 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHKLP | VARIANT_CALC,
     kWidthKTable,
     Size,
@@ -2501,11 +2492,10 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_APPLIES_TO_PAGE_RULE |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS |
         CSS_PROPERTY_LOGICAL_END_EDGE,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     Margin,
@@ -2521,10 +2511,9 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_APPLIES_TO_PAGE_RULE |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     Margin,
@@ -2847,11 +2836,10 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_AXIS |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HLPO | VARIANT_CALC,
     nullptr,
     MaxSize,
@@ -2880,10 +2868,9 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HKLPO | VARIANT_CALC,
     kWidthKTable,
     MaxSize,
@@ -2912,11 +2899,10 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_AXIS |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     MinSize,
@@ -2959,10 +2945,9 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHKLP | VARIANT_CALC,
     kWidthKTable,
     MinSize,
@@ -3024,11 +3009,10 @@ CSS_PROP_LOGICAL(
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS |
         CSS_PROPERTY_LOGICAL_END_EDGE,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     Offset,
@@ -3042,10 +3026,9 @@ CSS_PROP_LOGICAL(
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     Offset,
@@ -3059,10 +3042,9 @@ CSS_PROP_LOGICAL(
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_END_EDGE,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     Offset,
@@ -3076,9 +3058,8 @@ CSS_PROP_LOGICAL(
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_AHLP | VARIANT_CALC,
     nullptr,
     Offset,
@@ -3143,10 +3124,10 @@ CSS_PROP_OUTLINE(
     CSS_PROPERTY_PARSE_VALUE |
         CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED,
     "",
-    VARIANT_HCK,
-    kOutlineColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleOutline, mOutlineColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_OUTLINE(
     outline-offset,
     outline_offset,
@@ -3296,11 +3277,10 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_APPLIES_TO_PLACEHOLDER |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS |
         CSS_PROPERTY_LOGICAL_END_EDGE,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HLP | VARIANT_CALC,
     nullptr,
     Padding,
@@ -3318,10 +3298,9 @@ CSS_PROP_LOGICAL(
         CSS_PROPERTY_APPLIES_TO_PLACEHOLDER |
         CSS_PROPERTY_STORES_CALC |
         CSS_PROPERTY_GETCS_NEEDS_LAYOUT_FLUSH |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS |
         CSS_PROPERTY_LOGICAL |
         CSS_PROPERTY_LOGICAL_BLOCK_AXIS,
-    "layout.css.vertical-text.enabled",
+    "",
     VARIANT_HLP | VARIANT_CALC,
     nullptr,
     Padding,
@@ -3959,10 +3938,10 @@ CSS_PROP_TEXTRESET(
         CSS_PROPERTY_APPLIES_TO_PLACEHOLDER |
         CSS_PROPERTY_IGNORED_WHEN_COLORS_DISABLED,
     "",
-    VARIANT_HCK,
-    kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    VARIANT_HC,
+    nullptr,
+    offsetof(nsStyleTextReset, mTextDecorationColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXTRESET(
     text-decoration-line,
     text_decoration_line,
@@ -3987,7 +3966,7 @@ CSS_PROP_TEXTRESET(
     VARIANT_HK,
     kTextDecorationStyleKTable,
     CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    eStyleAnimType_None)
 CSS_PROP_SHORTHAND(
     text-emphasis,
     text_emphasis,
@@ -4003,8 +3982,8 @@ CSS_PROP_TEXT(
     "",
     VARIANT_HC,
     nullptr,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    offsetof(nsStyleText, mTextEmphasisColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXT(
     text-emphasis-position,
     text_emphasis_position,
@@ -4039,7 +4018,7 @@ CSS_PROP_TEXT(
     VARIANT_HC,
     nullptr,
     offsetof(nsStyleText, mWebkitTextFillColor),
-    eStyleAnimType_Custom)
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXT(
     text-indent,
     text_indent,
@@ -4057,9 +4036,8 @@ CSS_PROP_VISIBILITY(
     text-orientation,
     text_orientation,
     TextOrientation,
-    CSS_PROPERTY_PARSE_VALUE |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS,
-    "layout.css.vertical-text.enabled",
+    CSS_PROPERTY_PARSE_VALUE,
+    "",
     VARIANT_HK,
     kTextOrientationKTable,
     CSS_PROP_NO_OFFSET,
@@ -4129,7 +4107,7 @@ CSS_PROP_TEXT(
     VARIANT_HC,
     nullptr,
     offsetof(nsStyleText, mWebkitTextStrokeColor),
-    eStyleAnimType_Custom)
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXT(
     -webkit-text-stroke-width,
     _webkit_text_stroke_width,
@@ -4504,9 +4482,8 @@ CSS_PROP_VISIBILITY(
     writing-mode,
     writing_mode,
     WritingMode,
-    CSS_PROPERTY_PARSE_VALUE |
-        CSS_PROPERTY_ENABLED_IN_UA_SHEETS,
-    "layout.css.vertical-text.enabled",
+    CSS_PROPERTY_PARSE_VALUE,
+    "",
     VARIANT_HK,
     kWritingModeKTable,
     CSS_PROP_NO_OFFSET,

@@ -77,6 +77,7 @@ class Animation;
 class AnimationData;
 class AsyncCanvasRenderer;
 class AsyncPanZoomController;
+class BasicLayerManager;
 class ClientLayerManager;
 class Layer;
 class LayerMetricsWrapper;
@@ -196,6 +197,9 @@ public:
   virtual ClientLayerManager* AsClientLayerManager()
   { return nullptr; }
 
+  virtual BasicLayerManager* AsBasicLayerManager()
+  { return nullptr; }
+
   /**
    * Returns true if this LayerManager is owned by an nsIWidget,
    * and is used for drawing into the widget.
@@ -209,7 +213,7 @@ public:
    * This transaction will update the state of the window from which
    * this LayerManager was obtained.
    */
-  virtual void BeginTransaction() = 0;
+  virtual bool BeginTransaction() = 0;
   /**
    * Start a new transaction. Nested transactions are not allowed so
    * there must be no transaction currently in progress.
@@ -217,7 +221,7 @@ public:
    * the given target context. The rendering will be complete when
    * EndTransaction returns.
    */
-  virtual void BeginTransactionWithTarget(gfxContext* aTarget) = 0;
+  virtual bool BeginTransactionWithTarget(gfxContext* aTarget) = 0;
 
   enum EndTransactionFlags {
     END_DEFAULT = 0,

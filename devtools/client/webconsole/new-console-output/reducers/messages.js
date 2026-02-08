@@ -11,11 +11,13 @@ const constants = require("devtools/client/webconsole/new-console-output/constan
 const MessageState = Immutable.Record({
   messagesById: Immutable.List(),
   messagesUiById: Immutable.List(),
+  messagesTableDataById: Immutable.Map(),
 });
 
 function messages(state = new MessageState(), action) {
   const messagesById = state.messagesById;
   const messagesUiById = state.messagesUiById;
+  const messagesTableDataById = state.messagesTableDataById;
 
   switch (action.type) {
     case constants.MESSAGE_ADD:
@@ -23,10 +25,6 @@ function messages(state = new MessageState(), action) {
 
       if (newMessage.type === constants.MESSAGE_TYPE.NULL_MESSAGE) {
         return state;
-      }
-
-      if (newMessage.type === constants.MESSAGE_TYPE.CLEAR) {
-        return state.set("messagesById", Immutable.List([newMessage]));
       }
 
       if (newMessage.allowRepeating && messagesById.size > 0) {
@@ -47,12 +45,18 @@ function messages(state = new MessageState(), action) {
         }
       });
     case constants.MESSAGES_CLEAR:
-      return state.set("messagesById", Immutable.List());
+      return state.withMutations(function (record) {
+        record.set("messagesById", Immutable.List());
+        record.set("messagesUiById", Immutable.List());
+      });
     case constants.MESSAGE_OPEN:
       return state.set("messagesUiById", messagesUiById.push(action.id));
     case constants.MESSAGE_CLOSE:
       let index = state.messagesUiById.indexOf(action.id);
       return state.deleteIn(["messagesUiById", index]);
+    case constants.MESSAGE_TABLE_RECEIVE:
+      const {id, data} = action;
+      return state.set("messagesTableDataById", messagesTableDataById.set(id, data));
   }
 
   return state;

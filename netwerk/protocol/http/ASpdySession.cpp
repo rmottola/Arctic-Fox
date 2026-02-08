@@ -99,7 +99,7 @@ SpdyPushCache::~SpdyPushCache()
 }
 
 bool
-SpdyPushCache::RegisterPushedStreamHttp2(nsCString key,
+SpdyPushCache::RegisterPushedStreamHttp2(const nsCString& key,
                                          Http2PushedStream *stream)
 {
   LOG3(("SpdyPushCache::RegisterPushedStreamHttp2 %s 0x%X\n",
@@ -114,7 +114,7 @@ SpdyPushCache::RegisterPushedStreamHttp2(nsCString key,
 }
 
 Http2PushedStream *
-SpdyPushCache::RemovePushedStreamHttp2(nsCString key)
+SpdyPushCache::RemovePushedStreamHttp2(const nsCString& key)
 {
   Http2PushedStream *rv = mHashHttp2.Get(key);
   LOG3(("SpdyPushCache::RemovePushedStreamHttp2 %s 0x%X\n",

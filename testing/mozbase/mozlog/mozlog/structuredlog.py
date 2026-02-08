@@ -11,7 +11,7 @@ import sys
 import time
 import traceback
 
-from logtypes import Unicode, TestId, Status, SubStatus, Dict, List, Int, Any
+from logtypes import Unicode, TestId, Status, SubStatus, Dict, List, Int, Any, Tuple
 from logtypes import log_action, convertor_registry
 
 """Structured Logging for recording test results.
@@ -62,6 +62,7 @@ Subfields for all messages:
 
 _default_logger_name = None
 
+
 def get_default_logger(component=None):
     """Gets the default logger if available, optionally tagged with component
     name. Will return None if not yet set
@@ -74,6 +75,7 @@ def get_default_logger(component=None):
         return None
 
     return StructuredLogger(_default_logger_name, component=component)
+
 
 def set_default_logger(default_logger):
     """Sets the default logger to logger.
@@ -93,20 +95,28 @@ def set_default_logger(default_logger):
 log_levels = dict((k.upper(), v) for v, k in
                   enumerate(["critical", "error", "warning", "info", "debug"]))
 
+lint_levels = ["ERROR", "WARNING"]
+
+
 def log_actions():
     """Returns the set of actions implemented by mozlog."""
     return set(convertor_registry.keys())
 
+
 class LoggerState(object):
+
     def __init__(self):
         self.handlers = []
         self.running_tests = set()
         self.suite_started = False
         self.component_states = {}
 
+
 class ComponentState(object):
+
     def __init__(self):
         self.filter_ = None
+
 
 class StructuredLogger(object):
     _lock = Lock()
@@ -184,7 +194,7 @@ class StructuredLogger(object):
         if action in ("test_status", "test_end"):
             if (data["expected"] == data["status"] or
                 data["status"] == "SKIP" or
-                "expected" not in raw_data):
+                    "expected" not in raw_data):
                 del data["expected"]
 
         if not self._ensure_suite_state(action, data):
@@ -245,7 +255,8 @@ class StructuredLogger(object):
 
         :param list tests: Test identifiers that will be run in the suite.
         :param dict run_info: Optional information typically provided by mozinfo.
-        :param dict version_info: Optional target application version information provided by mozversion.
+        :param dict version_info: Optional target application version information provided
+          by mozversion.
         :param dict device_info: Optional target device information provided by mozdevice.
         """
         if not self._ensure_suite_state('suite_start', data):
@@ -303,7 +314,7 @@ class StructuredLogger(object):
         """
 
         if (data["expected"] == data["status"] or
-            data["status"] == "SKIP"):
+                data["status"] == "SKIP"):
             del data["expected"]
 
         if data["test"] not in self._state.running_tests:
@@ -335,7 +346,7 @@ class StructuredLogger(object):
         """
 
         if (data["expected"] == data["status"] or
-             data["status"] == "SKIP"):
+                data["status"] == "SKIP"):
             del data["expected"]
 
         if data["test"] not in self._state.running_tests:
@@ -433,9 +444,44 @@ def _log_func(level_name):
     return log
 
 
-# Create all the methods on StructuredLog for debug levels
+def _lint_func(level_name):
+    @log_action(Unicode("path"),
+                Unicode("message", default=""),
+                Int("lineno", default=0),
+                Int("column", default=None, optional=True),
+                Unicode("hint", default=None, optional=True),
+                Unicode("source", default=None, optional=True),
+                Unicode("rule", default=None, optional=True),
+                Tuple("lineoffset", (Int, Int), default=None, optional=True),
+                Unicode("linter", default=None, optional=True))
+    def lint(self, data):
+        data["level"] = level_name
+        self._log_data("lint", data)
+    lint.__doc__ = """Log an error resulting from a failed lint check
+
+        :param linter: name of the linter that flagged this error
+        :param path: path to the file containing the error
+        :param message: text describing the error
+        :param lineno: line number that contains the error
+        :param column: column containing the error
+        :param hint: suggestion for fixing the error (optional)
+        :param source: source code context of the error (optional)
+        :param rule: name of the rule that was violated (optional)
+        :param lineoffset: denotes an error spans multiple lines, of the form
+                           (<lineno offset>, <num lines>) (optional)
+        """
+    lint.__name__ = str("lint_%s" % level_name)
+    return lint
+
+
+# Create all the methods on StructuredLog for log/lint levels
 for level_name in log_levels:
     setattr(StructuredLogger, level_name.lower(), _log_func(level_name))
+
+for level_name in lint_levels:
+    level_name = level_name.lower()
+    name = "lint_%s" % level_name
+    setattr(StructuredLogger, name, _lint_func(level_name))
 
 
 class StructuredLogFileLike(object):
@@ -450,6 +496,7 @@ class StructuredLogFileLike(object):
     :param level: log level to use for each write.
     :param prefix: String prefix to prepend to each log entry.
     """
+
     def __init__(self, logger, level="info", prefix=None):
         self.logger = logger
         self.log_func = getattr(self.logger, level)
@@ -466,4 +513,3 @@ class StructuredLogFileLike(object):
 
     def flush(self):
         pass
-

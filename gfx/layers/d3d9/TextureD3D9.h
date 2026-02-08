@@ -17,12 +17,6 @@
 #include "DeviceManagerD3D9.h"
 
 namespace mozilla {
-namespace gfxs {
-class DrawTarget;
-}
-}
-
-namespace mozilla {
 namespace layers {
 
 class CompositorD3D9;
@@ -184,7 +178,7 @@ public:
 
   virtual bool Serialize(SurfaceDescriptor& aOutDescrptor) override;
 
-  virtual bool Lock(OpenMode aMode, FenceHandle*) override;
+  virtual bool Lock(OpenMode aMode) override;
 
   virtual void Unlock() override;
 
@@ -195,14 +189,15 @@ public:
   virtual bool UpdateFromSurface(gfx::SourceSurface* aSurface) override;
 
   virtual TextureData*
-  CreateSimilar(ClientIPCAllocator* aAllocator,
+  CreateSimilar(LayersIPCChannel* aAllocator,
+                LayersBackend aLayersBackend,
                 TextureFlags aFlags,
                 TextureAllocationFlags aAllocFlags) const override;
 
   static D3D9TextureData*
   Create(gfx::IntSize aSize, gfx::SurfaceFormat aFormat, TextureAllocationFlags aFlags);
 
-  virtual void Deallocate(ClientIPCAllocator* aAllocator) override {}
+  virtual void Deallocate(LayersIPCChannel* aAllocator) override {}
 
 protected:
   D3D9TextureData(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
@@ -232,13 +227,13 @@ public:
 
   virtual void FillInfo(TextureData::Info& aInfo) const override;
 
-  virtual bool Lock(OpenMode, FenceHandle*) override { return true; }
+  virtual bool Lock(OpenMode) override { return true; }
 
   virtual void Unlock() override {}
 
   virtual bool Serialize(SurfaceDescriptor& aOutDescriptor) override;
 
-  virtual void Deallocate(ClientIPCAllocator* aAllocator) override {}
+  virtual void Deallocate(LayersIPCChannel* aAllocator) override {}
 
   IDirect3DDevice9* GetD3D9Device() { return mDevice; }
   IDirect3DTexture9* GetD3D9Texture() { return mTexture; }

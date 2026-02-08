@@ -35,6 +35,7 @@ skip-if(Android||B2G) == 649134-2.html 649134-2-ref.html
 == bug502168-1_malformed.html bug502168-1_well-formed.html
 
 == responsive-image-load-shortcircuit.html responsive-image-load-shortcircuit-ref.html
+== image-load-shortcircuit.html image-load-shortcircuit-ref.html
 
 # Test that image documents taken into account CSS properties like
 # image-orientation when determining the size of the image.
@@ -44,8 +45,8 @@ fuzzy(1,149) == bug917595-iframe-1.html    bug917595-1-ref.html
 skip-if(B2G) fuzzy-if(!B2G,3,640) == bug917595-exif-rotated.jpg bug917595-pixel-rotated.jpg # bug 1060869
 
 # Test support for SVG-as-image in <picture> elements.
-pref(dom.image.picture.enabled,true) pref(dom.image.srcset.enabled,true) == bug1106522-1.html bug1106522-ref.html
-pref(dom.image.picture.enabled,true) pref(dom.image.srcset.enabled,true) == bug1106522-2.html bug1106522-ref.html
+== bug1106522-1.html bug1106522-ref.html
+== bug1106522-2.html bug1106522-ref.html
 
 == href-attr-change-restyles.html href-attr-change-restyles-ref.html
 == figure.html figure-ref.html

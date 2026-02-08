@@ -99,7 +99,7 @@ NativeObject::removeDenseElementForSparseIndex(ExclusiveContext* cx,
 {
     MarkObjectGroupFlags(cx, obj, OBJECT_FLAG_NON_PACKED | OBJECT_FLAG_SPARSE_INDEXES);
     if (obj->containsDenseElement(index))
-        obj->setDenseElement(index, MagicValue(JS_ELEMENTS_HOLE));
+        obj->setDenseElementUnchecked(index, MagicValue(JS_ELEMENTS_HOLE));
 }
 
 inline bool
@@ -120,6 +120,7 @@ NativeObject::ensureDenseInitializedLengthNoPackedCheck(ExclusiveContext* cx, ui
                                                         uint32_t extra)
 {
     MOZ_ASSERT(!denseElementsAreCopyOnWrite());
+    MOZ_ASSERT(!denseElementsAreFrozen());
 
     /*
      * Ensure that the array's contents have been initialized up to index, and
@@ -154,6 +155,7 @@ NativeObject::extendDenseElements(ExclusiveContext* cx,
                                   uint32_t requiredCapacity, uint32_t extra)
 {
     MOZ_ASSERT(!denseElementsAreCopyOnWrite());
+    MOZ_ASSERT(!denseElementsAreFrozen());
 
     /*
      * Don't grow elements for non-extensible objects or watched objects. Dense
@@ -593,8 +595,8 @@ ThrowIfNotConstructing(JSContext *cx, const CallArgs &args, const char *builtinN
 {
     if (args.isConstructing())
         return true;
-    return JS_ReportErrorFlagsAndNumber(cx, JSREPORT_ERROR, GetErrorMessage, nullptr,
-                                        JSMSG_BUILTIN_CTOR_NO_NEW, builtinName);
+    return JS_ReportErrorFlagsAndNumberASCII(cx, JSREPORT_ERROR, GetErrorMessage, nullptr,
+                                             JSMSG_BUILTIN_CTOR_NO_NEW, builtinName);
 }
 
 inline bool

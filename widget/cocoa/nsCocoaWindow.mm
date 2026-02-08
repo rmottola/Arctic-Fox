@@ -479,7 +479,7 @@ nsresult nsCocoaWindow::CreateNativeWindow(const NSRect &aRect,
     [mWindow setOpaque:NO];
   } else {
     // Make sure that regular windows are opaque from the start, so that
-    // nsChildView::ComputeShouldAccelerate returns true for them.
+    // nsChildView::WidgetTypeSupportsAcceleration returns true for them.
     [mWindow setOpaque:YES];
   }
 
@@ -720,6 +720,12 @@ nsCocoaWindow::SetFakeModal(bool aState)
 {
     mFakeModal = aState;
     SetModal(aState);
+}
+
+bool
+nsCocoaWindow::IsRunningAppModal()
+{
+  return [NSApp _isRunningAppModal];
 }
 
 // Hide or show this window

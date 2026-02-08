@@ -9,7 +9,7 @@
 
 #include "nsCSSRules.h"
 #include "nsCSSValue.h"
-#include "mozilla/CSSStyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/css/ImportRule.h"
 #include "mozilla/css/NameSpaceRule.h"
@@ -29,7 +29,7 @@
 #include "nsContentUtils.h"
 #include "nsError.h"
 #include "nsStyleUtil.h"
-#include "mozilla/css/Declaration.h"
+#include "mozilla/DeclarationBlockInlines.h"
 #include "nsCSSParser.h"
 #include "nsDOMClassInfoID.h"
 #include "mozilla/dom/CSSStyleDeclarationBinding.h"
@@ -975,8 +975,11 @@ DocumentRule::UseForPresentation(nsPresContext* aPresContext)
   nsIDocument *doc = aPresContext->Document();
   nsIURI *docURI = doc->GetDocumentURI();
   nsAutoCString docURISpec;
-  if (docURI)
-    docURI->GetSpec(docURISpec);
+  if (docURI) {
+    // If GetSpec fails (due to OOM) just skip these URI-specific CSS rules.
+    nsresult rv = docURI->GetSpec(docURISpec);
+    NS_ENSURE_SUCCESS(rv, false);
+  }
 
   for (URL *url = mURLs; url; url = url->next) {
     switch (url->func) {
@@ -1920,7 +1923,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsCSSKeyframeStyleDeclaration)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
 NS_INTERFACE_MAP_END_INHERITING(nsDOMCSSDeclaration)
 
-css::Declaration*
+DeclarationBlock*
 nsCSSKeyframeStyleDeclaration::GetCSSDeclaration(Operation aOperation)
 {
   if (mRule) {
@@ -1946,10 +1949,10 @@ nsCSSKeyframeStyleDeclaration::GetParentRule(nsIDOMCSSRule **aParent)
 }
 
 nsresult
-nsCSSKeyframeStyleDeclaration::SetCSSDeclaration(css::Declaration* aDecl)
+nsCSSKeyframeStyleDeclaration::SetCSSDeclaration(DeclarationBlock* aDecl)
 {
   MOZ_ASSERT(aDecl, "must be non-null");
-  mRule->ChangeDeclaration(aDecl);
+  mRule->ChangeDeclaration(aDecl->AsGecko());
   return NS_OK;
 }
 
@@ -2467,7 +2470,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsCSSPageStyleDeclaration)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
 NS_INTERFACE_MAP_END_INHERITING(nsDOMCSSDeclaration)
 
-css::Declaration*
+DeclarationBlock*
 nsCSSPageStyleDeclaration::GetCSSDeclaration(Operation aOperation)
 {
   if (mRule) {
@@ -2493,10 +2496,10 @@ nsCSSPageStyleDeclaration::GetParentRule(nsIDOMCSSRule** aParent)
 }
 
 nsresult
-nsCSSPageStyleDeclaration::SetCSSDeclaration(css::Declaration* aDecl)
+nsCSSPageStyleDeclaration::SetCSSDeclaration(DeclarationBlock* aDecl)
 {
   MOZ_ASSERT(aDecl, "must be non-null");
-  mRule->ChangeDeclaration(aDecl);
+  mRule->ChangeDeclaration(aDecl->AsGecko());
   return NS_OK;
 }
 

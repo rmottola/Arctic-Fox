@@ -6,13 +6,16 @@
 #if !defined(OpusDecoder_h_)
 #define OpusDecoder_h_
 
-#include "OpusParser.h"
 #include "PlatformDecoderModule.h"
 
 #include "mozilla/Maybe.h"
 #include "nsAutoPtr.h"
 
+struct OpusMSDecoder;
+
 namespace mozilla {
+
+class OpusParser;
 
 class OpusDataDecoder : public MediaDataDecoder
 {
@@ -21,10 +24,10 @@ public:
   ~OpusDataDecoder();
 
   RefPtr<InitPromise> Init() override;
-  nsresult Input(MediaRawData* aSample) override;
-  nsresult Flush() override;
-  nsresult Drain() override;
-  nsresult Shutdown() override;
+  void Input(MediaRawData* aSample) override;
+  void Flush() override;
+  void Drain() override;
+  void Shutdown() override;
   const char* GetDescriptionName() const override
   {
     return "opus audio decoder";
@@ -41,16 +44,10 @@ public:
   static void AppendCodecDelay(MediaByteBuffer* config, uint64_t codecDelayUS);
 
 private:
-  enum DecodeError {
-    DECODE_SUCCESS,
-    DECODE_ERROR,
-    FATAL_ERROR
-  };
-
   nsresult DecodeHeader(const unsigned char* aData, size_t aLength);
 
   void ProcessDecode(MediaRawData* aSample);
-  DecodeError DoDecode(MediaRawData* aSample);
+  MediaResult DoDecode(MediaRawData* aSample);
   void ProcessDrain();
 
   const AudioInfo& mInfo;

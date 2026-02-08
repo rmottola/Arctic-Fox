@@ -963,7 +963,8 @@ function sanitizeName(aName) {
  *        The name of the pref.
  **/
 function getMozParamPref(prefName) {
-  return Services.prefs.getCharPref(BROWSER_SEARCH_PREF + "param." + prefName);
+  let branch = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF + "param.");
+  return encodeURIComponent(branch.getCharPref(prefName));
 }
 
 /**
@@ -985,7 +986,7 @@ function notifyAction(aEngine, aVerb) {
   }
 }
 
-function  parseJsonFromStream(aInputStream) {
+function parseJsonFromStream(aInputStream) {
   const json = Cc["@mozilla.org/dom/json;1"].createInstance(Ci.nsIJSON);
   const data = json.decodeFromStream(aInputStream, aInputStream.available());
   return data;
@@ -1211,7 +1212,7 @@ EngineURL.prototype = {
         this._addMozParam(param);
       }
       else
-        this.addParam(param.name, param.value, param.purpose);
+        this.addParam(param.name, param.value, param.purpose || undefined);
     }
   },
 
@@ -1770,6 +1771,13 @@ Engine.prototype = {
         + this.name + "\".");
     // Only accept remote icons from http[s] or ftp
     switch (uri.scheme) {
+      case "resource":
+      case "chrome":
+        // We only allow chrome and resource icon URLs for built-in search engines
+        if (!this._isDefault) {
+          return;
+        }
+        // Fall through to the data case
       case "data":
         if (!this._hasPreferredIcon || aIsPreferred) {
           this._iconURI = uri;
@@ -2059,7 +2067,7 @@ Engine.prototype = {
       let url = aJson._urls[i];
       let engineURL = new EngineURL(url.type || URLTYPE_SEARCH_HTML,
                                     url.method || "GET", url.template,
-                                    url.resultDomain);
+                                    url.resultDomain || undefined);
       engineURL._initWithJSON(url, this);
       this._urls.push(engineURL);
     }
@@ -2756,6 +2764,7 @@ SearchService.prototype = {
 
     Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "init-complete");
     Services.telemetry.getHistogramById("SEARCH_SERVICE_INIT_SYNC").add(true);
+    this._recordEngineTelemetry();
 
     LOG("_syncInit end");
   },
@@ -2798,6 +2807,7 @@ SearchService.prototype = {
       this._initObservers.resolve(this._initRV);
       Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "init-complete");
       Services.telemetry.getHistogramById("SEARCH_SERVICE_INIT_SYNC").add(false);
+      this._recordEngineTelemetry();
 
       LOG("_asyncInit: Completed _asyncInit");
     }.bind(this));
@@ -2860,7 +2870,9 @@ SearchService.prototype = {
   },
 
   _buildCache: function SRCH_SVC__buildCache() {
-    TelemetryStopwatch.start("SEARCH_SERVICE_BUILD_CACHE_MS");
+    if (this._batchTask)
+      this._batchTask.disarm();
+
     let cache = {};
     let locale = getLocale();
     let buildID = Services.appinfo.platformBuildID;
@@ -2901,7 +2913,6 @@ SearchService.prototype = {
     } catch (ex) {
       LOG("_buildCache: Could not write to cache file: " + ex);
     }
-    TelemetryStopwatch.finish("SEARCH_SERVICE_BUILD_CACHE_MS");
   },
 
   _syncLoadEngines: function SRCH_SVC__syncLoadEngines(cache) {
@@ -3163,6 +3174,7 @@ SearchService.prototype = {
         // Typically we'll re-init as a result of a pref observer,
         // so signal to 'callers' that we're done.
         Services.obs.notifyObservers(null, SEARCH_SERVICE_TOPIC, "init-complete");
+        this._recordEngineTelemetry();
         gInitialized = true;
       } catch (err) {
         LOG("Reinit failed: " + err);
@@ -3387,7 +3399,7 @@ SearchService.prototype = {
 
     let skippedEngines = 0;
     for (let engine of cache.engines) {
-      if (skipReadOnly && engine._readOnly !== false) {
+      if (skipReadOnly && engine._readOnly == undefined) {
         ++skippedEngines;
         continue;
       }
@@ -3402,7 +3414,7 @@ SearchService.prototype = {
 
   _loadEngineFromCache: function SRCH_SVC__loadEngineFromCache(json) {
     try {
-      let engine = new Engine(json._shortName, json._readOnly);
+      let engine = new Engine(json._shortName, json._readOnly == undefined);
       engine._initWithJSON(json);
       this._addEngineToStore(engine);
     } catch (ex) {
@@ -3562,7 +3574,7 @@ SearchService.prototype = {
   _findJAREngines: function SRCH_SVC_findJAREngines() {
     LOG("_findJAREngines: looking for engines in JARs")
 
-    let chan = makeChannel(APP_SEARCH_PREFIX + "list.txt");
+    let chan = makeChannel(APP_SEARCH_PREFIX + "list.json");
     if (!chan) {
       LOG("_findJAREngines: " + APP_SEARCH_PREFIX + " isn't registered");
       return [];
@@ -3572,8 +3584,17 @@ SearchService.prototype = {
 
     let sis = Cc["@mozilla.org/scriptableinputstream;1"].
                 createInstance(Ci.nsIScriptableInputStream);
-    sis.init(chan.open2());
-    this._parseListTxt(sis.read(sis.available()), uris);
+    try {
+      sis.init(chan.open2());
+      this._parseListJSON(sis.read(sis.available()), uris);
+      // parseListJSON will catch its own errors, so we
+      // should only go into this catch if list.json
+      // doesn't exist
+    } catch (e) {
+      chan = makeChannel(APP_SEARCH_PREFIX + "list.txt");
+      sis.init(chan.open2());
+      this._parseListTxt(sis.read(sis.available()), uris);
+    }
     return uris;
   },
 
@@ -3587,7 +3608,7 @@ SearchService.prototype = {
     return Task.spawn(function() {
       LOG("_asyncFindJAREngines: looking for engines in JARs")
 
-      let listURL = APP_SEARCH_PREFIX + "list.txt";
+      let listURL = APP_SEARCH_PREFIX + "list.json";
       let chan = makeChannel(listURL);
       if (!chan) {
         LOG("_asyncFindJAREngines: " + APP_SEARCH_PREFIX + " isn't registered");
@@ -3596,7 +3617,7 @@ SearchService.prototype = {
 
       let uris = [];
 
-      // Read list.txt to find the engines we need to load.
+      // Read list.json to find the engines we need to load.
       let deferred = Promise.defer();
       let request = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"].
                       createInstance(Ci.nsIXMLHttpRequest);
@@ -3606,15 +3627,87 @@ SearchService.prototype = {
       };
       request.onerror = function(aEvent) {
         LOG("_asyncFindJAREngines: failed to read " + listURL);
-        deferred.resolve("");
+        // Couldn't find list.json, try list.txt
+        request.onerror = function(aEvent) {
+          LOG("_asyncFindJAREngines: failed to read " + APP_SEARCH_PREFIX + "list.txt");
+          deferred.resolve("");
+        }
+        request.open("GET", NetUtil.newURI(APP_SEARCH_PREFIX + "list.txt").spec, true);
+        request.send();
       };
       request.open("GET", NetUtil.newURI(listURL).spec, true);
       request.send();
       let list = yield deferred.promise;
 
-      this._parseListTxt(list, uris);
+      if (request.responseURL.endsWith(".txt")) {
+        this._parseListTxt(list, uris);
+      } else {
+        this._parseListJSON(list, uris);
+      }
       throw new Task.Result(uris);
     }.bind(this));
+  },
+
+  _parseListJSON: function SRCH_SVC_parseListJSON(list, uris) {
+    let searchSettings;
+    try {
+      searchSettings = JSON.parse(list);
+    } catch(e) {
+      LOG("failing to parse list.json: " + e);
+      return;
+    }
+
+    let jarNames = new Set();
+    for (let region in searchSettings) {
+      // Artifact builds use the full list.json which parses
+      // slightly differently
+      if (!("visibleDefaultEngines" in searchSettings[region])) {
+        continue;
+      }
+      for (let engine of searchSettings[region]["visibleDefaultEngines"]) {
+        jarNames.add(engine);
+      }
+    }
+
+    // Check if we have a useable country specific list of visible default engines.
+    let engineNames;
+    let visibleDefaultEngines = this.getVerifiedGlobalAttr("visibleDefaultEngines");
+    if (visibleDefaultEngines) {
+      engineNames = visibleDefaultEngines.split(",");
+      for (let engineName of engineNames) {
+        // If all engineName values are part of jarNames,
+        // then we can use the country specific list, otherwise ignore it.
+        // The visibleDefaultEngines string containing the name of an engine we
+        // don't ship indicates the server is misconfigured to answer requests
+        // from the specific Firefox version we are running, so ignoring the
+        // value altogether is safer.
+        if (!jarNames.has(engineName)) {
+          LOG("_parseListJSON: ignoring visibleDefaultEngines value because " +
+              engineName + " is not in the jar engines we have found");
+          engineNames = null;
+          break;
+        }
+      }
+    }
+
+    // Fallback to building a list based on the regions in the JSON
+    if (!engineNames || !engineNames.length) {
+      let region;
+      if (Services.prefs.prefHasUserValue("browser.search.region")) {
+        region = Services.prefs.getCharPref("browser.search.region");
+      }
+      if (!region || !(region in searchSettings)) {
+        region = "default";
+      }
+      engineNames = searchSettings[region]["visibleDefaultEngines"];
+    }
+
+    for (let name of engineNames) {
+      uris.push(APP_SEARCH_PREFIX + name + ".xml");
+    }
+
+    // Store this so that it can be used while writing the cache file.
+    this._visibleDefaultEngines = engineNames;
   },
 
   _parseListTxt: function SRCH_SVC_parseListTxt(list, uris) {
@@ -4268,6 +4361,25 @@ SearchService.prototype = {
     }
 
     return result;
+  },
+
+  _recordEngineTelemetry: function() {
+    Services.telemetry.getHistogramById("SEARCH_SERVICE_ENGINE_COUNT")
+            .add(Object.keys(this._engines).length);
+    let hasUpdates = false;
+    let hasIconUpdates = false;
+    for (let name in this._engines) {
+      let engine = this._engines[name];
+      if (engine._hasUpdates) {
+        hasUpdates = true;
+        if (engine._iconUpdateURL) {
+          hasIconUpdates = true;
+          break;
+        }
+      }
+    }
+    Services.telemetry.getHistogramById("SEARCH_SERVICE_HAS_UPDATES").add(hasUpdates);
+    Services.telemetry.getHistogramById("SEARCH_SERVICE_HAS_ICON_UPDATES").add(hasIconUpdates);
   },
 
   /**

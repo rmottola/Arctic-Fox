@@ -6,18 +6,17 @@
 
 """Utility functions for mozrunner"""
 
-__all__ = ['findInPath', 'get_metadata_from_egg', 'uses_marionette']
-
-
-from functools import wraps
 import mozinfo
 import os
 import sys
 
+__all__ = ['findInPath', 'get_metadata_from_egg']
 
-### python package method metadata by introspection
+
+# python package method metadata by introspection
 try:
     import pkg_resources
+
     def get_metadata_from_egg(module):
         ret = {}
         try:
@@ -26,6 +25,7 @@ try:
             return {}
         if dist.has_metadata("PKG-INFO"):
             key = None
+            value = ""
             for line in dist.get_metadata("PKG-INFO").splitlines():
                 # see http://www.python.org/dev/peps/pep-0314/
                 if key == 'Description':
@@ -255,8 +255,6 @@ def get_stack_fixer_function(utilityPath, symbolsPath):
     if not mozinfo.info.get('debug'):
         return None
 
-    stack_fixer_function = None
-
     def import_stack_fixer_module(module_name):
         sys.path.insert(0, utilityPath)
         module = __import__(module_name, globals(), locals(), [])
@@ -264,13 +262,15 @@ def get_stack_fixer_function(utilityPath, symbolsPath):
         return module
 
     if symbolsPath and os.path.exists(symbolsPath):
-        # Run each line through a function in fix_stack_using_bpsyms.py (uses breakpad symbol files).
+        # Run each line through a function in fix_stack_using_bpsyms.py (uses breakpad
+        # symbol files).
         # This method is preferred for Tinderbox builds, since native
         # symbols may have been stripped.
         stack_fixer_module = import_stack_fixer_module(
             'fix_stack_using_bpsyms')
-        stack_fixer_function = lambda line: stack_fixer_module.fixSymbols(
-            line, symbolsPath)
+
+        def stack_fixer_function(line):
+            return stack_fixer_module.fixSymbols(line, symbolsPath)
 
     elif mozinfo.isMac:
         # Run each line through fix_macosx_stack.py (uses atos).
@@ -278,8 +278,9 @@ def get_stack_fixer_function(utilityPath, symbolsPath):
         # have to run "make buildsymbols".
         stack_fixer_module = import_stack_fixer_module(
             'fix_macosx_stack')
-        stack_fixer_function = lambda line: stack_fixer_module.fixSymbols(
-            line)
+
+        def stack_fixer_function(line):
+            return stack_fixer_module.fixSymbols(line)
 
     elif mozinfo.isLinux:
         # Run each line through fix_linux_stack.py (uses addr2line).
@@ -287,7 +288,11 @@ def get_stack_fixer_function(utilityPath, symbolsPath):
         # have to run "make buildsymbols".
         stack_fixer_module = import_stack_fixer_module(
             'fix_linux_stack')
-        stack_fixer_function = lambda line: stack_fixer_module.fixSymbols(
-            line)
+
+        def stack_fixer_function(line):
+            return stack_fixer_module.fixSymbols(line)
+
+    else:
+        return None
 
     return stack_fixer_function

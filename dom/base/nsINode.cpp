@@ -86,7 +86,6 @@
 #include "nsRuleProcessorData.h"
 #include "nsString.h"
 #include "nsStyleConsts.h"
-#include "nsSVGFeatures.h"
 #include "nsSVGUtils.h"
 #include "nsTextNode.h"
 #include "nsUnicharUtils.h"
@@ -153,6 +152,9 @@ nsINode::~nsINode()
 {
   MOZ_ASSERT(!HasSlots(), "nsNodeUtils::LastRelease was not called?");
   MOZ_ASSERT(mSubtreeRoot == this, "Didn't restore state properly?");
+#ifdef MOZ_STYLO
+  ClearServoData();
+#endif
 }
 
 void*
@@ -688,18 +690,19 @@ nsINode::Normalize()
   }
 }
 
-void
+nsresult
 nsINode::GetBaseURI(nsAString &aURI) const
 {
   nsCOMPtr<nsIURI> baseURI = GetBaseURI();
 
   nsAutoCString spec;
   if (baseURI) {
-    // XXX: should handle GetSpec() failure properly. See bug 1301254.
-    Unused << baseURI->GetSpec(spec);
+    nsresult rv = baseURI->GetSpec(spec);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
 
   CopyUTF8toUTF16(spec, aURI);
+  return NS_OK;
 }
 
 void
@@ -2927,27 +2930,6 @@ nsINode::QuerySelectorAll(const nsAString& aSelector, ErrorResult& aResult)
   }
 
   return contentList.forget();
-}
-
-nsresult
-nsINode::QuerySelector(const nsAString& aSelector, nsIDOMElement **aReturn)
-{
-  ErrorResult rv;
-  Element* result = nsINode::QuerySelector(aSelector, rv);
-  if (rv.Failed()) {
-    return rv.StealNSResult();
-  }
-  nsCOMPtr<nsIDOMElement> elt = do_QueryInterface(result);
-  elt.forget(aReturn);
-  return NS_OK;
-}
-
-nsresult
-nsINode::QuerySelectorAll(const nsAString& aSelector, nsIDOMNodeList **aReturn)
-{
-  ErrorResult rv;
-  *aReturn = nsINode::QuerySelectorAll(aSelector, rv).take();
-  return rv.StealNSResult();
 }
 
 Element*

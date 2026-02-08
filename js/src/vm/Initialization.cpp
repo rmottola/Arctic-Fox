@@ -15,6 +15,7 @@
 #include "jstypes.h"
 
 #include "builtin/AtomicsObject.h"
+#include "ds/MemoryProtectionExceptionHandler.h"
 #include "gc/Statistics.h"
 #include "jit/ExecutableAllocator.h"
 #include "jit/Ion.h"
@@ -28,6 +29,7 @@
 #include "vm/Runtime.h"
 #include "vm/Time.h"
 #include "vm/TraceLogging.h"
+#include "wasm/WasmInstance.h"
 
 using JS::detail::InitState;
 using JS::detail::libraryInitState;
@@ -98,7 +100,13 @@ JS::detail::InitWithFailureDiagnostic(bool isDebugBuild)
     js::oom::SetThreadType(js::oom::THREAD_TYPE_MAIN);
 #endif
 
+    RETURN_IF_FAIL(js::Mutex::Init());
+
+    RETURN_IF_FAIL(js::wasm::InitInstanceStaticData());
+
     js::jit::ExecutableAllocator::initStatic();
+
+    MOZ_ALWAYS_TRUE(js::MemoryProtectionExceptionHandler::install());
 
     RETURN_IF_FAIL(js::jit::InitializeIon());
 
@@ -144,6 +152,12 @@ JS_ShutDown(void)
     js::DestroyTraceLoggerThreadState();
     js::DestroyTraceLoggerGraphState();
 #endif
+
+    js::MemoryProtectionExceptionHandler::uninstall();
+
+    js::wasm::ShutDownInstanceStaticData();
+
+    js::Mutex::ShutDown();
 
     // The only difficult-to-address reason for the restriction that you can't
     // call JS_Init/stuff/JS_ShutDown multiple times is the Windows PRMJ

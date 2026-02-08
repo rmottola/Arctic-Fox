@@ -9,6 +9,7 @@
 
 #include "mozilla/Vector.h"
 
+#include "ds/MemoryProtectionExceptionHandler.h"
 #include "gc/Memory.h"
 
 namespace js {
@@ -58,6 +59,13 @@ class PageProtectingVector final
      */
     intptr_t unprotectedBytes;
 
+    /*
+     * The size in bytes that a buffer needs to be before its pages will be
+     * protected. This is intended to reduce churn for small vectors while
+     * still offering protection when they grow large enough.
+     */
+    size_t protectionLowerBound;
+
     bool protectionEnabled;
     bool regionUnprotected;
 
@@ -65,11 +73,12 @@ class PageProtectingVector final
         unprotectedBytes += offsetToPage;
         offsetToPage = (pageSize - (uintptr_t(vector.begin()) & pageMask)) & pageMask;
         unprotectedBytes -= offsetToPage;
+        protectionEnabled = vector.capacity() >= protectionLowerBound &&
+                            vector.capacity() >= pageSize + offsetToPage;
     }
 
     void protect() {
-        MOZ_ASSERT(!regionUnprotected);
-        if (protectionEnabled && unprotectedBytes >= intptr_t(pageSize)) {
+        if (!regionUnprotected && protectionEnabled && unprotectedBytes >= intptr_t(pageSize)) {
             size_t toProtect = size_t(unprotectedBytes) & ~pageMask;
             uintptr_t addr = uintptr_t(vector.begin()) + offsetToPage + protectedBytes;
             gc::MakePagesReadOnly(reinterpret_cast<void*>(addr), toProtect);
@@ -79,9 +88,8 @@ class PageProtectingVector final
     }
 
     void unprotect() {
-        MOZ_ASSERT(!regionUnprotected);
         MOZ_ASSERT_IF(!protectionEnabled, !protectedBytes);
-        if (protectedBytes) {
+        if (!regionUnprotected && protectedBytes) {
             uintptr_t addr = uintptr_t(vector.begin()) + offsetToPage;
             gc::UnprotectPages(reinterpret_cast<void*>(addr), protectedBytes);
             unprotectedBytes += protectedBytes;
@@ -91,7 +99,15 @@ class PageProtectingVector final
 
     void protectNewBuffer() {
         updateOffsetToPage();
+        if (protectionEnabled)
+            MemoryProtectionExceptionHandler::addRegion(vector.begin(), vector.capacity());
         protect();
+    }
+
+    void unprotectOldBuffer() {
+        if (protectionEnabled)
+            MemoryProtectionExceptionHandler::removeRegion(vector.begin());
+        unprotect();
     }
 
     bool anyProtected(size_t first, size_t last) {
@@ -125,7 +141,7 @@ class PageProtectingVector final
 
         void emplace(PageProtectingVector* holder) {
             vector = holder;
-            vector->unprotect();
+            vector->unprotectOldBuffer();
         }
 
         explicit AutoUnprotect(PageProtectingVector* holder) {
@@ -146,23 +162,22 @@ class PageProtectingVector final
         offsetToPage(0),
         protectedBytes(0),
         unprotectedBytes(0),
+        protectionLowerBound(0),
         protectionEnabled(false),
-        regionUnprotected(false) { updateOffsetToPage(); }
+        regionUnprotected(false) { protectNewBuffer(); }
 
-    ~PageProtectingVector() { unprotect(); }
+    ~PageProtectingVector() { unprotectOldBuffer(); }
 
-    /* Enable protection for the entire buffer. */
-    void enableProtection() {
-        MOZ_ASSERT(!protectionEnabled);
-        protectionEnabled = true;
-        protectNewBuffer();
-    }
-
-    /* Disable protection for the entire buffer. */
-    void disableProtection() {
-        MOZ_ASSERT(protectionEnabled);
-        unprotect();
-        protectionEnabled = false;
+    /*
+     * Sets the lower bound on the size, in bytes, that this vector's underlying
+     * capacity has to be before its used pages will be protected.
+     */
+    void setLowerBoundForProtection(size_t bytes) {
+        if (protectionLowerBound != bytes) {
+            unprotectOldBuffer();
+            protectionLowerBound = bytes;
+            protectNewBuffer();
+        }
     }
 
     /*

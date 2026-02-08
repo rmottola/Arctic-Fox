@@ -14,7 +14,7 @@
 #include "mozilla/Alignment.h"
 #include "mozilla/Array.h"
 #include "mozilla/Assertions.h"
-#include "mozilla/CycleCollectedJSRuntime.h"
+#include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/DeferredFinalize.h"
 #include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/CallbackObject.h"
@@ -799,9 +799,9 @@ MaybeWrapObjectValue(JSContext* cx, JS::MutableHandle<JS::Value> rval)
     return TryToOuterize(rval);
   }
 
-  // It's not a WebIDL object.  But it might be an XPConnect one, in which case
-  // we may need to outerize here, so make sure to call JS_WrapValue.
-  return JS_WrapValue(cx, rval);
+  // It's not a WebIDL object, so it's OK to just leave it as-is: only WebIDL
+  // objects (specifically only windows) require outerization.
+  return true;
 }
 
 // Like MaybeWrapObjectValue, but also allows null
@@ -1228,15 +1228,12 @@ HandleNewBindingWrappingFailure(JSContext* cx, JS::Handle<JSObject*> scope,
 
 template<bool Fatal>
 inline bool
-EnumValueNotFound(JSContext* cx, JSString* str, const char* type,
-                  const char* sourceDescription)
-{
-  return false;
-}
+EnumValueNotFound(JSContext* cx, JS::HandleString str, const char* type,
+                  const char* sourceDescription);
 
 template<>
 inline bool
-EnumValueNotFound<false>(JSContext* cx, JSString* str, const char* type,
+EnumValueNotFound<false>(JSContext* cx, JS::HandleString str, const char* type,
                          const char* sourceDescription)
 {
   // TODO: Log a warning to the console.
@@ -1245,11 +1242,11 @@ EnumValueNotFound<false>(JSContext* cx, JSString* str, const char* type,
 
 template<>
 inline bool
-EnumValueNotFound<true>(JSContext* cx, JSString* str, const char* type,
+EnumValueNotFound<true>(JSContext* cx, JS::HandleString str, const char* type,
                         const char* sourceDescription)
 {
-  JSAutoByteString deflated(cx, str);
-  if (!deflated) {
+  JSAutoByteString deflated;
+  if (!deflated.encodeUtf8(cx, str)) {
     return false;
   }
   return ThrowErrorMessage(cx, MSG_INVALID_ENUM_VALUE, sourceDescription,
@@ -1284,46 +1281,40 @@ FindEnumStringIndexImpl(const CharT* chars, size_t length, const EnumEntry* valu
 }
 
 template<bool InvalidValueFatal>
-inline int
+inline bool
 FindEnumStringIndex(JSContext* cx, JS::Handle<JS::Value> v, const EnumEntry* values,
-                    const char* type, const char* sourceDescription, bool* ok)
+                    const char* type, const char* sourceDescription, int* index)
 {
   // JS_StringEqualsAscii is slow as molasses, so don't use it here.
-  JSString* str = JS::ToString(cx, v);
+  JS::RootedString str(cx, JS::ToString(cx, v));
   if (!str) {
-    *ok = false;
-    return 0;
+    return false;
   }
 
   {
-    int index;
     size_t length;
     JS::AutoCheckCannotGC nogc;
     if (js::StringHasLatin1Chars(str)) {
       const JS::Latin1Char* chars = JS_GetLatin1StringCharsAndLength(cx, nogc, str,
                                                                      &length);
       if (!chars) {
-        *ok = false;
-        return 0;
+        return false;
       }
-      index = FindEnumStringIndexImpl(chars, length, values);
+      *index = FindEnumStringIndexImpl(chars, length, values);
     } else {
       const char16_t* chars = JS_GetTwoByteStringCharsAndLength(cx, nogc, str,
                                                                 &length);
       if (!chars) {
-        *ok = false;
-        return 0;
+        return false;
       }
-      index = FindEnumStringIndexImpl(chars, length, values);
+      *index = FindEnumStringIndexImpl(chars, length, values);
     }
-    if (index >= 0) {
-      *ok = true;
-      return index;
+    if (*index >= 0) {
+      return true;
     }
   }
 
-  *ok = EnumValueNotFound<InvalidValueFatal>(cx, str, type, sourceDescription);
-  return -1;
+  return EnumValueNotFound<InvalidValueFatal>(cx, str, type, sourceDescription);
 }
 
 inline nsWrapperCache*
@@ -2406,6 +2397,54 @@ XrayGetNativeProto(JSContext* cx, JS::Handle<JSObject*> obj,
   return JS_WrapObject(cx, protop);
 }
 
+/**
+ * Get the Xray expando class to use for the given DOM object.
+ */
+const JSClass*
+XrayGetExpandoClass(JSContext* cx, JS::Handle<JSObject*> obj);
+
+/**
+ * Delete a named property, if any.  Return value is false if exception thrown,
+ * true otherwise.  The caller should not do any more work after calling this
+ * function, because it has no way whether a deletion was performed and hence
+ * opresult already has state set on it.  If callers ever need to change that,
+ * add a "bool* found" argument and change the generated DeleteNamedProperty to
+ * use it instead of a local variable.
+ */
+bool
+XrayDeleteNamedProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
+                        JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
+                        JS::ObjectOpResult& opresult);
+
+/**
+ * Get the object which should be used to cache the return value of a property
+ * getter in the case of a [Cached] or [StoreInSlot] property.  `obj` is the
+ * `this` value for our property getter that we're working with.
+ *
+ * This function can return null on failure to allocate the object, throwing on
+ * the JSContext in the process.
+ *
+ * The isXray outparam will be set to true if obj is an Xray and false
+ * otherwise.
+ *
+ * Note that the Slow version should only be called from
+ * GetCachedSlotStorageObject.
+ */
+JSObject*
+GetCachedSlotStorageObjectSlow(JSContext* cx, JS::Handle<JSObject*> obj,
+                               bool* isXray);
+
+inline JSObject*
+GetCachedSlotStorageObject(JSContext* cx, JS::Handle<JSObject*> obj,
+                           bool* isXray) {
+  if (IsDOMObject(obj)) {
+    *isXray = false;
+    return obj;
+  }
+
+  return GetCachedSlotStorageObjectSlow(cx, obj, isXray);
+}
+
 extern NativePropertyHooks sEmptyNativePropertyHooks;
 
 extern const js::ClassOps sBoringInterfaceObjectClassClassOps;
@@ -2909,15 +2948,15 @@ struct CreateGlobalOptions<nsGlobalWindow>
 nsresult
 RegisterDOMNames();
 
-// The return value is whatever the ProtoHandleGetter we used
-// returned.  This should be the DOM prototype for the global.
+// The return value is true if we created and successfully performed our part of
+// the setup for the global, false otherwise.
 //
 // Typically this method's caller will want to ensure that
 // xpc::InitGlobalObjectOptions is called before, and xpc::InitGlobalObject is
 // called after, this method, to ensure that this global object and its
 // compartment are consistent with other global objects.
 template <class T, ProtoHandleGetter GetProto>
-JS::Handle<JSObject*>
+bool
 CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
              const JSClass* aClass, JS::CompartmentOptions& aOptions,
              JSPrincipals* aPrincipal, bool aInitStandardClasses,
@@ -2932,7 +2971,7 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
                                  JS::DontFireOnNewGlobalHook, aOptions));
   if (!aGlobal) {
     NS_WARNING("Failed to create global");
-    return nullptr;
+    return false;
   }
 
   JSAutoCompartment ac(aCx, aGlobal);
@@ -2947,31 +2986,31 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
                                     CreateGlobalOptions<T>::ProtoAndIfaceCacheKind);
 
     if (!CreateGlobalOptions<T>::PostCreateGlobal(aCx, aGlobal)) {
-      return nullptr;
+      return false;
     }
   }
 
   if (aInitStandardClasses &&
       !JS_InitStandardClasses(aCx, aGlobal)) {
     NS_WARNING("Failed to init standard classes");
-    return nullptr;
+    return false;
   }
 
   JS::Handle<JSObject*> proto = GetProto(aCx);
   if (!proto || !JS_SplicePrototype(aCx, aGlobal, proto)) {
     NS_WARNING("Failed to set proto");
-    return nullptr;
+    return false;
   }
 
   bool succeeded;
   if (!JS_SetImmutablePrototype(aCx, aGlobal, &succeeded)) {
-    return nullptr;
+    return false;
   }
   MOZ_ASSERT(succeeded,
              "making a fresh global object's [[Prototype]] immutable can "
              "internally fail, but it should never be unsuccessful");
 
-  return proto;
+  return true;
 }
 
 /*

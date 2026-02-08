@@ -29,6 +29,11 @@
   /* Flex container */
   flex-direction: inherit;
   flex-wrap: inherit;
+  /* -webkit-box container (aliased from -webkit versions to -moz versions) */
+  -moz-box-orient: inherit;
+  -moz-box-direction: inherit;
+  -moz-box-pack: inherit;
+  -moz-box-align: inherit;
   /* Grid container */
   grid-auto-columns: inherit;
   grid-auto-rows: inherit;
@@ -521,6 +526,36 @@ input[type="color"]:-moz-system-metric(color-picker-available)::-moz-color-swatc
   box-sizing: border-box;
   border: 1px solid grey;
   display: block;
+  /* Please keep the Multicol/Flex/Grid/Align sections below in sync with
+     ::-moz-scrolled-content in ua.css and ::-moz-fieldset-content above. */
+  /* Multicol container */
+  -moz-column-count: inherit;
+  -moz-column-width: inherit;
+  -moz-column-gap: inherit;
+  -moz-column-rule: inherit;
+  -moz-column-fill: inherit;
+  /* Flex container */
+  flex-direction: inherit;
+  flex-wrap: inherit;
+  /* -webkit-box container (aliased from -webkit versions to -moz versions) */
+  -moz-box-orient: inherit;
+  -moz-box-direction: inherit;
+  -moz-box-pack: inherit;
+  -moz-box-align: inherit;
+  /* Grid container */
+  grid-auto-columns: inherit;
+  grid-auto-rows: inherit;
+  grid-auto-flow: inherit;
+  grid-column-gap: inherit;
+  grid-row-gap: inherit;
+  grid-template-areas: inherit;
+  grid-template-columns: inherit;
+  grid-template-rows: inherit;
+  /* CSS Align */
+  align-content: inherit;
+  align-items: inherit;
+  justify-content: inherit;
+  justify-items: inherit;
 }
 
 /* Try to make RTL <input type='file'> look nicer. */

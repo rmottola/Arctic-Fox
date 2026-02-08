@@ -120,8 +120,7 @@ class TypedArrayObject : public NativeObject
     AllocKindForLazyBuffer(size_t nbytes)
     {
         MOZ_ASSERT(nbytes <= INLINE_BUFFER_LIMIT);
-        /* For GGC we need at least one slot in which to store a forwarding pointer. */
-        size_t dataSlots = Max(size_t(1), AlignBytes(nbytes, sizeof(Value)) / sizeof(Value));
+        size_t dataSlots = AlignBytes(nbytes, sizeof(Value)) / sizeof(Value);
         MOZ_ASSERT(nbytes <= dataSlots * sizeof(Value));
         return gc::GetGCObjectKind(FIXED_DATA_START + dataSlots);
     }
@@ -293,6 +292,8 @@ class TypedArrayObject : public NativeObject
 
     static bool set(JSContext* cx, unsigned argc, Value* vp);
 };
+
+MOZ_MUST_USE bool TypedArray_bufferGetter(JSContext* cx, unsigned argc, Value* vp);
 
 extern TypedArrayObject*
 TypedArrayCreateWithTemplate(JSContext* cx, HandleObject templateObj, int32_t len);
@@ -558,6 +559,24 @@ ClampIntForUint8Array(int32_t x)
     if (x > 255)
         return 255;
     return x;
+}
+
+static inline bool
+IsAnyArrayBuffer(HandleObject obj)
+{
+    return IsArrayBuffer(obj) || IsSharedArrayBuffer(obj);
+}
+
+static inline bool
+IsAnyArrayBuffer(JSObject* obj)
+{
+    return IsArrayBuffer(obj) || IsSharedArrayBuffer(obj);
+}
+
+static inline bool
+IsAnyArrayBuffer(HandleValue v)
+{
+    return v.isObject() && IsAnyArrayBuffer(&v.toObject());
 }
 
 } // namespace js

@@ -12,6 +12,7 @@
 #include "nsClassHashtable.h"
 #include "nsDataHashtable.h"
 #include "mozilla/Atomics.h"
+#include "nsIAsyncShutdown.h"
 #include "nsThreadUtils.h"
 #include "mozilla/MozPromise.h"
 #include "GMPStorage.h"
@@ -25,6 +26,7 @@ class GMPParent;
 
 class GeckoMediaPluginServiceParent final : public GeckoMediaPluginService
                                           , public mozIGeckoMediaPluginChromeService
+                                          , public nsIAsyncShutdownBlocker
 {
 public:
   static already_AddRefed<GeckoMediaPluginServiceParent> GetSingleton();
@@ -33,12 +35,12 @@ public:
   nsresult Init() override;
 
   NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_NSIASYNCSHUTDOWNBLOCKER
 
   // mozIGeckoMediaPluginService
-  NS_IMETHOD GetPluginVersionForAPI(const nsACString& aAPI,
-                                    nsTArray<nsCString>* aTags,
-                                    bool* aHasPlugin,
-                                    nsACString& aOutVersion) override;
+  NS_IMETHOD HasPluginForAPI(const nsACString& aAPI,
+                             nsTArray<nsCString>* aTags,
+                             bool *aRetVal) override;
   NS_IMETHOD GetNodeId(const nsAString& aOrigin,
                        const nsAString& aTopLevelOrigin,
                        const nsAString& aGMPName,
@@ -62,6 +64,14 @@ public:
   bool IsShuttingDown();
 
   already_AddRefed<GMPStorage> GetMemoryStorageFor(const nsACString& aNodeId);
+  nsresult ForgetThisSiteNative(const nsAString& aSite,
+                                const mozilla::OriginAttributesPattern& aPattern);
+
+  // Notifies that some user of this class is created/destroyed.
+  void ServiceUserCreated();
+  void ServiceUserDestroyed();
+
+  void UpdateContentProcessGMPCapabilities();
 
 private:
   friend class GMPServiceParent;
@@ -103,7 +113,8 @@ private:
   void ClearNodeIdAndPlugin(DirectoryFilter& aFilter);
   void ClearNodeIdAndPlugin(nsIFile* aPluginStorageDir,
                             DirectoryFilter& aFilter);
-  void ForgetThisSiteOnGMPThread(const nsACString& aOrigin);
+  void ForgetThisSiteOnGMPThread(const nsACString& aOrigin,
+                                 const mozilla::OriginAttributesPattern& aPattern);
   void ClearRecentHistoryOnGMPThread(PRTime aSince);
 
   already_AddRefed<GMPParent> GetById(uint32_t aPluginId);
@@ -214,10 +225,16 @@ private:
 
   // Hashes nodeId to the hashtable of storage for that nodeId.
   nsRefPtrHashtable<nsCStringHashKey, GMPStorage> mTempGMPStorage;
+
+  // Tracks how many users are running (on the GMP thread). Only when this count
+  // drops to 0 can we safely shut down the thread.
+  MainThreadOnly<int32_t> mServiceUserCount;
 };
 
 nsresult ReadSalt(nsIFile* aPath, nsACString& aOutData);
-bool MatchOrigin(nsIFile* aPath, const nsACString& aSite);
+bool MatchOrigin(nsIFile* aPath,
+                 const nsACString& aSite,
+                 const mozilla::OriginAttributesPattern& aPattern);
 
 class GMPServiceParent final : public PGMPServiceParent
 {
@@ -225,35 +242,34 @@ public:
   explicit GMPServiceParent(GeckoMediaPluginServiceParent* aService)
     : mService(aService)
   {
+    mService->ServiceUserCreated();
   }
   virtual ~GMPServiceParent();
 
-  bool RecvGetGMPNodeId(const nsString& aOrigin,
-                        const nsString& aTopLevelOrigin,
-                        const nsString& aGMPName,
-                        const bool& aInPrivateBrowsing,
-                        nsCString* aID) override;
-  static bool RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
-                                            nsTArray<nsCString>&& aTags,
-                                            bool* aHasPlugin,
-                                            nsCString* aVersion);
+  mozilla::ipc::IPCResult RecvGetGMPNodeId(const nsString& aOrigin,
+                                           const nsString& aTopLevelOrigin,
+                                           const nsString& aGMPName,
+                                           const bool& aInPrivateBrowsing,
+                                           nsCString* aID) override;
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
   static PGMPServiceParent* Create(Transport* aTransport, ProcessId aOtherPid);
 
-  bool RecvSelectGMP(const nsCString& aNodeId,
-                     const nsCString& aAPI,
-                     nsTArray<nsCString>&& aTags,
-                     uint32_t* aOutPluginId,
-                     nsresult* aOutRv) override;
+  mozilla::ipc::IPCResult RecvSelectGMP(const nsCString& aNodeId,
+                                        const nsCString& aAPI,
+                                        nsTArray<nsCString>&& aTags,
+                                        uint32_t* aOutPluginId,
+                                        nsresult* aOutRv) override;
 
-  bool RecvLaunchGMP(const uint32_t& aPluginId,
-                     nsTArray<ProcessId>&& aAlreadyBridgedTo,
-                     ProcessId* aOutID,
-                     nsCString* aOutDisplayName,
-                     nsresult* aOutRv) override;
+  mozilla::ipc::IPCResult RecvLaunchGMP(const uint32_t& aPluginId,
+                                        nsTArray<ProcessId>&& aAlreadyBridgedTo,
+                                        ProcessId* aOutID,
+                                        nsCString* aOutDisplayName,
+                                        nsresult* aOutRv) override;
 
 private:
+  void CloseTransport(Monitor* aSyncMonitor, bool* aCompleted);
+
   RefPtr<GeckoMediaPluginServiceParent> mService;
 };
 

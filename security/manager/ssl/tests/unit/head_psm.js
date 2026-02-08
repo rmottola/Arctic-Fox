@@ -28,6 +28,7 @@ const isDebugBuild = Cc["@mozilla.org/xpcom/debug;1"]
 const gEVExpected = isDebugBuild && !("@mozilla.org/b2g-process-global;1" in Cc);
 
 const SSS_STATE_FILE_NAME = "SiteSecurityServiceState.txt";
+const PRELOAD_STATE_FILE_NAME = "SecurityPreloadState.txt";
 
 const SEC_ERROR_BASE = Ci.nsINSSErrorsService.NSS_SEC_ERROR_BASE;
 const SSL_ERROR_BASE = Ci.nsINSSErrorsService.NSS_SSL_ERROR_BASE;
@@ -323,10 +324,12 @@ function add_tls_server_setup(serverBinName, certsPath) {
  * @param {Function} aAfterStreamOpen
  *   A callback function that is called with the nsISocketTransport once the
  *   output stream is ready.
+ * @param {String} aFirstPartyDomain
+ *   The first party domain which will be used to double-key the OCSP cache.
  */
 function add_connection_test(aHost, aExpectedResult,
                              aBeforeConnect, aWithSecurityInfo,
-                             aAfterStreamOpen) {
+                             aAfterStreamOpen, aFirstPartyDomain) {
   const REMOTE_PORT = 8443;
 
   function Connection(aHost) {
@@ -342,6 +345,9 @@ function add_connection_test(aHost, aExpectedResult,
     // listening on 127.0.0.1 causes frequent failures on OS X 10.10.
     this.transport.connectionFlags |= Ci.nsISocketTransport.DISABLE_IPV6;
     this.transport.setEventSink(this, this.thread);
+    if (aFirstPartyDomain) {
+      this.transport.firstPartyDomain = aFirstPartyDomain;
+    }
     this.inputStream = null;
     this.outputStream = null;
     this.connected = false;

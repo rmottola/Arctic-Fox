@@ -9,7 +9,7 @@
 
 #include "mozilla/AddonPathService.h"
 #include "mozilla/BasicEvents.h"
-#include "mozilla/CycleCollectedJSRuntime.h"
+#include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventListenerManager.h"
@@ -877,6 +877,7 @@ EventListenerManager::SetEventHandler(nsIAtom* aName,
       bool allowsInlineScript = true;
       rv = csp->GetAllowsInline(nsIContentPolicy::TYPE_SCRIPT,
                                 EmptyString(), // aNonce
+                                false, // aParserCreated
                                 scriptSample,
                                 0,             // aLineNumber
                                 &allowsInlineScript);

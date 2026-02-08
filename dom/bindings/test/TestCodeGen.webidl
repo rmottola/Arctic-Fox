@@ -480,8 +480,12 @@ interface TestInterface {
   void passByteString(ByteString arg);
   void passNullableByteString(ByteString? arg);
   void passOptionalByteString(optional ByteString arg);
+  void passOptionalByteStringWithDefaultValue(optional ByteString arg = "abc");
   void passOptionalNullableByteString(optional ByteString? arg);
+  void passOptionalNullableByteStringWithDefaultValue(optional ByteString? arg = null);
   void passVariadicByteString(ByteString... arg);
+  void passOptionalUnionByteString(optional (ByteString or long) arg);
+  void passOptionalUnionByteStringWithDefaultValue(optional (ByteString or long) arg = "abc");
 
   // USVString types
   void passUSVS(USVString arg);
@@ -640,7 +644,12 @@ interface TestInterface {
   //void passUnionWithSequence((sequence<object> or long) arg);
   void passUnionWithArrayBuffer((ArrayBuffer or long) arg);
   void passUnionWithString((DOMString or object) arg);
-  //void passUnionWithEnum((TestEnum or object) arg);
+  // Using an enum in a union.  Note that we use some enum not declared in our
+  // binding file, because UnionTypes.h will need to include the binding header
+  // for this enum.  Pick an enum from an interface that won't drag in too much
+  // stuff.
+  void passUnionWithEnum((SupportedType or object) arg);
+
   // Trying to use a callback in a union won't include the test
   // headers, unfortunately, so won't compile.
   //void passUnionWithCallback((TestCallback or long) arg);
@@ -660,6 +669,12 @@ interface TestInterface {
   void passUnionWithDefaultValue11(optional (unrestricted float or DOMString) arg = "");
   void passUnionWithDefaultValue12(optional (unrestricted float or DOMString) arg = 1);
   void passUnionWithDefaultValue13(optional (unrestricted float or DOMString) arg = Infinity);
+  void passUnionWithDefaultValue14(optional (double or ByteString) arg = "");
+  void passUnionWithDefaultValue15(optional (double or ByteString) arg = 1);
+  void passUnionWithDefaultValue16(optional (double or ByteString) arg = 1.5);
+  void passUnionWithDefaultValue17(optional (double or SupportedType) arg = "text/html");
+  void passUnionWithDefaultValue18(optional (double or SupportedType) arg = 1);
+  void passUnionWithDefaultValue19(optional (double or SupportedType) arg = 1.5);
 
   void passNullableUnionWithDefaultValue1(optional (double or DOMString)? arg = "");
   void passNullableUnionWithDefaultValue2(optional (double or DOMString)? arg = 1);
@@ -673,6 +688,14 @@ interface TestInterface {
   void passNullableUnionWithDefaultValue10(optional (unrestricted float or DOMString)? arg = "");
   void passNullableUnionWithDefaultValue11(optional (unrestricted float or DOMString)? arg = 1);
   void passNullableUnionWithDefaultValue12(optional (unrestricted float or DOMString)? arg = null);
+  void passNullableUnionWithDefaultValue13(optional (double or ByteString)? arg = "");
+  void passNullableUnionWithDefaultValue14(optional (double or ByteString)? arg = 1);
+  void passNullableUnionWithDefaultValue15(optional (double or ByteString)? arg = 1.5);
+  void passNullableUnionWithDefaultValue16(optional (double or ByteString)? arg = null);
+  void passNullableUnionWithDefaultValue17(optional (double or SupportedType)? arg = "text/html");
+  void passNullableUnionWithDefaultValue18(optional (double or SupportedType)? arg = 1);
+  void passNullableUnionWithDefaultValue19(optional (double or SupportedType)? arg = 1.5);
+  void passNullableUnionWithDefaultValue20(optional (double or SupportedType)? arg = null);
 
   void passSequenceOfUnions(sequence<(CanvasPattern or CanvasGradient)> arg);
   void passSequenceOfUnions2(sequence<(object or long)> arg);
@@ -920,6 +943,10 @@ interface TestInterface {
   [Throws] attribute boolean throwingAttr;
   [GetterThrows] attribute boolean throwingGetterAttr;
   [SetterThrows] attribute boolean throwingSetterAttr;
+  [NeedsSubjectPrincipal] void needsSubjectPrincipalMethod();
+  [NeedsSubjectPrincipal] attribute boolean needsSubjectPrincipalAttr;
+  [NeedsCallerType] void needsCallerTypeMethod();
+  [NeedsCallerType] attribute boolean needsCallerTypeAttr;
   legacycaller short(unsigned long arg1, TestInterface arg2);
   void passArgsWithDefaults(optional long arg1,
                             optional TestInterface? arg2 = null,
@@ -1009,6 +1036,9 @@ dictionary Dict : ParentDict {
   DOMString otherStr = "def";
   DOMString? yetAnotherStr = null;
   DOMString template;
+  ByteString byteStr;
+  ByteString emptyByteStr = "";
+  ByteString otherByteStr = "def";
   object someObj;
   boolean prototype;
   object? anotherObj = null;
@@ -1177,16 +1207,6 @@ interface TestIndexedAndNamedGetterAndSetterInterface : TestIndexedSetterInterfa
   readonly attribute unsigned long length;
 };
 
-interface TestIndexedDeleterInterface {
-  deleter void delItem(unsigned long idx);
-  getter long (unsigned long index);
-};
-
-interface TestIndexedDeleterWithRetvalInterface {
-  deleter boolean delItem(unsigned long index);
-  getter long (unsigned long index);
-};
-
 interface TestNamedDeleterInterface {
   deleter void (DOMString name);
   getter long (DOMString name);
@@ -1194,13 +1214,6 @@ interface TestNamedDeleterInterface {
 
 interface TestNamedDeleterWithRetvalInterface {
   deleter boolean delNamedItem(DOMString name);
-  getter long (DOMString name);
-};
-
-interface TestIndexedAndNamedDeleterInterface {
-  deleter void (unsigned long index);
-  getter long (unsigned long index);
-  deleter void delNamedItem(DOMString name);
   getter long (DOMString name);
 };
 
@@ -1240,4 +1253,12 @@ namespace TestProtoObjectHackedNamespace {
 [SecureContext]
 interface TestSecureContextInterface {
   static void alsoSecureContext();
+};
+
+[Exposed=(Window,Worker)]
+interface TestWorkerExposedInterface {
+  [NeedsSubjectPrincipal] void needsSubjectPrincipalMethod();
+  [NeedsSubjectPrincipal] attribute boolean needsSubjectPrincipalAttr;
+  [NeedsCallerType] void needsCallerTypeMethod();
+  [NeedsCallerType] attribute boolean needsCallerTypeAttr;
 };

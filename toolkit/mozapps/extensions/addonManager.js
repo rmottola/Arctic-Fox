@@ -194,7 +194,7 @@ amManager.prototype = {
         }
 
         return this.installAddonsFromWebpage(payload.mimetype,
-          aMessage.target, payload.triggeringPrincipal, payload.uris,
+          aMessage.target, payload.principalToInherit, payload.uris,
           payload.hashes, payload.names, payload.icons, callback);
       }
 
@@ -247,7 +247,9 @@ amManager.prototype = {
           }
           AddonManager.addAddonListener(this.addonListener);
         } else {
-          AddonManager.removeAddonListener(this.addonListener);
+          if (this.addonListener) {
+            AddonManager.removeAddonListener(this.addonListener);
+          }
         }
       }
     }

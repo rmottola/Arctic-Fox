@@ -35,6 +35,9 @@ int GetQuirksFromMimeTypeAndFilename(const nsCString& aMimeType,
         quirks |= QUIRK_FLASH_HOOK_GETWINDOWINFO;
         quirks |= QUIRK_FLASH_FIXUP_MOUSE_CAPTURE;
         quirks |= QUIRK_WINLESS_HOOK_IME;
+#if defined(_M_X64) || defined(__x86_64__)
+        quirks |= QUIRK_FLASH_HOOK_GETKEYSTATE;
+#endif
 #endif
     }
 
@@ -50,7 +53,6 @@ int GetQuirksFromMimeTypeAndFilename(const nsCString& aMimeType,
     // Whitelist Flash and Quicktime to support offline renderer
     NS_NAMED_LITERAL_CSTRING(quicktime, "QuickTime Plugin.plugin");
     if (specialType == nsPluginHost::eSpecialType_Flash) {
-        quirks |= QUIRK_FLASH_AVOID_CGMODE_CRASHES;
         quirks |= QUIRK_ALLOW_OFFLINE_RENDERER;
     } else if (FindInReadable(quicktime, aPluginFilename)) {
         quirks |= QUIRK_ALLOW_OFFLINE_RENDERER;

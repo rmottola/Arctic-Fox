@@ -196,8 +196,11 @@ class NrIceCtx {
  public:
   enum ConnectionState { ICE_CTX_INIT,
                          ICE_CTX_CHECKING,
-                         ICE_CTX_OPEN,
-                         ICE_CTX_FAILED
+                         ICE_CTX_CONNECTED,
+                         ICE_CTX_COMPLETED,
+                         ICE_CTX_FAILED,
+                         ICE_CTX_DISCONNECTED,
+                         ICE_CTX_CLOSED
   };
 
   enum GatheringState { ICE_CTX_GATHER_INIT,
@@ -209,8 +212,8 @@ class NrIceCtx {
                      ICE_CONTROLLED
   };
 
-  enum Policy { ICE_POLICY_NONE,
-                ICE_POLICY_RELAY,
+  enum Policy { ICE_POLICY_RELAY,
+                ICE_POLICY_NO_HOST,
                 ICE_POLICY_ALL
   };
 
@@ -221,10 +224,8 @@ class NrIceCtx {
   static std::string GetNewUfrag();
   static std::string GetNewPwd();
 
-  bool Initialize(bool hide_non_default);
-  bool Initialize(bool hide_non_default,
-                  const std::string& ufrag,
-                  const std::string& pwd);
+  bool Initialize();
+  bool Initialize(const std::string& ufrag, const std::string& pwd);
 
   int SetNat(const RefPtr<TestNat>& aNat);
 
@@ -308,7 +309,7 @@ class NrIceCtx {
   nsresult SetProxyServer(const NrIceProxyServer& proxy_server);
 
   // Start ICE gathering
-  nsresult StartGathering();
+  nsresult StartGathering(bool default_route_only, bool proxy_only);
 
   // Start checking
   nsresult StartChecks();
@@ -351,7 +352,8 @@ private:
   static int stream_ready(void *obj, nr_ice_media_stream *stream);
   static int stream_failed(void *obj, nr_ice_media_stream *stream);
   static int ice_checking(void *obj, nr_ice_peer_ctx *pctx);
-  static int ice_completed(void *obj, nr_ice_peer_ctx *pctx);
+  static int ice_connected(void *obj, nr_ice_peer_ctx *pctx);
+  static int ice_disconnected(void *obj, nr_ice_peer_ctx *pctx);
   static int msg_recvd(void *obj, nr_ice_peer_ctx *pctx,
                        nr_ice_media_stream *stream, int component_id,
                        unsigned char *msg, int len);

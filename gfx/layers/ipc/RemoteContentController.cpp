@@ -12,6 +12,7 @@
 #include "MainThreadUtils.h"
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/TabParent.h"
+#include "mozilla/layers/APZCTreeManagerParent.h"  // for APZCTreeManagerParent
 #include "mozilla/layers/APZThreadUtils.h"
 #include "mozilla/layout/RenderFrameParent.h"
 #include "mozilla/gfx/GPUProcessManager.h"
@@ -29,7 +30,6 @@ using namespace mozilla::gfx;
 RemoteContentController::RemoteContentController()
   : mCompositorThread(MessageLoop::current())
   , mCanSend(true)
-  , mMutex("RemoteContentController")
 {
 }
 
@@ -54,21 +54,72 @@ RemoteContentController::HandleTap(TapType aTapType,
                                    const ScrollableLayerGuid& aGuid,
                                    uint64_t aInputBlockId)
 {
-  if (MessageLoop::current() != mCompositorThread) {
-    // We have to send messages from the compositor thread
-    mCompositorThread->PostTask(NewRunnableMethod<TapType, LayoutDevicePoint, Modifiers,
-                                        ScrollableLayerGuid, uint64_t>(this,
-                                          &RemoteContentController::HandleTap,
-                                          aTapType, aPoint, aModifiers, aGuid,
-                                          aInputBlockId));
-    return;
+  APZThreadUtils::AssertOnControllerThread();
+
+  if (XRE_GetProcessType() == GeckoProcessType_GPU) {
+    MOZ_ASSERT(MessageLoop::current() == mCompositorThread);
+
+    // The raw pointer to APZCTreeManagerParent is ok here because we are on the
+    // compositor thread.
+    APZCTreeManagerParent* apzctmp =
+        CompositorBridgeParent::GetApzcTreeManagerParentForRoot(aGuid.mLayersId);
+    if (apzctmp) {
+      Unused << apzctmp->SendHandleTap(aTapType, aPoint, aModifiers, aGuid, aInputBlockId);
+      return;
+    }
   }
 
-  bool callTakeFocusForClickFromTap = (aTapType == TapType::eSingleTap);
+  // If we get here we're probably in the parent process, but we might be in
+  // the GPU process in some shutdown phase where the LayerTreeState or
+  // APZCTreeManagerParent structures are torn down. In that case we'll just get
+  // a null TabParent.
+  dom::TabParent* tab = dom::TabParent::GetTabParentFromLayersId(aGuid.mLayersId);
+  if (tab) {
+    // If we got a TabParent we're definitely in the parent process, and the
+    // message is going to a child process. That means we're in an e10s
+    // environment, so we must be on the main thread.
+    MOZ_ASSERT(XRE_IsParentProcess());
+    MOZ_ASSERT(NS_IsMainThread());
+    tab->SendHandleTap(aTapType, aPoint, aModifiers, aGuid, aInputBlockId);
+  }
+}
 
-  if (mCanSend) {
-    Unused << SendHandleTap(aTapType, aPoint,
-            aModifiers, aGuid, aInputBlockId, callTakeFocusForClickFromTap);
+void
+RemoteContentController::NotifyPinchGesture(PinchGestureInput::PinchGestureType aType,
+                                            const ScrollableLayerGuid& aGuid,
+                                            LayoutDeviceCoord aSpanChange,
+                                            Modifiers aModifiers)
+{
+  APZThreadUtils::AssertOnControllerThread();
+
+  // For now we only ever want to handle this NotifyPinchGesture message in
+  // the parent process, even if the APZ is sending it to a content process.
+
+  // If we're in the GPU process, try to find a handle to the parent process
+  // and send it there.
+  if (XRE_IsGPUProcess()) {
+    MOZ_ASSERT(MessageLoop::current() == mCompositorThread);
+
+    // The raw pointer to APZCTreeManagerParent is ok here because we are on the
+    // compositor thread.
+    APZCTreeManagerParent* apzctmp =
+        CompositorBridgeParent::GetApzcTreeManagerParentForRoot(aGuid.mLayersId);
+    if (apzctmp) {
+      Unused << apzctmp->SendNotifyPinchGesture(aType, aGuid, aSpanChange, aModifiers);
+      return;
+    }
+  }
+
+  // If we're in the parent process, handle it directly. We don't have a handle
+  // to the widget though, so we fish out the ChromeProcessController and
+  // delegate to that instead.
+  if (XRE_IsParentProcess()) {
+    MOZ_ASSERT(NS_IsMainThread());
+    RefPtr<GeckoContentController> rootController =
+        CompositorBridgeParent::GetGeckoContentControllerForRoot(aGuid.mLayersId);
+    if (rootController) {
+      rootController->NotifyPinchGesture(aType, aGuid, aSpanChange, aModifiers);
+    }
   }
 }
 
@@ -93,18 +144,6 @@ void
 RemoteContentController::DispatchToRepaintThread(already_AddRefed<Runnable> aTask)
 {
   mCompositorThread->PostTask(Move(aTask));
-}
-
-bool
-RemoteContentController::GetTouchSensitiveRegion(CSSRect* aOutRegion)
-{
-  MutexAutoLock lock(mMutex);
-  if (mTouchSensitiveRegion.IsEmpty()) {
-    return false;
-  }
-
-  *aOutRegion = CSSRect::FromAppUnits(mTouchSensitiveRegion.GetBounds());
-  return true;
 }
 
 void
@@ -191,14 +230,6 @@ RemoteContentController::NotifyFlushComplete()
   if (mCanSend) {
     Unused << SendNotifyFlushComplete();
   }
-}
-
-bool
-RemoteContentController::RecvUpdateHitRegion(const nsRegion& aRegion)
-{
-  MutexAutoLock lock(mMutex);
-  mTouchSensitiveRegion = aRegion;
-  return true;
 }
 
 void

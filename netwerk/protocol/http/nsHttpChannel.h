@@ -27,6 +27,8 @@
 #include "nsIStreamListener.h"
 #include "nsISupportsPrimitives.h"
 #include "nsICorsPreflightCallback.h"
+#include "AlternateServices.h"
+#include "nsIHstsPrimingCallback.h"
 
 class nsDNSPrefetch;
 class nsICancelable;
@@ -74,6 +76,7 @@ class nsHttpChannel final : public HttpBaseChannel
                           , public nsSupportsWeakReference
                           , public nsICorsPreflightCallback
                           , public nsIChannelWithDivertableParentListener
+                          , public nsIHstsPrimingCallback
 {
 public:
     NS_DECL_ISUPPORTS_INHERITED
@@ -89,6 +92,7 @@ public:
     NS_DECL_NSIAPPLICATIONCACHECONTAINER
     NS_DECL_NSIAPPLICATIONCACHECHANNEL
     NS_DECL_NSIASYNCVERIFYREDIRECTCALLBACK
+    NS_DECL_NSIHSTSPRIMINGCALLBACK
     NS_DECL_NSITHREADRETARGETABLEREQUEST
     NS_DECL_NSIDNSLISTENER
     NS_DECL_NSICHANNELWITHDIVERTABLEPARENTLISTENER
@@ -203,6 +207,9 @@ public: /* internal necko use only */
     nsresult OpenCacheEntry(bool usingSSL);
     nsresult ContinueConnect();
 
+    // If the load is mixed-content, build and send an HSTS priming request.
+    nsresult TryHSTSPriming();
+
     nsresult StartRedirectChannelToURI(nsIURI *, uint32_t);
 
     // This allows cache entry to be marked as foreign even after channel itself
@@ -257,6 +264,13 @@ public: /* internal necko use only */
     NS_IMETHOD GetResponseSynthesized(bool* aSynthesized) override;
     bool AwaitingCacheCallbacks();
     void SetCouldBeSynthesized();
+
+private: // used for alternate service validation
+    RefPtr<TransactionObserver> mTransactionObserver;
+public:
+    void SetConnectionInfo(nsHttpConnectionInfo *); // clones the argument
+    void SetTransactionObserver(TransactionObserver *arg) { mTransactionObserver = arg; }
+    TransactionObserver *GetTransactionObserver() { return mTransactionObserver; }
 
 protected:
     virtual ~nsHttpChannel();
@@ -415,6 +429,9 @@ private:
                rv == NS_ERROR_MALFORMED_URI;
     }
 
+    // Report net vs cache time telemetry
+    void ReportNetVSCacheTelemetry();
+
     // Create a aggregate set of the current notification callbacks
     // and ensure the transaction is updated to use it.
     void UpdateAggregateCallbacks();
@@ -449,6 +466,12 @@ private:
 
     // cache specific data
     nsCOMPtr<nsICacheEntry>           mCacheEntry;
+    // This will be set during OnStopRequest() before calling CloseCacheEntry(),
+    // but only if the listener wants to use alt-data (signaled by
+    // HttpBaseChannel::mPreferredCachedAltDataType being not empty)
+    // Needed because calling openAlternativeOutputStream needs a reference
+    // to the cache entry.
+    nsCOMPtr<nsICacheEntry>           mAltDataCacheEntry;
     // We must close mCacheInputStream explicitly to avoid leaks.
     AutoClose<nsIInputStream>         mCacheInputStream;
     RefPtr<nsInputStreamPump>       mCachePump;
@@ -463,6 +486,8 @@ private:
 
     // auth specific data
     nsCOMPtr<nsIHttpChannelAuthProvider> mAuthProvider;
+
+    mozilla::TimeStamp                mOnStartRequestTimestamp;
 
     // States of channel interception
     enum {
@@ -492,6 +517,9 @@ private:
 
     static const uint32_t WAIT_FOR_CACHE_ENTRY = 1;
     static const uint32_t WAIT_FOR_OFFLINE_CACHE_ENTRY = 2;
+
+    bool                              mCacheOpenWithPriority;
+    uint32_t                          mCacheQueueSizeWhenOpen;
 
     // state flags
     uint32_t                          mCachedContentIsValid     : 1;
@@ -535,11 +563,6 @@ private:
     // consumers set this to true to use cache pinning, this has effect
     // only when the channel is in an app context (load context has an appid)
     uint32_t                          mPinCacheContent : 1;
-    // Whether fetching the content is meant to be handled by the
-    // packaged app service, which behaves like a caching layer.
-    // Upon successfully fetching the package, the resource will be placed in
-    // the cache, and served by calling OnCacheEntryAvailable.
-    uint32_t                          mIsPackagedAppResource : 1;
     // True if CORS preflight has been performed
     uint32_t                          mIsCorsPreflightDone : 1;
 

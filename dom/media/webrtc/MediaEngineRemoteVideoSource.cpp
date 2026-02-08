@@ -29,10 +29,11 @@ NS_IMPL_ISUPPORTS0(MediaEngineRemoteVideoSource)
 
 MediaEngineRemoteVideoSource::MediaEngineRemoteVideoSource(
   int aIndex, mozilla::camera::CaptureEngine aCapEngine,
-  dom::MediaSourceEnum aMediaSource, const char* aMonitorName)
+  dom::MediaSourceEnum aMediaSource, bool aScary, const char* aMonitorName)
   : MediaEngineCameraVideoSource(aIndex, aMonitorName),
     mMediaSource(aMediaSource),
-    mCapEngine(aCapEngine)
+    mCapEngine(aCapEngine),
+    mScary(aScary)
 {
   MOZ_ASSERT(aMediaSource != dom::MediaSourceEnum::Other);
   mSettings.mWidth.Construct(0);
@@ -51,7 +52,7 @@ MediaEngineRemoteVideoSource::Init()
     &mozilla::camera::CamerasChild::GetCaptureDevice,
     mCapEngine, mCaptureIndex,
     deviceName, kMaxDeviceNameLength,
-    uniqueId, kMaxUniqueIdLength)) {
+    uniqueId, kMaxUniqueIdLength, nullptr)) {
     LOG(("Error initializing RemoteVideoSource (GetCaptureDevice)"));
     return;
   }
@@ -524,7 +525,7 @@ void MediaEngineRemoteVideoSource::Refresh(int aIndex) {
     &mozilla::camera::CamerasChild::GetCaptureDevice,
     mCapEngine, aIndex,
     deviceName, sizeof(deviceName),
-    uniqueId, sizeof(uniqueId))) {
+    uniqueId, sizeof(uniqueId), nullptr)) {
     return;
   }
 

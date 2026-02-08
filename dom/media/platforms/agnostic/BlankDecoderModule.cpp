@@ -44,11 +44,9 @@ public:
     return InitPromise::CreateAndResolve(mType, __func__);
   }
 
-  nsresult Shutdown() override {
-    return NS_OK;
-  }
+  void Shutdown() override {}
 
-  nsresult Input(MediaRawData* aSample) override
+  void Input(MediaRawData* aSample) override
   {
     RefPtr<MediaData> data =
       mCreator->Create(media::TimeUnit::FromMicroseconds(aSample->mTime),
@@ -56,25 +54,20 @@ public:
                        aSample->mOffset);
 
     OutputFrame(data);
-
-    return NS_OK;
   }
 
-  nsresult Flush() override
+  void Flush() override
   {
     mReorderQueue.Clear();
-
-    return NS_OK;
   }
 
-  nsresult Drain() override
+  void Drain() override
   {
     while (!mReorderQueue.IsEmpty()) {
       mCallback->Output(mReorderQueue.Pop().get());
     }
 
     mCallback->DrainComplete();
-    return NS_OK;
   }
 
   const char* GetDescriptionName() const override
@@ -86,7 +79,7 @@ private:
   void OutputFrame(MediaData* aData)
   {
     if (!aData) {
-      mCallback->Error(MediaDataDecoderError::FATAL_ERROR);
+      mCallback->Error(MediaResult(NS_ERROR_OUT_OF_MEMORY, __func__));
       return;
     }
 
@@ -96,11 +89,7 @@ private:
     while (mReorderQueue.Length() > mMaxRefFrames) {
       mCallback->Output(mReorderQueue.Pop().get());
     }
-
-    if (mReorderQueue.Length() <= mMaxRefFrames) {
-      mCallback->InputExhausted();
-    }
-
+    mCallback->InputExhausted();
   }
 
 private:

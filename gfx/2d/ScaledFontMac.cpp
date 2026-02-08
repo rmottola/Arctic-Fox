@@ -115,7 +115,7 @@ void
 ScaledFontMac::CopyGlyphsToBuilder(const GlyphBuffer &aBuffer, PathBuilder *aBuilder, BackendType aBackendType, const Matrix *aTransformHint)
 {
   if (!(aBackendType == BackendType::COREGRAPHICS || aBackendType == BackendType::COREGRAPHICS_ACCELERATED)) {
-    ScaledFontBase::CopyGlyphsToBuilder(aBuffer, aBuilder, aBackendType, aTransformHint);
+    ScaledFontBase::CopyGlyphsToBuilder(aBuffer, aBuilder, aTransformHint);
     return;
   }
 #ifdef MOZ_WIDGET_COCOA

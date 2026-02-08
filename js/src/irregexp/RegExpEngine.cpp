@@ -64,16 +64,16 @@ RegExpNode::RegExpNode(LifoAlloc* alloc)
 // CharacterRange
 
 // The '2' variant has inclusive from and exclusive to.
-// This covers \s as defined in ECMA-262 5.1, 15.10.2.12,
-// which include WhiteSpace (7.2) or LineTerminator (7.3) values.
+// This covers \s as defined in ES2016, 21.2.2.12 CharacterClassEscape,
+// which include WhiteSpace (11.2) or LineTerminator (11.3) values.
 static const int kSpaceRanges[] = { '\t', '\r' + 1, ' ', ' ' + 1,
-    0x00A0, 0x00A1, 0x1680, 0x1681, 0x180E, 0x180F, 0x2000, 0x200B,
+    0x00A0, 0x00A1, 0x1680, 0x1681, 0x2000, 0x200B,
     0x2028, 0x202A, 0x202F, 0x2030, 0x205F, 0x2060, 0x3000, 0x3001,
     0xFEFF, 0xFF00, 0x10000 };
 static const int kSpaceRangeCount = ArrayLength(kSpaceRanges);
 
 static const int kSpaceAndSurrogateRanges[] = { '\t', '\r' + 1, ' ', ' ' + 1,
-    0x00A0, 0x00A1, 0x1680, 0x1681, 0x180E, 0x180F, 0x2000, 0x200B,
+    0x00A0, 0x00A1, 0x1680, 0x1681, 0x2000, 0x200B,
     0x2028, 0x202A, 0x202F, 0x2030, 0x205F, 0x2060, 0x3000, 0x3001,
     unicode::LeadSurrogateMin, unicode::TrailSurrogateMax + 1,
     0xFEFF, 0xFF00, 0x10000 };
@@ -1323,7 +1323,7 @@ LoopChoiceNode::FilterASCII(int depth, bool ignore_case, bool unicode)
 void
 Analysis::EnsureAnalyzed(RegExpNode* that)
 {
-    JS_CHECK_RECURSION(cx, fail("Stack overflow"); return);
+    JS_CHECK_RECURSION(cx, failASCII("Stack overflow"); return);
 
     if (that->info()->been_analyzed || that->info()->being_analyzed)
         return;
@@ -1765,7 +1765,7 @@ RegExpCompiler::Assemble(JSContext* cx,
 
     if (reg_exp_too_big_) {
         code.destroy();
-        JS_ReportError(cx, "regexp too big");
+        JS_ReportErrorASCII(cx, "regexp too big");
         return RegExpCode();
     }
 
@@ -1806,7 +1806,7 @@ irregexp::CompilePattern(JSContext* cx, RegExpShared* shared, RegExpCompileData*
                          bool unicode)
 {
     if ((data->capture_count + 1) * 2 - 1 > RegExpMacroAssembler::kMaxRegister) {
-        JS_ReportError(cx, "regexp too big");
+        JS_ReportErrorASCII(cx, "regexp too big");
         return RegExpCode();
     }
 
@@ -1872,7 +1872,7 @@ irregexp::CompilePattern(JSContext* cx, RegExpShared* shared, RegExpCompileData*
     Analysis analysis(cx, ignore_case, is_ascii, unicode);
     analysis.EnsureAnalyzed(node);
     if (analysis.has_failed()) {
-        JS_ReportError(cx, analysis.errorMessage());
+        JS_ReportErrorASCII(cx, "%s", analysis.errorMessage());
         return RegExpCode();
     }
 

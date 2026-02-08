@@ -35,11 +35,11 @@ loader.lazyRequireGetter(this, "gSequenceId", "devtools/client/webconsole/jsterm
 loader.lazyImporter(this, "VariablesView", "resource://devtools/client/shared/widgets/VariablesView.jsm");
 loader.lazyImporter(this, "VariablesViewController", "resource://devtools/client/shared/widgets/VariablesViewController.jsm");
 loader.lazyRequireGetter(this, "gDevTools", "devtools/client/framework/devtools", true);
-loader.lazyImporter(this, "PluralForm", "resource://gre/modules/PluralForm.jsm");
 loader.lazyRequireGetter(this, "KeyShortcuts", "devtools/client/shared/key-shortcuts", true);
 loader.lazyRequireGetter(this, "ZoomKeys", "devtools/client/shared/zoom-keys");
 
-const STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
+const {PluralForm} = require("devtools/shared/plural-form");
+const STRINGS_URI = "devtools/locale/webconsole.properties";
 var l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
@@ -494,6 +494,10 @@ WebConsoleFrame.prototype = {
     };
     allReady.then(notifyObservers, notifyObservers);
 
+    if (this.NEW_CONSOLE_OUTPUT_ENABLED) {
+      allReady.then(this.newConsoleOutput.init);
+    }
+
     return allReady;
   },
 
@@ -586,7 +590,8 @@ WebConsoleFrame.prototype = {
       this.outputNode.parentNode.appendChild(this.experimentalOutputNode);
       // @TODO Once the toolbox has been converted to React, see if passing
       // in JSTerm is still necessary.
-      this.newConsoleOutput = new this.window.NewConsoleOutput(this.experimentalOutputNode, this.jsterm, toolbox);
+      this.newConsoleOutput = new this.window.NewConsoleOutput(
+        this.experimentalOutputNode, this.jsterm, toolbox, this.owner);
       console.log("Created newConsoleOutput", this.newConsoleOutput);
 
       let filterToolbar = doc.querySelector(".hud-console-filter-toolbar");
@@ -3271,6 +3276,13 @@ WebConsoleConnectionProxy.prototype = {
   },
 
   /**
+   * Batched dispatch of messages.
+   */
+  dispatchMessagesAdd: function(packets) {
+    this.webConsoleFrame.newConsoleOutput.dispatchMessagesAdd(packets);
+  },
+
+  /**
    * The "cachedMessages" response handler.
    *
    * @private
@@ -3296,9 +3308,10 @@ WebConsoleConnectionProxy.prototype = {
     messages.sort((a, b) => a.timeStamp - b.timeStamp);
 
     if (this.webConsoleFrame.NEW_CONSOLE_OUTPUT_ENABLED) {
-      for (let packet of messages) {
-        this.dispatchMessageAdd(packet);
-      }
+      // Filter out CSS page errors.
+      messages = messages.filter(message => !(message._type == "PageError"
+          && Utils.categoryForScriptError(message) === CATEGORY_CSS));
+      this.dispatchMessagesAdd(messages);
     } else {
       this.webConsoleFrame.displayCachedMessages(messages);
       if (!this._hasNativeConsoleAPI) {
@@ -3323,7 +3336,10 @@ WebConsoleConnectionProxy.prototype = {
   _onPageError: function (type, packet) {
     if (this.webConsoleFrame && packet.from == this._consoleActor) {
       if (this.webConsoleFrame.NEW_CONSOLE_OUTPUT_ENABLED) {
-        this.dispatchMessageAdd(packet);
+        let category = Utils.categoryForScriptError(packet.pageError);
+        if (category !== CATEGORY_CSS) {
+          this.dispatchMessageAdd(packet);
+        }
         return;
       }
       this.webConsoleFrame.handlePageError(packet.pageError);
@@ -3378,7 +3394,11 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onNetworkEvent: function (type, networkInfo) {
     if (this.webConsoleFrame) {
-      this.webConsoleFrame.handleNetworkEvent(networkInfo);
+      if (this.webConsoleFrame.NEW_CONSOLE_OUTPUT_ENABLED) {
+        this.dispatchMessageAdd(networkInfo);
+      } else {
+        this.webConsoleFrame.handleNetworkEvent(networkInfo);
+      }
     }
   },
 

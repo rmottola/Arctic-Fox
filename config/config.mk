@@ -136,7 +136,6 @@ PYTHON_PATH = $(PYTHON) $(topsrcdir)/config/pythonpath.py
 _DEBUG_ASFLAGS :=
 _DEBUG_CFLAGS :=
 _DEBUG_LDFLAGS :=
-_DEBUG_RUSTFLAGS :=
 
 ifneq (,$(MOZ_DEBUG)$(MOZ_DEBUG_SYMBOLS))
   ifeq ($(AS),$(YASM))
@@ -152,14 +151,12 @@ ifneq (,$(MOZ_DEBUG)$(MOZ_DEBUG_SYMBOLS))
   endif
   _DEBUG_CFLAGS += $(MOZ_DEBUG_FLAGS)
   _DEBUG_LDFLAGS += $(MOZ_DEBUG_LDFLAGS)
-  _DEBUG_RUSTFLAGS += -g
 endif
 
 ASFLAGS += $(_DEBUG_ASFLAGS)
 OS_CFLAGS += $(_DEBUG_CFLAGS)
 OS_CXXFLAGS += $(_DEBUG_CFLAGS)
 OS_LDFLAGS += $(_DEBUG_LDFLAGS)
-RUSTFLAGS += $(_DEBUG_RUSTFLAGS)
 
 # XXX: What does this? Bug 482434 filed for better explanation.
 ifeq ($(OS_ARCH)_$(GNU_CC),WINNT_)
@@ -290,7 +287,6 @@ CFLAGS		+= $(MOZ_OPTIMIZE_FLAGS)
 CXXFLAGS	+= $(MOZ_OPTIMIZE_FLAGS)
 endif # MOZ_OPTIMIZE == 1
 LDFLAGS		+= $(MOZ_OPTIMIZE_LDFLAGS)
-RUSTFLAGS	+= $(MOZ_OPTIMIZE_RUSTFLAGS)
 endif # MOZ_OPTIMIZE
 
 HOST_CFLAGS	+= $(_DEPEND_CFLAGS)
@@ -344,6 +340,31 @@ endif
 
 HOST_CFLAGS += $(HOST_DEFINES) $(MOZBUILD_HOST_CFLAGS)
 HOST_CXXFLAGS += $(HOST_DEFINES) $(MOZBUILD_HOST_CXXFLAGS)
+
+# We only add color flags if neither the flag to disable color
+# (e.g. "-fno-color-diagnostics" nor a flag to control color
+# (e.g. "-fcolor-diagnostics=never") is present.
+define colorize_flags
+ifeq (,$(filter $(COLOR_CFLAGS:-f%=-fno-%),$$(1))$(findstring $(COLOR_CFLAGS),$$(1)))
+$(1) += $(COLOR_CFLAGS)
+endif
+endef
+
+color_flags_vars := \
+  COMPILE_CFLAGS \
+  COMPILE_CXXFLAGS \
+  COMPILE_CMFLAGS \
+  COMPILE_CMMFLAGS \
+  HOST_CFLAGS \
+  HOST_CXXFLAGS \
+  LDFLAGS \
+  $(NULL)
+
+ifdef MACH_STDOUT_ISATTY
+ifdef COLOR_CFLAGS
+$(foreach var,$(color_flags_vars),$(eval $(call colorize_flags,$(var))))
+endif
+endif
 
 #
 # Name of the binary code directories

@@ -89,7 +89,7 @@ class LIRGeneratorARM64 : public LIRGeneratorShared
     void lowerUMod(MMod* mod);
     void visitPowHalf(MPowHalf* ins);
     void visitAsmJSNeg(MAsmJSNeg* ins);
-    void visitAsmSelect(MAsmSelect* ins);
+    void visitWasmSelect(MWasmSelect* ins);
 
     LTableSwitchV* newLTableSwitchV(MTableSwitch* ins);
     LTableSwitch* newLTableSwitch(const LAllocation& in,
@@ -103,8 +103,8 @@ class LIRGeneratorARM64 : public LIRGeneratorShared
     void lowerPhi(MPhi* phi);
     void visitGuardShape(MGuardShape* ins);
     void visitGuardObjectGroup(MGuardObjectGroup* ins);
-    void visitAsmJSUnsignedToDouble(MAsmJSUnsignedToDouble* ins);
-    void visitAsmJSUnsignedToFloat32(MAsmJSUnsignedToFloat32* ins);
+    void visitWasmUnsignedToDouble(MWasmUnsignedToDouble* ins);
+    void visitWasmUnsignedToFloat32(MWasmUnsignedToFloat32* ins);
     void visitAsmJSLoadHeap(MAsmJSLoadHeap* ins);
     void visitAsmJSStoreHeap(MAsmJSStoreHeap* ins);
     void visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap* ins);
@@ -117,7 +117,6 @@ class LIRGeneratorARM64 : public LIRGeneratorShared
     void visitSubstr(MSubstr* ins);
     void visitRandom(MRandom* ins);
     void visitWasmTruncateToInt64(MWasmTruncateToInt64* ins);
-    void visitWasmBoundsCheck(MWasmBoundsCheck* ins);
     void visitWasmLoad(MWasmLoad* ins);
     void visitWasmStore(MWasmStore* ins);
     void visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins);

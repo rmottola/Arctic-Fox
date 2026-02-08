@@ -11,7 +11,8 @@ this.EXPORTED_SYMBOLS = [ "EME_ADOBE_ID",
                           "GMP_PLUGIN_IDS",
                           "GMPPrefs",
                           "GMPUtils",
-                          "OPEN_H264_ID" ];
+                          "OPEN_H264_ID",
+                          "WIDEVINE_ID" ];
 
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -20,7 +21,8 @@ Cu.import("resource://gre/modules/AppConstants.jsm");
 // GMP IDs
 const OPEN_H264_ID  = "gmp-gmpopenh264";
 const EME_ADOBE_ID  = "gmp-eme-adobe";
-const GMP_PLUGIN_IDS = [ OPEN_H264_ID, EME_ADOBE_ID ];
+const WIDEVINE_ID   = "gmp-widevinecdm";
+const GMP_PLUGIN_IDS = [ OPEN_H264_ID, EME_ADOBE_ID, WIDEVINE_ID ];
 
 var GMPPluginUnsupportedReason = {
   NOT_WINDOWS: 1,
@@ -40,12 +42,21 @@ this.GMPUtils = {
    *          The plugin to check.
    */
   isPluginHidden: function(aPlugin) {
+    if (this._is32bitModeMacOS()) {
+      // GMPs are hidden on MacOS when running in 32 bit mode.
+      // See bug 1291537.
+      return true;
+    }
     if (!aPlugin.isEME) {
       return false;
     }
 
-    if (!this._isPluginSupported(aPlugin) &&
-        !this._isPluginForcedVisible(aPlugin)) {
+    if (!this._isPluginSupported(aPlugin) ||
+        !this._isPluginVisible(aPlugin)) {
+      return true;
+    }
+
+    if (!GMPPrefs.get(GMPPrefs.KEY_EME_ENABLED, true)) {
       return true;
     }
 
@@ -58,6 +69,9 @@ this.GMPUtils = {
    *          The plugin to check.
    */
   _isPluginSupported: function(aPlugin) {
+    if (this._isPluginForceSupported(aPlugin)) {
+      return true;
+    }
     if (aPlugin.id != EME_ADOBE_ID) {
       // Only checking Adobe EME at the moment.
       return true;
@@ -76,14 +90,33 @@ this.GMPUtils = {
     return true;
   },
 
+  _is32bitModeMacOS: function() {
+    if (AppConstants.platform != "macosx") {
+      return false;
+    }
+    return Services.appinfo.XPCOMABI.split("-")[0] == "x86";
+  },
+
   /**
-   * Checks whether or not a given plugin is forced visible. This can be used
-   * to test plugins that aren't yet supported by default on a particular OS.
+   * Checks whether or not a given plugin is visible in the addons manager
+   * UI and the "enable DRM" notification box. This can be used to test
+   * plugins that aren't yet turned on in the mozconfig.
    * @param   aPlugin
    *          The plugin to check.
    */
-  _isPluginForcedVisible: function(aPlugin) {
-    return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_FORCEVISIBLE, false, aPlugin.id);
+  _isPluginVisible: function(aPlugin) {
+    return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_VISIBLE, false, aPlugin.id);
+  },
+
+  /**
+   * Checks whether or not a given plugin is forced-supported. This is used
+   * in automated tests to override the checks that prevent GMPs running on an
+   * unsupported platform.
+   * @param   aPlugin
+   *          The plugin to check.
+   */
+  _isPluginForceSupported: function(aPlugin) {
+    return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_FORCE_SUPPORTED, false, aPlugin.id);
   },
 
   /**
@@ -121,9 +154,10 @@ this.GMPPrefs = {
   KEY_PLUGIN_LAST_UPDATE:       "media.{0}.lastUpdate",
   KEY_PLUGIN_VERSION:           "media.{0}.version",
   KEY_PLUGIN_AUTOUPDATE:        "media.{0}.autoupdate",
-  KEY_PLUGIN_FORCEVISIBLE:      "media.{0}.forcevisible",
+  KEY_PLUGIN_VISIBLE:           "media.{0}.visible",
   KEY_PLUGIN_TRIAL_CREATE:      "media.{0}.trial-create",
   KEY_PLUGIN_ABI:               "media.{0}.abi",
+  KEY_PLUGIN_FORCE_SUPPORTED:   "media.{0}.forceSupported",
   KEY_URL:                      "media.gmp-manager.url",
   KEY_URL_OVERRIDE:             "media.gmp-manager.url.override",
   KEY_CERT_CHECKATTRS:          "media.gmp-manager.cert.checkAttributes",

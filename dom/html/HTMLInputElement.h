@@ -17,6 +17,7 @@
 #include "nsIDOMNSEditableElement.h"
 #include "nsCOMPtr.h"
 #include "nsIConstraintValidation.h"
+#include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/HTMLFormElement.h" // for HasEverTriedInvalidSubmit()
 #include "mozilla/dom/HTMLInputElementBinding.h"
 #include "mozilla/dom/Promise.h"
@@ -135,12 +136,15 @@ public:
   virtual void Focus(ErrorResult& aError) override;
 
   // nsINode
-#if defined(XP_WIN) || defined(XP_LINUX)
+#if !defined(ANDROID) && !defined(XP_MACOSX)
   virtual bool IsNodeApzAwareInternal() const override;
 #endif
 
   // Element
   virtual bool IsInteractiveHTMLContent(bool aIgnoreTabindex) const override;
+
+  // EventTarget
+  virtual void AsyncEventRunning(AsyncEventDispatcher* aEvent) override;
 
   // nsIDOMHTMLInputElement
   NS_DECL_NSIDOMHTMLINPUTELEMENT
@@ -264,7 +268,7 @@ public:
    *
    * @return the selected button (or null).
    */
-  already_AddRefed<nsIDOMHTMLInputElement> GetSelectedRadioButton();
+  already_AddRefed<nsIDOMHTMLInputElement> GetSelectedRadioButton() const;
 
   virtual nsresult Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode **aResult) const override;
 
@@ -661,8 +665,9 @@ public:
     SetHTMLAttr(nsGkAtoms::value, aValue, aRv);
   }
 
-  void GetValue(nsAString& aValue, ErrorResult& aRv);
-  void SetValue(const nsAString& aValue, ErrorResult& aRv);
+  void SetValue(const nsAString& aValue, CallerType aCallerType,
+                ErrorResult& aRv);
+  void GetValue(nsAString& aValue, CallerType aCallerType);
 
   Nullable<Date> GetValueAsDate(ErrorResult& aRv);
 
@@ -771,7 +776,7 @@ public:
 
   nsIControllers* GetControllers(ErrorResult& aRv);
 
-  int32_t GetTextLength(ErrorResult& aRv);
+  int32_t InputTextLength(CallerType aCallerType);
 
   void MozGetFileNameArray(nsTArray<nsString>& aFileNames, ErrorResult& aRv);
 
@@ -779,7 +784,24 @@ public:
   void MozSetFileArray(const Sequence<OwningNonNull<File>>& aFiles);
   void MozSetDirectory(const nsAString& aDirectoryPath, ErrorResult& aRv);
 
+  /*
+   * The following functions are called from datetime picker to let input box
+   * know the current state of the picker or to update the input box on changes.
+   */
+  void GetDateTimeInputBoxValue(DateTimeValue& aValue);
+  void UpdateDateTimeInputBox(const DateTimeValue& aValue);
+  void SetDateTimePickerState(bool aOpen);
+
+  /*
+   * The following functions are called from datetime input box XBL to control
+   * and update the picker.
+   */
+  void OpenDateTimePicker(const DateTimeValue& aInitialValue);
+  void UpdateDateTimePicker(const DateTimeValue& aValue);
+  void CloseDateTimePicker();
+
   HTMLInputElement* GetOwnerNumberControl();
+  HTMLInputElement* GetOwnerDateTimeControl();
 
   void StartNumberControlSpinnerSpin();
   enum SpinnerStopState {
@@ -810,7 +832,8 @@ public:
 
   nsIEditor* GetEditor();
 
-  // XPCOM SetUserInput() is OK
+  void SetUserInput(const nsAString& aInput,
+                    nsIPrincipal& aSubjectPrincipal);
 
   // XPCOM GetPhonetic() is OK
 
@@ -908,10 +931,17 @@ protected:
    */
   nsresult SetValueInternal(const nsAString& aValue, uint32_t aFlags);
 
-  nsresult GetValueInternal(nsAString& aValue) const;
+  // Generic getter for the value that doesn't do experimental control type
+  // sanitization.
+  void GetValueInternal(nsAString& aValue, CallerType aCallerType) const;
+
+  // A getter for callers that know we're not dealing with a file input, so they
+  // don't have to think about the caller type.
+  void GetNonFileValueInternal(nsAString& aValue) const;
 
   /**
-   * Returns whether the current value is the empty string.
+   * Returns whether the current value is the empty string.  This only makes
+   * sense for some input types; does NOT make sense for file inputs.
    *
    * @return whether the current value is the empty string.
    */
@@ -1044,8 +1074,8 @@ protected:
    */
   bool DoesStepApply() const
   {
-    // TODO: this is temporary until bug 888316 is fixed.
-    return DoesMinMaxApply() && mType != NS_FORM_INPUT_WEEK;
+    // TODO: this is temporary until bug 888331 is fixed.
+    return DoesMinMaxApply() && mType != NS_FORM_INPUT_DATETIME_LOCAL;
   }
 
   /**
@@ -1058,8 +1088,8 @@ protected:
    */
   bool DoesValueAsNumberApply() const
   {
-    // TODO: this is temporary until bug 888316 is fixed.
-    return DoesMinMaxApply() && mType != NS_FORM_INPUT_WEEK;
+    // TODO: this is temporary until bug 888331 is fixed.
+    return DoesMinMaxApply() && mType != NS_FORM_INPUT_DATETIME_LOCAL;
   }
 
   /**
@@ -1172,7 +1202,15 @@ protected:
   bool IsValidSimpleColor(const nsAString& aValue) const;
 
   /**
-   * Parse a date string of the form yyyy-mm
+   * Parse a week string of the form yyyy-Www
+   * @param the string to be parsed.
+   * @return whether the string is a valid week.
+   * Note : this function does not consider the empty string as valid.
+   */
+  bool IsValidWeek(const nsAString& aValue) const;
+
+  /**
+   * Parse a month string of the form yyyy-mm
    * @param the string to be parsed.
    * @return whether the string is a valid month.
    * Note : this function does not consider the empty string as valid.
@@ -1209,6 +1247,16 @@ protected:
                   uint32_t* aMonth) const;
 
   /**
+   * Parse a week string of the form yyyy-Www
+   *
+   * @param the string to be parsed.
+   * @return the year and week in aYear and aWeek.
+   * @return whether the parsing was successful.
+   */
+  bool ParseWeek(const nsAString& aValue,
+                 uint32_t* aYear,
+                 uint32_t* aWeek) const;
+  /**
    * Parse a date string of the form yyyy-mm-dd
    *
    * @param the string to be parsed.
@@ -1221,6 +1269,12 @@ protected:
                  uint32_t* aDay) const;
 
   /**
+   * This methods returns the number of days since epoch for a given year and
+   * week.
+   */
+  double DaysSinceEpochFromWeek(uint32_t aYear, uint32_t aWeek) const;
+
+  /**
    * This methods returns the number of days in a given month, for a given year.
    */
   uint32_t NumberOfDaysInMonth(uint32_t aMonth, uint32_t aYear) const;
@@ -1230,6 +1284,24 @@ protected:
    * given year and month.
    */
   int32_t MonthsSinceJan1970(uint32_t aYear, uint32_t aMonth) const;
+
+  /**
+   * This methods returns the day of the week given a date. If @isoWeek is true,
+   * 7=Sunday, otherwise, 0=Sunday.
+   */
+  uint32_t DayOfWeek(uint32_t aYear, uint32_t aMonth, uint32_t aDay,
+                     bool isoWeek) const;
+
+  /**
+   * This methods returns the maximum number of week in a given year, the
+   * result is either 52 or 53.
+   */
+  uint32_t MaximumWeekInYear(uint32_t aYear) const;
+
+  /**
+   * This methods returns true if it's a leap year.
+   */
+  bool IsLeapYear(uint32_t aYear) const;
 
   /**
    * Returns whether aValue is a valid time as described by HTML specifications:
@@ -1258,7 +1330,7 @@ protected:
    *
    * @param aValue The Decimal that will be used to set the value.
    */
-  void SetValue(Decimal aValue);
+  void SetValue(Decimal aValue, CallerType aCallerType);
 
   /**
    * Update the HAS_RANGE bit field value.
@@ -1441,6 +1513,12 @@ protected:
   Decimal mRangeThumbDragStartValue;
 
   /**
+   * Current value in the input box, in DateTimeValue dictionary format, see
+   * HTMLInputElement.webidl for details.
+   */
+  nsAutoPtr<DateTimeValue> mDateTimeInputBoxValue;
+
+  /**
    * The selection properties cache for number controls.  This is needed because
    * the number controls don't recycle their text field, so the normal cache in
    * nsTextEditorState cannot do its job.
@@ -1452,9 +1530,13 @@ protected:
   static const Decimal kStepScaleFactorNumberRange;
   static const Decimal kStepScaleFactorTime;
   static const Decimal kStepScaleFactorMonth;
+  static const Decimal kStepScaleFactorWeek;
 
   // Default step base value when a type do not have specific one.
   static const Decimal kDefaultStepBase;
+  // Default step base value when type=week does not not have a specific one,
+  // which is −259200000, the start of week 1970-W01.
+  static const Decimal kDefaultStepBaseWeek;
 
   // Default step used when there is no specified step.
   static const Decimal kDefaultStep;
@@ -1463,10 +1545,21 @@ protected:
   // Float value returned by GetStep() when the step attribute is set to 'any'.
   static const Decimal kStepAny;
 
-  // Maximum year limited by ECMAScript date object range, year <= 275760.
-  static const double kMaximumYear;
   // Minimum year limited by HTML standard, year >= 1.
   static const double kMinimumYear;
+  // Maximum year limited by ECMAScript date object range, year <= 275760.
+  static const double kMaximumYear;
+  // Maximum valid week is 275760-W37.
+  static const double kMaximumWeekInMaximumYear;
+  // Maximum valid day is 275760-09-13.
+  static const double kMaximumDayInMaximumYear;
+  // Maximum valid month is 275760-09.
+  static const double kMaximumMonthInMaximumYear;
+  // Long years in a ISO calendar have 53 weeks in them.
+  static const double kMaximumWeekInYear;
+  // Milliseconds in a day.
+  static const double kMsPerDay;
+
 
   /**
    * The type of this input (<input type=...>) as an integer.
@@ -1519,7 +1612,8 @@ private:
   static bool MayFireChangeOnBlur(uint8_t aType) {
     return IsSingleLineTextControl(false, aType) ||
            aType == NS_FORM_INPUT_RANGE ||
-           aType == NS_FORM_INPUT_NUMBER;
+           aType == NS_FORM_INPUT_NUMBER ||
+           aType == NS_FORM_INPUT_TIME;
   }
 
   struct nsFilePickerFilter {

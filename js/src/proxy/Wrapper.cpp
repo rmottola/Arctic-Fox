@@ -21,7 +21,7 @@
 using namespace js;
 
 bool
-Wrapper::finalizeInBackground(Value priv) const
+Wrapper::finalizeInBackground(const Value& priv) const
 {
     if (!priv.isObject())
         return true;
@@ -329,10 +329,7 @@ JSObject*
 Wrapper::wrappedObject(JSObject* wrapper)
 {
     MOZ_ASSERT(wrapper->is<WrapperObject>());
-    JSObject* target = wrapper->as<ProxyObject>().target();
-    if (target)
-        JS::ExposeObjectToActiveJS(target);
-    return target;
+    return wrapper->as<ProxyObject>().target();
 }
 
 JS_FRIEND_API(JSObject*)

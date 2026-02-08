@@ -164,3 +164,19 @@ js::ThisThread::SetName(const char* name)
 #endif
   MOZ_RELEASE_ASSERT(!rv);
 }
+
+void
+js::ThisThread::GetName(char* nameBuffer, size_t len)
+{
+  MOZ_RELEASE_ASSERT(len >= 16);
+
+  int rv = -1;
+#ifdef HAVE_PTHREAD_GETNAME_NP
+  rv = pthread_getname_np(pthread_self(), nameBuffer, len);
+#elif defined(__linux__)
+  rv = prctl(PR_GET_NAME, reinterpret_cast<unsigned long>(nameBuffer));
+#endif
+
+  if (rv)
+    nameBuffer[0] = '\0';
+}

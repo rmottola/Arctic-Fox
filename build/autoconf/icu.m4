@@ -15,7 +15,7 @@ MOZ_ARG_WITH_BOOL(system-icu,
     MOZ_SYSTEM_ICU=1)
 
 if test -n "$MOZ_SYSTEM_ICU"; then
-    PKG_CHECK_MODULES(MOZ_ICU, icu-i18n >= 50.1)
+    PKG_CHECK_MODULES(MOZ_ICU, icu-i18n >= 58.1)
     CFLAGS="$CFLAGS $MOZ_ICU_CFLAGS"
     CXXFLAGS="$CXXFLAGS $MOZ_ICU_CFLAGS"
 fi
@@ -85,7 +85,7 @@ if test -n "$USE_ICU"; then
     dnl We also don't do it on Windows because sometimes the file goes
     dnl missing -- possibly due to overzealous antivirus software? --
     dnl which prevents the browser from starting up :(
-    if test -z "$JS_STANDALONE" -a -z "$MOZ_SYSTEM_ICU" -a "$OS_TARGET" != WINNT; then
+    if test -z "$JS_STANDALONE" -a -z "$MOZ_SYSTEM_ICU" -a "$OS_TARGET" != WINNT -a "$MOZ_WIDGET_TOOLKIT" != "android"; then
         MOZ_ICU_DATA_ARCHIVE=1
     else
         MOZ_ICU_DATA_ARCHIVE=

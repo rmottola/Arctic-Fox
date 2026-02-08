@@ -86,7 +86,8 @@ ReadStream(const nsCOMPtr<nsIInputStream>& stream, /*out*/ SECItem& buf)
   // instead of length, so that we can check whether the metadata for
   // the entry is incorrect.
   uint32_t bytesRead;
-  rv = stream->Read(char_ptr_cast(buf.data), buf.len, &bytesRead);
+  rv = stream->Read(BitwiseCast<char*, unsigned char*>(buf.data), buf.len,
+                    &bytesRead);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -188,7 +189,8 @@ VerifyStreamContentDigest(nsIInputStream* stream,
   uint64_t totalBytesRead = 0;
   for (;;) {
     uint32_t bytesRead;
-    rv = stream->Read(char_ptr_cast(buf.data), buf.len, &bytesRead);
+    rv = stream->Read(BitwiseCast<char*, unsigned char*>(buf.data), buf.len,
+                      &bytesRead);
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (bytesRead == 0) {
@@ -641,7 +643,8 @@ VerifyCertificate(CERTCertificate* signerCert, void* voidContext, void* pinArg)
     return MapSECStatus(SECFailure);
   }
   Input certDER;
-  Result rv = certDER.Init(signerCert->derCert.data, signerCert->derCert.len);
+  mozilla::pkix::Result rv = certDER.Init(signerCert->derCert.data,
+                                          signerCert->derCert.len);
   if (rv != Success) {
     return mozilla::psm::GetXPCOMFromNSSError(MapResultToPRErrorCode(rv));
   }
@@ -652,7 +655,7 @@ VerifyCertificate(CERTCertificate* signerCert, void* voidContext, void* pinArg)
                       KeyPurposeId::id_kp_codeSigning,
                       CertPolicyId::anyPolicy,
                       nullptr/*stapledOCSPResponse*/);
-  if (rv == Result::ERROR_EXPIRED_CERTIFICATE) {
+  if (rv == mozilla::pkix::Result::ERROR_EXPIRED_CERTIFICATE) {
     // For code-signing you normally need trusted 3rd-party timestamps to
     // handle expiration properly. The signer could always mess with their
     // system clock so you can't trust the certificate was un-expired when
@@ -751,7 +754,7 @@ OpenSignedAppFile(AppTrustedRoot aTrustedRoot, nsIFile* aJarFile,
   }
 
   ScopedAutoSECItem mfDigest;
-  rv = ParseSF(char_ptr_cast(sfBuffer.data), mfDigest);
+  rv = ParseSF(BitwiseCast<char*, unsigned char*>(sfBuffer.data), mfDigest);
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -777,7 +780,8 @@ OpenSignedAppFile(AppTrustedRoot aTrustedRoot, nsIFile* aJarFile,
 
   nsTHashtable<nsCStringHashKey> items;
 
-  rv = ParseMF(char_ptr_cast(manifestBuffer.data), zip, items, buf);
+  rv = ParseMF(BitwiseCast<char*, unsigned char*>(manifestBuffer.data), zip,
+               items, buf);
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -1433,7 +1437,7 @@ VerifySignedDirectory(AppTrustedRoot aTrustedRoot,
   // Get the expected manifest hash from the signed .sf file
 
   ScopedAutoSECItem mfDigest;
-  rv = ParseSF(char_ptr_cast(sfBuffer.data), mfDigest);
+  rv = ParseSF(BitwiseCast<char*, unsigned char*>(sfBuffer.data), mfDigest);
   if (NS_FAILED(rv)) {
     return NS_ERROR_SIGNED_JAR_MANIFEST_INVALID;
   }
@@ -1460,7 +1464,7 @@ VerifySignedDirectory(AppTrustedRoot aTrustedRoot,
   ScopedAutoSECItem buf(128 * 1024);
 
   nsTHashtable<nsStringHashKey> items;
-  rv = ParseMFUnpacked(char_ptr_cast(manifestBuffer.data),
+  rv = ParseMFUnpacked(BitwiseCast<char*, unsigned char*>(manifestBuffer.data),
                        aDirectory, items, buf);
   if (NS_FAILED(rv)){
     return rv;

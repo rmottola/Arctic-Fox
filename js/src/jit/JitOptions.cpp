@@ -62,7 +62,7 @@ DefaultJitOptions::DefaultJitOptions()
 {
     // Whether to perform expensive graph-consistency DEBUG-only assertions.
     // It can be useful to disable this to reduce DEBUG-compile time of large
-    // asm.js programs.
+    // wasm programs.
     SET_DEFAULT(checkGraphConsistency, true);
 
 #ifdef CHECK_OSIPOINT_REGISTERS
@@ -221,12 +221,22 @@ DefaultJitOptions::DefaultJitOptions()
     // Toggles whether unboxed plain objects can be created by the VM.
     SET_DEFAULT(disableUnboxedObjects, false);
 
+    // Test whether Atomics are allowed in asm.js code.
+    SET_DEFAULT(asmJSAtomicsEnable, false);
+
     // Test whether wasm int64 / double NaN bits testing is enabled.
     SET_DEFAULT(wasmTestMode, false);
 
-    // Determines whether explicit bounds check will be used for OOB
-    // instead of signals (even when signals are available).
-    SET_DEFAULT(wasmExplicitBoundsChecks, false);
+    // Test whether wasm bounds check should always be generated.
+    SET_DEFAULT(wasmAlwaysCheckBounds, false);
+
+    // Toggles the optimization whereby offsets are folded into loads and not
+    // included in the bounds check.
+    SET_DEFAULT(wasmFoldOffsets, true);
+
+    // Determines whether we suppress using signal handlers
+    // for interrupting jit-ed code. This is used only for testing.
+    SET_DEFAULT(ionInterruptWithoutSignals, false);
 }
 
 bool

@@ -14,7 +14,7 @@ var {
 class StubContext extends BaseContext {
   constructor() {
     let fakeExtension = {id: "test@web.extension"};
-    super(fakeExtension);
+    super("testEnv", fakeExtension);
     this.sandbox = Cu.Sandbox(global);
   }
 
@@ -128,7 +128,7 @@ add_task(function* test_post_unload_listeners() {
 class Context extends BaseContext {
   constructor(principal) {
     let fakeExtension = {id: "test@web.extension"};
-    super(fakeExtension);
+    super("testEnv", fakeExtension);
     Object.defineProperty(this, "principal", {
       value: principal,
       configurable: true,
@@ -170,7 +170,7 @@ add_task(function* test_stringify_inaccessible() {
 
 add_task(function* test_stringify_accessible() {
   // Test that an accessible property from another global is included
-  let principal = ssm.createExpandedPrincipal([PRINCIPAL1, PRINCIPAL2]);
+  let principal = Cu.getObjectPrincipal(Cu.Sandbox([PRINCIPAL1, PRINCIPAL2]));
   let context = new Context(principal);
   let sandbox = context.sandbox;
   let sandbox2 = Cu.Sandbox(PRINCIPAL2);

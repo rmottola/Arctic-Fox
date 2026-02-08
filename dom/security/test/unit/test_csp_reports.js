@@ -105,6 +105,7 @@ function run_test() {
         let inlineOK = true;
         inlineOK = csp.getAllowsInline(Ci.nsIContentPolicy.TYPE_SCRIPT,
                                        "", // aNonce
+                                       false, // aParserCreated
                                        "", // aContent
                                        0); // aLineNumber
 
@@ -113,7 +114,9 @@ function run_test() {
       });
 
   // test that eval violations cause a report.
-  makeTest(1, {"blocked-uri": "self"}, false,
+  makeTest(1, {"blocked-uri": "self",
+               // JSON script-sample is UTF8 encoded
+               "script-sample" : "\xc2\xa3\xc2\xa5\xc2\xb5\xe5\x8c\x97\xf0\xa0\x9d\xb9"}, false,
       function(csp) {
         let evalOK = true, oReportViolation = {'value': false};
         evalOK = csp.getAllowsEval(oReportViolation);
@@ -127,7 +130,10 @@ function run_test() {
           // force the logging, since the getter doesn't.
           csp.logViolationDetails(Ci.nsIContentSecurityPolicy.VIOLATION_TYPE_EVAL,
                                   selfuri.asciiSpec,
-                                  "script sample",
+                                  // sending UTF-16 script sample to make sure
+                                  // csp report in JSON is not cut-off, please
+                                  // note that JSON is UTF8 encoded.
+                                  "\u00a3\u00a5\u00b5\u5317\ud841\udf79",
                                   1);
         }
       });
@@ -146,6 +152,7 @@ function run_test() {
         let inlineOK = true;
         inlineOK = csp.getAllowsInline(Ci.nsIContentPolicy.TYPE_SCRIPT,
                                        "", // aNonce
+                                       false, // aParserCreated
                                        "", // aContent
                                        0); // aLineNumber
 

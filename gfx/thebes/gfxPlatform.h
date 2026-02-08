@@ -53,6 +53,7 @@ class DrawEventRecorder;
 class VsyncSource;
 class ContentDeviceData;
 class GPUDeviceData;
+class FeatureState;
 
 inline uint32_t
 BackendTypeBit(BackendType b)
@@ -133,7 +134,8 @@ enum class DeviceResetReason
   INVALID_CALL,
   OUT_OF_MEMORY,
   FORCED_RESET,
-  UNKNOWN
+  UNKNOWN,
+  D3D9_RESET
 };
 
 enum class ForcedDeviceResetReason
@@ -270,14 +272,14 @@ public:
     /// asking for it, we will examine the commands in the first few seconds
     /// of the canvas usage, and potentially change to accelerated or
     /// non-accelerated canvas.
-    virtual bool UseAcceleratedCanvas();
+    bool AllowOpenGLCanvas();
     virtual void InitializeSkiaCacheLimits();
 
     static bool AsyncPanZoomEnabled();
 
     virtual void GetAzureBackendInfo(mozilla::widget::InfoObject &aObj) {
       aObj.DefineProperty("AzureCanvasBackend", GetBackendName(mPreferredCanvasBackend));
-      aObj.DefineProperty("AzureCanvasAccelerated", UseAcceleratedCanvas());
+      aObj.DefineProperty("AzureCanvasAccelerated", AllowOpenGLCanvas());
       aObj.DefineProperty("AzureFallbackCanvasBackend", GetBackendName(mFallbackCanvasBackend));
       aObj.DefineProperty("AzureContentBackend", GetBackendName(mContentBackend));
     }
@@ -393,9 +395,7 @@ public:
      * True when zooming should not require reflow, so glyph metrics and
      * positioning should not be adjusted for device pixels.
      * If this is TRUE, then FontHintingEnabled() should be FALSE,
-     * but the converse is not necessarily required; in particular,
-     * B2G always has FontHintingEnabled FALSE, but RequiresLinearZoom
-     * is only true for the browser process, not Gaia or other apps.
+     * but the converse is not necessarily required;
      *
      * Like FontHintingEnabled (above), this setting shouldn't
      * change per gecko process, while the process is live.  If so the
@@ -456,7 +456,7 @@ public:
 
     static bool OffMainThreadCompositingEnabled();
 
-    virtual bool CanUseHardwareVideoDecoding();
+    void UpdateCanUseHardareVideoDecoding();
 
     // Returns a prioritized list of all available compositor backends.
     void GetCompositorBackends(bool useAcceleration, nsTArray<mozilla::layers::LayersBackend>& aBackends);
@@ -752,6 +752,8 @@ protected:
     static already_AddRefed<mozilla::gfx::ScaledFont>
       GetScaledFontForFontWithCairoSkia(mozilla::gfx::DrawTarget* aTarget, gfxFont* aFont);
 
+    virtual bool CanUseHardwareVideoDecoding();
+
     int8_t  mAllowDownloadableFonts;
     int8_t  mGraphiteShapingEnabled;
     int8_t  mOpenTypeSVGEnabled;
@@ -803,6 +805,7 @@ private:
     void PopulateScreenInfo();
 
     void InitCompositorAccelerationPrefs();
+    void InitGPUProcessPrefs();
 
     RefPtr<gfxASurface> mScreenReferenceSurface;
     nsCOMPtr<nsIObserver> mSRGBOverrideObserver;

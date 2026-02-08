@@ -59,7 +59,6 @@ JSValIsInterfaceOfType(JSContext* cx, HandleValue v, REFNSIID iid)
 {
 
     nsCOMPtr<nsIXPConnectWrappedNative> wn;
-    nsCOMPtr<nsISupports> sup;
     nsCOMPtr<nsISupports> iface;
 
     if (v.isPrimitive())
@@ -2344,11 +2343,11 @@ nsXPCComponents_Utils::ReportError(HandleValue error, JSContext* cx)
 
         uint32_t column = err->tokenOffset();
 
-        const char16_t* ucmessage = err->ucmessage;
         const char16_t* linebuf = err->linebuf();
 
         nsresult rv = scripterr->InitWithWindowID(
-                ucmessage ? nsDependentString(ucmessage) : EmptyString(),
+                err->message() ? NS_ConvertUTF8toUTF16(err->message().c_str())
+                : EmptyString(),
                 fileUni,
                 linebuf ? nsDependentString(linebuf, err->linebufLength()) : EmptyString(),
                 err->lineno,
@@ -2570,7 +2569,7 @@ nsXPCComponents_Utils::GetWeakReference(HandleValue object, JSContext* cx,
 NS_IMETHODIMP
 nsXPCComponents_Utils::ForceGC()
 {
-    JSContext* cx = nsXPConnect::GetRuntimeInstance()->Context();
+    JSContext* cx = nsXPConnect::GetContextInstance()->Context();
     PrepareForFullGC(cx);
     GCForReason(cx, GC_NORMAL, gcreason::COMPONENT_UTILS);
     return NS_OK;
@@ -2628,10 +2627,6 @@ class PreciseGCRunnable : public Runnable
 
     NS_IMETHOD Run() override
     {
-        JSContext* cx = dom::danger::GetJSContext();
-        if (JS_IsRunning(cx))
-            return NS_DispatchToMainThread(this);
-
         nsJSContext::GarbageCollectNow(gcreason::COMPONENT_UTILS,
                                        nsJSContext::NonIncrementalGC,
                                        mShrinking ?
@@ -2701,7 +2696,7 @@ nsXPCComponents_Utils::CallFunctionWithAsyncStack(HandleValue function,
     if (NS_FAILED(rv))
         return rv;
     if (!asyncStack.isObject()) {
-        JS_ReportError(cx, "Must use a native JavaScript stack frame");
+        JS_ReportErrorASCII(cx, "Must use a native JavaScript stack frame");
         return NS_ERROR_INVALID_ARG;
     }
 
@@ -3038,7 +3033,7 @@ nsXPCComponents_Utils::BlockScriptForGlobal(HandleValue globalArg,
                                             /* stopAtWindowProxy = */ false));
     NS_ENSURE_TRUE(JS_IsGlobalObject(global), NS_ERROR_INVALID_ARG);
     if (nsContentUtils::IsSystemPrincipal(xpc::GetObjectPrincipal(global))) {
-        JS_ReportError(cx, "Script may not be disabled for system globals");
+        JS_ReportErrorASCII(cx, "Script may not be disabled for system globals");
         return NS_ERROR_FAILURE;
     }
     Scriptability::Get(global).Block();
@@ -3054,7 +3049,7 @@ nsXPCComponents_Utils::UnblockScriptForGlobal(HandleValue globalArg,
                                             /* stopAtWindowProxy = */ false));
     NS_ENSURE_TRUE(JS_IsGlobalObject(global), NS_ERROR_INVALID_ARG);
     if (nsContentUtils::IsSystemPrincipal(xpc::GetObjectPrincipal(global))) {
-        JS_ReportError(cx, "Script may not be disabled for system globals");
+        JS_ReportErrorASCII(cx, "Script may not be disabled for system globals");
         return NS_ERROR_FAILURE;
     }
     Scriptability::Get(global).Unblock();
@@ -3188,8 +3183,8 @@ NS_IMETHODIMP
 nsXPCComponents_Utils::GetWatchdogTimestamp(const nsAString& aCategory, PRTime* aOut)
 {
     WatchdogTimestampCategory category;
-    if (aCategory.EqualsLiteral("RuntimeStateChange"))
-        category = TimestampRuntimeStateChange;
+    if (aCategory.EqualsLiteral("ContextStateChange"))
+        category = TimestampContextStateChange;
     else if (aCategory.EqualsLiteral("WatchdogWakeup"))
         category = TimestampWatchdogWakeup;
     else if (aCategory.EqualsLiteral("WatchdogHibernateStart"))
@@ -3198,7 +3193,7 @@ nsXPCComponents_Utils::GetWatchdogTimestamp(const nsAString& aCategory, PRTime* 
         category = TimestampWatchdogHibernateStop;
     else
         return NS_ERROR_INVALID_ARG;
-    *aOut = XPCJSRuntime::Get()->GetWatchdogTimestamp(category);
+    *aOut = XPCJSContext::Get()->GetWatchdogTimestamp(category);
     return NS_OK;
 }
 
@@ -3235,12 +3230,12 @@ xpc::CloneInto(JSContext* aCx, HandleValue aValue, HandleValue aScope,
     RootedObject scope(aCx, &aScope.toObject());
     scope = js::CheckedUnwrap(scope);
     if(!scope) {
-        JS_ReportError(aCx, "Permission denied to clone object into scope");
+        JS_ReportErrorASCII(aCx, "Permission denied to clone object into scope");
         return false;
     }
 
     if (!aOptions.isUndefined() && !aOptions.isObject()) {
-        JS_ReportError(aCx, "Invalid argument");
+        JS_ReportErrorASCII(aCx, "Invalid argument");
         return false;
     }
 
@@ -3459,7 +3454,7 @@ nsXPCComponents::GetManager(nsIComponentManager * *aManager)
 NS_IMETHODIMP
 nsXPCComponents::GetReturnCode(JSContext* aCx, MutableHandleValue aOut)
 {
-    nsresult res = XPCJSRuntime::Get()->GetPendingResult();
+    nsresult res = XPCJSContext::Get()->GetPendingResult();
     aOut.setNumber(static_cast<uint32_t>(res));
     return NS_OK;
 }
@@ -3470,7 +3465,7 @@ nsXPCComponents::SetReturnCode(JSContext* aCx, HandleValue aCode)
     nsresult rv;
     if (!ToUint32(aCx, aCode, (uint32_t*)&rv))
         return NS_ERROR_FAILURE;
-    XPCJSRuntime::Get()->SetPendingResult(rv);
+    XPCJSContext::Get()->SetPendingResult(rv);
     return NS_OK;
 }
 

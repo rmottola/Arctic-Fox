@@ -17,6 +17,7 @@
 #include "Http2Push.h"
 #include "mozilla/net/DNS.h"
 #include "ARefBase.h"
+#include "AlternateServices.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "nsINetworkInterface.h"
@@ -277,6 +278,8 @@ private:
     nsHttpVersion                   mHttpVersion;
     uint16_t                        mHttpResponseCode;
 
+    uint32_t                        mCurrentHttpResponseHeaderSize;
+
     // mCapsToClear holds flags that should be cleared in mCaps, e.g. unset
     // NS_HTTP_REFRESH_DNS when DNS refresh request has completed to avoid
     // redundant requests on the network. The member itself is atomic, but
@@ -458,6 +461,10 @@ private:
 
     nsresult                        mTransportStatus;
 
+public:
+    void SetTransactionObserver(TransactionObserver *arg) { mTransactionObserver = arg; }
+private:
+    RefPtr<TransactionObserver> mTransactionObserver;
 public:
     void GetNetworkAddresses(NetAddr &self, NetAddr &peer);
 

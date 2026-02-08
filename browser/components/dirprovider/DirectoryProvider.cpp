@@ -20,7 +20,7 @@
 #include "nsDirectoryServiceUtils.h"
 #include "mozilla/ModuleUtils.h"
 #include "nsServiceManagerUtils.h"
-#include "nsStringAPI.h"
+#include "nsString.h"
 #include "nsXULAppAPI.h"
 #include "nsIPrefLocalizedString.h"
 
@@ -117,9 +117,10 @@ AppendDistroSearchDirs(nsIProperties* aDirSvc, nsCOMArray<nsIFile> &array)
 
         defLocalePlugins->AppendNative(defLocale);
         rv = defLocalePlugins->Exists(&exists);
-        if (NS_SUCCEEDED(rv) && exists)
+        if (NS_SUCCEEDED(rv) && exists) {
           array.AppendObject(defLocalePlugins);
           return; // all done
+        }
       }
     }
 

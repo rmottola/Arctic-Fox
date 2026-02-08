@@ -105,7 +105,6 @@ static bool gShuttingDownThread = false;
 static mozilla::Atomic<int32_t> gFreshnessGuarantee(CONFIRM_AGE_DEFAULT_SEC);
 
 NS_IMPL_ISUPPORTS(nsUrlClassifierDBServiceWorker,
-                  nsIUrlClassifierDBServiceWorker,
                   nsIUrlClassifierDBService)
 
 nsUrlClassifierDBServiceWorker::nsUrlClassifierDBServiceWorker()
@@ -457,8 +456,8 @@ nsUrlClassifierDBServiceWorker::BeginStream(const nsACString &table)
     }
   }
 
-  mProtocolParser = (useProtobuf ? new ProtocolParserProtobuf()
-                                 : new ProtocolParser());
+  mProtocolParser = (useProtobuf ? static_cast<ProtocolParser*>(new ProtocolParserProtobuf())
+                                 : static_cast<ProtocolParser*>(new ProtocolParserV2()));
   if (!mProtocolParser)
     return NS_ERROR_OUT_OF_MEMORY;
 
@@ -467,6 +466,8 @@ nsUrlClassifierDBServiceWorker::BeginStream(const nsACString &table)
   if (!table.IsEmpty()) {
     mProtocolParser->SetCurrentTable(table);
   }
+
+  mProtocolParser->SetRequestedTables(mUpdateTables);
 
   return NS_OK;
 }
@@ -555,8 +556,8 @@ nsUrlClassifierDBServiceWorker::FinishStream()
 
   if (NS_SUCCEEDED(mUpdateStatus)) {
     if (mProtocolParser->ResetRequested()) {
-      mClassifier->Reset();
-   }
+      mClassifier->ResetTables(mUpdateTables);
+    }
   }
 
   mProtocolParser = nullptr;
@@ -583,6 +584,11 @@ nsUrlClassifierDBServiceWorker::FinishUpdate()
   if (NS_SUCCEEDED(mUpdateStatus)) {
     LOG(("Notifying success: %d", mUpdateWait));
     mUpdateObserver->UpdateSuccess(mUpdateWait);
+  } else if (NS_ERROR_NOT_IMPLEMENTED == mUpdateStatus) {
+    LOG(("Treating NS_ERROR_NOT_IMPLEMENTED a successful update "
+         "but still mark it spoiled."));
+    mUpdateObserver->UpdateSuccess(0);
+    mClassifier->MarkSpoiled(mUpdateTables);
   } else {
     if (LOG_ENABLED()) {
       nsAutoCString errorName;
@@ -625,6 +631,38 @@ nsUrlClassifierDBServiceWorker::ResetDatabase()
 }
 
 NS_IMETHODIMP
+nsUrlClassifierDBServiceWorker::ReloadDatabase()
+{
+  nsTArray<nsCString> tables;
+  nsTArray<int64_t> lastUpdateTimes;
+  nsresult rv = mClassifier->ActiveTables(tables);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // We need to make sure lastupdatetime is set after reload database
+  // Otherwise request will be skipped if it is not confirmed.
+  for (uint32_t table = 0; table < tables.Length(); table++) {
+    lastUpdateTimes.AppendElement(mClassifier->GetLastUpdateTime(tables[table]));
+  }
+
+  // This will null out mClassifier
+  rv = CloseDb();
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // Create new mClassifier and load prefixset and completions from disk.
+  rv = OpenDb();
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  for (uint32_t table = 0; table < tables.Length(); table++) {
+    int64_t time = lastUpdateTimes[table];
+    if (time) {
+      mClassifier->SetLastUpdateTime(tables[table], lastUpdateTimes[table]);
+    }
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsUrlClassifierDBServiceWorker::CancelUpdate()
 {
   LOG(("nsUrlClassifierDBServiceWorker::CancelUpdate"));
@@ -655,7 +693,7 @@ nsUrlClassifierDBServiceWorker::CancelUpdate()
 // a background thread.
 // XXX This could be turned into a single shutdown event so the logic
 // is simpler in nsUrlClassifierDBService::Shutdown.
-NS_IMETHODIMP
+nsresult
 nsUrlClassifierDBServiceWorker::CloseDb()
 {
   if (mClassifier) {
@@ -669,7 +707,7 @@ nsUrlClassifierDBServiceWorker::CloseDb()
   return NS_OK;
 }
 
-NS_IMETHODIMP
+nsresult
 nsUrlClassifierDBServiceWorker::CacheCompletions(CacheResultArray *results)
 {
   LOG(("nsUrlClassifierDBServiceWorker::CacheCompletions [%p]", this));
@@ -684,7 +722,7 @@ nsUrlClassifierDBServiceWorker::CacheCompletions(CacheResultArray *results)
     return NS_OK;
   }
 
-  nsAutoPtr<ProtocolParser> pParse(new ProtocolParser());
+  nsAutoPtr<ProtocolParserV2> pParse(new ProtocolParserV2());
   nsTArray<TableUpdate*> updates;
 
   // Only cache results for tables that we have, don't take
@@ -703,34 +741,37 @@ nsUrlClassifierDBServiceWorker::CacheCompletions(CacheResultArray *results)
       }
     }
     if (activeTable) {
-      TableUpdate * tu = pParse->GetTableUpdate(resultsPtr->ElementAt(i).table);
+      TableUpdateV2* tuV2 = TableUpdate::Cast<TableUpdateV2>(
+        pParse->GetTableUpdate(resultsPtr->ElementAt(i).table));
+
+      NS_ENSURE_TRUE(tuV2, NS_ERROR_FAILURE);
+
       LOG(("CacheCompletion Addchunk %d hash %X", resultsPtr->ElementAt(i).entry.addChunk,
            resultsPtr->ElementAt(i).entry.ToUint32()));
-      rv = tu->NewAddComplete(resultsPtr->ElementAt(i).entry.addChunk,
-                              resultsPtr->ElementAt(i).entry.complete);
+      rv = tuV2->NewAddComplete(resultsPtr->ElementAt(i).entry.addChunk,
+                                resultsPtr->ElementAt(i).entry.complete);
       if (NS_FAILED(rv)) {
         // We can bail without leaking here because ForgetTableUpdates
         // hasn't been called yet.
         return rv;
       }
-      rv = tu->NewAddChunk(resultsPtr->ElementAt(i).entry.addChunk);
+      rv = tuV2->NewAddChunk(resultsPtr->ElementAt(i).entry.addChunk);
       if (NS_FAILED(rv)) {
         return rv;
       }
-      tu->SetLocalUpdate();
-      updates.AppendElement(tu);
+      updates.AppendElement(tuV2);
       pParse->ForgetTableUpdates();
     } else {
       LOG(("Completion received, but table is not active, so not caching."));
     }
    }
 
-  mClassifier->ApplyUpdates(&updates);
+  mClassifier->ApplyFullHashes(&updates);
   mLastResults = *resultsPtr;
   return NS_OK;
 }
 
-NS_IMETHODIMP
+nsresult
 nsUrlClassifierDBServiceWorker::CacheMisses(PrefixArray *results)
 {
   LOG(("nsUrlClassifierDBServiceWorker::CacheMisses [%p] %d",
@@ -1584,6 +1625,14 @@ nsUrlClassifierDBService::ResetDatabase()
   return mWorkerProxy->ResetDatabase();
 }
 
+NS_IMETHODIMP
+nsUrlClassifierDBService::ReloadDatabase()
+{
+  NS_ENSURE_TRUE(gDbBackgroundThread, NS_ERROR_NOT_INITIALIZED);
+
+  return mWorkerProxy->ReloadDatabase();
+}
+
 nsresult
 nsUrlClassifierDBService::CacheCompletions(CacheResultArray *results)
 {
@@ -1633,6 +1682,8 @@ nsUrlClassifierDBService::Observe(nsISupports *aSubject, const char *aTopic,
     nsresult rv;
     nsCOMPtr<nsIPrefBranch> prefs(do_QueryInterface(aSubject, &rv));
     NS_ENSURE_SUCCESS(rv, rv);
+    Unused << prefs;
+
     if (NS_LITERAL_STRING(CHECK_MALWARE_PREF).Equals(aData)) {
       mCheckMalware = Preferences::GetBool(CHECK_MALWARE_PREF,
         CHECK_MALWARE_DEFAULT);

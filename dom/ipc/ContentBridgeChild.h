@@ -27,10 +27,10 @@ public:
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
   void DeferredDestroy();
 
-  virtual bool RecvAsyncMessage(const nsString& aMsg,
-                                InfallibleTArray<jsipc::CpowEntry>&& aCpows,
-                                const IPC::Principal& aPrincipal,
-                                const ClonedMessageData& aData) override;
+  virtual mozilla::ipc::IPCResult RecvAsyncMessage(const nsString& aMsg,
+                                                   InfallibleTArray<jsipc::CpowEntry>&& aCpows,
+                                                   const IPC::Principal& aPrincipal,
+                                                   const ClonedMessageData& aData) override;
 
   virtual PBlobChild*
   SendPBlobConstructor(PBlobChild* actor,
@@ -43,8 +43,13 @@ public:
                                        const IPCTabContext& aContext,
                                        const uint32_t& aChromeFlags,
                                        const ContentParentId& aCpID,
-                                       const bool& aIsForApp,
                                        const bool& aIsForBrowser) override;
+
+  virtual mozilla::ipc::PFileDescriptorSetChild*
+  SendPFileDescriptorSetConstructor(const mozilla::ipc::FileDescriptor&) override;
+
+  virtual mozilla::ipc::PSendStreamChild*
+  SendPSendStreamConstructor(mozilla::ipc::PSendStreamChild*) override;
 
   FORWARD_SHMEM_ALLOCATOR_TO(PContentBridgeChild)
 
@@ -55,22 +60,31 @@ protected:
                                             const IPCTabContext& aContext,
                                             const uint32_t& aChromeFlags,
                                             const ContentParentId& aCpID,
-                                            const bool& aIsForApp,
                                             const bool& aIsForBrowser) override;
   virtual bool DeallocPBrowserChild(PBrowserChild*) override;
-  virtual bool RecvPBrowserConstructor(PBrowserChild* aCctor,
-                                       const TabId& aTabId,
-                                       const IPCTabContext& aContext,
-                                       const uint32_t& aChromeFlags,
-                                       const ContentParentId& aCpID,
-                                       const bool& aIsForApp,
-                                       const bool& aIsForBrowser) override;
+  virtual mozilla::ipc::IPCResult RecvPBrowserConstructor(PBrowserChild* aCctor,
+                                                          const TabId& aTabId,
+                                                          const IPCTabContext& aContext,
+                                                          const uint32_t& aChromeFlags,
+                                                          const ContentParentId& aCpID,
+                                                          const bool& aIsForBrowser) override;
 
   virtual mozilla::jsipc::PJavaScriptChild* AllocPJavaScriptChild() override;
   virtual bool DeallocPJavaScriptChild(mozilla::jsipc::PJavaScriptChild*) override;
 
   virtual PBlobChild* AllocPBlobChild(const BlobConstructorParams& aParams) override;
   virtual bool DeallocPBlobChild(PBlobChild*) override;
+
+  virtual mozilla::ipc::PSendStreamChild* AllocPSendStreamChild() override;
+
+  virtual bool
+  DeallocPSendStreamChild(mozilla::ipc::PSendStreamChild* aActor) override;
+
+  virtual PFileDescriptorSetChild*
+  AllocPFileDescriptorSetChild(const mozilla::ipc::FileDescriptor& aFD) override;
+
+  virtual bool
+  DeallocPFileDescriptorSetChild(mozilla::ipc::PFileDescriptorSetChild* aActor) override;
 
   DISALLOW_EVIL_CONSTRUCTORS(ContentBridgeChild);
 

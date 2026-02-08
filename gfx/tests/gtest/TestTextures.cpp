@@ -225,7 +225,8 @@ TEST(Layers, TextureSerialization) {
 
     auto texData = BufferTextureData::Create(surface->GetSize(),
       gfx::ImageFormatToSurfaceFormat(surface->Format()),
-      gfx::BackendType::CAIRO, TextureFlags::DEALLOCATE_CLIENT, ALLOC_DEFAULT, nullptr
+      gfx::BackendType::CAIRO, LayersBackend::LAYERS_NONE,
+      TextureFlags::DEALLOCATE_CLIENT, ALLOC_DEFAULT, nullptr
     );
     ASSERT_TRUE(!!texData);
 
@@ -257,6 +258,7 @@ TEST(Layers, TextureYCbCrSerialization) {
   clientData.mYStride = ySurface->Stride();
   clientData.mCbCrStride = cbSurface->Stride();
   clientData.mStereoMode = StereoMode::MONO;
+  clientData.mYUVColorSpace = YUVColorSpace::BT601;
   clientData.mYSkip = 0;
   clientData.mCbSkip = 0;
   clientData.mCrSkip = 0;
@@ -265,7 +267,8 @@ TEST(Layers, TextureYCbCrSerialization) {
   clientData.mPicX = 0;
 
   RefPtr<TextureClient> client = TextureClient::CreateForYCbCr(nullptr, clientData.mYSize, clientData.mCbCrSize,
-                                                               StereoMode::MONO, TextureFlags::DEALLOCATE_CLIENT);
+                                                               StereoMode::MONO, YUVColorSpace::BT601,
+                                                               TextureFlags::DEALLOCATE_CLIENT);
 
   TestTextureClientYCbCr(client, clientData);
 

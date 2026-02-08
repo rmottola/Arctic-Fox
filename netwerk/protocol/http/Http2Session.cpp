@@ -123,7 +123,6 @@ Http2Session::Http2Session(nsISocketTransport *aSocketTransport, uint32_t versio
   mInputFrameBuffer = MakeUnique<char[]>(mInputFrameBufferSize);
   mOutputQueueBuffer = MakeUnique<char[]>(mOutputQueueSize);
   mDecompressBuffer.SetCapacity(kDefaultBufferSize);
-  mDecompressor.SetCompressor(&mCompressor);
 
   mPushAllowance = gHttpHandler->SpdyPushAllowance();
   mInitialRwin = std::max(gHttpHandler->SpdyPullAllowance(), mPushAllowance);
@@ -833,10 +832,10 @@ Http2Session::SendHello()
   MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
   LOG3(("Http2Session::SendHello %p\n", this));
 
-  // sized for magic + 4 settings and a session window update and 5 priority frames
+  // sized for magic + 5 settings and a session window update and 5 priority frames
   // 24 magic, 33 for settings (9 header + 4 settings @6), 13 for window update,
   // 5 priority frames at 14 (9 + 5) each
-  static const uint32_t maxSettings = 4;
+  static const uint32_t maxSettings = 5;
   static const uint32_t prioritySize = 5 * (kFrameHeaderBytes + 5);
   static const uint32_t maxDataLen = 24 + kFrameHeaderBytes + maxSettings * 6 + 13 + prioritySize;
   char *packet = EnsureOutputBuffer(maxDataLen);
@@ -855,6 +854,14 @@ Http2Session::SendHello()
   // 2nd entry is bytes 15 to 20
   // 3rd entry is bytes 21 to 26
   // 4th entry is bytes 27 to 32
+  // 5th entry is bytes 33 to 38
+
+  // Let the other endpoint know about our default HPACK decompress table size
+  uint32_t maxHpackBufferSize = gHttpHandler->DefaultHpackBuffer();
+  mDecompressor.SetInitialMaxBufferSize(maxHpackBufferSize);
+  NetworkEndian::writeUint16(packet + kFrameHeaderBytes + (6 * numberOfEntries), SETTINGS_TYPE_HEADER_TABLE_SIZE);
+  NetworkEndian::writeUint32(packet + kFrameHeaderBytes + (6 * numberOfEntries) + 2, maxHpackBufferSize);
+  numberOfEntries++;
 
   if (!gHttpHandler->AllowPush()) {
     // If we don't support push then set MAX_CONCURRENT to 0 and also
@@ -2193,11 +2200,6 @@ Http2Session::RecvAltSvc(Http2Session *self)
     nsAutoCString specifiedOriginHost;
     if (origin.EqualsIgnoreCase("https://", 8)) {
       specifiedOriginHost.Assign(origin.get() + 8, origin.Length() - 8);
-      if (ci->GetInsecureScheme()) {
-        // technically this is ok because it will still be confirmed before being used
-        // but let's not support it.
-        okToReroute = false;
-      }
     } else if (origin.EqualsIgnoreCase("http://", 7)) {
       specifiedOriginHost.Assign(origin.get() + 7, origin.Length() - 7);
     }

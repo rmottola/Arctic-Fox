@@ -992,9 +992,9 @@ nsXULAppInfo::GetLastRunCrashID(nsAString &aLastRunCrashID)
 }
 
 NS_IMETHODIMP
-nsXULAppInfo::GetIsReleaseBuild(bool* aResult)
+nsXULAppInfo::GetIsReleaseOrBeta(bool* aResult)
 {
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
   *aResult = true;
 #else
   *aResult = false;
@@ -1443,9 +1443,11 @@ ScopedXPCOMStartup::Initialize()
     mServiceManager = nullptr;
   }
   else {
+#ifdef DEBUG
     nsCOMPtr<nsIComponentRegistrar> reg =
       do_QueryInterface(mServiceManager);
     NS_ASSERTION(reg, "Service Manager doesn't QI to Registrar.");
+#endif
   }
 
   return rv;
@@ -1532,16 +1534,6 @@ ScopedXPCOMStartup::CreateAppSupport(nsISupports* aOuter, REFNSIID aIID, void** 
 }
 
 nsINativeAppSupport* ScopedXPCOMStartup::gNativeAppSupport;
-
-/**
- * A helper class which calls NS_LogInit/NS_LogTerm in its scope.
- */
-class ScopedLogging
-{
-public:
-  ScopedLogging() { NS_LogInit(); }
-  ~ScopedLogging() { NS_LogTerm(); }
-};
 
 static void DumpArbitraryHelp()
 {
@@ -1764,9 +1756,7 @@ static nsresult LaunchChild(nsINativeAppSupport* aNative,
 #else
 #if defined(XP_MACOSX)
   CommandLineServiceMac::SetupMacCommandLine(gRestartArgc, gRestartArgv, true);
-  uint32_t restartMode = 0;
-  restartMode = gRestartMode;
-  LaunchChildMac(gRestartArgc, gRestartArgv, restartMode);
+  LaunchChildMac(gRestartArgc, gRestartArgv);
 #else
   nsCOMPtr<nsIFile> lf;
   nsresult rv = XRE_GetBinaryPath(gArgv[0], getter_AddRefs(lf));
@@ -4338,9 +4328,25 @@ XREMain::XRE_mainRun()
 #if defined(MOZ_SANDBOX) && defined(XP_LINUX) && !defined(MOZ_WIDGET_GONK)
   // If we're on Linux, we now have information about the OS capabilities
   // available to us.
-  SandboxInfo::SubmitTelemetry();
+  SandboxInfo sandboxInfo = SandboxInfo::Get();
+  Telemetry::Accumulate(Telemetry::SANDBOX_HAS_SECCOMP_BPF,
+                        sandboxInfo.Test(SandboxInfo::kHasSeccompBPF));
+  Telemetry::Accumulate(Telemetry::SANDBOX_HAS_SECCOMP_TSYNC,
+                        sandboxInfo.Test(SandboxInfo::kHasSeccompTSync));
+  Telemetry::Accumulate(Telemetry::SANDBOX_HAS_USER_NAMESPACES_PRIVILEGED,
+                        sandboxInfo.Test(SandboxInfo::kHasPrivilegedUserNamespaces));
+  Telemetry::Accumulate(Telemetry::SANDBOX_HAS_USER_NAMESPACES,
+                        sandboxInfo.Test(SandboxInfo::kHasUserNamespaces));
+  Telemetry::Accumulate(Telemetry::SANDBOX_CONTENT_ENABLED,
+                        sandboxInfo.Test(SandboxInfo::kEnabledForContent));
+  Telemetry::Accumulate(Telemetry::SANDBOX_MEDIA_ENABLED,
+                        sandboxInfo.Test(SandboxInfo::kEnabledForMedia));
 #if defined(MOZ_CRASHREPORTER)
-  SandboxInfo::Get().AnnotateCrashReport();
+  nsAutoCString flagsString;
+  flagsString.AppendInt(sandboxInfo.AsInteger());
+
+  CrashReporter::AnnotateCrashReport(
+    NS_LITERAL_CSTRING("ContentSandboxCapabilities"), flagsString);
 #endif /* MOZ_CRASHREPORTER */
 #endif /* MOZ_SANDBOX && XP_LINUX && !MOZ_WIDGET_GONK */
 
@@ -4659,6 +4665,12 @@ GeckoProcessType
 XRE_GetProcessType()
 {
   return mozilla::startup::sChildProcessType;
+}
+
+bool
+XRE_IsGPUProcess()
+{
+  return XRE_GetProcessType() == GeckoProcessType_GPU;
 }
 
 bool

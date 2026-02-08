@@ -140,9 +140,6 @@ fi
 
 MOZ_TOOL_VARIABLES
 
-AC_PROG_CPP
-AC_PROG_CXXCPP
-
 dnl Special win32 checks
 dnl ========================================================
 
@@ -158,6 +155,10 @@ case "$target" in
         # Make sure compilers are valid
         CFLAGS="$CFLAGS -TC -nologo"
         CXXFLAGS="$CXXFLAGS -TP -nologo"
+        if test -z "$CLANG_CL"; then
+            CFLAGS="$CFLAGS -utf-8"
+            CXXFLAGS="$CXXFLAGS -utf-8"
+        fi
         # MSVC warning C4345 warns of newly conformant behavior as of VS2003.
         # MSVC warning C4351 warns of newly conformant behavior as of VS2005.
         # MSVC warning C4800 warns when a value is implicitly cast to bool,
@@ -166,12 +167,9 @@ case "$target" in
         # that behavior) that it's better to turn it off.
         # _CRT_SECURE_NO_WARNINGS disables warnings about using MSVC-specific
         # secure CRT functions.
-        # MSVC warning C4819 warns some UTF-8 characters (e.g. copyright sign)
-        # on non-Western system locales even if it is in a comment.
         # MSVC warning wd4595 warns non-member operator new or delete functions
         # may not be declared inline, as of VS2015 Update 2.
-        CFLAGS="$CFLAGS -wd4819"
-        CXXFLAGS="$CXXFLAGS -wd4345 -wd4351 -wd4800 -wd4819 -wd4595 -D_CRT_SECURE_NO_WARNINGS"
+        CXXFLAGS="$CXXFLAGS -wd4345 -wd4351 -wd4800 -wd4595 -D_CRT_SECURE_NO_WARNINGS"
         AC_LANG_SAVE
         AC_LANG_C
         AC_TRY_COMPILE([#include <stdio.h>],
@@ -657,8 +655,6 @@ case "$target" in
     if test -z "$CLANG_CC"; then
        MOZ_OPTIMIZE_FLAGS="-freorder-blocks -fno-reorder-functions $MOZ_OPTIMIZE_FLAGS"
     fi
-    # The Maemo builders don't know about this flag
-    MOZ_ARM_VFP_FLAGS="-mfpu=vfp"
     ;;
 
 *-*linux*)
@@ -755,6 +751,13 @@ case "$target" in
         dnl If nothing, compiler sometimes causes C1041 error.
         CFLAGS="$CFLAGS -FS"
         CXXFLAGS="$CXXFLAGS -FS"
+        dnl VS2013+ supports -Gw for better linker optimizations.
+        dnl http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
+        dnl Disabled on ASan because it causes false-positive ODR violations.
+        if test -z "$MOZ_ASAN"; then
+            CFLAGS="$CFLAGS -Gw"
+            CXXFLAGS="$CXXFLAGS -Gw"
+        fi
         # khuey says we can safely ignore MSVC warning C4251
         # MSVC warning C4244 (implicit type conversion may lose data) warns
         # and requires workarounds for perfectly valid code.  Also, GCC/clang
@@ -794,6 +797,10 @@ case "$target" in
             # use such pragmas, so just ignore them.
             CFLAGS="$CFLAGS -Wno-unknown-pragmas"
             CXXFLAGS="$CXXFLAGS -Wno-unknown-pragmas"
+            # We get errors about various #pragma intrinsic directives from
+            # clang-cl, and we don't need to hear about those.
+            CFLAGS="$CFLAGS -Wno-ignored-pragmas"
+            CXXFLAGS="$CXXFLAGS -Wno-ignored-pragmas"
             # clang-cl's Intrin.h marks things like _ReadWriteBarrier
             # as __attribute((__deprecated__)).  This is nice to know,
             # but since we don't get the equivalent warning from MSVC,
@@ -857,7 +864,6 @@ case "$target" in
         RCFLAGS="-nologo"
     fi
     AC_DEFINE(HAVE__MSIZE)
-    AC_DEFINE(STDC_HEADERS)
     AC_DEFINE(WIN32_LEAN_AND_MEAN)
     BIN_SUFFIX='.exe'
     MOZ_USER_DIR="Mozilla"
@@ -980,7 +986,6 @@ fi
 if test -z "$SKIP_COMPILER_CHECKS"; then
 dnl Checks for typedefs, structures, and compiler characteristics.
 dnl ========================================================
-AC_HEADER_STDC
 AC_C_CONST
 AC_TYPE_MODE_T
 AC_TYPE_OFF_T
@@ -1002,41 +1007,9 @@ else
   AC_MSG_RESULT(no)
 fi
 
-MOZ_CHECK_HEADERS(endian.h)
-if test "$ac_cv_header_endian_h" = yes; then
-    AC_DEFINE(JS_HAVE_ENDIAN_H)
-fi
-
-MOZ_CHECK_HEADERS([machine/endian.h],[],[],[#include <sys/types.h>])
-if test "$ac_cv_header_machine_endian_h" = yes; then
-    AC_DEFINE(JS_HAVE_MACHINE_ENDIAN_H)
-fi
-
-MOZ_CHECK_HEADERS(sys/isa_defs.h)
-if test "$ac_cv_header_sys_isa_defs_h" = yes; then
-    AC_DEFINE(JS_HAVE_SYS_ISA_DEFS_H)
-fi
-
 AC_LANG_CPLUSPLUS
 
 MOZ_CXX11
-
-dnl Check for .hidden assembler directive and visibility attribute.
-dnl Borrowed from glibc configure.in
-dnl ===============================================================
-if test "$GNU_CC" -a "$OS_TARGET" != WINNT; then
-  AC_DEFINE(HAVE_VISIBILITY_HIDDEN_ATTRIBUTE)
-  AC_DEFINE(HAVE_VISIBILITY_ATTRIBUTE)
-  case "$OS_TARGET" in
-  Darwin)
-    VISIBILITY_FLAGS='-fvisibility=hidden -fvisibility-inlines-hidden'
-    ;;
-  *)
-    VISIBILITY_FLAGS="-I${DIST}/system_wrappers -include ${_topsrcdir}/config/gcc_hidden.h"
-    WRAP_SYSTEM_INCLUDES=1
-    ;;
-  esac
-fi         # GNU_CC
 
 case "${OS_TARGET}" in
 WINNT|Darwin|Android)
@@ -1046,9 +1019,6 @@ WINNT|Darwin|Android)
   WRAP_STL_INCLUDES=1
   ;;
 esac
-
-AC_SUBST(WRAP_SYSTEM_INCLUDES)
-AC_SUBST_LIST(VISIBILITY_FLAGS)
 
 dnl Checks for header files.
 dnl ========================================================
@@ -1072,8 +1042,6 @@ if test "x$enable_dtrace" = "xyes"; then
   fi
 fi
 AC_SUBST(HAVE_DTRACE)
-
-MOZ_LINUX_PERF_EVENT
 
 dnl Checks for libraries.
 dnl ========================================================
@@ -1218,35 +1186,44 @@ dnl Checks for library functions.
 dnl ========================================================
 AC_PROG_GCC_TRADITIONAL
 AC_FUNC_MEMCMP
-AC_CHECK_FUNCS([getc_unlocked _getc_nolock gmtime_r localtime_r])
+AC_CHECK_FUNCS([getc_unlocked _getc_nolock gmtime_r localtime_r pthread_getname_np])
 
 dnl check for clock_gettime(), the CLOCK_MONOTONIC clock
-AC_CACHE_CHECK(for clock_gettime(CLOCK_MONOTONIC),
-               ac_cv_clock_monotonic,
-               [for libs in "" -lrt; do
-                    _SAVE_LIBS="$LIBS"
-                    LIBS="$LIBS $libs"
-                    AC_TRY_LINK([#include <time.h>],
-                                 [ struct timespec ts;
-                                   clock_gettime(CLOCK_MONOTONIC, &ts); ],
-                                 ac_cv_clock_monotonic=$libs
-                                 LIBS="$_SAVE_LIBS"
-                                 break,
-                                 ac_cv_clock_monotonic=no)
-                    LIBS="$_SAVE_LIBS"
-                done])
-if test "$ac_cv_clock_monotonic" != "no"; then
-    HAVE_CLOCK_MONOTONIC=1
-    REALTIME_LIBS=$ac_cv_clock_monotonic
-    AC_DEFINE(HAVE_CLOCK_MONOTONIC)
-    AC_SUBST(HAVE_CLOCK_MONOTONIC)
-    AC_SUBST_LIST(REALTIME_LIBS)
-fi
+dnl avoid this on Darwin, since depending on your system config, we may think
+dnl it exists but it really doesn't
+case "$OS_TARGET" in
+Darwin)
+  ;;
+*)
+  AC_CACHE_CHECK(for clock_gettime(CLOCK_MONOTONIC),
+                 ac_cv_clock_monotonic,
+                 [for libs in "" -lrt; do
+                      _SAVE_LIBS="$LIBS"
+                      LIBS="$LIBS $libs"
+                      AC_TRY_LINK([#include <time.h>],
+                                   [ struct timespec ts;
+                                     clock_gettime(CLOCK_MONOTONIC, &ts); ],
+                                   ac_cv_clock_monotonic=$libs
+                                   LIBS="$_SAVE_LIBS"
+                                   break,
+                                   ac_cv_clock_monotonic=no)
+                      LIBS="$_SAVE_LIBS"
+                  done])
+  if test "$ac_cv_clock_monotonic" != "no"; then
+      HAVE_CLOCK_MONOTONIC=1
+      REALTIME_LIBS=$ac_cv_clock_monotonic
+      AC_DEFINE(HAVE_CLOCK_MONOTONIC)
+      AC_SUBST(HAVE_CLOCK_MONOTONIC)
+      AC_SUBST_LIST(REALTIME_LIBS)
+  fi
+  ;;
+esac
 
 dnl Checks for math functions.
 dnl ========================================================
 AC_CHECK_LIB(m, sin)
-AC_CHECK_LIB(m, __sincos, AC_DEFINE(HAVE_SINCOS))
+AC_CHECK_LIB(m, sincos, AC_DEFINE(HAVE_SINCOS))
+AC_CHECK_LIB(m, __sincos, AC_DEFINE(HAVE___SINCOS))
 
 
 dnl check for wcrtomb/mbrtowc
@@ -1768,13 +1745,6 @@ elif test "$CPU_ARCH" = "x86"; then
 elif test "$CPU_ARCH" = "x86_64"; then
     AC_DEFINE(JS_CODEGEN_X64)
     JS_CODEGEN_X64=1
-
-    dnl Signal-handler OOM checking requires large mprotected guard regions, so
-    dnl currently it is only implemented on x64.
-    AC_DEFINE(ASMJS_MAY_USE_SIGNAL_HANDLERS)
-    AC_DEFINE(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
-    ASMJS_MAY_USE_SIGNAL_HANDLERS=1
-    ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB=1
 elif test "$CPU_ARCH" = "arm"; then
     AC_DEFINE(JS_CODEGEN_ARM)
     JS_CODEGEN_ARM=1
@@ -1785,10 +1755,6 @@ elif test "$CPU_ARCH" = "arm"; then
 
     dnl ARM platforms may trap on unaligned accesses; catch the signal and
     dnl recover.
-    AC_DEFINE(ASMJS_MAY_USE_SIGNAL_HANDLERS)
-    AC_DEFINE(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_UNALIGNED)
-    ASMJS_MAY_USE_SIGNAL_HANDLERS=1
-    ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_UNALIGNED=1
 elif test "$CPU_ARCH" = "mips32"; then
     AC_DEFINE(JS_CODEGEN_MIPS32)
     JS_CODEGEN_MIPS32=1
@@ -1810,9 +1776,6 @@ AC_SUBST(JS_CODEGEN_X86)
 AC_SUBST(JS_CODEGEN_X64)
 AC_SUBST(JS_CODEGEN_NONE)
 AC_SUBST(JS_DISASM_ARM)
-AC_SUBST(ASMJS_MAY_USE_SIGNAL_HANDLERS)
-AC_SUBST(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
-AC_SUBST(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_UNALIGNED)
 
 dnl ========================================================
 dnl instruments
@@ -2161,6 +2124,15 @@ AC_SUBST(MOZ_PKG_SPECIAL)
 
 AC_SUBST(MOZILLA_OFFICIAL)
 
+dnl ========================================================
+dnl ECMAScript Internationalization API Support (uses ICU)
+dnl ========================================================
+
+dnl top-level configure may override this with --without-intl-api
+_INTL_API=yes
+
+MOZ_CONFIG_ICU()
+
 dnl Echo the CFLAGS to remove extra whitespace.
 CFLAGS=`echo \
 	$_WARNINGS_CFLAGS \
@@ -2260,15 +2232,6 @@ fi
 AC_SUBST(PREPROCESS_OPTION)
 
 dnl ========================================================
-dnl ECMAScript Internationalization API Support (uses ICU)
-dnl ========================================================
-
-dnl top-level configure may override this with --without-intl-api
-_INTL_API=yes
-
-MOZ_CONFIG_ICU()
-
-dnl ========================================================
 dnl JavaScript shell
 dnl ========================================================
 
@@ -2297,7 +2260,6 @@ AC_SUBST(JS_LIBRARY_NAME)
 AC_SUBST(JS_CONFIG_MOZ_JS_LIBS)
 AC_SUBST(JS_CONFIG_LIBS)
 
-MOZ_SUBCONFIGURE_FFI()
 MOZ_SUBCONFIGURE_JEMALLOC()
 
 # Avoid using obsolete NSPR features

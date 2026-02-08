@@ -96,6 +96,8 @@ def parse_args():
                           help='Extra args to pass to valgrind.')
     harness_og.add_option('--rr', action='store_true',
                           help='Run tests under RR record-and-replay debugger.')
+    harness_og.add_option('-C', '--check-output', action='store_true',
+                          help='Run tests to check output for different jit-flags')
     op.add_option_group(harness_og)
 
     input_og = OptionGroup(op, "Inputs", "Change what tests are run.")
@@ -115,6 +117,8 @@ def parse_args():
     input_og.add_option('--no-extensions', action='store_true',
                         help='Run only tests conforming to the ECMAScript 5'
                         ' standard.')
+    input_og.add_option('--repeat', type=int, default=1,
+                        help='Repeat tests the given number of times.')
     op.add_option_group(input_og)
 
     output_og = OptionGroup(op, "Output",
@@ -170,7 +174,14 @@ def parse_args():
         op.error("--valgrind, --debug, and --rr are mutually exclusive.")
 
     # Fill the debugger field, as needed.
-    debugger_prefix = options.debugger.split() if options.debug else []
+    if options.debug:
+        if options.debugger == 'lldb':
+            debugger_prefix = ['lldb', '--']
+        else:
+            debugger_prefix = options.debugger.split()
+    else:
+        debugger_prefix = []
+
     if options.valgrind:
         debugger_prefix = ['valgrind'] + options.valgrind_args.split()
         if os.uname()[0] == 'Darwin':
@@ -312,6 +323,10 @@ def load_tests(options, requested_paths, excluded_paths):
     if not options.run_slow_tests:
         test_gen = (_ for _ in test_gen if not _.slow)
 
+    if options.repeat:
+        test_gen = (test for test in test_gen for i in range(options.repeat))
+        test_count *= options.repeat
+
     return test_count, test_gen
 
 
@@ -336,15 +351,14 @@ def main():
     test_dir = dirname(abspath(__file__))
 
     if options.debug:
-        tests = list(test_gen)
-        if len(tests) > 1:
+        if test_count > 1:
             print('Multiple tests match command line arguments,'
                   ' debugger can only run one')
-            for tc in tests:
+            for tc in test_gen:
                 print('    {}'.format(tc.path))
             return 2
 
-        cmd = tests[0].get_command(prefix)
+        cmd = test_gen.next().get_command(prefix)
         if options.show_cmd:
             print(list2cmdline(cmd))
         with changedir(test_dir), change_env(test_environment):

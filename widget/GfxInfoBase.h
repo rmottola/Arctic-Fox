@@ -58,6 +58,8 @@ public:
   NS_IMETHOD GetFeatures(JSContext*, JS::MutableHandle<JS::Value>) override;
   NS_IMETHOD GetFeatureLog(JSContext*, JS::MutableHandle<JS::Value>) override;
   NS_IMETHOD GetActiveCrashGuards(JSContext*, JS::MutableHandle<JS::Value>) override;
+  NS_IMETHOD GetContentBackend(nsAString & aContentBackend) override;
+  NS_IMETHOD GetUsingGPUProcess(bool *aOutValue) override;
 
   // Initialization function. If you override this, you must call this class's
   // version of Init first.

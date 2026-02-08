@@ -350,6 +350,72 @@ enum class nsDidReflowStatus : uint32_t {
 #define NS_FRAME_OVERFLOW_LARGE   0x000000ff // overflow is stored as a
                                              // separate rect property
 
+/**
+ * nsBidiLevel is the type of the level values in our Unicode Bidi
+ * implementation.
+ * It holds an embedding level and indicates the visual direction
+ * by its bit 0 (even/odd value).<p>
+ *
+ * <li><code>aParaLevel</code> can be set to the
+ * pseudo-level values <code>NSBIDI_DEFAULT_LTR</code>
+ * and <code>NSBIDI_DEFAULT_RTL</code>.</li></ul>
+ *
+ * @see nsBidi::SetPara
+ *
+ * <p>The related constants are not real, valid level values.
+ * <code>NSBIDI_DEFAULT_XXX</code> can be used to specify
+ * a default for the paragraph level for
+ * when the <code>SetPara</code> function
+ * shall determine it but there is no
+ * strongly typed character in the input.<p>
+ *
+ * Note that the value for <code>NSBIDI_DEFAULT_LTR</code> is even
+ * and the one for <code>NSBIDI_DEFAULT_RTL</code> is odd,
+ * just like with normal LTR and RTL level values -
+ * these special values are designed that way. Also, the implementation
+ * assumes that NSBIDI_MAX_EXPLICIT_LEVEL is odd.
+ *
+ * @see NSBIDI_DEFAULT_LTR
+ * @see NSBIDI_DEFAULT_RTL
+ * @see NSBIDI_LEVEL_OVERRIDE
+ * @see NSBIDI_MAX_EXPLICIT_LEVEL
+ */
+typedef uint8_t nsBidiLevel;
+
+/** Paragraph level setting.
+ *  If there is no strong character, then set the paragraph level to 0 (left-to-right).
+ */
+#define NSBIDI_DEFAULT_LTR 0xfe
+
+/** Paragraph level setting.
+ *  If there is no strong character, then set the paragraph level to 1 (right-to-left).
+ */
+#define NSBIDI_DEFAULT_RTL 0xff
+
+/**
+ * Maximum explicit embedding level.
+ * (The maximum resolved level can be up to <code>NSBIDI_MAX_EXPLICIT_LEVEL+1</code>).
+ *
+ */
+#define NSBIDI_MAX_EXPLICIT_LEVEL 125
+
+/** Bit flag for level input.
+ *  Overrides directional properties.
+ */
+#define NSBIDI_LEVEL_OVERRIDE 0x80
+
+/**
+ * <code>nsBidiDirection</code> values indicate the text direction.
+ */
+enum nsBidiDirection {
+  /** All left-to-right text This is a 0 value. */
+  NSBIDI_LTR,
+  /** All right-to-left text This is a 1 value. */
+  NSBIDI_RTL,
+  /** Mixed-directional text. */
+  NSBIDI_MIXED
+};
+
 namespace mozilla {
 /*
  * For replaced elements only. Gets the intrinsic dimensions of this element.
@@ -376,6 +442,19 @@ struct IntrinsicSize {
   bool operator!=(const IntrinsicSize& rhs) {
     return !(*this == rhs);
   }
+};
+
+// Pseudo bidi embedding level indicating nonexistence.
+static const nsBidiLevel kBidiLevelNone = 0xff;
+
+struct FrameBidiData
+{
+  nsBidiLevel baseLevel;
+  nsBidiLevel embeddingLevel;
+  // The embedding level of virtual bidi formatting character before
+  // this frame if any. kBidiLevelNone is used to indicate nonexistence
+  // or unnecessity of such virtual character.
+  nsBidiLevel precedingControl;
 };
 
 } // namespace mozilla
@@ -947,11 +1026,31 @@ public:
 
   NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(FragStretchBSizeProperty, nscoord)
 
+  // The block-axis margin-box size associated with eBClampMarginBoxMinSize.
+  NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(BClampMarginBoxMinSizeProperty, nscoord)
+
   NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(IBaselinePadProperty, nscoord)
   NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(BBaselinePadProperty, nscoord)
 
   NS_DECLARE_FRAME_PROPERTY_WITH_DTOR(GenConProperty, ContentArray,
                                       DestroyContentArray)
+
+  NS_DECLARE_FRAME_PROPERTY_SMALL_VALUE(BidiDataProperty, mozilla::FrameBidiData)
+
+  mozilla::FrameBidiData GetBidiData()
+  {
+    return Properties().Get(BidiDataProperty());
+  }
+
+  nsBidiLevel GetBaseLevel()
+  {
+    return GetBidiData().baseLevel;
+  }
+
+  nsBidiLevel GetEmbeddingLevel()
+  {
+    return GetBidiData().embeddingLevel;
+  }
 
   nsTArray<nsIContent*>* GetGenConPseudos() {
     return Properties().Get(GenConProperty());
@@ -1073,15 +1172,20 @@ public:
    * Indices into aRadii are the NS_CORNER_* constants in nsStyleConsts.h
    * aSkipSides is a union of SIDE_BIT_LEFT/RIGHT/TOP/BOTTOM bits that says
    * which side(s) to skip.
+   *
+   * Note: GetMarginBoxBorderRadii() and GetShapeBoxBorderRadii() work only
+   * on frames that establish block formatting contexts since they don't
+   * participate in margin-collapsing.
    */
   virtual bool GetBorderRadii(const nsSize& aFrameSize,
                               const nsSize& aBorderArea,
                               Sides aSkipSides,
                               nscoord aRadii[8]) const;
   bool GetBorderRadii(nscoord aRadii[8]) const;
-
+  bool GetMarginBoxBorderRadii(nscoord aRadii[8]) const;
   bool GetPaddingBoxBorderRadii(nscoord aRadii[8]) const;
   bool GetContentBoxBorderRadii(nscoord aRadii[8]) const;
+  bool GetShapeBoxBorderRadii(nscoord aRadii[8]) const;
 
   /**
    * Get the position of the frame's baseline, relative to the top of
@@ -1876,7 +1980,7 @@ public:
 
   virtual mozilla::IntrinsicSize GetIntrinsicSize() = 0;
 
-  /*
+  /**
    * Get the intrinsic ratio of this element, or nsSize(0,0) if it has
    * no intrinsic ratio.  The intrinsic ratio is the ratio of the
    * height/width of a box with an intrinsic size or the intrinsic
@@ -1892,14 +1996,25 @@ public:
    */
   enum ComputeSizeFlags {
     eDefault =           0,
-    /* Set if the frame is in a context where non-replaced blocks should
+    /**
+     * Set if the frame is in a context where non-replaced blocks should
      * shrink-wrap (e.g., it's floating, absolutely positioned, or
-     * inline-block). */
+     * inline-block).
+     */
     eShrinkWrap =        1 << 0,
-    /* Set if we'd like to compute our 'auto' bsize, regardless of our actual
+    /**
+     * Set if we'd like to compute our 'auto' bsize, regardless of our actual
      * corresponding computed value. (e.g. to get an intrinsic height for flex
-     * items with "min-height: auto" to use during flexbox layout.) */
-    eUseAutoBSize =      1 << 1
+     * items with "min-height: auto" to use during flexbox layout.)
+     */
+    eUseAutoBSize =      1 << 1,
+    /**
+     * Indicates that we should clamp the margin-box min-size to the given CB
+     * size.  This is used for implementing the grid area clamping here:
+     * https://drafts.csswg.org/css-grid/#min-size-auto
+     */
+    eIClampMarginBoxMinSize = 1 << 2, // clamp in our inline axis
+    eBClampMarginBoxMinSize = 1 << 3, // clamp in our block axis
   };
 
   /**
@@ -2506,8 +2621,8 @@ public:
 
   /**
    * Returns a rect that encompasses everything that might be painted by
-   * this frame.  This includes this frame, all its descendent frames, this
-   * frame's outline, and descentant frames' outline, but does not include
+   * this frame.  This includes this frame, all its descendant frames, this
+   * frame's outline, and descendant frames' outline, but does not include
    * areas clipped out by the CSS "overflow" and "clip" properties.
    *
    * HasOverflowRects() (below) will return true when this overflow
@@ -2844,7 +2959,7 @@ public:
    * @param aParentContent the content node corresponding to the parent frame
    * @return whether the frame is a pseudo frame
    */   
-  bool IsPseudoFrame(nsIContent* aParentContent) {
+  bool IsPseudoFrame(const nsIContent* aParentContent) {
     return mContent == aParentContent;
   }
 
@@ -2860,20 +2975,18 @@ public:
   virtual bool SupportsVisibilityHidden() { return true; }
 
   /**
-   * Returns true if the frame has a valid clip rect set via the 'clip'
-   * property, and the 'clip' property applies to this frame. The 'clip'
-   * property applies to HTML frames if they are absolutely positioned. The
-   * 'clip' property applies to SVG frames regardless of the value of the
-   * 'position' property.
+   * Returns the clip rect set via the 'clip' property, if the 'clip' property
+   * applies to this frame; otherwise returns Nothing(). The 'clip' property
+   * applies to HTML frames if they are absolutely positioned. The 'clip'
+   * property applies to SVG frames regardless of the value of the 'position'
+   * property.
    *
-   * If this method returns true, then we also set aRect to the computed clip
-   * rect, with coordinates relative to this frame's origin. aRect must not be
-   * null!
+   * The coordinates of the returned rectangle are relative to this frame's
+   * origin.
    */
-  bool GetClipPropClipRect(const nsStyleDisplay* aDisp,
-                           const nsStyleEffects* aEffects,
-                           nsRect* aRect,
-                           const nsSize& aSize) const;
+  Maybe<nsRect> GetClipPropClipRect(const nsStyleDisplay* aDisp,
+                                    const nsStyleEffects* aEffects,
+                                    const nsSize& aSize) const;
 
   /**
    * Check if this frame is focusable and in the current tab order.
@@ -3269,6 +3382,15 @@ public:
                                            int32_t aIncrement,
                                            bool aForCounting) { return false; }
 
+  /**
+   * Helper function - computes the content-box inline size for aCoord.
+   */
+  nscoord ComputeISizeValue(nsRenderingContext* aRenderingContext,
+                            nscoord             aContainingBlockISize,
+                            nscoord             aContentEdgeToBoxSizing,
+                            nscoord             aBoxSizingToMarginEdge,
+                            const nsStyleCoord& aCoord,
+                            ComputeSizeFlags    aFlags = eDefault);
 protected:
   // Members
   nsRect           mRect;

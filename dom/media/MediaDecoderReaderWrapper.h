@@ -21,8 +21,8 @@ class StartTimeRendezvous;
 
 typedef MozPromise<bool, bool, /* isExclusive = */ false> HaveStartTimePromise;
 
-typedef Variant<MediaData*, MediaDecoderReader::NotDecodedReason> AudioCallbackData;
-typedef Variant<Tuple<MediaData*, TimeStamp>, MediaDecoderReader::NotDecodedReason> VideoCallbackData;
+typedef Variant<MediaData*, MediaResult> AudioCallbackData;
+typedef Variant<Tuple<MediaData*, TimeStamp>, MediaResult> VideoCallbackData;
 typedef Variant<MediaData::Type, WaitForDataRejectValue> WaitCallbackData;
 
 /**
@@ -47,8 +47,7 @@ private:
   MediaCallbackExc<WaitCallbackData> mVideoWaitCallback;
 
 public:
-  MediaDecoderReaderWrapper(bool aIsRealTime,
-                            AbstractThread* aOwnerThread,
+  MediaDecoderReaderWrapper(AbstractThread* aOwnerThread,
                             MediaDecoderReader* aReader);
 
   media::TimeUnit StartTime() const;
@@ -113,13 +112,8 @@ public:
   AbstractCanonical<media::TimeIntervals>* CanonicalBuffered() {
     return mReader->CanonicalBuffered();
   }
-  AbstractCanonical<bool>* CanonicalIsSuspended() {
-    return mReader->CanonicalIsSuspended();
-  }
 
-#ifdef MOZ_EME
   void SetCDMProxy(CDMProxy* aProxy) { mReader->SetCDMProxy(aProxy); }
-#endif
 
   void SetVideoBlankDecode(bool aIsBlankDecode);
 

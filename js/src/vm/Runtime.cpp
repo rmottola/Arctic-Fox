@@ -38,7 +38,6 @@
 #include "jswin.h"
 #include "jswrapper.h"
 
-#include "asmjs/WasmSignalHandlers.h"
 #include "builtin/Promise.h"
 #include "gc/GCInternals.h"
 #include "jit/arm/Simulator-arm.h"
@@ -52,6 +51,7 @@
 #include "js/MemoryMetrics.h"
 #include "js/SliceBudget.h"
 #include "vm/Debugger.h"
+#include "wasm/WasmSignalHandlers.h"
 
 #include "jscntxtinlines.h"
 #include "jsgcinlines.h"
@@ -94,6 +94,7 @@ PerThreadData::PerThreadData(JSRuntime* runtime)
 #ifdef DEBUG
   , ionCompiling(false)
   , ionCompilingSafeForMinorGC(false)
+  , performingGC(false)
   , gcSweeping(false)
 #endif
 {}
@@ -149,7 +150,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     telemetryCallback(nullptr),
     handlingSegFault(false),
     handlingJitInterrupt_(false),
-    interruptCallback(nullptr),
+    interruptCallbackDisabled(false),
     getIncumbentGlobalCallback(nullptr),
     enqueuePromiseJobCallback(nullptr),
     enqueuePromiseJobCallbackData(nullptr),
@@ -157,6 +158,8 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     promiseRejectionTrackerCallbackData(nullptr),
     startAsyncTaskCallback(nullptr),
     finishAsyncTaskCallback(nullptr),
+    promiseTasksToDestroy(mutexid::PromiseTaskPtrVector),
+    exclusiveAccessLock(mutexid::RuntimeExclusiveAccess),
 #ifdef DEBUG
     mainThreadHasExclusiveAccess(false),
 #endif
@@ -244,7 +247,9 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     debuggerMallocSizeOf(ReturnZeroSize),
     lastAnimationTime(0),
     performanceMonitoring(thisFromCtor()),
-    ionLazyLinkListSize_(0)
+    ionLazyLinkListSize_(0),
+    stackFormat_(parentRuntime ? js::StackFormat::Default
+                               : js::StackFormat::SpiderMonkey)
 {
     setGCStoreBufferPtr(&gc.storeBuffer);
 
@@ -330,7 +335,7 @@ JSRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
     JS::ResetTimeZone();
 
 #ifdef JS_SIMULATOR
-    simulator_ = js::jit::Simulator::Create();
+    simulator_ = js::jit::Simulator::Create(contextFromMainThread());
     if (!simulator_)
         return false;
 #endif
@@ -379,12 +384,11 @@ JSRuntime::destroyRuntime()
 
         /*
          * Cancel any pending, in progress or completed Ion compilations and
-         * parse tasks. Waiting for AsmJS and compression tasks is done
+         * parse tasks. Waiting for wasm and compression tasks is done
          * synchronously (on the main thread or during parse tasks), so no
          * explicit canceling is needed for these.
          */
-        for (CompartmentsIter comp(this, SkipAtoms); !comp.done(); comp.next())
-            CancelOffThreadIonCompile(comp, nullptr);
+        CancelOffThreadIonCompile(this);
         CancelOffThreadParses(this);
 
         /* Remove persistent GC roots. */
@@ -530,11 +534,16 @@ InvokeInterruptCallback(JSContext* cx)
     // Important: Additional callbacks can occur inside the callback handler
     // if it re-enters the JS engine. The embedding must ensure that the
     // callback is disconnected before attempting such re-entry.
-    JSInterruptCallback cb = cx->runtime()->interruptCallback;
-    if (!cb)
+    if (cx->runtime()->interruptCallbackDisabled)
         return true;
 
-    if (cb(cx)) {
+    bool stop = false;
+    for (JSInterruptCallback cb : cx->runtime()->interruptCallbacks) {
+        if (!cb(cx))
+            stop = true;
+    }
+
+    if (!stop) {
         // Debugger treats invoking the interrupt callback as a "step", so
         // invoke the onStep handler.
         if (cx->compartment()->isDebuggee()) {
@@ -572,7 +581,7 @@ InvokeInterruptCallback(JSContext* cx)
     const char16_t* chars;
     AutoStableStringChars stableChars(cx);
     if (flat && stableChars.initTwoByte(cx, flat))
-        chars = stableChars.twoByteRange().start().get();
+        chars = stableChars.twoByteRange().begin().get();
     else
         chars = u"(stack not available)";
     JS_ReportErrorFlagsAndNumberUC(cx, JSREPORT_WARNING, GetErrorMessage, nullptr,
@@ -619,7 +628,7 @@ JSRuntime::setDefaultLocale(const char* locale)
     if (!locale)
         return false;
     resetDefaultLocale();
-    defaultLocale = JS_strdup(this, locale);
+    defaultLocale = JS_strdup(contextFromMainThread(), locale);
     return defaultLocale != nullptr;
 }
 
@@ -646,7 +655,7 @@ JSRuntime::getDefaultLocale()
     if (!locale || !strcmp(locale, "C"))
         locale = "und";
 
-    char* lang = JS_strdup(this, locale);
+    char* lang = JS_strdup(contextFromMainThread(), locale);
     if (!lang)
         return nullptr;
 
@@ -725,7 +734,8 @@ JSRuntime::enqueuePromiseJob(JSContext* cx, HandleFunction job, HandleObject pro
         // intrinsic_EnqueuePromiseReactionJob for details.
         if (IsWrapper(promise))
             unwrappedPromise = UncheckedUnwrap(promise);
-        allocationSite = JS::GetPromiseAllocationSite(unwrappedPromise);
+        if (unwrappedPromise->is<PromiseObject>())
+            allocationSite = JS::GetPromiseAllocationSite(unwrappedPromise);
     }
     return cx->runtime()->enqueuePromiseJobCallback(cx, job, allocationSite, incumbentGlobal, data);
 }
@@ -840,7 +850,7 @@ JSRuntime::clearUsedByExclusiveThread(Zone* zone)
 }
 
 bool
-js::CurrentThreadCanAccessRuntime(JSRuntime* rt)
+js::CurrentThreadCanAccessRuntime(const JSRuntime* rt)
 {
     return rt->ownerThread_ == js::ThisThread::GetId();
 }
@@ -856,6 +866,14 @@ js::CurrentThreadCanAccessZone(Zone* zone)
     // is imperfect.
     return zone->usedByExclusiveThread;
 }
+
+#ifdef DEBUG
+bool
+js::CurrentThreadIsPerformingGC()
+{
+    return TlsPerThreadData.get()->performingGC;
+}
+#endif
 
 JS_FRIEND_API(void)
 JS::UpdateJSContextProfilerSampleBufferGen(JSContext* cx, uint32_t generation,

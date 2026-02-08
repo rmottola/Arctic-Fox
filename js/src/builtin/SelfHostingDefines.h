@@ -19,6 +19,27 @@
 #define FUN_APPLY(FUN, RECEIVER, ARGS) \
   callFunction(std_Function_apply, FUN, RECEIVER, ARGS)
 
+// NB: keep this in sync with the copy in vm/ArgumentsObject.h.
+#define MAX_ARGS_LENGTH (500 * 1000)
+
+// Spread non-empty argument list of up to 15 elements.
+#define SPREAD(v, n) SPREAD_##n(v)
+#define SPREAD_1(v) v[0]
+#define SPREAD_2(v) SPREAD_1(v), v[1]
+#define SPREAD_3(v) SPREAD_2(v), v[2]
+#define SPREAD_4(v) SPREAD_3(v), v[3]
+#define SPREAD_5(v) SPREAD_4(v), v[4]
+#define SPREAD_6(v) SPREAD_5(v), v[5]
+#define SPREAD_7(v) SPREAD_6(v), v[6]
+#define SPREAD_8(v) SPREAD_7(v), v[7]
+#define SPREAD_9(v) SPREAD_8(v), v[8]
+#define SPREAD_10(v) SPREAD_9(v), v[9]
+#define SPREAD_11(v) SPREAD_10(v), v[10]
+#define SPREAD_12(v) SPREAD_11(v), v[11]
+#define SPREAD_13(v) SPREAD_12(v), v[12]
+#define SPREAD_14(v) SPREAD_13(v), v[13]
+#define SPREAD_15(v) SPREAD_14(v), v[14]
+
 // Property descriptor attributes.
 #define ATTR_ENUMERABLE         0x01
 #define ATTR_CONFIGURABLE       0x02
@@ -56,33 +77,6 @@
 #define ITEM_KIND_KEY 0
 #define ITEM_KIND_VALUE 1
 #define ITEM_KIND_KEY_AND_VALUE 2
-
-#define PROMISE_STATE_SLOT             0
-#define PROMISE_RESULT_SLOT            1
-#define PROMISE_FULFILL_REACTIONS_SLOT 2
-#define PROMISE_REJECT_REACTIONS_SLOT  3
-#define PROMISE_RESOLVE_FUNCTION_SLOT  4
-#define PROMISE_REJECT_FUNCTION_SLOT   5
-#define PROMISE_ALLOCATION_SITE_SLOT   6
-#define PROMISE_RESOLUTION_SITE_SLOT   7
-#define PROMISE_ALLOCATION_TIME_SLOT   8
-#define PROMISE_RESOLUTION_TIME_SLOT   9
-#define PROMISE_ID_SLOT               10
-#define PROMISE_IS_HANDLED_SLOT       11
-
-#define PROMISE_STATE_PENDING   0
-#define PROMISE_STATE_FULFILLED 1
-#define PROMISE_STATE_REJECTED  2
-
-#define PROMISE_IS_HANDLED_STATE_HANDLED   0
-#define PROMISE_IS_HANDLED_STATE_UNHANDLED 1
-#define PROMISE_IS_HANDLED_STATE_REPORTED  2
-
-#define PROMISE_HANDLER_IDENTITY 0
-#define PROMISE_HANDLER_THROWER  1
-
-#define PROMISE_REJECTION_TRACKER_OPERATION_REJECT false
-#define PROMISE_REJECTION_TRACKER_OPERATION_HANDLE true
 
 // NB: keep these in sync with the copy in jsfriendapi.h.
 #define JSITER_OWNONLY    0x8   /* iterate over obj's own properties only */

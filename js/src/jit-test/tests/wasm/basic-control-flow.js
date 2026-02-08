@@ -47,9 +47,9 @@ assertEq(wasmEvalText(`(module
 
 // The if (resp. else) branch is taken iff the condition is true (resp. false)
 counter = 0;
-var imports = { inc() { counter++ } };
+var imports = { "":{inc() { counter++ }} };
 assertEq(wasmEvalText(`(module
-    (import "inc" "" (result i32))
+    (import "" "inc" (result i32))
     (func
         (result i32)
         (if
@@ -63,7 +63,7 @@ assertEq(wasmEvalText(`(module
 assertEq(counter, 0);
 
 assertEq(wasmEvalText(`(module
-    (import "inc" "" (result i32))
+    (import "" "inc" (result i32))
     (func
         (result i32)
         (if
@@ -77,7 +77,7 @@ assertEq(wasmEvalText(`(module
 assertEq(counter, 0);
 
 assertEq(wasmEvalText(`(module
-    (import "inc" "" (result i32))
+    (import "" "inc" (result i32))
     (func
         (if
             (i32.const 0)
@@ -89,7 +89,7 @@ assertEq(wasmEvalText(`(module
 assertEq(counter, 0);
 
 assertEq(wasmEvalText(`(module
-    (import "inc" "" (result i32))
+    (import "" "inc" (result i32))
     (func
         (if
             (i32.const 1)
@@ -103,7 +103,7 @@ assertEq(counter, 1);
 // One can chain if with if/if
 counter = 0;
 assertEq(wasmEvalText(`(module
-    (import "inc" "" (result i32))
+    (import "" "inc" (result i32))
     (func
         (result i32)
         (if
@@ -139,11 +139,9 @@ wasmEvalText('(module (func (if (i32.const 1) (i32.const 0) (if (i32.const 1) (i
 assertEq(wasmEvalText('(module (func (return)) (export "" 0))')(), undefined);
 assertEq(wasmEvalText('(module (func (result i32) (return (i32.const 1))) (export "" 0))')(), 1);
 assertEq(wasmEvalText('(module (func (if (return) (i32.const 0))) (export "" 0))')(), undefined);
+assertEq(wasmEvalText('(module (func (return (i32.const 1))) (export "" 0))')(), undefined);
 assertErrorMessage(() => wasmEvalText('(module (func (result f32) (return (i32.const 1))) (export "" 0))'), TypeError, mismatchError("i32", "f32"));
 assertThrowsInstanceOf(() => wasmEvalText('(module (func (result i32) (return)) (export "" 0))'), TypeError);
-
-// TODO: Reenable when syntactic arities are added for returns
-//assertThrowsInstanceOf(() => wasmEvalText('(module (func (return (i32.const 1))) (export "" 0))'), TypeError);
 
 // ----------------------------------------------------------------------------
 // br / br_if
@@ -212,21 +210,22 @@ assertEq(wasmEvalText(`(module (func (result i32)
   (return (i32.const 2))
 ) (export "" 0))`)(), 1);
 
-// TODO enable once bug 1253572 is fixed.
-/*
 var notcalled = false;
 var called = false;
-var imports = {
+var imports = {"": {
     notcalled() {notcalled = true},
     called() {called = true}
-};
-assertEq(wasmEvalText(`(module (import "inc" "") (func
+}};
+assertEq(wasmEvalText(`(module
+(import "" "notcalled")
+(import "" "called")
+(func
   (block
     (return (br 0))
     (call_import 0)
   )
   (call_import 1)
-) (export "" 0))`)(imports), undefined);
+) (export "" 0))`, imports)(), undefined);
 assertEq(notcalled, false);
 assertEq(called, true);
 
@@ -238,8 +237,7 @@ assertEq(wasmEvalText(`(module (func
     )
   )
   (return)
-) (export "" 0))`)(), 1);
-*/
+) (export "" 0))`)(), undefined);
 
 assertEq(wasmEvalText(`(module (func (result i32)
   (block

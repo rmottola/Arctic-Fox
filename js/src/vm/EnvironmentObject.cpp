@@ -17,6 +17,7 @@
 #include "frontend/ParseNode.h"
 #include "gc/Policy.h"
 #include "vm/ArgumentsObject.h"
+#include "vm/AsyncFunction.h"
 #include "vm/GlobalObject.h"
 #include "vm/ProxyObject.h"
 #include "vm/Shape.h"
@@ -1023,7 +1024,9 @@ const Class LexicalEnvironmentObject::class_ = {
 };
 
 /* static */ NamedLambdaObject*
-NamedLambdaObject::create(JSContext* cx, HandleFunction callee, HandleObject enclosing,
+NamedLambdaObject::create(JSContext* cx, HandleFunction callee,
+                          HandleFunction func,
+                          HandleObject enclosing,
                           gc::InitialHeap heap)
 {
     MOZ_ASSERT(callee->isNamedLambda());
@@ -1045,14 +1048,14 @@ NamedLambdaObject::create(JSContext* cx, HandleFunction callee, HandleObject enc
     if (!obj)
         return nullptr;
 
-    obj->initFixedSlot(lambdaSlot(), ObjectValue(*callee));
+    obj->initFixedSlot(lambdaSlot(), ObjectValue(*func));
     return static_cast<NamedLambdaObject*>(obj);
 }
 
 /* static */ NamedLambdaObject*
 NamedLambdaObject::createTemplateObject(JSContext* cx, HandleFunction callee, gc::InitialHeap heap)
 {
-    return create(cx, callee, nullptr, heap);
+    return create(cx, callee, callee, nullptr, heap);
 }
 
 /* static */ NamedLambdaObject*
@@ -1060,7 +1063,15 @@ NamedLambdaObject::create(JSContext* cx, AbstractFramePtr frame)
 {
     RootedFunction fun(cx, frame.callee());
     RootedObject enclosing(cx, frame.environmentChain());
-    return create(cx, fun, enclosing, gc::DefaultHeap);
+    return create(cx, fun, fun, enclosing, gc::DefaultHeap);
+}
+
+/* static */ NamedLambdaObject*
+NamedLambdaObject::create(JSContext* cx, AbstractFramePtr frame, HandleFunction replacement)
+{
+    RootedFunction fun(cx, frame.callee());
+    RootedObject enclosing(cx, frame.environmentChain());
+    return create(cx, fun, replacement, enclosing, gc::DefaultHeap);
 }
 
 /* static */ size_t
@@ -1244,7 +1255,7 @@ EnvironmentIter::settle()
                 MOZ_ASSERT(scope == &env_->as<LexicalEnvironmentObject>().scope());
             } else if (scope->is<FunctionScope>()) {
                 MOZ_ASSERT(scope->as<FunctionScope>().script() ==
-                           env_->as<CallObject>().callee().nonLazyScript());
+                           env_->as<CallObject>().callee().existingScriptNonDelazifying());
             } else if (scope->is<VarScope>()) {
                 MOZ_ASSERT(scope == &env_->as<VarEnvironmentObject>().scope());
             } else if (scope->is<WithScope>()) {
@@ -1341,8 +1352,8 @@ ReportOptimizedOut(JSContext* cx, HandleId id)
 {
     JSAutoByteString printable;
     if (ValueToPrintable(cx, IdToValue(id), &printable)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT,
-                             printable.ptr());
+        JS_ReportErrorNumberLatin1(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_OPTIMIZED_OUT,
+                                   printable.ptr());
     }
 }
 
@@ -1375,28 +1386,27 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
     };
 
     /*
-     * This function handles access to unaliased locals/formals. Since they are
-     * unaliased, the values of these variables are not stored in the slots of
-     * the normal Call/ClonedBlockObject scope objects and thus must be
-     * recovered from somewhere else:
-     *  + if the invocation for which the scope was created is still executing,
+     * This function handles access to unaliased locals/formals. Since they
+     * are unaliased, the values of these variables are not stored in the
+     * slots of the normal CallObject and LexicalEnvironmentObject
+     * environments and thus must be recovered from somewhere else:
+     *  + if the invocation for which the env was created is still executing,
      *    there is a JS frame live on the stack holding the values;
-     *  + if the invocation for which the scope was created finished executing:
-     *     - and there was a DebugEnvironmentProxy associated with scope, then the
-     *       DebugEnvironments::onPop(Call|Block) handler copied out the unaliased
-     *       variables:
-     *        . for block scopes, the unaliased values were copied directly
-     *          into the block object, since there is a slot allocated for every
-     *          block binding, regardless of whether it is aliased;
-     *        . for function scopes, a dense array is created in onPopCall to hold
-     *          the unaliased values and attached to the DebugEnvironmentProxy;
+     *  + if the invocation for which the env was created finished executing:
+     *     - and there was a DebugEnvironmentProxy associated with env, then
+     *       the DebugEnvironments::onPop(Call|Lexical) handler copied out the
+     *       unaliased variables. In both cases, a dense array is created in
+     *       onPop(Call|Lexical) to hold the unaliased values and attached to
+     *       the DebugEnvironmentProxy;
      *     - and there was not a DebugEnvironmentProxy yet associated with the
      *       scope, then the unaliased values are lost and not recoverable.
      *
      * Callers should check accessResult for non-failure results:
      *  - ACCESS_UNALIASED if the access was unaliased and completed
      *  - ACCESS_GENERIC   if the access was aliased or the property not found
-     *  - ACCESS_LOST      if the value has been lost to the debugger
+     *  - ACCESS_LOST      if the value has been lost to the debugger and the
+     *                     action is GET; if the action is SET, we assign to the
+     *                     name of the variable on the environment object
      */
     bool handleUnaliasedAccess(JSContext* cx, Handle<DebugEnvironmentProxy*> debugEnv,
                                Handle<EnvironmentObject*> env, HandleId id, Action action,
@@ -1532,7 +1542,8 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
 
             // Named lambdas that are not closed over are lost.
             if (loc.kind() == BindingLocation::Kind::NamedLambdaCallee) {
-                *accessResult = ACCESS_LOST;
+                if (action == GET)
+                    *accessResult = ACCESS_LOST;
                 return true;
             }
 
@@ -1716,7 +1727,7 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
      * code, but that's fine: createMissingThis will do the right thing in that
      * case.
      */
-    static bool isMaybeUninitializedThisValue(JSContext* cx, jsid id, Value v)
+    static bool isMaybeUninitializedThisValue(JSContext* cx, jsid id, const Value& v)
     {
         return isThis(cx, id) && v.isUndefined();
     }
@@ -1811,8 +1822,8 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
             return false;
 
         if (!argsObj) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
-                                 "Debugger scope");
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
+                                      "Debugger scope");
             return false;
         }
 
@@ -1834,8 +1845,8 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
             return false;
 
         if (!success) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
-                                 "Debugger scope");
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
+                                      "Debugger scope");
             return false;
         }
 
@@ -1891,8 +1902,8 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
             return false;
 
         if (!argsObj) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
-                                 "Debugger env");
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
+                                      "Debugger env");
             return false;
         }
 
@@ -1908,8 +1919,8 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
             return false;
 
         if (!success) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
-                                 "Debugger env");
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_DEBUG_NOT_LIVE,
+                                      "Debugger env");
             return false;
         }
 
@@ -2031,11 +2042,10 @@ class DebugEnvironmentProxyHandler : public BaseProxyHandler
         switch (access) {
           case ACCESS_UNALIASED:
             return result.succeed();
-          case ACCESS_GENERIC:
-            {
-                RootedValue envVal(cx, ObjectValue(*env));
-                return SetProperty(cx, env, id, v, envVal, result);
-            }
+          case ACCESS_GENERIC: {
+            RootedValue envVal(cx, ObjectValue(*env));
+            return SetProperty(cx, env, id, v, envVal, result);
+          }
           default:
             MOZ_CRASH("bad AccessResult");
         }
@@ -2876,6 +2886,7 @@ GetDebugEnvironmentForMissing(JSContext* cx, const EnvironmentIter& ei)
         // Generators should always reify their scopes.
         MOZ_ASSERT(!callee->isGenerator());
 
+        JS::ExposeObjectToActiveJS(callee);
         Rooted<CallObject*> callobj(cx, CallObject::createHollowForDebug(cx, callee));
         if (!callobj)
             return nullptr;
@@ -3121,8 +3132,8 @@ js::GetThisValueForDebuggerMaybeOptimizedOut(JSContext* cx, AbstractFramePtr fra
                 return GetProperty(cx, callObj, callObj, bi.name()->asPropertyName(), res);
             }
 
-            if (loc.kind() == BindingLocation::Kind::Frame)
-                res.set(frame.unaliasedLocal(bi.location().slot()));
+            if (loc.kind() == BindingLocation::Kind::Frame && ei.withinInitialFrame())
+                res.set(frame.unaliasedLocal(loc.slot()));
             else
                 res.setMagic(JS_OPTIMIZED_OUT);
 
@@ -3187,9 +3198,9 @@ ReportCannotDeclareGlobalBinding(JSContext* cx, HandlePropertyName name, const c
 {
     JSAutoByteString printable;
     if (AtomToPrintableString(cx, name, &printable)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
-                             JSMSG_CANT_DECLARE_GLOBAL_BINDING,
-                             printable.ptr(), reason);
+        JS_ReportErrorNumberLatin1(cx, GetErrorMessage, nullptr,
+                                   JSMSG_CANT_DECLARE_GLOBAL_BINDING,
+                                   printable.ptr(), reason);
     }
 }
 
@@ -3365,7 +3376,15 @@ js::InitFunctionEnvironmentObjects(JSContext* cx, AbstractFramePtr frame)
 
     // Named lambdas may have an environment that holds itself for recursion.
     if (callee->needsNamedLambdaEnvironment()) {
-        NamedLambdaObject* declEnv = NamedLambdaObject::create(cx, frame);
+        NamedLambdaObject* declEnv;
+        if (callee->isAsync()) {
+            // Named async function needs special environment to return
+            // wrapped function for the binding.
+            RootedFunction fun(cx, GetWrappedAsyncFunction(callee));
+            declEnv = NamedLambdaObject::create(cx, frame, fun);
+        } else {
+            declEnv = NamedLambdaObject::create(cx, frame);
+        }
         if (!declEnv)
             return false;
         frame.pushOnEnvironmentChain(*declEnv);

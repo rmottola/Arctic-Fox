@@ -30,6 +30,8 @@
 #include <string>
 #endif
 
+#include "gfxPrefs.h"
+
 struct _cairo_surface;
 typedef _cairo_surface cairo_surface_t;
 
@@ -43,11 +45,11 @@ struct ID3D11Texture2D;
 struct ID3D11Device;
 struct ID2D1Device;
 struct IDWriteRenderingParams;
-struct IDWriteFont;
-struct IDWriteFontFamily;
 struct IDWriteFontFace;
 
 class GrContext;
+class SkCanvas;
+struct gfxFontStyle;
 
 struct CGContext;
 typedef struct CGContext *CGContextRef;
@@ -672,7 +674,13 @@ public:
   typedef void (*FontDescriptorOutput)(const uint8_t *aData, uint32_t aLength, Float aFontSize, void *aBaton);
 
   virtual FontType GetType() const = 0;
-  virtual AntialiasMode GetDefaultAAMode() { return AntialiasMode::DEFAULT; }
+  virtual AntialiasMode GetDefaultAAMode() {
+    if (gfxPrefs::DisableAllTextAA()) {
+      return AntialiasMode::NONE;
+    }
+
+    return AntialiasMode::DEFAULT;
+  }
 
   /** This allows getting a path that describes the outline of a set of glyphs.
    * A target is passed in so that the guarantee is made the returned path
@@ -686,7 +694,7 @@ public:
    * implementation in some backends, and more efficient implementation in
    * others.
    */
-  virtual void CopyGlyphsToBuilder(const GlyphBuffer &aBuffer, PathBuilder *aBuilder, BackendType aBackendType, const Matrix *aTransformHint = nullptr) = 0;
+  virtual void CopyGlyphsToBuilder(const GlyphBuffer &aBuffer, PathBuilder *aBuilder, const Matrix *aTransformHint = nullptr) = 0;
 
   /* This gets the metrics of a set of glyphs for the current font face.
    */
@@ -1430,9 +1438,6 @@ public:
 
   static void SetGlobalEventRecorder(DrawEventRecorder *aRecorder);
 
-  // This is a little hacky at the moment, but we want to have this data. Bug 1068613.
-  static void SetLogForwarder(LogForwarder* aLogFwd);
-
   static uint32_t GetMaxSurfaceSize(BackendType aType);
 
   static LogForwarder* GetLogForwarder() { return sConfig ? sConfig->mLogForwarder : nullptr; }
@@ -1463,6 +1468,10 @@ public:
 
   static bool DoesBackendSupportDataDrawtarget(BackendType aType);
 
+#ifdef USE_SKIA
+  static already_AddRefed<DrawTarget> CreateDrawTargetWithSkCanvas(SkCanvas* aCanvas);
+#endif
+
 #ifdef XP_DARWIN
   static already_AddRefed<DrawTarget> CreateDrawTargetForCairoCGContext(CGContextRef cg, const IntSize& aSize);
   static already_AddRefed<GlyphRenderingOptions>
@@ -1489,11 +1498,11 @@ public:
   static void D2DCleanup();
 
   static already_AddRefed<ScaledFont>
-    CreateScaledFontForDWriteFont(IDWriteFont* aFont,
-                                  IDWriteFontFamily* aFontFamily,
-                                  IDWriteFontFace* aFontFace,
+    CreateScaledFontForDWriteFont(IDWriteFontFace* aFontFace,
+                                  const gfxFontStyle* aStyle,
                                   Float aSize,
-                                  bool aUseEmbeddedBitmap);
+                                  bool aUseEmbeddedBitmap,
+                                  bool aForceGDIMode);
 
 private:
   static ID2D1Device *mD2D1Device;

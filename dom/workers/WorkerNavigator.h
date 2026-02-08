@@ -11,16 +11,20 @@
 #include "RuntimeService.h"
 #include "nsString.h"
 #include "nsWrapperCache.h"
+#include "mozilla/dom/BindingDeclarations.h"
+#include "mozilla/dom/StorageManager.h"
 
 namespace mozilla {
 namespace dom {
 class Promise;
+class StorageManager;
 
 class WorkerNavigator final : public nsWrapperCache
 {
   typedef struct workers::RuntimeService::NavigatorProperties NavigatorProperties;
 
   NavigatorProperties mProperties;
+  RefPtr<StorageManager> mStorageManager;
   bool mOnline;
 
   WorkerNavigator(const NavigatorProperties& aProperties,
@@ -55,11 +59,13 @@ public:
   {
     aAppCodeName.AssignLiteral("Mozilla");
   }
-  void GetAppName(nsString& aAppName) const;
+  void GetAppName(nsString& aAppName, CallerType aCallerType) const;
 
-  void GetAppVersion(nsString& aAppVersion) const;
+  void GetAppVersion(nsString& aAppVersion, CallerType aCallerType,
+                     ErrorResult& aRv) const;
 
-  void GetPlatform(nsString& aPlatform) const;
+  void GetPlatform(nsString& aPlatform, CallerType aCallerType,
+                   ErrorResult& aRv) const;
 
   void GetProduct(nsString& aProduct) const
   {
@@ -85,7 +91,8 @@ public:
     aLanguages = mProperties.mLanguages;
   }
 
-  void GetUserAgent(nsString& aUserAgent, ErrorResult& aRv) const;
+  void GetUserAgent(nsString& aUserAgent, CallerType aCallerType,
+                    ErrorResult& aRv) const;
 
   bool OnLine() const
   {
@@ -101,6 +108,8 @@ public:
   void SetLanguages(const nsTArray<nsString>& aLanguages);
 
   uint64_t HardwareConcurrency() const;
+
+  StorageManager* Storage();
 };
 
 } // namespace dom

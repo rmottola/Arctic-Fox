@@ -42,7 +42,8 @@ function generateGoodOCSPResponse() {
   return responses[0];
 }
 
-function add_ocsp_test(aHost, aExpectedResult, aResponses, aMessage) {
+function add_ocsp_test(aHost, aExpectedResult, aResponses, aMessage,
+                       aFirstPartyDomain) {
   add_connection_test(aHost, aExpectedResult,
       function() {
         clearSessionCache();
@@ -55,35 +56,25 @@ function add_ocsp_test(aHost, aExpectedResult, aResponses, aMessage) {
         equal(gFetchCount, aResponses.length,
               "should have made " + aResponses.length +
               " OCSP request" + (aResponses.length == 1 ? "" : "s"));
-      });
+      }, null, aFirstPartyDomain);
 }
 
 function run_test() {
   do_get_profile();
   Services.prefs.setBoolPref("security.ssl.enable_ocsp_stapling", true);
   Services.prefs.setIntPref("security.OCSP.enabled", 1);
-  Services.prefs.setIntPref("security.pki.sha1_enforcement_level", 3);
+  Services.prefs.setIntPref("security.pki.sha1_enforcement_level", 4);
   add_tls_server_setup("OCSPStaplingServer", "ocsp_certs");
 
   let ocspResponder = new HttpServer();
   ocspResponder.registerPrefixHandler("/", function(request, response) {
-    ++gFetchCount;
 
     do_print("gFetchCount: " + gFetchCount);
+    let responseFunction = gResponsePattern[gFetchCount];
+    Assert.notEqual(undefined, responseFunction);
 
-    if (gFetchCount != 2) {
-      do_print("returning 500 Internal Server Error");
-
-      response.setStatusLine(request.httpVersion, 500, "Internal Server Error");
-      let body = "Refusing to return a response";
-      response.bodyOutputStream.write(body, body.length);
-      return;
-    }
-
-    do_print("returning 200 OK");
-    response.setStatusLine(request.httpVersion, 200, "OK");
-    response.setHeader("Content-Type", "application/ocsp-response");
-    response.write(gGoodOCSPResponse);
+    ++gFetchCount;
+    responseFunction(request, response);
   });
   ocspResponder.start(8888);
 
@@ -103,29 +94,29 @@ function add_tests() {
                               12000);
     run_next_test();
   });
-  add_connection_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
-                      clearSessionCache);
+
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess, [],
+                "expected zero OCSP requests for a short-lived certificate");
+
   add_test(function() {
-    Assert.equal(0, gFetchCount,
-                 "expected zero OCSP requests for a short-lived certificate");
     Services.prefs.setIntPref("security.pki.cert_short_lifetime_in_days", 100);
     run_next_test();
   });
+
   // If a "short lifetime" is something more reasonable, ensure that we do OCSP
   // fetching for this long-lived certificate.
-  add_connection_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
-                      clearSessionCache);
+
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
+                [respondWithError],
+                "expected one OCSP request for a long-lived certificate");
   add_test(function() {
-    Assert.equal(1, gFetchCount,
-                 "expected one OCSP request for a long-lived certificate");
     Services.prefs.clearUserPref("security.pki.cert_short_lifetime_in_days");
     run_next_test();
   });
-
   //---------------------------------------------------------------------------
 
   // Reset state
-  add_test(function() { clearOCSPCache(); gFetchCount = 0; run_next_test(); });
+  add_test(function() { clearOCSPCache(); run_next_test(); });
 
   // This test assumes that OCSPStaplingServer uses the same cert for
   // ocsp-stapling-unknown.example.com and ocsp-stapling-none.example.com.
@@ -136,6 +127,7 @@ function add_tests() {
                 SEC_ERROR_OCSP_UNKNOWN_CERT, [],
                 "Stapled Unknown response -> a fetch should not have been" +
                 " attempted");
+
   // A failure to retrieve an OCSP response must result in the cached Unknown
   // response being recognized and honored.
   add_ocsp_test("ocsp-stapling-none.example.com", SEC_ERROR_OCSP_UNKNOWN_CERT,
@@ -166,43 +158,141 @@ function add_tests() {
     gGoodOCSPResponse = generateGoodOCSPResponse();
     run_next_test();
   });
-  add_connection_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
-                      clearSessionCache);
-  add_test(function() { do_check_eq(gFetchCount, 2); run_next_test(); });
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
+                [respondWithGoodOCSP],
+                "Cached Unknown response, no stapled response -> a fetch" +
+                " should have been attempted");
 
   // The Good response retrieved from the previous fetch must have replaced
   // the Unknown response in the cache, resulting in the catched Good response
   // being returned and no fetch.
-  add_connection_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
-                      clearSessionCache);
-  add_test(function() { do_check_eq(gFetchCount, 2); run_next_test(); });
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
+                [],
+                "Cached Good response -> a fetch should not have been" +
+                " attempted");
 
 
   //---------------------------------------------------------------------------
 
   // Reset state
-  add_test(function() { clearOCSPCache(); gFetchCount = 0; run_next_test(); });
+  add_test(function() { clearOCSPCache(); run_next_test(); });
 
   // A failure to retrieve an OCSP response will result in an error entry being
   // added to the cache.
-  add_connection_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
-                      clearSessionCache);
-  add_test(function() { do_check_eq(gFetchCount, 1); run_next_test(); });
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
+                [respondWithError],
+                "No stapled response -> a fetch should have been attempted");
 
   // The error entry will prevent a fetch from happening for a while.
-  add_connection_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
-                      clearSessionCache);
-  add_test(function() { do_check_eq(gFetchCount, 1); run_next_test(); });
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess, [],
+                "Noted OCSP server failure -> a fetch should not have been" +
+                " attempted");
 
   // The error entry must not prevent a stapled OCSP response from being
   // honored.
-  add_connection_test("ocsp-stapling-revoked.example.com",
-                      SEC_ERROR_REVOKED_CERTIFICATE,
-                      clearSessionCache);
-  add_test(function() { do_check_eq(gFetchCount, 1); run_next_test(); });
+  add_ocsp_test("ocsp-stapling-revoked.example.com",
+                SEC_ERROR_REVOKED_CERTIFICATE, [],
+                "Stapled Revoked response -> a fetch should not have been" +
+                " attempted");
+
+  //---------------------------------------------------------------------------
+
+  // Ensure OCSP responses from signers with SHA1 certificates are OK. This
+  // is included in the OCSP caching tests since there were OCSP cache-related
+  // regressions when sha-1 telemetry probes were added.
+  add_test(function() {
+    clearOCSPCache();
+    // set security.OCSP.require so that checking the OCSP signature fails
+    Services.prefs.setBoolPref("security.OCSP.require", true);
+    run_next_test();
+  });
+
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
+                [respondWithSHA1OCSP],
+                "signing cert is good (though sha1) - should succeed");
+
+  add_test(function() {
+    Services.prefs.setBoolPref("security.OCSP.require", false);
+    run_next_test();
+  });
 
   //---------------------------------------------------------------------------
 
   // Reset state
-  add_test(function() { clearOCSPCache(); gFetchCount = 0; run_next_test(); });
+  add_test(function() { clearOCSPCache(); run_next_test(); });
+
+  // This test makes sure that OCSP cache are isolated by firstPartyDomain.
+
+  let gObservedCnt = 0;
+  let protocolProxyService = Cc["@mozilla.org/network/protocol-proxy-service;1"]
+                               .getService(Ci.nsIProtocolProxyService);
+
+  // Observe all channels and make sure the firstPartyDomain in their loadInfo's
+  // origin attributes are aFirstPartyDomain.
+  function startObservingChannels(aFirstPartyDomain) {
+    // We use a dummy proxy filter to catch all channels, even those that do not
+    // generate an "http-on-modify-request" notification.
+    let proxyFilter = {
+      applyFilter: function (aProxyService, aChannel, aProxy) {
+        // We have the channel; provide it to the callback.
+        if (aChannel.originalURI.spec == "http://localhost:8888/") {
+          gObservedCnt++;
+          equal(aChannel.loadInfo.originAttributes.firstPartyDomain,
+                aFirstPartyDomain, "firstPartyDomain should match");
+        }
+        // Pass on aProxy unmodified.
+        return aProxy;
+      }
+    };
+    protocolProxyService.registerChannelFilter(proxyFilter, 0);
+    // Return the stop() function:
+    return () => protocolProxyService.unregisterChannelFilter(proxyFilter);
+  }
+
+  let stopObservingChannels;
+  add_test(function() {
+    stopObservingChannels = startObservingChannels("foo.com");
+    run_next_test();
+  });
+
+  // A good OCSP response will be cached.
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
+                [respondWithGoodOCSP],
+                "No stapled response (firstPartyDomain = foo.com) -> a fetch " +
+                "should have been attempted", "foo.com");
+
+  // The cache will prevent a fetch from happening.
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess, [],
+                "Noted OCSP server failure (firstPartyDomain = foo.com) -> a " +
+                "fetch should not have been attempted", "foo.com");
+
+  add_test(function() {
+    stopObservingChannels();
+    equal(gObservedCnt, 1, "should have observed only 1 OCSP requests");
+    gObservedCnt = 0;
+    run_next_test();
+  });
+
+  add_test(function() {
+    stopObservingChannels = startObservingChannels("bar.com");
+    run_next_test();
+  });
+
+  // But using a different firstPartyDomain should result in a fetch.
+  add_ocsp_test("ocsp-stapling-none.example.com", PRErrorCodeSuccess,
+                [respondWithGoodOCSP],
+                "No stapled response (firstPartyDomain = bar.com) -> a fetch " +
+                "should have been attempted", "bar.com");
+
+  add_test(function() {
+    stopObservingChannels();
+    equal(gObservedCnt, 1, "should have observed only 1 OCSP requests");
+    gObservedCnt = 0;
+    run_next_test();
+  });
+
+  //---------------------------------------------------------------------------
+
+  // Reset state
+  add_test(function() { clearOCSPCache(); run_next_test(); });
 }

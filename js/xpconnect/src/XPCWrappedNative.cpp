@@ -23,6 +23,7 @@
 #include "mozilla/DeferredFinalize.h"
 #include "mozilla/Likely.h"
 #include "mozilla/Unused.h"
+#include "mozilla/Sprintf.h"
 #include "mozilla/dom/BindingUtils.h"
 #include <algorithm>
 
@@ -51,9 +52,9 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(XPCWrappedNative)
         char name[72];
         XPCNativeScriptableInfo* si = tmp->GetScriptableInfo();
         if (si)
-            snprintf(name, sizeof(name), "XPCWrappedNative (%s)", si->GetJSClass()->name);
+            SprintfLiteral(name, "XPCWrappedNative (%s)", si->GetJSClass()->name);
         else
-            snprintf(name, sizeof(name), "XPCWrappedNative");
+            SprintfLiteral(name, "XPCWrappedNative");
 
         cb.DescribeRefCountedNode(tmp->mRefCnt.get(), name);
     } else {
@@ -74,7 +75,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(XPCWrappedNative)
 
         JSObject* obj = tmp->GetFlatJSObjectPreserveColor();
         NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mFlatJSObject");
-        cb.NoteJSObject(obj);
+        cb.NoteJSChild(JS::GCCellPtr(obj));
     }
 
     // XPCWrappedNative keeps its native object alive.
@@ -300,7 +301,7 @@ XPCWrappedNative::GetNewOrUsed(xpcObjectHelper& helper,
 
     nsresult rv;
 
-    MOZ_ASSERT(!Scope->GetRuntime()->GCIsRunning(),
+    MOZ_ASSERT(!Scope->GetContext()->GCIsRunning(),
                "XPCWrappedNative::GetNewOrUsed called during GC");
 
     nsISupports* identity = helper.GetCanonical();
@@ -431,14 +432,15 @@ XPCWrappedNative::GetNewOrUsed(xpcObjectHelper& helper,
         if (!iface)
             iface = XPCNativeInterface::GetISupports();
 
-        AutoMarkingNativeSetPtr set(cx);
-        set = XPCNativeSet::GetNewOrUsed(nullptr, iface, 0);
+        XPCNativeSetKey key(iface);
+        RefPtr<XPCNativeSet> set =
+            XPCNativeSet::GetNewOrUsed(&key);
 
         if (!set)
             return NS_ERROR_FAILURE;
 
-        wrapper =
-            new XPCWrappedNative(helper.forgetCanonical(), Scope, set);
+        wrapper = new XPCWrappedNative(helper.forgetCanonical(), Scope,
+                                       set.forget());
     }
 
     MOZ_ASSERT(!xpc::WrapperFactory::IsXrayWrapper(parent),
@@ -565,7 +567,7 @@ XPCWrappedNative::XPCWrappedNative(already_AddRefed<nsISupports>&& aIdentity,
 // This ctor is used if this object will NOT have a proto.
 XPCWrappedNative::XPCWrappedNative(already_AddRefed<nsISupports>&& aIdentity,
                                    XPCWrappedNativeScope* aScope,
-                                   XPCNativeSet* aSet)
+                                   already_AddRefed<XPCNativeSet>&& aSet)
 
     : mMaybeScope(TagScope(aScope)),
       mSet(aSet),
@@ -577,7 +579,7 @@ XPCWrappedNative::XPCWrappedNative(already_AddRefed<nsISupports>&& aIdentity,
     mFlatJSObject.setFlags(FLAT_JS_OBJECT_VALID);
 
     MOZ_ASSERT(aScope, "bad ctor param");
-    MOZ_ASSERT(aSet, "bad ctor param");
+    MOZ_ASSERT(mSet, "bad ctor param");
 }
 
 XPCWrappedNative::~XPCWrappedNative()
@@ -607,8 +609,8 @@ XPCWrappedNative::Destroy()
     }
 
     if (mIdentity) {
-        XPCJSRuntime* rt = GetRuntime();
-        if (rt && rt->GetDoingFinalization()) {
+        XPCJSContext* cx = GetContext();
+        if (cx && cx->GetDoingFinalization()) {
             DeferredFinalize(mIdentity.forget().take());
         } else {
             mIdentity = nullptr;
@@ -633,7 +635,7 @@ XPCWrappedNative::SetProto(XPCWrappedNativeProto* p)
     MOZ_ASSERT(HasProto());
 
     // Write barrier for incremental GC.
-    JSContext* cx = GetRuntime()->Context();
+    JSContext* cx = GetContext()->Context();
     GetProto()->WriteBarrierPre(cx);
 
     mMaybeProto = p;
@@ -902,7 +904,7 @@ XPCWrappedNative::FlatJSObjectFinalized()
 
         // We also need to release any native pointers held...
         RefPtr<nsISupports> native = to->TakeNative();
-        if (native && GetRuntime()) {
+        if (native && GetContext()) {
             DeferredFinalize(native.forget().take());
         }
 
@@ -938,7 +940,7 @@ void
 XPCWrappedNative::FlatJSObjectMoved(JSObject* obj, const JSObject* old)
 {
     JS::AutoAssertGCCallback inCallback(obj);
-    MOZ_ASSERT(mFlatJSObject == old);
+    MOZ_ASSERT(mFlatJSObject.unbarrieredGetPtr() == old);
 
     nsWrapperCache* cache = nullptr;
     CallQueryInterface(mIdentity, &cache);
@@ -1013,16 +1015,14 @@ private:
 bool
 XPCWrappedNative::ExtendSet(XPCNativeInterface* aInterface)
 {
-    AutoJSContext cx;
-
     if (!mSet->HasInterface(aInterface)) {
-        AutoMarkingNativeSetPtr newSet(cx);
-        newSet = XPCNativeSet::GetNewOrUsed(mSet, aInterface,
-                                            mSet->GetInterfaceCount());
+        XPCNativeSetKey key(mSet, aInterface);
+        RefPtr<XPCNativeSet> newSet =
+            XPCNativeSet::GetNewOrUsed(&key);
         if (!newSet)
             return false;
 
-        mSet = newSet;
+        mSet = newSet.forget();
     }
     return true;
 }
@@ -1320,7 +1320,7 @@ public:
         , mMethodInfo(nullptr)
         , mCallee(ccx.GetTearOff()->GetNative())
         , mVTableIndex(ccx.GetMethodIndex())
-        , mIdxValueId(ccx.GetRuntime()->GetStringID(XPCJSRuntime::IDX_VALUE))
+        , mIdxValueId(ccx.GetContext()->GetStringID(XPCJSContext::IDX_VALUE))
         , mJSContextIndex(UINT8_MAX)
         , mOptArgcIndex(UINT8_MAX)
         , mArgv(ccx.GetArgv())
@@ -1355,7 +1355,7 @@ CallMethodHelper::Call()
 {
     mCallContext.SetRetVal(JS::UndefinedValue());
 
-    XPCJSRuntime::Get()->SetPendingException(nullptr);
+    XPCJSContext::Get()->SetPendingException(nullptr);
 
     if (mVTableIndex == 0) {
         return QueryInterfaceFastPath();
@@ -2009,11 +2009,11 @@ CallMethodHelper::CleanupParam(nsXPTCMiniVariant& param, nsXPTType& type)
             break;
         case nsXPTType::T_ASTRING:
         case nsXPTType::T_DOMSTRING:
-            nsXPConnect::GetRuntimeInstance()->mScratchStrings.Destroy((nsString*)param.val.p);
+            nsXPConnect::GetContextInstance()->mScratchStrings.Destroy((nsString*)param.val.p);
             break;
         case nsXPTType::T_UTF8STRING:
         case nsXPTType::T_CSTRING:
-            nsXPConnect::GetRuntimeInstance()->mScratchCStrings.Destroy((nsCString*)param.val.p);
+            nsXPConnect::GetContextInstance()->mScratchCStrings.Destroy((nsCString*)param.val.p);
             break;
         default:
             MOZ_ASSERT(!type.IsArithmetic(), "Cleanup requested on unexpected type.");
@@ -2039,9 +2039,9 @@ CallMethodHelper::AllocateStringClass(nsXPTCVariant* dp,
     // ASTRING and DOMSTRING are very similar, and both use nsString.
     // UTF8_STRING and CSTRING are also quite similar, and both use nsCString.
     if (type_tag == nsXPTType::T_ASTRING || type_tag == nsXPTType::T_DOMSTRING)
-        dp->val.p = nsXPConnect::GetRuntimeInstance()->mScratchStrings.Create();
+        dp->val.p = nsXPConnect::GetContextInstance()->mScratchStrings.Create();
     else
-        dp->val.p = nsXPConnect::GetRuntimeInstance()->mScratchCStrings.Create();
+        dp->val.p = nsXPConnect::GetContextInstance()->mScratchCStrings.Create();
 
     // Check for OOM, in either case.
     if (!dp->val.p) {
@@ -2163,9 +2163,9 @@ NS_IMETHODIMP XPCWrappedNative::DebugDump(int16_t depth)
         if (depth && mSet)
             mSet->DebugDump(depth);
         else
-            XPC_LOG_ALWAYS(("mSet @ %x", mSet));
+            XPC_LOG_ALWAYS(("mSet @ %x", mSet.get()));
 
-        XPC_LOG_ALWAYS(("mFlatJSObject of %x", mFlatJSObject.getPtr()));
+        XPC_LOG_ALWAYS(("mFlatJSObject of %x", mFlatJSObject.unbarrieredGetPtr()));
         XPC_LOG_ALWAYS(("mIdentity of %x", mIdentity.get()));
         XPC_LOG_ALWAYS(("mScriptableInfo @ %x", mScriptableInfo));
 
@@ -2316,7 +2316,7 @@ XPCJSObjectHolder::XPCJSObjectHolder(JSObject* obj)
     : mJSObj(obj)
 {
     MOZ_ASSERT(obj);
-    XPCJSRuntime::Get()->AddObjectHolderRoot(this);
+    XPCJSContext::Get()->AddObjectHolderRoot(this);
 }
 
 XPCJSObjectHolder::~XPCJSObjectHolder()

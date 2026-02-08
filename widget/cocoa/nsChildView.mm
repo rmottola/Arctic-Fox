@@ -18,6 +18,7 @@
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
 
+#include "nsArrayUtils.h"
 #include "nsObjCExceptions.h"
 #include "nsCOMPtr.h"
 #include "nsToolkit.h"
@@ -66,6 +67,7 @@
 #include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/BasicCompositor.h"
 #include "mozilla/layers/InputAPZContext.h"
+#include "mozilla/widget/CompositorWidget.h"
 #include "gfxUtils.h"
 #include "gfxPrefs.h"
 #include "mozilla/gfx/2D.h"
@@ -131,7 +133,7 @@ extern NSMenu* sApplicationMenu; // Application menu shared by all menubars
 
 static bool gChildViewMethodsSwizzled = false;
 
-extern nsISupportsArray *gDraggedTransferables;
+extern nsIArray *gDraggedTransferables;
 
 ChildView* ChildViewMouseTracker::sLastMouseEventView = nil;
 NSEvent* ChildViewMouseTracker::sLastMouseMoveEvent = nil;
@@ -178,7 +180,7 @@ static uint32_t gNumberOfWidgetsNeedingEventThread = 0;
 - (CGFloat)cornerRadius;
 - (void)clearCorners;
 
--(void)setFullscreen:(BOOL)aFullscreen;
+-(void)setGLOpaque:(BOOL)aOpaque;
 
 // Overlay drawing functions for traditional CGContext drawing
 - (void)drawTitleString;
@@ -351,6 +353,7 @@ nsChildView::nsChildView() : nsBaseWidget()
 , mHasRoundedBottomCorners(false)
 , mIsCoveringTitlebar(false)
 , mIsFullscreen(false)
+, mIsOpaque(false)
 , mTitlebarCGContext(nullptr)
 , mBackingScaleFactor(0.0)
 , mVisible(false)
@@ -1369,14 +1372,11 @@ NS_IMETHODIMP nsChildView::Invalidate(const LayoutDeviceIntRect& aRect)
 }
 
 bool
-nsChildView::ComputeShouldAccelerate()
+nsChildView::WidgetTypeSupportsAcceleration()
 {
   // Don't use OpenGL for transparent windows or for popup windows.
-  if (!mView || ![[mView window] isOpaque] ||
-      [[mView window] isKindOfClass:[PopupWindow class]])
-    return false;
-
-  return nsBaseWidget::ComputeShouldAccelerate();
+  return mView && [[mView window] isOpaque] &&
+         ![[mView window] isKindOfClass:[PopupWindow class]];
 }
 
 bool
@@ -1986,7 +1986,7 @@ nsChildView::PrepareWindowEffects()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  bool isFullscreen;
+  bool canBeOpaque;
   {
     MutexAutoLock lock(mEffectsLock);
     mShowsResizeIndicator = ShowsResizeIndicator(&mResizeIndicatorRect);
@@ -1995,7 +1995,13 @@ nsChildView::PrepareWindowEffects()
     mDevPixelCornerRadius = cornerRadius * BackingScaleFactor();
     mIsCoveringTitlebar = [(ChildView*)mView isCoveringTitlebar];
     NSInteger styleMask = [[mView window] styleMask];
-    isFullscreen = (styleMask & NSFullScreenWindowMask) || !(styleMask & NSTitledWindowMask);
+    bool wasFullscreen = mIsFullscreen;
+    mIsFullscreen = (styleMask & NSFullScreenWindowMask) || !(styleMask & NSTitledWindowMask);
+
+    canBeOpaque = mIsFullscreen && wasFullscreen;
+    if (canBeOpaque && VibrancyManager::SystemSupportsVibrancy()) {
+      canBeOpaque = !EnsureVibrancyManager().HasVibrantRegions();
+    }
     if (mIsCoveringTitlebar) {
       mTitlebarRect = RectContainingTitlebarControls();
       UpdateTitlebarCGContext();
@@ -2003,9 +2009,9 @@ nsChildView::PrepareWindowEffects()
   }
 
   // If we've just transitioned into or out of full screen then update the opacity on our GLContext.
-  if (isFullscreen != mIsFullscreen) {
-    mIsFullscreen = isFullscreen;
-    [(ChildView*)mView setFullscreen:isFullscreen];
+  if (canBeOpaque != mIsOpaque) {
+    mIsOpaque = canBeOpaque;
+    [(ChildView*)mView setGLOpaque:canBeOpaque];
   }
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
@@ -2020,9 +2026,9 @@ nsChildView::CleanupWindowEffects()
 }
 
 bool
-nsChildView::PreRender(LayerManagerComposite* aManager)
+nsChildView::PreRender(WidgetRenderingContext* aContext)
 {
-  UniquePtr<GLManager> manager(GLManager::CreateGLManager(aManager));
+  UniquePtr<GLManager> manager(GLManager::CreateGLManager(aContext->mLayerManager));
   if (!manager) {
     return true;
   }
@@ -2042,9 +2048,9 @@ nsChildView::PreRender(LayerManagerComposite* aManager)
 }
 
 void
-nsChildView::PostRender(LayerManagerComposite* aManager)
+nsChildView::PostRender(WidgetRenderingContext* aContext)
 {
-  UniquePtr<GLManager> manager(GLManager::CreateGLManager(aManager));
+  UniquePtr<GLManager> manager(GLManager::CreateGLManager(aContext->mLayerManager));
   if (!manager) {
     return;
   }
@@ -2054,10 +2060,10 @@ nsChildView::PostRender(LayerManagerComposite* aManager)
 }
 
 void
-nsChildView::DrawWindowOverlay(LayerManagerComposite* aManager,
+nsChildView::DrawWindowOverlay(WidgetRenderingContext* aContext,
                                LayoutDeviceIntRect aRect)
 {
-  mozilla::UniquePtr<GLManager> manager(GLManager::CreateGLManager(aManager));
+  mozilla::UniquePtr<GLManager> manager(GLManager::CreateGLManager(aContext->mLayerManager));
   if (manager) {
     DrawWindowOverlay(manager.get(), aRect);
   }
@@ -2549,10 +2555,15 @@ nsChildView::UpdateVibrancy(const nsTArray<ThemeGeometry>& aThemeGeometries)
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeHighlightedMenuItem);
   LayoutDeviceIntRegion sourceListRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeSourceList);
+  LayoutDeviceIntRegion sourceListSelectionRegion =
+    GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeSourceListSelection);
+  LayoutDeviceIntRegion activeSourceListSelectionRegion =
+    GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeActiveSourceListSelection);
 
   MakeRegionsNonOverlapping(sheetRegion, vibrantLightRegion, vibrantDarkRegion,
                             menuRegion, tooltipRegion, highlightedMenuItemRegion,
-                            sourceListRegion);
+                            sourceListRegion, sourceListSelectionRegion,
+                            activeSourceListSelectionRegion);
 
   auto& vm = EnsureVibrancyManager();
   vm.UpdateVibrantRegion(VibrancyType::LIGHT, vibrantLightRegion);
@@ -2561,6 +2572,8 @@ nsChildView::UpdateVibrancy(const nsTArray<ThemeGeometry>& aThemeGeometries)
   vm.UpdateVibrantRegion(VibrancyType::HIGHLIGHTED_MENUITEM, highlightedMenuItemRegion);
   vm.UpdateVibrantRegion(VibrancyType::SHEET, sheetRegion);
   vm.UpdateVibrantRegion(VibrancyType::SOURCE_LIST, sourceListRegion);
+  vm.UpdateVibrantRegion(VibrancyType::SOURCE_LIST_SELECTION, sourceListSelectionRegion);
+  vm.UpdateVibrantRegion(VibrancyType::ACTIVE_SOURCE_LIST_SELECTION, activeSourceListSelectionRegion);
   vm.UpdateVibrantRegion(VibrancyType::DARK, vibrantDarkRegion);
 }
 
@@ -2590,6 +2603,10 @@ ThemeGeometryTypeToVibrancyType(nsITheme::ThemeGeometryType aThemeGeometryType)
       return VibrancyType::SHEET;
     case nsNativeThemeCocoa::eThemeGeometryTypeSourceList:
       return VibrancyType::SOURCE_LIST;
+    case nsNativeThemeCocoa::eThemeGeometryTypeSourceListSelection:
+      return VibrancyType::SOURCE_LIST_SELECTION;
+    case nsNativeThemeCocoa::eThemeGeometryTypeActiveSourceListSelection:
+      return VibrancyType::ACTIVE_SOURCE_LIST_SELECTION;
     default:
       MOZ_CRASH();
   }
@@ -3835,12 +3852,12 @@ NSEvent* gLastDragMouseDownEvent = nil;
   return [frameView roundedCornerRadius];
 }
 
--(void)setFullscreen:(BOOL)aFullscreen
+-(void)setGLOpaque:(BOOL)aOpaque
 {
   CGLLockContext((CGLContextObj)[mGLContext CGLContextObj]);
   // Make the context opaque for fullscreen (since it performs better), and transparent
   // for windowed (since we need it for rounded corners).
-  GLint opaque = aFullscreen ? 1 : 0;
+  GLint opaque = aOpaque ? 1 : 0;
   [mGLContext setValues:&opaque forParameter:NSOpenGLCPSurfaceOpacity];
   CGLUnlockContext((CGLContextObj)[mGLContext CGLContextObj]);
 }
@@ -3994,9 +4011,8 @@ NSEvent* gLastDragMouseDownEvent = nil;
     }
 
     if ([self isUsingOpenGL]) {
-      if (mGeckoChild->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
-        ClientLayerManager *manager = static_cast<ClientLayerManager*>(mGeckoChild->GetLayerManager());
-        manager->AsShadowForwarder()->WindowOverlayChanged();
+      if (ShadowLayerForwarder* slf = mGeckoChild->GetLayerManager()->AsShadowForwarder()) {
+        slf->WindowOverlayChanged();
       }
     }
 
@@ -5376,7 +5392,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
     [viewWindow orderWindow:NSWindowAbove relativeTo:0];
   }
 
-#if !defined(RELEASE_BUILD) || defined(DEBUG)
+#if !defined(RELEASE_OR_BETA) || defined(DEBUG)
   if (!Preferences::GetBool("intl.allow-insecure-text-input", false) &&
       mGeckoChild && mTextInputHandler && mTextInputHandler->IsFocused()) {
 #ifdef MOZ_CRASHREPORTER
@@ -5408,7 +5424,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
       #undef CRASH_MESSAGE
     }
   }
-#endif // #if !defined(RELEASE_BUILD) || defined(DEBUG)
+#endif // #if !defined(RELEASE_OR_BETA) || defined(DEBUG)
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
   bool handled = false;
@@ -5863,14 +5879,12 @@ PanGestureTypeForEvent(NSEvent* aEvent)
     return nil;
 
   uint32_t transferableCount;
-  rv = gDraggedTransferables->Count(&transferableCount);
+  rv = gDraggedTransferables->GetLength(&transferableCount);
   if (NS_FAILED(rv))
     return nil;
 
   for (uint32_t i = 0; i < transferableCount; i++) {
-    nsCOMPtr<nsISupports> genericItem;
-    gDraggedTransferables->GetElementAt(i, getter_AddRefs(genericItem));
-    nsCOMPtr<nsITransferable> item(do_QueryInterface(genericItem));
+    nsCOMPtr<nsITransferable> item = do_QueryElementAt(gDraggedTransferables, i);
     if (!item) {
       NS_ERROR("no transferable");
       return nil;

@@ -11,12 +11,15 @@
 #include "mozilla/RefPtr.h"
 #include "nsCycleCollectionTraversalCallback.h"
 #include "nsTArray.h"
+#include "nsTHashtable.h"
 
 class nsIGlobalObject;
 
 namespace mozilla {
 namespace dom {
 
+class BlobImpl;
+class ContentParent;
 class File;
 class GetFilesHelperParent;
 class OwningFileOrDirectory;
@@ -34,9 +37,46 @@ protected:
   virtual ~GetFilesCallback() {}
 };
 
+class GetFilesHelperBase
+{
+protected:
+  explicit GetFilesHelperBase(bool aRecursiveFlag)
+    : mRecursiveFlag(aRecursiveFlag)
+  {}
+
+  virtual ~GetFilesHelperBase() {}
+
+  virtual bool
+  IsCanceled()
+  {
+    return false;
+  }
+
+  nsresult
+  ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile);
+
+  nsresult
+  AddExploredDirectory(nsIFile* aDirectory);
+
+  bool
+  ShouldFollowSymLink(nsIFile* aDirectory);
+
+  bool mRecursiveFlag;
+
+  // We populate this array in the I/O thread with the paths of the Files that
+  // we want to send as result to the promise objects.
+  struct FileData {
+    nsString mDomPath;
+    nsString mRealPath;
+  };
+  FallibleTArray<FileData> mTargetPathArray;
+  nsTHashtable<nsCStringHashKey> mExploredDirectories;
+};
+
 // Retrieving the list of files can be very time/IO consuming. We use this
 // helper class to do it just once.
 class GetFilesHelper : public Runnable
+                     , public GetFilesHelperBase
 {
   friend class GetFilesHelperParent;
 
@@ -59,7 +99,7 @@ public:
 protected:
   GetFilesHelper(nsIGlobalObject* aGlobal, bool aRecursiveFlag);
 
-  virtual ~GetFilesHelper() {}
+  virtual ~GetFilesHelper();
 
   void
   SetDirectoryPath(const nsAString& aDirectoryPath)
@@ -67,12 +107,18 @@ protected:
     mDirectoryPath = aDirectoryPath;
   }
 
-  bool
-  IsCanceled()
+  virtual bool
+  IsCanceled() override
   {
     MutexAutoLock lock(mMutex);
     return mCanceled;
   }
+
+  virtual void
+  Work(ErrorResult& aRv);
+
+  virtual void
+  Cancel() {};
 
   NS_IMETHOD
   Run() override;
@@ -83,8 +129,8 @@ protected:
   void
   RunMainThread();
 
-  nsresult
-  ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile);
+  void
+  OperationCompleted();
 
   void
   ResolveOrRejectPromise(Promise* aPromise);
@@ -94,17 +140,8 @@ protected:
 
   nsCOMPtr<nsIGlobalObject> mGlobal;
 
-  bool mRecursiveFlag;
   bool mListingCompleted;
   nsString mDirectoryPath;
-
-  // We populate this array in the I/O thread with the paths of the Files that
-  // we want to send as result to the promise objects.
-  struct FileData {
-    nsString mDomPath;
-    nsString mRealPath;
-  };
-  FallibleTArray<FileData> mTargetPathArray;
 
   // This is the real File sequence that we expose via Promises.
   Sequence<RefPtr<File>> mFiles;
@@ -119,6 +156,50 @@ protected:
 
   // This variable is protected by mutex.
   bool mCanceled;
+};
+
+class GetFilesHelperChild final : public GetFilesHelper
+{
+public:
+  GetFilesHelperChild(nsIGlobalObject* aGlobal, bool aRecursiveFlag)
+    : GetFilesHelper(aGlobal, aRecursiveFlag)
+    , mPendingOperation(false)
+  {}
+
+  virtual void
+  Work(ErrorResult& aRv) override;
+
+  virtual void
+  Cancel() override;
+
+  bool
+  AppendBlobImpl(BlobImpl* aBlobImpl);
+
+  void
+  Finished(nsresult aResult);
+
+private:
+  nsID mUUID;
+  bool mPendingOperation;
+};
+
+class GetFilesHelperParentCallback;
+
+class GetFilesHelperParent final : public GetFilesHelper
+{
+  friend class GetFilesHelperParentCallback;
+
+public:
+  static already_AddRefed<GetFilesHelperParent>
+  Create(const nsID& aUUID, const nsAString& aDirectoryPath,
+         bool aRecursiveFlag, ContentParent* aContentParent, ErrorResult& aRv);
+
+private:
+  GetFilesHelperParent(const nsID& aUUID, ContentParent* aContentParent,
+                       bool aRecursiveFlag);
+
+  RefPtr<ContentParent> mContentParent;
+  nsID mUUID;
 };
 
 } // dom namespace

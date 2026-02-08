@@ -98,8 +98,6 @@ static NS_DEFINE_CID(kXPCOMShutdownCID,
 
 using namespace mozilla;
 
-uint32_t gRestartMode = 0;
-
 class nsAppExitEvent : public mozilla::Runnable {
 private:
   RefPtr<nsAppStartup> mService;
@@ -365,7 +363,12 @@ nsAppStartup::Quit(uint32_t aMode)
       mediator->GetEnumerator(nullptr, getter_AddRefs(windowEnumerator));
       if (windowEnumerator) {
         bool more;
-        while (windowEnumerator->HasMoreElements(&more), more) {
+        windowEnumerator->HasMoreElements(&more);
+        // If we reported no windows, we definitely shouldn't be
+        // iterating any here.
+        MOZ_ASSERT_IF(!mConsiderQuitStopper, !more);
+
+        while (more) {
           nsCOMPtr<nsISupports> window;
           windowEnumerator->GetNext(getter_AddRefs(window));
           nsCOMPtr<nsPIDOMWindowOuter> domWindow(do_QueryInterface(window));
@@ -374,6 +377,7 @@ nsAppStartup::Quit(uint32_t aMode)
             if (!domWindow->CanClose())
               return NS_OK;
           }
+          windowEnumerator->HasMoreElements(&more);
         }
       }
     }
@@ -383,12 +387,10 @@ nsAppStartup::Quit(uint32_t aMode)
     mShuttingDown = true;
     if (!mRestart) {
       mRestart = (aMode & eRestart) != 0;
-      gRestartMode = (aMode & 0xF0);
     }
 
     if (!mRestartNotSameProfile) {
       mRestartNotSameProfile = (aMode & eRestartNotSameProfile) != 0;
-      gRestartMode = (aMode & 0xF0);
     }
 
     if (mRestart || mRestartNotSameProfile) {
@@ -609,7 +611,7 @@ nsAppStartup::CreateChromeWindow(nsIWebBrowserChrome *aParent,
                                  nsIWebBrowserChrome **_retval)
 {
   bool cancel;
-  return CreateChromeWindow2(aParent, aChromeFlags, 0, nullptr, &cancel, _retval);
+  return CreateChromeWindow2(aParent, aChromeFlags, 0, nullptr, nullptr, &cancel, _retval);
 }
 
 
@@ -633,6 +635,7 @@ nsAppStartup::CreateChromeWindow2(nsIWebBrowserChrome *aParent,
                                   uint32_t aChromeFlags,
                                   uint32_t aContextFlags,
                                   nsITabParent *aOpeningTab,
+                                  mozIDOMWindowProxy* aOpener,
                                   bool *aCancel,
                                   nsIWebBrowserChrome **_retval)
 {
@@ -652,7 +655,7 @@ nsAppStartup::CreateChromeWindow2(nsIWebBrowserChrome *aParent,
     NS_ASSERTION(xulParent, "window created using non-XUL parent. that's unexpected, but may work.");
 
     if (xulParent)
-      xulParent->CreateNewWindow(aChromeFlags, aOpeningTab, getter_AddRefs(newWindow));
+      xulParent->CreateNewWindow(aChromeFlags, aOpeningTab, aOpener, getter_AddRefs(newWindow));
     // And if it fails, don't try again without a parent. It could fail
     // intentionally (bug 115969).
   } else { // try using basic methods:
@@ -669,7 +672,7 @@ nsAppStartup::CreateChromeWindow2(nsIWebBrowserChrome *aParent,
     appShell->CreateTopLevelWindow(0, 0, aChromeFlags,
                                    nsIAppShellService::SIZE_TO_CONTENT,
                                    nsIAppShellService::SIZE_TO_CONTENT,
-                                   aOpeningTab,
+                                   aOpeningTab, aOpener,
                                    getter_AddRefs(newWindow));
   }
 

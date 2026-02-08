@@ -9,6 +9,7 @@
 
 #include "Workers.h"
 
+#include "js/CharacterEncoding.h"
 #include "nsIContentPolicy.h"
 #include "nsIContentSecurityPolicy.h"
 #include "nsILoadGroup.h"
@@ -59,6 +60,7 @@ struct RuntimeStats;
 } // namespace JS
 
 namespace mozilla {
+class ThrottledEventQueue;
 namespace dom {
 class Function;
 class MessagePort;
@@ -196,11 +198,22 @@ private:
   nsTArray<RefPtr<SharedWorker>> mSharedWorkers;
 
   uint64_t mBusyCount;
+  // SharedWorkers may have multiple windows paused, so this must be
+  // a count instead of just a boolean.
+  uint32_t mParentWindowPausedDepth;
   Status mParentStatus;
   bool mParentFrozen;
-  bool mParentSuspended;
   bool mIsChromeWorker;
   bool mMainThreadObjectsForgotten;
+  // mIsSecureContext is set once in our constructor; after that it can be read
+  // from various threads.  We could make this const if we were OK with setting
+  // it in the initializer list via calling some function that takes all sorts
+  // of state (loadinfo, worker type, parent).
+  //
+  // It's a bit unfortunate that we have to have an out-of-band boolean for
+  // this, but we need access to this state from the parent thread, and we can't
+  // use our global object's secure state there.
+  bool mIsSecureContext;
   WorkerType mWorkerType;
   TimeStamp mCreationTimeStamp;
   DOMHighResTimeStamp mCreationTimeHighRes;
@@ -322,11 +335,14 @@ public:
   bool
   Thaw(nsPIDOMWindowInner* aWindow);
 
+  // When we debug a worker, we want to disconnect the window and the worker
+  // communication. This happens calling this method.
+  // Note: this method doesn't suspend the worker! Use Freeze/Thaw instead.
   void
-  Suspend();
+  ParentWindowPaused();
 
   void
-  Resume();
+  ParentWindowResumed();
 
   bool
   Terminate()
@@ -424,10 +440,10 @@ public:
   }
 
   bool
-  IsSuspended() const
+  IsParentWindowPaused() const
   {
     AssertIsOnParentThread();
-    return mParentSuspended;
+    return mParentWindowPausedDepth > 0;
   }
 
   bool
@@ -782,10 +798,10 @@ public:
     return mLoadInfo.mStorageAllowed;
   }
 
-  bool
-  IsInPrivateBrowsing() const
+  const PrincipalOriginAttributes&
+  GetOriginAttributes() const
   {
-    return mLoadInfo.mPrivateBrowsing;
+    return mLoadInfo.mOriginAttributes;
   }
 
   // Determine if the SW testing per-window flag is set by devtools
@@ -818,6 +834,16 @@ public:
 
   IMPL_EVENT_HANDLER(message)
   IMPL_EVENT_HANDLER(error)
+
+  // Check whether this worker is a secure context.  For use from the parent
+  // thread only; the canonical "is secure context" boolean is stored on the
+  // compartment of the worker global.  The only reason we don't
+  // AssertIsOnParentThread() here is so we can assert that this value matches
+  // the one on the compartment, which has to be done from the worker thread.
+  bool IsSecureContext() const
+  {
+    return mIsSecureContext;
+  }
 
 #ifdef DEBUG
   void
@@ -917,6 +943,8 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   nsTObserverArray<WorkerHolder*> mHolders;
   nsTArray<nsAutoPtr<TimeoutInfo>> mTimeouts;
   uint32_t mDebuggerEventLoopLevel;
+  RefPtr<ThrottledEventQueue> mMainThreadThrottledEventQueue;
+  nsCOMPtr<nsIEventTarget> mMainThreadEventTarget;
 
   struct SyncLoopInfo
   {
@@ -955,8 +983,6 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   bool mFrozen;
   bool mTimerRunning;
   bool mRunningExpiredTimeouts;
-  bool mCloseHandlerStarted;
-  bool mCloseHandlerFinished;
   bool mPendingEventQueueClearing;
   bool mMemoryReporterRunning;
   bool mBlockedForMemoryReporter;
@@ -1141,7 +1167,8 @@ public:
   NotifyInternal(JSContext* aCx, Status aStatus);
 
   void
-  ReportError(JSContext* aCx, const char* aMessage, JSErrorReport* aReport);
+  ReportError(JSContext* aCx, JS::ConstUTF8CharsZ aToStringResult,
+              JSErrorReport* aReport);
 
   static void
   ReportErrorToConsole(const char* aMessage);
@@ -1159,20 +1186,6 @@ public:
 
   bool
   RescheduleTimeoutTimer(JSContext* aCx);
-
-  void
-  CloseHandlerStarted()
-  {
-    AssertIsOnWorkerThread();
-    mCloseHandlerStarted = true;
-  }
-
-  void
-  CloseHandlerFinished()
-  {
-    AssertIsOnWorkerThread();
-    mCloseHandlerFinished = true;
-  }
 
   void
   UpdateContextOptionsInternal(JSContext* aCx, const JS::ContextOptions& aContextOptions);
@@ -1357,6 +1370,20 @@ public:
   void
   MaybeDispatchLoadFailedRunnable();
 
+  // Get the event target to use when dispatching to the main thread
+  // from this Worker thread.  This may be the main thread itself or
+  // a ThrottledEventQueue to the main thread.
+  nsIEventTarget*
+  MainThreadEventTarget();
+
+  nsresult
+  DispatchToMainThread(nsIRunnable* aRunnable,
+                       uint32_t aFlags = NS_DISPATCH_NORMAL);
+
+  nsresult
+  DispatchToMainThread(already_AddRefed<nsIRunnable> aRunnable,
+                       uint32_t aFlags = NS_DISPATCH_NORMAL);
+
 private:
   WorkerPrivate(WorkerPrivate* aParent,
                 const nsAString& aScriptURL, bool aIsChromeWorker,
@@ -1374,23 +1401,15 @@ private:
       status = mStatus;
     }
 
-    if (status >= Killing) {
-      return false;
+    if (status < Terminating) {
+      return true;
     }
-    if (status >= Running) {
-      return mKillTime.IsNull() || RemainingRunTimeMS() > 0;
-    }
-    return true;
-  }
 
-  uint32_t
-  RemainingRunTimeMS() const;
+    return false;
+  }
 
   void
   CancelAllTimeouts();
-
-  bool
-  ScheduleKillCloseEventRunnable();
 
   enum class ProcessAllControlRunnablesResult
   {

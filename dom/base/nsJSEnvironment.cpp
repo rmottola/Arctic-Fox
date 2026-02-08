@@ -56,7 +56,7 @@
 #include "mozilla/dom/DOMExceptionBinding.h"
 #include "mozilla/dom/ErrorEvent.h"
 #include "nsAXPCNativeCallContext.h"
-#include "mozilla/CycleCollectedJSRuntime.h"
+#include "mozilla/CycleCollectedJSContext.h"
 
 #include "nsJSPrincipals.h"
 
@@ -75,7 +75,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/dom/asmjscache/AsmJSCache.h"
 #include "mozilla/dom/CanvasRenderingContext2DBinding.h"
-#include "mozilla/CycleCollectedJSRuntime.h"
+#include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/ContentEvents.h"
 
 #include "nsCycleCollectionNoteRootCallback.h"
@@ -1208,7 +1208,7 @@ nsJSContext::GarbageCollectNow(JS::gcreason::Reason aReason,
     sNeedsFullGC = false;
     JS::PrepareForFullGC(sContext);
   } else {
-    CycleCollectedJSRuntime::Get()->PrepareWaitingZonesForGC();
+    CycleCollectedJSContext::Get()->PrepareWaitingZonesForGC();
   }
 
   if (aIncremental == IncrementalGC) {
@@ -1274,16 +1274,37 @@ struct CycleCollectorStats
   constexpr CycleCollectorStats() :
     mMaxGCDuration(0), mRanSyncForgetSkippable(false), mSuspected(0),
     mMaxSkippableDuration(0), mMaxSliceTime(0), mMaxSliceTimeSinceClear(0),
-    mTotalSliceTime(0), mAnyLockedOut(false), mExtraForgetSkippableCalls(0) {}
+    mTotalSliceTime(0), mAnyLockedOut(false), mExtraForgetSkippableCalls(0),
+    mFile(nullptr) {}
 
   void Init()
   {
     Clear();
     mMaxSliceTimeSinceClear = 0;
+
+    char* env = getenv("MOZ_CCTIMER");
+    if (!env) {
+      return;
+    }
+    if (strcmp(env, "none") == 0) {
+      mFile = nullptr;
+    } else if (strcmp(env, "stdout") == 0) {
+      mFile = stdout;
+    } else if (strcmp(env, "stderr") == 0) {
+      mFile = stderr;
+    } else {
+      mFile = fopen(env, "a");
+      if (!mFile) {
+        MOZ_CRASH("Failed to open MOZ_CCTIMER log file.");
+      }
+    }
   }
 
   void Clear()
   {
+    if (mFile && mFile != stdout && mFile != stderr) {
+      fclose(mFile);
+    }
     mBeginSliceTime = TimeStamp();
     mEndSliceTime = TimeStamp();
     mBeginTime = TimeStamp();
@@ -1352,6 +1373,9 @@ struct CycleCollectorStats
   bool mAnyLockedOut;
 
   int32_t mExtraForgetSkippableCalls;
+
+  // A file to dump CC activity to; set by MOZ_CCTIMER environment variable.
+  FILE* mFile;
 };
 
 CycleCollectorStats gCCStats;
@@ -1562,11 +1586,6 @@ nsJSContext::EndCycleCollectionCallback(CycleCollectorResults &aResults)
            NS_GC_DELAY - std::min(ccNowDuration, kMaxICCDuration));
   }
 
-  PRTime endCCTime;
-  if (sPostGCEventsToObserver) {
-    endCCTime = PR_Now();
-  }
-
   // Log information about the CC via telemetry, JSON and the console.
   Telemetry::Accumulate(Telemetry::CYCLE_COLLECTOR_FINISH_IGC, gCCStats.mAnyLockedOut);
   Telemetry::Accumulate(Telemetry::CYCLE_COLLECTOR_SYNC_SKIPPABLE, gCCStats.mRanSyncForgetSkippable);
@@ -1589,7 +1608,7 @@ nsJSContext::EndCycleCollectionCallback(CycleCollectorResults &aResults)
   uint32_t minForgetSkippableTime = (sMinForgetSkippableTime == UINT32_MAX)
     ? 0 : sMinForgetSkippableTime;
 
-  if (sPostGCEventsToConsole) {
+  if (sPostGCEventsToConsole || gCCStats.mFile) {
     nsCString mergeMsg;
     if (aResults.mMergedZones) {
       mergeMsg.AssignLiteral(" merged");
@@ -1619,10 +1638,15 @@ nsJSContext::EndCycleCollectionCallback(CycleCollectorResults &aResults)
                                           PR_USEC_PER_MSEC,
                                         sTotalForgetSkippableTime / PR_USEC_PER_MSEC,
                                         gCCStats.mMaxSkippableDuration, sRemovedPurples));
-    nsCOMPtr<nsIConsoleService> cs =
-      do_GetService(NS_CONSOLESERVICE_CONTRACTID);
-    if (cs) {
-      cs->LogStringMessage(msg.get());
+    if (sPostGCEventsToConsole) {
+      nsCOMPtr<nsIConsoleService> cs =
+        do_GetService(NS_CONSOLESERVICE_CONTRACTID);
+      if (cs) {
+        cs->LogStringMessage(msg.get());
+      }
+    }
+    if (gCCStats.mFile) {
+      fprintf(gCCStats.mFile, "%s\n", NS_ConvertUTF16toUTF8(msg).get());
     }
   }
 
@@ -1654,7 +1678,8 @@ nsJSContext::EndCycleCollectionCallback(CycleCollectorResults &aResults)
              u"\"removed\": %lu } "
        u"}");
     nsString json;
-    json.Adopt(nsTextFormatter::smprintf(kJSONFmt.get(), endCCTime, ccNowDuration,
+
+    json.Adopt(nsTextFormatter::smprintf(kJSONFmt.get(), PR_Now(), ccNowDuration,
                                          gCCStats.mMaxSliceTime,
                                          gCCStats.mTotalSliceTime,
                                          gCCStats.mMaxGCDuration,
@@ -2161,11 +2186,15 @@ DOMGCSliceCallback(JSContext* aCx, JS::GCProgress aProgress, const JS::GCDescrip
       }
 
       if (sPostGCEventsToConsole) {
-        nsString gcstats;
+        NS_NAMED_LITERAL_STRING(kFmt, "[%s] ");
+        nsString prefix, gcstats;
         gcstats.Adopt(aDesc.formatSliceMessage(aCx));
+        prefix.Adopt(nsTextFormatter::smprintf(kFmt.get(),
+                                               ProcessNameForCollectorLog()));
+        nsString msg = prefix + gcstats;
         nsCOMPtr<nsIConsoleService> cs = do_GetService(NS_CONSOLESERVICE_CONTRACTID);
         if (cs) {
-          cs->LogStringMessage(gcstats.get());
+          cs->LogStringMessage(msg.get());
         }
       }
 
@@ -2189,17 +2218,6 @@ nsJSContext::SetWindowProxy(JS::Handle<JSObject*> aWindowProxy)
 
 JSObject*
 nsJSContext::GetWindowProxy()
-{
-  JSObject* windowProxy = GetWindowProxyPreserveColor();
-  if (windowProxy) {
-    JS::ExposeObjectToActiveJS(windowProxy);
-  }
-
-  return windowProxy;
-}
-
-JSObject*
-nsJSContext::GetWindowProxyPreserveColor()
 {
   return mWindowProxy;
 }
@@ -2356,6 +2374,62 @@ AsmJSCacheOpenEntryForWrite(JS::Handle<JSObject*> aGlobal,
                                        aSize, aMemory, aHandle);
 }
 
+class AsyncTaskRunnable final : public Runnable
+{
+  ~AsyncTaskRunnable()
+  {
+    MOZ_ASSERT(!mTask);
+  }
+
+public:
+  explicit AsyncTaskRunnable(JS::AsyncTask* aTask)
+    : mTask(aTask)
+  {
+    MOZ_ASSERT(mTask);
+  }
+
+protected:
+  NS_IMETHOD Run() override
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(sContext == mTask->user);
+
+    AutoJSAPI jsapi;
+    jsapi.Init();
+
+    mTask->finish(sContext);
+    mTask = nullptr;  // mTask may delete itself
+
+    return NS_OK;
+  }
+
+private:
+  JS::AsyncTask* mTask;
+};
+
+static bool
+StartAsyncTaskCallback(JSContext* aCx, JS::AsyncTask* aTask)
+{
+  MOZ_ASSERT(aCx == sContext);
+  aTask->user = sContext;
+  return true;
+}
+
+static bool
+FinishAsyncTaskCallback(JS::AsyncTask* aTask)
+{
+  // AsyncTasks can finish during shutdown so cannot simply
+  // NS_DispatchToMainThread.
+  nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
+  if (!mainThread) {
+    return false;
+  }
+
+  RefPtr<AsyncTaskRunnable> r = new AsyncTaskRunnable(aTask);
+  MOZ_ALWAYS_SUCCEEDS(mainThread->Dispatch(r.forget(), NS_DISPATCH_NORMAL));
+  return true;
+}
+
 void
 nsJSContext::EnsureStatics()
 {
@@ -2390,6 +2464,8 @@ nsJSContext::EnsureStatics()
     asmjscache::CloseEntryForWrite
   };
   JS::SetAsmJSCacheOps(sContext, &asmJSCacheOps);
+
+  JS::SetAsyncTaskCallbacks(sContext, StartAsyncTaskCallback, FinishAsyncTaskCallback);
 
   // Set these global xpconnect options...
   Preferences::RegisterCallbackAndCall(SetMemoryHighWaterMarkPrefChangedCallback,
@@ -2494,6 +2570,44 @@ void
 nsJSContext::NotifyDidPaint()
 {
   sDidPaintAfterPreviousICCSlice = true;
+  if (sICCTimer) {
+    static uint32_t sCount = 0;
+    // 16 here is the common value for refresh driver tick frequency.
+    static const uint32_t kTicksPerSliceDelay = kICCIntersliceDelay / 16;
+    if (++sCount % kTicksPerSliceDelay != 0) {
+      // Don't trigger CC slice all the time after paint, but often still.
+      // The key point is to trigger it right after paint, especially when
+      // we're running RefreshDriver constantly.
+      return;
+    }
+
+    sICCTimer->Cancel();
+    ICCTimerFired(nullptr, nullptr);
+    if (sICCTimer) {
+      sICCTimer->InitWithNamedFuncCallback(ICCTimerFired, nullptr,
+                                           kICCIntersliceDelay,
+                                           nsITimer::TYPE_REPEATING_SLACK,
+                                           "ICCTimerFired");
+    }
+  } else if (sCCTimer) {
+    static uint32_t sCount = 0;
+    static const uint32_t kTicksPerForgetSkippableDelay =
+      NS_CC_SKIPPABLE_DELAY / 16;
+    if (++sCount % kTicksPerForgetSkippableDelay != 0) {
+      // The comment above about triggering CC slice applies to forget skippable
+      // too.
+      return;
+    }
+
+    sCCTimer->Cancel();
+    CCTimerFired(nullptr, nullptr);
+    if (sCCTimer) {
+      sCCTimer->InitWithNamedFuncCallback(CCTimerFired, nullptr,
+                                          NS_CC_SKIPPABLE_DELAY,
+                                          nsITimer::TYPE_REPEATING_SLACK,
+                                          "CCTimerFired");
+    }
+  }
 }
 
 nsScriptNameSpaceManager*

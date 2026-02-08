@@ -193,6 +193,7 @@ namespace jit {
     _(JSOP_ARGUMENTS)          \
     _(JSOP_RUNONCE)            \
     _(JSOP_REST)               \
+    _(JSOP_TOASYNC)            \
     _(JSOP_TOID)               \
     _(JSOP_TOSTRING)           \
     _(JSOP_TABLESWITCH)        \
@@ -300,6 +301,7 @@ class BaselineCompiler : public BaselineCompilerSpecific
     MOZ_MUST_USE bool emitDebugTrap();
     MOZ_MUST_USE bool emitTraceLoggerEnter();
     MOZ_MUST_USE bool emitTraceLoggerExit();
+    MOZ_MUST_USE bool emitTraceLoggerResume(Register script, AllocatableGeneralRegisterSet& regs);
 
     void emitProfilerEnterFrame();
     void emitProfilerExitFrame();

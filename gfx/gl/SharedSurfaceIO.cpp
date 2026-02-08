@@ -165,7 +165,7 @@ SharedSurface_IOSurface::SharedSurface_IOSurface(const RefPtr<MacIOSurface>& ioS
 
 SharedSurface_IOSurface::~SharedSurface_IOSurface()
 {
-    if (!mGL->MakeCurrent())
+    if (!mGL || !mGL->MakeCurrent())
         return;
 
     mGL->fDeleteTextures(1, &mProdTex);
@@ -211,7 +211,7 @@ SharedSurface_IOSurface::ReadbackBySharedHandle(gfx::DataSourceSurface* out_surf
 
 /*static*/ UniquePtr<SurfaceFactory_IOSurface>
 SurfaceFactory_IOSurface::Create(GLContext* gl, const SurfaceCaps& caps,
-                                 const RefPtr<layers::ClientIPCAllocator>& allocator,
+                                 const RefPtr<layers::LayersIPCChannel>& allocator,
                                  const layers::TextureFlags& flags)
 {
     auto maxDims = gfx::IntSize::Truncate(MacIOSurface::GetMaxWidth(),

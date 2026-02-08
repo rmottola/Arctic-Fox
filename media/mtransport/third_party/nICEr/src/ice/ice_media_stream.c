@@ -619,8 +619,8 @@ int nr_ice_media_stream_component_nominated(nr_ice_media_stream *stream,nr_ice_c
       stream->pctx->handler->vtbl->stream_ready(stream->pctx->handler->obj,stream->local_stream);
     }
 
-    /* Now tell the peer_ctx that we're done */
-    if(r=nr_ice_peer_ctx_check_if_done(stream->pctx))
+    /* Now tell the peer_ctx that we're connected */
+    if(r=nr_ice_peer_ctx_check_if_connected(stream->pctx))
       ABORT(r);
 
   done:
@@ -660,8 +660,8 @@ int nr_ice_media_stream_component_failed(nr_ice_media_stream *stream,nr_ice_comp
       stream->pctx->handler->vtbl->stream_failed(stream->pctx->handler->obj,stream->local_stream);
     }
 
-    /* Now tell the peer_ctx that we're done */
-    if(r=nr_ice_peer_ctx_check_if_done(stream->pctx))
+    /* Now tell the peer_ctx that we're connected */
+    if(r=nr_ice_peer_ctx_check_if_connected(stream->pctx))
       ABORT(r);
 
     _status=0;
@@ -913,3 +913,21 @@ void nr_ice_media_stream_role_change(nr_ice_media_stream *stream)
     }
   }
 
+int nr_ice_media_stream_find_pair(nr_ice_media_stream *str, nr_ice_candidate *lcand, nr_ice_candidate *rcand, nr_ice_cand_pair **pair)
+  {
+    nr_ice_cand_pair_head *head = &str->check_list;
+    nr_ice_cand_pair *c1;
+
+    c1=TAILQ_FIRST(head);
+    while(c1){
+      if(c1->local == lcand &&
+         c1->remote == rcand) {
+        *pair=c1;
+        return(0);
+      }
+
+      c1=TAILQ_NEXT(c1,check_queue_entry);
+    }
+
+    return(R_NOT_FOUND);
+  }

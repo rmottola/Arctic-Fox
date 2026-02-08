@@ -157,9 +157,9 @@ public:
   explicit nsAsyncInstantiateEvent(nsObjectLoadingContent* aContent)
   : mContent(aContent) {}
 
-  ~nsAsyncInstantiateEvent() {}
+  ~nsAsyncInstantiateEvent() override = default;
 
-  NS_IMETHOD Run();
+  NS_IMETHOD Run() override;
 
 private:
   nsCOMPtr<nsIObjectLoadingContent> mContent;
@@ -190,9 +190,9 @@ public:
   explicit CheckPluginStopEvent(nsObjectLoadingContent* aContent)
   : mContent(aContent) {}
 
-  ~CheckPluginStopEvent() {}
+  ~CheckPluginStopEvent() override = default;
 
-  NS_IMETHOD Run();
+  NS_IMETHOD Run() override;
 
 private:
   nsCOMPtr<nsIObjectLoadingContent> mContent;
@@ -288,9 +288,9 @@ public:
     MOZ_ASSERT(aTarget && aDocument);
   }
 
-  ~nsSimplePluginEvent() {}
+  ~nsSimplePluginEvent() override = default;
 
-  NS_IMETHOD Run();
+  NS_IMETHOD Run() override;
 
 private:
   nsCOMPtr<nsISupports> mTarget;
@@ -336,9 +336,9 @@ public:
       mSubmittedCrashReport(submittedCrashReport)
   {}
 
-  ~nsPluginCrashedEvent() {}
+  ~nsPluginCrashedEvent() override = default;
 
-  NS_IMETHOD Run();
+  NS_IMETHOD Run() override;
 };
 
 NS_IMETHODIMP
@@ -369,78 +369,6 @@ nsPluginCrashedEvent::Run()
   event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
 
   EventDispatcher::DispatchDOMEvent(mContent, nullptr, event, nullptr, nullptr);
-  return NS_OK;
-}
-
-class nsStopPluginRunnable : public Runnable, public nsITimerCallback
-{
-public:
-  NS_DECL_ISUPPORTS_INHERITED
-
-  nsStopPluginRunnable(nsPluginInstanceOwner* aInstanceOwner,
-                       nsObjectLoadingContent* aContent)
-    : mInstanceOwner(aInstanceOwner)
-    , mContent(aContent)
-  {
-    NS_ASSERTION(aInstanceOwner, "need an owner");
-    NS_ASSERTION(aContent, "need a nsObjectLoadingContent");
-  }
-
-  // Runnable
-  NS_IMETHOD Run() override;
-
-  // nsITimerCallback
-  NS_IMETHOD Notify(nsITimer* timer) override;
-
-protected:
-  virtual ~nsStopPluginRunnable() {}
-
-private:
-  nsCOMPtr<nsITimer> mTimer;
-  RefPtr<nsPluginInstanceOwner> mInstanceOwner;
-  nsCOMPtr<nsIObjectLoadingContent> mContent;
-};
-
-NS_IMPL_ISUPPORTS_INHERITED(nsStopPluginRunnable, Runnable, nsITimerCallback)
-
-NS_IMETHODIMP
-nsStopPluginRunnable::Notify(nsITimer *aTimer)
-{
-  return Run();
-}
-
-NS_IMETHODIMP
-nsStopPluginRunnable::Run()
-{
-  // InitWithCallback calls Release before AddRef so we need to hold a
-  // strong ref on 'this' since we fall through to this scope if it fails.
-  nsCOMPtr<nsITimerCallback> kungFuDeathGrip = this;
-  nsCOMPtr<nsIAppShell> appShell = do_GetService(kAppShellCID);
-  if (appShell) {
-    uint32_t currentLevel = 0;
-    appShell->GetEventloopNestingLevel(&currentLevel);
-    if (currentLevel > mInstanceOwner->GetLastEventloopNestingLevel()) {
-      if (!mTimer)
-        mTimer = do_CreateInstance("@mozilla.org/timer;1");
-      if (mTimer) {
-        // Fire 100ms timer to try to tear down this plugin as quickly as
-        // possible once the nesting level comes back down.
-        nsresult rv = mTimer->InitWithCallback(this, 100,
-                                               nsITimer::TYPE_ONE_SHOT);
-        if (NS_SUCCEEDED(rv)) {
-          return rv;
-        }
-      }
-      NS_ERROR("Failed to setup a timer to stop the plugin later (at a safe "
-               "time). Stopping the plugin now, this might crash.");
-    }
-  }
-
-  mTimer = nullptr;
-
-  static_cast<nsObjectLoadingContent*>(mContent.get())->
-    DoStopPlugin(mInstanceOwner, false, true);
-
   return NS_OK;
 }
 
@@ -1012,15 +940,7 @@ nsObjectLoadingContent::BuildParametersArray()
   nsCOMPtr<nsIContent> content =
     do_QueryInterface(static_cast<nsIImageLoadingContent*>(this));
 
-  int32_t start = 0, end = content->GetAttrCount(), step = 1;
-  // HTML attributes are stored in reverse order.
-  if (content->IsHTMLElement() && content->IsInHTMLDocument()) {
-    start = end - 1;
-    end = -1;
-    step = -1;
-  }
-
-  for (int32_t i = start; i != end; i += step) {
+  for (uint32_t i = 0; i != content->GetAttrCount(); i += 1) {
     MozPluginParameter param;
     const nsAttrName* attrName = content->GetAttrNameAt(i);
     nsIAtom* atom = attrName->LocalName();
@@ -1255,21 +1175,22 @@ nsObjectLoadingContent::GetFrameLoader()
   return loader.forget();
 }
 
-NS_IMETHODIMP
-nsObjectLoadingContent::GetParentApplication(mozIApplication** aApplication)
+void
+nsObjectLoadingContent::PresetOpenerWindow(mozIDOMWindowProxy* aWindow, mozilla::ErrorResult& aRv)
 {
-  if (!aApplication) {
-    return NS_ERROR_FAILURE;
-  }
-
-  *aApplication = nullptr;
-  return NS_OK;
+  aRv.Throw(NS_ERROR_FAILURE);
 }
 
 NS_IMETHODIMP
 nsObjectLoadingContent::SetIsPrerendered()
 {
   return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+void
+nsObjectLoadingContent::InternalSetFrameLoader(nsIFrameLoader* aNewFrameLoader)
+{
+  MOZ_CRASH("You shouldn't be calling this function, it doesn't make any sense on this type.");
 }
 
 NS_IMETHODIMP
@@ -1377,7 +1298,7 @@ public:
   {}
 
 protected:
-  ~ObjectInterfaceRequestorShim() {}
+  ~ObjectInterfaceRequestorShim() = default;
   nsCOMPtr<nsIObjectLoadingContent> mContent;
 };
 
@@ -2466,6 +2387,7 @@ nsObjectLoadingContent::LoadObject(bool aNotify,
       }
 
       mFrameLoader = nsFrameLoader::Create(thisContent->AsElement(),
+                                           /* aOpener = */ nullptr,
                                            mNetworkCreated);
       if (!mFrameLoader) {
         NS_NOTREACHED("nsFrameLoader::Create failed");
@@ -2679,8 +2601,11 @@ nsObjectLoadingContent::OpenChannel()
                      nsIChannel::LOAD_CALL_CONTENT_SNIFFERS |
                      nsIChannel::LOAD_CLASSIFY_URI |
                      nsIChannel::LOAD_BYPASS_SERVICE_WORKER);
-
   NS_ENSURE_SUCCESS(rv, rv);
+  if (inherit) {
+    nsCOMPtr<nsILoadInfo> loadinfo = chan->GetLoadInfo();
+    loadinfo->SetPrincipalToInherit(thisContent->NodePrincipal());
+  }
 
   // Referrer
   nsCOMPtr<nsIHttpChannel> httpChan(do_QueryInterface(chan));
@@ -2910,7 +2835,7 @@ nsObjectLoadingContent::CreateStaticClone(nsObjectLoadingContent* aDest) const
   if (mFrameLoader) {
     nsCOMPtr<nsIContent> content =
       do_QueryInterface(static_cast<nsIImageLoadingContent*>(aDest));
-    nsFrameLoader* fl = nsFrameLoader::Create(content->AsElement(), false);
+    nsFrameLoader* fl = nsFrameLoader::Create(content->AsElement(), nullptr, false);
     if (fl) {
       aDest->mFrameLoader = fl;
       mFrameLoader->CreateStaticClone(fl);
@@ -3085,29 +3010,6 @@ nsObjectLoadingContent::GetSrcURI(nsIURI** aURI)
   return NS_OK;
 }
 
-static bool
-DoDelayedStop(nsPluginInstanceOwner* aInstanceOwner,
-              nsObjectLoadingContent* aContent,
-              bool aDelayedStop)
-{
-  // Don't delay stopping QuickTime (bug 425157), Flip4Mac (bug 426524),
-  // XStandard (bug 430219), CMISS Zinc (bug 429604).
-  if (aDelayedStop
-#if !(defined XP_WIN || defined MOZ_X11)
-      && !aInstanceOwner->MatchPluginName("QuickTime")
-      && !aInstanceOwner->MatchPluginName("Flip4Mac")
-      && !aInstanceOwner->MatchPluginName("XStandard plugin")
-      && !aInstanceOwner->MatchPluginName("CMISS Zinc Plugin")
-#endif
-      ) {
-    nsCOMPtr<nsIRunnable> evt =
-      new nsStopPluginRunnable(aInstanceOwner, aContent);
-    NS_DispatchToCurrentThread(evt);
-    return true;
-  }
-  return false;
-}
-
 void
 nsObjectLoadingContent::LoadFallback(FallbackType aType, bool aNotify) {
   EventStates oldState = ObjectState();
@@ -3171,16 +3073,13 @@ nsObjectLoadingContent::LoadFallback(FallbackType aType, bool aNotify) {
 }
 
 void
-nsObjectLoadingContent::DoStopPlugin(nsPluginInstanceOwner* aInstanceOwner,
-                                     bool aDelayedStop,
-                                     bool aForcedReentry)
+nsObjectLoadingContent::DoStopPlugin(nsPluginInstanceOwner* aInstanceOwner)
 {
   // DoStopPlugin can process events -- There may be pending
   // CheckPluginStopEvent events which can drop in underneath us and destroy the
-  // instance we are about to destroy. We prevent that with the mPluginStopping
-  // flag.  (aForcedReentry is only true from the callback of an earlier delayed
-  // stop)
-  if (mIsStopping && !aForcedReentry) {
+  // instance we are about to destroy. We prevent that with the mIsStopping
+  // flag.
+  if (mIsStopping) {
     return;
   }
   mIsStopping = true;
@@ -3189,10 +3088,6 @@ nsObjectLoadingContent::DoStopPlugin(nsPluginInstanceOwner* aInstanceOwner,
   RefPtr<nsNPAPIPluginInstance> inst;
   aInstanceOwner->GetInstance(getter_AddRefs(inst));
   if (inst) {
-    if (DoDelayedStop(aInstanceOwner, this, aDelayedStop)) {
-      return;
-    }
-
 #if defined(XP_MACOSX)
     aInstanceOwner->HidePluginWindow();
 #endif
@@ -3245,27 +3140,11 @@ nsObjectLoadingContent::StopPluginInstance()
   // the instance owner until the plugin is stopped.
   mInstanceOwner->SetFrame(nullptr);
 
-  bool delayedStop = false;
-#ifdef XP_WIN
-  // Force delayed stop for Real plugin only; see bug 420886, 426852.
-  RefPtr<nsNPAPIPluginInstance> inst;
-  mInstanceOwner->GetInstance(getter_AddRefs(inst));
-  if (inst) {
-    const char* mime = nullptr;
-    if (NS_SUCCEEDED(inst->GetMIMEType(&mime)) && mime) {
-      if (nsPluginHost::GetSpecialType(nsDependentCString(mime)) ==
-          nsPluginHost::eSpecialType_RealPlayer) {
-        delayedStop = true;
-      }
-    }
-  }
-#endif
-
   RefPtr<nsPluginInstanceOwner> ownerGrip(mInstanceOwner);
   mInstanceOwner = nullptr;
 
   // This can/will re-enter
-  DoStopPlugin(ownerGrip, delayedStop);
+  DoStopPlugin(ownerGrip);
 
   return NS_OK;
 }
@@ -3345,14 +3224,6 @@ nsObjectLoadingContent::DefaultFallbackType()
     return PLUGIN_ACTIVE;
   }
   return reason;
-}
-
-NS_IMETHODIMP
-nsObjectLoadingContent::GetHasRunningPlugin(bool *aHasPlugin)
-{
-  NS_ENSURE_TRUE(nsContentUtils::IsCallerChrome(), NS_ERROR_NOT_AVAILABLE);
-  *aHasPlugin = HasRunningPlugin();
-  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -3537,7 +3408,7 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
 }
 
 nsIDocument*
-nsObjectLoadingContent::GetContentDocument()
+nsObjectLoadingContent::GetContentDocument(nsIPrincipal& aSubjectPrincipal)
 {
   nsCOMPtr<nsIContent> thisContent =
     do_QueryInterface(static_cast<nsIImageLoadingContent*>(this));
@@ -3552,7 +3423,7 @@ nsObjectLoadingContent::GetContentDocument()
   }
 
   // Return null for cross-origin contentDocument.
-  if (!nsContentUtils::SubjectPrincipal()->SubsumesConsideringDomain(sub_doc->NodePrincipal())) {
+  if (!aSubjectPrincipal.SubsumesConsideringDomain(sub_doc->NodePrincipal())) {
     return nullptr;
   }
 
@@ -3888,10 +3759,6 @@ nsObjectLoadingContent::MaybeFireErrorEvent()
 nsObjectLoadingContent::SetupProtoChainRunner::SetupProtoChainRunner(
     nsObjectLoadingContent* aContent)
   : mContent(aContent)
-{
-}
-
-nsObjectLoadingContent::SetupProtoChainRunner::~SetupProtoChainRunner()
 {
 }
 

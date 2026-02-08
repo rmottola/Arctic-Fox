@@ -383,8 +383,13 @@ nsDOMDataChannel::DoOnMessageAvailable(const nsACString& aData,
 
   if (aBinary) {
     if (mBinaryType == DC_BINARY_TYPE_BLOB) {
-      rv = nsContentUtils::CreateBlobBuffer(cx, GetOwner(), aData, &jsData);
-      NS_ENSURE_SUCCESS(rv, rv);
+      RefPtr<Blob> blob =
+        Blob::CreateStringBlob(GetOwner(), aData, EmptyString());
+      MOZ_ASSERT(blob);
+
+      if (!ToJSValue(cx, blob, &jsData)) {
+        return NS_ERROR_FAILURE;
+      }
     } else if (mBinaryType == DC_BINARY_TYPE_ARRAYBUFFER) {
       JS::Rooted<JSObject*> arrayBuf(cx);
       rv = nsContentUtils::CreateArrayBuffer(cx, aData, arrayBuf.address());
@@ -402,10 +407,11 @@ nsDOMDataChannel::DoOnMessageAvailable(const nsACString& aData,
     jsData.setString(jsString);
   }
 
-  RefPtr<MessageEvent> event = NS_NewDOMMessageEvent(this, nullptr, nullptr);
+  RefPtr<MessageEvent> event = new MessageEvent(this, nullptr, nullptr);
 
   event->InitMessageEvent(nullptr, NS_LITERAL_STRING("message"), false, false,
-                          jsData, mOrigin, EmptyString(), nullptr, nullptr);
+                          jsData, mOrigin, EmptyString(), nullptr,
+                          Sequence<OwningNonNull<MessagePort>>());
   event->SetTrusted(true);
 
   LOG(("%p(%p): %s - Dispatching\n",this,(void*)mDataChannel,__FUNCTION__));

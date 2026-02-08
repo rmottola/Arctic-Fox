@@ -259,13 +259,13 @@
         </setter>
       </property>
 
-      <method name="setDocShellIsActiveAndForeground">
-        <parameter name="isActive"/>
+      <method name="preserveLayers">
+        <parameter name="preserve"/>
         <body><![CDATA[
-          // See the explanation for what this does in nsITabParent.ipdl
-
           let {frameLoader} = this.QueryInterface(Components.interfaces.nsIFrameLoaderOwner);
-          frameLoader.tabParent.setDocShellIsActiveAndForeground(isActive);
+          if (frameLoader.tabParent) {
+            frameLoader.tabParent.preserveLayers(preserve);
+          }
         ]]></body>
       </method>
 
@@ -466,7 +466,7 @@
               let menulist = document.getElementById(this.getAttribute("selectmenulist"));
               menulist.menupopup.style.direction = data.direction;
               this._selectParentHelper.populate(menulist, data.options, data.selectedIndex, this._fullZoom);
-              this._selectParentHelper.open(this, menulist, data.rect);
+              this._selectParentHelper.open(this, menulist, data.rect, data.isOpenedViaTouch);
               break;
             }
 

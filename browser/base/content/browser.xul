@@ -147,7 +147,16 @@
     <panel type="autocomplete" id="PopupAutoComplete" noautofocus="true" hidden="true"/>
 
     <!-- for url bar autocomplete -->
-    <panel type="autocomplete-richlistbox" id="PopupAutoCompleteRichResult" noautofocus="true" hidden="true"/>
+    <panel type="autocomplete-richlistbox"
+           id="PopupAutoCompleteRichResult"
+           noautofocus="true"
+           hidden="true"/>
+
+    <panel id="DateTimePickerPanel"
+           hidden="true"
+           noautofocus="true"
+           consumeoutsideclicks="false"
+           level="parent"/>
 
     <!-- for select dropdowns. The menupopup is what shows the list of options,
          and the popuponly menulist makes things like the menuactive attributes
@@ -1172,7 +1181,7 @@
         <image id="sidebar-throbber"/>
         <toolbarbutton class="close-icon tabbable" tooltiptext="&sidebarCloseButton.tooltip;" oncommand="SidebarUI.hide();"/>
       </sidebarheader>
-      <browser id="sidebar" flex="1" autoscroll="false" disablehistory="true"
+      <browser id="sidebar" flex="1" autoscroll="false" disablehistory="true" disablefullscreen="true"
                 style="min-width: 14em; width: 18em; max-width: 36em;" tooltip="aHTMLTooltip"/>
     </vbox>
 
@@ -1184,7 +1193,8 @@
                   tabcontainer="tabbrowser-tabs"
                   contentcontextmenu="contentAreaContextMenu"
                   autocompletepopup="PopupAutoComplete"
-                  selectmenulist="ContentSelectDropdown"/>
+                  selectmenulist="ContentSelectDropdown"
+                  datetimepicker="DateTimePickerPanel"/>
       <chatbar id="pinnedchats" layer="true" mousethrough="always" hidden="true"/>
     </vbox>
     <vbox id="browser-border-end" hidden="true" layer="true"/>

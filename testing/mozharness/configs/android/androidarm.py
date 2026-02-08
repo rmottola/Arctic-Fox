@@ -297,7 +297,7 @@ config = {
         },
         "mochitest-chrome": {
             "category": "mochitest",
-            "extra_args": ["--chrome"],
+            "extra_args": ["--flavor=chrome"],
         },
         "mochitest-gl-1": {
             "category": "mochitest-gl",

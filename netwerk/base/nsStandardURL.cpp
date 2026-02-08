@@ -65,6 +65,19 @@ static LazyLogModule gStandardURLLog("nsStandardURL");
 
 //----------------------------------------------------------------------------
 
+#ifdef MOZ_RUST_URLPARSE
+extern "C" int32_t c_fn_set_size(void * container, size_t size)
+{
+  ((nsACString *) container)->SetLength(size);
+  return 0;
+}
+
+extern "C" char * c_fn_get_buffer(void * container)
+{
+  return ((nsACString *) container)->BeginWriting();
+}
+#endif
+
 static nsresult
 EncodeString(nsIUnicodeEncoder *encoder, const nsAFlatString &str, nsACString &result)
 {
@@ -380,7 +393,7 @@ void
 nsStandardURL::InvalidateCache(bool invalidateCachedFile)
 {
     if (invalidateCachedFile)
-        mFile = 0;
+        mFile = nullptr;
     if (mHostA) {
         free(mHostA);
         mHostA = nullptr;
@@ -1178,6 +1191,7 @@ NS_IMPL_RELEASE(nsStandardURL)
 NS_INTERFACE_MAP_BEGIN(nsStandardURL)
     NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIStandardURL)
     NS_INTERFACE_MAP_ENTRY(nsIURI)
+    NS_INTERFACE_MAP_ENTRY(nsIURIWithQuery)
     NS_INTERFACE_MAP_ENTRY(nsIURL)
     NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIFileURL, mSupportsFileURL)
     NS_INTERFACE_MAP_ENTRY(nsIStandardURL)
@@ -1290,6 +1304,8 @@ nsStandardURL::GetHost(nsACString &result)
 NS_IMETHODIMP
 nsStandardURL::GetPort(int32_t *result)
 {
+    // should never be more than 16 bit
+    MOZ_ASSERT(mPort <= std::numeric_limits<uint16_t>::max());
     *result = mPort;
     return NS_OK;
 }
@@ -1472,11 +1488,6 @@ nsStandardURL::SetSpec(const nsACString &input)
         // finally, use the URLSegment member variables to build a normalized
         // copy of |spec|
         rv = BuildNormalizedSpec(spec);
-    }
-
-    // Make sure that a URLTYPE_AUTHORITY has a non-empty hostname.
-    if (mURLType == URLTYPE_AUTHORITY && mHost.mLen == -1) {
-        rv = NS_ERROR_MALFORMED_URI;
     }
 
     if (NS_FAILED(rv)) {
@@ -1918,6 +1929,12 @@ nsStandardURL::SetHost(const nsACString &input)
         return rv;
     }
 
+    nsAutoCString ipString;
+    rv = NormalizeIPv4(hostBuf, ipString);
+    if (NS_SUCCEEDED(rv)) {
+      hostBuf = ipString;
+    }
+
     // NormalizeIDN always copies if the call was successful
     host = hostBuf.get();
     len = hostBuf.Length();
@@ -1967,8 +1984,9 @@ nsStandardURL::SetPort(int32_t port)
     if ((port == mPort) || (mPort == -1 && port == mDefaultPort))
         return NS_OK;
 
-    // ports must be >= 0
-    if (port < -1) // -1 == use default
+    // ports must be >= 0 and 16 bit
+    // -1 == use default
+    if (port < -1 || port > std::numeric_limits<uint16_t>::max())
         return NS_ERROR_MALFORMED_URI;
 
     if (mURLType == URLTYPE_NO_AUTHORITY) {
@@ -3080,26 +3098,20 @@ nsStandardURL::SetFile(nsIFile *file)
     rv = net_GetURLSpecFromFile(file, url);
     if (NS_FAILED(rv)) return rv;
 
-    uint32_t oldURLType = mURLType;
-    uint32_t oldDefaultPort = mDefaultPort;
-    rv = Init(nsIStandardURL::URLTYPE_NO_AUTHORITY, -1, url, nullptr, nullptr);
+    SetSpec(url);
 
-    if (NS_FAILED(rv)) {
-        // Restore the old url type and default port if the call to Init fails.
-        mURLType = oldURLType;
-        mDefaultPort = oldDefaultPort;
-        return rv;
-    }
+    rv = Init(mURLType, mDefaultPort, url, nullptr, nullptr);
 
     // must clone |file| since its value is not guaranteed to remain constant
-    InvalidateCache();
-    if (NS_FAILED(file->Clone(getter_AddRefs(mFile)))) {
-        NS_WARNING("nsIFile::Clone failed");
-        // failure to clone is not fatal (GetFile will generate mFile)
-        mFile = nullptr;
+    if (NS_SUCCEEDED(rv)) {
+        InvalidateCache();
+        if (NS_FAILED(file->Clone(getter_AddRefs(mFile)))) {
+            NS_WARNING("nsIFile::Clone failed");
+            // failure to clone is not fatal (GetFile will generate mFile)
+            mFile = nullptr;
+        }
     }
-
-    return NS_OK;
+    return rv;
 }
 
 //----------------------------------------------------------------------------
@@ -3123,7 +3135,8 @@ nsStandardURL::Init(uint32_t urlType,
 {
     ENSURE_MUTABLE();
 
-    if (spec.Length() > (uint32_t) net_GetURLMaxLength()) {
+    if (spec.Length() > (uint32_t) net_GetURLMaxLength() ||
+        defaultPort > std::numeric_limits<uint16_t>::max()) {
         return NS_ERROR_MALFORMED_URI;
     }
 
@@ -3173,6 +3186,11 @@ nsStandardURL::SetDefaultPort(int32_t aNewDefaultPort)
     ENSURE_MUTABLE();
 
     InvalidateCache();
+
+    // should never be more than 16 bit
+    if (aNewDefaultPort >= std::numeric_limits<uint16_t>::max()) {
+        return NS_ERROR_MALFORMED_URI;
+    }
 
     // If we're already using the new default-port as a custom port, then clear
     // it off of our mSpec & set mPort to -1, to indicate that we'll be using

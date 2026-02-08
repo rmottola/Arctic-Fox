@@ -13,7 +13,9 @@
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/dom/ipc/BlobChild.h"
 #include "mozilla/dom/ipc/StructuredCloneData.h"
+#include "mozilla/ipc/FileDescriptorSetChild.h"
 #include "mozilla/ipc/InputStreamUtils.h"
+#include "mozilla/ipc/SendStream.h"
 
 #include "nsPrintfCString.h"
 #include "xpcpublic.h"
@@ -42,7 +44,6 @@ nsIContentChild::AllocPBrowserChild(const TabId& aTabId,
                                     const IPCTabContext& aContext,
                                     const uint32_t& aChromeFlags,
                                     const ContentParentId& aCpID,
-                                    const bool& aIsForApp,
                                     const bool& aIsForBrowser)
 {
   // We'll happily accept any kind of IPCTabContext here; we don't need to
@@ -109,7 +110,33 @@ nsIContentChild::GetOrCreateActorForBlobImpl(BlobImpl* aImpl)
   return actor;
 }
 
+PSendStreamChild*
+nsIContentChild::AllocPSendStreamChild()
+{
+  MOZ_CRASH("PSendStreamChild actors should be manually constructed!");
+}
+
 bool
+nsIContentChild::DeallocPSendStreamChild(PSendStreamChild* aActor)
+{
+  delete aActor;
+  return true;
+}
+
+PFileDescriptorSetChild*
+nsIContentChild::AllocPFileDescriptorSetChild(const FileDescriptor& aFD)
+{
+  return new FileDescriptorSetChild(aFD);
+}
+
+bool
+nsIContentChild::DeallocPFileDescriptorSetChild(PFileDescriptorSetChild* aActor)
+{
+  delete static_cast<FileDescriptorSetChild*>(aActor);
+  return true;
+}
+
+mozilla::ipc::IPCResult
 nsIContentChild::RecvAsyncMessage(const nsString& aMsg,
                                   InfallibleTArray<CpowEntry>&& aCpows,
                                   const IPC::Principal& aPrincipal,
@@ -124,7 +151,7 @@ nsIContentChild::RecvAsyncMessage(const nsString& aMsg,
     cpm->ReceiveMessage(static_cast<nsIContentFrameMessageManager*>(cpm.get()), nullptr,
                         aMsg, false, &data, &cpows, aPrincipal, nullptr);
   }
-  return true;
+  return IPC_OK();
 }
 
 } // namespace dom

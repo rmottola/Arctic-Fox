@@ -254,14 +254,13 @@ public:
   WindowHook&             GetWindowHook() { return mWindowHook; }
   nsWindow*               GetParentWindow(bool aIncludeOwner);
   // Get an array of all nsWindow*s on the main thread.
-  typedef void            (WindowEnumCallback)(nsWindow*);
-  static void             EnumAllWindows(WindowEnumCallback aCallback);
+  static nsTArray<nsWindow*> EnumAllWindows();
 
   /**
    * Misc.
    */
   virtual bool            AutoErase(HDC dc);
-  bool ComputeShouldAccelerate() override;
+  bool WidgetTypeSupportsAcceleration() override;
 
   void                    ForcePresent();
 

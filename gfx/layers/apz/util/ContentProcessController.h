@@ -21,6 +21,17 @@ namespace layers {
 
 class APZChild;
 
+/**
+ * ContentProcessController is a GeckoContentController for a TabChild, and is always
+ * remoted using PAPZ/APZChild.
+ *
+ * ContentProcessController is created in ContentChild when a layer tree id has
+ * been allocated for a PBrowser that lives in that content process, and is destroyed
+ * when the Destroy message is received, or when the tab dies.
+ *
+ * If ContentProcessController needs to implement a new method on GeckoContentController
+ * PAPZ, APZChild, and RemoteContentController must be updated to handle it.
+ */
 class ContentProcessController final
       : public GeckoContentController
 {
@@ -42,6 +53,11 @@ public:
                  Modifiers aModifiers,
                  const ScrollableLayerGuid& aGuid,
                  uint64_t aInputBlockId) override;
+
+  void NotifyPinchGesture(PinchGestureInput::PinchGestureType aType,
+                          const ScrollableLayerGuid& aGuid,
+                          LayoutDeviceCoord aSpanChange,
+                          Modifiers aModifiers) override;
 
   void NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                             APZStateChange aChange,

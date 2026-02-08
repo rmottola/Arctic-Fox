@@ -10,4 +10,8 @@ Upstream code can be viewed at
 and cloned by
   git clone https://github.com/google/brotli
 
+The in-tree copy is updated by running
+  sh update.sh
+from within the modules/brotli directory.
+
 Current version: [commit 29d31d5921b0a2b323ac24e7f7d0cdc9a3c0dd08].

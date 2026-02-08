@@ -7,7 +7,7 @@
 
 #include "mozilla/css/ErrorReporter.h"
 
-#include "mozilla/CSSStyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 #include "mozilla/css/Loader.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
@@ -35,7 +35,10 @@ public:
       mURI = aURI;
 
       nsAutoCString cSpec;
-      mURI->GetSpec(cSpec);
+      nsresult rv = mURI->GetSpec(cSpec);
+      if (NS_FAILED(rv)) {
+        cSpec.AssignLiteral("[nsIURI::GetSpec failed]");
+      }
       CopyUTF8toUTF16(cSpec, mSpec);
     }
     return mSpec;

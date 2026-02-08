@@ -35,6 +35,7 @@
 #include "nsIFile.h"
 #include "nsISimpleEnumerator.h"
 #include "nsThreadUtils.h"
+#include "GMPCrashHelper.h"
 
 #include "mozilla/dom/PluginCrashedEvent.h"
 #include "mozilla/EventDispatcher.h"
@@ -349,9 +350,11 @@ class GetGMPContentParentForVideoDecoderDone : public GetGMPContentParentCallbac
 {
 public:
   explicit GetGMPContentParentForVideoDecoderDone(UniquePtr<GetGMPVideoDecoderCallback>&& aCallback,
-                                                  GMPCrashHelper* aHelper)
+                                                  GMPCrashHelper* aHelper,
+                                                  uint32_t aDecryptorId)
    : mCallback(Move(aCallback))
    , mHelper(aHelper)
+   , mDecryptorId(aDecryptorId)
   {
   }
 
@@ -359,7 +362,7 @@ public:
   {
     GMPVideoDecoderParent* gmpVDP = nullptr;
     GMPVideoHostImpl* videoHost = nullptr;
-    if (aGMPParent && NS_SUCCEEDED(aGMPParent->GetGMPVideoDecoder(&gmpVDP))) {
+    if (aGMPParent && NS_SUCCEEDED(aGMPParent->GetGMPVideoDecoder(&gmpVDP, mDecryptorId))) {
       videoHost = &gmpVDP->Host();
       gmpVDP->SetCrashHelper(mHelper);
     }
@@ -369,13 +372,15 @@ public:
 private:
   UniquePtr<GetGMPVideoDecoderCallback> mCallback;
   RefPtr<GMPCrashHelper> mHelper;
+  const uint32_t mDecryptorId;
 };
 
 NS_IMETHODIMP
-GeckoMediaPluginService::GetGMPVideoDecoder(GMPCrashHelper* aHelper,
-                                            nsTArray<nsCString>* aTags,
-                                            const nsACString& aNodeId,
-                                            UniquePtr<GetGMPVideoDecoderCallback>&& aCallback)
+GeckoMediaPluginService::GetDecryptingGMPVideoDecoder(GMPCrashHelper* aHelper,
+                                                      nsTArray<nsCString>* aTags,
+                                                      const nsACString& aNodeId,
+                                                      UniquePtr<GetGMPVideoDecoderCallback>&& aCallback,
+                                                      uint32_t aDecryptorId)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
   NS_ENSURE_ARG(aTags && aTags->Length() > 0);
@@ -386,7 +391,7 @@ GeckoMediaPluginService::GetGMPVideoDecoder(GMPCrashHelper* aHelper,
   }
 
   UniquePtr<GetGMPContentParentCallback> callback(
-    new GetGMPContentParentForVideoDecoderDone(Move(aCallback), aHelper));
+    new GetGMPContentParentForVideoDecoderDone(Move(aCallback), aHelper, aDecryptorId));
   if (!GetContentParentFrom(aHelper,
                             aNodeId,
                             NS_LITERAL_CSTRING(GMP_API_VIDEO_DECODER),
@@ -510,15 +515,6 @@ GeckoMediaPluginService::GetGMPDecryptor(GMPCrashHelper* aHelper,
   return NS_OK;
 }
 
-NS_IMETHODIMP
-GeckoMediaPluginService::HasPluginForAPI(const nsACString& aAPI,
-                                         nsTArray<nsCString>* aTags,
-                                         bool* aOutHavePlugin)
-{
-  nsCString unused;
-  return GetPluginVersionForAPI(aAPI, aTags, aOutHavePlugin, unused);
-}
-
 void
 GeckoMediaPluginService::ConnectCrashHelper(uint32_t aPluginId, GMPCrashHelper* aHelper)
 {
@@ -557,17 +553,3 @@ void GeckoMediaPluginService::DisconnectCrashHelper(GMPCrashHelper* aHelper)
 
 } // namespace gmp
 } // namespace mozilla
-
-NS_IMPL_ADDREF(GMPCrashHelper)
-NS_IMPL_RELEASE_WITH_DESTROY(GMPCrashHelper, Destroy())
-
-void
-GMPCrashHelper::Destroy()
-{
-  if (NS_IsMainThread()) {
-    delete this;
-  } else {
-    // Don't addref, as then we'd end up releasing after the detele runs!
-    NS_DispatchToMainThread(mozilla::NewNonOwningRunnableMethod(this, &GMPCrashHelper::Destroy));
-  }
-}

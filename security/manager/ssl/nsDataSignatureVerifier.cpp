@@ -12,6 +12,7 @@
 #include "nsCOMPtr.h"
 #include "nsNSSComponent.h"
 #include "nssb64.h"
+#include "pkix/pkixnss.h"
 #include "pkix/pkixtypes.h"
 #include "ScopedNSSTypes.h"
 #include "secerr.h"
@@ -262,11 +263,17 @@ VerifyCertificate(CERTCertificate* cert, void* voidContext, void* pinArg)
   RefPtr<SharedCertVerifier> certVerifier(GetDefaultCertVerifier());
   NS_ENSURE_TRUE(certVerifier, NS_ERROR_UNEXPECTED);
 
-  return MapSECStatus(certVerifier->VerifyCert(cert,
-                                               certificateUsageObjectSigner,
-                                               Now(), pinArg,
-                                               nullptr, // hostname
-                                               context->builtChain));
+  mozilla::pkix::Result result =
+    certVerifier->VerifyCert(cert,
+                             certificateUsageObjectSigner,
+                             Now(), pinArg,
+                             nullptr, // hostname
+                             context->builtChain);
+  if (result != Success) {
+    return GetXPCOMFromNSSError(MapResultToPRErrorCode(result));
+  }
+
+  return NS_OK;
 }
 
 } // namespace
@@ -292,8 +299,10 @@ nsDataSignatureVerifier::VerifySignature(const char* aRSABuf,
   *aSigningCert = nullptr;
 
   Digest digest;
-  nsresult rv = digest.DigestBuf(SEC_OID_SHA1, uint8_t_ptr_cast(aPlaintext),
-                                 aPlaintextLen);
+  nsresult rv = digest.DigestBuf(
+    SEC_OID_SHA1,
+    BitwiseCast<const uint8_t*, const char*>(aPlaintext),
+    aPlaintextLen);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }

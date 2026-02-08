@@ -9,6 +9,7 @@
 #endif
 
 #include "mozilla/IntegerPrintfMacros.h"
+#include "mozilla/Sprintf.h"
 
 #include "jscntxt.h"
 #include "jsgc.h"
@@ -174,7 +175,7 @@ gc::GCRuntime::startVerifyPreBarriers()
     if (verifyPreData || isIncrementalGCInProgress())
         return;
 
-    if (!IsIncrementalGCSafe(rt))
+    if (IsIncrementalGCUnsafe(rt) != AbortReason::None)
         return;
 
     number++;
@@ -293,22 +294,19 @@ js::gc::AssertSafeToSkipBarrier(TenuredCell* thing)
     MOZ_ASSERT(!zone->needsIncrementalBarrier() || zone->isAtomsZone());
 }
 
-static void
-AssertMarkedOrAllocated(const EdgeValue& edge)
+static bool
+IsMarkedOrAllocated(const EdgeValue& edge)
 {
     if (!edge.thing || IsMarkedOrAllocated(TenuredCell::fromPointer(edge.thing)))
-        return;
+        return true;
 
     // Permanent atoms and well-known symbols aren't marked during graph traversal.
     if (edge.kind == JS::TraceKind::String && static_cast<JSString*>(edge.thing)->isPermanentAtom())
-        return;
+        return true;
     if (edge.kind == JS::TraceKind::Symbol && static_cast<JS::Symbol*>(edge.thing)->isWellKnownSymbol())
-        return;
+        return true;
 
-    char msgbuf[1024];
-    snprintf(msgbuf, sizeof(msgbuf), "[barrier verifier] Unmarked edge: %s", edge.label);
-    MOZ_ReportAssertionFailure(msgbuf, __FILE__, __LINE__);
-    MOZ_CRASH();
+    return false;
 }
 
 void
@@ -344,7 +342,7 @@ gc::GCRuntime::endVerifyPreBarriers()
     verifyPreData = nullptr;
     incrementalState = State::NotActive;
 
-    if (!compartmentCreated && IsIncrementalGCSafe(rt)) {
+    if (!compartmentCreated && IsIncrementalGCUnsafe(rt) == AbortReason::None) {
         CheckEdgeTracer cetrc(rt);
 
         /* Start after the roots. */
@@ -354,8 +352,19 @@ gc::GCRuntime::endVerifyPreBarriers()
             js::TraceChildren(&cetrc, node->thing, node->kind);
 
             if (node->count <= MAX_VERIFIER_EDGES) {
-                for (uint32_t i = 0; i < node->count; i++)
-                    AssertMarkedOrAllocated(node->edges[i]);
+                for (uint32_t i = 0; i < node->count; i++) {
+                    EdgeValue& edge = node->edges[i];
+                    if (!IsMarkedOrAllocated(edge)) {
+                        char msgbuf[1024];
+                        SprintfLiteral(msgbuf,
+                                       "[barrier verifier] Unmarked edge: %s %p '%s' edge to %s %p",
+                                       JS::GCTraceKindToAscii(node->kind), node->thing,
+                                       edge.label,
+                                       JS::GCTraceKindToAscii(edge.kind), edge.thing);
+                        MOZ_ReportAssertionFailure(msgbuf, __FILE__, __LINE__);
+                        MOZ_CRASH();
+                    }
+                }
             }
 
             node = NextNode(node);
@@ -430,7 +439,7 @@ class CheckHeapTracer : public JS::CallbackTracer
   public:
     explicit CheckHeapTracer(JSRuntime* rt);
     bool init();
-    bool check(AutoLockForExclusiveAccess& lock);
+    void check(AutoLockForExclusiveAccess& lock);
 
   private:
     void onChild(const JS::GCCellPtr& thing) override;
@@ -472,6 +481,12 @@ CheckHeapTracer::init()
     return visited.init();
 }
 
+inline static bool
+IsValidGCThingPointer(Cell* cell)
+{
+    return (uintptr_t(cell) & CellMask) == 0;
+}
+
 void
 CheckHeapTracer::onChild(const JS::GCCellPtr& thing)
 {
@@ -484,9 +499,10 @@ CheckHeapTracer::onChild(const JS::GCCellPtr& thing)
         return;
     }
 
-    if (!IsGCThingValidAfterMovingGC(cell)) {
+    if (!IsValidGCThingPointer(cell) || !IsGCThingValidAfterMovingGC(cell))
+    {
         failures++;
-        fprintf(stderr, "Stale pointer %p\n", cell);
+        fprintf(stderr, "Bad pointer %p\n", cell);
         const char* name = contextName();
         for (int index = parentIndex; index != -1; index = stack[index].parentIndex) {
             const WorkItem& parent = stack[index];
@@ -504,12 +520,13 @@ CheckHeapTracer::onChild(const JS::GCCellPtr& thing)
         oom = true;
 }
 
-bool
+void
 CheckHeapTracer::check(AutoLockForExclusiveAccess& lock)
 {
     // The analysis thinks that traceRuntime might GC by calling a GC callback.
     JS::AutoSuppressGCAnalysis nogc;
-    rt->gc.traceRuntime(this, lock);
+    if (!rt->isBeingDestroyed())
+        rt->gc.traceRuntime(this, lock);
 
     while (!stack.empty()) {
         WorkItem item = stack.back();
@@ -523,24 +540,22 @@ CheckHeapTracer::check(AutoLockForExclusiveAccess& lock)
     }
 
     if (oom)
-        return false;
+        return;
 
     if (failures) {
-        fprintf(stderr, "Heap check: %zu failure(s) out of %" PRIu32 " pointers checked\n",
+        fprintf(stderr, "Heap check: %" PRIuSIZE " failure(s) out of %" PRIu32 " pointers checked\n",
                 failures, visited.count());
     }
     MOZ_RELEASE_ASSERT(failures == 0);
-
-    return true;
 }
 
 void
-js::gc::CheckHeapAfterMovingGC(JSRuntime* rt)
+js::gc::CheckHeapAfterGC(JSRuntime* rt)
 {
     AutoTraceSession session(rt, JS::HeapState::Tracing);
     CheckHeapTracer tracer(rt);
-    if (!tracer.init() || !tracer.check(session.lock))
-        fprintf(stderr, "OOM checking heap\n");
+    if (tracer.init())
+        tracer.check(session.lock);
 }
 
 #endif /* JSGC_HASH_TABLE_CHECKS */

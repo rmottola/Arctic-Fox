@@ -99,6 +99,7 @@ EXPORTS += [
 ]
 
 EXPORTS.mozilla += [
+    'CSSAlignUtils.h',
     'ReflowInput.h',
     'ReflowOutput.h',
     'WritingModes.h',
@@ -115,6 +116,7 @@ EXPORTS.mozilla.layout += [
 UNIFIED_SOURCES += [
     'AsyncScrollBase.cpp',
     'BlockReflowInput.cpp',
+    'CSSAlignUtils.cpp',
     'DetailsFrame.cpp',
     'FrameChildList.cpp',
     'MathMLTextRunFactory.cpp',

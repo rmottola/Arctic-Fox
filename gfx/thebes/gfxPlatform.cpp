@@ -6,7 +6,6 @@
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ImageBridgeChild.h"
-#include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUProcessManager.h"
@@ -96,10 +95,6 @@
 #include "TexturePoolOGL.h"
 #endif
 
-#ifdef MOZ_WIDGET_GONK
-#include "mozilla/layers/GrallocTextureHost.h"
-#endif
-
 #include "mozilla/Hal.h"
 
 #ifdef USE_SKIA
@@ -147,9 +142,6 @@ class mozilla::gl::SkiaGLGlue : public GenericAtomicRefCounted {
 
 namespace mozilla {
 namespace layers {
-#ifdef MOZ_WIDGET_GONK
-void InitGralloc();
-#endif
 void ShutdownTileCache();
 } // namespace layers
 } // namespace mozilla
@@ -368,7 +360,7 @@ NS_IMPL_ISUPPORTS_INHERITED0(CrashTelemetryEvent, Runnable);
 void
 CrashStatsLogForwarder::CrashAction(LogReason aReason)
 {
-#ifndef RELEASE_BUILD
+#ifndef RELEASE_OR_BETA
   // Non-release builds crash by default, but will use telemetry
   // if this environment variable is present.
   static bool useTelemetry = gfxEnv::GfxDevCrashTelemetry();
@@ -500,10 +492,11 @@ gfxPlatform::gfxPlatform()
     mSkiaGlue = nullptr;
 
     uint32_t canvasMask = BackendTypeBit(BackendType::CAIRO);
+    uint32_t contentMask = BackendTypeBit(BackendType::CAIRO);
 #ifdef USE_SKIA
     canvasMask |= BackendTypeBit(BackendType::SKIA);
+    contentMask |= BackendTypeBit(BackendType::SKIA);
 #endif
-    uint32_t contentMask = BackendTypeBit(BackendType::CAIRO);
     InitBackendPrefs(canvasMask, BackendType::CAIRO,
                      contentMask, BackendType::CAIRO);
     mTotalSystemMemory = mozilla::hal::GetTotalSystemMemory();
@@ -583,7 +576,9 @@ static uint32_t GetSkiaGlyphCacheSize()
 void
 gfxPlatform::Init()
 {
+    MOZ_RELEASE_ASSERT(!XRE_IsGPUProcess(), "GFX: Not allowed in GPU process.");
     MOZ_RELEASE_ASSERT(NS_IsMainThread(), "GFX: Not in main thread.");
+
     if (gEverInitialized) {
         NS_RUNTIMEABORT("Already started???");
     }
@@ -630,10 +625,9 @@ gfxPlatform::Init()
                                gfxPrefs::WebGLForceLayersReadback(),
                                gfxPrefs::WebGLForceMSAA());
       // Prefs that don't fit into any of the other sections
-      forcedPrefs.AppendPrintf("-T%d%d%d%d) ",
+      forcedPrefs.AppendPrintf("-T%d%d%d) ",
                                gfxPrefs::AndroidRGB16Force(),
                                gfxPrefs::CanvasAzureAccelerated(),
-                               gfxPrefs::DisableGralloc(),
                                gfxPrefs::ForceShmemTiles());
       ScopedGfxFeatureReporter::AppNote(forcedPrefs);
     }
@@ -670,6 +664,11 @@ gfxPlatform::Init()
     #error "No gfxPlatform implementation available"
 #endif
     gPlatform->InitAcceleration();
+
+    if (gfxConfig::IsEnabled(Feature::GPU_PROCESS)) {
+      GPUProcessManager* gpu = GPUProcessManager::Get();
+      gpu->LaunchGPUProcess();
+    }
 
 #ifdef USE_SKIA
     SkGraphics::Init();
@@ -733,10 +732,6 @@ gfxPlatform::Init()
 #ifdef MOZ_WIDGET_ANDROID
     // Texture pool init
     TexturePoolOGL::Init();
-#endif
-
-#ifdef MOZ_WIDGET_GONK
-    mozilla::layers::InitGralloc();
 #endif
 
     Preferences::RegisterCallbackAndCall(RecordingPrefChanged, "gfx.2d.recording", nullptr);
@@ -860,12 +855,6 @@ gfxPlatform::Shutdown()
       GPUProcessManager::Shutdown();
     }
 
-    // This is a bit iffy - we're assuming that we were the ones that set the
-    // log forwarder in the Factory, so that it's our responsibility to
-    // delete it.
-    delete mozilla::gfx::Factory::GetLogForwarder();
-    mozilla::gfx::Factory::SetLogForwarder(nullptr);
-
     gfx::Factory::ShutDown();
 
     delete gGfxPlatformPrefsLock;
@@ -893,9 +882,6 @@ gfxPlatform::InitLayersIPC()
     if (XRE_IsParentProcess())
     {
         layers::CompositorThreadHolder::Start();
-#ifdef MOZ_WIDGET_GONK
-        SharedBufferManagerChild::StartUp();
-#endif
     }
 }
 
@@ -918,10 +904,6 @@ gfxPlatform::ShutdownLayersIPC()
         gfx::VRManagerChild::ShutDown();
         layers::CompositorBridgeChild::ShutDown();
         layers::ImageBridgeChild::ShutDown();
-
-#ifdef MOZ_WIDGET_GONK
-        layers::SharedBufferManagerChild::ShutDown();
-#endif
 
         // This has to happen after shutting down the child protocols.
         layers::CompositorThreadHolder::Shutdown();
@@ -1190,18 +1172,6 @@ gfxPlatform::ComputeTileSize()
       // but I think everything should at least support 1024
       w = h = clamped(int32_t(RoundUpPow2(screenSize.width)) / 4, 256, 1024);
     }
-
-#ifdef MOZ_WIDGET_GONK
-    android::sp<android::GraphicBuffer> alloc =
-          new android::GraphicBuffer(w, h, android::PIXEL_FORMAT_RGBA_8888,
-                                     android::GraphicBuffer::USAGE_SW_READ_OFTEN |
-                                     android::GraphicBuffer::USAGE_SW_WRITE_OFTEN |
-                                     android::GraphicBuffer::USAGE_HW_TEXTURE);
-
-    if (alloc.get()) {
-      w = alloc->getStride(); // We want the tiles to be gralloc stride aligned.
-    }
-#endif
   }
 
   // Don't allow changing the tile size after we've set it.
@@ -1251,10 +1221,20 @@ gfxPlatform::SupportsAzureContentForDrawTarget(DrawTarget* aTarget)
   return SupportsAzureContentForType(aTarget->GetBackendType());
 }
 
-bool gfxPlatform::UseAcceleratedCanvas()
+bool gfxPlatform::AllowOpenGLCanvas()
 {
+  // For now, only allow Skia+OpenGL, unless it's blocked.
   // Allow acceleration on Skia if the preference is set, unless it's blocked
-  if (mPreferredCanvasBackend == BackendType::SKIA && gfxPrefs::CanvasAzureAccelerated()) {
+  // as long as we have the accelerated layers
+
+  // The compositor backend is only set correctly in the parent process,
+  // so we let content process always assume correct compositor backend.
+  // The callers have to do the right thing.
+  bool correctBackend = !XRE_IsParentProcess() ||
+    ((mCompositorBackend == LayersBackend::LAYERS_OPENGL) &&
+     (GetContentBackendFor(mCompositorBackend) == BackendType::SKIA));
+
+  if (gfxPrefs::CanvasAzureAccelerated() && correctBackend) {
     nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
     int32_t status;
     nsCString discardFailureId;
@@ -1270,7 +1250,7 @@ bool gfxPlatform::UseAcceleratedCanvas()
 void
 gfxPlatform::InitializeSkiaCacheLimits()
 {
-  if (UseAcceleratedCanvas()) {
+  if (AllowOpenGLCanvas()) {
 #ifdef USE_SKIA_GPU
     bool usingDynamicCache = gfxPrefs::CanvasSkiaGLDynamicCache();
     int cacheItemLimit = gfxPrefs::CanvasSkiaGLCacheItems();
@@ -1304,9 +1284,7 @@ gfxPlatform::GetSkiaGLGlue()
 #ifdef USE_SKIA_GPU
   // Check the accelerated Canvas is enabled for the first time,
   // because the callers should check it before using.
-  if (!mSkiaGlue &&
-      !UseAcceleratedCanvas()) {
-    gfxCriticalNote << "Accelerated Skia canvas is disabled";
+  if (!mSkiaGlue && !AllowOpenGLCanvas()) {
     return nullptr;
   }
 
@@ -1361,11 +1339,6 @@ gfxPlatform::PurgeSkiaGPUCache()
 bool
 gfxPlatform::HasEnoughTotalSystemMemoryForSkiaGL()
 {
-#ifdef MOZ_WIDGET_GONK
-  if (mTotalSystemMemory < 250*1024*1024) {
-    return false;
-  }
-#endif
   return true;
 }
 
@@ -2095,6 +2068,18 @@ static bool sBufferRotationCheckPref = true;
 
 static mozilla::Atomic<bool> sLayersAccelerationPrefsInitialized(false);
 
+void VideoDecodingFailedChangedCallback(const char* aPref, void*)
+{
+  sLayersHardwareVideoDecodingFailed = Preferences::GetBool(aPref, false);
+  gfxPlatform::GetPlatform()->UpdateCanUseHardareVideoDecoding();
+}
+
+void
+gfxPlatform::UpdateCanUseHardareVideoDecoding()
+{
+  gfxVars::SetCanUseHardwareVideoDecoding(CanUseHardwareVideoDecoding());
+}
+
 void
 gfxPlatform::InitAcceleration()
 {
@@ -2134,38 +2119,54 @@ gfxPlatform::InitAcceleration()
     }
   }
 
-  Preferences::AddBoolVarCache(&sLayersHardwareVideoDecodingFailed,
-                               "media.hardware-video-decoding.failed",
-                               false);
+  sLayersAccelerationPrefsInitialized = true;
 
   if (XRE_IsParentProcess()) {
-    FeatureState& gpuProc = gfxConfig::GetFeature(Feature::GPU_PROCESS);
-    if (gfxPrefs::GPUProcessDevEnabled()) {
-      // We want to hide this from about:support, so only set a default if the
-      // pref is known to be true.
-      gpuProc.SetDefaultFromPref(
-        gfxPrefs::GetGPUProcessDevEnabledPrefName(),
-        true,
-        gfxPrefs::GetGPUProcessDevEnabledPrefDefault());
+    Preferences::RegisterCallbackAndCall(VideoDecodingFailedChangedCallback,
+                                         "media.hardware-video-decoding.failed",
+                                         nullptr,
+                                         Preferences::ExactMatch);
+    InitGPUProcessPrefs();
+  }
+}
 
-      // We require E10S - otherwise, there is very little benefit to the GPU
-      // process, since the UI process must still use acceleration for
-      // performance.
-      if (!BrowserTabsRemoteAutostart()) {
-        gpuProc.Disable(
-          FeatureStatus::Unavailable,
-          "Multi-process mode is not enabled",
-          NS_LITERAL_CSTRING("FEATURE_FAILURE_NO_E10S"));
-      }
-    }
-
-    if (gpuProc.IsEnabled()) {
-      GPUProcessManager* gpu = GPUProcessManager::Get();
-      gpu->EnableGPUProcess();
-    }
+void
+gfxPlatform::InitGPUProcessPrefs()
+{
+  // We want to hide this from about:support, so only set a default if the
+  // pref is known to be true.
+  if (!gfxPrefs::GPUProcessDevEnabled() && !gfxPrefs::GPUProcessDevForceEnabled()) {
+    return;
   }
 
-  sLayersAccelerationPrefsInitialized = true;
+  FeatureState& gpuProc = gfxConfig::GetFeature(Feature::GPU_PROCESS);
+
+  gpuProc.SetDefaultFromPref(
+    gfxPrefs::GetGPUProcessDevEnabledPrefName(),
+    true,
+    gfxPrefs::GetGPUProcessDevEnabledPrefDefault());
+
+  if (gfxPrefs::GPUProcessDevForceEnabled()) {
+    gpuProc.UserForceEnable("User force-enabled via pref");
+  }
+
+  // We require E10S - otherwise, there is very little benefit to the GPU
+  // process, since the UI process must still use acceleration for
+  // performance.
+  if (!BrowserTabsRemoteAutostart()) {
+    gpuProc.ForceDisable(
+      FeatureStatus::Unavailable,
+      "Multi-process mode is not enabled",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_NO_E10S"));
+    return;
+  }
+  if (InSafeMode()) {
+    gpuProc.ForceDisable(
+      FeatureStatus::Blocked,
+      "Safe-mode is enabled",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_SAFE_MODE"));
+    return;
+  }
 }
 
 void
@@ -2361,9 +2362,9 @@ gfxPlatform::GetTilesSupportInfo(mozilla::widget::InfoObject& aObj)
 /*static*/ bool
 gfxPlatform::AsyncPanZoomEnabled()
 {
-#if !defined(MOZ_B2G) && !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_UIKIT)
-  // For XUL applications (everything but B2G on mobile and desktop, and
-  // Firefox on Android) we only want to use APZ when E10S is enabled. If
+#if !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_UIKIT)
+  // For XUL applications (everything but Firefox on Android)
+  // we only want to use APZ when E10S is enabled. If
   // we ever get input events off the main thread we can consider relaxing
   // this requirement.
   if (!BrowserTabsRemoteAutostart()) {
@@ -2518,16 +2519,17 @@ gfxPlatform::InitOpenGLConfig()
     openGLFeature.EnableByDefault();
   #endif
 
+  // When layers acceleration is force-enabled, enable it even for blacklisted
+  // devices.
+  if (gfxPrefs::LayersAccelerationForceEnabledDoNotUseDirectly()) {
+    openGLFeature.UserForceEnable("Force-enabled by pref");
+    return;
+  }
+
   nsCString message;
   nsCString failureId;
   if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_OPENGL_LAYERS, &message, failureId)) {
     openGLFeature.Disable(FeatureStatus::Blacklisted, message.get(), failureId);
-  }
-
-  // Ensure that an accelerated compositor backend is available when layers
-  // acceleration is force-enabled.
-  if (gfxPrefs::LayersAccelerationForceEnabledDoNotUseDirectly()) {
-    openGLFeature.UserForceEnable("Force-enabled by pref");
   }
 }
 

@@ -1161,7 +1161,7 @@ nsWindow::EnumAllChildWindProc(HWND aWnd, LPARAM aParam)
 {
   nsWindow *wnd = WinUtils::GetNSWindowPtr(aWnd);
   if (wnd) {
-    ((nsWindow::WindowEnumCallback*)aParam)(wnd);
+    reinterpret_cast<nsTArray<nsWindow*>*>(aParam)->AppendElement(wnd);
   }
   return TRUE;
 }
@@ -1171,18 +1171,20 @@ nsWindow::EnumAllThreadWindowProc(HWND aWnd, LPARAM aParam)
 {
   nsWindow *wnd = WinUtils::GetNSWindowPtr(aWnd);
   if (wnd) {
-    ((nsWindow::WindowEnumCallback*)aParam)(wnd);
+    reinterpret_cast<nsTArray<nsWindow*>*>(aParam)->AppendElement(wnd);
   }
   EnumChildWindows(aWnd, EnumAllChildWindProc, aParam);
   return TRUE;
 }
 
-void
-nsWindow::EnumAllWindows(WindowEnumCallback aCallback)
+/* static*/ nsTArray<nsWindow*>
+nsWindow::EnumAllWindows()
 {
+  nsTArray<nsWindow*> windows;
   EnumThreadWindows(GetCurrentThreadId(),
                     EnumAllThreadWindowProc,
-                    (LPARAM)aCallback);
+                    reinterpret_cast<LPARAM>(&windows));
+  return windows;
 }
 
 static already_AddRefed<SourceSurface>
@@ -3782,16 +3784,16 @@ nsWindow::UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometries)
     ::GetWindowRect(mWnd, &rect);
     // We want 1 pixel of border for every whole 100% of scaling
     double borderSize = std::min(1, RoundDown(GetDesktopToDeviceScale().scale));
-    clearRegion.Or(clearRegion, nsIntRect(0, 0, rect.right - rect.left, borderSize));
+    clearRegion.Or(clearRegion, gfx::IntRect::Truncate(0, 0, rect.right - rect.left, borderSize));
   }
 
   if (!IsWin10OrLater()) {
     for (size_t i = 0; i < aThemeGeometries.Length(); i++) {
       if (aThemeGeometries[i].mType == nsNativeThemeWin::eThemeGeometryTypeWindowButtons) {
         LayoutDeviceIntRect bounds = aThemeGeometries[i].mRect;
-        clearRegion.Or(clearRegion, nsIntRect(bounds.X(), bounds.Y(), bounds.Width(), bounds.Height() - 2.0));
-        clearRegion.Or(clearRegion, nsIntRect(bounds.X() + 1.0, bounds.YMost() - 2.0, bounds.Width() - 1.0, 1.0));
-        clearRegion.Or(clearRegion, nsIntRect(bounds.X() + 2.0, bounds.YMost() - 1.0, bounds.Width() - 3.0, 1.0));
+        clearRegion.Or(clearRegion, gfx::IntRect::Truncate(bounds.X(), bounds.Y(), bounds.Width(), bounds.Height() - 2.0));
+        clearRegion.Or(clearRegion, gfx::IntRect::Truncate(bounds.X() + 1.0, bounds.YMost() - 2.0, bounds.Width() - 1.0, 1.0));
+        clearRegion.Or(clearRegion, gfx::IntRect::Truncate(bounds.X() + 2.0, bounds.YMost() - 1.0, bounds.Width() - 3.0, 1.0));
       }
     }
   }
@@ -7809,7 +7811,7 @@ void nsWindow::PickerClosed()
 }
 
 bool
-nsWindow::ComputeShouldAccelerate()
+nsWindow::WidgetTypeSupportsAcceleration()
 {
   // We don't currently support using an accelerated layer manager with
   // transparent windows so don't even try. I'm also not sure if we even
@@ -7818,12 +7820,8 @@ nsWindow::ComputeShouldAccelerate()
   // Also see bug 1150376, D3D11 composition can cause issues on some devices
   // on Windows 7 where presentation fails randomly for windows with drop
   // shadows.
-  if (mTransparencyMode == eTransparencyTransparent ||
-      (IsPopup() && DeviceManagerDx::Get()->IsWARP()))
-  {
-    return false;
-  }
-  return nsBaseWidget::ComputeShouldAccelerate();
+  return mTransparencyMode != eTransparencyTransparent &&
+         !(IsPopup() && DeviceManagerDx::Get()->IsWARP());
 }
 
 void

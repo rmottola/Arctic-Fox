@@ -43,11 +43,16 @@ function TabListView(window, props) {
   this._clientTemplate = this._doc.getElementById("client-template");
   this._emptyClientTemplate = this._doc.getElementById("empty-client-template");
   this._tabTemplate = this._doc.getElementById("tab-template");
+  this.tabsFilter = this._doc.querySelector(".tabsFilter");
+  this.clearFilter = this._doc.querySelector(".textbox-search-clear");
+  this.searchBox = this._doc.querySelector(".search-box");
+  this.searchIcon = this._doc.querySelector(".textbox-search-icon");
 
   this.container = this._doc.createElement("div");
 
+  this._attachFixedListeners();
   this._setupContextMenu();
-};
+}
 
 TabListView.prototype = {
   render(state) {
@@ -72,18 +77,12 @@ TabListView.prototype = {
     this._clearChilden();
     this.container.appendChild(wrapper);
 
-    // The search-box is outside of our container (it's not scrollable)
-    this.tabsFilter = this._doc.querySelector(".tabsFilter");
-    this.clearFilter = this._doc.querySelector(".textbox-search-clear");
-    this.searchBox = this._doc.querySelector(".search-box");
-    this.searchIcon = this._doc.querySelector(".textbox-search-icon");
-
     this.list = this.container.querySelector(".list");
 
     this._createList(state);
     this._updateSearchBox(state);
 
-    this._attachListeners();
+    this._attachListListeners();
   },
 
   _createList(state) {
@@ -93,6 +92,12 @@ TabListView.prototype = {
         this._renderFilteredClient(client);
       } else {
         this._renderClient(client);
+      }
+    }
+    if (this.list.firstChild) {
+      const firstTab = this.list.firstChild.querySelector(".item.tab:first-child .item-title");
+      if (firstTab) {
+        firstTab.setAttribute("tabindex", 2);
       }
     }
   },
@@ -167,14 +172,20 @@ TabListView.prototype = {
     }
   },
 
-  _attachListeners() {
-    this.list.addEventListener("click", this.onClick.bind(this));
-    this.list.addEventListener("keydown", this.onKeyDown.bind(this));
+  // These listeners are attached only once, when we initialize the view
+  _attachFixedListeners() {
     this.tabsFilter.addEventListener("input", this.onFilter.bind(this));
     this.tabsFilter.addEventListener("focus", this.onFilterFocus.bind(this));
     this.tabsFilter.addEventListener("blur", this.onFilterBlur.bind(this));
     this.clearFilter.addEventListener("click", this.onClearFilter.bind(this));
     this.searchIcon.addEventListener("click", this.onFilterFocus.bind(this));
+  },
+
+  // These listeners have to be re-created every time since we re-create the list
+  _attachListListeners() {
+    this.list.addEventListener("click", this.onClick.bind(this));
+    this.list.addEventListener("mouseup", this.onMouseUp.bind(this));
+    this.list.addEventListener("keydown", this.onKeyDown.bind(this));
   },
 
   _updateSearchBox(state) {
@@ -242,8 +253,16 @@ TabListView.prototype = {
 
     itemNode.querySelector(".item-title").textContent = item.title;
 
-    let icon = itemNode.querySelector(".item-icon-container");
-    icon.style.backgroundImage = "url(" + item.icon + ")";
+    if (item.icon) {
+      let icon = itemNode.querySelector(".item-icon-container");
+      icon.style.backgroundImage = "url(" + item.icon + ")";
+    }
+  },
+
+  onMouseUp(event) {
+    if (event.which == 2) { // Middle click
+      this.onClick(event);
+    }
   },
 
   onClick(event) {
@@ -259,7 +278,18 @@ TabListView.prototype = {
       }
     }
 
-    if (event.target.classList.contains("item-twisty-container")) {
+    // Middle click on a client
+    if (itemNode.classList.contains("client")) {
+      let where = getChromeWindow(this._window).whereToOpenLink(event);
+      if (where != "current") {
+        const tabs = itemNode.querySelector(".item-tabs-list").childNodes;
+        const urls = [...tabs].map(tab => tab.dataset.url);
+        this.props.onOpenTabs(urls, where, {});
+      }
+    }
+
+    if (event.target.classList.contains("item-twisty-container")
+        && event.which != 2) {
       this.props.onToggleBranch(itemNode.dataset.id);
       return;
     }

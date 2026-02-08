@@ -113,6 +113,7 @@ nsresult nsWebShellWindow::Initialize(nsIXULWindow* aParent,
                                       int32_t aInitialHeight,
                                       bool aIsHiddenWindow,
                                       nsITabParent *aOpeningTab,
+                                      mozIDOMWindowProxy *aOpenerWindow,
                                       nsWidgetInitData& widgetInitData)
 {
   nsresult rv;
@@ -209,15 +210,28 @@ nsresult nsWebShellWindow::Initialize(nsIXULWindow* aParent,
     webProgress->AddProgressListener(this, nsIWebProgress::NOTIFY_STATE_NETWORK);
   }
 
+  if (aOpenerWindow) {
+    nsPIDOMWindowOuter* window = mDocShell->GetWindow();
+    MOZ_ASSERT(window);
+    window->SetOpenerWindow(nsPIDOMWindowOuter::From(aOpenerWindow), true);
+  }
+
   // Eagerly create an about:blank content viewer with the right principal here,
   // rather than letting it happening in the upcoming call to
   // SetInitialPrincipalToSubject. This avoids creating the about:blank document
   // and then blowing it away with a second one, which can cause problems for the
   // top-level chrome window case. See bug 789773.
+  // Note that we don't accept expanded principals here, similar to
+  // SetInitialPrincipalToSubject.
   if (nsContentUtils::IsInitialized()) { // Sometimes this happens really early  See bug 793370.
-    rv = mDocShell->CreateAboutBlankContentViewer(nsContentUtils::SubjectPrincipalOrSystemIfNativeCaller());
+    MOZ_ASSERT(mDocShell->ItemType() == nsIDocShellTreeItem::typeChrome);
+    nsCOMPtr<nsIPrincipal> principal = nsContentUtils::SubjectPrincipalOrSystemIfNativeCaller();
+    if (nsContentUtils::IsExpandedPrincipal(principal)) {
+      principal = nullptr;
+    }
+    rv = mDocShell->CreateAboutBlankContentViewer(principal);
     NS_ENSURE_SUCCESS(rv, rv);
-    nsCOMPtr<nsIDocument> doc = mDocShell ? mDocShell->GetDocument() : nullptr;
+    nsCOMPtr<nsIDocument> doc = mDocShell->GetDocument();
     NS_ENSURE_TRUE(!!doc, NS_ERROR_FAILURE);
     doc->SetIsInitialDocument(true);
   }

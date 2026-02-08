@@ -97,6 +97,7 @@ NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 FontFaceSet::FontFaceSet(nsPIDOMWindowInner* aWindow, nsIDocument* aDocument)
   : DOMEventTargetHelper(aWindow)
   , mDocument(aDocument)
+  , mResolveLazilyCreatedReadyPromise(false)
   , mStatus(FontFaceSetLoadStatus::Loaded)
   , mNonRuleFacesDirty(false)
   , mHasLoadingFontFaces(false)
@@ -111,12 +112,7 @@ FontFaceSet::FontFaceSet(nsPIDOMWindowInner* aWindow, nsIDocument* aDocument)
   // be able to get to anyway) as it causes the window.FontFaceSet constructor
   // to be created.
   if (global && PrefEnabled()) {
-    ErrorResult rv;
-    mReady = Promise::Create(global, rv);
-  }
-
-  if (mReady) {
-    mReady->MaybeResolve(this);
+    mResolveLazilyCreatedReadyPromise = true;
   }
 
   if (!mDocument->DidFireDOMContentLoaded()) {
@@ -386,8 +382,16 @@ Promise*
 FontFaceSet::GetReady(ErrorResult& aRv)
 {
   if (!mReady) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return nullptr;
+    nsCOMPtr<nsIGlobalObject> global = GetParentObject();
+    mReady = Promise::Create(global, aRv);
+    if (!mReady) {
+      aRv.Throw(NS_ERROR_FAILURE);
+      return nullptr;
+    }
+    if (mResolveLazilyCreatedReadyPromise) {
+      mReady->MaybeResolve(this);
+      mResolveLazilyCreatedReadyPromise = false;
+    }
   }
 
   FlushUserFontSet();
@@ -1263,9 +1267,7 @@ FontFaceSet::LogMessage(gfxUserFontEntry* aUserFontEntry,
     CSSStyleSheet* sheet = rule->GetStyleSheet();
     // if the style sheet is removed while the font is loading can be null
     if (sheet) {
-      nsAutoCString spec;
-      rv = sheet->GetSheetURI()->GetSpec(spec);
-      NS_ENSURE_SUCCESS(rv, rv);
+      nsCString spec = sheet->GetSheetURI()->GetSpecOrDefault();
       CopyUTF8toUTF16(spec, href);
     } else {
       NS_WARNING("null parent stylesheet for @font-face rule");
@@ -1507,14 +1509,14 @@ FontFaceSet::CheckLoadingStarted()
                             false))->PostDOMEvent();
 
   if (PrefEnabled()) {
-    RefPtr<Promise> ready;
-    if (GetParentObject()) {
-      ErrorResult rv;
-      ready = Promise::Create(GetParentObject(), rv);
+    if (mReady) {
+      if (GetParentObject()) {
+        ErrorResult rv;
+        mReady = Promise::Create(GetParentObject(), rv);
+      }
     }
-
-    if (ready) {
-      mReady.swap(ready);
+    if (!mReady) {
+      mResolveLazilyCreatedReadyPromise = false;
     }
   }
 }
@@ -1601,6 +1603,8 @@ FontFaceSet::CheckLoadingFinished()
   mStatus = FontFaceSetLoadStatus::Loaded;
   if (mReady) {
     mReady->MaybeResolve(this);
+  } else {
+    mResolveLazilyCreatedReadyPromise = true;
   }
 
   // Now dispatch the loadingdone/loadingerror events.
@@ -1694,7 +1698,7 @@ FontFaceSet::PrefEnabled()
 // nsICSSLoaderObserver
 
 NS_IMETHODIMP
-FontFaceSet::StyleSheetLoaded(StyleSheetHandle aSheet,
+FontFaceSet::StyleSheetLoaded(StyleSheet* aSheet,
                               bool aWasAlternate,
                               nsresult aStatus)
 {

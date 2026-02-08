@@ -68,7 +68,8 @@
 #include "jsfriendapi.h"
 #include "ImportManager.h"
 #include "mozilla/LinkedList.h"
-#include "CustomElementsRegistry.h"
+#include "CustomElementRegistry.h"
+#include "mozilla/dom/Performance.h"
 
 #define XML_DECLARATION_BITS_DECLARATION_EXISTS   (1 << 0)
 #define XML_DECLARATION_BITS_ENCODING_EXISTS      (1 << 1)
@@ -94,9 +95,11 @@ namespace mozilla {
 class EventChainPreVisitor;
 namespace dom {
 class BoxObject;
-class UndoManager;
+class ImageTracker;
 struct LifecycleCallbacks;
 class CallbackFunction;
+class DOMIntersectionObserver;
+class Performance;
 
 struct FullscreenRequest : public LinkedListElement<FullscreenRequest>
 {
@@ -305,9 +308,8 @@ public:
     return mDocument;
   }
 
-  virtual uint32_t Length() override;
-  virtual mozilla::CSSStyleSheet*
-  IndexedGetter(uint32_t aIndex, bool& aFound) override;
+  uint32_t Length() override;
+  mozilla::StyleSheet* IndexedGetter(uint32_t aIndex, bool& aFound) override;
 
 protected:
   virtual ~nsDOMStyleSheetList();
@@ -607,13 +609,15 @@ public:
 
   virtual nsresult GetAllowPlugins(bool* aAllowPlugins) override;
 
-  virtual already_AddRefed<mozilla::dom::UndoManager> GetUndoManager() override;
-
   static bool IsElementAnimateEnabled(JSContext* aCx, JSObject* aObject);
   static bool IsWebAnimationsEnabled(JSContext* aCx, JSObject* aObject);
   virtual mozilla::dom::DocumentTimeline* Timeline() override;
   virtual void GetAnimations(
       nsTArray<RefPtr<mozilla::dom::Animation>>& aAnimations) override;
+  mozilla::LinkedList<mozilla::dom::DocumentTimeline>& Timelines() override
+  {
+    return mTimelines;
+  }
 
   virtual nsresult SetSubDocumentFor(Element* aContent,
                                      nsIDocument* aSubDoc) override;
@@ -621,37 +625,37 @@ public:
   virtual Element* FindContentForSubDocument(nsIDocument *aDocument) const override;
   virtual Element* GetRootElementInternal() const override;
 
-  virtual void EnsureOnDemandBuiltInUASheet(mozilla::StyleSheetHandle aSheet) override;
+  virtual void EnsureOnDemandBuiltInUASheet(mozilla::StyleSheet* aSheet) override;
 
   /**
    * Get the (document) style sheets owned by this document.
    * These are ordered, highest priority last
    */
   virtual int32_t GetNumberOfStyleSheets() const override;
-  virtual mozilla::StyleSheetHandle GetStyleSheetAt(int32_t aIndex) const override;
+  virtual mozilla::StyleSheet* GetStyleSheetAt(int32_t aIndex) const override;
   virtual int32_t GetIndexOfStyleSheet(
-      const mozilla::StyleSheetHandle aSheet) const override;
-  virtual void AddStyleSheet(mozilla::StyleSheetHandle aSheet) override;
-  virtual void RemoveStyleSheet(mozilla::StyleSheetHandle aSheet) override;
+      const mozilla::StyleSheet* aSheet) const override;
+  virtual void AddStyleSheet(mozilla::StyleSheet* aSheet) override;
+  virtual void RemoveStyleSheet(mozilla::StyleSheet* aSheet) override;
 
   virtual void UpdateStyleSheets(
-      nsTArray<mozilla::StyleSheetHandle::RefPtr>& aOldSheets,
-      nsTArray<mozilla::StyleSheetHandle::RefPtr>& aNewSheets) override;
-  virtual void AddStyleSheetToStyleSets(mozilla::StyleSheetHandle aSheet);
-  virtual void RemoveStyleSheetFromStyleSets(mozilla::StyleSheetHandle aSheet);
+      nsTArray<RefPtr<mozilla::StyleSheet>>& aOldSheets,
+      nsTArray<RefPtr<mozilla::StyleSheet>>& aNewSheets) override;
+  virtual void AddStyleSheetToStyleSets(mozilla::StyleSheet* aSheet);
+  virtual void RemoveStyleSheetFromStyleSets(mozilla::StyleSheet* aSheet);
 
-  virtual void InsertStyleSheetAt(mozilla::StyleSheetHandle aSheet,
+  virtual void InsertStyleSheetAt(mozilla::StyleSheet* aSheet,
                                   int32_t aIndex) override;
-  virtual void SetStyleSheetApplicableState(mozilla::StyleSheetHandle aSheet,
+  virtual void SetStyleSheetApplicableState(mozilla::StyleSheet* aSheet,
                                             bool aApplicable) override;
 
   virtual nsresult LoadAdditionalStyleSheet(additionalSheetType aType,
                                             nsIURI* aSheetURI) override;
   virtual nsresult AddAdditionalStyleSheet(additionalSheetType aType,
-                                           mozilla::StyleSheetHandle aSheet) override;
+                                           mozilla::StyleSheet* aSheet) override;
   virtual void RemoveAdditionalStyleSheet(additionalSheetType aType,
                                           nsIURI* sheetURI) override;
-  virtual mozilla::StyleSheetHandle GetFirstAdditionalAuthorSheet() override;
+  virtual mozilla::StyleSheet* GetFirstAdditionalAuthorSheet() override;
 
   virtual nsIChannel* GetChannel() const override {
     return mChannel;
@@ -711,11 +715,11 @@ public:
   virtual void DocumentStatesChanged(
                  mozilla::EventStates aStateMask) override;
 
-  virtual void StyleRuleChanged(mozilla::StyleSheetHandle aStyleSheet,
+  virtual void StyleRuleChanged(mozilla::StyleSheet* aStyleSheet,
                                 mozilla::css::Rule* aStyleRule) override;
-  virtual void StyleRuleAdded(mozilla::StyleSheetHandle aStyleSheet,
+  virtual void StyleRuleAdded(mozilla::StyleSheet* aStyleSheet,
                               mozilla::css::Rule* aStyleRule) override;
-  virtual void StyleRuleRemoved(mozilla::StyleSheetHandle aStyleSheet,
+  virtual void StyleRuleRemoved(mozilla::StyleSheet* aStyleSheet,
                                 mozilla::css::Rule* aStyleRule) override;
 
   virtual void FlushPendingNotifications(mozFlushType aType) override;
@@ -778,16 +782,21 @@ public:
 
   virtual nsViewportInfo GetViewportInfo(const mozilla::ScreenIntSize& aDisplaySize) override;
 
-  /**
-   * Called when an app-theme-changed observer notification is
-   * received by this document.
-   */
-  void OnAppThemeChanged();
-
   void ReportUseCounters();
 
+  virtual void AddIntersectionObserver(
+    mozilla::dom::DOMIntersectionObserver* aObserver) override;
+  virtual void RemoveIntersectionObserver(
+    mozilla::dom::DOMIntersectionObserver* aObserver) override;
+  virtual void UpdateIntersectionObservations() override;
+  virtual void ScheduleIntersectionObserverNotification() override;
+  virtual void NotifyIntersectionObservers() override;
+
+  virtual void NotifyLayerManagerRecreated() override;
+
+
 private:
-  void AddOnDemandBuiltInUASheet(mozilla::StyleSheetHandle aSheet);
+  void AddOnDemandBuiltInUASheet(mozilla::StyleSheet* aSheet);
   nsRadioGroupStruct* GetRadioGroupInternal(const nsAString& aName) const;
   void SendToConsole(nsCOMArray<nsISecurityConsoleMessage>& aMessages);
 
@@ -897,8 +906,6 @@ public:
   virtual mozilla::PendingAnimationTracker*
   GetOrCreatePendingAnimationTracker() override;
 
-  void SetImagesNeedAnimating(bool aAnimating) override;
-
   virtual void SuppressEventHandling(SuppressionType aWhat,
                                      uint32_t aIncrease) override;
 
@@ -970,7 +977,7 @@ public:
                             const nsAString& aIntegrity) override;
 
   virtual nsresult LoadChromeSheetSync(nsIURI* uri, bool isAgentSheet,
-                                       mozilla::StyleSheetHandle::RefPtr* aSheet) override;
+                                       RefPtr<mozilla::StyleSheet>* aSheet) override;
 
   virtual nsISupports* GetCurrentContentSink() override;
 
@@ -990,10 +997,6 @@ public:
   virtual Element *LookupImageElement(const nsAString& aElementId) override;
   virtual void MozSetImageElement(const nsAString& aImageElementId,
                                   Element* aElement) override;
-
-  virtual nsresult AddImage(imgIRequest* aImage) override;
-  virtual nsresult RemoveImage(imgIRequest* aImage, uint32_t aFlags) override;
-  virtual nsresult SetImageLockingState(bool aLocked) override;
 
   // AddPlugin adds a plugin-related element to mPlugins when the element is
   // added to the tree.
@@ -1088,10 +1091,11 @@ public:
   Element* FullScreenStackTop();
 
   // DOM-exposed fullscreen API
-  bool FullscreenEnabled() override;
+  bool FullscreenEnabled(mozilla::dom::CallerType aCallerType) override;
   Element* GetFullscreenElement() override;
 
-  void RequestPointerLock(Element* aElement) override;
+  void RequestPointerLock(Element* aElement,
+                          mozilla::dom::CallerType aCallerType) override;
   bool SetPointerLock(Element* aElement, int aCursorStyle);
   static void UnlockPointer(nsIDocument* aDoc = nullptr);
 
@@ -1275,9 +1279,7 @@ public:
 
   js::ExpandoAndGeneration mExpandoAndGeneration;
 
-#ifdef MOZ_EME
   bool ContainsEMEContent();
-#endif
 
   bool ContainsMSEContent();
 
@@ -1288,7 +1290,7 @@ protected:
 
   void RemoveDocStyleSheetsFromStyleSets();
   void RemoveStyleSheetsFromStyleSets(
-      const nsTArray<mozilla::StyleSheetHandle::RefPtr>& aSheets,
+      const nsTArray<RefPtr<mozilla::StyleSheet>>& aSheets,
       mozilla::SheetType aType);
   void ResetStylesheetsToURI(nsIURI* aURI);
   void FillStyleSet(mozilla::StyleSetHandle aStyleSet);
@@ -1342,12 +1344,15 @@ protected:
   // EndLoad() has already happened.
   nsWeakPtr mWeakSink;
 
-  nsTArray<mozilla::StyleSheetHandle::RefPtr> mStyleSheets;
-  nsTArray<mozilla::StyleSheetHandle::RefPtr> mOnDemandBuiltInUASheets;
-  nsTArray<mozilla::StyleSheetHandle::RefPtr> mAdditionalSheets[AdditionalSheetTypeCount];
+  nsTArray<RefPtr<mozilla::StyleSheet>> mStyleSheets;
+  nsTArray<RefPtr<mozilla::StyleSheet>> mOnDemandBuiltInUASheets;
+  nsTArray<RefPtr<mozilla::StyleSheet>> mAdditionalSheets[AdditionalSheetTypeCount];
 
   // Array of observers
   nsTObserverArray<nsIDocumentObserver*> mObservers;
+
+  // Array of intersection observers
+  nsTArray<RefPtr<mozilla::dom::DOMIntersectionObserver>> mIntersectionObservers;
 
   // Tracker for animations that are waiting to start.
   // nullptr until GetOrCreatePendingAnimationTracker is called.
@@ -1385,8 +1390,8 @@ private:
     ErrorResult& rv);
 
 public:
-  virtual already_AddRefed<mozilla::dom::CustomElementsRegistry>
-    GetCustomElementsRegistry() override;
+  virtual already_AddRefed<mozilla::dom::CustomElementRegistry>
+    GetCustomElementRegistry() override;
 
   static bool IsWebComponentsEnabled(JSContext* aCx, JSObject* aObject);
 
@@ -1426,12 +1431,6 @@ public:
 
   bool mInXBLUpdate:1;
 
-  // Whether we're currently holding a lock on all of our images.
-  bool mLockingImages:1;
-
-  // Whether we currently require our images to animate
-  bool mAnimatingImages:1;
-
   // Whether we're currently under a FlushPendingNotifications call to
   // our presshell.  This is used to handle flush reentry correctly.
   bool mInFlush:1;
@@ -1448,12 +1447,6 @@ public:
 
   uint16_t mCurrentOrientationAngle;
   mozilla::dom::OrientationType mCurrentOrientationType;
-
-  // Whether we're observing the "app-theme-changed" observer service
-  // notification.  We need to keep track of this because we might get multiple
-  // OnPageShow notifications in a row without an OnPageHide in between, if
-  // we're getting document.open()/close() called on us.
-  bool mObservingAppThemeChanged:1;
 
   // Keeps track of whether we have a pending
   // 'style-sheet-applicable-state-changed' notification.
@@ -1498,8 +1491,8 @@ private:
   friend class nsUnblockOnloadEvent;
   // Recomputes the visibility state but doesn't set the new value.
   mozilla::dom::VisibilityState GetVisibilityState() const;
-  void NotifyStyleSheetAdded(mozilla::StyleSheetHandle aSheet, bool aDocumentSheet);
-  void NotifyStyleSheetRemoved(mozilla::StyleSheetHandle aSheet, bool aDocumentSheet);
+  void NotifyStyleSheetAdded(mozilla::StyleSheet* aSheet, bool aDocumentSheet);
+  void NotifyStyleSheetRemoved(mozilla::StyleSheet* aSheet, bool aDocumentSheet);
 
   void PostUnblockOnloadEvent();
   void DoUnblockOnload();
@@ -1601,15 +1594,11 @@ private:
   uint8_t mScrolledToRefAlready : 1;
   uint8_t mChangeScrollPosWhenScrollingToRef : 1;
 
-  // Tracking for images in the document.
-  nsDataHashtable< nsPtrHashKey<imgIRequest>, uint32_t> mImageTracker;
-
   // Tracking for plugins in the document.
   nsTHashtable< nsPtrHashKey<nsIObjectLoadingContent> > mPlugins;
 
-  RefPtr<mozilla::dom::UndoManager> mUndoManager;
-
   RefPtr<mozilla::dom::DocumentTimeline> mDocumentTimeline;
+  mozilla::LinkedList<mozilla::dom::DocumentTimeline> mTimelines;
 
   enum ViewportType {
     DisplayWidthHeight,

@@ -680,8 +680,10 @@ SSL_OptionSet
 SSL_OptionSetDefault
 SSL_PeerCertificate
 SSL_PeerCertificateChain
+SSL_PeerSignedCertTimestamps
 SSL_PeerStapledOCSPResponses
 SSL_ResetHandshake
+SSL_SendAdditionalKeyShares
 SSL_SetCanFalseStartCallback
 SSL_SetDowngradeCheckVersion
 SSL_SetNextProtoNego
@@ -689,8 +691,10 @@ SSL_SetPKCS11PinArg
 SSL_SetSockPeerID
 SSL_SetSRTPCiphers
 SSL_SetStapledOCSPResponses
+SSL_SetTrustAnchors
 SSL_SetURL
 SSL_ShutdownServerSessionIDCache
+SSL_SignatureSchemePrefSet
 SSL_SNISocketConfigHook
 SSL_VersionRangeGet
 SSL_VersionRangeGetDefault

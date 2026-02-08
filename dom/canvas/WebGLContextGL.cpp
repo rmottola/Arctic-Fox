@@ -252,10 +252,11 @@ WebGLContext::BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB,
 GLenum
 WebGLContext::CheckFramebufferStatus(GLenum target)
 {
+    const char funcName[] = "checkFramebufferStatus";
     if (IsContextLost())
         return LOCAL_GL_FRAMEBUFFER_UNSUPPORTED;
 
-    if (!ValidateFramebufferTarget(target, "invalidateFramebuffer"))
+    if (!ValidateFramebufferTarget(target, funcName))
         return 0;
 
     WebGLFramebuffer* fb;
@@ -276,8 +277,7 @@ WebGLContext::CheckFramebufferStatus(GLenum target)
     if (!fb)
         return LOCAL_GL_FRAMEBUFFER_COMPLETE;
 
-    nsCString fbErrorInfo;
-    return fb->CheckFramebufferStatus(&fbErrorInfo).get();
+    return fb->CheckFramebufferStatus(funcName).get();
 }
 
 already_AddRefed<WebGLProgram>
@@ -484,10 +484,11 @@ void
 WebGLContext::FramebufferRenderbuffer(GLenum target, GLenum attachment,
                                       GLenum rbtarget, WebGLRenderbuffer* wrb)
 {
+    const char funcName[] = "framebufferRenderbuffer";
     if (IsContextLost())
         return;
 
-    if (!ValidateFramebufferTarget(target, "framebufferRenderbuffer"))
+    if (!ValidateFramebufferTarget(target, funcName))
         return;
 
     WebGLFramebuffer* fb;
@@ -505,20 +506,10 @@ WebGLContext::FramebufferRenderbuffer(GLenum target, GLenum attachment,
         MOZ_CRASH("GFX: Bad target.");
     }
 
-    if (!fb) {
-        return ErrorInvalidOperation("framebufferRenderbuffer: cannot modify"
-                                     " framebuffer 0.");
-    }
+    if (!fb)
+        return ErrorInvalidOperation("%s: Cannot modify framebuffer 0.", funcName);
 
-    if (rbtarget != LOCAL_GL_RENDERBUFFER) {
-        return ErrorInvalidEnumInfo("framebufferRenderbuffer: rbtarget:",
-                                    rbtarget);
-    }
-
-    if (!ValidateFramebufferAttachment(fb, attachment, "framebufferRenderbuffer"))
-        return;
-
-    fb->FramebufferRenderbuffer(attachment, rbtarget, wrb);
+    fb->FramebufferRenderbuffer(funcName, attachment, rbtarget, wrb);
 }
 
 void
@@ -528,56 +519,12 @@ WebGLContext::FramebufferTexture2D(GLenum target,
                                    WebGLTexture* tobj,
                                    GLint level)
 {
+    const char funcName[] = "framebufferTexture2D";
     if (IsContextLost())
         return;
 
-    if (!ValidateFramebufferTarget(target, "framebufferTexture2D"))
+    if (!ValidateFramebufferTarget(target, funcName))
         return;
-
-    if (level < 0) {
-        ErrorInvalidValue("framebufferTexture2D: level must not be negative.");
-        return;
-    }
-
-    if (textarget != LOCAL_GL_TEXTURE_2D &&
-        (textarget < LOCAL_GL_TEXTURE_CUBE_MAP_POSITIVE_X ||
-         textarget > LOCAL_GL_TEXTURE_CUBE_MAP_NEGATIVE_Z))
-    {
-        return ErrorInvalidEnumInfo("framebufferTexture2D: textarget:",
-                                    textarget);
-    }
-
-    if (IsWebGL2()) {
-        /* GLES 3.0.4 p208:
-         *   If textarget is one of TEXTURE_CUBE_MAP_POSITIVE_X,
-         *   TEXTURE_CUBE_MAP_POSITIVE_Y, TEXTURE_CUBE_MAP_POSITIVE_Z,
-         *   TEXTURE_CUBE_MAP_NEGATIVE_X, TEXTURE_CUBE_MAP_NEGATIVE_Y,
-         *   or TEXTURE_CUBE_MAP_NEGATIVE_Z, then level must be greater
-         *   than or equal to zero and less than or equal to log2 of the
-         *   value of MAX_CUBE_MAP_TEXTURE_SIZE. If textarget is TEXTURE_2D,
-         *   level must be greater than or equal to zero and no larger than
-         *   log2 of the value of MAX_TEXTURE_SIZE. Otherwise, an
-         *   INVALID_VALUE error is generated.
-         */
-
-        if (textarget == LOCAL_GL_TEXTURE_2D) {
-            if (uint32_t(level) > FloorLog2(mImplMaxTextureSize)) {
-                ErrorInvalidValue("framebufferTexture2D: level is too large.");
-                return;
-            }
-        } else {
-            MOZ_ASSERT(textarget >= LOCAL_GL_TEXTURE_CUBE_MAP_POSITIVE_X &&
-                       textarget <= LOCAL_GL_TEXTURE_CUBE_MAP_NEGATIVE_Z);
-
-            if (uint32_t(level) > FloorLog2(mImplMaxCubeMapTextureSize)) {
-                ErrorInvalidValue("framebufferTexture2D: level is too large.");
-                return;
-            }
-        }
-    } else if (level != 0) {
-        ErrorInvalidValue("framebufferTexture2D: level must be 0.");
-        return;
-    }
 
     WebGLFramebuffer* fb;
     switch (target) {
@@ -594,15 +541,10 @@ WebGLContext::FramebufferTexture2D(GLenum target,
         MOZ_CRASH("GFX: Bad target.");
     }
 
-    if (!fb) {
-        return ErrorInvalidOperation("framebufferTexture2D: cannot modify"
-                                     " framebuffer 0.");
-    }
+    if (!fb)
+        return ErrorInvalidOperation("%s: Cannot modify framebuffer 0.", funcName);
 
-    if (!ValidateFramebufferAttachment(fb, attachment, "framebufferTexture2D"))
-        return;
-
-    fb->FramebufferTexture2D(attachment, textarget, tobj, level);
+    fb->FramebufferTexture2D(funcName, attachment, textarget, tobj, level);
 }
 
 void
@@ -684,14 +626,9 @@ WebGLContext::GetBufferParameter(GLenum target, GLenum pname)
     if (IsContextLost())
         return JS::NullValue();
 
-    if (!ValidateBufferTarget(target, "getBufferParameter"))
+    const auto& buffer = ValidateBufferSelection("getBufferParameter", target);
+    if (!buffer)
         return JS::NullValue();
-
-    WebGLRefPtr<WebGLBuffer>& slot = GetBufferSlotByTarget(target);
-    if (!slot) {
-        ErrorInvalidOperation("No buffer bound to `target` (0x%4x).", target);
-        return JS::NullValue();
-    }
 
     MakeContextCurrent();
 
@@ -1503,57 +1440,60 @@ WebGLContext::ValidatePackSize(const char* funcName, uint32_t width, uint32_t he
 
 void
 WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format,
-                         GLenum type, const dom::ArrayBufferView& view,
-                         ErrorResult& out_error)
+                         GLenum type, const dom::ArrayBufferView& dstView,
+                         GLuint dstElemOffset, ErrorResult& out_error)
 {
+    const char funcName[] = "readPixels";
     if (!ReadPixels_SharedPrecheck(&out_error))
         return;
 
     if (mBoundPixelPackBuffer) {
-        ErrorInvalidOperation("readPixels: PIXEL_PACK_BUFFER must be null.");
+        ErrorInvalidOperation("%s: PIXEL_PACK_BUFFER must be null.", funcName);
         return;
     }
 
-    //////
+    ////
 
     js::Scalar::Type reqScalarType;
     if (!GetJSScalarFromGLType(type, &reqScalarType)) {
-        ErrorInvalidEnum("readPixels: Bad `type`.");
+        ErrorInvalidEnum("%s: Bad `type`.", funcName);
         return;
     }
 
-    const js::Scalar::Type dataScalarType = JS_GetArrayBufferViewType(view.Obj());
-    if (dataScalarType != reqScalarType) {
-        ErrorInvalidOperation("readPixels: `pixels` type does not match `type`.");
+    const auto& viewElemType = dstView.Type();
+    if (viewElemType != reqScalarType) {
+        ErrorInvalidOperation("%s: `pixels` type does not match `type`.", funcName);
         return;
     }
 
-    //////
+    ////
 
-    // Compute length and data.  Don't reenter after this point, lest the
-    // precomputed go out of sync with the instant length/data.
-    view.ComputeLengthAndData();
-    void* data = view.DataAllowShared();
-    const auto dataLen = view.LengthAllowShared();
-
-    if (!data) {
-        ErrorOutOfMemory("readPixels: buffer storage is null. Did we run out of memory?");
-        out_error.Throw(NS_ERROR_OUT_OF_MEMORY);
+    uint8_t* bytes;
+    size_t byteLen;
+    if (!ValidateArrayBufferView(funcName, dstView, dstElemOffset, 0, &bytes, &byteLen))
         return;
-    }
 
-    ReadPixelsImpl(x, y, width, height, format, type, data, dataLen);
+    ////
+
+    ReadPixelsImpl(x, y, width, height, format, type, bytes, byteLen);
 }
 
 void
-WebGL2Context::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format,
-                          GLenum type, WebGLsizeiptr offset, ErrorResult& out_error)
+WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format,
+                         GLenum type, WebGLsizeiptr offset, ErrorResult& out_error)
 {
     if (!ReadPixels_SharedPrecheck(&out_error))
         return;
 
     if (!mBoundPixelPackBuffer) {
         ErrorInvalidOperation("readPixels: PIXEL_PACK_BUFFER must not be null.");
+        return;
+    }
+
+    if (mBoundPixelPackBuffer->mNumActiveTFOs) {
+        ErrorInvalidOperation("%s: Buffer is bound to an active transform feedback"
+                              " object.",
+                              "readPixels");
         return;
     }
 
@@ -1583,6 +1523,9 @@ WebGL2Context::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenu
     if (checkedBytesAfterOffset.isValid()) {
         bytesAfterOffset = checkedBytesAfterOffset.value();
     }
+
+    gl->MakeCurrent();
+    const ScopedLazyBind lazyBind(gl, LOCAL_GL_PIXEL_PACK_BUFFER, mBoundPixelPackBuffer);
 
     ReadPixelsImpl(x, y, width, height, format, type, (void*)offset, bytesAfterOffset);
 }
@@ -2091,12 +2034,43 @@ WebGLContext::Uniform4f(WebGLUniformLocation* loc, GLfloat a1, GLfloat a2,
 ////////////////////////////////////////
 // Array
 
+static bool
+ValidateArrOffsetAndCount(WebGLContext* webgl, const char* funcName, size_t elemsAvail,
+                          GLuint elemOffset, GLuint elemCountOverride,
+                          size_t* const out_elemCount)
+{
+    if (elemOffset > elemsAvail) {
+        webgl->ErrorInvalidValue("%s: Bad offset into list.", funcName);
+        return false;
+    }
+    elemsAvail -= elemOffset;
+
+    if (elemCountOverride) {
+        if (elemCountOverride > elemsAvail) {
+            webgl->ErrorInvalidValue("%s: Bad count override for sub-list.", funcName);
+            return false;
+        }
+        elemsAvail = elemCountOverride;
+    }
+
+    *out_elemCount = elemsAvail;
+    return true;
+}
+
 void
 WebGLContext::UniformNiv(const char* funcName, uint8_t N, WebGLUniformLocation* loc,
-                         const IntArr& arr)
+                         const Int32Arr& arr, GLuint elemOffset, GLuint elemCountOverride)
 {
+    size_t elemCount;
+    if (!ValidateArrOffsetAndCount(this, funcName, arr.elemCount, elemOffset,
+                                   elemCountOverride, &elemCount))
+    {
+        return;
+    }
+    const auto elemBytes = arr.elemBytes + elemOffset;
+
     uint32_t numElementsToUpload;
-    if (!ValidateUniformArraySetter(loc, N, LOCAL_GL_INT, arr.dataCount, funcName,
+    if (!ValidateUniformArraySetter(loc, N, LOCAL_GL_INT, elemCount, funcName,
                                     &numElementsToUpload))
     {
         return;
@@ -2104,7 +2078,7 @@ WebGLContext::UniformNiv(const char* funcName, uint8_t N, WebGLUniformLocation* 
 
     bool error;
     const ValidateIfSampler samplerValidator(this, funcName, loc, numElementsToUpload,
-                                             arr.data, &error);
+                                             elemBytes, &error);
     if (error)
         return;
 
@@ -2117,16 +2091,25 @@ WebGLContext::UniformNiv(const char* funcName, uint8_t N, WebGLUniformLocation* 
     const auto func = kFuncList[N-1];
 
     MakeContextCurrent();
-    (gl->*func)(loc->mLoc, numElementsToUpload, arr.data);
+    (gl->*func)(loc->mLoc, numElementsToUpload, elemBytes);
 }
 
 void
-WebGL2Context::UniformNuiv(const char* funcName, uint8_t N, WebGLUniformLocation* loc,
-                           const UintArr& arr)
+WebGLContext::UniformNuiv(const char* funcName, uint8_t N, WebGLUniformLocation* loc,
+                          const Uint32Arr& arr, GLuint elemOffset,
+                          GLuint elemCountOverride)
 {
+    size_t elemCount;
+    if (!ValidateArrOffsetAndCount(this, funcName, arr.elemCount, elemOffset,
+                                   elemCountOverride, &elemCount))
+    {
+        return;
+    }
+    const auto elemBytes = arr.elemBytes + elemOffset;
+
     uint32_t numElementsToUpload;
-    if (!ValidateUniformArraySetter(loc, N, LOCAL_GL_UNSIGNED_INT, arr.dataCount,
-                                    funcName, &numElementsToUpload))
+    if (!ValidateUniformArraySetter(loc, N, LOCAL_GL_UNSIGNED_INT, elemCount, funcName,
+                                    &numElementsToUpload))
     {
         return;
     }
@@ -2141,15 +2124,24 @@ WebGL2Context::UniformNuiv(const char* funcName, uint8_t N, WebGLUniformLocation
     const auto func = kFuncList[N-1];
 
     MakeContextCurrent();
-    (gl->*func)(loc->mLoc, numElementsToUpload, arr.data);
+    (gl->*func)(loc->mLoc, numElementsToUpload, elemBytes);
 }
 
 void
 WebGLContext::UniformNfv(const char* funcName, uint8_t N, WebGLUniformLocation* loc,
-                         const FloatArr& arr)
+                         const Float32Arr& arr, GLuint elemOffset,
+                         GLuint elemCountOverride)
 {
+    size_t elemCount;
+    if (!ValidateArrOffsetAndCount(this, funcName, arr.elemCount, elemOffset,
+                                   elemCountOverride, &elemCount))
+    {
+        return;
+    }
+    const auto elemBytes = arr.elemBytes + elemOffset;
+
     uint32_t numElementsToUpload;
-    if (!ValidateUniformArraySetter(loc, N, LOCAL_GL_FLOAT, arr.dataCount, funcName,
+    if (!ValidateUniformArraySetter(loc, N, LOCAL_GL_FLOAT, elemCount, funcName,
                                     &numElementsToUpload))
     {
         return;
@@ -2165,16 +2157,25 @@ WebGLContext::UniformNfv(const char* funcName, uint8_t N, WebGLUniformLocation* 
     const auto func = kFuncList[N-1];
 
     MakeContextCurrent();
-    (gl->*func)(loc->mLoc, numElementsToUpload, arr.data);
+    (gl->*func)(loc->mLoc, numElementsToUpload, elemBytes);
 }
 
 void
 WebGLContext::UniformMatrixAxBfv(const char* funcName, uint8_t A, uint8_t B,
                                  WebGLUniformLocation* loc, bool transpose,
-                                 const FloatArr& arr)
+                                 const Float32Arr& arr, GLuint elemOffset,
+                                 GLuint elemCountOverride)
 {
+    size_t elemCount;
+    if (!ValidateArrOffsetAndCount(this, funcName, arr.elemCount, elemOffset,
+                                   elemCountOverride, &elemCount))
+    {
+        return;
+    }
+    const auto elemBytes = arr.elemBytes + elemOffset;
+
     uint32_t numElementsToUpload;
-    if (!ValidateUniformMatrixArraySetter(loc, A, B, LOCAL_GL_FLOAT, arr.dataCount,
+    if (!ValidateUniformMatrixArraySetter(loc, A, B, LOCAL_GL_FLOAT, elemCount,
                                           transpose, funcName, &numElementsToUpload))
     {
         return;
@@ -2197,7 +2198,7 @@ WebGLContext::UniformMatrixAxBfv(const char* funcName, uint8_t A, uint8_t B,
     const auto func = kFuncList[3*(A-2) + (B-2)];
 
     MakeContextCurrent();
-    (gl->*func)(loc->mLoc, numElementsToUpload, false, arr.data);
+    (gl->*func)(loc->mLoc, numElementsToUpload, false, elemBytes);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

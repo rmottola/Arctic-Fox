@@ -1378,18 +1378,25 @@ var gCSSProperties = {
     other_values: [ "exact" ],
     invalid_values: []
   },
-  "-moz-columns": {
-    domProp: "MozColumns",
+  "columns": {
+    domProp: "columns",
     inherited: false,
     type: CSS_TYPE_TRUE_SHORTHAND,
-    subproperties: [ "-moz-column-count", "-moz-column-width" ],
+    subproperties: [ "column-count", "column-width" ],
     initial_values: [ "auto", "auto auto" ],
     other_values: [ "3", "20px", "2 10px", "10px 2", "2 auto", "auto 2", "auto 50px", "50px auto" ],
     invalid_values: [ "5%", "-1px", "-1", "3 5", "10px 4px", "10 2px 5in", "30px -1",
                       "auto 3 5px", "5 auto 20px", "auto auto auto", "calc(50px + rubbish) 2" ]
   },
-  "-moz-column-count": {
-    domProp: "MozColumnCount",
+  "-moz-columns": {
+    domProp: "MozColumns",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    alias_for: "columns",
+    subproperties: [ "column-count", "column-width" ]
+  },
+  "column-count": {
+    domProp: "columnCount",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "auto" ],
@@ -1397,16 +1404,30 @@ var gCSSProperties = {
     // negative and zero invalid per editor's draft
     invalid_values: [ "-1", "0", "3px" ]
   },
-        "-moz-column-fill": {
-                domProp: "MozColumnFill",
-                inherited: false,
-                type: CSS_TYPE_LONGHAND,
-                initial_values: [ "balance" ],
-                other_values: [ "auto" ],
-                invalid_values: [ "2px", "dotted", "5em" ]
-        },
-  "-moz-column-gap": {
-    domProp: "MozColumnGap",
+  "-moz-column-count": {
+    domProp: "MozColumnCount",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "column-count",
+    subproperties: [ "column-count" ]
+  },
+  "column-fill": {
+    domProp: "columnFill",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "balance" ],
+    other_values: [ "auto" ],
+    invalid_values: [ "2px", "dotted", "5em" ]
+  },
+  "-moz-column-fill": {
+    domProp: "MozColumnFill",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "column-fill",
+    subproperties: [ "column-fill" ]
+  },
+  "column-gap": {
+    domProp: "columnGap",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "normal", "1em", "calc(-2em + 3em)" ],
@@ -1422,18 +1443,32 @@ var gCSSProperties = {
     ],
     invalid_values: [ "3%", "-1px", "4" ]
   },
-  "-moz-column-rule": {
-    domProp: "MozColumnRule",
+  "-moz-column-gap": {
+    domProp: "MozColumnGap",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "column-gap",
+    subproperties: [ "column-gap" ]
+  },
+  "column-rule": {
+    domProp: "columnRule",
     inherited: false,
     type: CSS_TYPE_TRUE_SHORTHAND,
     prerequisites: { "color": "green" },
-    subproperties: [ "-moz-column-rule-width", "-moz-column-rule-style", "-moz-column-rule-color" ],
+    subproperties: [ "column-rule-width", "column-rule-style", "column-rule-color" ],
     initial_values: [ "medium none currentColor", "none", "medium", "currentColor" ],
     other_values: [ "2px blue solid", "red dotted 1px", "ridge 4px orange", "5px solid" ],
     invalid_values: [ "2px 3px 4px red", "dotted dashed", "5px dashed green 3px", "5 solid", "5 green solid" ]
   },
-  "-moz-column-rule-width": {
-    domProp: "MozColumnRuleWidth",
+  "-moz-column-rule": {
+    domProp: "MozColumnRule",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    alias_for: "column-rule",
+    subproperties: [ "column-rule-width", "column-rule-style", "column-rule-color" ]
+  },
+  "column-rule-width": {
+    domProp: "columnRuleWidth",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "-moz-column-rule-style": "solid" },
@@ -1702,25 +1737,46 @@ var gCSSProperties = {
       "calc((0 + 2em) * 1)",
     ]
   },
-  "-moz-column-rule-style": {
-    domProp: "MozColumnRuleStyle",
+  "-moz-column-rule-width": {
+    domProp: "MozColumnRuleWidth",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "column-rule-width",
+    subproperties: [ "column-rule-width" ]
+  },
+  "column-rule-style": {
+    domProp: "columnRuleStyle",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "none" ],
     other_values: [ "solid", "hidden", "ridge", "groove", "inset", "outset", "double", "dotted", "dashed" ],
     invalid_values: [ "20", "foo" ]
   },
-  "-moz-column-rule-color": {
-    domProp: "MozColumnRuleColor",
+  "-moz-column-rule-style": {
+    domProp: "MozColumnRuleStyle",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "column-rule-style",
+    subproperties: [ "column-rule-style" ]
+  },
+  "column-rule-color": {
+    domProp: "columnRuleColor",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "color": "green" },
-    initial_values: [ "currentColor", "-moz-use-text-color" ],
+    initial_values: [ "currentColor" ],
     other_values: [ "red", "blue", "#ffff00" ],
     invalid_values: [ "ffff00" ]
   },
-  "-moz-column-width": {
-    domProp: "MozColumnWidth",
+  "-moz-column-rule-color": {
+    domProp: "MozColumnRuleColor",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "column-rule-color",
+    subproperties: [ "column-rule-color" ]
+  },
+  "column-width": {
+    domProp: "columnWidth",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "auto" ],
@@ -1733,6 +1789,13 @@ var gCSSProperties = {
       "calc(0px)"
     ],
     invalid_values: [ "20", "-1px", "50%" ]
+  },
+  "-moz-column-width": {
+    domProp: "MozColumnWidth",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "column-width",
+    subproperties: [ "column-width" ]
   },
   "-moz-float-edge": {
     domProp: "MozFloatEdge",
@@ -2405,7 +2468,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "color": "black" },
-    initial_values: [ "currentColor", "-moz-use-text-color" ],
+    initial_values: [ "currentColor" ],
     other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
     invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000" ],
     quirks_values: { "000000": "#000000", "96ed2a": "#96ed2a" },
@@ -2471,7 +2534,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "color": "black" },
-    initial_values: [ "currentColor", "-moz-use-text-color" ],
+    initial_values: [ "currentColor" ],
     other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
     invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000" ],
     quirks_values: { "000000": "#000000", "96ed2a": "#96ed2a" },
@@ -2518,7 +2581,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "color": "black" },
-    initial_values: [ "currentColor", "-moz-use-text-color" ],
+    initial_values: [ "currentColor" ],
     other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
     invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000" ],
     quirks_values: { "000000": "#000000", "96ed2a": "#96ed2a" },
@@ -2588,7 +2651,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "color": "black" },
-    initial_values: [ "currentColor", "-moz-use-text-color" ],
+    initial_values: [ "currentColor" ],
     other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
     invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000" ],
     quirks_values: { "000000": "#000000", "96ed2a": "#96ed2a" },
@@ -3388,7 +3451,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "color": "black" },
-    initial_values: [ "currentColor", "-moz-use-text-color" ], // XXX should be invert
+    initial_values: [ "currentColor" ], // XXX should be invert
     other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
     invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000", "cc00ff" ]
   },
@@ -3656,7 +3719,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     prerequisites: { "color": "black" },
-    initial_values: [ "currentColor", "-moz-use-text-color" ],
+    initial_values: [ "currentColor" ],
     other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
     invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000", "ff00ff" ]
   },
@@ -4305,13 +4368,13 @@ var gCSSProperties = {
     initial_values: [ "normal" ],
     other_values: [ "start", "end", "flex-start", "flex-end", "center", "left",
                     "right", "space-between", "space-around", "space-evenly",
-                    "baseline", "last-baseline", "stretch", "start safe",
+                    "first baseline", "last baseline", "baseline", "stretch", "start safe",
                     "unsafe end", "unsafe end stretch", "end safe space-evenly" ],
     invalid_values: [ "none", "5", "self-end", "safe", "normal unsafe", "unsafe safe",
                       "safe baseline", "baseline unsafe", "baseline end", "end normal",
                       "safe end unsafe start", "safe end unsafe", "normal safe start",
                       "unsafe end start", "end start safe", "space-between unsafe",
-                      "stretch safe", "auto" ]
+                      "stretch safe", "auto", "first", "last" ]
   },
   "align-items": {
     domProp: "alignItems",
@@ -4320,8 +4383,8 @@ var gCSSProperties = {
     initial_values: [ "normal" ],
     // Can't test 'left'/'right' here since that computes to 'start' for blocks.
     other_values: [ "end", "flex-start", "flex-end", "self-start", "self-end",
-                    "center", "stretch", "baseline", "unsafe left", "start",
-                    "center unsafe", "safe right", "center safe" ],
+                    "center", "stretch", "first baseline", "last baseline", "baseline",
+                    "unsafe left", "start", "center unsafe", "safe right", "center safe" ],
     invalid_values: [ "space-between", "abc", "5%", "legacy", "legacy end",
                       "end legacy", "unsafe", "unsafe baseline", "normal unsafe",
                       "safe left unsafe", "safe stretch", "end end", "auto" ]
@@ -4330,11 +4393,10 @@ var gCSSProperties = {
     domProp: "alignSelf",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
-    // (Assuming defaults on the parent, 'auto' will compute to 'normal'.)
-    initial_values: [ "auto", "normal" ],
-    other_values: [ "start", "flex-start", "flex-end", "center", "stretch",
-                    "baseline", "last-baseline", "right safe", "unsafe center",
-                    "self-start", "self-end safe" ],
+    initial_values: [ "auto" ],
+    other_values: [ "normal", "start", "flex-start", "flex-end", "center", "stretch",
+                    "first baseline", "last baseline", "baseline", "right safe",
+                    "unsafe center", "self-start", "self-end safe" ],
     invalid_values: [ "space-between", "abc", "30px", "stretch safe", "safe" ]
   },
   "justify-content": {
@@ -4344,13 +4406,13 @@ var gCSSProperties = {
     initial_values: [ "normal" ],
     other_values: [ "start", "end", "flex-start", "flex-end", "center", "left",
                     "right", "space-between", "space-around", "space-evenly",
-                    "baseline", "last-baseline", "stretch", "start safe",
+                    "first baseline", "last baseline", "baseline", "stretch", "start safe",
                     "unsafe end", "unsafe end stretch", "end safe space-evenly" ],
     invalid_values: [ "30px", "5%", "self-end", "safe", "normal unsafe", "unsafe safe",
                       "safe baseline", "baseline unsafe", "baseline end", "normal end",
                       "safe end unsafe start", "safe end unsafe", "normal safe start",
                       "unsafe end start", "end start safe", "space-around unsafe",
-                      "safe stretch", "auto" ]
+                      "safe stretch", "auto", "first", "last" ]
   },
   "justify-items": {
     domProp: "justifyItems",
@@ -4358,26 +4420,27 @@ var gCSSProperties = {
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "auto", "normal" ],
     other_values: [ "end", "flex-start", "flex-end", "self-start", "self-end",
-                    "center", "left", "right", "baseline", "stretch", "start",
-                    "legacy left", "right legacy", "legacy center",
-                    "unsafe right", "left unsafe", "safe right", "center safe" ],
+                    "center", "left", "right", "first baseline", "last baseline",
+                    "baseline", "stretch", "start", "legacy left", "right legacy",
+                    "legacy center", "unsafe right", "left unsafe", "safe right",
+                    "center safe" ],
     invalid_values: [ "space-between", "abc", "30px", "legacy", "legacy start",
                       "end legacy", "legacy baseline", "legacy legacy", "unsafe",
                       "safe legacy left", "legacy left safe", "legacy safe left",
                       "safe left legacy", "legacy left legacy", "baseline unsafe",
-                      "safe unsafe", "safe left unsafe", "safe stretch" ]
+                      "safe unsafe", "safe left unsafe", "safe stretch", "last" ]
   },
   "justify-self": {
     domProp: "justifySelf",
     inherited: false,
     type: CSS_TYPE_LONGHAND,
-    initial_values: [ "auto", "normal" ],
-    other_values: [ "start", "end", "flex-start", "flex-end", "self-start",
-                    "self-end", "center", "left", "right", "baseline",
-                    "last-baseline", "stretch", "left unsafe", "unsafe right",
+    initial_values: [ "auto" ],
+    other_values: [ "normal", "start", "end", "flex-start", "flex-end", "self-start",
+                    "self-end", "center", "left", "right", "baseline", "first baseline",
+                    "last baseline", "stretch", "left unsafe", "unsafe right",
                     "safe right", "center safe" ],
-    invalid_values: [ "space-between", "abc", "30px", "none",
-                      "legacy left", "right legacy" ]
+    invalid_values: [ "space-between", "abc", "30px", "none", "first", "last",
+                      "legacy left", "right legacy", "baseline first", "baseline last" ]
   },
   "flex": {
     domProp: "flex",
@@ -4966,510 +5029,508 @@ if (IsCSSPropertyPrefEnabled("layout.css.touch_action.enabled")) {
     };
 }
 
-if (IsCSSPropertyPrefEnabled("layout.css.vertical-text.enabled")) {
-  var verticalTextProperties = {
-    "writing-mode": {
-      domProp: "writingMode",
-      inherited: true,
-      type: CSS_TYPE_LONGHAND,
-      initial_values: [ "horizontal-tb", "lr", "lr-tb", "rl", "rl-tb" ],
-      other_values: [ "vertical-lr", "vertical-rl", "sideways-rl", "sideways-lr", "tb", "tb-rl" ],
-      invalid_values: [ "10px", "30%", "justify", "auto", "1em" ]
-    },
-    "text-orientation": {
-      domProp: "textOrientation",
-      inherited: true,
-      type: CSS_TYPE_LONGHAND,
-      initial_values: [ "mixed" ],
-      other_values: [ "upright", "sideways", "sideways-right" ], /* sideways-right alias for backward compatibility */
-      invalid_values: [ "none", "3em", "sideways-left" ] /* sideways-left removed from CSS Writing Modes */
-    },
-    "border-block-end": {
-      domProp: "borderBlockEnd",
-      inherited: false,
-      type: CSS_TYPE_TRUE_SHORTHAND,
-      subproperties: [ "border-block-end-color", "border-block-end-style", "border-block-end-width" ],
-      initial_values: [ "none", "medium", "currentColor", "thin", "none medium currentcolor" ],
-      other_values: [ "solid", "green", "medium solid", "green solid", "10px solid", "thick solid", "5px green none" ],
-      invalid_values: [ "5%", "5", "5 solid green" ]
-    },
-    "block-size": {
-      domProp: "blockSize",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      axis: true,
-      get_computed: logical_axis_prop_get_computed,
-      /* XXX testing auto has prerequisites */
-      initial_values: [ "auto" ],
-      prerequisites: { "display": "block" },
-      other_values: [ "15px", "3em", "15%",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "none", "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available" ],
-    },
-    "border-block-end-color": {
-      domProp: "borderBlockEndColor",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      initial_values: [ "currentColor" ],
-      other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
-      invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000" ]
-    },
-    "border-block-end-style": {
-      domProp: "borderBlockEndStyle",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* XXX hidden is sometimes the same as initial */
-      initial_values: [ "none" ],
-      other_values: [ "solid", "dashed", "dotted", "double", "outset", "inset", "groove", "ridge" ],
-      invalid_values: []
-    },
-    "border-block-end-width": {
-      domProp: "borderBlockEndWidth",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      prerequisites: { "border-block-end-style": "solid" },
-      initial_values: [ "medium", "3px", "calc(4px - 1px)" ],
-      other_values: [ "thin", "thick", "1px", "2em",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(0em)",
-        "calc(0px)",
-        "calc(5em)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 5em)",
-      ],
-      invalid_values: [ "5%", "5" ]
-    },
-    "border-block-start": {
-      domProp: "borderBlockStart",
-      inherited: false,
-      type: CSS_TYPE_TRUE_SHORTHAND,
-      subproperties: [ "border-block-start-color", "border-block-start-style", "border-block-start-width" ],
-      initial_values: [ "none", "medium", "currentColor", "thin", "none medium currentcolor" ],
-      other_values: [ "solid", "green", "medium solid", "green solid", "10px solid", "thick solid", "5px green none" ],
-      invalid_values: [ "5%", "5", "5 solid green" ]
-    },
-    "border-block-start-color": {
-      domProp: "borderBlockStartColor",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      initial_values: [ "currentColor" ],
-      other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
-      invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000" ]
-    },
-    "border-block-start-style": {
-      domProp: "borderBlockStartStyle",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* XXX hidden is sometimes the same as initial */
-      initial_values: [ "none" ],
-      other_values: [ "solid", "dashed", "dotted", "double", "outset", "inset", "groove", "ridge" ],
-      invalid_values: []
-    },
-    "border-block-start-width": {
-      domProp: "borderBlockStartWidth",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      prerequisites: { "border-block-start-style": "solid" },
-      initial_values: [ "medium", "3px", "calc(4px - 1px)" ],
-      other_values: [ "thin", "thick", "1px", "2em",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(0em)",
-        "calc(0px)",
-        "calc(5em)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 5em)",
-      ],
-      invalid_values: [ "5%", "5" ]
-    },
-    "-moz-border-end": {
-      domProp: "MozBorderEnd",
-      inherited: false,
-      type: CSS_TYPE_TRUE_SHORTHAND,
-      alias_for: "border-inline-end",
-      subproperties: [ "-moz-border-end-color", "-moz-border-end-style", "-moz-border-end-width" ],
-    },
-    "-moz-border-end-color": {
-      domProp: "MozBorderEndColor",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "border-inline-end-color",
-      subproperties: [ "border-inline-end-color" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "-moz-border-end-style": {
-      domProp: "MozBorderEndStyle",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "border-inline-end-style",
-      subproperties: [ "border-inline-end-style" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "-moz-border-end-width": {
-      domProp: "MozBorderEndWidth",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "border-inline-end-width",
-      subproperties: [ "border-inline-end-width" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "-moz-border-start": {
-      domProp: "MozBorderStart",
-      inherited: false,
-      type: CSS_TYPE_TRUE_SHORTHAND,
-      alias_for: "border-inline-start",
-      subproperties: [ "-moz-border-start-color", "-moz-border-start-style", "-moz-border-start-width" ],
-    },
-    "-moz-border-start-color": {
-      domProp: "MozBorderStartColor",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "border-inline-start-color",
-      subproperties: [ "border-inline-start-color" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "-moz-border-start-style": {
-      domProp: "MozBorderStartStyle",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "border-inline-start-style",
-      subproperties: [ "border-inline-start-style" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "-moz-border-start-width": {
-      domProp: "MozBorderStartWidth",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "border-inline-start-width",
-      subproperties: [ "border-inline-start-width" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "inline-size": {
-      domProp: "inlineSize",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      axis: true,
-      get_computed: logical_axis_prop_get_computed,
-      /* XXX testing auto has prerequisites */
-      initial_values: [ "auto" ],
-      prerequisites: { "display": "block" },
-      other_values: [ "15px", "3em", "15%",
-        // these three keywords compute to the initial value only when the
-        // writing mode is vertical, and we're testing with a horizontal
-        // writing mode
-        "-moz-max-content", "-moz-min-content", "-moz-fit-content",
-        // whether -moz-available computes to the initial value depends on
-        // the container size, and for the container size we're testing
-        // with, it does
-        // "-moz-available",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "none" ],
-    },
-    "margin-block-end": {
-      domProp: "marginBlockEnd",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* XXX testing auto has prerequisites */
-      initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)" ],
-      other_values: [ "1px", "2em", "5%",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "..25px", ".+5px", ".px", "-.px", "++5px", "-+4px", "+-3px", "--7px", "+-.6px", "-+.5px", "++.7px", "--.4px" ],
-    },
-    "margin-block-start": {
-      domProp: "marginBlockStart",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* XXX testing auto has prerequisites */
-      initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)" ],
-      other_values: [ "1px", "2em", "5%",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "..25px", ".+5px", ".px", "-.px", "++5px", "-+4px", "+-3px", "--7px", "+-.6px", "-+.5px", "++.7px", "--.4px" ],
-    },
-    "-moz-margin-end": {
-      domProp: "MozMarginEnd",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "margin-inline-end",
-      subproperties: [ "margin-inline-end" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "-moz-margin-start": {
-      domProp: "MozMarginStart",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "margin-inline-start",
-      subproperties: [ "margin-inline-start" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "max-block-size": {
-      domProp: "maxBlockSize",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      axis: true,
-      get_computed: logical_axis_prop_get_computed,
-      prerequisites: { "display": "block" },
-      initial_values: [ "none" ],
-      other_values: [ "30px", "50%",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "auto", "5", "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available" ]
-    },
-    "max-inline-size": {
-      domProp: "maxInlineSize",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      axis: true,
-      get_computed: logical_axis_prop_get_computed,
-      prerequisites: { "display": "block" },
-      initial_values: [ "none" ],
-      other_values: [ "30px", "50%",
-        // these four keywords compute to the initial value only when the
-        // writing mode is vertical, and we're testing with a horizontal
-        // writing mode
-        "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "auto", "5" ]
-    },
-    "min-block-size": {
-      domProp: "minBlockSize",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      axis: true,
-      get_computed: logical_axis_prop_get_computed,
-      prerequisites: { "display": "block" },
-      initial_values: [ "auto", "0", "calc(0em)", "calc(-2px)", "calc(-1%)" ],
-      other_values: [ "30px", "50%",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "none", "5", "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available" ]
-    },
-    "min-inline-size": {
-      domProp: "minInlineSize",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      axis: true,
-      get_computed: logical_axis_prop_get_computed,
-      prerequisites: { "display": "block" },
-      initial_values: [ "auto", "0", "calc(0em)", "calc(-2px)", "calc(-1%)" ],
-      other_values: [ "30px", "50%",
-        // these four keywords compute to the initial value only when the
-        // writing mode is vertical, and we're testing with a horizontal
-        // writing mode
-        "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ "none", "5" ]
-    },
-    "offset-block-end": {
-      domProp: "offsetBlockEnd",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* FIXME: run tests with multiple prerequisites */
-      prerequisites: { "position": "relative" },
-      /* XXX 0 may or may not be equal to auto */
-      initial_values: [ "auto" ],
-      other_values: [ "32px", "-3em", "12%",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: []
-    },
-    "offset-block-start": {
-      domProp: "offsetBlockStart",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* FIXME: run tests with multiple prerequisites */
-      prerequisites: { "position": "relative" },
-      /* XXX 0 may or may not be equal to auto */
-      initial_values: [ "auto" ],
-      other_values: [ "32px", "-3em", "12%",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: []
-    },
-    "offset-inline-end": {
-      domProp: "offsetInlineEnd",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* FIXME: run tests with multiple prerequisites */
-      prerequisites: { "position": "relative" },
-      /* XXX 0 may or may not be equal to auto */
-      initial_values: [ "auto" ],
-      other_values: [ "32px", "-3em", "12%",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: []
-    },
-    "offset-inline-start": {
-      domProp: "offsetInlineStart",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      /* FIXME: run tests with multiple prerequisites */
-      prerequisites: { "position": "relative" },
-      /* XXX 0 may or may not be equal to auto */
-      initial_values: [ "auto" ],
-      other_values: [ "32px", "-3em", "12%",
-        "calc(2px)",
-        "calc(-2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: []
-    },
-    "padding-block-end": {
-      domProp: "paddingBlockEnd",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)", "calc(-3px)", "calc(-1%)" ],
-      other_values: [ "1px", "2em", "5%",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ ],
-    },
-    "padding-block-start": {
-      domProp: "paddingBlockStart",
-      inherited: false,
-      type: CSS_TYPE_LONGHAND,
-      logical: true,
-      get_computed: logical_box_prop_get_computed,
-      initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)", "calc(-3px)", "calc(-1%)" ],
-      other_values: [ "1px", "2em", "5%",
-        "calc(2px)",
-        "calc(50%)",
-        "calc(3*25px)",
-        "calc(25px*3)",
-        "calc(3*25px + 50%)",
-      ],
-      invalid_values: [ ],
-    },
-    "-moz-padding-end": {
-      domProp: "MozPaddingEnd",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "padding-inline-end",
-      subproperties: [ "padding-inline-end" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-    "-moz-padding-start": {
-      domProp: "MozPaddingStart",
-      inherited: false,
-      type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-      alias_for: "padding-inline-start",
-      subproperties: [ "padding-inline-start" ],
-      get_computed: logical_box_prop_get_computed,
-    },
-  };
-  for (var prop in verticalTextProperties) {
-    gCSSProperties[prop] = verticalTextProperties[prop];
-  }
-  /*
-   * Vertical vs horizontal writing-mode can affect line-height
-   * because font metrics may not be symmetrical,
-   * so we require writing-mode:initial to ensure consistency
-   * in font shorthand and line-height tests.
-   */
-  ["font", "line-height"].forEach(function(prop) {
-    var p = gCSSProperties[prop];
-    if (p.prerequisites === undefined) {
-      p.prerequisites = {};
-    }
-    p.prerequisites["writing-mode"] = "initial";
-  });
+var verticalTextProperties = {
+  "writing-mode": {
+    domProp: "writingMode",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "horizontal-tb", "lr", "lr-tb", "rl", "rl-tb" ],
+    other_values: [ "vertical-lr", "vertical-rl", "sideways-rl", "sideways-lr", "tb", "tb-rl" ],
+    invalid_values: [ "10px", "30%", "justify", "auto", "1em" ]
+  },
+  "text-orientation": {
+    domProp: "textOrientation",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "mixed" ],
+    other_values: [ "upright", "sideways", "sideways-right" ], /* sideways-right alias for backward compatibility */
+    invalid_values: [ "none", "3em", "sideways-left" ] /* sideways-left removed from CSS Writing Modes */
+  },
+  "border-block-end": {
+    domProp: "borderBlockEnd",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    subproperties: [ "border-block-end-color", "border-block-end-style", "border-block-end-width" ],
+    initial_values: [ "none", "medium", "currentColor", "thin", "none medium currentcolor" ],
+    other_values: [ "solid", "green", "medium solid", "green solid", "10px solid", "thick solid", "5px green none" ],
+    invalid_values: [ "5%", "5", "5 solid green" ]
+  },
+  "block-size": {
+    domProp: "blockSize",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    axis: true,
+    get_computed: logical_axis_prop_get_computed,
+    /* XXX testing auto has prerequisites */
+    initial_values: [ "auto" ],
+    prerequisites: { "display": "block" },
+    other_values: [ "15px", "3em", "15%",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "none", "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available" ],
+  },
+  "border-block-end-color": {
+    domProp: "borderBlockEndColor",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    initial_values: [ "currentColor" ],
+    other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
+    invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000" ]
+  },
+  "border-block-end-style": {
+    domProp: "borderBlockEndStyle",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* XXX hidden is sometimes the same as initial */
+    initial_values: [ "none" ],
+    other_values: [ "solid", "dashed", "dotted", "double", "outset", "inset", "groove", "ridge" ],
+    invalid_values: []
+  },
+  "border-block-end-width": {
+    domProp: "borderBlockEndWidth",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    prerequisites: { "border-block-end-style": "solid" },
+    initial_values: [ "medium", "3px", "calc(4px - 1px)" ],
+    other_values: [ "thin", "thick", "1px", "2em",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(0em)",
+      "calc(0px)",
+      "calc(5em)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 5em)",
+    ],
+    invalid_values: [ "5%", "5" ]
+  },
+  "border-block-start": {
+    domProp: "borderBlockStart",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    subproperties: [ "border-block-start-color", "border-block-start-style", "border-block-start-width" ],
+    initial_values: [ "none", "medium", "currentColor", "thin", "none medium currentcolor" ],
+    other_values: [ "solid", "green", "medium solid", "green solid", "10px solid", "thick solid", "5px green none" ],
+    invalid_values: [ "5%", "5", "5 solid green" ]
+  },
+  "border-block-start-color": {
+    domProp: "borderBlockStartColor",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    initial_values: [ "currentColor" ],
+    other_values: [ "green", "rgba(255,128,0,0.5)", "transparent" ],
+    invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000" ]
+  },
+  "border-block-start-style": {
+    domProp: "borderBlockStartStyle",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* XXX hidden is sometimes the same as initial */
+    initial_values: [ "none" ],
+    other_values: [ "solid", "dashed", "dotted", "double", "outset", "inset", "groove", "ridge" ],
+    invalid_values: []
+  },
+  "border-block-start-width": {
+    domProp: "borderBlockStartWidth",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    prerequisites: { "border-block-start-style": "solid" },
+    initial_values: [ "medium", "3px", "calc(4px - 1px)" ],
+    other_values: [ "thin", "thick", "1px", "2em",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(0em)",
+      "calc(0px)",
+      "calc(5em)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 5em)",
+    ],
+    invalid_values: [ "5%", "5" ]
+  },
+  "-moz-border-end": {
+    domProp: "MozBorderEnd",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    alias_for: "border-inline-end",
+    subproperties: [ "-moz-border-end-color", "-moz-border-end-style", "-moz-border-end-width" ],
+  },
+  "-moz-border-end-color": {
+    domProp: "MozBorderEndColor",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "border-inline-end-color",
+    subproperties: [ "border-inline-end-color" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "-moz-border-end-style": {
+    domProp: "MozBorderEndStyle",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "border-inline-end-style",
+    subproperties: [ "border-inline-end-style" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "-moz-border-end-width": {
+    domProp: "MozBorderEndWidth",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "border-inline-end-width",
+    subproperties: [ "border-inline-end-width" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "-moz-border-start": {
+    domProp: "MozBorderStart",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    alias_for: "border-inline-start",
+    subproperties: [ "-moz-border-start-color", "-moz-border-start-style", "-moz-border-start-width" ],
+  },
+  "-moz-border-start-color": {
+    domProp: "MozBorderStartColor",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "border-inline-start-color",
+    subproperties: [ "border-inline-start-color" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "-moz-border-start-style": {
+    domProp: "MozBorderStartStyle",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "border-inline-start-style",
+    subproperties: [ "border-inline-start-style" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "-moz-border-start-width": {
+    domProp: "MozBorderStartWidth",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "border-inline-start-width",
+    subproperties: [ "border-inline-start-width" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "inline-size": {
+    domProp: "inlineSize",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    axis: true,
+    get_computed: logical_axis_prop_get_computed,
+    /* XXX testing auto has prerequisites */
+    initial_values: [ "auto" ],
+    prerequisites: { "display": "block" },
+    other_values: [ "15px", "3em", "15%",
+      // these three keywords compute to the initial value only when the
+      // writing mode is vertical, and we're testing with a horizontal
+      // writing mode
+      "-moz-max-content", "-moz-min-content", "-moz-fit-content",
+      // whether -moz-available computes to the initial value depends on
+      // the container size, and for the container size we're testing
+      // with, it does
+      // "-moz-available",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "none" ],
+  },
+  "margin-block-end": {
+    domProp: "marginBlockEnd",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* XXX testing auto has prerequisites */
+    initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)" ],
+    other_values: [ "1px", "2em", "5%",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "..25px", ".+5px", ".px", "-.px", "++5px", "-+4px", "+-3px", "--7px", "+-.6px", "-+.5px", "++.7px", "--.4px" ],
+  },
+  "margin-block-start": {
+    domProp: "marginBlockStart",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* XXX testing auto has prerequisites */
+    initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)" ],
+    other_values: [ "1px", "2em", "5%",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "..25px", ".+5px", ".px", "-.px", "++5px", "-+4px", "+-3px", "--7px", "+-.6px", "-+.5px", "++.7px", "--.4px" ],
+  },
+  "-moz-margin-end": {
+    domProp: "MozMarginEnd",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "margin-inline-end",
+    subproperties: [ "margin-inline-end" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "-moz-margin-start": {
+    domProp: "MozMarginStart",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "margin-inline-start",
+    subproperties: [ "margin-inline-start" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "max-block-size": {
+    domProp: "maxBlockSize",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    axis: true,
+    get_computed: logical_axis_prop_get_computed,
+    prerequisites: { "display": "block" },
+    initial_values: [ "none" ],
+    other_values: [ "30px", "50%",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "auto", "5", "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available" ]
+  },
+  "max-inline-size": {
+    domProp: "maxInlineSize",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    axis: true,
+    get_computed: logical_axis_prop_get_computed,
+    prerequisites: { "display": "block" },
+    initial_values: [ "none" ],
+    other_values: [ "30px", "50%",
+      // these four keywords compute to the initial value only when the
+      // writing mode is vertical, and we're testing with a horizontal
+      // writing mode
+      "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "auto", "5" ]
+  },
+  "min-block-size": {
+    domProp: "minBlockSize",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    axis: true,
+    get_computed: logical_axis_prop_get_computed,
+    prerequisites: { "display": "block" },
+    initial_values: [ "auto", "0", "calc(0em)", "calc(-2px)", "calc(-1%)" ],
+    other_values: [ "30px", "50%",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "none", "5", "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available" ]
+  },
+  "min-inline-size": {
+    domProp: "minInlineSize",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    axis: true,
+    get_computed: logical_axis_prop_get_computed,
+    prerequisites: { "display": "block" },
+    initial_values: [ "auto", "0", "calc(0em)", "calc(-2px)", "calc(-1%)" ],
+    other_values: [ "30px", "50%",
+      // these four keywords compute to the initial value only when the
+      // writing mode is vertical, and we're testing with a horizontal
+      // writing mode
+      "-moz-max-content", "-moz-min-content", "-moz-fit-content", "-moz-available",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ "none", "5" ]
+  },
+  "offset-block-end": {
+    domProp: "offsetBlockEnd",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* FIXME: run tests with multiple prerequisites */
+    prerequisites: { "position": "relative" },
+    /* XXX 0 may or may not be equal to auto */
+    initial_values: [ "auto" ],
+    other_values: [ "32px", "-3em", "12%",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: []
+  },
+  "offset-block-start": {
+    domProp: "offsetBlockStart",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* FIXME: run tests with multiple prerequisites */
+    prerequisites: { "position": "relative" },
+    /* XXX 0 may or may not be equal to auto */
+    initial_values: [ "auto" ],
+    other_values: [ "32px", "-3em", "12%",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: []
+  },
+  "offset-inline-end": {
+    domProp: "offsetInlineEnd",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* FIXME: run tests with multiple prerequisites */
+    prerequisites: { "position": "relative" },
+    /* XXX 0 may or may not be equal to auto */
+    initial_values: [ "auto" ],
+    other_values: [ "32px", "-3em", "12%",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: []
+  },
+  "offset-inline-start": {
+    domProp: "offsetInlineStart",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    /* FIXME: run tests with multiple prerequisites */
+    prerequisites: { "position": "relative" },
+    /* XXX 0 may or may not be equal to auto */
+    initial_values: [ "auto" ],
+    other_values: [ "32px", "-3em", "12%",
+      "calc(2px)",
+      "calc(-2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: []
+  },
+  "padding-block-end": {
+    domProp: "paddingBlockEnd",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)", "calc(-3px)", "calc(-1%)" ],
+    other_values: [ "1px", "2em", "5%",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ ],
+  },
+  "padding-block-start": {
+    domProp: "paddingBlockStart",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    logical: true,
+    get_computed: logical_box_prop_get_computed,
+    initial_values: [ "0", "0px", "0%", "calc(0pt)", "calc(0% + 0px)", "calc(-3px)", "calc(-1%)" ],
+    other_values: [ "1px", "2em", "5%",
+      "calc(2px)",
+      "calc(50%)",
+      "calc(3*25px)",
+      "calc(25px*3)",
+      "calc(3*25px + 50%)",
+    ],
+    invalid_values: [ ],
+},
+  "-moz-padding-end": {
+    domProp: "MozPaddingEnd",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "padding-inline-end",
+    subproperties: [ "padding-inline-end" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+  "-moz-padding-start": {
+    domProp: "MozPaddingStart",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "padding-inline-start",
+    subproperties: [ "padding-inline-start" ],
+    get_computed: logical_box_prop_get_computed,
+  },
+};
+for (var prop in verticalTextProperties) {
+  gCSSProperties[prop] = verticalTextProperties[prop];
 }
+/*
+ * Vertical vs horizontal writing-mode can affect line-height
+ * because font metrics may not be symmetrical,
+ * so we require writing-mode:initial to ensure consistency
+ * in font shorthand and line-height tests.
+ */
+["font", "line-height"].forEach(function(prop) {
+  var p = gCSSProperties[prop];
+  if (p.prerequisites === undefined) {
+    p.prerequisites = {};
+  }
+  p.prerequisites["writing-mode"] = "initial";
+});
 
 if (IsCSSPropertyPrefEnabled("layout.css.text-combine-upright.enabled")) {
   gCSSProperties["text-combine-upright"] = {
@@ -6239,10 +6300,10 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
     other_values: [
       // <'grid-template-rows'> / <'grid-template-columns'>
       "40px / 100px",
-      "[foo] 40px [bar] / [baz] 100px [fizz]",
+      "[foo] 40px [bar] / [baz] repeat(auto-fill,100px) [fizz]",
       " none/100px",
       "40px/none",
-      // [ <track-list> / ]? [ <line-names>? <string> <track-size>? <line-names>? ]+
+      // [ <line-names>? <string> <track-size>? <line-names>? ]+ [ / <explicit-track-list> ]?
       "'fizz'",
       "[bar] 'fizz'",
       "'fizz' / [foo] 40px",
@@ -6253,6 +6314,8 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "[bar] 'fizz' 100px [buzz] \n [a] '.' 200px [b] / [foo] 40px",
     ],
     invalid_values: [
+      "'fizz' / repeat(1, 100px)",
+      "'fizz' repeat(1, 100px) / 0px",
       "[foo] [bar] 40px / 100px",
       "[fizz] [buzz] 100px / 40px",
       "[fizz] [buzz] 'foo' / 40px",
@@ -6510,9 +6573,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
   };
 }
 
-if (IsCSSPropertyPrefEnabled("layout.css.display-contents.enabled")) {
-  gCSSProperties["display"].other_values.push("contents");
-}
+gCSSProperties["display"].other_values.push("contents");
 
 if (IsCSSPropertyPrefEnabled("layout.css.contain.enabled")) {
   gCSSProperties["contain"] = {

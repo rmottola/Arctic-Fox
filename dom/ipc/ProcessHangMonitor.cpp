@@ -7,9 +7,14 @@
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/ProcessHangMonitorIPC.h"
 
+#include "jsapi.h"
+#include "js/GCAPI.h"
+
 #include "mozilla/Atomics.h"
+#include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/Monitor.h"
@@ -71,7 +76,7 @@ class HangMonitorChild
 {
  public:
   explicit HangMonitorChild(ProcessHangMonitor* aMonitor);
-  virtual ~HangMonitorChild();
+  ~HangMonitorChild() override;
 
   void Open(Transport* aTransport, ProcessId aOtherPid,
             MessageLoop* aIOLoop);
@@ -91,13 +96,17 @@ class HangMonitorChild
 
   void ClearHang();
   void ClearHangAsync();
+  void ClearForcePaint();
 
-  virtual bool RecvTerminateScript() override;
-  virtual bool RecvBeginStartingDebugger() override;
-  virtual bool RecvEndStartingDebugger() override;
+  mozilla::ipc::IPCResult RecvTerminateScript() override;
+  mozilla::ipc::IPCResult RecvBeginStartingDebugger() override;
+  mozilla::ipc::IPCResult RecvEndStartingDebugger() override;
 
-  virtual void ActorDestroy(ActorDestroyReason aWhy) override;
+  mozilla::ipc::IPCResult RecvForcePaint(const TabId& aTabId, const uint64_t& aLayerObserverEpoch) override;
 
+  void ActorDestroy(ActorDestroyReason aWhy) override;
+
+  void InterruptCallback();
   void Shutdown();
 
   static HangMonitorChild* Get() { return sInstance; }
@@ -108,6 +117,7 @@ class HangMonitorChild
   void ShutdownOnThread();
 
   static Atomic<HangMonitorChild*> sInstance;
+  UniquePtr<BackgroundHangMonitor> mForcePaintMonitor;
 
   const RefPtr<ProcessHangMonitor> mHangMonitor;
   Monitor mMonitor;
@@ -119,6 +129,10 @@ class HangMonitorChild
   bool mTerminateScript;
   bool mStartDebugger;
   bool mFinishedStartingDebugger;
+  bool mForcePaint;
+  TabId mForcePaintTab;
+  MOZ_INIT_OUTSIDE_CTOR uint64_t mForcePaintEpoch;
+  JSContext* mContext;
   bool mShutdownDone;
 
   // This field is only accessed on the hang thread.
@@ -181,7 +195,7 @@ public:
   }
 
 private:
-  ~HangMonitoredProcess() {}
+  ~HangMonitoredProcess() = default;
 
   // Everything here is main thread-only.
   HangMonitorParent* mActor;
@@ -195,18 +209,20 @@ class HangMonitorParent
 {
 public:
   explicit HangMonitorParent(ProcessHangMonitor* aMonitor);
-  virtual ~HangMonitorParent();
+  ~HangMonitorParent() override;
 
   void Open(Transport* aTransport, ProcessId aPid, MessageLoop* aIOLoop);
 
-  virtual bool RecvHangEvidence(const HangData& aHangData) override;
-  virtual bool RecvClearHang() override;
+  mozilla::ipc::IPCResult RecvHangEvidence(const HangData& aHangData) override;
+  mozilla::ipc::IPCResult RecvClearHang() override;
 
-  virtual void ActorDestroy(ActorDestroyReason aWhy) override;
+  void ActorDestroy(ActorDestroyReason aWhy) override;
 
   void SetProcess(HangMonitoredProcess* aProcess) { mProcess = aProcess; }
 
   void Shutdown();
+
+  void ForcePaint(dom::TabParent* aTabParent, uint64_t aLayerObserverEpoch);
 
   void TerminateScript();
   void BeginStartingDebugger();
@@ -224,6 +240,9 @@ public:
 
 private:
   bool TakeBrowserMinidump(const PluginHangData& aPhd, nsString& aCrashId);
+
+  void ForcePaintOnThread(TabId aTabId, uint64_t aLayerObserverEpoch);
+
   void ShutdownOnThread();
 
   const RefPtr<ProcessHangMonitor> mHangMonitor;
@@ -255,17 +274,53 @@ HangMonitorChild::HangMonitorChild(ProcessHangMonitor* aMonitor)
    mTerminateScript(false),
    mStartDebugger(false),
    mFinishedStartingDebugger(false),
+   mForcePaint(false),
    mShutdownDone(false),
    mIPCOpen(true)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  mContext = danger::GetJSContext();
+  mForcePaintMonitor =
+    MakeUnique<mozilla::BackgroundHangMonitor>("Gecko_Child_ForcePaint",
+                                               128, /* ms timeout for microhangs */
+                                               8192 /* ms timeout for permahangs */,
+                                               BackgroundHangMonitor::THREAD_PRIVATE);
 }
 
 HangMonitorChild::~HangMonitorChild()
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(sInstance == this);
+  mForcePaintMonitor = nullptr;
   sInstance = nullptr;
+}
+
+void
+HangMonitorChild::InterruptCallback()
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
+  bool forcePaint;
+  TabId forcePaintTab;
+  uint64_t forcePaintEpoch;
+
+  {
+    MonitorAutoLock lock(mMonitor);
+    forcePaint = mForcePaint;
+    forcePaintTab = mForcePaintTab;
+    forcePaintEpoch = mForcePaintEpoch;
+
+    mForcePaint = false;
+  }
+
+  if (forcePaint) {
+    RefPtr<TabChild> tabChild = TabChild::FindTabChild(forcePaintTab);
+    if (tabChild) {
+      JS::AutoAssertNoGC nogc(mContext);
+      JS::AutoAssertOnBarrier nobarrier(mContext);
+      tabChild->ForcePaint(forcePaintEpoch);
+    }
+  }
 }
 
 void
@@ -301,34 +356,63 @@ HangMonitorChild::ActorDestroy(ActorDestroyReason aWhy)
   MonitorLoop()->PostTask(NewNonOwningRunnableMethod(this, &HangMonitorChild::ShutdownOnThread));
 }
 
-bool
+mozilla::ipc::IPCResult
 HangMonitorChild::RecvTerminateScript()
 {
   MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
 
   MonitorAutoLock lock(mMonitor);
   mTerminateScript = true;
-  return true;
+  return IPC_OK();
 }
 
-bool
+mozilla::ipc::IPCResult
 HangMonitorChild::RecvBeginStartingDebugger()
 {
   MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
 
   MonitorAutoLock lock(mMonitor);
   mStartDebugger = true;
-  return true;
+  return IPC_OK();
 }
 
-bool
+mozilla::ipc::IPCResult
 HangMonitorChild::RecvEndStartingDebugger()
 {
   MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
 
   MonitorAutoLock lock(mMonitor);
   mFinishedStartingDebugger = true;
-  return true;
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+HangMonitorChild::RecvForcePaint(const TabId& aTabId, const uint64_t& aLayerObserverEpoch)
+{
+  MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
+
+  mForcePaintMonitor->NotifyActivity();
+
+  {
+    MonitorAutoLock lock(mMonitor);
+    mForcePaint = true;
+    mForcePaintTab = aTabId;
+    mForcePaintEpoch = aLayerObserverEpoch;
+  }
+
+  JS_RequestInterruptCallback(mContext);
+  JS::RequestGCInterruptCallback(mContext);
+
+  return IPC_OK();
+}
+
+void
+HangMonitorChild::ClearForcePaint()
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  MOZ_RELEASE_ASSERT(XRE_IsContentProcess());
+
+  mForcePaintMonitor->NotifyWait();
 }
 
 void
@@ -525,6 +609,25 @@ HangMonitorParent::ShutdownOnThread()
 }
 
 void
+HangMonitorParent::ForcePaint(dom::TabParent* aTab, uint64_t aLayerObserverEpoch)
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  TabId id = aTab->GetTabId();
+  MonitorLoop()->PostTask(NewNonOwningRunnableMethod<TabId, uint64_t>(
+                            this, &HangMonitorParent::ForcePaintOnThread, id, aLayerObserverEpoch));
+}
+
+void
+HangMonitorParent::ForcePaintOnThread(TabId aTabId, uint64_t aLayerObserverEpoch)
+{
+  MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
+
+  if (mIPCOpen) {
+    Unused << SendForcePaint(aTabId, aLayerObserverEpoch);
+  }
+}
+
+void
 HangMonitorParent::ActorDestroy(ActorDestroyReason aWhy)
 {
   MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
@@ -619,21 +722,21 @@ HangMonitorParent::TakeBrowserMinidump(const PluginHangData& aPhd,
   return false;
 }
 
-bool
+mozilla::ipc::IPCResult
 HangMonitorParent::RecvHangEvidence(const HangData& aHangData)
 {
   // chrome process, background thread
   MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
 
   if (!mReportHangs) {
-    return true;
+    return IPC_OK();
   }
 
 #ifdef XP_WIN
   // Don't report hangs if we're debugging the process. You can comment this
   // line out for testing purposes.
   if (IsDebuggerPresent()) {
-    return true;
+    return IPC_OK();
   }
 #endif
 
@@ -653,7 +756,7 @@ HangMonitorParent::RecvHangEvidence(const HangData& aHangData)
     new HangObserverNotifier(mProcess, this, aHangData, crashId, takeMinidump);
   NS_DispatchToMainThread(notifier);
 
-  return true;
+  return IPC_OK();
 }
 
 class ClearHangNotifier final : public Runnable
@@ -680,14 +783,14 @@ private:
   RefPtr<HangMonitoredProcess> mProcess;
 };
 
-bool
+mozilla::ipc::IPCResult
 HangMonitorParent::RecvClearHang()
 {
   // chrome process, background thread
   MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
 
   if (!mReportHangs) {
-    return true;
+    return IPC_OK();
   }
 
   mHangMonitor->InitiateCPOWTimeout();
@@ -698,7 +801,7 @@ HangMonitorParent::RecvClearHang()
     new ClearHangNotifier(mProcess);
   NS_DispatchToMainThread(notifier);
 
-  return true;
+  return IPC_OK();
 }
 
 void
@@ -959,6 +1062,16 @@ HangMonitoredProcess::UserCanceled()
   return NS_OK;
 }
 
+static bool
+InterruptCallback(JSContext* cx)
+{
+  if (HangMonitorChild* child = HangMonitorChild::Get()) {
+    child->InterruptCallback();
+  }
+
+  return true;
+}
+
 ProcessHangMonitor* ProcessHangMonitor::sInstance;
 
 ProcessHangMonitor::ProcessHangMonitor()
@@ -1072,9 +1185,9 @@ mozilla::CreateHangMonitorParent(ContentParent* aContentParent,
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
   ProcessHangMonitor* monitor = ProcessHangMonitor::GetOrCreate();
-  HangMonitorParent* parent = new HangMonitorParent(monitor);
+  auto* parent = new HangMonitorParent(monitor);
 
-  HangMonitoredProcess* process = new HangMonitoredProcess(parent, aContentParent);
+  auto* process = new HangMonitoredProcess(parent, aContentParent);
   parent->SetProcess(process);
 
   monitor->MonitorLoop()->PostTask(NewNonOwningRunnableMethod
@@ -1094,8 +1207,12 @@ mozilla::CreateHangMonitorChild(mozilla::ipc::Transport* aTransport,
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
+  JSContext* cx = danger::GetJSContext();
+  JS_AddInterruptCallback(cx, InterruptCallback);
+  JS::AddGCInterruptCallback(cx, InterruptCallback);
+
   ProcessHangMonitor* monitor = ProcessHangMonitor::GetOrCreate();
-  HangMonitorChild* child = new HangMonitorChild(monitor);
+  auto* child = new HangMonitorChild(monitor);
 
   monitor->MonitorLoop()->PostTask(NewNonOwningRunnableMethod
                                    <mozilla::ipc::Transport*,
@@ -1140,5 +1257,26 @@ ProcessHangMonitor::ClearHang()
   MOZ_ASSERT(NS_IsMainThread());
   if (HangMonitorChild* child = HangMonitorChild::Get()) {
     child->ClearHang();
+  }
+}
+
+/* static */ void
+ProcessHangMonitor::ForcePaint(PProcessHangMonitorParent* aParent,
+                               dom::TabParent* aTabParent,
+                               uint64_t aLayerObserverEpoch)
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  auto parent = static_cast<HangMonitorParent*>(aParent);
+  parent->ForcePaint(aTabParent, aLayerObserverEpoch);
+}
+
+/* static */ void
+ProcessHangMonitor::ClearForcePaint()
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  MOZ_RELEASE_ASSERT(XRE_IsContentProcess());
+
+  if (HangMonitorChild* child = HangMonitorChild::Get()) {
+    child->ClearForcePaint();
   }
 }

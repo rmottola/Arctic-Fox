@@ -29,7 +29,6 @@
 
 #ifdef MOZ_WIDGET_GONK
 #include "nsJSUtils.h"
-#include "SpeakerManagerService.h"
 #endif
 
 #include "mozilla/Preferences.h"
@@ -79,6 +78,13 @@ public:
     topic.Append(NS_ConvertUTF16toUTF8(name));
 
     observerService->NotifyObservers(wrapper, topic.get(),
+                                     mActive
+                                       ? u"active"
+                                       : u"inactive");
+
+    // TODO : remove b2g related event in bug1299390.
+    observerService->NotifyObservers(wrapper,
+                                     "media-playback",
                                      mActive
                                        ? u"active"
                                        : u"inactive");
@@ -153,6 +159,22 @@ private:
   AudioChannelService::AudibleChangedReasons mReason;
 };
 
+bool
+IsEnableAudioCompetingForAllAgents()
+{
+  // In general, the audio competing should only be for audible media and it
+  // helps user can focus on one media at the same time. However, we hope to
+  // treat all media as the same in the mobile device. First reason is we have
+  // media control on fennec and we just want to control one media at once time.
+  // Second reason is to reduce the bandwidth, avoiding to play any non-audible
+  // media in background which user doesn't notice about.
+#ifdef MOZ_WIDGET_ANDROID
+  return true;
+#else
+  return false;
+#endif
+}
+
 } // anonymous namespace
 
 StaticRefPtr<AudioChannelService> gAudioChannelService;
@@ -224,9 +246,6 @@ AudioChannelService::Shutdown()
     gAudioChannelService->mWindows.Clear();
     gAudioChannelService->mPlayingChildren.Clear();
     gAudioChannelService->mTabParents.Clear();
-#ifdef MOZ_WIDGET_GONK
-    gAudioChannelService->mSpeakerManager.Clear();
-#endif
 
     gAudioChannelService = nullptr;
   }
@@ -315,13 +334,6 @@ AudioChannelService::UnregisterAudioChannelAgent(AudioChannelAgent* aAgent)
   // released in their callback.
   RefPtr<AudioChannelAgent> kungFuDeathGrip(aAgent);
   winData->RemoveAgent(aAgent);
-
-#ifdef MOZ_WIDGET_GONK
-  bool active = AnyAudioChannelIsActive();
-  for (uint32_t i = 0; i < mSpeakerManager.Length(); i++) {
-    mSpeakerManager[i]->SetAudioChannelActive(active);
-  }
-#endif
 
   MaybeSendStatusUpdate();
 }
@@ -548,12 +560,6 @@ AudioChannelService::Observe(nsISupports* aSubject, const char* aTopic,
       }
     }
 
-#ifdef MOZ_WIDGET_GONK
-    bool active = AnyAudioChannelIsActive();
-    for (uint32_t i = 0; i < mSpeakerManager.Length(); i++) {
-      mSpeakerManager[i]->SetAudioChannelActive(active);
-    }
-#endif
   } else if (!strcmp(aTopic, "ipc:content-shutdown")) {
     nsCOMPtr<nsIPropertyBag2> props = do_QueryInterface(aSubject);
     if (!props) {
@@ -1117,7 +1123,9 @@ AudioChannelService::AudioChannelWindow::IsAgentInvolvingInAudioCompeting(AudioC
 bool
 AudioChannelService::AudioChannelWindow::IsAudioCompetingInSameTab() const
 {
-  return (mOwningAudioFocus && mAudibleAgents.Length() > 1);
+  bool hasMultipleActiveAgents = IsEnableAudioCompetingForAllAgents() ?
+    mAgents.Length() > 1 : mAudibleAgents.Length() > 1;
+  return mOwningAudioFocus && hasMultipleActiveAgents;
 }
 
 void
@@ -1128,14 +1136,15 @@ AudioChannelService::AudioChannelWindow::AudioFocusChanged(AudioChannelAgent* aN
   // from other window.
   MOZ_ASSERT(aNewPlayingAgent);
 
-  if (mAudibleAgents.IsEmpty()) {
+  if (IsInactiveWindow()) {
     // These would happen in two situations,
     // (1) Audio in page A was ended, and another page B want to play audio.
     //     Page A should abandon its focus.
     // (2) Audio was paused by remote-control, page should still own the focus.
     mOwningAudioFocus = IsContainingPlayingAgent(aNewPlayingAgent);
   } else {
-    nsTObserverArray<AudioChannelAgent*>::ForwardIterator iter(mAudibleAgents);
+    nsTObserverArray<AudioChannelAgent*>::ForwardIterator
+      iter(IsEnableAudioCompetingForAllAgents() ? mAgents : mAudibleAgents);
     while (iter.HasMore()) {
       AudioChannelAgent* agent = iter.GetNext();
       MOZ_ASSERT(agent);
@@ -1181,7 +1190,8 @@ AudioChannelService::AudioChannelWindow::GetCompetingBehavior(AudioChannelAgent*
                                                               bool aIncomingChannelActive) const
 {
   MOZ_ASSERT(aAgent);
-  MOZ_ASSERT(mAudibleAgents.Contains(aAgent));
+  MOZ_ASSERT(IsEnableAudioCompetingForAllAgents() ?
+    mAgents.Contains(aAgent) : mAudibleAgents.Contains(aAgent));
 
   uint32_t competingBehavior = nsISuspendedTypes::NONE_SUSPENDED;
   int32_t presentChannelType = aAgent->AudioChannelType();
@@ -1221,6 +1231,8 @@ AudioChannelService::AudioChannelWindow::AppendAgent(AudioChannelAgent* aAgent,
     AudioAudibleChanged(aAgent,
                         AudibleState::eAudible,
                         AudibleChangedReasons::eDataAudibleChanged);
+  } else if (IsEnableAudioCompetingForAllAgents() && !aAudible) {
+    NotifyAudioCompetingChanged(aAgent, true);
   }
 }
 
@@ -1342,6 +1354,13 @@ AudioChannelService::AudioChannelWindow::IsLastAudibleAgent() const
   return mAudibleAgents.IsEmpty();
 }
 
+bool
+AudioChannelService::AudioChannelWindow::IsInactiveWindow() const
+{
+  return IsEnableAudioCompetingForAllAgents() ?
+    mAudibleAgents.IsEmpty() && mAgents.IsEmpty() : mAudibleAgents.IsEmpty();
+}
+
 void
 AudioChannelService::AudioChannelWindow::NotifyAudioAudibleChanged(nsPIDOMWindowOuter* aWindow,
                                                                    AudibleState aAudible,
@@ -1349,8 +1368,8 @@ AudioChannelService::AudioChannelWindow::NotifyAudioAudibleChanged(nsPIDOMWindow
 {
   RefPtr<AudioPlaybackRunnable> runnable =
     new AudioPlaybackRunnable(aWindow, aAudible, aReason);
-  nsresult rv = NS_DispatchToCurrentThread(runnable);
-  NS_WARN_IF(NS_FAILED(rv));
+  DebugOnly<nsresult> rv = NS_DispatchToCurrentThread(runnable);
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "NS_DispatchToCurrentThread failed");
 }
 
 void
@@ -1360,6 +1379,6 @@ AudioChannelService::AudioChannelWindow::NotifyChannelActive(uint64_t aWindowID,
 {
   RefPtr<NotifyChannelActiveRunnable> runnable =
     new NotifyChannelActiveRunnable(aWindowID, aChannel, aActive);
-  nsresult rv = NS_DispatchToCurrentThread(runnable);
-  NS_WARN_IF(NS_FAILED(rv));
+  DebugOnly<nsresult> rv = NS_DispatchToCurrentThread(runnable);
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "NS_DispatchToCurrentThread failed");
 }

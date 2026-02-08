@@ -257,6 +257,9 @@ function startup(data, reasonCode) {
     let module = cuddlefish.Module('sdk/loader/cuddlefish', cuddlefishURI);
     let require = cuddlefish.Require(loader, module);
 
+    // Init the 'sdk/webextension' module from the bootstrap addon parameter.
+    require("sdk/webextension").initFromBootstrapAddonParam(data);
+
     require('sdk/addon/runner').startup(reason, {
       loader: loader,
       main: main,
@@ -295,8 +298,11 @@ function loadSandbox(uri) {
 }
 
 function unloadSandbox(sandbox) {
-  if ("nukeSandbox" in Cu)
-    Cu.nukeSandbox(sandbox);
+  if ("nukeSandbox" in Cu) {
+    try {
+      Cu.nukeSandbox(sandbox);
+    } catch (e) {}
+  }
 }
 
 function setTimeout(callback, delay) {
@@ -343,6 +349,7 @@ function nukeModules() {
     // Bug 775067: From FF17 we can kill all CCW from a given sandbox
     unloadSandbox(sandbox);
   }
+  unloadSandbox(loader.sharedGlobalSandbox);
   loader = null;
 
   // both `toolkit/loader` and `system/xul-app` are loaded as JSM's via

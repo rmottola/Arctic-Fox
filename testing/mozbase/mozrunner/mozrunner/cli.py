@@ -15,10 +15,11 @@ from .utils import findInPath
 # Map of debugging programs to information about them
 # from http://mxr.mozilla.org/mozilla-central/source/build/automationutils.py#59
 DEBUGGERS = {'gdb': {'interactive': True,
-                     'args': ['-q', '--args'],},
+                     'args': ['-q', '--args'], },
              'valgrind': {'interactive': False,
                           'args': ['--leak-check=full']}
              }
+
 
 def debugger_arguments(debugger, arguments=None, interactive=None):
     """Finds debugger arguments from debugger given and defaults
@@ -126,7 +127,7 @@ class CLI(MozProfileCLI):
             if key in self.metadata:
                 print key + ": " + self.metadata[key]
 
-    ### methods for running
+    # methods for running
 
     def command_args(self):
         """additional arguments for the mozilla application"""
@@ -158,7 +159,8 @@ class CLI(MozProfileCLI):
             debug_args = debug_args.split()
         interactive = self.options.interactive
         if self.options.debugger:
-            debug_args, interactive = debugger_arguments(self.options.debugger, debug_args, interactive)
+            debug_args, interactive = debugger_arguments(self.options.debugger, debug_args,
+                                                         interactive)
         return debug_args, interactive
 
     def start(self, runner):

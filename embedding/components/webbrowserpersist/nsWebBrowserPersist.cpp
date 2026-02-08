@@ -29,7 +29,6 @@
 #include "nsUnicharUtils.h"
 #include "nsIStringEnumerator.h"
 #include "nsCRT.h"
-#include "nsSupportsArray.h"
 #include "nsContentCID.h"
 #include "nsStreamUtils.h"
 
@@ -1531,7 +1530,6 @@ nsWebBrowserPersist::GetExtensionForContentType(const char16_t *aContentType, ch
         NS_ENSURE_TRUE(mMIMEService, NS_ERROR_FAILURE);
     }
 
-    nsCOMPtr<nsIMIMEInfo> mimeInfo;
     nsAutoCString contentType;
     contentType.AssignWithConversion(aContentType);
     nsAutoCString ext;

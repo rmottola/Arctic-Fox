@@ -280,7 +280,7 @@ public:
     if (mTimer)
     {
       mTimer->Cancel();
-      mTimer = 0;
+      mTimer = nullptr;
     }
 
     mContent = nullptr;
@@ -1138,7 +1138,7 @@ nsFrameSelection::MoveCaret(nsDirection       aDirection,
           // For visual movement, pos.mContentOffset depends on the direction-
           // ality of the first/last frame on the line (theFrame), and the caret
           // directionality must correspond.
-          FrameBidiData bidiData = nsBidi::GetBidiData(theFrame);
+          FrameBidiData bidiData = theFrame->GetBidiData();
           SetCaretBidiLevel(visualMovement ? bidiData.embeddingLevel
                                            : bidiData.baseLevel);
           break;
@@ -1149,7 +1149,7 @@ nsFrameSelection::MoveCaret(nsDirection       aDirection,
           if ((pos.mContentOffset != frameStart &&
                pos.mContentOffset != frameEnd) ||
               eSelectLine == aAmount) {
-            SetCaretBidiLevel(nsBidi::GetEmbeddingLevel(theFrame));
+            SetCaretBidiLevel(theFrame->GetEmbeddingLevel());
           }
           else {
             BidiLevelFromMove(mShell, pos.mResultContent, pos.mContentOffset,
@@ -1379,7 +1379,7 @@ nsFrameSelection::GetPrevNextBidiLevels(nsIContent*        aNode,
     direction = eDirNext;
   else {
     // we are neither at the beginning nor at the end of the frame, so we have no worries
-    nsBidiLevel currentLevel = nsBidi::GetEmbeddingLevel(currentFrame);
+    nsBidiLevel currentLevel = currentFrame->GetEmbeddingLevel();
     levels.SetData(currentFrame, currentFrame, currentLevel, currentLevel);
     return levels;
   }
@@ -1394,9 +1394,9 @@ nsFrameSelection::GetPrevNextBidiLevels(nsIContent*        aNode,
   if (NS_FAILED(rv))
     newFrame = nullptr;
 
-  FrameBidiData currentBidi = nsBidi::GetBidiData(currentFrame);
+  FrameBidiData currentBidi = currentFrame->GetBidiData();
   nsBidiLevel currentLevel = currentBidi.embeddingLevel;
-  nsBidiLevel newLevel = newFrame ? nsBidi::GetEmbeddingLevel(newFrame)
+  nsBidiLevel newLevel = newFrame ? newFrame->GetEmbeddingLevel()
                                   : currentBidi.baseLevel;
   
   // If not jumping lines, disregard br frames, since they might be positioned incorrectly.
@@ -1457,7 +1457,7 @@ nsFrameSelection::GetFrameFromLevel(nsIFrame    *aFrameIn,
     foundFrame = frameTraversal->CurrentItem();
     if (!foundFrame)
       return NS_ERROR_FAILURE;
-    foundLevel = nsBidi::GetEmbeddingLevel(foundFrame);
+    foundLevel = foundFrame->GetEmbeddingLevel();
 
   } while (foundLevel > aBidiLevel);
 
@@ -1557,7 +1557,7 @@ void nsFrameSelection::BidiLevelFromClick(nsIContent *aNode,
   if (!clickInFrame)
     return;
 
-  SetCaretBidiLevel(nsBidi::GetEmbeddingLevel(clickInFrame));
+  SetCaretBidiLevel(clickInFrame->GetEmbeddingLevel());
 }
 
 
@@ -1991,7 +1991,7 @@ nsFrameSelection::RepaintSelection(SelectionType aSelectionType)
 #endif
   return mDomSelections[index]->Repaint(mShell->GetPresContext());
 }
- 
+
 nsIFrame*
 nsFrameSelection::GetFrameForNodeOffset(nsIContent*        aNode,
                                         int32_t            aOffset,
@@ -2010,11 +2010,12 @@ nsFrameSelection::GetFrameForNodeOffset(nsIContent*        aNode,
   }
 
   nsIFrame* returnFrame = nullptr;
+  nsCOMPtr<nsIContent> theNode;
 
   while (true) {
     *aReturnOffset = aOffset;
 
-    nsCOMPtr<nsIContent> theNode = aNode;
+    theNode = aNode;
 
     if (aNode->IsElement()) {
       int32_t childIndex  = 0;
@@ -2133,6 +2134,18 @@ nsFrameSelection::GetFrameForNodeOffset(nsIContent*        aNode,
 
   if (!returnFrame)
     return nullptr;
+
+  // If we ended up here and were asked to position the caret after a visible
+  // break, let's return the frame on the next line instead if it exists.
+  if (aOffset > 0 &&  (uint32_t) aOffset >= aNode->Length() &&
+      theNode == aNode->GetLastChild()) {
+    nsIFrame* newFrame;
+    nsLayoutUtils::IsInvisibleBreak(theNode, &newFrame);
+    if (newFrame) {
+      returnFrame = newFrame;
+      *aReturnOffset = 0;
+    }
+  }
 
   // find the child frame containing the offset we want
   returnFrame->GetChildFrameContainingOffset(*aReturnOffset, aHint == CARET_ASSOCIATE_AFTER,
@@ -5290,7 +5303,7 @@ Selection::CollapseToEnd(ErrorResult& aRv)
  * IsCollapsed -- is the whole selection just one point, or unset?
  */
 bool
-Selection::IsCollapsed()
+Selection::IsCollapsed() const
 {
   uint32_t cnt = mRanges.Length();
   if (cnt == 0) {
@@ -5350,7 +5363,7 @@ Selection::GetRangeAt(uint32_t aIndex, ErrorResult& aRv)
 }
 
 nsRange*
-Selection::GetRangeAt(int32_t aIndex)
+Selection::GetRangeAt(int32_t aIndex) const
 {
   RangeData empty(nullptr);
   return mRanges.SafeElementAt(aIndex, empty).mRange;
@@ -5855,6 +5868,48 @@ Selection::ContainsNode(nsINode& aNode, bool aAllowPartial, ErrorResult& aRv)
   return false;
 }
 
+class PointInRectChecker : public nsLayoutUtils::RectCallback {
+public:
+  explicit PointInRectChecker(const nsPoint& aPoint)
+    : mPoint(aPoint)
+    , mMatchFound(false)
+  {
+  }
+
+  void AddRect(const nsRect& aRect) override
+  {
+    mMatchFound = mMatchFound || aRect.Contains(mPoint);
+  }
+
+  bool MatchFound()
+  {
+    return mMatchFound;
+  }
+
+private:
+  nsPoint mPoint;
+  bool mMatchFound;
+};
+
+bool
+Selection::ContainsPoint(const nsPoint& aPoint)
+{
+  if (IsCollapsed()) {
+    return false;
+  }
+  PointInRectChecker checker(aPoint);
+  for (uint32_t i = 0; i < RangeCount(); i++) {
+    nsRange* range = GetRangeAt(i);
+    nsRange::CollectClientRects(&checker, range,
+                                range->GetStartParent(), range->StartOffset(),
+                                range->GetEndParent(), range->EndOffset(),
+                                true, false);
+    if (checker.MatchFound()) {
+      return true;
+    }
+  }
+  return false;
+}
 
 nsPresContext*
 Selection::GetPresContext() const
@@ -6428,7 +6483,7 @@ Selection::SelectionLanguageChange(bool aLangRTL)
     return NS_ERROR_FAILURE;
   }
 
-  nsBidiLevel level = nsBidi::GetEmbeddingLevel(focusFrame);
+  nsBidiLevel level = focusFrame->GetEmbeddingLevel();
   int32_t focusOffset = static_cast<int32_t>(FocusOffset());
   if ((focusOffset != frameStart) && (focusOffset != frameEnd))
     // the cursor is not at a frame boundary, so the level of both the characters (logically) before and after the cursor

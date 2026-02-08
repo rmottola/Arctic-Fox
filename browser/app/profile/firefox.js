@@ -68,7 +68,7 @@ pref("services.blocklist.gfx.collection", "gfx");
 pref("services.blocklist.gfx.checked", 0);
 
 // for now, let's keep kinto update out of the release channel
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("services.blocklist.update_enabled", false);
 #else
 pref("services.blocklist.update_enabled", true);
@@ -233,6 +233,9 @@ pref("extensions.installDistroAddons", true);
 pref("lightweightThemes.update.enabled", true);
 pref("lightweightThemes.animation.enabled", false);
 pref("lightweightThemes.recommendedThemes", "[{\"id\":\"recommended-1\",\"homepageURL\":\"https://addons.mozilla.org/firefox/addon/a-web-browser-renaissance/\",\"headerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/1.header.jpg\",\"footerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/1.footer.jpg\",\"textcolor\":\"#000000\",\"accentcolor\":\"#f2d9b1\",\"iconURL\":\"resource:///chrome/browser/content/browser/defaultthemes/1.icon.jpg\",\"previewURL\":\"resource:///chrome/browser/content/browser/defaultthemes/1.preview.jpg\",\"author\":\"Sean.Martell\",\"version\":\"0\"},{\"id\":\"recommended-2\",\"homepageURL\":\"https://addons.mozilla.org/firefox/addon/space-fantasy/\",\"headerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/2.header.jpg\",\"footerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/2.footer.jpg\",\"textcolor\":\"#ffffff\",\"accentcolor\":\"#d9d9d9\",\"iconURL\":\"resource:///chrome/browser/content/browser/defaultthemes/2.icon.jpg\",\"previewURL\":\"resource:///chrome/browser/content/browser/defaultthemes/2.preview.jpg\",\"author\":\"fx5800p\",\"version\":\"1.0\"},{\"id\":\"recommended-3\",\"homepageURL\":\"https://addons.mozilla.org/firefox/addon/linen-light/\",\"headerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/3.header.png\",\"footerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/3.footer.png\",\"accentcolor\":\"#ada8a8\",\"iconURL\":\"resource:///chrome/browser/content/browser/defaultthemes/3.icon.png\",\"previewURL\":\"resource:///chrome/browser/content/browser/defaultthemes/3.preview.png\",\"author\":\"DVemer\",\"version\":\"1.0\"},{\"id\":\"recommended-4\",\"homepageURL\":\"https://addons.mozilla.org/firefox/addon/pastel-gradient/\",\"headerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/4.header.png\",\"footerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/4.footer.png\",\"textcolor\":\"#000000\",\"accentcolor\":\"#000000\",\"iconURL\":\"resource:///chrome/browser/content/browser/defaultthemes/4.icon.png\",\"previewURL\":\"resource:///chrome/browser/content/browser/defaultthemes/4.preview.png\",\"author\":\"darrinhenein\",\"version\":\"1.0\"},{\"id\":\"recommended-5\",\"homepageURL\":\"https://addons.mozilla.org/firefox/addon/carbon-light/\",\"headerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/5.header.png\",\"footerURL\":\"resource:///chrome/browser/content/browser/defaultthemes/5.footer.png\",\"textcolor\":\"#3b3b3b\",\"accentcolor\":\"#2e2e2e\",\"iconURL\":\"resource:///chrome/browser/content/browser/defaultthemes/5.icon.jpg\",\"previewURL\":\"resource:///chrome/browser/content/browser/defaultthemes/5.preview.jpg\",\"author\":\"Jaxivo\",\"version\":\"1.0\"}]");
+
+// How long to show a Hearbeat survey (two hours, in seconds)
+pref("browser.uitour.surveyDuration", 7200);
 
 pref("keyword.enabled", true);
 pref("browser.fixup.domainwhitelist.localhost", true);
@@ -478,7 +481,7 @@ pref("browser.tabs.drawInTitlebar", false);
 // false  return to the adjacent tab (old default)
 pref("browser.tabs.selectOwnerOnClose", true);
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("browser.tabs.showAudioPlayingIcon", false);
 #else
 pref("browser.tabs.showAudioPlayingIcon", true);
@@ -563,6 +566,8 @@ pref("privacy.sanitize.sanitizeOnShutdown", false);
 pref("privacy.sanitize.migrateFx3Prefs",    false);
 
 pref("privacy.panicButton.enabled",         true);
+
+pref("privacy.firstparty.isolate",          false);
 
 pref("network.proxy.share_proxy_settings",  false); // use the same proxy settings for all protocols
 
@@ -1074,7 +1079,7 @@ pref("browser.tabs.remote.autostart", false);
 //
 // This setting may not be required anymore once we decide to permanently
 // enable the content sandbox.
-pref("security.sandbox.content.level", 1);
+pref("security.sandbox.content.level", 2);
 #endif
 
 #if defined(XP_MACOSX) || defined(XP_WIN)
@@ -1313,14 +1318,14 @@ pref("media.webaudio.enabled", true);
 pref("dom.debug.propagate_gesture_events_through_content", false);
 
 // The request URL of the GeoLocation backend.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("geo.wifi.uri", "https://www.googleapis.com/geolocation/v1/geolocate?key=%GOOGLE_API_KEY%");
 #else
 pref("geo.wifi.uri", "https://location.services.mozilla.com/v1/geolocate?key=%MOZILLA_API_KEY%");
 #endif
 
 #ifdef XP_MACOSX
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("geo.provider.use_corelocation", false);
 #else
 pref("geo.provider.use_corelocation", true);
@@ -1333,7 +1338,7 @@ pref("geo.provider.ms-windows-location", false);
 
 #ifdef MOZ_WIDGET_GTK
 #ifdef MOZ_GPSD
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("geo.provider.use_gpsd", false);
 #else
 pref("geo.provider.use_gpsd", true);
@@ -1388,6 +1393,27 @@ pref("media.gmp.decoder.enabled", true);
 pref("media.gmp.decoder.aac", 2);
 pref("media.gmp.decoder.h264", 2);
 
+// Whether we should run a test-pattern through EME GMPs before assuming they'll
+// decode H.264.
+pref("media.gmp.trial-create.enabled", true);
+
+// Note: when media.gmp-*.visible is true, provided we're running on a
+// supported platform/OS version, the corresponding CDM appears in the
+// plugins list, Firefox will download the GMP/CDM if enabled, and our
+// UI to re-enable EME prompts the user to re-enable EME if it's disabled
+// and script requests EME. If *.visible is false, we won't show the UI
+// to enable the CDM if its disabled; it's as if the keysystem is completely
+// unsupported.
+
+#ifdef MOZ_ADOBE_EME
+pref("media.gmp-eme-adobe.visible", true);
+pref("media.gmp-eme-adobe.enabled", true);
+#endif
+
+#ifdef MOZ_WIDEVINE_EME
+pref("media.gmp-widevinecdm.visible", true);
+pref("media.gmp-widevinecdm.enabled", true);
+#endif
 
 // ****************** s4e prefs ******************
 pref("status4evar.addonbar.borderStyle", false);
@@ -1442,6 +1468,9 @@ pref("experiments.manifest.uri", "https://telemetry-experiment.cdn.mozilla.net/m
 // Whether experiments are supported by the current application profile.
 pref("experiments.supported", true);
 
+// Enable GMP support in the addon manager.
+pref("media.gmp-provider.enabled", false);
+
 // For the about:tabcrashed page
 pref("browser.tabs.crashReporting.sendReport", true);
 pref("browser.tabs.crashReporting.includeURL", false);
@@ -1457,7 +1486,7 @@ pref("privacy.trackingprotection.ui.enabled", false);
 // Enable Contextual Identity Containers
 pref("privacy.userContext.enabled", false);
 
-#ifndef RELEASE_BUILD
+#ifndef RELEASE_OR_BETA
 // At the moment, autostart.2 is used, while autostart.1 is unused.
 // We leave it here set to false to reset users' defaults and allow
 // us to change everybody to true in the future, when desired.
@@ -1487,6 +1516,10 @@ pref("dom.ipc.reportProcessHangs", false);
 #else
 pref("dom.ipc.reportProcessHangs", true);
 #endif
+
+pref("browser.reader.detectedFirstArticle", false);
+// Don't limit how many nodes we care about on desktop:
+pref("reader.parse-node-limit", 0);
 
 // On desktop, we want the URLs to be included here for ease of debugging,
 // and because (normally) these errors are not persisted anywhere.

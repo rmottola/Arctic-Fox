@@ -99,15 +99,6 @@ LoadContext::GetNestedFrameId(uint64_t* aId)
 }
 
 NS_IMETHODIMP
-LoadContext::IsAppOfType(uint32_t, bool*)
-{
-  MOZ_ASSERT(mIsNotNull);
-
-  // don't expect we need this in parent (Thunderbird/SeaMonkey specific?)
-  return NS_ERROR_UNEXPECTED;
-}
-
-NS_IMETHODIMP
 LoadContext::GetIsContent(bool* aIsContent)
 {
   MOZ_ASSERT(mIsNotNull);
@@ -175,17 +166,6 @@ LoadContext::GetIsInIsolatedMozBrowserElement(bool* aIsInIsolatedMozBrowserEleme
   NS_ENSURE_ARG_POINTER(aIsInIsolatedMozBrowserElement);
 
   *aIsInIsolatedMozBrowserElement = mOriginAttributes.mInIsolatedMozBrowser;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-LoadContext::GetAppId(uint32_t* aAppId)
-{
-  MOZ_ASSERT(mIsNotNull);
-
-  NS_ENSURE_ARG_POINTER(aAppId);
-
-  *aAppId = mOriginAttributes.mAppId;
   return NS_OK;
 }
 

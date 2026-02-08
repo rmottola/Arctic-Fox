@@ -1122,7 +1122,6 @@ nsZipReaderCache::IsCached(nsIFile* zipFile, bool* aResult)
 {
   NS_ENSURE_ARG_POINTER(zipFile);
   nsresult rv;
-  nsCOMPtr<nsIZipReader> antiLockZipGrip;
   MutexAutoLock lock(mLock);
 
   nsAutoCString uri;
@@ -1141,7 +1140,6 @@ nsZipReaderCache::GetZip(nsIFile* zipFile, nsIZipReader* *result)
 {
   NS_ENSURE_ARG_POINTER(zipFile);
   nsresult rv;
-  nsCOMPtr<nsIZipReader> antiLockZipGrip;
   MutexAutoLock lock(mLock);
 
 #ifdef ZIP_CACHE_HIT_RATE

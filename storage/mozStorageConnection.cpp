@@ -194,10 +194,39 @@ Module gModules[] = {
 ////////////////////////////////////////////////////////////////////////////////
 //// Local Functions
 
-void tracefunc (void *aClosure, const char *aStmt)
+int tracefunc (unsigned aReason, void *aClosure, void *aP, void *aX)
 {
-  MOZ_LOG(gStorageLog, LogLevel::Debug, ("sqlite3_trace on %p for '%s'", aClosure,
-                                     aStmt));
+  switch (aReason) {
+    case SQLITE_TRACE_STMT: {
+      // aP is a pointer to the prepared statement.
+      sqlite3_stmt* stmt = static_cast<sqlite3_stmt*>(aP);
+      // aX is a pointer to a string containing the unexpanded SQL or a comment,
+      // starting with "--"" in case of a trigger.
+      char* expanded = static_cast<char*>(aX);
+      // Simulate what sqlite_trace was doing.
+      if (!::strncmp(expanded, "--", 2)) {
+        MOZ_LOG(gStorageLog, LogLevel::Debug,
+          ("TRACE_STMT on %p: '%s'", aClosure, expanded));
+      } else {
+        char* sql = ::sqlite3_expanded_sql(stmt);
+        MOZ_LOG(gStorageLog, LogLevel::Debug,
+          ("TRACE_STMT on %p: '%s'", aClosure, sql));
+        ::sqlite3_free(sql);
+      }
+      break;
+    }
+    case SQLITE_TRACE_PROFILE: {
+      // aX is pointer to a 64bit integer containing nanoseconds it took to
+      // execute the last command.
+      sqlite_int64 time = *(static_cast<sqlite_int64*>(aX)) / 1000000;
+      if (time > 0) {
+        MOZ_LOG(gStorageLog, LogLevel::Debug,
+          ("TRACE_TIME on %p: %dms", aClosure, time));
+      }
+      break;
+    }
+  }
+  return 0;
 }
 
 void
@@ -472,7 +501,8 @@ private:
 
 Connection::Connection(Service *aService,
                        int aFlags,
-                       bool aAsyncOnly)
+                       bool aAsyncOnly,
+                       bool aIgnoreLockingMode)
 : sharedAsyncExecutionMutex("Connection::sharedAsyncExecutionMutex")
 , sharedDBMutex("Connection::sharedDBMutex")
 , threadOpenedOn(do_GetCurrentThread())
@@ -485,9 +515,12 @@ Connection::Connection(Service *aService,
 , mTransactionInProgress(false)
 , mProgressHandler(nullptr)
 , mFlags(aFlags)
+, mIgnoreLockingMode(aIgnoreLockingMode)
 , mStorageService(aService)
 , mAsyncOnly(aAsyncOnly)
 {
+  MOZ_ASSERT(!mIgnoreLockingMode || mFlags & SQLITE_OPEN_READONLY,
+             "Can't ignore locking for a non-readonly connection!");
   mStorageService->registerConnection(this);
 }
 
@@ -577,6 +610,7 @@ nsresult
 Connection::initialize()
 {
   NS_ASSERTION (!mDBConn, "Initialize called on already opened database!");
+  MOZ_ASSERT(!mIgnoreLockingMode, "Can't ignore locking on an in-memory db.");
   PROFILER_LABEL("mozStorageConnection", "initialize",
     js::ProfileEntry::Category::STORAGE);
 
@@ -610,8 +644,15 @@ Connection::initialize(nsIFile *aDatabaseFile)
   nsresult rv = aDatabaseFile->GetPath(path);
   NS_ENSURE_SUCCESS(rv, rv);
 
+#ifdef XP_WIN
+  static const char* sIgnoreLockingVFS = "win32-none";
+#else
+  static const char* sIgnoreLockingVFS = "unix-none";
+#endif
+  const char* vfs = mIgnoreLockingMode ? sIgnoreLockingVFS : nullptr;
+
   int srv = ::sqlite3_open_v2(NS_ConvertUTF16toUTF8(path).get(), &mDBConn,
-                              mFlags, nullptr);
+                              mFlags, vfs);
   if (srv != SQLITE_OK) {
     mDBConn = nullptr;
     return convertResultCode(srv);
@@ -689,7 +730,9 @@ Connection::initializeInternal()
   // SQLite tracing can slow down queries (especially long queries)
   // significantly. Don't trace unless the user is actively monitoring SQLite.
   if (MOZ_LOG_TEST(gStorageLog, LogLevel::Debug)) {
-    ::sqlite3_trace(mDBConn, tracefunc, this);
+    ::sqlite3_trace_v2(mDBConn,
+                       SQLITE_TRACE_STMT | SQLITE_TRACE_PROFILE,
+                       tracefunc, this);
 
     MOZ_LOG(gStorageLog, LogLevel::Debug, ("Opening connection to '%s' (%p)",
                                         mTelemetryFilename.get(), this));
@@ -718,6 +761,10 @@ Connection::initializeInternal()
     mDBConn = nullptr;
     return convertResultCode(srv);
   }
+
+#if defined(MOZ_MEMORY_TEMP_STORE_PRAGMA)
+  (void)ExecuteSimpleSQL(NS_LITERAL_CSTRING("PRAGMA temp_store = 2;"));
+#endif
 
   // Register our built-in SQL functions.
   srv = registerFunctions(mDBConn);

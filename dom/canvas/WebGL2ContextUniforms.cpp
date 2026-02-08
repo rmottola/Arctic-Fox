@@ -27,7 +27,7 @@ WebGL2Context::ValidateUniformMatrixTranspose(bool /*transpose*/, const char* /*
 // Uniforms
 
 void
-WebGL2Context::Uniform1ui(WebGLUniformLocation* loc, GLuint v0)
+WebGLContext::Uniform1ui(WebGLUniformLocation* loc, GLuint v0)
 {
     if (!ValidateUniformSetter(loc, 1, LOCAL_GL_UNSIGNED_INT, "uniform1ui"))
         return;
@@ -37,7 +37,7 @@ WebGL2Context::Uniform1ui(WebGLUniformLocation* loc, GLuint v0)
 }
 
 void
-WebGL2Context::Uniform2ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1)
+WebGLContext::Uniform2ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1)
 {
     if (!ValidateUniformSetter(loc, 2, LOCAL_GL_UNSIGNED_INT, "uniform2ui"))
         return;
@@ -47,7 +47,7 @@ WebGL2Context::Uniform2ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1)
 }
 
 void
-WebGL2Context::Uniform3ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1, GLuint v2)
+WebGLContext::Uniform3ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1, GLuint v2)
 {
     if (!ValidateUniformSetter(loc, 3, LOCAL_GL_UNSIGNED_INT, "uniform3ui"))
         return;
@@ -57,8 +57,8 @@ WebGL2Context::Uniform3ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1, GLuin
 }
 
 void
-WebGL2Context::Uniform4ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1, GLuint v2,
-                          GLuint v3)
+WebGLContext::Uniform4ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1, GLuint v2,
+                         GLuint v3)
 {
     if (!ValidateUniformSetter(loc, 4, LOCAL_GL_UNSIGNED_INT, "uniform4ui"))
         return;
@@ -67,60 +67,66 @@ WebGL2Context::Uniform4ui(WebGLUniformLocation* loc, GLuint v0, GLuint v1, GLuin
     gl->fUniform4ui(loc->mLoc, v0, v1, v2, v3);
 }
 
-
 // -------------------------------------------------------------------------
 // Uniform Buffer Objects and Transform Feedback Buffers
-// TODO(djg): Implemented in WebGLContext
-/*
-    void BindBufferBase(GLenum target, GLuint index, WebGLBuffer* buffer);
-    void BindBufferRange(GLenum target, GLuint index, WebGLBuffer* buffer,
-                         GLintptr offset, GLsizeiptr size);
-*/
 
-/* This doesn't belong here. It's part of state querying */
 void
-WebGL2Context::GetIndexedParameter(GLenum target, GLuint index,
-                                   dom::Nullable<dom::OwningWebGLBufferOrLongLong>& retval)
+WebGL2Context::GetIndexedParameter(JSContext* cx, GLenum target, GLuint index,
+                                   JS::MutableHandleValue retval, ErrorResult& out_error)
 {
-    retval.SetNull();
+    const char funcName[] = "getIndexedParameter";
+    retval.set(JS::NullValue());
     if (IsContextLost())
         return;
 
-    GLint64 data = 0;
-
-    MakeContextCurrent();
-
+    const std::vector<IndexedBufferBinding>* bindings;
     switch (target) {
     case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_BINDING:
-        if (index >= mGLMaxTransformFeedbackSeparateAttribs)
-            return ErrorInvalidValue("getIndexedParameter: index should be less than "
-                                     "MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS");
-
-        if (mBoundTransformFeedbackBuffers[index].get()) {
-            retval.SetValue().SetAsWebGLBuffer() =
-                mBoundTransformFeedbackBuffers[index].get();
-        }
-        return;
-
-    case LOCAL_GL_UNIFORM_BUFFER_BINDING:
-        if (index >= mGLMaxUniformBufferBindings)
-            return ErrorInvalidValue("getIndexedParameter: index should be than "
-                                     "MAX_UNIFORM_BUFFER_BINDINGS");
-
-        if (mBoundUniformBuffers[index].get())
-            retval.SetValue().SetAsWebGLBuffer() = mBoundUniformBuffers[index].get();
-        return;
-
     case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_START:
     case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_SIZE:
+        bindings = &(mBoundTransformFeedback->mIndexedBindings);
+        break;
+
+    case LOCAL_GL_UNIFORM_BUFFER_BINDING:
     case LOCAL_GL_UNIFORM_BUFFER_START:
     case LOCAL_GL_UNIFORM_BUFFER_SIZE:
-        gl->fGetInteger64i_v(target, index, &data);
-        retval.SetValue().SetAsLongLong() = data;
+        bindings = &mIndexedUniformBufferBindings;
+        break;
+
+    default:
+        ErrorInvalidEnumInfo("getIndexedParameter: target", target);
         return;
     }
 
-    ErrorInvalidEnumInfo("getIndexedParameter: target", target);
+    if (index >= bindings->size()) {
+        ErrorInvalidValue("%s: `index` must be < %s.", funcName,
+                          "MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS");
+        return;
+    }
+    const auto& binding = (*bindings)[index];
+
+    JS::Value ret = JS::NullValue();
+
+    switch (target) {
+    case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_BINDING:
+    case LOCAL_GL_UNIFORM_BUFFER_BINDING:
+        if (binding.mBufferBinding) {
+            ret = WebGLObjectAsJSValue(cx, binding.mBufferBinding.get(), out_error);
+        }
+        break;
+
+    case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_START:
+    case LOCAL_GL_UNIFORM_BUFFER_START:
+        ret = JS::NumberValue(binding.mRangeStart);
+        break;
+
+    case LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER_SIZE:
+    case LOCAL_GL_UNIFORM_BUFFER_SIZE:
+        ret = JS::NumberValue(binding.mRangeSize);
+        break;
+    }
+
+    retval.set(ret);
 }
 
 void
@@ -244,10 +250,10 @@ WebGL2Context::GetUniformBlockIndex(WebGLProgram* program,
 void
 WebGL2Context::GetActiveUniformBlockParameter(JSContext* cx, WebGLProgram* program,
                                               GLuint uniformBlockIndex, GLenum pname,
-                                              dom::Nullable<dom::OwningUnsignedLongOrUint32ArrayOrBoolean>& retval,
-                                              ErrorResult& rv)
+                                              JS::MutableHandleValue out_retval,
+                                              ErrorResult& out_error)
 {
-    retval.SetNull();
+    out_retval.set(JS::NullValue());
     if (IsContextLost())
         return;
 
@@ -262,11 +268,12 @@ WebGL2Context::GetActiveUniformBlockParameter(JSContext* cx, WebGLProgram* progr
     case LOCAL_GL_UNIFORM_BLOCK_BINDING:
     case LOCAL_GL_UNIFORM_BLOCK_DATA_SIZE:
     case LOCAL_GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS:
-        program->GetActiveUniformBlockParam(uniformBlockIndex, pname, retval);
+        out_retval.set(program->GetActiveUniformBlockParam(uniformBlockIndex, pname));
         return;
 
     case LOCAL_GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES:
-        program->GetActiveUniformBlockActiveUniforms(cx, uniformBlockIndex, retval, rv);
+        out_retval.set(program->GetActiveUniformBlockActiveUniforms(cx, uniformBlockIndex,
+                                                                    &out_error));
         return;
     }
 

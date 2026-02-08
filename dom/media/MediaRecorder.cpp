@@ -1020,7 +1020,7 @@ MediaRecorder::MediaRecorder(AudioNode& aSrcAudioNode,
     AudioNodeStream::Flags flags =
       AudioNodeStream::EXTERNAL_OUTPUT |
       AudioNodeStream::NEED_MAIN_THREAD_FINISHED;
-    mPipeStream = AudioNodeStream::Create(ctx, engine, flags);
+    mPipeStream = AudioNodeStream::Create(ctx, engine, flags, ctx->Graph());
     AudioNodeStream* ns = aSrcAudioNode.GetStream();
     if (ns) {
       mInputPort =
@@ -1340,17 +1340,6 @@ MediaRecorder::IsTypeSupported(const nsAString& aMIMEType)
   else if (mimeType.EqualsLiteral(VIDEO_WEBM) &&
            MediaEncoder::IsWebMEncoderEnabled()) {
     codeclist = gWebMVideoEncoderCodecs;
-  }
-#endif
-#ifdef MOZ_OMX_ENCODER
-    // We're working on MP4 encoder support for desktop
-  else if (mimeType.EqualsLiteral(VIDEO_MP4) ||
-           mimeType.EqualsLiteral(AUDIO_3GPP) ||
-           mimeType.EqualsLiteral(AUDIO_3GPP2)) {
-    if (MediaEncoder::IsOMXEncoderEnabled()) {
-      // XXX check codecs for MP4/3GPP
-      return true;
-    }
   }
 #endif
 

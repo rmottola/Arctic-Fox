@@ -79,6 +79,7 @@ SymbolObject::initClass(JSContext* cx, HandleObject obj)
 
     if (!LinkConstructorAndPrototype(cx, ctor, proto) ||
         !DefinePropertiesAndFunctions(cx, proto, properties, methods) ||
+        !DefineToStringTag(cx, proto, cx->names().Symbol) ||
         !DefinePropertiesAndFunctions(cx, ctor, nullptr, staticMethods) ||
         !GlobalObject::initBuiltinConstructor(cx, global, JSProto_Symbol, ctor, proto))
     {
@@ -97,7 +98,7 @@ SymbolObject::construct(JSContext* cx, unsigned argc, Value* vp)
     // yet, so just throw a TypeError.
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.isConstructing()) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_CONSTRUCTOR, "Symbol");
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_NOT_CONSTRUCTOR, "Symbol");
         return false;
     }
 

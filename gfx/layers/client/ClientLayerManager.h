@@ -61,8 +61,8 @@ public:
   virtual int32_t GetMaxTextureSize() const override;
 
   virtual void SetDefaultTargetConfiguration(BufferMode aDoubleBuffering, ScreenRotation aRotation);
-  virtual void BeginTransactionWithTarget(gfxContext* aTarget) override;
-  virtual void BeginTransaction() override;
+  virtual bool BeginTransactionWithTarget(gfxContext* aTarget) override;
+  virtual bool BeginTransaction() override;
   virtual bool EndEmptyTransaction(EndTransactionFlags aFlags = END_DEFAULT) override;
   virtual void EndTransaction(DrawPaintedLayerCallback aCallback,
                               void* aCallbackData,
@@ -92,7 +92,7 @@ public:
   void UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier);
   TextureFactoryIdentifier GetTextureFactoryIdentifier()
   {
-    return mForwarder->GetTextureFactoryIdentifier();
+    return AsShadowForwarder()->GetTextureFactoryIdentifier();
   }
 
   virtual void FlushRendering() override;
@@ -154,22 +154,6 @@ public:
 
   // Disable component alpha layers with the software compositor.
   virtual bool ShouldAvoidComponentAlphaLayers() override { return !IsCompositingCheap(); }
-
-  /**
-   * Called for each iteration of a progressive tile update. Updates
-   * aMetrics with the current scroll offset and scale being used to composite
-   * the primary scrollable layer in this manager, to determine what area
-   * intersects with the target composition bounds.
-   * aDrawingCritical will be true if the current drawing operation is using
-   * the critical displayport.
-   * Returns true if the update should continue, or false if it should be
-   * cancelled.
-   * This is only called if gfxPlatform::UseProgressiveTilePainting() returns
-   * true.
-   */
-  bool ProgressiveUpdateCallback(bool aHasPendingNewThebesContent,
-                                 FrameMetrics& aMetrics,
-                                 bool aDrawingCritical);
 
   bool InConstruction() { return mPhase == PHASE_CONSTRUCTION; }
 #ifdef DEBUG
@@ -237,6 +221,8 @@ public:
   bool AsyncPanZoomEnabled() const override;
 
   void SetNextPaintSyncId(int32_t aSyncId);
+
+  void SetLayerObserverEpoch(uint64_t aLayerObserverEpoch);
 
   class DidCompositeObserver {
   public:

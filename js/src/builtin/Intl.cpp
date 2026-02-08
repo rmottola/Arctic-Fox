@@ -11,6 +11,7 @@
 
 #include "builtin/Intl.h"
 
+#include "mozilla/PodOperations.h"
 #include "mozilla/Range.h"
 #include "mozilla/ScopeExit.h"
 
@@ -22,14 +23,13 @@
 #include "jsobj.h"
 
 #if ENABLE_INTL_API
-#include "unicode/locid.h"
-#include "unicode/numsys.h"
 #include "unicode/ucal.h"
 #include "unicode/ucol.h"
 #include "unicode/udat.h"
 #include "unicode/udatpg.h"
 #include "unicode/uenum.h"
 #include "unicode/unum.h"
+#include "unicode/unumsys.h"
 #include "unicode/ustring.h"
 #endif
 #include "vm/DateTime.h"
@@ -37,6 +37,7 @@
 #include "vm/Interpreter.h"
 #include "vm/Stack.h"
 #include "vm/StringBuffer.h"
+#include "vm/Unicode.h"
 
 #include "jsobjinlines.h"
 
@@ -47,11 +48,7 @@ using namespace js;
 using mozilla::IsFinite;
 using mozilla::IsNegativeZero;
 using mozilla::MakeScopeExit;
-
-#if ENABLE_INTL_API
-using icu::Locale;
-using icu::NumberingSystem;
-#endif
+using mozilla::PodCopy;
 
 
 /*
@@ -77,6 +74,8 @@ using icu::NumberingSystem;
  * directory for license.
  */
 
+namespace {
+
 typedef bool UBool;
 typedef char16_t UChar;
 typedef double UDate;
@@ -86,7 +85,7 @@ enum UErrorCode {
     U_BUFFER_OVERFLOW_ERROR,
 };
 
-static inline UBool
+inline UBool
 U_FAILURE(UErrorCode code)
 {
     MOZ_CRASH("U_FAILURE: Intl API disabled");
@@ -104,7 +103,7 @@ Char16ToUChar(char16_t* chars)
     MOZ_CRASH("Char16ToUChar: Intl API disabled");
 }
 
-static int32_t
+int32_t
 u_strlen(const UChar* s)
 {
     MOZ_CRASH("u_strlen: Intl API disabled");
@@ -112,19 +111,19 @@ u_strlen(const UChar* s)
 
 struct UEnumeration;
 
-static int32_t
+int32_t
 uenum_count(UEnumeration* en, UErrorCode* status)
 {
     MOZ_CRASH("uenum_count: Intl API disabled");
 }
 
-static const char*
+const char*
 uenum_next(UEnumeration* en, int32_t* resultLength, UErrorCode* status)
 {
     MOZ_CRASH("uenum_next: Intl API disabled");
 }
 
-static void
+void
 uenum_close(UEnumeration* en)
 {
     MOZ_CRASH("uenum_close: Intl API disabled");
@@ -133,70 +132,70 @@ uenum_close(UEnumeration* en)
 struct UCollator;
 
 enum UColAttribute {
-     UCOL_ALTERNATE_HANDLING,
-     UCOL_CASE_FIRST,
-     UCOL_CASE_LEVEL,
-     UCOL_NORMALIZATION_MODE,
-     UCOL_STRENGTH,
-     UCOL_NUMERIC_COLLATION,
+    UCOL_ALTERNATE_HANDLING,
+    UCOL_CASE_FIRST,
+    UCOL_CASE_LEVEL,
+    UCOL_NORMALIZATION_MODE,
+    UCOL_STRENGTH,
+    UCOL_NUMERIC_COLLATION,
 };
 
 enum UColAttributeValue {
-  UCOL_DEFAULT = -1,
-  UCOL_PRIMARY = 0,
-  UCOL_SECONDARY = 1,
-  UCOL_TERTIARY = 2,
-  UCOL_OFF = 16,
-  UCOL_ON = 17,
-  UCOL_SHIFTED = 20,
-  UCOL_LOWER_FIRST = 24,
-  UCOL_UPPER_FIRST = 25,
+    UCOL_DEFAULT = -1,
+    UCOL_PRIMARY = 0,
+    UCOL_SECONDARY = 1,
+    UCOL_TERTIARY = 2,
+    UCOL_OFF = 16,
+    UCOL_ON = 17,
+    UCOL_SHIFTED = 20,
+    UCOL_LOWER_FIRST = 24,
+    UCOL_UPPER_FIRST = 25,
 };
 
 enum UCollationResult {
-  UCOL_EQUAL = 0,
-  UCOL_GREATER = 1,
-  UCOL_LESS = -1
+    UCOL_EQUAL = 0,
+    UCOL_GREATER = 1,
+    UCOL_LESS = -1
 };
 
-static int32_t
+int32_t
 ucol_countAvailable()
 {
     MOZ_CRASH("ucol_countAvailable: Intl API disabled");
 }
 
-static const char*
+const char*
 ucol_getAvailable(int32_t localeIndex)
 {
     MOZ_CRASH("ucol_getAvailable: Intl API disabled");
 }
 
-static UCollator*
+UCollator*
 ucol_open(const char* loc, UErrorCode* status)
 {
     MOZ_CRASH("ucol_open: Intl API disabled");
 }
 
-static void
+void
 ucol_setAttribute(UCollator* coll, UColAttribute attr, UColAttributeValue value, UErrorCode* status)
 {
     MOZ_CRASH("ucol_setAttribute: Intl API disabled");
 }
 
-static UCollationResult
+UCollationResult
 ucol_strcoll(const UCollator* coll, const UChar* source, int32_t sourceLength,
              const UChar* target, int32_t targetLength)
 {
     MOZ_CRASH("ucol_strcoll: Intl API disabled");
 }
 
-static void
+void
 ucol_close(UCollator* coll)
 {
     MOZ_CRASH("ucol_close: Intl API disabled");
 }
 
-static UEnumeration*
+UEnumeration*
 ucol_getKeywordValuesForLocale(const char* key, const char* locale, UBool commonlyUsed,
                                UErrorCode* status)
 {
@@ -221,138 +220,216 @@ enum UNumberFormatRoundingMode {
 };
 
 enum UNumberFormatAttribute {
-  UNUM_GROUPING_USED,
-  UNUM_MIN_INTEGER_DIGITS,
-  UNUM_MAX_FRACTION_DIGITS,
-  UNUM_MIN_FRACTION_DIGITS,
-  UNUM_ROUNDING_MODE,
-  UNUM_SIGNIFICANT_DIGITS_USED,
-  UNUM_MIN_SIGNIFICANT_DIGITS,
-  UNUM_MAX_SIGNIFICANT_DIGITS,
+    UNUM_GROUPING_USED,
+    UNUM_MIN_INTEGER_DIGITS,
+    UNUM_MAX_FRACTION_DIGITS,
+    UNUM_MIN_FRACTION_DIGITS,
+    UNUM_ROUNDING_MODE,
+    UNUM_SIGNIFICANT_DIGITS_USED,
+    UNUM_MIN_SIGNIFICANT_DIGITS,
+    UNUM_MAX_SIGNIFICANT_DIGITS,
 };
 
 enum UNumberFormatTextAttribute {
-  UNUM_CURRENCY_CODE,
+    UNUM_CURRENCY_CODE,
 };
 
-static int32_t
+int32_t
 unum_countAvailable()
 {
     MOZ_CRASH("unum_countAvailable: Intl API disabled");
 }
 
-static const char*
+const char*
 unum_getAvailable(int32_t localeIndex)
 {
     MOZ_CRASH("unum_getAvailable: Intl API disabled");
 }
 
-static UNumberFormat*
+UNumberFormat*
 unum_open(UNumberFormatStyle style, const UChar* pattern, int32_t patternLength,
           const char* locale, UParseError* parseErr, UErrorCode* status)
 {
     MOZ_CRASH("unum_open: Intl API disabled");
 }
 
-static void
+void
 unum_setAttribute(UNumberFormat* fmt, UNumberFormatAttribute  attr, int32_t newValue)
 {
     MOZ_CRASH("unum_setAttribute: Intl API disabled");
 }
 
-static int32_t
+int32_t
 unum_formatDouble(const UNumberFormat* fmt, double number, UChar* result,
                   int32_t resultLength, UFieldPosition* pos, UErrorCode* status)
 {
     MOZ_CRASH("unum_formatDouble: Intl API disabled");
 }
 
-static void
+void
 unum_close(UNumberFormat* fmt)
 {
     MOZ_CRASH("unum_close: Intl API disabled");
 }
 
-static void
+void
 unum_setTextAttribute(UNumberFormat* fmt, UNumberFormatTextAttribute tag, const UChar* newValue,
                       int32_t newValueLength, UErrorCode* status)
 {
     MOZ_CRASH("unum_setTextAttribute: Intl API disabled");
 }
 
-class Locale {
-  public:
-    explicit Locale(const char* language, const char* country = 0, const char* variant = 0,
-                    const char* keywordsAndValues = 0);
-};
+typedef void* UNumberingSystem;
 
-Locale::Locale(const char* language, const char* country, const char* variant,
-               const char* keywordsAndValues)
+UNumberingSystem*
+unumsys_open(const char* locale, UErrorCode* status)
 {
-    MOZ_CRASH("Locale::Locale: Intl API disabled");
-}
-
-class NumberingSystem {
-  public:
-    static NumberingSystem* createInstance(const Locale& inLocale, UErrorCode& status);
-    const char* getName();
-};
-
-NumberingSystem*
-NumberingSystem::createInstance(const Locale& inLocale, UErrorCode& status)
-{
-    MOZ_CRASH("NumberingSystem::createInstance: Intl API disabled");
+    MOZ_CRASH("unumsys_open: Intl API disabled");
 }
 
 const char*
-NumberingSystem::getName()
+unumsys_getName(const UNumberingSystem* unumsys)
 {
-    MOZ_CRASH("NumberingSystem::getName: Intl API disabled");
+    MOZ_CRASH("unumsys_getName: Intl API disabled");
+}
+
+void
+unumsys_close(UNumberingSystem* unumsys)
+{
+    MOZ_CRASH("unumsys_close: Intl API disabled");
 }
 
 typedef void* UCalendar;
 
 enum UCalendarType {
-  UCAL_TRADITIONAL,
-  UCAL_DEFAULT = UCAL_TRADITIONAL,
-  UCAL_GREGORIAN
+    UCAL_TRADITIONAL,
+    UCAL_DEFAULT = UCAL_TRADITIONAL,
+    UCAL_GREGORIAN
 };
 
-static UCalendar*
+enum UCalendarAttribute {
+    UCAL_FIRST_DAY_OF_WEEK,
+    UCAL_MINIMAL_DAYS_IN_FIRST_WEEK
+};
+
+enum UCalendarDaysOfWeek {
+    UCAL_SUNDAY,
+    UCAL_MONDAY,
+    UCAL_TUESDAY,
+    UCAL_WEDNESDAY,
+    UCAL_THURSDAY,
+    UCAL_FRIDAY,
+    UCAL_SATURDAY
+};
+
+enum UCalendarWeekdayType {
+    UCAL_WEEKDAY,
+    UCAL_WEEKEND,
+    UCAL_WEEKEND_ONSET,
+    UCAL_WEEKEND_CEASE
+};
+
+enum UCalendarDateFields {
+    UCAL_ERA,
+    UCAL_YEAR,
+    UCAL_MONTH,
+    UCAL_WEEK_OF_YEAR,
+    UCAL_WEEK_OF_MONTH,
+    UCAL_DATE,
+    UCAL_DAY_OF_YEAR,
+    UCAL_DAY_OF_WEEK,
+    UCAL_DAY_OF_WEEK_IN_MONTH,
+    UCAL_AM_PM,
+    UCAL_HOUR,
+    UCAL_HOUR_OF_DAY,
+    UCAL_MINUTE,
+    UCAL_SECOND,
+    UCAL_MILLISECOND,
+    UCAL_ZONE_OFFSET,
+    UCAL_DST_OFFSET,
+    UCAL_YEAR_WOY,
+    UCAL_DOW_LOCAL,
+    UCAL_EXTENDED_YEAR,
+    UCAL_JULIAN_DAY,
+    UCAL_MILLISECONDS_IN_DAY,
+    UCAL_IS_LEAP_MONTH,
+    UCAL_FIELD_COUNT,
+    UCAL_DAY_OF_MONTH = UCAL_DATE
+};
+
+UCalendar*
 ucal_open(const UChar* zoneID, int32_t len, const char* locale,
           UCalendarType type, UErrorCode* status)
 {
     MOZ_CRASH("ucal_open: Intl API disabled");
 }
 
-static const char*
+const char*
 ucal_getType(const UCalendar* cal, UErrorCode* status)
 {
     MOZ_CRASH("ucal_getType: Intl API disabled");
 }
 
-static UEnumeration*
+UEnumeration*
 ucal_getKeywordValuesForLocale(const char* key, const char* locale,
                                UBool commonlyUsed, UErrorCode* status)
 {
     MOZ_CRASH("ucal_getKeywordValuesForLocale: Intl API disabled");
 }
 
-static void
+void
 ucal_close(UCalendar* cal)
 {
     MOZ_CRASH("ucal_close: Intl API disabled");
 }
 
+UCalendarWeekdayType
+ucal_getDayOfWeekType(const UCalendar *cal, UCalendarDaysOfWeek dayOfWeek, UErrorCode* status)
+{
+    MOZ_CRASH("ucal_getDayOfWeekType: Intl API disabled");
+}
+
+int32_t
+ucal_getAttribute(const UCalendar*    cal,
+                  UCalendarAttribute  attr)
+{
+    MOZ_CRASH("ucal_getAttribute: Intl API disabled");
+}
+
+int32_t
+ucal_get(const UCalendar *cal, UCalendarDateFields field, UErrorCode *status)
+{
+    MOZ_CRASH("ucal_get: Intl API disabled");
+}
+
+UEnumeration*
+ucal_openTimeZones(UErrorCode* status)
+{
+    MOZ_CRASH("ucal_openTimeZones: Intl API disabled");
+}
+
+int32_t
+ucal_getCanonicalTimeZoneID(const UChar* id, int32_t len, UChar* result, int32_t resultCapacity,
+                            UBool* isSystemID, UErrorCode* status)
+{
+    MOZ_CRASH("ucal_getCanonicalTimeZoneID: Intl API disabled");
+}
+
+int32_t
+ucal_getDefaultTimeZone(UChar* result, int32_t resultCapacity, UErrorCode* status)
+{
+    MOZ_CRASH("ucal_getDefaultTimeZone: Intl API disabled");
+}
+
 typedef void* UDateTimePatternGenerator;
 
-static UDateTimePatternGenerator*
+UDateTimePatternGenerator*
 udatpg_open(const char* locale, UErrorCode* pErrorCode)
 {
     MOZ_CRASH("udatpg_open: Intl API disabled");
 }
 
-static int32_t
+int32_t
 udatpg_getBestPattern(UDateTimePatternGenerator* dtpg, const UChar* skeleton,
                       int32_t length, UChar* bestPattern, int32_t capacity,
                       UErrorCode* pErrorCode)
@@ -360,7 +437,7 @@ udatpg_getBestPattern(UDateTimePatternGenerator* dtpg, const UChar* skeleton,
     MOZ_CRASH("udatpg_getBestPattern: Intl API disabled");
 }
 
-static void
+void
 udatpg_close(UDateTimePatternGenerator* dtpg)
 {
     MOZ_CRASH("udatpg_close: Intl API disabled");
@@ -370,43 +447,45 @@ typedef void* UCalendar;
 typedef void* UDateFormat;
 
 enum UDateFormatField {
-  UDAT_ERA_FIELD = 0,
-  UDAT_YEAR_FIELD = 1,
-  UDAT_MONTH_FIELD = 2,
-  UDAT_DATE_FIELD = 3,
-  UDAT_HOUR_OF_DAY1_FIELD = 4,
-  UDAT_HOUR_OF_DAY0_FIELD = 5,
-  UDAT_MINUTE_FIELD = 6,
-  UDAT_SECOND_FIELD = 7,
-  UDAT_FRACTIONAL_SECOND_FIELD = 8,
-  UDAT_DAY_OF_WEEK_FIELD = 9,
-  UDAT_DAY_OF_YEAR_FIELD = 10,
-  UDAT_DAY_OF_WEEK_IN_MONTH_FIELD = 11,
-  UDAT_WEEK_OF_YEAR_FIELD = 12,
-  UDAT_WEEK_OF_MONTH_FIELD = 13,
-  UDAT_AM_PM_FIELD = 14,
-  UDAT_HOUR1_FIELD = 15,
-  UDAT_HOUR0_FIELD = 16,
-  UDAT_TIMEZONE_FIELD = 17,
-  UDAT_YEAR_WOY_FIELD = 18,
-  UDAT_DOW_LOCAL_FIELD = 19,
-  UDAT_EXTENDED_YEAR_FIELD = 20,
-  UDAT_JULIAN_DAY_FIELD = 21,
-  UDAT_MILLISECONDS_IN_DAY_FIELD = 22,
-  UDAT_TIMEZONE_RFC_FIELD = 23,
-  UDAT_TIMEZONE_GENERIC_FIELD = 24,
-  UDAT_STANDALONE_DAY_FIELD = 25,
-  UDAT_STANDALONE_MONTH_FIELD = 26,
-  UDAT_QUARTER_FIELD = 27,
-  UDAT_STANDALONE_QUARTER_FIELD = 28,
-  UDAT_TIMEZONE_SPECIAL_FIELD = 29,
-  UDAT_YEAR_NAME_FIELD = 30,
-  UDAT_TIMEZONE_LOCALIZED_GMT_OFFSET_FIELD = 31,
-  UDAT_TIMEZONE_ISO_FIELD = 32,
-  UDAT_TIMEZONE_ISO_LOCAL_FIELD = 33,
-  UDAT_RELATED_YEAR_FIELD = 34,
-  UDAT_TIME_SEPARATOR_FIELD = 35,
-  UDAT_FIELD_COUNT = 36 
+    UDAT_ERA_FIELD = 0,
+    UDAT_YEAR_FIELD = 1,
+    UDAT_MONTH_FIELD = 2,
+    UDAT_DATE_FIELD = 3,
+    UDAT_HOUR_OF_DAY1_FIELD = 4,
+    UDAT_HOUR_OF_DAY0_FIELD = 5,
+    UDAT_MINUTE_FIELD = 6,
+    UDAT_SECOND_FIELD = 7,
+    UDAT_FRACTIONAL_SECOND_FIELD = 8,
+    UDAT_DAY_OF_WEEK_FIELD = 9,
+    UDAT_DAY_OF_YEAR_FIELD = 10,
+    UDAT_DAY_OF_WEEK_IN_MONTH_FIELD = 11,
+    UDAT_WEEK_OF_YEAR_FIELD = 12,
+    UDAT_WEEK_OF_MONTH_FIELD = 13,
+    UDAT_AM_PM_FIELD = 14,
+    UDAT_HOUR1_FIELD = 15,
+    UDAT_HOUR0_FIELD = 16,
+    UDAT_TIMEZONE_FIELD = 17,
+    UDAT_YEAR_WOY_FIELD = 18,
+    UDAT_DOW_LOCAL_FIELD = 19,
+    UDAT_EXTENDED_YEAR_FIELD = 20,
+    UDAT_JULIAN_DAY_FIELD = 21,
+    UDAT_MILLISECONDS_IN_DAY_FIELD = 22,
+    UDAT_TIMEZONE_RFC_FIELD = 23,
+    UDAT_TIMEZONE_GENERIC_FIELD = 24,
+    UDAT_STANDALONE_DAY_FIELD = 25,
+    UDAT_STANDALONE_MONTH_FIELD = 26,
+    UDAT_QUARTER_FIELD = 27,
+    UDAT_STANDALONE_QUARTER_FIELD = 28,
+    UDAT_TIMEZONE_SPECIAL_FIELD = 29,
+    UDAT_YEAR_NAME_FIELD = 30,
+    UDAT_TIMEZONE_LOCALIZED_GMT_OFFSET_FIELD = 31,
+    UDAT_TIMEZONE_ISO_FIELD = 32,
+    UDAT_TIMEZONE_ISO_LOCAL_FIELD = 33,
+    UDAT_RELATED_YEAR_FIELD = 34,
+    UDAT_AM_PM_MIDNIGHT_NOON_FIELD = 35,
+    UDAT_FLEXIBLE_DAY_PERIOD_FIELD = 36,
+    UDAT_TIME_SEPARATOR_FIELD = 37,
+    UDAT_FIELD_COUNT = 38
 };
 
 enum UDateFormatStyle {
@@ -414,19 +493,19 @@ enum UDateFormatStyle {
     UDAT_IGNORE = UDAT_PATTERN
 };
 
-static int32_t
+int32_t
 udat_countAvailable()
 {
     MOZ_CRASH("udat_countAvailable: Intl API disabled");
 }
 
-static const char*
+const char*
 udat_getAvailable(int32_t localeIndex)
 {
     MOZ_CRASH("udat_getAvailable: Intl API disabled");
 }
 
-static UDateFormat*
+UDateFormat*
 udat_open(UDateFormatStyle timeStyle, UDateFormatStyle dateStyle, const char* locale,
           const UChar* tzID, int32_t tzIDLength, const UChar* pattern,
           int32_t patternLength, UErrorCode* status)
@@ -434,26 +513,26 @@ udat_open(UDateFormatStyle timeStyle, UDateFormatStyle dateStyle, const char* lo
     MOZ_CRASH("udat_open: Intl API disabled");
 }
 
-static const UCalendar*
+const UCalendar*
 udat_getCalendar(const UDateFormat* fmt)
 {
     MOZ_CRASH("udat_getCalendar: Intl API disabled");
 }
 
-static void
+void
 ucal_setGregorianChange(UCalendar* cal, UDate date, UErrorCode* pErrorCode)
 {
     MOZ_CRASH("ucal_setGregorianChange: Intl API disabled");
 }
 
-static int32_t
+int32_t
 udat_format(const UDateFormat* format, UDate dateToFormat, UChar* result,
             int32_t resultLength, UFieldPosition* position, UErrorCode* status)
 {
     MOZ_CRASH("udat_format: Intl API disabled");
 }
 
-static int32_t
+int32_t
 udat_formatForFields(const UDateFormat* format, UDate dateToFormat,
                      UChar* result, int32_t resultLength, UFieldPositionIterator* fpositer,
                      UErrorCode* status)
@@ -461,29 +540,31 @@ udat_formatForFields(const UDateFormat* format, UDate dateToFormat,
     MOZ_CRASH("udat_formatForFields: Intl API disabled");
 }
 
-static UFieldPositionIterator*
+UFieldPositionIterator*
 ufieldpositer_open(UErrorCode* status)
 {
     MOZ_CRASH("ufieldpositer_open: Intl API disabled");
 }
 
-static void
+void
 ufieldpositer_close(UFieldPositionIterator* fpositer)
 {
     MOZ_CRASH("ufieldpositer_close: Intl API disabled");
 }
 
-static int32_t
+int32_t
 ufieldpositer_next(UFieldPositionIterator* fpositer, int32_t* beginIndex, int32_t* endIndex)
 {
     MOZ_CRASH("ufieldpositer_next: Intl API disabled");
 }
 
-static void
+void
 udat_close(UDateFormat* format)
 {
     MOZ_CRASH("udat_close: Intl API disabled");
 }
+
+} // anonymous namespace
 
 #endif
 
@@ -856,14 +937,14 @@ js::intl_availableCollations(JSContext* cx, unsigned argc, Value* vp)
     UErrorCode status = U_ZERO_ERROR;
     UEnumeration* values = ucol_getKeywordValuesForLocale("co", locale.ptr(), false, &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
     ScopedICUObject<UEnumeration, uenum_close> toClose(values);
 
     uint32_t count = uenum_count(values, &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
 
@@ -875,7 +956,7 @@ js::intl_availableCollations(JSContext* cx, unsigned argc, Value* vp)
     for (uint32_t i = 0; i < count; i++) {
         const char* collation = uenum_next(values, nullptr, &status);
         if (U_FAILURE(status)) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
             return false;
         }
 
@@ -1025,7 +1106,7 @@ NewUCollator(JSContext* cx, HandleObject collator)
     UErrorCode status = U_ZERO_ERROR;
     UCollator* coll = ucol_open(icuLocale(locale.ptr()), &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return nullptr;
     }
 
@@ -1037,7 +1118,7 @@ NewUCollator(JSContext* cx, HandleObject collator)
     ucol_setAttribute(coll, UCOL_CASE_FIRST, uCaseFirst, &status);
     if (U_FAILURE(status)) {
         ucol_close(coll);
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return nullptr;
     }
 
@@ -1068,8 +1149,8 @@ intl_CompareStrings(JSContext* cx, UCollator* coll, HandleString str1, HandleStr
     mozilla::Range<const char16_t> chars2 = stableChars2.twoByteRange();
 
     UCollationResult uresult = ucol_strcoll(coll,
-                                            Char16ToUChar(chars1.start().get()), chars1.length(),
-                                            Char16ToUChar(chars2.start().get()), chars2.length());
+                                            Char16ToUChar(chars1.begin().get()), chars1.length(),
+                                            Char16ToUChar(chars2.begin().get()), chars2.length());
     int32_t res;
     switch (uresult) {
         case UCOL_LESS: res = -1; break;
@@ -1354,20 +1435,20 @@ js::intl_numberingSystem(JSContext* cx, unsigned argc, Value* vp)
     if (!locale)
         return false;
 
-    // There's no C API for numbering system, so use the C++ API and hope it
-    // won't break. http://bugs.icu-project.org/trac/ticket/10039
-    Locale ulocale(locale.ptr());
     UErrorCode status = U_ZERO_ERROR;
-    NumberingSystem* numbers = NumberingSystem::createInstance(ulocale, status);
+    UNumberingSystem* numbers = unumsys_open(icuLocale(locale.ptr()), &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
-    const char* name = numbers->getName();
+
+    ScopedICUObject<UNumberingSystem, unumsys_close> toClose(numbers);
+
+    const char* name = unumsys_getName(numbers);
     RootedString jsname(cx, JS_NewStringCopyZ(cx, name));
-    delete numbers;
     if (!jsname)
         return false;
+
     args.rval().setString(jsname);
     return true;
 }
@@ -1423,7 +1504,7 @@ NewUNumberFormat(JSContext* cx, HandleObject numberFormat)
         if (!currency->ensureFlat(cx) || !stableChars.initTwoByte(cx, currency))
             return nullptr;
         // uCurrency remains owned by stableChars.
-        uCurrency = Char16ToUChar(stableChars.twoByteRange().start().get());
+        uCurrency = Char16ToUChar(stableChars.twoByteRange().begin().get());
         if (!uCurrency)
             return nullptr;
 
@@ -1492,7 +1573,7 @@ NewUNumberFormat(JSContext* cx, HandleObject numberFormat)
     UErrorCode status = U_ZERO_ERROR;
     UNumberFormat* nf = unum_open(uStyle, nullptr, 0, icuLocale(locale.ptr()), nullptr, &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return nullptr;
     }
     ScopedICUObject<UNumberFormat, unum_close> toClose(nf);
@@ -1500,7 +1581,7 @@ NewUNumberFormat(JSContext* cx, HandleObject numberFormat)
     if (uCurrency) {
         unum_setTextAttribute(nf, UNUM_CURRENCY_CODE, uCurrency, 3, &status);
         if (U_FAILURE(status)) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
             return nullptr;
         }
     }
@@ -1539,7 +1620,7 @@ intl_FormatNumber(JSContext* cx, UNumberFormat* nf, double x, MutableHandleValue
         unum_formatDouble(nf, x, Char16ToUChar(chars.begin()), size, nullptr, &status);
     }
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
 
@@ -1639,6 +1720,7 @@ static const JSFunctionSpec dateTimeFormat_static_methods[] = {
 
 static const JSFunctionSpec dateTimeFormat_methods[] = {
     JS_SELF_HOSTED_FN("resolvedOptions", "Intl_DateTimeFormat_resolvedOptions", 0, 0),
+    JS_SELF_HOSTED_FN("formatToParts", "Intl_DateTimeFormat_formatToParts", 0, 0),
 #if JS_HAS_TOSOURCE
     JS_FN(js_toSource_str, dateTimeFormat_toSource, 0, 0),
 #endif
@@ -1776,23 +1858,6 @@ CreateDateTimeFormatPrototype(JSContext* cx, HandleObject Intl, Handle<GlobalObj
         return nullptr;
     }
 
-    // If the still-experimental DateTimeFormat.prototype.formatToParts method
-    // is enabled, also add it.
-    if (cx->compartment()->creationOptions().experimentalDateTimeFormatFormatToPartsEnabled()) {
-        RootedValue ftp(cx);
-        HandlePropertyName name = cx->names().formatToParts;
-        if (!GlobalObject::getSelfHostedFunction(cx, cx->global(),
-                    cx->names().DateTimeFormatFormatToParts,
-                    name,
-                    0, &ftp))
-        {
-            return nullptr;
-        }
-
-        if (!DefineProperty(cx, proto, cx->names().formatToParts, ftp, nullptr, nullptr, 0))
-            return nullptr;
-    }
-
     RootedValue options(cx);
     if (!CreateDefaultOptions(cx, &options))
         return nullptr;
@@ -1866,7 +1931,7 @@ js::intl_availableCalendars(JSContext* cx, unsigned argc, Value* vp)
 
         const char* calendar = ucal_getType(cal, &status);
         if (U_FAILURE(status)) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
             return false;
         }
 
@@ -1882,21 +1947,21 @@ js::intl_availableCalendars(JSContext* cx, unsigned argc, Value* vp)
     // Now get the calendars that "would make a difference", i.e., not the default.
     UEnumeration* values = ucal_getKeywordValuesForLocale("ca", locale.ptr(), false, &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
     ScopedICUObject<UEnumeration, uenum_close> toClose(values);
 
     uint32_t count = uenum_count(values, &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
 
     for (; count > 0; count--) {
         const char* calendar = uenum_next(values, nullptr, &status);
         if (U_FAILURE(status)) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
             return false;
         }
 
@@ -1909,6 +1974,187 @@ js::intl_availableCalendars(JSContext* cx, unsigned argc, Value* vp)
     }
 
     args.rval().setObject(*calendars);
+    return true;
+}
+
+/**
+ * Create a time zone map key. Time zones are keyed by their upper case name.
+ */
+static UniqueChars
+TimeZoneKey(JSContext* cx, const char* timeZone, size_t size)
+{
+    auto timeZoneKey = cx->make_pod_array<char>(size);
+    if (!timeZoneKey)
+        return nullptr;
+    PodCopy(timeZoneKey.get(), timeZone, size);
+
+    // Convert time zone name to ASCII upper case.
+    char* chars = timeZoneKey.get();
+    for (unsigned i = 0; i < size; i++) {
+        char c = chars[i];
+        if ('a' <= c && c <= 'z')
+            chars[i] = c & ~0x20;
+        MOZ_ASSERT(unicode::ToUpperCase(c) == chars[i]);
+    }
+
+    return timeZoneKey;
+}
+
+bool
+js::intl_availableTimeZones(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 0);
+
+    UErrorCode status = U_ZERO_ERROR;
+    UEnumeration* values = ucal_openTimeZones(&status);
+    if (U_FAILURE(status)) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        return false;
+    }
+    ScopedICUObject<UEnumeration, uenum_close> toClose(values);
+
+    RootedObject timeZones(cx, NewObjectWithGivenProto<PlainObject>(cx, nullptr));
+    if (!timeZones)
+        return false;
+    RootedString jsTimeZone(cx);
+    RootedValue element(cx);
+    while (true) {
+        int32_t size;
+        const char* timeZone = uenum_next(values, &size, &status);
+        if (U_FAILURE(status)) {
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+            return false;
+        }
+        if (timeZone == nullptr)
+            break;
+
+        MOZ_ASSERT(size >= 0);
+        UniqueChars timeZoneKey = TimeZoneKey(cx, timeZone, size_t(size));
+        if (!timeZoneKey)
+            return false;
+
+        RootedAtom atom(cx, Atomize(cx, timeZoneKey.get(), size_t(size)));
+        if (!atom)
+            return false;
+
+        jsTimeZone = NewStringCopyN<CanGC>(cx, timeZone, size_t(size));
+        if (!jsTimeZone)
+            return false;
+        element.setString(jsTimeZone);
+
+        if (!DefineProperty(cx, timeZones, atom->asPropertyName(), element))
+            return false;
+    }
+
+    args.rval().setObject(*timeZones);
+    return true;
+}
+
+bool
+js::intl_canonicalizeTimeZone(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args[0].isString());
+
+    AutoStableStringChars stableChars(cx);
+    if (!stableChars.initTwoByte(cx, args[0].toString()))
+        return false;
+
+    mozilla::Range<const char16_t> tzchars = stableChars.twoByteRange();
+
+    Vector<char16_t, INITIAL_CHAR_BUFFER_SIZE> chars(cx);
+    if (!chars.resize(INITIAL_CHAR_BUFFER_SIZE))
+        return false;
+
+    UBool* isSystemID = nullptr;
+    UErrorCode status = U_ZERO_ERROR;
+    int32_t size = ucal_getCanonicalTimeZoneID(Char16ToUChar(tzchars.begin().get()),
+                                               tzchars.length(), Char16ToUChar(chars.begin()),
+                                               INITIAL_CHAR_BUFFER_SIZE, isSystemID, &status);
+    if (status == U_BUFFER_OVERFLOW_ERROR) {
+        MOZ_ASSERT(size >= 0);
+        if (!chars.resize(size_t(size)))
+            return false;
+        status = U_ZERO_ERROR;
+        ucal_getCanonicalTimeZoneID(Char16ToUChar(tzchars.begin().get()), tzchars.length(),
+                                    Char16ToUChar(chars.begin()), size, isSystemID, &status);
+    }
+    if (U_FAILURE(status)) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        return false;
+    }
+
+    MOZ_ASSERT(size >= 0);
+    JSString* str = NewStringCopyN<CanGC>(cx, chars.begin(), size);
+    if (!str)
+        return false;
+    args.rval().setString(str);
+    return true;
+}
+
+bool
+js::intl_defaultTimeZone(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 0);
+
+    // The current default might be stale, because JS::ResetTimeZone() doesn't
+    // immediately update ICU's default time zone. So perform an update if
+    // needed.
+    js::ResyncICUDefaultTimeZone();
+
+    Vector<char16_t, INITIAL_CHAR_BUFFER_SIZE> chars(cx);
+    if (!chars.resize(INITIAL_CHAR_BUFFER_SIZE))
+        return false;
+
+    UErrorCode status = U_ZERO_ERROR;
+    int32_t size = ucal_getDefaultTimeZone(Char16ToUChar(chars.begin()), INITIAL_CHAR_BUFFER_SIZE,
+                                           &status);
+    if (status == U_BUFFER_OVERFLOW_ERROR) {
+        MOZ_ASSERT(size >= 0);
+        if (!chars.resize(size_t(size)))
+            return false;
+        status = U_ZERO_ERROR;
+        ucal_getDefaultTimeZone(Char16ToUChar(chars.begin()), size, &status);
+    }
+    if (U_FAILURE(status)) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        return false;
+    }
+
+    MOZ_ASSERT(size >= 0);
+    JSString* str = NewStringCopyN<CanGC>(cx, chars.begin(), size_t(size));
+    if (!str)
+        return false;
+    args.rval().setString(str);
+    return true;
+}
+
+bool
+js::intl_defaultTimeZoneOffset(JSContext* cx, unsigned argc, Value* vp) {
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 0);
+
+    UErrorCode status = U_ZERO_ERROR;
+    const UChar* uTimeZone = nullptr;
+    int32_t uTimeZoneLength = 0;
+    const char* rootLocale = "";
+    UCalendar* cal = ucal_open(uTimeZone, uTimeZoneLength, rootLocale, UCAL_DEFAULT, &status);
+    if (U_FAILURE(status)) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        return false;
+    }
+    ScopedICUObject<UCalendar, ucal_close> toClose(cal);
+
+    int32_t offset = ucal_get(cal, UCAL_ZONE_OFFSET, &status);
+    if (U_FAILURE(status)) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        return false;
+    }
+
+    args.rval().setInt32(offset);
     return true;
 }
 
@@ -1933,20 +2179,20 @@ js::intl_patternForSkeleton(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     mozilla::Range<const char16_t> skeletonChars = stableChars.twoByteRange();
-    uint32_t skeletonLen = u_strlen(Char16ToUChar(skeletonChars.start().get()));
+    uint32_t skeletonLen = u_strlen(Char16ToUChar(skeletonChars.begin().get()));
 
     UErrorCode status = U_ZERO_ERROR;
     UDateTimePatternGenerator* gen = udatpg_open(icuLocale(locale.ptr()), &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
     ScopedICUObject<UDateTimePatternGenerator, udatpg_close> toClose(gen);
 
-    int32_t size = udatpg_getBestPattern(gen, Char16ToUChar(skeletonChars.start().get()),
+    int32_t size = udatpg_getBestPattern(gen, Char16ToUChar(skeletonChars.begin().get()),
                                          skeletonLen, nullptr, 0, &status);
     if (U_FAILURE(status) && status != U_BUFFER_OVERFLOW_ERROR) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
     ScopedJSFreePtr<UChar> pattern(cx->pod_malloc<UChar>(size + 1));
@@ -1954,10 +2200,10 @@ js::intl_patternForSkeleton(JSContext* cx, unsigned argc, Value* vp)
         return false;
     pattern[size] = '\0';
     status = U_ZERO_ERROR;
-    udatpg_getBestPattern(gen, Char16ToUChar(skeletonChars.start().get()),
+    udatpg_getBestPattern(gen, Char16ToUChar(skeletonChars.begin().get()),
                           skeletonLen, pattern, size, &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
 
@@ -1987,65 +2233,38 @@ NewUDateFormat(JSContext* cx, HandleObject dateTimeFormat)
     if (!locale)
         return nullptr;
 
-    // UDateFormat options with default values.
-    const UChar* uTimeZone = nullptr;
-    uint32_t uTimeZoneLength = 0;
-    const UChar* uPattern = nullptr;
-    uint32_t uPatternLength = 0;
-
     // We don't need to look at calendar and numberingSystem - they can only be
     // set via the Unicode locale extension and are therefore already set on
     // locale.
 
-    RootedId id(cx, NameToId(cx->names().timeZone));
-    bool hasP;
-    if (!HasProperty(cx, internals, id, &hasP))
+    if (!GetProperty(cx, internals, internals, cx->names().timeZone, &value))
         return nullptr;
 
     AutoStableStringChars timeZoneChars(cx);
-    if (hasP) {
-        if (!GetProperty(cx, internals, internals, cx->names().timeZone, &value))
-            return nullptr;
-        if (!value.isUndefined()) {
-            JSFlatString* flat = value.toString()->ensureFlat(cx);
-            if (!flat || !timeZoneChars.initTwoByte(cx, flat))
-                return nullptr;
-            uTimeZone = Char16ToUChar(timeZoneChars.twoByteRange().start().get());
-            if (!uTimeZone)
-                return nullptr;
-            uTimeZoneLength = u_strlen(uTimeZone);
-        }
-    }
+    Rooted<JSFlatString*> timeZoneFlat(cx, value.toString()->ensureFlat(cx));
+    if (!timeZoneFlat || !timeZoneChars.initTwoByte(cx, timeZoneFlat))
+        return nullptr;
+
+    const UChar* uTimeZone = Char16ToUChar(timeZoneChars.twoByteRange().begin().get());
+    uint32_t uTimeZoneLength = u_strlen(uTimeZone);
+
     if (!GetProperty(cx, internals, internals, cx->names().pattern, &value))
         return nullptr;
 
     AutoStableStringChars patternChars(cx);
-    JSFlatString* flat = value.toString()->ensureFlat(cx);
-    if (!flat || !patternChars.initTwoByte(cx, flat))
+    Rooted<JSFlatString*> patternFlat(cx, value.toString()->ensureFlat(cx));
+    if (!patternFlat || !patternChars.initTwoByte(cx, patternFlat))
         return nullptr;
 
-    uPattern = Char16ToUChar(patternChars.twoByteRange().start().get());
-    if (!uPattern)
-        return nullptr;
-    uPatternLength = u_strlen(uPattern);
+    const UChar* uPattern = Char16ToUChar(patternChars.twoByteRange().begin().get());
+    uint32_t uPatternLength = u_strlen(uPattern);
 
     UErrorCode status = U_ZERO_ERROR;
-
-    if (!uTimeZone) {
-        // When no time zone was specified, we use ICU's default time zone.
-        // The current default might be stale, because JS::ResetTimeZone()
-        // doesn't immediately update ICU's default time zone.  So perform an
-        // update if needed.
-        js::ResyncICUDefaultTimeZone();
-    }
-
-    // If building with ICU headers before 50.1, use UDAT_IGNORE instead of
-    // UDAT_PATTERN.
     UDateFormat* df =
         udat_open(UDAT_PATTERN, UDAT_PATTERN, icuLocale(locale.ptr()), uTimeZone, uTimeZoneLength,
                   uPattern, uPatternLength, &status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return nullptr;
     }
 
@@ -2063,7 +2282,7 @@ static bool
 intl_FormatDateTime(JSContext* cx, UDateFormat* df, double x, MutableHandleValue result)
 {
     if (!IsFinite(x)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DATE_NOT_FINITE);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_DATE_NOT_FINITE);
         return false;
     }
 
@@ -2080,7 +2299,7 @@ intl_FormatDateTime(JSContext* cx, UDateFormat* df, double x, MutableHandleValue
         udat_format(df, x, Char16ToUChar(chars.begin()), size, nullptr, &status);
     }
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
 
@@ -2162,6 +2381,10 @@ GetFieldTypeForFormatField(UDateFormatField fieldName)
       case UDAT_RELATED_YEAR_FIELD:
 #endif
 #ifndef U_HIDE_DRAFT_API
+      case UDAT_AM_PM_MIDNIGHT_NOON_FIELD:
+      case UDAT_FLEXIBLE_DAY_PERIOD_FIELD:
+#endif
+#ifndef U_HIDE_INTERNAL_API
       case UDAT_TIME_SEPARATOR_FIELD:
 #endif
         // These fields are all unsupported.
@@ -2181,7 +2404,7 @@ static bool
 intl_FormatToPartsDateTime(JSContext* cx, UDateFormat* df, double x, MutableHandleValue result)
 {
     if (!IsFinite(x)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_DATE_NOT_FINITE);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_DATE_NOT_FINITE);
         return false;
     }
 
@@ -2192,7 +2415,7 @@ intl_FormatToPartsDateTime(JSContext* cx, UDateFormat* df, double x, MutableHand
     UErrorCode status = U_ZERO_ERROR;
     UFieldPositionIterator* fpositer = ufieldpositer_open(&status);
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
     auto closeFieldPosIter = MakeScopeExit([&]() { ufieldpositer_close(fpositer); });
@@ -2207,7 +2430,7 @@ intl_FormatToPartsDateTime(JSContext* cx, UDateFormat* df, double x, MutableHand
         udat_formatForFields(df, x, Char16ToUChar(chars.begin()), resultSize, fpositer, &status);
     }
     if (U_FAILURE(status)) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
         return false;
     }
 
@@ -2344,6 +2567,96 @@ js::intl_FormatDateTime(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+bool
+js::intl_GetCalendarInfo(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+
+    JSAutoByteString locale(cx, args[0].toString());
+    if (!locale)
+        return false;
+
+    UErrorCode status = U_ZERO_ERROR;
+    const UChar* uTimeZone = nullptr;
+    int32_t uTimeZoneLength = 0;
+    UCalendar* cal = ucal_open(uTimeZone, uTimeZoneLength, locale.ptr(), UCAL_DEFAULT, &status);
+    if (U_FAILURE(status)) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        return false;
+    }
+    ScopedICUObject<UCalendar, ucal_close> toClose(cal);
+
+    RootedObject info(cx, NewBuiltinClassInstance<PlainObject>(cx));
+    if (!info)
+        return false;
+
+    RootedValue v(cx);
+    int32_t firstDayOfWeek = ucal_getAttribute(cal, UCAL_FIRST_DAY_OF_WEEK);
+    v.setInt32(firstDayOfWeek);
+
+    if (!DefineProperty(cx, info, cx->names().firstDayOfWeek, v))
+        return false;
+
+    int32_t minDays = ucal_getAttribute(cal, UCAL_MINIMAL_DAYS_IN_FIRST_WEEK);
+    v.setInt32(minDays);
+    if (!DefineProperty(cx, info, cx->names().minDays, v))
+        return false;
+
+    UCalendarWeekdayType prevDayType = ucal_getDayOfWeekType(cal, UCAL_SATURDAY, &status);
+    if (U_FAILURE(status)) {
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+        return false;
+    }
+
+    RootedValue weekendStart(cx), weekendEnd(cx);
+
+    for (int i = UCAL_SUNDAY; i <= UCAL_SATURDAY; i++) {
+        UCalendarDaysOfWeek dayOfWeek = static_cast<UCalendarDaysOfWeek>(i);
+        UCalendarWeekdayType type = ucal_getDayOfWeekType(cal, dayOfWeek, &status);
+        if (U_FAILURE(status)) {
+            JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+            return false;
+        }
+
+        if (prevDayType != type) {
+            switch (type) {
+              case UCAL_WEEKDAY:
+                // If the first Weekday after Weekend is Sunday (1),
+                // then the last Weekend day is Saturday (7).
+                // Otherwise we'll just take the previous days number.
+                weekendEnd.setInt32(i == 1 ? 7 : i - 1);
+                break;
+              case UCAL_WEEKEND:
+                weekendStart.setInt32(i);
+                break;
+              case UCAL_WEEKEND_ONSET:
+              case UCAL_WEEKEND_CEASE:
+                // At the time this code was added, ICU apparently never behaves this way,
+                // so just throw, so that users will report a bug and we can decide what to
+                // do.
+                JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_INTERNAL_INTL_ERROR);
+                return false;
+              default:
+                break;
+            }
+        }
+
+        prevDayType = type;
+    }
+
+    MOZ_ASSERT(weekendStart.isInt32());
+    MOZ_ASSERT(weekendEnd.isInt32());
+
+    if (!DefineProperty(cx, info, cx->names().weekendStart, weekendStart))
+        return false;
+
+    if (!DefineProperty(cx, info, cx->names().weekendEnd, weekendEnd))
+        return false;
+
+    args.rval().setObject(*info);
+    return true;
+}
 
 /******************** Intl ********************/
 

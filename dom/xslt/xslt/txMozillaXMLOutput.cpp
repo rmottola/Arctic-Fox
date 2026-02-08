@@ -27,7 +27,7 @@
 #include "nsIHTMLDocument.h"
 #include "nsIStyleSheetLinkingElement.h"
 #include "nsIDocumentTransformer.h"
-#include "mozilla/CSSStyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 #include "mozilla/css/Loader.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/EncodingUtils.h"
@@ -804,13 +804,16 @@ txMozillaXMLOutput::createResultDocument(const nsSubstring& aName, int32_t aNsID
     nsIScriptGlobalObject* sgo =
       source->GetScriptHandlingObject(hasHadScriptObject);
     NS_ENSURE_STATE(sgo || !hasHadScriptObject);
-    mDocument->SetScriptHandlingObject(sgo);
 
     mCurrentNode = mDocument;
     mNodeInfoManager = mDocument->NodeInfoManager();
 
     // Reset and set up the document
     URIUtils::ResetWithSource(mDocument, aSourceDocument);
+
+    // Make sure we set the script handling object after resetting with the
+    // source, so that we have the right principal.
+    mDocument->SetScriptHandlingObject(sgo);
 
     // Set the charset
     if (!mOutputFormat.mEncoding.IsEmpty()) {
@@ -977,7 +980,7 @@ txTransformNotifier::ScriptEvaluated(nsresult aResult,
 }
 
 NS_IMETHODIMP 
-txTransformNotifier::StyleSheetLoaded(StyleSheetHandle aSheet,
+txTransformNotifier::StyleSheetLoaded(StyleSheet* aSheet,
                                       bool aWasAlternate,
                                       nsresult aStatus)
 {

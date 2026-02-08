@@ -204,8 +204,10 @@ ChannelFromScriptURL(nsIPrincipal* principal,
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel)) {
+    mozilla::net::ReferrerPolicy referrerPolicy = parentDoc ?
+      parentDoc->GetReferrerPolicy() : mozilla::net::RP_Default;
     rv = nsContentUtils::SetFetchReferrerURIWithPolicy(principal, parentDoc,
-                                                       httpChannel, mozilla::net::RP_Default);
+                                                       httpChannel, referrerPolicy);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -350,7 +352,7 @@ public:
 
   explicit CacheCreator(WorkerPrivate* aWorkerPrivate)
     : mCacheName(aWorkerPrivate->ServiceWorkerCacheName())
-    , mPrivateBrowsing(aWorkerPrivate->IsInPrivateBrowsing())
+    , mOriginAttributes(aWorkerPrivate->GetOriginAttributes())
   {
     MOZ_ASSERT(aWorkerPrivate->IsServiceWorker());
     MOZ_ASSERT(aWorkerPrivate->LoadScriptAsPartOfLoadingServiceWorkerScript());
@@ -411,7 +413,7 @@ private:
   nsTArray<RefPtr<CacheScriptLoader>> mLoaders;
 
   nsString mCacheName;
-  bool mPrivateBrowsing;
+  PrincipalOriginAttributes mOriginAttributes;
 };
 
 NS_IMPL_ISUPPORTS0(CacheCreator)
@@ -1467,7 +1469,7 @@ CacheCreator::CreateCacheStorage(nsIPrincipal* aPrincipal)
   // If we're in private browsing mode, don't even try to create the
   // CacheStorage.  Instead, just fail immediately to terminate the
   // ServiceWorker load.
-  if (NS_WARN_IF(mPrivateBrowsing)) {
+  if (NS_WARN_IF(mOriginAttributes.mPrivateBrowsingId > 0)) {
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
@@ -1478,7 +1480,8 @@ CacheCreator::CreateCacheStorage(nsIPrincipal* aPrincipal)
   mCacheStorage =
     CacheStorage::CreateOnMainThread(mozilla::dom::cache::CHROME_ONLY_NAMESPACE,
                                      mSandboxGlobalObject,
-                                     aPrincipal, mPrivateBrowsing,
+                                     aPrincipal,
+                                     false, /* privateBrowsing can't be true here */
                                      true /* force trusted origin */,
                                      error);
   if (NS_WARN_IF(error.Failed())) {
@@ -2072,7 +2075,7 @@ ScriptExecutorRunnable::LogExceptionToConsole(JSContext* aCx,
   }
 
   RefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
-  xpcReport->Init(report.report(), report.message(),
+  xpcReport->Init(report.report(), report.toStringResult().c_str(),
                   aWorkerPrivate->IsChromeWorker(), aWorkerPrivate->WindowID());
 
   RefPtr<AsyncErrorReporter> r = new AsyncErrorReporter(xpcReport);

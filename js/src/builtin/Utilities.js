@@ -148,7 +148,7 @@ function GetIterator(obj, method) {
 
     // Step 5.
     if (!IsObject(iterator))
-        ThrowTypeError(JSMSG_NOT_ITERABLE, ToString(iterator));
+        ThrowTypeError(JSMSG_NOT_ITERATOR, ToString(iterator));
 
     // Step 6.
     return iterator;
@@ -201,6 +201,15 @@ function SpeciesConstructor(obj, defaultConstructor) {
 function GetTypeError(msg) {
     try {
         FUN_APPLY(ThrowTypeError, undefined, arguments);
+    } catch (e) {
+        return e;
+    }
+    assert(false, "the catch block should've returned from this function.");
+}
+
+function GetInternalError(msg) {
+    try {
+        FUN_APPLY(ThrowInternalError, undefined, arguments);
     } catch (e) {
         return e;
     }

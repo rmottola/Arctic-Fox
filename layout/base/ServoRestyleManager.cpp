@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/ServoRestyleManager.h"
+#include "mozilla/ServoBindings.h"
 #include "mozilla/ServoStyleSet.h"
 #include "mozilla/dom/ChildIterator.h"
 #include "nsContentUtils.h"
@@ -32,6 +33,12 @@ ServoRestyleManager::PostRestyleEvent(Element* aElement,
 
   if (aRestyleHint == 0 && !aMinChangeHint && !HasPendingRestyles()) {
     return; // Nothing to do.
+  }
+
+  // XXX This is a temporary hack to make style attribute change works.
+  //     In the future, we should be able to use this hint directly.
+  if (aRestyleHint & eRestyle_StyleAttribute) {
+    aRestyleHint |= eRestyle_Subtree;
   }
 
   // Note that unlike in Servo, we don't mark elements as dirty until we process
@@ -223,7 +230,7 @@ MarkChildrenAsDirtyForServo(nsIContent* aContent)
 }
 
 /* static */ nsIFrame*
-ServoRestyleManager::FrameForPseudoElement(nsIContent* aContent,
+ServoRestyleManager::FrameForPseudoElement(const nsIContent* aContent,
                                            nsIAtom* aPseudoTagOrNull)
 {
   MOZ_ASSERT_IF(aPseudoTagOrNull, aContent->IsElement());
@@ -386,7 +393,7 @@ ServoRestyleManager::ContentInserted(nsINode* aContainer, nsIContent* aChild)
     return;
   }
 
-  if (!aContainer->ServoData().get()) {
+  if (!aContainer->HasServoData()) {
     // This can happen with display:none. Bug 1297249 tracks more investigation
     // and assertions here.
     return;
@@ -417,7 +424,7 @@ void
 ServoRestyleManager::ContentAppended(nsIContent* aContainer,
                                      nsIContent* aFirstNewContent)
 {
-  if (!aContainer->ServoData().get()) {
+  if (!aContainer->HasServoData()) {
     // This can happen with display:none. Bug 1297249 tracks more investigation
     // and assertions here.
     return;
@@ -494,6 +501,17 @@ ServoRestyleManager::AttributeWillChange(Element* aElement,
 {
   ServoElementSnapshot* snapshot = SnapshotForElement(aElement);
   snapshot->AddAttrs(aElement);
+}
+
+void
+ServoRestyleManager::AttributeChanged(Element* aElement, int32_t aNameSpaceID,
+                                      nsIAtom* aAttribute, int32_t aModType,
+                                      const nsAttrValue* aOldValue)
+{
+  MOZ_ASSERT(SnapshotForElement(aElement)->HasAttrs());
+  if (aAttribute == nsGkAtoms::style) {
+    PostRestyleEvent(aElement, eRestyle_StyleAttribute, nsChangeHint(0));
+  }
 }
 
 nsresult

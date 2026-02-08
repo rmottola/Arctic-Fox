@@ -10,10 +10,11 @@
 #include "nsIPresentationService.h"
 #include "nsIWebProgress.h"
 #include "nsServiceManagerUtils.h"
+#include "nsThreadUtils.h"
 #include "PresentationCallbacks.h"
 #include "PresentationRequest.h"
 #include "PresentationConnection.h"
-#include "nsThreadUtils.h"
+#include "PresentationTransportBuilderConstructor.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -25,11 +26,9 @@ using namespace mozilla::dom;
 NS_IMPL_ISUPPORTS(PresentationRequesterCallback, nsIPresentationServiceCallback)
 
 PresentationRequesterCallback::PresentationRequesterCallback(PresentationRequest* aRequest,
-                                                             const nsAString& aUrl,
                                                              const nsAString& aSessionId,
                                                              Promise* aPromise)
   : mRequest(aRequest)
-  , mUrl(aUrl)
   , mSessionId(aSessionId)
   , mPromise(aPromise)
 {
@@ -44,18 +43,22 @@ PresentationRequesterCallback::~PresentationRequesterCallback()
 
 // nsIPresentationServiceCallback
 NS_IMETHODIMP
-PresentationRequesterCallback::NotifySuccess()
+PresentationRequesterCallback::NotifySuccess(const nsAString& aUrl)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  RefPtr<PresentationConnection> connection =
-    PresentationConnection::Create(mRequest->GetOwner(), mSessionId, mUrl,
-                                   nsIPresentationService::ROLE_CONTROLLER);
-  if (NS_WARN_IF(!connection)) {
-    mPromise->MaybeReject(NS_ERROR_DOM_OPERATION_ERR);
-    return NS_OK;
+  if (aUrl.IsEmpty()) {
+    return NotifyError(NS_ERROR_DOM_OPERATION_ERR);
   }
 
+  RefPtr<PresentationConnection> connection =
+    PresentationConnection::Create(mRequest->GetOwner(), mSessionId, aUrl,
+                                   nsIPresentationService::ROLE_CONTROLLER);
+  if (NS_WARN_IF(!connection)) {
+    return NotifyError(NS_ERROR_DOM_OPERATION_ERR);
+  }
+
+  mRequest->NotifyPromiseSettled();
   mPromise->MaybeResolve(connection);
 
   return mRequest->DispatchConnectionAvailableEvent(connection);
@@ -66,6 +69,7 @@ PresentationRequesterCallback::NotifyError(nsresult aError)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
+  mRequest->NotifyPromiseSettled();
   mPromise->MaybeReject(aError);
   return NS_OK;
 }
@@ -79,11 +83,10 @@ NS_IMPL_ISUPPORTS_INHERITED0(PresentationReconnectCallback,
 
 PresentationReconnectCallback::PresentationReconnectCallback(
                                            PresentationRequest* aRequest,
-                                           const nsAString& aUrl,
                                            const nsAString& aSessionId,
                                            Promise* aPromise,
                                            PresentationConnection* aConnection)
-  : PresentationRequesterCallback(aRequest, aUrl, aSessionId, aPromise)
+  : PresentationRequesterCallback(aRequest, aSessionId, aPromise)
   , mConnection(aConnection)
 {
 }
@@ -93,7 +96,7 @@ PresentationReconnectCallback::~PresentationReconnectCallback()
 }
 
 NS_IMETHODIMP
-PresentationReconnectCallback::NotifySuccess()
+PresentationReconnectCallback::NotifySuccess(const nsAString& aUrl)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -108,6 +111,10 @@ PresentationReconnectCallback::NotifySuccess()
   // the session ID. Resolve the promise with this connection and dispatch
   // the event.
   if (mConnection) {
+    mConnection->NotifyStateChange(
+      mSessionId,
+      nsIPresentationSessionListener::STATE_CONNECTING,
+      NS_OK);
     mPromise->MaybeResolve(mConnection);
     rv = mRequest->DispatchConnectionAvailableEvent(mConnection);
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -116,12 +123,13 @@ PresentationReconnectCallback::NotifySuccess()
   } else {
     // Use |PresentationRequesterCallback::NotifySuccess| to create a new
     // connection since we don't find one that can be reused.
-    rv = PresentationRequesterCallback::NotifySuccess();
+    rv = PresentationRequesterCallback::NotifySuccess(aUrl);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
 
     rv = service->UpdateWindowIdBySessionId(mSessionId,
+                                            nsIPresentationService::ROLE_CONTROLLER,
                                             mRequest->GetOwner()->WindowID());
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
@@ -139,6 +147,12 @@ PresentationReconnectCallback::NotifySuccess()
 NS_IMETHODIMP
 PresentationReconnectCallback::NotifyError(nsresult aError)
 {
+  if (mConnection) {
+    mConnection->NotifyStateChange(
+      mSessionId,
+      nsIPresentationSessionListener::STATE_CLOSED,
+      aError);
+  }
   return PresentationRequesterCallback::NotifyError(aError);
 }
 
@@ -199,7 +213,11 @@ PresentationResponderLoadingCallback::NotifyReceiverReady(bool aIsLoading)
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  return service->NotifyReceiverReady(mSessionId, windowId, aIsLoading);
+  nsCOMPtr<nsIPresentationTransportBuilderConstructor> constructor =
+    PresentationTransportBuilderConstructor::Create();
+  return service->NotifyReceiverReady(mSessionId,
+                                      windowId,aIsLoading,
+                                      constructor);
 }
 
 // nsIWebProgressListener

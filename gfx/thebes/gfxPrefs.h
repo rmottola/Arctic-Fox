@@ -113,6 +113,9 @@ public:
     virtual bool HasDefaultValue() const = 0;
 
     // Returns the pref value as a discriminated union.
+    virtual void GetLiveValue(GfxPrefValue* aOutValue) const = 0;
+
+    // Returns the pref value as a discriminated union.
     virtual void GetCachedValue(GfxPrefValue* aOutValue) const = 0;
 
     // Change the cached value. GfxPrefValue must be a compatible type.
@@ -158,7 +161,7 @@ private:
     }
 
   protected:
-    T GetLiveValue(const char* aPrefName) const {
+    T GetLiveValueByName(const char* aPrefName) const {
       if (IsPrefsServiceAvailable()) {
         return PrefGet(aPrefName, mValue);
       }
@@ -228,11 +231,15 @@ private:
     const char *Name() const override {
       return Prefname();
     }
+    void GetLiveValue(GfxPrefValue* aOutValue) const override {
+      T value = GetLiveValue();
+      CopyPrefValue(&value, aOutValue);
+    }
     // When using the Preferences service, the change callback can be triggered
     // *before* our cached value is updated, so we expose a method to grab the
     // true live value.
     T GetLiveValue() const {
-      return BaseClass::GetLiveValue(Prefname());
+      return BaseClass::GetLiveValueByName(Prefname());
     }
     bool HasDefaultValue() const override {
       return this->mValue == Default();
@@ -262,6 +269,7 @@ private:
   DECL_GFX_PREF(Live, "apz.fling_accel_base_mult",             APZFlingAccelBaseMultiplier, float, 1.0f);
   DECL_GFX_PREF(Live, "apz.fling_accel_interval_ms",           APZFlingAccelInterval, int32_t, 500);
   DECL_GFX_PREF(Live, "apz.fling_accel_supplemental_mult",     APZFlingAccelSupplementalMultiplier, float, 1.0f);
+  DECL_GFX_PREF(Live, "apz.fling_accel_min_velocity",          APZFlingAccelMinVelocity, float, 1.5f);
   DECL_GFX_PREF(Once, "apz.fling_curve_function_x1",           APZCurveFunctionX1, float, 0.0f);
   DECL_GFX_PREF(Once, "apz.fling_curve_function_x2",           APZCurveFunctionX2, float, 1.0f);
   DECL_GFX_PREF(Once, "apz.fling_curve_function_y1",           APZCurveFunctionY1, float, 0.0f);
@@ -309,6 +317,7 @@ private:
   DECL_GFX_PREF(Live, "dom.meta-viewport.enabled",             MetaViewportEnabled, bool, false);
   DECL_GFX_PREF(Once, "dom.vr.enabled",                        VREnabled, bool, false);
   DECL_GFX_PREF(Once, "dom.vr.oculus.enabled",                 VROculusEnabled, bool, true);
+  DECL_GFX_PREF(Once, "dom.vr.openvr.enabled",                 VROpenVREnabled, bool, false);
   DECL_GFX_PREF(Once, "dom.vr.osvr.enabled",                   VROSVREnabled, bool, false);
   DECL_GFX_PREF(Live, "dom.vr.poseprediction.enabled",         VRPosePredictionEnabled, bool, false);
   DECL_GFX_PREF(Live, "dom.w3c_pointer_events.enabled",        PointerEventsEnabled, bool, false);
@@ -341,7 +350,7 @@ private:
 #if defined(ANDROID)
   DECL_GFX_PREF(Once, "gfx.apitrace.enabled",                  UseApitrace, bool, false);
 #endif
-#if defined(RELEASE_BUILD)
+#if defined(RELEASE_OR_BETA)
   // "Skip" means this is locked to the default value in beta and release.
   DECL_GFX_PREF(Skip, "gfx.blocklist.all",                     BlocklistAll, int32_t, 0);
 #else
@@ -362,11 +371,14 @@ private:
   // The zero default here should match QCMS_INTENT_DEFAULT from qcms.h
   DECL_GFX_PREF(Live, "gfx.color_management.rendering_intent", CMSRenderingIntent, int32_t, 0);
 
+  DECL_GFX_PREF(Once, "gfx.device-reset.limit",                DeviceResetLimitCount, int32_t, 10);
+  DECL_GFX_PREF(Once, "gfx.device-reset.threshold-ms",         DeviceResetThresholdMilliseconds, int32_t, -1);
+
   DECL_GFX_PREF(Once, "gfx.direct2d.disabled",                 Direct2DDisabled, bool, false);
   DECL_GFX_PREF(Once, "gfx.direct2d.force-enabled",            Direct2DForceEnabled, bool, false);
+  DECL_GFX_PREF(Live, "gfx.direct3d11.reuse-decoder-device",   Direct3D11ReuseDecoderDevice, int32_t, -1);
   DECL_GFX_PREF(Live, "gfx.draw-color-bars",                   CompositorDrawColorBars, bool, false);
   DECL_GFX_PREF(Once, "gfx.e10s.hide-plugins-for-scroll",      HidePluginsForScroll, bool, true);
-  DECL_GFX_PREF(Live, "gfx.gralloc.fence-with-readpixels",     GrallocFenceWithReadPixels, bool, false);
   DECL_GFX_PREF(Live, "gfx.layerscope.enabled",                LayerScopeEnabled, bool, false);
   DECL_GFX_PREF(Live, "gfx.layerscope.port",                   LayerScopePort, int32_t, 23456);
   // Note that        "gfx.logging.level" is defined in Logging.h.
@@ -383,6 +395,7 @@ private:
   DECL_GFX_PREF(Live, "gfx.SurfaceTexture.detach.enabled",     SurfaceTextureDetachEnabled, bool, true);
   DECL_GFX_PREF(Live, "gfx.testing.device-reset",              DeviceResetForTesting, int32_t, 0);
   DECL_GFX_PREF(Live, "gfx.testing.device-fail",               DeviceFailForTesting, bool, false);
+  DECL_GFX_PREF(Once, "gfx.text.disable-aa",                   DisableAllTextAA, bool, false);
   DECL_GFX_PREF(Live, "gfx.ycbcr.accurate-conversion",         YCbCrAccurateConversion, bool, false);
 
   DECL_GFX_PREF(Live, "gfx.content.use-native-pushlayer",      UseNativePushLayer, bool, false);
@@ -402,8 +415,6 @@ private:
   DECL_GFX_PREF(Once, "gfx.touch.resample.vsync-adjust",       TouchVsyncSampleAdjust, int32_t, 5);
 
   DECL_GFX_PREF(Live, "gfx.vsync.collect-scroll-transforms",   CollectScrollTransforms, bool, false);
-  // On b2g, in really bad cases, I've seen up to 80 ms delays between touch events and the main thread
-  // processing them. So 80 ms / 16 = 5 vsync events. Double it up just to be on the safe side, so 10.
   DECL_GFX_PREF(Once, "gfx.vsync.compositor.unobserve-count",  CompositorUnobserveCount, int32_t, 10);
   // Use vsync events generated by hardware
   DECL_GFX_PREF(Once, "gfx.work-around-driver-bugs",           WorkAroundDriverBugs, bool, true);
@@ -477,8 +488,9 @@ private:
   DECL_GFX_PREF(Once, "layers.force-shmem-tiles",              ForceShmemTiles, bool, false);
   DECL_GFX_PREF(Live, "layers.frame-counter",                  DrawFrameCounter, bool, false);
   DECL_GFX_PREF(Once, "layers.gpu-process.dev.enabled",        GPUProcessDevEnabled, bool, false);
+  DECL_GFX_PREF(Once, "layers.gpu-process.dev.force-enabled",  GPUProcessDevForceEnabled, bool, false);
   DECL_GFX_PREF(Once, "layers.gpu-process.dev.timeout_ms",     GPUProcessDevTimeoutMs, int32_t, 5000);
-  DECL_GFX_PREF(Once, "layers.gralloc.disable",                DisableGralloc, bool, false);
+  DECL_GFX_PREF(Live, "layers.gpu-process.dev.max_restarts",   GPUProcessDevMaxRestarts, int32_t, 0);
   DECL_GFX_PREF(Live, "layers.low-precision-buffer",           UseLowPrecisionBuffer, bool, false);
   DECL_GFX_PREF(Live, "layers.low-precision-opacity",          LowPrecisionOpacity, float, 1.0f);
   DECL_GFX_PREF(Live, "layers.low-precision-resolution",       LowPrecisionResolution, float, 0.25f);
@@ -486,7 +498,6 @@ private:
   DECL_GFX_PREF(Once, "layers.offmainthreadcomposition.force-disabled", LayersOffMainThreadCompositionForceDisabled, bool, false);
   DECL_GFX_PREF(Live, "layers.offmainthreadcomposition.frame-rate", LayersCompositionFrameRate, int32_t,-1);
   DECL_GFX_PREF(Live, "layers.orientation.sync.timeout",       OrientationSyncMillis, uint32_t, (uint32_t)0);
-  DECL_GFX_PREF(Once, "layers.overzealous-gralloc-unlocking",  OverzealousGrallocUnlocking, bool, false);
   DECL_GFX_PREF(Once, "layers.prefer-d3d9",                    LayersPreferD3D9, bool, false);
   DECL_GFX_PREF(Once, "layers.prefer-opengl",                  LayersPreferOpenGL, bool, false);
   DECL_GFX_PREF(Live, "layers.progressive-paint",              ProgressivePaint, bool, false);
@@ -510,6 +521,7 @@ private:
   DECL_GFX_PREF(Live, "layers.transaction.warning-ms",         LayerTransactionWarning, uint32_t, 200);
   DECL_GFX_PREF(Once, "layers.uniformity-info",                UniformityInfo, bool, false);
   DECL_GFX_PREF(Once, "layers.use-image-offscreen-surfaces",   UseImageOffscreenSurfaces, bool, true);
+  DECL_GFX_PREF(Live, "layers.draw-mask-debug",                DrawMaskLayer, bool, false);
 
   DECL_GFX_PREF(Live, "layout.css.scroll-behavior.damping-ratio", ScrollBehaviorDampingRatio, float, 1.0f);
   DECL_GFX_PREF(Live, "layout.css.scroll-behavior.enabled",    ScrollBehaviorEnabled, bool, true);
@@ -529,6 +541,12 @@ private:
 
   DECL_GFX_PREF(Once, "media.hardware-video-decoding.force-enabled",
                                                                HardwareVideoDecodingForceEnabled, bool, false);
+#ifdef XP_WIN
+  DECL_GFX_PREF(Live, "media.windows-media-foundation.allow-d3d11-dxva", PDMWMFAllowD3D11, bool, true);
+  DECL_GFX_PREF(Live, "media.windows-media-foundation.max-dxva-videos", PDMWMFMaxDXVAVideos, uint32_t, 8);
+  DECL_GFX_PREF(Live, "media.wmf.low-latency.enabled", PDMWMFLowLatencyEnabled, bool, false);
+  DECL_GFX_PREF(Live, "media.wmf.skip-blacklist", PDMWMFSkipBlacklist, bool, false);
+#endif
 
   // These affect how line scrolls from wheel events will be accelerated.
   DECL_GFX_PREF(Live, "mousewheel.acceleration.factor",        MouseWheelAccelerationFactor, int32_t, -1);
@@ -537,6 +555,10 @@ private:
   // This affects whether events will be routed through APZ or not.
   DECL_GFX_PREF(Live, "mousewheel.system_scroll_override_on_root_content.enabled",
                                                                MouseWheelHasRootScrollDeltaOverride, bool, false);
+  DECL_GFX_PREF(Live, "mousewheel.system_scroll_override_on_root_content.horizontal.factor",
+                                                               MouseWheelRootScrollHorizontalFactor, int32_t, 0);
+  DECL_GFX_PREF(Live, "mousewheel.system_scroll_override_on_root_content.vertical.factor",
+                                                               MouseWheelRootScrollVerticalFactor, int32_t, 0);
   DECL_GFX_PREF(Live, "mousewheel.transaction.ignoremovedelay",MouseWheelIgnoreMoveDelayMs, int32_t, (int32_t)100);
   DECL_GFX_PREF(Live, "mousewheel.transaction.timeout",        MouseWheelTransactionTimeoutMs, int32_t, (int32_t)1500);
 

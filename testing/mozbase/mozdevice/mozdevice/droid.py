@@ -16,6 +16,7 @@ from devicemanagerADB import DeviceManagerADB
 from devicemanagerSUT import DeviceManagerSUT
 from devicemanager import DMError
 
+
 class DroidMixin(object):
     """Mixin to extend DeviceManager with Android-specific functionality"""
 
@@ -46,7 +47,7 @@ class DroidMixin(object):
             raise DMError("Only one instance of an application may be running "
                           "at once")
 
-        acmd = [ "am", "start" ] + self._getExtraAmStartArgs() + \
+        acmd = ["am", "start"] + self._getExtraAmStartArgs() + \
             ["-W" if wait else '', "-n", "%s/%s" % (appName, activityName)]
 
         if intent:
@@ -134,7 +135,8 @@ class DroidMixin(object):
         """
         version = self.shellCheckOutput(["getprop", "ro.build.version.sdk"])
         if int(version) >= version_codes.HONEYCOMB:
-            self.shellCheckOutput([ "am", "force-stop", appName ], root=self._stopApplicationNeedsRoot)
+            self.shellCheckOutput(["am", "force-stop", appName],
+                                  root=self._stopApplicationNeedsRoot)
         else:
             num_tries = 0
             max_tries = 5
@@ -150,6 +152,7 @@ class DroidMixin(object):
                 # (this is not 100% guaranteed to work since it is inherently
                 # racey, but it's the best we can do)
                 time.sleep(1)
+
 
 class DroidADB(DeviceManagerADB, DroidMixin):
 
@@ -194,6 +197,7 @@ class DroidADB(DeviceManagerADB, DroidMixin):
         # relying on convention
         return '/data/data/%s' % packageName
 
+
 class DroidSUT(DeviceManagerSUT, DroidMixin):
 
     def _getExtraAmStartArgs(self):
@@ -205,29 +209,32 @@ class DroidSUT(DeviceManagerSUT, DroidMixin):
             infoDict = self.getInfo(directive="sutuserinfo")
             if infoDict.get('sutuserinfo') and \
                     len(infoDict['sutuserinfo']) > 0:
-               userSerialString = infoDict['sutuserinfo'][0]
-               # user serial always an integer, see: http://developer.android.com/reference/android/os/UserManager.html#getSerialNumberForUser%28android.os.UserHandle%29
-               m = re.match('User Serial:([0-9]+)', userSerialString)
-               if m:
-                   self._userSerial = m.group(1)
-               else:
-                   self._userSerial = None
+                userSerialString = infoDict['sutuserinfo'][0]
+                # user serial always an integer, see:
+                # http://developer.android.com/reference/android/os/UserManager.html#getSerialNumberForUser%28android.os.UserHandle%29
+                m = re.match('User Serial:([0-9]+)', userSerialString)
+                if m:
+                    self._userSerial = m.group(1)
+                else:
+                    self._userSerial = None
             else:
                 self._userSerial = None
 
         if self._userSerial is not None:
-            return [ "--user", self._userSerial ]
+            return ["--user", self._userSerial]
 
         return []
 
     def getTopActivity(self):
-        return self._runCmds([{ 'cmd': "activity" }]).strip()
+        return self._runCmds([{'cmd': "activity"}]).strip()
 
     def getAppRoot(self, packageName):
-        return self._runCmds([{ 'cmd': 'getapproot %s' % packageName }]).strip()
+        return self._runCmds([{'cmd': 'getapproot %s' % packageName}]).strip()
+
 
 def DroidConnectByHWID(hwid, timeout=30, **kwargs):
-    """Try to connect to the given device by waiting for it to show up using mDNS with the given timeout."""
+    """Try to connect to the given device by waiting for it to show up using
+    mDNS with the given timeout."""
     zc = Zeroconf(moznetwork.get_ip())
 
     evt = threading.Event()

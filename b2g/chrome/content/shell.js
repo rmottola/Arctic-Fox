@@ -6,8 +6,6 @@
 
 window.performance.mark('gecko-shell-loadstart');
 
-Cu.import('resource://gre/modules/ContactService.jsm');
-Cu.import('resource://gre/modules/AlarmService.jsm');
 Cu.import('resource://gre/modules/NotificationDB.jsm');
 Cu.import("resource://gre/modules/AppsUtils.jsm");
 Cu.import('resource://gre/modules/UserAgentOverrides.jsm');
@@ -366,7 +364,6 @@ var shell = {
       document.createElementNS('http://www.w3.org/1999/xhtml', 'html:iframe');
     systemAppFrame.setAttribute('id', 'systemapp');
     systemAppFrame.setAttribute('mozbrowser', 'true');
-    systemAppFrame.setAttribute('mozapp', manifestURL);
     systemAppFrame.setAttribute('allowfullscreen', 'true');
     systemAppFrame.setAttribute('src', 'blank.html');
     let container = document.getElementById('container');
@@ -726,8 +723,6 @@ var shell = {
 
     Services.obs.notifyObservers(null, 'content-start', null);
 
-    isGonk && Cu.import('resource://gre/modules/OperatorApps.jsm');
-
     if (AppConstants.MOZ_GRAPHENE &&
         Services.prefs.getBoolPref("b2g.nativeWindowGeometry.fullscreen")) {
       window.fullScreen = true;
@@ -1031,9 +1026,6 @@ window.addEventListener('ContentStart', function cr_onContentStart() {
 });
 
 window.addEventListener('ContentStart', function update_onContentStart() {
-  Cu.import('resource://gre/modules/WebappsUpdater.jsm');
-  WebappsUpdater.handleContentStart(shell);
-
   if (!AppConstants.MOZ_UPDATER) {
     return;
   }

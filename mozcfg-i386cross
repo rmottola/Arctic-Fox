@@ -15,7 +15,6 @@ ac_add_options --disable-applemedia
 ac_add_options --disable-webrtc
 ac_add_options --disable-safe-browsing
 ac_add_options --disable-necko-wifi
-ac_add_options --disable-eme
 ac_add_options --disable-gamepad
 ac_add_options --enable-strip
 ac_add_options --enable-application=browser

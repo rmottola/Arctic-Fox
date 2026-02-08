@@ -787,6 +787,15 @@ HandleException(ResumeFromException* rfe)
             IonScript* ionScript = nullptr;
             bool invalidated = iter.checkInvalidation(&ionScript);
 
+#ifdef JS_TRACE_LOGGING
+            if (logger && cx->compartment()->isDebuggee() && logger->enabled()) {
+                logger->disable(/* force = */ true,
+                                "Forcefully disabled tracelogger, due to "
+                                "throwing an exception with an active Debugger "
+                                "in IonMonkey.");
+            }
+#endif
+
             for (;;) {
                 HandleExceptionIon(cx, frames, rfe, &overrecursed);
 
@@ -1060,17 +1069,16 @@ MarkIonJSFrame(JSTracer* trc, const JitFrameIterator& frame)
 #ifdef JS_NUNBOX32
     LAllocation type, payload;
     while (safepoint.getNunboxSlot(&type, &payload)) {
-        jsval_layout layout;
-        layout.s.tag = (JSValueTag)ReadAllocation(frame, &type);
-        layout.s.payload.uintptr = ReadAllocation(frame, &payload);
+        JSValueTag tag = JSValueTag(ReadAllocation(frame, &type));
+        uintptr_t rawPayload = ReadAllocation(frame, &payload);
 
-        Value v = IMPL_TO_JSVAL(layout);
+        Value v = Value::fromTagAndPayload(tag, rawPayload);
         TraceRoot(trc, &v, "ion-torn-value");
 
-        if (v != IMPL_TO_JSVAL(layout)) {
+        if (v != Value::fromTagAndPayload(tag, rawPayload)) {
             // GC moved the value, replace the stored payload.
-            layout = JSVAL_TO_IMPL(v);
-            WriteAllocation(frame, &payload, layout.s.payload.uintptr);
+            rawPayload = *v.payloadUIntPtr();
+            WriteAllocation(frame, &payload, rawPayload);
         }
     }
 #endif
@@ -1167,7 +1175,7 @@ MarkJitStubFrame(JSTracer* trc, const JitFrameIterator& frame)
     JitStubFrameLayout* layout = (JitStubFrameLayout*)frame.fp();
 
     if (ICStub* stub = layout->maybeStubPtr()) {
-        MOZ_ASSERT(ICStub::CanMakeCalls(stub->kind()));
+        MOZ_ASSERT(stub->makesGCCalls());
         stub->trace(trc);
     }
 }
@@ -1820,48 +1828,36 @@ SnapshotIterator::allocationValue(const RValueAllocation& alloc, ReadMethod rm)
 #if defined(JS_NUNBOX32)
       case RValueAllocation::UNTYPED_REG_REG:
       {
-        jsval_layout layout;
-        layout.s.tag = (JSValueTag) fromRegister(alloc.reg());
-        layout.s.payload.word = fromRegister(alloc.reg2());
-        return IMPL_TO_JSVAL(layout);
+        return Value::fromTagAndPayload(JSValueTag(fromRegister(alloc.reg())),
+                                        fromRegister(alloc.reg2()));
       }
 
       case RValueAllocation::UNTYPED_REG_STACK:
       {
-        jsval_layout layout;
-        layout.s.tag = (JSValueTag) fromRegister(alloc.reg());
-        layout.s.payload.word = fromStack(alloc.stackOffset2());
-        return IMPL_TO_JSVAL(layout);
+        return Value::fromTagAndPayload(JSValueTag(fromRegister(alloc.reg())),
+                                        fromStack(alloc.stackOffset2()));
       }
 
       case RValueAllocation::UNTYPED_STACK_REG:
       {
-        jsval_layout layout;
-        layout.s.tag = (JSValueTag) fromStack(alloc.stackOffset());
-        layout.s.payload.word = fromRegister(alloc.reg2());
-        return IMPL_TO_JSVAL(layout);
+        return Value::fromTagAndPayload(JSValueTag(fromStack(alloc.stackOffset())),
+                                        fromRegister(alloc.reg2()));
       }
 
       case RValueAllocation::UNTYPED_STACK_STACK:
       {
-        jsval_layout layout;
-        layout.s.tag = (JSValueTag) fromStack(alloc.stackOffset());
-        layout.s.payload.word = fromStack(alloc.stackOffset2());
-        return IMPL_TO_JSVAL(layout);
+        return Value::fromTagAndPayload(JSValueTag(fromStack(alloc.stackOffset())),
+                                        fromStack(alloc.stackOffset2()));
       }
 #elif defined(JS_PUNBOX64)
       case RValueAllocation::UNTYPED_REG:
       {
-        jsval_layout layout;
-        layout.asBits = fromRegister(alloc.reg());
-        return IMPL_TO_JSVAL(layout);
+        return Value::fromRawBits(fromRegister(alloc.reg()));
       }
 
       case RValueAllocation::UNTYPED_STACK:
       {
-        jsval_layout layout;
-        layout.asBits = fromStack(alloc.stackOffset());
-        return IMPL_TO_JSVAL(layout);
+        return Value::fromRawBits(fromStack(alloc.stackOffset()));
       }
 #endif
 
@@ -1917,7 +1913,7 @@ SnapshotIterator::maybeRead(const RValueAllocation& a, MaybeReadFallback& fallba
 }
 
 void
-SnapshotIterator::writeAllocationValuePayload(const RValueAllocation& alloc, Value v)
+SnapshotIterator::writeAllocationValuePayload(const RValueAllocation& alloc, const Value& v)
 {
     uintptr_t payload = *v.payloadUIntPtr();
 #if defined(JS_PUNBOX64)
@@ -2135,7 +2131,7 @@ SnapshotIterator::computeInstructionResults(JSContext* cx, RInstructionResults* 
 }
 
 void
-SnapshotIterator::storeInstructionResult(Value v)
+SnapshotIterator::storeInstructionResult(const Value& v)
 {
     uint32_t currIns = recover_.numInstructionsRead() - 1;
     MOZ_ASSERT((*instructionResults_)[currIns].isMagic(JS_ION_BAILOUT));
@@ -2365,7 +2361,7 @@ InlineFrameIterator::findNextFrame()
         // Inlined functions may be clones that still point to the lazy script
         // for the executed script, if they are clones. The actual script
         // exists though, just make sure the function points to it.
-        script_ = calleeTemplate_->existingScriptForInlinedFunction();
+        script_ = calleeTemplate_->existingScript();
         MOZ_ASSERT(script_->hasBaselineScript());
 
         pc_ = script_->offsetToPC(si_.pcOffset());
@@ -2396,7 +2392,8 @@ InlineFrameIterator::callee(MaybeReadFallback& fallback) const
 }
 
 JSObject*
-InlineFrameIterator::computeEnvironmentChain(Value envChainValue, MaybeReadFallback& fallback,
+InlineFrameIterator::computeEnvironmentChain(const Value& envChainValue,
+                                             MaybeReadFallback& fallback,
                                              bool* hasInitialEnv) const
 {
     if (envChainValue.isObject()) {

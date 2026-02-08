@@ -6,9 +6,6 @@
 
 TEST_DIRS += [
     'external',
-    'component',
-    'bug656331_component',
-    'component_no_aslr',
     'gtest',
 ]
 
@@ -30,7 +27,6 @@ SimplePrograms([
     'TestRacingServiceManager',
     'TestRegistrationOrder',
     'TestThreadPoolListener',
-    'TestTimers',
     'TestUnicodeArguments',
 ])
 
@@ -50,7 +46,6 @@ GeckoCppUnitTests([
     'ShowAlignments',
     'TestAutoPtr',
     'TestAutoRef',
-    'TestCOMArray',
     'TestCOMPtr',
     'TestCOMPtrEq',
     'TestFile',
@@ -63,7 +58,8 @@ GeckoCppUnitTests([
     'TestStringAPI',
     'TestTArray',
     'TestTextFormatter',
-    'TestThreadUtils'
+    'TestThreadUtils',
+    'TestTimers'
 ])
 
 if CONFIG['MOZ_MEMORY']:

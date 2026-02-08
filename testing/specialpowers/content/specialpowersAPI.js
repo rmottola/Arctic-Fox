@@ -503,6 +503,13 @@ SpecialPowersAPI.prototype = {
         listeners.push({ name: name, listener: listener });
       },
 
+      promiseOneMessage: name => new Promise(resolve => {
+        chromeScript.addMessageListener(name, function listener(message) {
+          chromeScript.removeMessageListener(name, listener);
+          resolve(message);
+        });
+      }),
+
       removeMessageListener: (name, listener) => {
         listeners = listeners.filter(
           o => (o.name != name || o.listener != listener)
@@ -620,8 +627,10 @@ SpecialPowersAPI.prototype = {
    * Try will tell what needs to be fixed up.
    */
   getFullComponents: function() {
-    return typeof this.Components.classes == 'object' ? this.Components
-                                                      : Components;
+    if (this.Components && typeof this.Components.classes == 'object') {
+      return this.Components;
+    }
+    return Components;
   },
 
   /*
@@ -630,7 +639,8 @@ SpecialPowersAPI.prototype = {
    * to untrusted content, and wrapping it confuses QI and identity checks.
    */
   get Cc() { return wrapPrivileged(this.getFullComponents().classes); },
-  get Ci() { return this.Components.interfaces; },
+  get Ci() { return this.Components ? this.Components.interfaces
+                                    : Components.interfaces; },
   get Cu() { return wrapPrivileged(this.getFullComponents().utils); },
   get Cr() { return wrapPrivileged(this.Components.results); },
 
@@ -1162,50 +1172,6 @@ SpecialPowersAPI.prototype = {
     }
   },
 
-  // Disables the app install prompt for the duration of this test. There is
-  // no need to re-enable the prompt at the end of the test.
-  //
-  // The provided callback is invoked once the prompt is disabled.
-  autoConfirmAppInstall: function(cb) {
-    this.pushPrefEnv({set: [['dom.mozApps.auto_confirm_install', true]]}, cb);
-  },
-
-  autoConfirmAppUninstall: function(cb) {
-    this.pushPrefEnv({set: [['dom.mozApps.auto_confirm_uninstall', true]]}, cb);
-  },
-
-  // Allow tests to install addons without signing the package, for convenience.
-  allowUnsignedAddons: function() {
-    this._sendSyncMessage("SPWebAppService", {
-      op: "allow-unsigned-addons"
-    });
-  },
-
-  // Turn on debug information from UserCustomizations.jsm
-  debugUserCustomizations: function(value) {
-    this._sendSyncMessage("SPWebAppService", {
-      op: "debug-customizations",
-      value: value
-    });
-  },
-
-  // Force-registering an app in the registry
-  injectApp: function(aAppId, aApp) {
-    this._sendSyncMessage("SPWebAppService", {
-      op: "inject-app",
-      appId: aAppId,
-      app: aApp
-    });
-  },
-
-  // Removing app from the registry
-  rejectApp: function(aAppId) {
-    this._sendSyncMessage("SPWebAppService", {
-      op: "reject-app",
-      appId: aAppId
-    });
-  },
-
   _proxiedObservers: {
     "specialpowers-http-notify-request": function(aMessage) {
       let uri = aMessage.json.uri;
@@ -1496,13 +1462,12 @@ SpecialPowersAPI.prototype = {
   // needs to run several times and when no other JS is running.
   // The current number of iterations has been determined according to massive
   // cross platform testing.
-  exactGC: function(win, callback) {
-    var self = this;
+  exactGC: function(callback) {
     let count = 0;
 
     function genGCCallback(cb) {
       return function() {
-        self.getDOMWindowUtils(win).cycleCollect();
+        Cu.forceCC();
         if (++count < 2) {
           Cu.schedulePreciseGC(genGCCallback(cb));
         } else if (cb) {
@@ -2093,11 +2058,6 @@ SpecialPowersAPI.prototype = {
   observeMutationEvents: function(mo, node, nativeAnonymousChildList, subtree) {
     unwrapIfWrapped(mo).observe(unwrapIfWrapped(node),
                                 {nativeAnonymousChildList, subtree});
-  },
-
-  clearAppPrivateData: function(appId, browserOnly) {
-    return this._sendAsyncMessage('SPClearAppPrivateData',
-                                  { appId: appId, browserOnly: browserOnly });
   },
 };
 

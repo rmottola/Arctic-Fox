@@ -26,11 +26,14 @@ function testSetup() {
 
     request.getAvailability().then(
       function(aAvailability) {
+        is(aAvailability.value, false, "Sender: should have no available device after setup");
         aAvailability.onchange = function() {
           aAvailability.onchange = null;
           ok(aAvailability.value, "Device should be available.");
           aResolve();
         }
+
+        gScript.sendAsyncMessage('trigger-device-add');
       },
       function(aError) {
         ok(false, "Error occurred when getting availability: " + aError);
@@ -38,8 +41,6 @@ function testSetup() {
         aReject();
       }
     );
-
-    gScript.sendAsyncMessage('trigger-device-add');
   });
 }
 
@@ -157,20 +158,20 @@ function testIncomingMessage() {
   });
 }
 
-function testTerminateConnection() {
+function testCloseConnection() {
   return new Promise(function(aResolve, aReject) {
     frameScript.addMessageListener('data-transport-closed', function dataTransportClosedHandler(aReason) {
       frameScript.removeMessageListener('data-transport-closed', dataTransportClosedHandler);
       info("The data transport is closed. " + aReason);
     });
 
-    connection.onterminate = function() {
-      connection.onterminate = null;
-      is(connection.state, "terminated", "Connection should be terminated.");
+    connection.onclose = function() {
+      connection.onclose = null;
+      is(connection.state, "closed", "Connection should be closed.");
       aResolve();
     };
 
-    connection.terminate();
+    connection.close();
   });
 }
 
@@ -184,7 +185,7 @@ function testReconnect() {
 
     gScript.addMessageListener('start-reconnect', function startReconnectHandler(url) {
       gScript.removeMessageListener('start-reconnect', startReconnectHandler);
-      is(url, "http://example.com", "URLs should be the same.")
+      is(url, "http://example.com/", "URLs should be the same.")
       gScript.sendAsyncMessage('trigger-reconnected-acked', url);
     });
 
@@ -237,6 +238,30 @@ function teardown() {
   gScript.sendAsyncMessage('teardown');
 }
 
+function testConstructRequestError() {
+  return Promise.all([
+    // XXX: Bug 1305204 - uncomment when bug 1275746 is fixed again.
+    // new Promise(function(aResolve, aReject) {
+    //   try {
+    //     request = new PresentationRequest("\\\\\\");
+    //   }
+    //   catch(e) {
+    //     is(e.name, "SyntaxError", "Expect to get SyntaxError.");
+    //     aResolve();
+    //   }
+    // }),
+    new Promise(function(aResolve, aReject) {
+      try {
+        request = new PresentationRequest([]);
+      }
+      catch(e) {
+        is(e.name, "NotSupportedError", "Expect to get NotSupportedError.");
+        aResolve();
+      }
+    }),
+  ]);
+}
+
 function runTests() {
   ok(window.PresentationRequest, "PresentationRequest should be available.");
 
@@ -244,7 +269,10 @@ function runTests() {
   then(testStartConnection).
   then(testSend).
   then(testIncomingMessage).
-  then(testTerminateConnection).
+  then(testCloseConnection).
+  then(testReconnect).
+  then(testCloseConnection).
+  then(testConstructRequestError).
   then(teardown);
 }
 
