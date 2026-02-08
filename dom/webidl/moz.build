@@ -80,6 +80,7 @@ WEBIDL_FILES = [
     'Comment.webidl',
     'CompositionEvent.webidl',
     'Console.webidl',
+    'ConstantSourceNode.webidl',
     'ContainerBoxObject.webidl',
     'ConvolverNode.webidl',
     'Coordinates.webidl',
