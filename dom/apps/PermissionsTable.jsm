@@ -167,11 +167,6 @@ this.PermissionsTable =  { geolocation: {
                              privileged: DENY_ACTION,
                              certified: ALLOW_ACTION
                            },
-                           phonenumberservice: {
-                             app: DENY_ACTION,
-                             privileged: DENY_ACTION,
-                             certified: ALLOW_ACTION
-                           },
                            fmradio: {
                              app: DENY_ACTION,
                              privileged: ALLOW_ACTION,
