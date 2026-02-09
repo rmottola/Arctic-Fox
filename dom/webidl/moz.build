@@ -251,7 +251,6 @@ WEBIDL_FILES = [
     'HTMLVideoElement.webidl',
     'IDBCursor.webidl',
     'IDBDatabase.webidl',
-    'IDBEnvironment.webidl',
     'IDBFactory.webidl',
     'IDBFileHandle.webidl',
     'IDBFileRequest.webidl',
