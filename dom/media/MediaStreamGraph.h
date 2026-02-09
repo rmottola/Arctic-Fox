@@ -1349,6 +1349,7 @@ public:
    */
   virtual void DispatchToMainThreadAfterStreamStateUpdate(already_AddRefed<nsIRunnable> aRunnable)
   {
+    AssertOnGraphThreadOrNotRunning();
     *mPendingUpdateRunnables.AppendElement() = aRunnable;
   }
 
@@ -1369,6 +1370,8 @@ public:
    */
   void NotifyOutputData(AudioDataValue* aBuffer, size_t aFrames,
                         TrackRate aRate, uint32_t aChannels);
+
+  void AssertOnGraphThreadOrNotRunning() const;
 
 protected:
   explicit MediaStreamGraph(TrackRate aSampleRate)
