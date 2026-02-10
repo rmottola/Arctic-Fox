@@ -3058,6 +3058,24 @@ nsRange::GetClientRects(bool aClampToEdge, bool aFlushLayout)
   return rectList.forget();
 }
 
+void
+nsRange::GetClientRectsAndTexts(
+  mozilla::dom::ClientRectsAndTexts& aResult,
+  ErrorResult& aErr)
+{
+  if (!mStartParent) {
+    return;
+  }
+
+  aResult.mRectList = new DOMRectList(static_cast<nsIDOMRange*>(this));
+  aResult.mTextList = new DOMStringList();
+
+  nsLayoutUtils::RectListBuilder builder(aResult.mRectList);
+
+  CollectClientRectsAndText(&builder, aResult.mTextList, this,
+    mStartParent, mStartOffset, mEndParent, mEndOffset, true, true);
+}
+
 NS_IMETHODIMP
 nsRange::GetUsedFontFaces(nsIDOMFontFaceList** aResult)
 {
