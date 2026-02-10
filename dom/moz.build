@@ -93,7 +93,6 @@ DIRS += [
     'xml',
     'xslt',
     'xul',
-    'resourcestats',
     'manifest',
     'vr',
     'u2f',
