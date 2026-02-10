@@ -990,7 +990,7 @@ IDBTransaction::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 }
 
 nsresult
-IDBTransaction::PreHandleEvent(EventChainPreVisitor& aVisitor)
+IDBTransaction::GetEventTargetParent(EventChainPreVisitor& aVisitor)
 {
   AssertIsOnOwningThread();
 

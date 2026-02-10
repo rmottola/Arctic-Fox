@@ -814,7 +814,7 @@ public:
   NS_DECL_NSIDOMDOCUMENTXBL
 
   // nsIDOMEventTarget
-  virtual nsresult PreHandleEvent(
+  virtual nsresult GetEventTargetParent(
                      mozilla::EventChainPreVisitor& aVisitor) override;
   virtual mozilla::EventListenerManager*
     GetOrCreateListenerManager() override;
