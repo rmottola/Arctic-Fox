@@ -2627,9 +2627,6 @@ PDeviceStorageRequestParent*
 ContentParent::AllocPDeviceStorageRequestParent(const DeviceStorageParams& aParams)
 {
   RefPtr<DeviceStorageRequestParent> result = new DeviceStorageRequestParent(aParams);
-  if (!result->EnsureRequiredPermissions(this)) {
-    return nullptr;
-  }
   result->Dispatch();
   return result.forget().take();
 }
