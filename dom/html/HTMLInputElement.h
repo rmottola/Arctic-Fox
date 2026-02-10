@@ -185,6 +185,7 @@ public:
 
   virtual nsresult GetEventTargetParent(
                      EventChainPreVisitor& aVisitor) override;
+  virtual nsresult PreHandleEvent(EventChainVisitor& aVisitor) override;
   virtual nsresult PostHandleEvent(
                      EventChainPostVisitor& aVisitor) override;
   void PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor);
