@@ -10,13 +10,7 @@ MOCHITEST_CHROME_MANIFESTS += [
     'tests/chrome.ini'
 ]
 
-EXTRA_COMPONENTS += [
-    'AppsService.js',
-    'AppsService.manifest',
-]
-
 EXTRA_JS_MODULES += [
-    'AppsServiceChild.jsm',
     'PermissionsTable.jsm',
 ]
 
