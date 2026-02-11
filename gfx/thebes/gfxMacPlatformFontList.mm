@@ -1059,7 +1059,7 @@ gfxMacPlatformFontList::AddFamily(CFStringRef aFamily)
     nsAutoString key;
     ToLowerCase(familyName, key);
 
-    gfxFontFamily* familyEntry = new gfxMacFontFamily(familyName, sizeHint);
+    RefPtr<gfxFontFamily> familyEntry = new gfxMacFontFamily(familyName, sizeHint);
     table.Put(key, familyEntry);
 
     // check the bad underline blacklist
@@ -1071,7 +1071,7 @@ gfxMacPlatformFontList::AddFamily(CFStringRef aFamily)
 #if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
 #endif
 nsresult
-gfxMacPlatformFontList::InitFontList()
+gfxMacPlatformFontList::InitFontListForPlatform()
 {
     nsAutoreleasePool localPool;
 
@@ -1087,8 +1087,7 @@ gfxMacPlatformFontList::InitFontList()
     mATSGeneration = currentGeneration;
 #endif
 
-    // reset font lists
-    gfxPlatformFontList::InitFontList();
+    // reset system font list
     mSystemFontFamilies.Clear();
     
 #if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
@@ -1175,7 +1174,7 @@ gfxMacPlatformFontList::InitSingleFaceList()
 
             // add only if doesn't exist already
             if (!mFontFamilies.GetWeak(key)) {
-                gfxFontFamily *familyEntry =
+                RefPtr<gfxFontFamily> familyEntry =
                     new gfxSingleFaceMacFontFamily(familyName);
                 // LookupLocalFont sets this, need to clear
                 fontEntry->mIsLocalUserFont = false;
@@ -1325,7 +1324,8 @@ gfxMacPlatformFontList::GlobalFontFallback(const uint32_t aCh,
                                            uint32_t& aCmapCount,
                                            gfxFontFamily** aMatchedFamily)
 {
-    bool useCmaps = gfxPlatform::GetPlatform()->UseCmapsDuringSystemFallback();
+    bool useCmaps = IsFontFamilyWhitelistActive() ||
+                    gfxPlatform::GetPlatform()->UseCmapsDuringSystemFallback();
 
     if (useCmaps) {
         return gfxPlatformFontList::GlobalFontFallback(aCh,
@@ -1415,7 +1415,7 @@ gfxMacPlatformFontList::GlobalFontFallback(const uint32_t aCh,
 }
 
 gfxFontFamily*
-gfxMacPlatformFontList::GetDefaultFont(const gfxFontStyle* aStyle)
+gfxMacPlatformFontList::GetDefaultFontForPlatform(const gfxFontStyle* aStyle)
 {
     nsAutoreleasePool localPool;
 
