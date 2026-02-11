@@ -96,8 +96,6 @@
 #include "TexturePoolOGL.h"
 #endif
 
-#include "mozilla/Hal.h"
-
 #ifdef USE_SKIA
 # ifdef __GNUC__
 #  pragma GCC diagnostic push
@@ -140,6 +138,7 @@ class mozilla::gl::SkiaGLGlue : public GenericAtomicRefCounted {
 #include "gfxVR.h"
 #include "VRManagerChild.h"
 #include "mozilla/gfx/GPUParent.h"
+#include "prsystem.h"
 
 namespace mozilla {
 namespace layers {
@@ -523,7 +522,8 @@ gfxPlatform::gfxPlatform()
 #endif
     InitBackendPrefs(canvasMask, BackendType::CAIRO,
                      contentMask, BackendType::CAIRO);
-    mTotalSystemMemory = mozilla::hal::GetTotalSystemMemory();
+
+    mTotalSystemMemory = PR_GetPhysicalMemorySize();
 
     VRManager::ManagerInit();
 }
@@ -1287,7 +1287,7 @@ gfxPlatform::InitializeSkiaCacheLimits()
 #ifdef USE_SKIA_GPU
     bool usingDynamicCache = gfxPrefs::CanvasSkiaGLDynamicCache();
     int cacheItemLimit = gfxPrefs::CanvasSkiaGLCacheItems();
-    int cacheSizeLimit = gfxPrefs::CanvasSkiaGLCacheSize();
+    uint64_t cacheSizeLimit = std::max(gfxPrefs::CanvasSkiaGLCacheSize(), (int32_t)0);
 
     // Prefs are in megabytes, but we want the sizes in bytes
     cacheSizeLimit *= 1024*1024;
@@ -1302,11 +1302,14 @@ gfxPlatform::InitializeSkiaCacheLimits()
       }
     }
 
+    // Ensure cache size doesn't overflow on 32-bit platforms.
+    cacheSizeLimit = std::min(cacheSizeLimit, (uint64_t)SIZE_MAX);
+
   #ifdef DEBUG
-    printf_stderr("Determined SkiaGL cache limits: Size %i, Items: %i\n", cacheSizeLimit, cacheItemLimit);
+    printf_stderr("Determined SkiaGL cache limits: Size %" PRIu64 ", Items: %i\n", cacheSizeLimit, cacheItemLimit);
   #endif
 
-    mSkiaGlue->GetGrContext()->setResourceCacheLimits(cacheItemLimit, cacheSizeLimit);
+    mSkiaGlue->GetGrContext()->setResourceCacheLimits(cacheItemLimit, (size_t)cacheSizeLimit);
 #endif
   }
 }

@@ -816,6 +816,8 @@ pref("gfx.content.azure.backends", "cairo");
 pref("gfx.content.azure.backends", "cairo");
 #endif
 
+pref("gfx.canvas.skiagl.dynamic-cache", true);
+
 pref("gfx.text.disable-aa", false);
 
 pref("gfx.work-around-driver-bugs", true);
