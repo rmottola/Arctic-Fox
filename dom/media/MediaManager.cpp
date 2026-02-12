@@ -266,7 +266,11 @@ public:
     , mFinished(false)
     , mRemoved(false)
     , mAudioStopped(false)
-    , mVideoStopped(false) {}
+    , mAudioStopPending(false)
+    , mVideoStopped(false)
+    , mVideoStopPending(false)
+    , mChromeNotificationTaskPosted(false)
+  {}
 
   ~GetUserMediaCallbackMediaStreamListener()
   {
@@ -304,6 +308,8 @@ public:
   void StopSharing();
 
   void StopTrack(TrackID aID);
+
+  void NotifyChromeOfTrackStops();
 
   typedef media::Pledge<bool, dom::MediaStreamError*> PledgeVoid;
 
@@ -490,9 +496,21 @@ private:
   // MainThread only.
   bool mAudioStopped;
 
+  // true if we have scheduled MEDIA_STOP or MEDIA_STOP_TRACK for mAudioDevice.
+  // MainThread only.
+  bool mAudioStopPending;
+
   // true if we have sent MEDIA_STOP or MEDIA_STOP_TRACK for mVideoDevice.
   // MainThread only.
   bool mVideoStopped;
+
+  // true if we have scheduled MEDIA_STOP or MEDIA_STOP_TRACK for mVideoDevice.
+  // MainThread only.
+  bool mVideoStopPending;
+
+  // true if we have scheduled a task to notify chrome in the next stable state.
+  // The task will reset this to false. MainThread only.
+  bool mChromeNotificationTaskPosted;
 
   // Set at Activate on MainThread
 
@@ -3560,9 +3578,9 @@ GetUserMediaCallbackMediaStreamListener::StopTrack(TrackID aTrackID)
   {
     LOG(("Can't stop gUM track %d (%s), exists=%d, stopped=%d",
          aTrackID,
-         aTrackID == kAudioTrack ? "audio" : "video",
-         aTrackID == kAudioTrack ? !!mAudioDevice : !!mVideoDevice,
-         aTrackID == kAudioTrack ? mAudioStopped : mVideoStopped));
+         stopAudio ? "audio" : "video",
+         stopAudio ? !!mAudioDevice : !!mVideoDevice,
+         stopAudio ? mAudioStopped : mVideoStopped));
     return;
   }
 
@@ -3572,6 +3590,59 @@ GetUserMediaCallbackMediaStreamListener::StopTrack(TrackID aTrackID)
     return;
   }
 
+  // We wait until stable state before notifying chrome so chrome only does one
+  // update if more tracks are stopped in this event loop.
+
+  mAudioStopPending |= stopAudio;
+  mVideoStopPending |= stopVideo;
+
+  if (mChromeNotificationTaskPosted) {
+    return;
+  }
+
+  nsCOMPtr<nsIRunnable> runnable =
+    NewRunnableMethod(this, &GetUserMediaCallbackMediaStreamListener::NotifyChromeOfTrackStops);
+  nsContentUtils::RunInStableState(runnable.forget());
+  mChromeNotificationTaskPosted = true;
+}
+
+void
+GetUserMediaCallbackMediaStreamListener::NotifyChromeOfTrackStops()
+{
+  MOZ_ASSERT(mChromeNotificationTaskPosted);
+  mChromeNotificationTaskPosted = false;
+
+  // We make sure these are always reset.
+  bool stopAudio = mAudioStopPending;
+  bool stopVideo = mVideoStopPending;
+  mAudioStopPending = false;
+  mVideoStopPending = false;
+
+  if (mStopped) {
+    // The entire capture was stopped while we were waiting for stable state.
+    return;
+  }
+
+  MOZ_ASSERT(stopAudio || stopVideo);
+  MOZ_ASSERT(!stopAudio || !mAudioStopped,
+             "If there's a pending stop for audio, audio must not have been stopped");
+  MOZ_ASSERT(!stopAudio || mAudioDevice,
+             "If there's a pending stop for audio, there must be an audio device");
+  MOZ_ASSERT(!stopVideo || !mVideoStopped,
+             "If there's a pending stop for video, video must not have been stopped");
+  MOZ_ASSERT(!stopVideo || mVideoDevice,
+             "If there's a pending stop for video, there must be a video device");
+
+  if ((stopAudio || mAudioStopped || !mAudioDevice) &&
+      (stopAudio || mVideoStopped || !mVideoDevice)) {
+    // All tracks stopped.
+    Stop();
+    return;
+  }
+
+  mAudioStopped |= stopAudio;
+  mVideoStopped |= stopVideo;
+
   RefPtr<MediaOperationTask> mediaOperation =
     new MediaOperationTask(MEDIA_STOP_TRACK,
                            this, nullptr, nullptr,
@@ -3579,8 +3650,6 @@ GetUserMediaCallbackMediaStreamListener::StopTrack(TrackID aTrackID)
                            stopVideo ? mVideoDevice.get() : nullptr,
                            false , mWindowID, nullptr);
   MediaManager::PostTask(mediaOperation.forget());
-  mAudioStopped |= stopAudio;
-  mVideoStopped |= stopVideo;
 }
 
 void
