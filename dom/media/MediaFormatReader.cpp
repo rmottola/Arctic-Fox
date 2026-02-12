@@ -1524,6 +1524,8 @@ MediaFormatReader::Update(TrackType aTrack)
       }
       SkipVideoDemuxToNextKeyFrame(decoder.mLastSampleTime.refOr(TimeInterval()).Length());
       return;
+    } else if (aTrack == TrackType::kAudioTrack) {
+      decoder.Flush();
     }
   }
 
