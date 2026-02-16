@@ -26,12 +26,24 @@
   padding: 15px 10px 0;
 }
 
-#PMversion {
+#version {
+  font-weight: bold;
   margin-top: 10px;
-  margin-inline-start: 0;
+  margin-left: 0;
   -moz-user-select: text;
   -moz-user-focus: normal;
   cursor: text;
+}
+
+#version:-moz-locale-dir(rtl) {
+  direction: ltr;
+  text-align: right;
+  margin-left: 5px;
+  margin-right: 0;
+}
+
+#releasenotes {
+  margin-top: 10px;
 }
 
 #distribution,
