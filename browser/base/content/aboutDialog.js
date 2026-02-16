@@ -40,7 +40,7 @@ function init(aEvent)
     // Pref is unset
   }
 
-  // Include the build ID if this is an "a#" or "b#" build
+  // Include the build ID and display warning if this is an "a#" (nightly or aurora) build
   let version = Services.appinfo.version;
   if (/a\d+$/.test(version)) {
     let buildID = Services.appinfo.appBuildID;
