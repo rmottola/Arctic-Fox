@@ -1513,6 +1513,7 @@
             var aNoReferrer;
             var aUserContextId;
             var aRelatedBrowser;
+            var aOriginPrincipal;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -2231,6 +2232,10 @@
             var detail = aEventDetail || {};
             var evt = new CustomEvent("TabOpen", { bubbles: true, detail });
             t.dispatchEvent(evt);
+
+            if (!usingPreloadedContent && aOriginPrincipal) {
+              b.createAboutBlankContentViewer(aOriginPrincipal);
+            }
 
             // If we didn't swap docShells with a preloaded browser
             // then let's just continue loading the page normally.
