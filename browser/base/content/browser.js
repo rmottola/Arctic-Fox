@@ -7865,7 +7865,7 @@ var gRemoteTabsUI = {
 };
 
 /**
- * Switch to a tab that has a given URI, and focusses its browser window.
+ * Switch to a tab that has a given URI, and focuses its browser window.
  * If a matching tab is in this window, it will be switched to. Otherwise, other
  * windows will be searched.
  *
@@ -7884,7 +7884,7 @@ var gRemoteTabsUI = {
  *        matching when comparing URIs.
  *        - 'ignoreQueryString' property to be set to true to exclude query string
  *        matching when comparing URIs.
- *        - 'replaceQueryString' property to be set to true to exclude query string
+ *        - 'replaceQueryString' boolean property to be set to true to exclude query string
  *        matching when comparing URIs and overwrite the initial query string with
  *        the one from the new URI.
  * @return True if an existing tab was found, false otherwise
@@ -7917,6 +7917,30 @@ function switchToTabHavingURI(aURI, aOpenNew, aOpenParams={}) {
       return false;
     }
 
+    // Remove the query string, fragment, both, or neither from a given url.
+    function cleanURL(url, removeQuery, removeFragment) {
+      let ret = url;
+      if (removeFragment) {
+        ret = ret.split("#")[0];
+        if (removeQuery) {
+          // This removes a query, if present before the fragment.
+          ret = ret.split("?")[0];
+        }
+      } else if (removeQuery) {
+        // This is needed in case there is a fragment after the query.
+        let fragment = ret.split("#")[1];
+        ret = ret.split("?")[0].concat(
+          (fragment != undefined) ? "#".concat(fragment) : "");
+      }
+      return ret;
+    }
+
+    // Need to handle nsSimpleURIs here too (e.g. about:...), which don't
+    // work correctly with URL objects - so treat them as strings
+    let ignoreFragmentWhenComparing = typeof ignoreFragment == "string" &&
+                                      ignoreFragment.startsWith("whenComparing");
+    let requestedCompare = cleanURL(
+        aURI.spec, ignoreQueryString || replaceQueryString, ignoreFragmentWhenComparing);
     let browsers = aWindow.gBrowser.browsers;
     for (let i = 0; i < browsers.length; i++) {
       let browser = browsers[i];
