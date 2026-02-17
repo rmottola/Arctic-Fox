@@ -30,7 +30,7 @@ do_get_profile();
 const DIRECTORY_LINKS_FILE = "directoryLinks.json";
 const DIRECTORY_FRECENCY = 1000;
 const SUGGESTED_FRECENCY = Infinity;
-const kURLData = {"directory": [{"url":"http://example.com","title":"LocalSource"}]};
+const kURLData = {"directory": [{"url":"http://example.com", "title":"LocalSource"}]};
 const kTestURL = 'data:application/json,' + JSON.stringify(kURLData);
 
 // DirectoryLinksProvider preferences
@@ -57,7 +57,7 @@ Services.prefs.setCharPref(kPingUrlPref, kPingUrl);
 Services.prefs.setBoolPref(kNewtabEnhancedPref, true);
 
 const kHttpHandlerData = {};
-kHttpHandlerData[kExamplePath] = {"directory": [{"url":"http://example.com","title":"RemoteSource"}]};
+kHttpHandlerData[kExamplePath] = {"directory": [{"url":"http://example.com", "title":"RemoteSource"}]};
 
 const BinaryInputStream = CC("@mozilla.org/binaryinputstream;1",
                               "nsIBinaryInputStream",

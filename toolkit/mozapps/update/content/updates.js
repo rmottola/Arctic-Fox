@@ -1288,7 +1288,7 @@ var gErrorsPage = {
     gUpdates.wiz.getButton("finish").focus();
 
     var statusText = gUpdates.update.statusText;
-    LOG("gErrorsPage" , "onPageShow - update.statusText: " + statusText);
+    LOG("gErrorsPage", "onPageShow - update.statusText: " + statusText);
 
     var errorReason = document.getElementById("errorReason");
     errorReason.value = statusText;
@@ -1439,7 +1439,7 @@ var gFinishedPage = {
    */
   onWizardFinish: function() {
     // Do the restart
-    LOG("gFinishedPage" , "onWizardFinish - restarting the application");
+    LOG("gFinishedPage", "onWizardFinish - restarting the application");
 
     let aus = CoC["@mozilla.org/updates/update-service;1"].
               getService(CoI.nsIApplicationUpdateService);

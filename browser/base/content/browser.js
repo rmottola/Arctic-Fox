@@ -2989,7 +2989,7 @@ var BrowserOnClick = {
         }
 
         window.openDialog('chrome://pippki/content/exceptionDialog.xul',
-                          '','chrome,centerscreen,modal', params);
+                          '', 'chrome,centerscreen,modal', params);
 
         // If the user added the exception cert, attempt to reload the page
         if (params.exceptionAdded) {
@@ -5712,7 +5712,7 @@ var gHomeButton = {
       homeButton = document.getElementById("home-button");
     if (homeButton) {
       var homePage = this.getHomePage();
-      homePage = homePage.replace(/\|/g,', ');
+      homePage = homePage.replace(/\|/g, ', ');
       if (homePage.toLowerCase() == "about:home")
         homeButton.setAttribute("tooltiptext", homeButton.getAttribute("aboutHomeOverrideTooltip"));
       else
