@@ -80,10 +80,6 @@
                 label="&openLinkInPrivateWindowCmd.label;"
                 accesskey="&openLinkInPrivateWindowCmd.accesskey;"
                 oncommand="gContextMenu.openLinkInPrivateWindow();"/>
-      <menuitem id="context-openlinkincurrent"
-                label="&openLinkCmdInCurrent.label;"
-                accesskey="&openLinkCmdInCurrent.accesskey;"
-                oncommand="gContextMenu.openLinkInCurrent();"/>
       <menuseparator id="context-sep-open"/>
       <menuitem id="context-bookmarklink"
                 label="&bookmarkThisLinkCmd.label;"
