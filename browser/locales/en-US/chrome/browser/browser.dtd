@@ -553,7 +553,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY openLinkCmd.accesskey        "W">
 <!ENTITY openLinkInPrivateWindowCmd.label "Open Link in New Private Window">
 <!ENTITY openLinkInPrivateWindowCmd.accesskey "P">
-<!ENTITY openLinkCmdInCurrent.label     "Open Link in Current Tab">
+<!ENTITY openLinkCmdInCurrent.label     "Open Link">
 <!ENTITY openLinkCmdInCurrent.accesskey "O">
 <!ENTITY openFrameCmdInTab.label      "Open Frame in New Tab">
 <!ENTITY openFrameCmdInTab.accesskey  "T">
