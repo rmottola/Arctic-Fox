@@ -225,7 +225,6 @@ function openLinkIn(url, where, params) {
   var aAllowPopups          = !!params.allowPopups;
   var aUserContextId        = params.userContextId;
   var aIndicateErrorPageLoad = params.indicateErrorPageLoad;
-  var sendReferrerURI       = true;
   var aPrincipal            = params.originPrincipal;
   var aForceAboutBlankViewerInCurrent =
       params.forceAboutBlankViewerInCurrent;
@@ -256,12 +255,6 @@ function openLinkIn(url, where, params) {
   }
 
   if (!w || where == "window") {
-    // Strip referrer data when opening a new private window, to prevent
-    // regular browsing data from leaking into it.
-    if (aIsPrivate) {
-      sendReferrerURI = false;
-    }
-
     // This propagates to window.arguments.
     var sa = Cc["@mozilla.org/supports-array;1"].
              createInstance(Ci.nsISupportsArray);
