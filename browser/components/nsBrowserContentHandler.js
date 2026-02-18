@@ -190,8 +190,8 @@ function openWindow(parent, url, target, features, args, noExternalArgs) {
   }
 
   // Pass an array to avoid the browser "|"-splitting behavior.
-  var argArray = Components.classes["@mozilla.org/supports-array;1"]
-                    .createInstance(Components.interfaces.nsISupportsArray);
+  var argArray = Components.classes["@mozilla.org/array;1"]
+                    .createInstance(Components.interfaces.nsIMutableArray);
 
   // add args to the arguments array
   var stringArgs = null;
@@ -210,18 +210,18 @@ function openWindow(parent, url, target, features, args, noExternalArgs) {
       sstring.data = uri;
       uriArray.AppendElement(sstring);
     });
-    argArray.AppendElement(uriArray);
+    argArray.appendElement(uriArray, /* weak =*/ false);
   } else {
-    argArray.AppendElement(null);
+    argArray.appendElement(null, /* weak =*/ false);
   }
 
   // Pass these as null to ensure that we always trigger the "single URL"
   // behavior in browser.js's gBrowserInit.onLoad (which handles the window
   // arguments)
-  argArray.AppendElement(null); // charset
-  argArray.AppendElement(null); // referer
-  argArray.AppendElement(null); // postData
-  argArray.AppendElement(null); // allowThirdPartyFixup
+  argArray.appendElement(null, /* weak =*/ false); // charset
+  argArray.appendElement(null, /* weak =*/ false); // referer
+  argArray.appendElement(null, /* weak =*/ false); // postData
+  argArray.appendElement(null, /* weak =*/ false); // allowThirdPartyFixup
 
   return Services.ww.openWindow(parent, url, target, features, argArray);
 }
@@ -260,18 +260,18 @@ function doSearch(searchTerm, cmdLine) {
 
   var submission = engine.getSubmission(searchTerm, null, "system");
 
-  // fill our nsISupportsArray with uri-as-wstring, null, null, postData
-  var sa = Components.classes["@mozilla.org/supports-array;1"]
-                     .createInstance(Components.interfaces.nsISupportsArray);
+  // fill our nsIMutableArray with uri-as-wstring, null, null, postData
+  var args = Components.classes["@mozilla.org/array;1"]
+                     .createInstance(Components.interfaces.nsIMutableArray);
 
   var wuri = Components.classes["@mozilla.org/supports-string;1"]
                        .createInstance(Components.interfaces.nsISupportsString);
   wuri.data = submission.uri.spec;
 
-  sa.AppendElement(wuri);
-  sa.AppendElement(null);
-  sa.AppendElement(null);
-  sa.AppendElement(submission.postData);
+  args.appendElement(wuri, /*weak =*/ false);
+  args.appendElement(null, /*weak =*/ false);
+  args.appendElement(null, /*weak =*/ false);
+  args.appendElement(submission.postData, /*weak =*/ false);
 
   // XXXbsmedberg: use handURIToExistingBrowser to obey tabbed-browsing
   // preferences, but need nsIBrowserDOMWindow extensions
@@ -280,7 +280,7 @@ function doSearch(searchTerm, cmdLine) {
                                 "_blank",
                                 "chrome,dialog=no,all" +
                                 gBrowserContentHandler.getFeatures(cmdLine),
-                                sa);
+                                args);
 }
 
 function nsBrowserContentHandler() {
