@@ -411,12 +411,6 @@ pref("browser.search.suggest.enabled", true);
 pref("browser.search.official", true);
 #endif
 
-#ifdef XP_WIN
-pref("browser.search.redirectWindowsSearch", true);
-#else
-pref("browser.search.redirectWindowsSearch", false);
-#endif
-
 pref("browser.search.reset.enabled", true);
 
 pref("browser.usedOnWindows10", false);
@@ -1137,6 +1131,7 @@ pref("services.sync.prefs.sync.browser.newtabpage.enhanced", true);
 pref("services.sync.prefs.sync.browser.newtabpage.pinned", true);
 pref("services.sync.prefs.sync.browser.offline-apps.notify", true);
 pref("services.sync.prefs.sync.browser.safebrowsing.phishing.enabled", true);
+pref("services.sync.prefs.sync.browser.safebrowsing.malware.enabled", true);
 pref("services.sync.prefs.sync.browser.search.selectedEngine", true);
 pref("services.sync.prefs.sync.browser.search.update", true);
 pref("services.sync.prefs.sync.browser.sessionstore.restore_on_demand", true);
@@ -1178,6 +1173,8 @@ pref("services.sync.prefs.sync.privacy.clearOnShutdown.siteSettings", true);
 pref("services.sync.prefs.sync.privacy.donottrackheader.enabled", true);
 pref("services.sync.prefs.sync.privacy.donottrackheader.value", true);
 pref("services.sync.prefs.sync.privacy.sanitize.sanitizeOnShutdown", true);
+pref("services.sync.prefs.sync.privacy.trackingprotection.enabled", true);
+pref("services.sync.prefs.sync.privacy.trackingprotection.pbmode.enabled", true);
 pref("services.sync.prefs.sync.security.OCSP.enabled", true);
 pref("services.sync.prefs.sync.security.OCSP.require", true);
 pref("services.sync.prefs.sync.security.default_personal_cert", true);
@@ -1557,3 +1554,20 @@ pref("print.use_simplify_page", true);
 // Space separated list of URLS that are allowed to send objects (instead of
 // only strings) through webchannels. This list is duplicated in mobile/android/app/mobile.js
 pref("webchannel.allowObject.urlWhitelist", "https://accounts.firefox.com https://content.cdn.mozilla.net https://input.mozilla.org https://support.mozilla.org https://install.mozilla.org");
+
+// Whether or not the browser should scan for unsubmitted
+// crash reports, and then show a notification for submitting
+// those reports.
+#ifdef EARLY_BETA_OR_EARLIER
+pref("browser.crashReports.unsubmittedCheck.enabled", true);
+#else
+pref("browser.crashReports.unsubmittedCheck.enabled", false);
+#endif
+
+// chancesUntilSuppress is how many times we'll show the unsubmitted
+// crash report notification across different days and shutdown
+// without a user choice before we suppress the notification for
+// some number of days.
+pref("browser.crashReports.unsubmittedCheck.chancesUntilSuppress", 4);
+pref("browser.crashReports.unsubmittedCheck.autoSubmit", false);
+
