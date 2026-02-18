@@ -13,6 +13,7 @@ UNIFIED_SOURCES += [
     'TestChunkSet.cpp',
     'TestFailUpdate.cpp',
     'TestPerProviderDirectory.cpp',
+    'TestProtocolParser.cpp',
     'TestRiceDeltaDecoder.cpp',
     'TestSafebrowsingHash.cpp',
     'TestSafeBrowsingProtobuf.cpp',
