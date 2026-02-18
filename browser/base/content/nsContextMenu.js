@@ -150,7 +150,7 @@ nsContextMenu.prototype = {
       inContainer = true;
       var item = document.getElementById("context-openlinkincontainertab");
 
-      item.setAttribute("usercontextid", userContextId);
+      item.setAttribute("data-usercontextid", userContextId);
 
       var label = ContextualIdentityService.getUserContextLabel(userContextId);
       item.setAttribute("label",
@@ -989,7 +989,7 @@ nsContextMenu.prototype = {
 
     let params = {
       allowMixedContent: persistAllowMixedContentInChildTab,
-      userContextId: parseInt(event.target.getAttribute('usercontextid'))
+      userContextId: parseInt(event.target.getAttribute('data-usercontextid')),
     };
 
     openLinkIn(this.linkURL, "tab", this._openLinkInParameters(params));
