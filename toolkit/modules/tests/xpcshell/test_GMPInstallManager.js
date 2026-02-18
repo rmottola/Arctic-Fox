@@ -17,7 +17,7 @@ let { computeHash } = Cu.import("resource://gre/modules/addons/ProductAddonCheck
 
 do_get_profile();
 
-function run_test() {Cu.import("resource://gre/modules/Preferences.jsm")
+function run_test() { Cu.import("resource://gre/modules/Preferences.jsm")
   Preferences.set("media.gmp.log.dump", true);
   Preferences.set("media.gmp.log.level", 0);
   run_next_test();
