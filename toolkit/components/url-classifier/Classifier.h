@@ -24,6 +24,9 @@ namespace safebrowsing {
  */
 class Classifier {
 public:
+  typedef nsClassHashtable<nsCStringHashKey, nsCString> ProviderDictType;
+
+public:
   Classifier();
   ~Classifier();
 
@@ -98,6 +101,7 @@ public:
   // the root directory.
   static nsresult GetPrivateStoreDirectory(nsIFile* aRootStoreDirectory,
                                            const nsACString& aTableName,
+                                           const nsACString& aProvider,
                                            nsIFile** aPrivateStoreDirectory);
 
 private:
@@ -128,6 +132,8 @@ private:
                         const nsACString& aTable);
 
   nsresult LoadMetadata(nsIFile* aDirectory, nsACString& aResult);
+
+  nsCString GetProvider(const nsACString& aTableName);
 
   // Root dir of the Local profile.
   nsCOMPtr<nsIFile> mCacheDirectory;
