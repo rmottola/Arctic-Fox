@@ -17,6 +17,7 @@ UNIFIED_SOURCES += [
     'TestRiceDeltaDecoder.cpp',
     'TestSafebrowsingHash.cpp',
     'TestSafeBrowsingProtobuf.cpp',
+    'TestTable.cpp',
     'TestUrlClassifierTableUpdateV4.cpp',
     'TestUrlClassifierUtils.cpp',
     'TestVariableLengthPrefixSet.cpp',
