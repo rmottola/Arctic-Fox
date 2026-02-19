@@ -181,6 +181,46 @@ this.BrowserTestUtils = {
   },
 
   /**
+   * Waits for the next tab to open and load a given URL.
+   *
+   * The method doesn't wait for the tab contents to load.
+   *
+   * @param {tabbrowser} tabbrowser
+   *        The tabbrowser to look for the next new tab in.
+   * @param {string} url
+   *        A string URL to look for in the new tab. If null, allows any non-blank URL.
+   *
+   * @return {Promise}
+   * @resolves With the {xul:tab} when a tab is opened and its location changes to the given URL.
+   *
+   * NB: this method will not work if you open a new tab with e.g. BrowserOpenTab
+   * and the tab does not load a URL, because no onLocationChange will fire.
+   */
+  waitForNewTab(tabbrowser, url) {
+    return new Promise((resolve, reject) => {
+      tabbrowser.tabContainer.addEventListener("TabOpen", function onTabOpen(openEvent) {
+        tabbrowser.tabContainer.removeEventListener("TabOpen", onTabOpen);
+
+        let progressListener = {
+          onLocationChange(aBrowser) {
+            if (aBrowser != openEvent.target.linkedBrowser ||
+                (url && aBrowser.currentURI.spec != url) ||
+                (!url && aBrowser.currentURI.spec == "about:blank")) {
+              return;
+            }
+
+            tabbrowser.removeTabsProgressListener(progressListener);
+            resolve(openEvent.target);
+          },
+        };
+        tabbrowser.addTabsProgressListener(progressListener);
+
+      });
+    });
+  },
+
+
+  /**
    * Waits for the next browser window to open and be fully loaded.
    *
    * @return {Promise}
