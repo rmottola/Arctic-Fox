@@ -662,8 +662,7 @@ LoginManagerPrompter.prototype = {
 
       this._factory._asyncPrompts[hashKey] = asyncPrompt;
       this._factory._doAsyncPrompt();
-    }
-    catch (e) {
+    } catch (e) {
       Components.utils.reportError("LoginManagerPrompter: " +
           "asyncPromptAuth: " + e + "\nFalling back to promptAuth\n");
       // Fail the prompt operation to let the consumer fall back
@@ -902,8 +901,7 @@ LoginManagerPrompter.prototype = {
       accessKey: this._getLocalizedString(initialMsgNames.buttonAccessKey),
       callback: () => {
         histogram.add(PROMPT_ADD_OR_UPDATE);
-        if (histogramName == "PWMGR_PROMPT_REMEMBER_ACTION")
-        {
+        if (histogramName == "PWMGR_PROMPT_REMEMBER_ACTION") {
           Services.obs.notifyObservers(null, 'LoginStats:NewSavedPassword', null);
         }
         readDataFromUI();
