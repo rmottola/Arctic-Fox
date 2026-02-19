@@ -302,7 +302,7 @@ var gPermissionManager = {
         this._handleCapabilityChange();
       }
       else if (aData == "deleted") {
-        this._removePermissionFromList(permission);
+        this._removePermissionFromList(permission.principal);
       }
     }
   },
