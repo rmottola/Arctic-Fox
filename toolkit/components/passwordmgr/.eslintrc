@@ -1,0 +1,19 @@
+{
+  "extends": "../../.eslintrc",
+  "rules": {
+    // Require spacing around =>
+    "arrow-spacing": 2,
+
+    // No space before always a space after a comma
+    "comma-spacing": [2, {"before": false, "after": true}],
+
+    // Commas at the end of the line not the start
+    "comma-style": 2,
+
+    // No using undeclared variables
+    "no-undef": 2,
+
+    // Don't allow unused local variables unless they match the pattern
+    "no-unused-vars": [2, {"args": "none", "vars": "local", "varsIgnorePattern": "^(ids|ignored|unused)$"}],
+  }
+}
