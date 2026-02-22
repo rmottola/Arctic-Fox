@@ -14,7 +14,7 @@ const SCREENSIZE_HISTOGRAM = "DEVTOOLS_SCREEN_RESOLUTION_ENUMERATED_PER_USER";
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const { SourceMapService } = require("./source-map-service");
 
-var {Cc, Ci, Cu} = require("chrome");
+var {Ci, Cu} = require("chrome");
 var promise = require("promise");
 var defer = require("devtools/shared/defer");
 var Services = require("Services");
@@ -238,8 +238,8 @@ Toolbox.prototype = {
     if (panel) {
       deferred.resolve(panel);
     } else {
-      this.on(id + "-ready", (e, panel) => {
-        deferred.resolve(panel);
+      this.on(id + "-ready", (e, initializedPanel) => {
+        deferred.resolve(initializedPanel);
       });
     }
 
@@ -409,7 +409,7 @@ Toolbox.prototype = {
       this.textboxContextMenuPopup.addEventListener("popupshowing",
         this._updateTextboxMenuItems, true);
 
-      var shortcuts = new KeyShortcuts({
+      let shortcuts = new KeyShortcuts({
         window: this.doc.defaultView
       });
       this._buildDockButtons();
@@ -505,7 +505,8 @@ Toolbox.prototype = {
     this._telemetry.logOncePerBrowserVersion(OS_HISTOGRAM, system.getOSCPU());
     this._telemetry.logOncePerBrowserVersion(OS_IS_64_BITS,
                                              Services.appinfo.is64Bit ? 1 : 0);
-    this._telemetry.logOncePerBrowserVersion(SCREENSIZE_HISTOGRAM, system.getScreenDimensions());
+    this._telemetry.logOncePerBrowserVersion(SCREENSIZE_HISTOGRAM,
+                                             system.getScreenDimensions());
     this._telemetry.log(HOST_HISTOGRAM, this._getTelemetryHostId());
   },
 
@@ -982,16 +983,16 @@ Toolbox.prototype = {
       this._requisition = requisition;
 
       const spec = CommandUtils.getCommandbarSpec("devtools.toolbox.toolbarSpec");
-      return CommandUtils.createButtons(spec, this.target, this.doc,
-                                        requisition).then(buttons => {
-                                          let container = this.doc.getElementById("toolbox-buttons");
-                                          buttons.forEach(button=> {
-                                            if (button) {
-                                              container.appendChild(button);
-                                            }
-                                          });
-                                          this.setToolboxButtonsVisibility();
-                                        });
+      return CommandUtils.createButtons(spec, this.target, this.doc, requisition)
+        .then(buttons => {
+          let container = this.doc.getElementById("toolbox-buttons");
+          buttons.forEach(button => {
+            if (button) {
+              container.appendChild(button);
+            }
+          });
+          this.setToolboxButtonsVisibility();
+        });
     });
   },
 
@@ -1002,7 +1003,8 @@ Toolbox.prototype = {
   _buildPickerButton: function () {
     this._pickerButton = this.doc.createElementNS(HTML_NS, "button");
     this._pickerButton.id = "command-button-pick";
-    this._pickerButton.className = "command-button command-button-invertable devtools-button";
+    this._pickerButton.className =
+      "command-button command-button-invertable devtools-button";
     this._pickerButton.setAttribute("title", L10N.getStr("pickButton.tooltip"));
     this._pickerButton.setAttribute("hidden", "true");
 
@@ -1088,7 +1090,9 @@ Toolbox.prototype = {
       let on = true;
       try {
         on = Services.prefs.getBoolPref(visibilityswitch);
-      } catch (ex) { }
+      } catch (ex) {
+        // Do nothing.
+      }
 
       on = on && isTargetSupported(this.target);
 
@@ -1234,8 +1238,8 @@ Toolbox.prototype = {
       if (panel) {
         deferred.resolve(panel);
       } else {
-        this.once(id + "-ready", panel => {
-          deferred.resolve(panel);
+        this.once(id + "-ready", initializedPanel => {
+          deferred.resolve(initializedPanel);
         });
       }
       return deferred.promise;
@@ -1606,7 +1610,7 @@ Toolbox.prototype = {
   // Returns an instance of the preference actor
   get _preferenceFront() {
     return this.target.root.then(rootForm => {
-      return new getPreferenceFront(this.target.client, rootForm);
+      return getPreferenceFront(this.target.client, rootForm);
     });
   },
 
@@ -1958,9 +1962,9 @@ Toolbox.prototype = {
     if (!this._initInspector) {
       this._initInspector = Task.spawn(function* () {
         this._inspector = InspectorFront(this._target.client, this._target.form);
-        this._walker = yield this._inspector.getWalker(
-          {showAllAnonymousContent: Services.prefs.getBoolPref("devtools.inspector.showAllAnonymousContent")}
-        );
+        let pref = "devtools.inspector.showAllAnonymousContent";
+        let showAllAnonymousContent = Services.prefs.getBoolPref(pref);
+        this._walker = yield this._inspector.getWalker({ showAllAnonymousContent });
         this._selection = new Selection(this._walker);
 
         if (this.highlighterUtils.isRemoteHighlightable()) {
@@ -1984,7 +1988,7 @@ Toolbox.prototype = {
       return this._destroyingInspector;
     }
 
-    return this._destroyingInspector = Task.spawn(function* () {
+    this._destroyingInspector = Task.spawn(function* () {
       if (!this._inspector) {
         return;
       }
@@ -1996,7 +2000,9 @@ Toolbox.prototype = {
       if (this._walker && !this.walker.traits.autoReleased) {
         try {
           yield this._walker.release();
-        } catch (e) {}
+        } catch (e) {
+          // Do nothing;
+        }
       }
 
       yield this.highlighterUtils.stopPicker();
@@ -2026,6 +2032,7 @@ Toolbox.prototype = {
       this._selection = null;
       this._walker = null;
     }.bind(this));
+    return this._destroyingInspector;
   },
 
   /**
@@ -2231,7 +2238,7 @@ Toolbox.prototype = {
     // If target does not have profiler actor (addons), do not
     // even register the shared performance connection.
     if (!this.target.hasActor("profiler")) {
-      return;
+      return promise.resolve();
     }
 
     if (this._performanceFrontConnection) {
@@ -2270,10 +2277,11 @@ Toolbox.prototype = {
   }),
 
   /**
-   * Called when any event comes from the PerformanceFront. If the performance tool is already
-   * loaded when the first event comes in, immediately unbind this handler, as this is
-   * only used to queue up observed recordings before the performance tool can handle them,
-   * which will only occur when `console.profile()` recordings are started before the tool loads.
+   * Called when any event comes from the PerformanceFront. If the performance tool is
+   * already loaded when the first event comes in, immediately unbind this handler, as
+   * this is only used to queue up observed recordings before the performance tool can
+   * handle them, which will only occur when `console.profile()` recordings are started
+   * before the tool loads.
    */
   _onPerformanceFrontEvent: Task.async(function* (eventName, recording) {
     if (this.getPanel("performance")) {
@@ -2281,7 +2289,8 @@ Toolbox.prototype = {
       return;
     }
 
-    let recordings = this._performanceQueuedRecordings = this._performanceQueuedRecordings || [];
+    this._performanceQueuedRecordings = this._performanceQueuedRecordings || [];
+    let recordings = this._performanceQueuedRecordings;
 
     // Before any console recordings, we'll get a `console-profile-start` event
     // warning us that a recording will come later (via `recording-started`), so
