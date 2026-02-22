@@ -237,8 +237,10 @@ InspectorPanel.prototype = {
 
       // All the components are initialized. Let's select a node.
       this.selection.setNodeFront(defaultSelection, "inspector-open");
-
       this.markup.expandNode(this.selection.nodeFront);
+
+      // And setup the toolbar only now because it may depend on the document.
+      this.setupToolbar();
 
       this.emit("ready");
       deferred.resolve(this);
@@ -246,7 +248,6 @@ InspectorPanel.prototype = {
 
     this.setupSearchBox();
     this.setupSidebar();
-    this.setupToolbar();
 
     return deferred.promise;
   },
@@ -505,6 +506,8 @@ InspectorPanel.prototype = {
   },
 
   setupToolbar: function () {
+    this.teardownToolbar();
+
     // Setup the sidebar toggle button.
     let SidebarToggle = this.React.createFactory(this.browserRequire(
       "devtools/client/shared/components/sidebar-toggle"));
@@ -524,21 +527,28 @@ InspectorPanel.prototype = {
     this.addNodeButton = this.panelDoc.getElementById("inspector-element-add-button");
     this.addNodeButton.addEventListener("click", this.addNode);
 
-    // Setup the eye-dropper icon.
-    this.toolbox.target.actorHasMethod("inspector", "pickColorFromPage").then(value => {
-      if (!value) {
-        return;
-      }
+    // Setup the eye-dropper icon if we're in an HTML document and we have actor support.
+    if (this.selection.nodeFront && this.selection.nodeFront.isInHTMLDocument) {
+      this.toolbox.target.actorHasMethod("inspector", "pickColorFromPage").then(value => {
+        if (!value) {
+          return;
+        }
 
-      this.onEyeDropperDone = this.onEyeDropperDone.bind(this);
-      this.onEyeDropperButtonClicked = this.onEyeDropperButtonClicked.bind(this);
-      this.eyeDropperButton = this.panelDoc.getElementById("inspector-eyedropper-toggle");
-      this.eyeDropperButton.style.display = "initial";
-      this.eyeDropperButton.addEventListener("click", this.onEyeDropperButtonClicked);
-    }, e => console.error(e));
+        this.onEyeDropperDone = this.onEyeDropperDone.bind(this);
+        this.onEyeDropperButtonClicked = this.onEyeDropperButtonClicked.bind(this);
+        this.eyeDropperButton = this.panelDoc
+                                    .getElementById("inspector-eyedropper-toggle");
+        this.eyeDropperButton.style.display = "initial";
+        this.eyeDropperButton.addEventListener("click", this.onEyeDropperButtonClicked);
+      }, e => console.error(e));
+    } else {
+      this.panelDoc.getElementById("inspector-eyedropper-toggle").style.display = "none";
+    }
   },
 
   teardownToolbar: function () {
+    this._sidebarToggle = null;
+
     if (this.addNodeButton) {
       this.addNodeButton.removeEventListener("click", this.addNode);
       this.addNodeButton = null;
@@ -576,6 +586,9 @@ InspectorPanel.prototype = {
         this.markup.expandNode(this.selection.nodeFront);
         this.emit("new-root");
       });
+
+      // Setup the toolbar again, since its content may depend on the current document.
+      this.setupToolbar();
     };
     this._pendingSelection = onNodeSelected;
     this._getDefaultNodeForSelection()
@@ -1297,6 +1310,12 @@ InspectorPanel.prototype = {
    * @return {Promise} resolves when the eyedropper is visible.
    */
   showEyeDropper: function () {
+    // The eyedropper button doesn't exist, most probably because the actor doesn't
+    // support the pickColorFromPage, or because the page isn't HTML.
+    if (!this.eyeDropperButton) {
+      return null;
+    }
+
     this.telemetry.toolOpened("toolbareyedropper");
     this.eyeDropperButton.setAttribute("checked", "true");
     this.startEyeDropperListeners();
@@ -1309,6 +1328,12 @@ InspectorPanel.prototype = {
    * @return {Promise} resolves when the eyedropper is hidden.
    */
   hideEyeDropper: function () {
+    // The eyedropper button doesn't exist, most probably because the actor doesn't
+    // support the pickColorFromPage, or because the page isn't HTML.
+    if (!this.eyeDropperButton) {
+      return null;
+    }
+
     this.eyeDropperButton.removeAttribute("checked");
     this.stopEyeDropperListeners();
     return this.inspector.cancelPickColorFromPage()
