@@ -421,7 +421,7 @@ function getRuleViewLinkByIndex(view, index) {
  */
 function getRuleViewLinkTextByIndex(view, index) {
   let link = getRuleViewLinkByIndex(view, index);
-  return link.querySelector(".ruleview-rule-source-label").value;
+  return link.querySelector(".ruleview-rule-source-label").textContent;
 }
 
 /**
