@@ -529,7 +529,9 @@ const getHighlighterHelperFor = (type) => Task.async(
       finalize: function* () {
         highlightedNode = null;
         yield highlighter.finalize();
-      }
+      },
+
+      testActor: testActor
     };
   }
 );
