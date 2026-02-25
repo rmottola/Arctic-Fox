@@ -2872,7 +2872,7 @@ var AddonManagerInternal = {
       obj.maxProgress = install.maxProgress;
     },
 
-    makeListener(id, target) {
+    makeListener(id, mm) {
       const events = [
         "onDownloadStarted",
         "onDownloadProgress",
@@ -2890,7 +2890,7 @@ var AddonManagerInternal = {
         listener[event] = (install) => {
           let data = {event, id};
           AddonManager.webAPI.copyProps(install, data);
-          this.sendEvent(target, data);
+          this.sendEvent(mm, data);
         }
       });
       return listener;
@@ -2931,7 +2931,7 @@ var AddonManagerInternal = {
 
         let newInstall = install => {
           let id = this.nextInstall++;
-          let listener = this.makeListener(id, target);
+          let listener = this.makeListener(id, target.messageManager);
           install.addListener(listener);
 
           this.installs.set(id, {install, target, listener});
@@ -2998,7 +2998,7 @@ var AddonManagerInternal = {
 
     clearInstallsFrom(mm) {
       for (let [id, info] of this.installs) {
-        if (info.target == mm) {
+        if (info.target.messageManager == mm) {
           this.forgetInstall(id);
         }
       }
