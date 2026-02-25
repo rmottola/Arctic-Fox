@@ -41,6 +41,7 @@ const CLEARKEY_PLUGIN_ID     = "gmp-clearkey";
 const CLEARKEY_VERSION       = "0.1";
 
 const GMP_LICENSE_INFO       = "gmp_license_info";
+const GMP_LEARN_MORE         = "learn_more_label";
 
 const GMP_PLUGINS = [
   {
@@ -58,6 +59,9 @@ const GMP_PLUGINS = [
     id:              EME_ADOBE_ID,
     name:            "eme-adobe_name",
     description:     "eme-adobe_description",
+    // The following learnMoreURL is another hack to be able to support a SUMO page for this
+    // feature.
+    learnMoreURL:    Services.urlFormatter.formatURLPref("app.support.baseURL") + "drm-content",
     licenseURL:      "http://help.adobe.com/en_US/primetime/drm/HTML5_CDM_EULA/index.html",
     homepageURL:     "http://help.adobe.com/en_US/primetime/drm/HTML5_CDM",
     optionsURL:      "chrome://mozapps/content/extensions/gmpPrefs.xul",
@@ -660,13 +664,19 @@ var GMPProvider = {
     return GMPPrefs.get(GMPPrefs.KEY_PROVIDER_ENABLED, false);
   },
 
-  generateFullDescription: function(aLicenseURL, aLicenseInfo) {
-    return "<xhtml:a href=\"" + aLicenseURL + "\" target=\"_blank\">" +
-           aLicenseInfo + "</xhtml:a>."
+  generateFullDescription: function(aPlugin) {
+    let rv = [];
+    for (let [urlProp, labelId] of [["learnMoreURL", GMP_LEARN_MORE],
+                                    ["licenseURL", GMP_LICENSE_INFO]]) {
+      if (aPlugin[urlProp]) {
+        let label = pluginsBundle.GetStringFromName(labelId);
+        rv.push(`<xhtml:a href="${aPlugin[urlProp]}" target="_blank">${label}</xhtml:a>.`);
+      }
+    }
+    return rv.length ? rv.join("<xhtml:br /><xhtml:br />") : undefined;
   },
 
   buildPluginList: function() {
-    let licenseInfo = pluginsBundle.GetStringFromName(GMP_LICENSE_INFO);
 
     this._plugins = new Map();
     for (let aPlugin of GMP_PLUGINS) {
@@ -679,10 +689,7 @@ var GMPProvider = {
         wrapper: null,
         isEME: aPlugin.isEME,
       };
-      if (aPlugin.licenseURL) {
-        plugin.fullDescription =
-          this.generateFullDescription(aPlugin.licenseURL, licenseInfo);
-      }
+      plugin.fullDescription = this.generateFullDescription(aPlugin);
       plugin.wrapper = new GMPWrapper(plugin);
       this._plugins.set(plugin.id, plugin);
     }
