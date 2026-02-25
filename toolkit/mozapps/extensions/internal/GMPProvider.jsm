@@ -41,6 +41,7 @@ const CLEARKEY_PLUGIN_ID     = "gmp-clearkey";
 const CLEARKEY_VERSION       = "0.1";
 
 const GMP_LICENSE_INFO       = "gmp_license_info";
+const GMP_PRIVACY_INFO       = "gmp_privacy_info";
 const GMP_LEARN_MORE         = "learn_more_label";
 
 const GMP_PLUGINS = [
@@ -667,7 +668,8 @@ var GMPProvider = {
   generateFullDescription: function(aPlugin) {
     let rv = [];
     for (let [urlProp, labelId] of [["learnMoreURL", GMP_LEARN_MORE],
-                                    ["licenseURL", GMP_LICENSE_INFO]]) {
+                                    ["licenseURL", aPlugin.id == WIDEVINE_ID ?
+                                     GMP_PRIVACY_INFO : GMP_LICENSE_INFO]]) {
       if (aPlugin[urlProp]) {
         let label = pluginsBundle.GetStringFromName(labelId);
         rv.push(`<xhtml:a href="${aPlugin[urlProp]}" target="_blank">${label}</xhtml:a>.`);
