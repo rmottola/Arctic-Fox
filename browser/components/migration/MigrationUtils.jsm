@@ -37,7 +37,7 @@ var gMigrationBundle = null;
 XPCOMUtils.defineLazyGetter(this, "gAvailableMigratorKeys", function() {
   if (AppConstants.platform == "win") {
     return [
-      "firefox", "edge", "ie", "chrome", "chromium", "safari", "360se",
+      "firefox", "edge", "ie", "chrome", "chromium", "360se",
       "canary"
     ];
   }
@@ -614,7 +614,7 @@ this.MigrationUtils = Object.freeze({
    * @param aKey internal name of the migration source.
    *             Supported values: ie (windows),
    *                               edge (windows),
-   *                               safari (mac/windows),
+   *                               safari (mac),
    *                               canary (mac/windows),
    *                               chrome (mac/windows/linux),
    *                               chromium (mac/windows/linux),
