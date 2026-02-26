@@ -295,14 +295,14 @@ function openLinkIn(url, where, params) {
                                  createInstance(Ci.nsISupportsPRUint32);
     userContextIdSupports.data = aUserContextId;
 
-    sa.appendElement(wuri, /*weak =*/ false);
-    sa.appendElement(charset, /*weak =*/ false);
-    sa.appendElement(referrerURISupports, /*weak =*/ false);
-    sa.appendElement(aPostData, /*weak =*/ false);
-    sa.appendElement(allowThirdPartyFixupSupports, /*weak =*/ false);
-    sa.appendElement(referrerPolicySupports, /*weak =*/ false);
-    sa.appendElement(userContextIdSupports, /*weak =*/ false);
-    sa.appendElement(aPrincipal, /*weak =*/ false);
+    sa.appendElement(wuri, /* weak =*/ false);
+    sa.appendElement(charset, /* weak =*/ false);
+    sa.appendElement(referrerURISupports, /* weak =*/ false);
+    sa.appendElement(aPostData, /* weak =*/ false);
+    sa.appendElement(allowThirdPartyFixupSupports, /* weak =*/ false);
+    sa.appendElement(referrerPolicySupports, /* weak =*/ false);
+    sa.appendElement(userContextIdSupports, /* weak =*/ false);
+    sa.appendElement(aPrincipal, /* weak =*/ false);
 
     let features = "chrome,dialog=no,all";
     if (aIsPrivate) {

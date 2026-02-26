@@ -3476,8 +3476,8 @@ function adjustGeneralPaths() {
         logTestInfo("start - closing handle");
         let kernel32 = ctypes.open("kernel32");
         let CloseHandle = kernel32.declare("CloseHandle", ctypes.default_abi,
-                                           ctypes.bool, /*return*/
-                                           ctypes.voidptr_t /*handle*/);
+                                           ctypes.bool, /* return*/
+                                           ctypes.voidptr_t /* handle*/);
         if (!CloseHandle(gHandle)) {
           logTestInfo("call to CloseHandle failed");
         }

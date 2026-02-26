@@ -1315,7 +1315,7 @@ var ContentArea = {
       throw new Error("Invalid arguments");
 
     this._specialViews.set(aQueryString, { view: aView,
-                                           options: aOptions || new Object() });
+                                           options: aOptions || {} });
   },
 
   get currentView() {

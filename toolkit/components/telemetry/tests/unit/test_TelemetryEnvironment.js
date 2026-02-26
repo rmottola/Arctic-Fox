@@ -570,12 +570,12 @@ function checkSystemSection(data) {
   Assert.ok("DWriteEnabled" in gfxData);
   // DWriteVersion is disabled due to main thread jank and will be enabled
   // again as part of bug 1154500.
-  //Assert.ok("DWriteVersion" in gfxData);
+  // Assert.ok("DWriteVersion" in gfxData);
   if (gIsWindows) {
     Assert.equal(typeof gfxData.D2DEnabled, "boolean");
     Assert.equal(typeof gfxData.DWriteEnabled, "boolean");
     // As above, will be enabled again as part of bug 1154500.
-    //Assert.ok(checkString(gfxData.DWriteVersion));
+    // Assert.ok(checkString(gfxData.DWriteVersion));
   }
 
   Assert.ok("adapters" in gfxData);

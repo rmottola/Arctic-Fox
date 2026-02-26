@@ -430,7 +430,7 @@ function restoreItemForToolbar(aItem, aWrapper)
     let commandID = aWrapper.getAttribute("itemcommand");
     aItem.setAttribute("command", commandID);
 
-    //XXX Bug 309953 - toolbarbuttons aren't in sync with their commands after customizing
+    // XXX Bug 309953 - toolbarbuttons aren't in sync with their commands after customizing
     let command = gToolboxDocument.getElementById(commandID);
     if (command && command.hasAttribute("disabled"))
       aItem.setAttribute("disabled", command.getAttribute("disabled"));
@@ -636,8 +636,8 @@ function isToolbarItem(aElt)
          aElt.localName == "toolbarspacer";
 }
 
-///////////////////////////////////////////////////////////////////////////
-//// Drag and Drop observers
+// /////////////////////////////////////////////////////////////////////////
+// // Drag and Drop observers
 
 function onToolbarDragExit(aEvent)
 {

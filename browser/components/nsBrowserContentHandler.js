@@ -270,10 +270,10 @@ function doSearch(searchTerm, cmdLine) {
                        .createInstance(Components.interfaces.nsISupportsString);
   wuri.data = submission.uri.spec;
 
-  args.appendElement(wuri, /*weak =*/ false);
-  args.appendElement(null, /*weak =*/ false);
-  args.appendElement(null, /*weak =*/ false);
-  args.appendElement(submission.postData, /*weak =*/ false);
+  args.appendElement(wuri, /* weak =*/ false);
+  args.appendElement(null, /* weak =*/ false);
+  args.appendElement(null, /* weak =*/ false);
+  args.appendElement(submission.postData, /* weak =*/ false);
 
   // XXXbsmedberg: use handURIToExistingBrowser to obey tabbed-browsing
   // preferences, but need nsIBrowserDOMWindow extensions
