@@ -225,7 +225,6 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY urlbar.geolocationNotificationAnchor.label     "View the location request">
 <!ENTITY urlbar.addonsNotificationAnchor.label          "View the add-on install message">
 <!ENTITY urlbar.indexedDBNotificationAnchor.label       "View the app-offline storage message">
-<!ENTITY urlbar.loginFillNotificationAnchor.label       "Manage your login information">
 <!ENTITY urlbar.passwordNotificationAnchor.label        "Check if you want to save your password">
 <!ENTITY urlbar.pluginsNotificationAnchor.label         "Manage plugin usage on this page">
 <!ENTITY urlbar.webNotsNotificationAnchor3.label        "Change whether you can receive notifications from the site">

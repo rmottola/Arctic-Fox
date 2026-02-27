@@ -670,8 +670,6 @@
                          aria-label="&urlbar.addonsNotificationAnchor.label;"/>
                   <image id="indexedDB-notification-icon" class="notification-anchor-icon indexedDB-icon" role="button"
                          aria-label="&urlbar.indexedDBNotificationAnchor.label;"/>
-                  <image id="login-fill-notification-icon" class="notification-anchor-icon login-icon" role="button"
-                         aria-label="&urlbar.loginFillNotificationAnchor.label;"/>
                   <image id="password-notification-icon" class="notification-anchor-icon login-icon" role="button"
                          aria-label="&urlbar.passwordNotificationAnchor.label;"/>
                   <image id="plugins-notification-icon" class="notification-anchor-icon plugin-icon" role="button"
