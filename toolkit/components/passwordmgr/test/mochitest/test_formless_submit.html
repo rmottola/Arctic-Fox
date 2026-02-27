@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Test capturing of fields outside of a form due to navigation</title>
+  <title>Test capturing of fields outside of a form</title>
   <script src="/tests/SimpleTest/SimpleTest.js"></script>
   <script src="/tests/SimpleTest/SpawnTask.js"></script>
   <script src="pwmgr_common.js"></script>
@@ -24,33 +24,24 @@ let loadPromise = new Promise(resolve => {
 });
 
 add_task(function* setup() {
-  yield SpecialPowers.pushPrefEnv({
-    set: [
-      ["signon.formlessCapture.enabled", true],
-    ],
-  });
-
   info("Waiting for page and frame loads");
   yield loadPromise;
 
   yield loadRecipes({
     siteRecipes: [{
-      hosts: ["test1.mochi.test:8888"],
+      hosts: ["mochi.test:8888"],
       usernameSelector: "input[name='recipeuname']",
       passwordSelector: "input[name='recipepword']",
     }],
   });
 });
 
-const DEFAULT_ORIGIN = "http://test1.mochi.test:8888";
-const SCRIPTS = {
-  PUSHSTATE: `history.pushState({}, "Pushed state", "?pushed");`,
-  WINDOW_LOCATION: `window.location = "data:text/html;charset=utf-8,window.location";`,
-};
+const DEFAULT_ORIGIN = "http://mochi.test:8888";
 const TESTCASES = [
   {
     // Inputs
     document: `<input type=password value="pass1">`,
+    inputIndexForFormLike: 0,
 
     // Expected outputs similar to RemoteLogins:onFormSubmit
     hostname: DEFAULT_ORIGIN,
@@ -62,7 +53,17 @@ const TESTCASES = [
   {
     document: `<input value="user1">
       <input type=password value="pass1">`,
-
+    inputIndexForFormLike: 0,
+    hostname: DEFAULT_ORIGIN,
+    formSubmitURL: DEFAULT_ORIGIN,
+    usernameFieldValue: "user1",
+    newPasswordFieldValue: "pass1",
+    oldPasswordFieldValue: null,
+  },
+  {
+    document: `<input value="user1">
+      <input type=password value="pass1">`,
+    inputIndexForFormLike: 1,
     hostname: DEFAULT_ORIGIN,
     formSubmitURL: DEFAULT_ORIGIN,
     usernameFieldValue: "user1",
@@ -73,7 +74,7 @@ const TESTCASES = [
     document: `<input value="user1">
       <input type=password value="pass1">
       <input type=password value="pass2">`,
-
+    inputIndexForFormLike: 2,
     hostname: DEFAULT_ORIGIN,
     formSubmitURL: DEFAULT_ORIGIN,
     usernameFieldValue: "user1",
@@ -85,7 +86,7 @@ const TESTCASES = [
       <input type=password value="pass1">
       <input type=password value="pass2">
       <input type=password value="pass2">`,
-
+    inputIndexForFormLike: 3,
     hostname: DEFAULT_ORIGIN,
     formSubmitURL: DEFAULT_ORIGIN,
     usernameFieldValue: "user1",
@@ -100,7 +101,7 @@ const TESTCASES = [
         <input value="user3">
         <input type=password value="pass2">
       </form>`,
-
+    inputIndexForFormLike: 2,
     hostname: DEFAULT_ORIGIN,
     formSubmitURL: DEFAULT_ORIGIN,
     usernameFieldValue: "user1",
@@ -113,7 +114,7 @@ const TESTCASES = [
       <input value="default field username">
       <input type=password value="pass1">
       <input name="recipepword" type=password value="pass2">`,
-
+    inputIndexForFormLike: 2,
     hostname: DEFAULT_ORIGIN,
     formSubmitURL: DEFAULT_ORIGIN,
     usernameFieldValue: "username from recipe",
@@ -135,46 +136,37 @@ function getSubmitMessage() {
 
 add_task(function* test() {
   let loginFrame = document.getElementById("loginFrame");
+  let frameDoc = loginFrame.contentWindow.document;
 
   for (let tc of TESTCASES) {
-    for (let scriptName of Object.keys(SCRIPTS)) {
-      info("Starting testcase with script " + scriptName + ": " + JSON.stringify(tc));
-      let loadedPromise = new Promise((resolve) => {
-        loginFrame.addEventListener("load", function frameLoaded() {
-          loginFrame.removeEventListener("load", frameLoaded);
-          resolve();
-        });
-      });
-      loginFrame.src = DEFAULT_ORIGIN + "/tests/toolkit/components/passwordmgr/test/mochitest/blank.html";
-      yield loadedPromise;
+    info("Starting testcase: " + JSON.stringify(tc));
+    frameDoc.documentElement.innerHTML = tc.document;
+    let inputForFormLike = frameDoc.querySelectorAll("input")[tc.inputIndexForFormLike];
 
-      let frameDoc = SpecialPowers.wrap(loginFrame.contentWindow).document;
-      frameDoc.documentElement.innerHTML = tc.document;
-      // Wait for the form to be processed before trying to submit.
-      yield promiseFormsProcessed();
-      let processedPromise = getSubmitMessage();
-      info("Running " + scriptName + " script to cause a submission");
-      frameDoc.defaultView.eval(SCRIPTS[scriptName]);
+    let formLike = LoginFormFactory.createFromField(inputForFormLike);
 
-      let submittedResult = yield processedPromise;
+    info("Calling _onFormSubmit with FormLike");
+    let processedPromise = getSubmitMessage();
+    LoginManagerContent._onFormSubmit(formLike);
 
-      // Check data sent via RemoteLogins:onFormSubmit
-      is(submittedResult.hostname, tc.hostname, "Check hostname");
-      is(submittedResult.formSubmitURL, tc.formSubmitURL, "Check formSubmitURL");
+    let submittedResult = yield processedPromise;
 
-      if (tc.usernameFieldValue === null) {
-        is(submittedResult.usernameField, tc.usernameFieldValue, "Check usernameField");
-      } else {
-        is(submittedResult.usernameField.value, tc.usernameFieldValue, "Check usernameField");
-      }
+    // Check data sent via RemoteLogins:onFormSubmit
+    is(submittedResult.hostname, tc.hostname, "Check hostname");
+    is(submittedResult.formSubmitURL, tc.formSubmitURL, "Check formSubmitURL");
 
-      is(submittedResult.newPasswordField.value, tc.newPasswordFieldValue, "Check newPasswordFieldValue");
+    if (tc.usernameFieldValue === null) {
+      is(submittedResult.usernameField, tc.usernameFieldValue, "Check usernameField");
+    } else {
+      is(submittedResult.usernameField.value, tc.usernameFieldValue, "Check usernameField");
+    }
 
-      if (tc.oldPasswordFieldValue === null) {
-        is(submittedResult.oldPasswordField, tc.oldPasswordFieldValue, "Check oldPasswordFieldValue");
-      } else {
-        is(submittedResult.oldPasswordField.value, tc.oldPasswordFieldValue, "Check oldPasswordFieldValue");
-      }
+    is(submittedResult.newPasswordField.value, tc.newPasswordFieldValue, "Check newPasswordFieldValue");
+
+    if (tc.oldPasswordFieldValue === null) {
+      is(submittedResult.oldPasswordField, tc.oldPasswordFieldValue, "Check oldPasswordFieldValue");
+    } else {
+      is(submittedResult.oldPasswordField.value, tc.oldPasswordFieldValue, "Check oldPasswordFieldValue");
     }
   }
 });
@@ -184,7 +176,7 @@ add_task(function* test() {
 <p id="display"></p>
 
 <div id="content">
-  <iframe id="loginFrame" src="http://test1.mochi.test:8888/tests/toolkit/components/passwordmgr/test/mochitest/blank.html"></iframe>
+  <iframe id="loginFrame" src="http://mochi.test:8888/tests/toolkit/components/passwordmgr/test/blank.html"></iframe>
 </div>
 <pre id="test"></pre>
 </body>
