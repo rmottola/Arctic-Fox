@@ -268,8 +268,6 @@ var bmsvc = Cc["@mozilla.org/browser/nav-bookmarks-service;1"].
 var obssvc = Cc["@mozilla.org/observer-service;1"].
              getService(Ci.nsIObserverService);
 
-// /////////////////////////////////////////////////////////////////////////////
-
 /**
  * Adds some bookmarks for the URIs in |uris|.
  */

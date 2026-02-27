@@ -10,8 +10,7 @@ Components.utils.import("resource://testing-common/PromiseTestUtils.jsm");
 // Prevent test failures due to the unhandled rejections in this test file.
 PromiseTestUtils.disableUncaughtRejectionObserverForSelfTest();
 
-// //////////////////////////////////////////////////////////////////////////////
-// // Test runner
+// Test runner
 
 let run_promise_tests = function run_promise_tests(tests, cb) {
   let loop = function loop(index) {
@@ -79,8 +78,7 @@ let make_promise_test = function(test) {
   };
 };
 
-// //////////////////////////////////////////////////////////////////////////////
-// // Tests
+// Tests
 
 let tests = [];
 

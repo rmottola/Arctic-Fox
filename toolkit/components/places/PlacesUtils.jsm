@@ -551,8 +551,7 @@ this.PlacesUtils = {
     this._shutdownFunctions.push(aFunc);
   },
 
-  // ////////////////////////////////////////////////////////////////////////////
-  // // nsIObserver
+  // nsIObserver
   observe: function PU_observe(aSubject, aTopic, aData)
   {
     switch (aTopic) {
@@ -585,8 +584,7 @@ this.PlacesUtils = {
   onPageAnnotationRemoved: function() {},
 
 
-  // ////////////////////////////////////////////////////////////////////////////
-  // // nsITransactionListener
+  // nsITransactionListener
 
   didDo: function PU_didDo(aManager, aTransaction, aDoResult)
   {
@@ -2693,8 +2691,7 @@ var GuidHelper = {
   }
 };
 
-// //////////////////////////////////////////////////////////////////////////////
-// // Transactions handlers.
+// Transactions handlers.
 
 /**
  * Updates commands in the undo group of the active window commands.

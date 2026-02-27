@@ -73,7 +73,7 @@ let Screenshot = {
     });
   },
 
-  // /// helpers /////
+  // helpers
 
   _screenshotWindows(filename) {
     return new Promise((resolve, reject) => {

@@ -550,9 +550,7 @@ WebConsoleActor.prototype =
     return this._lastConsoleInputEvaluation;
   },
 
-  // ////////////////
   // Request handlers for known packet types.
-  // ////////////////
 
   /**
    * Handler for the "startListeners" request.
@@ -1071,9 +1069,7 @@ WebConsoleActor.prototype =
     return { updated: Object.keys(aRequest.preferences) };
   },
 
-  // ////////////////
   // End of request handlers.
-  // ////////////////
 
   /**
    * Create an object with the API we expose to the Web Console during
@@ -1407,9 +1403,7 @@ WebConsoleActor.prototype =
     };
   },
 
-  // ////////////////
   // Event handlers for various listeners.
-  // ////////////////
 
   /**
    * Handler for messages received from the ConsoleServiceListener. This method
@@ -1664,9 +1658,7 @@ WebConsoleActor.prototype =
     this.conn.send(packet);
   },
 
-  // ////////////////
   // End of event handlers for various listeners.
-  // ////////////////
 
   /**
    * Prepare a message from the console API to be sent to the remote Web Console

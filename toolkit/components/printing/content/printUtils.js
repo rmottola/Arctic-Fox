@@ -290,9 +290,7 @@ var PrintUtils = {
     return document.getElementById("print-preview-toolbar") != null;
   },
 
-  // //////////////////////////////////////////////////
-  // "private" methods and members. Don't use them. //
-  // /////////////////////////////////////////////////
+  // "private" methods and members. Don't use them.
 
   _listener: null,
   _closeHandlerPP: null,
