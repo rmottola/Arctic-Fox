@@ -1347,6 +1347,72 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         </body>
       </method>
 
+      <method name="_openAutocompletePopup">
+        <parameter name="aInput"/>
+        <parameter name="aElement"/>
+        <body><![CDATA[
+          if (this.mPopupOpen) {
+            return;
+          }
+
+          this.mInput = aInput;
+          this.selectedIndex = this._isFirstResultHeuristic ? 0 : -1;
+          this.view = aInput.controller.QueryInterface(Components.interfaces.nsITreeView);
+          this._invalidate();
+
+          var rect = window.document.documentElement.getBoundingClientRect();
+          var width = rect.right - rect.left;
+          this.setAttribute("width", width);
+
+          // Adjust the direction of the autocomplete popup list based on the textbox direction, bug 649840
+          var popupDirection = aElement.ownerDocument.defaultView.getComputedStyle(aElement).direction;
+          this.style.direction = popupDirection;
+
+          // Make the popup's starting margin negative so that the leading edge
+          // of the popup aligns with the window border.
+          let elementRect = aElement.getBoundingClientRect();
+          if (popupDirection == "rtl") {
+            let offset = elementRect.right - rect.right
+            this.style.marginRight = offset + "px";
+          } else {
+            let offset = rect.left - elementRect.left;
+            this.style.marginLeft = offset + "px";
+          }
+
+          // Keep the popup items' site icons aligned with the urlbar's identity
+          // icon if it's not too far from the edge of the window.  If there are
+          // at most two toolbar buttons between the window edge and the urlbar,
+          // then consider that as "not too far."  The forward button's
+          // visibility may have changed since the last time the popup was
+          // opened, so this needs to happen now.  Do it *before* the popup
+          // opens because otherwise the items will visibly shift.
+          let nodes = [...document.getElementById("nav-bar-customization-target").childNodes];
+          let urlbarPosition = nodes.findIndex(n => n.id == "urlbar-container");
+          let alignSiteIcons = urlbarPosition <= 2 &&
+                               nodes.slice(0, urlbarPosition)
+                                    .every(n => n.localName == "toolbarbutton");
+          if (alignSiteIcons) {
+            let identityRect =
+              document.getElementById("identity-icon").getBoundingClientRect();
+            this.siteIconStart = popupDirection == "rtl" ? identityRect.right
+                                                         : identityRect.left;
+          }
+          else {
+            // Reset the alignment so that the site icons are positioned
+            // according to whatever's in the CSS.
+            this.siteIconStart = undefined;
+          }
+
+          // Position the popup below the navbar.  To get the y-coordinate,
+          // which is an offset from the bottom of the input, subtract the
+          // bottom of the navbar from the buttom of the input.
+          let yOffset =
+            document.getElementById("nav-bar").getBoundingClientRect().bottom -
+            aInput.getBoundingClientRect().bottom;
+          this.openPopup(aElement, "after_start", 0, yOffset, false, false);
+        ]]></body>
+      </method>
+
       <method name="_updateFooterVisibility">
         <body>
           <![CDATA[
@@ -1547,9 +1613,19 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             }
 
             this.input.gotResultForCurrentQuery = true;
-            if (this.input.handleEnterWhenGotResult) {
-              this.input.handleEnterWhenGotResult = false;
-              this.input.mController.handleEnter(false);
+
+            // Check if we should perform a delayed handleEnter.
+            if (this.input.handleEnterInstance) {
+              let instance = this.input.handleEnterInstance;
+              this.input.handleEnterInstance = null;
+              // Don't handle this immediately or we could cause a recursive
+              // loop where the controller sets popupOpen and re-enters here.
+              setTimeout(() => {
+                // Safety check: handle only if the search string didn't change.
+                if (this.input.mController.searchString == instance.searchString) {
+                  this.input.mController.handleEnter(false, instance.event);
+                }
+              }, 0);
             }
           ]]>
         </body>
