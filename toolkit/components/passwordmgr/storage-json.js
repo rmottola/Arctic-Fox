@@ -283,8 +283,6 @@ this.LoginManagerStorage_json.prototype = {
   }) {
     this._store.ensureDataReady();
 
-    let conditions = [];
-
     function match(aLogin) {
       for (let field in matchData) {
         let wantedValue = matchData[field];
@@ -397,7 +395,6 @@ this.LoginManagerStorage_json.prototype = {
   },
 
   countLogins(hostname, formSubmitURL, httpRealm) {
-    let count = {};
     let loginData = {
       hostname: hostname,
       formSubmitURL: formSubmitURL,
