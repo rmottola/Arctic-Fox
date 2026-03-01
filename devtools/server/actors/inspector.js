@@ -2616,12 +2616,6 @@ exports.InspectorActor = protocol.ActorClassWithSpec(inspectorSpec, {
     this.tabActor = null;
   },
 
-  // Forces destruction of the actor and all its children
-  // like highlighter, walker and style actors.
-  disconnect: function () {
-    this.destroy();
-  },
-
   get window() {
     return this.tabActor.window;
   },
