@@ -260,7 +260,7 @@ EventTree*
 EventTree::FindOrInsert(Accessible* aContainer)
 {
   if (!mFirst) {
-    mFirst.reset(new EventTree(aContainer, true));
+    mFirst.reset(new EventTree(aContainer, mDependentEvents.IsEmpty()));
     return mFirst.get();
   }
 
