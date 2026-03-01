@@ -1035,7 +1035,7 @@ WebConsoleActor.prototype =
   {
     let prefs = Object.create(null);
     for (let key of aRequest.preferences) {
-      prefs[key] = !!this._prefs[key];
+      prefs[key] = this._prefs[key];
     }
     return { preferences: prefs };
   },
