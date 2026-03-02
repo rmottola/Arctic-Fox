@@ -671,3 +671,5 @@ chrome/marionette/content/MockFilePicker.jsm
 chrome/marionette/modules/MockFilePicker.jsm
 chrome/marionette/content/Assert.jsm
 chrome/marionette/modules/Assert.jsm
+
+browser/chrome/devtools/skin/images/globe.svg
