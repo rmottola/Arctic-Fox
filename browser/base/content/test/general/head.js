@@ -223,7 +223,7 @@ function promiseWindowClosed(win) {
   return deferred.promise;
 }
 
-function promiseOpenAndLoadWindow(aOptions, aWaitForDelayedStartup=false) {
+function promiseOpenAndLoadWindow(aOptions, aWaitForDelayedStartup = false) {
   let deferred = Promise.defer();
   let win = OpenBrowserWindow(aOptions);
   if (aWaitForDelayedStartup) {

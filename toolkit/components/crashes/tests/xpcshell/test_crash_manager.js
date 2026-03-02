@@ -75,7 +75,7 @@ add_task(function* test_pending_dumps() {
   }
 
   for (let i = 0; i < COUNT; i++) {
-    Assert.equal(entries[i].id, ids[COUNT-i-1], "Entries sorted by mtime");
+    Assert.equal(entries[i].id, ids[COUNT - i - 1], "Entries sorted by mtime");
   }
 });
 

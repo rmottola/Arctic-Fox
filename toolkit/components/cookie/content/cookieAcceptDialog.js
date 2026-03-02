@@ -133,7 +133,7 @@ function onload()
 
 function showhideinfo()
 {
-  var infobox=document.getElementById('infobox');
+  var infobox = document.getElementById('infobox');
 
   if (infobox.hidden) {
     infobox.setAttribute("hidden", "false");
@@ -174,7 +174,7 @@ function cookieDeny()
 
 function GetExpiresString(secondsUntilExpires) {
   if (secondsUntilExpires) {
-    var date = new Date(1000*secondsUntilExpires);
+    var date = new Date(1000 * secondsUntilExpires);
     const locale = Components.classes["@mozilla.org/chrome/chrome-registry;1"]
                    .getService(Components.interfaces.nsIXULChromeRegistry)
                    .getSelectedLocale("global", true);

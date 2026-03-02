@@ -73,7 +73,7 @@ function arraysEqual(a, b) {
     return false;
   }
 
-  for (let i=0; i<a.length; ++i) {
+  for (let i = 0; i < a.length; ++i) {
     if (a[i] !== b[i]) {
       return false;
     }
@@ -208,7 +208,7 @@ add_task(function* test_simpleFields() {
     [true,  null, {jsfilter: "var filter = " + sanityFilter.toSource()}],
   ];
 
-  for (let i=0; i<testData.length; ++i) {
+  for (let i = 0; i < testData.length; ++i) {
     let entry = testData[i];
     let applicable;
     let reason = null;
@@ -305,7 +305,7 @@ add_task(function* test_times() {
                 endTime: nowSec + 10 * SEC_IN_ONE_DAY}],
   ];
 
-  for (let i=0; i<testData.length; ++i) {
+  for (let i = 0; i < testData.length; ++i) {
     let entry = testData[i];
     let applicable;
     let reason = null;

@@ -16,7 +16,7 @@ add_task(function* tags_getter_setter() {
   var [query, dummy] = makeQuery();
   do_check_eq(query.tags.length, 0);
 
-  do_print("Setting tags to an empty array, tags getter should return "+
+  do_print("Setting tags to an empty array, tags getter should return " +
            "empty array");
   [query, dummy] = makeQuery([]);
   do_check_eq(query.tags.length, 0);

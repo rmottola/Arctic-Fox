@@ -120,7 +120,7 @@ Notification.prototype = {
       return anchorElement;
 
     if (!anchorElement && this.anchorID)
-      anchorElement = iconBox.querySelector("#"+this.anchorID);
+      anchorElement = iconBox.querySelector("#" + this.anchorID);
 
     // Use a default anchor icon if it's available
     if (!anchorElement)

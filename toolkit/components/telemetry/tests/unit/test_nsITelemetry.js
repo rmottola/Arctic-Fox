@@ -10,7 +10,7 @@ Cu.import("resource://gre/modules/TelemetryUtils.jsm", this);
 function numberRange(lower, upper)
 {
   let a = [];
-  for (let i=lower; i<upper; ++i) {
+  for (let i = lower; i < upper; ++i) {
     a.push(i);
   }
   return a;
@@ -60,7 +60,7 @@ function check_histogram(histogram_type, name, min, max, bucket_count) {
   var h = Telemetry.getHistogramById(name);
   var r = h.snapshot().ranges;
   var sum = 0;
-  for (let i=0;i<r.length;i++) {
+  for (let i = 0;i < r.length;i++) {
     var v = r[i];
     sum += v;
     h.add(v);
@@ -487,7 +487,7 @@ add_task(function* test_keyed_boolean_histogram() {
   let testSnapShot = {};
 
   let h = Telemetry.getKeyedHistogramById(KEYED_ID);
-  for (let i=0; i<2; ++i) {
+  for (let i = 0; i < 2; ++i) {
     let key = KEYS[i];
     h.add(key, true);
     testSnapShot[key] = testHistograms[i];
@@ -534,11 +534,11 @@ add_task(function* test_keyed_count_histogram() {
   let testSnapShot = {};
 
   let h = Telemetry.getKeyedHistogramById(KEYED_ID);
-  for (let i=0; i<4; ++i) {
+  for (let i = 0; i < 4; ++i) {
     let key = KEYS[i];
-    let value = i*2 + 1;
+    let value = i * 2 + 1;
 
-    for (let k=0; k<value; ++k) {
+    for (let k = 0; k < value; ++k) {
       h.add(key);
     }
     testHistograms[i].counts[0] = value;

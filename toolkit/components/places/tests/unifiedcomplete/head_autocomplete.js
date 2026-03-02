@@ -424,14 +424,14 @@ function setFaviconForHref(href, iconHref) {
   });
 }
 
-function makeTestServer(port=-1) {
+function makeTestServer(port = -1) {
   let httpServer = new HttpServer();
   httpServer.start(port);
   do_register_cleanup(() => httpServer.stop(() => {}));
   return httpServer;
 }
 
-function* addTestEngine(basename, httpServer=undefined) {
+function* addTestEngine(basename, httpServer = undefined) {
   httpServer = httpServer || makeTestServer();
   httpServer.registerDirectory("/", do_get_cwd());
   let dataUrl =

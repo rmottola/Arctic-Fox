@@ -185,7 +185,7 @@ var CharsetMenu = {
     }));
   },
 
-  getCharsetInfo: function(charsets, sort=true) {
+  getCharsetInfo: function(charsets, sort = true) {
     let list = Array.from(charsets, charset => ({
       label: this._getCharsetLabel(charset),
       accesskey: this._getCharsetAccessKey(charset),
