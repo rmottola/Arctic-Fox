@@ -154,9 +154,7 @@ struct nsCookieAttributes
 struct nsListIter
 {
   // default (non-initializing) constructor.
-  nsListIter()
-  {
-  }
+  nsListIter() = default;
 
   // explicit constructor to a given iterator state with entryclass 'aEntry'
   // and index 'aIndex'.
@@ -379,7 +377,7 @@ class InsertCookieDBListener final : public DBListenerErrorHandler
 private:
   virtual const char *GetOpType() override { return "INSERT"; }
 
-  ~InsertCookieDBListener() {}
+  ~InsertCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -415,7 +413,7 @@ class UpdateCookieDBListener final : public DBListenerErrorHandler
 private:
   virtual const char *GetOpType() override { return "UPDATE"; }
 
-  ~UpdateCookieDBListener() {}
+  ~UpdateCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -443,7 +441,7 @@ class RemoveCookieDBListener final : public DBListenerErrorHandler
 private:
   virtual const char *GetOpType() override { return "REMOVE"; }
 
-  ~RemoveCookieDBListener() {}
+  ~RemoveCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -472,7 +470,7 @@ private:
   virtual const char *GetOpType() override { return "READ"; }
   bool mCanceled;
 
-  ~ReadCookieDBListener() {}
+  ~ReadCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -555,7 +553,7 @@ NS_IMPL_ISUPPORTS(ReadCookieDBListener, mozIStorageStatementCallback)
  ******************************************************************************/
 class CloseCookieDBListener final :  public mozIStorageCompletionCallback
 {
-  ~CloseCookieDBListener() {}
+  ~CloseCookieDBListener() = default;
 
 public:
   explicit CloseCookieDBListener(DBState* dbState) : mDBState(dbState) { }
@@ -575,7 +573,7 @@ namespace {
 
 class AppClearDataObserver final : public nsIObserver {
 
-  ~AppClearDataObserver() {}
+  ~AppClearDataObserver() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -823,7 +821,7 @@ namespace {
 
 class ConvertAppIdToOriginAttrsSQLFunction final : public mozIStorageFunction
 {
-  ~ConvertAppIdToOriginAttrsSQLFunction() {}
+  ~ConvertAppIdToOriginAttrsSQLFunction() = default;
 
   NS_DECL_ISUPPORTS
   NS_DECL_MOZISTORAGEFUNCTION
@@ -859,7 +857,7 @@ ConvertAppIdToOriginAttrsSQLFunction::OnFunctionCall(
 
 class SetAppIdFromOriginAttributesSQLFunction final : public mozIStorageFunction
 {
-  ~SetAppIdFromOriginAttributesSQLFunction() {}
+  ~SetAppIdFromOriginAttributesSQLFunction() = default;
 
   NS_DECL_ISUPPORTS
   NS_DECL_MOZISTORAGEFUNCTION
@@ -891,7 +889,7 @@ SetAppIdFromOriginAttributesSQLFunction::OnFunctionCall(
 class SetInBrowserFromOriginAttributesSQLFunction final :
   public mozIStorageFunction
 {
-  ~SetInBrowserFromOriginAttributesSQLFunction() {}
+  ~SetInBrowserFromOriginAttributesSQLFunction() = default;
 
   NS_DECL_ISUPPORTS
   NS_DECL_MOZISTORAGEFUNCTION
