@@ -36,6 +36,9 @@ module.exports = {
     // Always require a trailing EOL
     "eol-last": 2,
 
+    // No spaces between function name and parentheses
+    "func-call-spacing": "error",
+
     // Require function* name()
     // "generator-star-spacing": [2, {"before": false, "after": true}],
 
