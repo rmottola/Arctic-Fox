@@ -1138,8 +1138,6 @@ EnvironmentCache.prototype = {
       this._log.error("_isDefaultBrowser - Could not determine if default browser", ex);
       return null;
     }
-
-    return null;
   },
 
   /**

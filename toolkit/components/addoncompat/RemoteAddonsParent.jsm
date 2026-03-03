@@ -135,7 +135,6 @@ var ContentPolicyParent = {
     switch (aMessage.name) {
       case "Addons:ContentPolicy:Run":
         return this.shouldLoad(aMessage.data, aMessage.objects);
-        break;
     }
     return undefined;
   },
@@ -233,7 +232,6 @@ var AboutProtocolParent = {
         return this.getURIFlags(msg);
       case "Addons:AboutProtocol:OpenChannel":
         return this.openChannel(msg);
-        break;
     }
     return undefined;
   },
