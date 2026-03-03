@@ -218,7 +218,7 @@ CommonDialog.prototype = {
     },
 
 
-    initTextbox : function (aName, aValue) {
+    initTextbox : function(aName, aValue) {
         this.ui[aName + "Container"].hidden = false;
         this.ui[aName + "Textbox"].setAttribute("value",
                                                 aValue !== null ? aValue : "");

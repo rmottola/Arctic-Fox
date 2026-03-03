@@ -66,7 +66,7 @@ function test() {
     );
 
     addVisits({uri: pageURI, transition: TRANSITION_TYPED}, aWindow,
-      function () {
+      function() {
         aWindow.PlacesUtils.favicons.setAndFetchFaviconForPage(pageURI, favIconURI,
           true, aWindow.PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE, null,
           Services.scriptSecurityManager.getSystemPrincipal());

@@ -156,7 +156,7 @@ DownloadLegacyTransfer.prototype = {
                             aMaxTotalProgress);
   },
 
-  onLocationChange: function () { },
+  onLocationChange: function() { },
 
   onStatusChange: function DLT_onStatusChange(aWebProgress, aRequest, aStatus,
                                               aMessage)
@@ -174,7 +174,7 @@ DownloadLegacyTransfer.prototype = {
     }
   },
 
-  onSecurityChange: function () { },
+  onSecurityChange: function() { },
 
   // nsIWebProgressListener2
 
@@ -247,17 +247,17 @@ DownloadLegacyTransfer.prototype = {
     }.bind(this)).then(null, Cu.reportError);
   },
 
-  setSha256Hash: function (hash)
+  setSha256Hash: function(hash)
   {
     this._sha256Hash = hash;
   },
 
-  setSignatureInfo: function (signatureInfo)
+  setSignatureInfo: function(signatureInfo)
   {
     this._signatureInfo = signatureInfo;
   },
 
-  setRedirects: function (redirects)
+  setRedirects: function(redirects)
   {
     this._redirects = redirects;
   },

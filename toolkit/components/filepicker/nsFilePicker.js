@@ -299,9 +299,9 @@ nsFilePicker.prototype = {
 }
 
 if (DEBUG)
-  debug = function (s) { dump("-*- filepicker: " + s + "\n"); };
+  debug = function(s) { dump("-*- filepicker: " + s + "\n"); };
 else
-  debug = function (s) {};
+  debug = function(s) {};
 
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory([nsFilePicker]);
 

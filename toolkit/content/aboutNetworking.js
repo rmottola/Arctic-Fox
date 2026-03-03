@@ -166,7 +166,7 @@ function init() {
   });
 }
 
-function confirm () {
+function confirm() {
   let div = document.getElementById("warning_message");
   div.classList.remove("active");
   let warnBox = document.getElementById("warncheck");

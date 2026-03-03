@@ -55,7 +55,7 @@ this.ReaderMode = {
     return this.isOnLowMemoryPlatform = memory.isLowMemoryPlatform();
   },
 
-  _getStateForParseOnLoad: function () {
+  _getStateForParseOnLoad: function() {
     let isEnabled = Services.prefs.getBoolPref("reader.parse-on-load.enabled");
     let isForceEnabled = Services.prefs.getBoolPref("reader.parse-on-load.force-enabled");
     // For low-memory devices, don't allow reader mode since it takes up a lot of memory.
@@ -387,7 +387,7 @@ this.ReaderMode = {
    * @param url The article URL. This should have referrers removed.
    * @return The file path to the cached article.
    */
-  _toHashedPath: function (url) {
+  _toHashedPath: function(url) {
     let value = this._unicodeConverter.convertToByteArray(url);
     this._cryptoHash.init(this._cryptoHash.MD5);
     this._cryptoHash.update(value, value.length);
@@ -404,7 +404,7 @@ this.ReaderMode = {
    * @resolves When the cache directory exists.
    * @rejects OS.File.Error
    */
-  _ensureCacheDir: function () {
+  _ensureCacheDir: function() {
     let dir = OS.Path.join(OS.Constants.Path.profileDir, "readercache");
     return OS.File.exists(dir).then(exists => {
       if (!exists) {

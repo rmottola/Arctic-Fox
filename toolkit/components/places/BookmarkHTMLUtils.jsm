@@ -1110,7 +1110,7 @@ BookmarkExporter.prototype = {
     }
   },
 
-  _writeSeparator: function (aItem, aIndent) {
+  _writeSeparator: function(aItem, aIndent) {
     this._write(aIndent + "<HR");
     // We keep exporting separator titles, but don't support them anymore.
     if (aItem.title)
@@ -1118,7 +1118,7 @@ BookmarkExporter.prototype = {
     this._write(">");
   },
 
-  _writeLivemark: function (aItem, aIndent) {
+  _writeLivemark: function(aItem, aIndent) {
     this._write(aIndent + "<DT><A");
     let feedSpec = aItem.annos.find(anno => anno.name == PlacesUtils.LMANNO_FEEDURI).value;
     this._writeAttribute("FEEDURL", escapeUrl(feedSpec));
@@ -1159,7 +1159,7 @@ BookmarkExporter.prototype = {
     this._writeDescription(aItem, aIndent);
   },
 
-  _writeDateAttributes: function (aItem) {
+  _writeDateAttributes: function(aItem) {
     if (aItem.dateAdded)
       this._writeAttribute("ADD_DATE",
                            Math.floor(aItem.dateAdded / MICROSEC_PER_SEC));
@@ -1188,7 +1188,7 @@ BookmarkExporter.prototype = {
     }
   },
 
-  _writeDescription: function (aItem, aIndent) {
+  _writeDescription: function(aItem, aIndent) {
     let descriptionAnno = aItem.annos &&
                           aItem.annos.find(anno => anno.name == DESCRIPTION_ANNO);
     if (descriptionAnno)

@@ -60,7 +60,7 @@ XULStore.prototype = {
   _saveAllowed: true,
   _writeTimer: Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer),
 
-  load: function () {
+  load: function() {
     Services.obs.addObserver(this, "profile-before-change", true);
 
     let profileType = "ProfD";
@@ -93,7 +93,7 @@ XULStore.prototype = {
   /*
    * Internal function for logging debug messages to the Error Console window
    */
-  log: function (message) {
+  log: function(message) {
     if (!debugMode)
       return;
     dump("XULStore: " + message + "\n");
@@ -202,7 +202,7 @@ XULStore.prototype = {
 
   /* ---------- interface implementation ---------- */
 
-  setValue: function (docURI, id, attr, value) {
+  setValue: function(docURI, id, attr, value) {
     this.log("Saving " + attr + "=" + value + " for id=" + id + ", doc=" + docURI);
 
     if (!this._saveAllowed) {
@@ -239,7 +239,7 @@ XULStore.prototype = {
     this.markAsChanged();
   },
 
-  hasValue: function (docURI, id, attr) {
+  hasValue: function(docURI, id, attr) {
     this.log("has store value for id=" + id + ", attr=" + attr + ", doc=" + docURI);
 
     let ids = this._data[docURI];
@@ -253,7 +253,7 @@ XULStore.prototype = {
     return false;
   },
 
-  getValue: function (docURI, id, attr) {
+  getValue: function(docURI, id, attr) {
     this.log("get store value for id=" + id + ", attr=" + attr + ", doc=" + docURI);
 
     let ids = this._data[docURI];
@@ -267,7 +267,7 @@ XULStore.prototype = {
     return "";
   },
 
-  removeValue: function (docURI, id, attr) {
+  removeValue: function(docURI, id, attr) {
     this.log("remove store value for id=" + id + ", attr=" + attr + ", doc=" + docURI);
 
     if (!this._saveAllowed) {
@@ -294,7 +294,7 @@ XULStore.prototype = {
     }
   },
 
-  getIDsEnumerator: function (docURI) {
+  getIDsEnumerator: function(docURI) {
     this.log("Getting ID enumerator for doc=" + docURI);
 
     if (!(docURI in this._data))
@@ -311,7 +311,7 @@ XULStore.prototype = {
     return new nsStringEnumerator(result);
   },
 
-  getAttributeEnumerator: function (docURI, id) {
+  getAttributeEnumerator: function(docURI, id) {
     this.log("Getting attribute enumerator for id=" + id + ", doc=" + docURI);
 
     if (!(docURI in this._data) || !(id in this._data[docURI]))

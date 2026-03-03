@@ -68,7 +68,7 @@ function play_nonautoplay_audio_should_be_paused() {
 
   nonAutoPlay.play();
   return new Promise(resolve => {
-    nonAutoPlay.onpause = function () {
+    nonAutoPlay.onpause = function() {
       nonAutoPlay.onpause = null;
       is(nonAutoPlay.ended, false, "Audio can't be playback.");
       resolve();
@@ -106,7 +106,7 @@ function play_nonautoplay_audio_should_play_until_ended() {
 
   nonAutoPlay.play();
   return new Promise(resolve => {
-    nonAutoPlay.onended = function () {
+    nonAutoPlay.onended = function() {
       nonAutoPlay.onended = null;
       ok(true, "Audio can be playback until ended.");
       resolve();

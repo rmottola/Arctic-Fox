@@ -107,7 +107,7 @@ function test() {
   function testPrivateBrowsingNonBookmarkedURI(aWindow, aCallback) {
     let pageURI = NetUtil.newURI("http://example.com/privateBrowsing");
     addVisits({ uri: pageURI, transitionType: TRANSITION_TYPED }, aWindow,
-      function () {
+      function() {
         aWindow.PlacesUtils.favicons.setAndFetchFaviconForPage(pageURI,
           favIcon16URI, true,
           aWindow.PlacesUtils.favicons.FAVICON_LOAD_PRIVATE, null,
@@ -122,7 +122,7 @@ function test() {
   function testDisabledHistory(aWindow, aCallback) {
     let pageURI = NetUtil.newURI("http://example.com/disabledHistory");
     addVisits({ uri: pageURI, transition: TRANSITION_TYPED }, aWindow,
-      function () {
+      function() {
         aWindow.Services.prefs.setBoolPref("places.history.enabled", false);
 
         aWindow.PlacesUtils.favicons.setAndFetchFaviconForPage(pageURI,
@@ -145,7 +145,7 @@ function test() {
     let pageURI = NetUtil.newURI("http://example.com/errorIcon");
     let places = [{ uri: pageURI, transition: TRANSITION_TYPED }];
     addVisits({ uri: pageURI, transition: TRANSITION_TYPED }, aWindow,
-      function () {
+      function() {
         aWindow.PlacesUtils.favicons.setAndFetchFaviconForPage(pageURI,
           favIconErrorPageURI, true,
           aWindow.PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE, null,
@@ -217,7 +217,7 @@ function test() {
     // callback to be invoked.  In turn, the callback will invoke
     // finish() causing the tests to finish.
     addVisits({ uri: lastPageURI, transition: TRANSITION_TYPED }, aWindow,
-      function () {
+      function() {
         aWindow.PlacesUtils.favicons.setAndFetchFaviconForPage(lastPageURI,
           favIcon32URI, true,
           aWindow.PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE, null,

@@ -16,7 +16,7 @@ const STATE_CANCELED = 3;
 
 const backgroundPageThumbsContent = {
 
-  init: function () {
+  init: function() {
     Services.obs.addObserver(this, "document-element-inserted", true);
 
     // We want a low network priority for this service - lower than b/g tabs
@@ -42,7 +42,7 @@ const backgroundPageThumbsContent = {
       addProgressListener(this, Ci.nsIWebProgress.NOTIFY_STATE_WINDOW);
   },
 
-  observe: function (subj, topic, data) {
+  observe: function(subj, topic, data) {
     // Arrange to prevent (most) popup dialogs for this window - popups done
     // in the parent (eg, auth) aren't prevented, but alert() etc are.
     // disableDialogs only works on the current inner window, so it has
@@ -59,7 +59,7 @@ const backgroundPageThumbsContent = {
     return docShell.QueryInterface(Ci.nsIWebNavigation);
   },
 
-  _onCapture: function (msg) {
+  _onCapture: function(msg) {
     this._nextCapture = {
       id: msg.data.id,
       url: msg.data.url,
@@ -77,7 +77,7 @@ const backgroundPageThumbsContent = {
     this._startNextCapture();
   },
 
-  _startNextCapture: function () {
+  _startNextCapture: function() {
     if (!this._nextCapture)
       return;
     this._currentCapture = this._nextCapture;
@@ -96,7 +96,7 @@ const backgroundPageThumbsContent = {
     }
   },
 
-  onStateChange: function (webProgress, req, flags, status) {
+  onStateChange: function(webProgress, req, flags, status) {
     if (webProgress.isTopLevel &&
         (flags & Ci.nsIWebProgressListener.STATE_STOP) &&
         this._currentCapture) {
@@ -135,7 +135,7 @@ const backgroundPageThumbsContent = {
     }
   },
 
-  _captureCurrentPage: function () {
+  _captureCurrentPage: function() {
     let capture = this._currentCapture;
     capture.finalURL = this._webNav.currentURI.spec;
     capture.pageLoadTime = new Date() - capture.pageLoadStartDate;
@@ -152,7 +152,7 @@ const backgroundPageThumbsContent = {
     });
   },
 
-  _finishCurrentCapture: function () {
+  _finishCurrentCapture: function() {
     let capture = this._currentCapture;
     let fileReader = new FileReader();
     fileReader.onloadend = () => {
@@ -169,7 +169,7 @@ const backgroundPageThumbsContent = {
     fileReader.readAsArrayBuffer(capture.imageBlob);
   },
 
-  _failCurrentCapture: function (reason) {
+  _failCurrentCapture: function(reason) {
     let capture = this._currentCapture;
     sendAsyncMessage("BackgroundPageThumbs:didCapture", {
       id: capture.id,

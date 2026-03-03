@@ -55,7 +55,7 @@ add_test(function batch() {
      args: [] },
   ];
   PlacesUtils.bookmarks.runInBatchMode({
-    runBatched: function () {
+    runBatched: function() {
       // Nothing.
     }
   }, null);

@@ -749,13 +749,13 @@ function do_compare_arrays(a1, a2, sorted)
 function NavBookmarkObserver() {}
 
 NavBookmarkObserver.prototype = {
-  onBeginUpdateBatch: function () {},
-  onEndUpdateBatch: function () {},
-  onItemAdded: function () {},
-  onItemRemoved: function () {},
-  onItemChanged: function () {},
-  onItemVisited: function () {},
-  onItemMoved: function () {},
+  onBeginUpdateBatch: function() {},
+  onEndUpdateBatch: function() {},
+  onItemAdded: function() {},
+  onItemRemoved: function() {},
+  onItemChanged: function() {},
+  onItemVisited: function() {},
+  onItemMoved: function() {},
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsINavBookmarkObserver,
   ])
@@ -768,14 +768,14 @@ NavBookmarkObserver.prototype = {
 function NavHistoryObserver() {}
 
 NavHistoryObserver.prototype = {
-  onBeginUpdateBatch: function () {},
-  onEndUpdateBatch: function () {},
-  onVisit: function () {},
-  onTitleChanged: function () {},
-  onDeleteURI: function () {},
-  onClearHistory: function () {},
-  onPageChanged: function () {},
-  onDeleteVisits: function () {},
+  onBeginUpdateBatch: function() {},
+  onEndUpdateBatch: function() {},
+  onVisit: function() {},
+  onTitleChanged: function() {},
+  onDeleteURI: function() {},
+  onClearHistory: function() {},
+  onPageChanged: function() {},
+  onDeleteVisits: function() {},
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsINavHistoryObserver,
   ])
@@ -789,22 +789,22 @@ NavHistoryObserver.prototype = {
 function NavHistoryResultObserver() {}
 
 NavHistoryResultObserver.prototype = {
-  batching: function () {},
-  containerStateChanged: function () {},
-  invalidateContainer: function () {},
-  nodeAnnotationChanged: function () {},
-  nodeDateAddedChanged: function () {},
-  nodeHistoryDetailsChanged: function () {},
-  nodeIconChanged: function () {},
-  nodeInserted: function () {},
-  nodeKeywordChanged: function () {},
-  nodeLastModifiedChanged: function () {},
-  nodeMoved: function () {},
-  nodeRemoved: function () {},
-  nodeTagsChanged: function () {},
-  nodeTitleChanged: function () {},
-  nodeURIChanged: function () {},
-  sortingChanged: function () {},
+  batching: function() {},
+  containerStateChanged: function() {},
+  invalidateContainer: function() {},
+  nodeAnnotationChanged: function() {},
+  nodeDateAddedChanged: function() {},
+  nodeHistoryDetailsChanged: function() {},
+  nodeIconChanged: function() {},
+  nodeInserted: function() {},
+  nodeKeywordChanged: function() {},
+  nodeLastModifiedChanged: function() {},
+  nodeMoved: function() {},
+  nodeRemoved: function() {},
+  nodeTagsChanged: function() {},
+  nodeTitleChanged: function() {},
+  nodeURIChanged: function() {},
+  sortingChanged: function() {},
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsINavHistoryResultObserver,
   ])

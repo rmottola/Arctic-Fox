@@ -20,7 +20,7 @@ var global = this;
 
 
 // Lazily load the finder code
-addMessageListener("Finder:Initialize", function () {
+addMessageListener("Finder:Initialize", function() {
   let {RemoteFinderListener} = Cu.import("resource://gre/modules/RemoteFinder.jsm", {});
   new RemoteFinderListener(global);
 });
@@ -879,7 +879,7 @@ WebChannelMessageToChromeListener.init();
 
 // This should be kept in sync with /browser/base/content.js.
 // Add message listener for "WebChannelMessageToContent" messages from chrome scripts.
-addMessageListener("WebChannelMessageToContent", function (e) {
+addMessageListener("WebChannelMessageToContent", function(e) {
   if (e.data) {
     // e.objects.eventTarget will be defined if sending a response to
     // a WebChannelMessageToChrome event. An unsolicited send
@@ -1014,7 +1014,7 @@ addMessageListener("Browser:PurgeSessionHistory", function BrowserPurgeHistory()
 });
 
 var ViewSelectionSource = {
-  init: function () {
+  init: function() {
     addMessageListener("ViewSource:GetSelection", this);
   },
 
@@ -1056,7 +1056,7 @@ var ViewSelectionSource = {
     return path;
   },
 
-  getSelection: function () {
+  getSelection: function() {
     // These are markers used to delimit the selection during processing. They
     // are removed from the final rendering.
     // We use noncharacter Unicode codepoints to minimize the risk of clashing
@@ -1429,12 +1429,12 @@ let AutoCompletePopup = {
     }
   },
 
-  get input () { return this._input; },
-  get overrideValue () { return null; },
-  set selectedIndex (index) {
+  get input() { return this._input; },
+  get overrideValue() { return null; },
+  set selectedIndex(index) {
     sendAsyncMessage("FormAutoComplete:SetSelectedIndex", { index });
   },
-  get selectedIndex () {
+  get selectedIndex() {
     // selectedIndex getter must be synchronous because we need the
     // correct value when the controller is in controller::HandleEnter.
     // We can't easily just let the parent inform us the new value every
@@ -1443,11 +1443,11 @@ let AutoCompletePopup = {
     // list).
     return sendSyncMessage("FormAutoComplete:GetSelectedIndex", {});
   },
-  get popupOpen () {
+  get popupOpen() {
     return this._popupOpen;
   },
 
-  openAutocompletePopup: function (input, element) {
+  openAutocompletePopup: function(input, element) {
     if (this._popupOpen || !input) {
       return;
     }
@@ -1468,7 +1468,7 @@ let AutoCompletePopup = {
     sendAsyncMessage("FormAutoComplete:ClosePopup", {});
   },
 
-  invalidate: function () {
+  invalidate: function() {
     if (this._popupOpen) {
       let results = this.getResultsFromController(this._input);
       sendAsyncMessage("FormAutoComplete:Invalidate", { results });

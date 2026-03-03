@@ -386,10 +386,10 @@ loadListener.prototype = {
 
   // FIXME: bug 253127
   // nsIHttpEventSink
-  onRedirect: function (aChannel, aNewChannel) {},
+  onRedirect: function(aChannel, aNewChannel) {},
   // nsIProgressEventSink
-  onProgress: function (aRequest, aContext, aProgress, aProgressMax) {},
-  onStatus: function (aRequest, aContext, aStatus, aStatusArg) {}
+  onProgress: function(aRequest, aContext, aProgress, aProgressMax) {},
+  onStatus: function(aRequest, aContext, aStatus, aStatusArg) {}
 }
 
 function isPartnerBuild() {
@@ -1800,7 +1800,7 @@ Engine.prototype = {
                      loadUsingSystemPrincipal: true
                    });
 
-        let iconLoadCallback = function (aByteArray, aEngine) {
+        let iconLoadCallback = function(aByteArray, aEngine) {
           // This callback may run after we've already set a preferred icon,
           // so check again.
           if (aEngine._hasPreferredIcon && !aIsPreferred)
@@ -3133,7 +3133,7 @@ SearchService.prototype = {
     }.bind(this));
   },
 
-  _asyncReInit: function () {
+  _asyncReInit: function() {
     LOG("_asyncReInit");
     // Start by clearing the initialized state, so we don't abort early.
     gInitialized = false;
@@ -3520,7 +3520,7 @@ SearchService.prototype = {
   },
 
   _loadFromChromeURLs: function SRCH_SVC_loadFromChromeURLs(aURLs) {
-    aURLs.forEach(function (url) {
+    aURLs.forEach(function(url) {
       try {
         LOG("_loadFromChromeURLs: loading engine from chrome url: " + url);
 
@@ -3888,7 +3888,7 @@ SearchService.prototype = {
     if (aWithHidden)
       return this._sortedEngines;
 
-    return this._sortedEngines.filter(function (engine) {
+    return this._sortedEngines.filter(function(engine) {
                                         return !engine.hidden;
                                       });
   },
@@ -3994,7 +3994,7 @@ SearchService.prototype = {
 
     LOG("getDefaultEngines: engineOrder: " + engineOrder.toSource());
 
-    function compareEngines (a, b) {
+    function compareEngines(a, b) {
       var aIdx = engineOrder[a.name];
       var bIdx = engineOrder[b.name];
 
@@ -4056,7 +4056,7 @@ SearchService.prototype = {
       var uri = makeURI(aEngineURL);
       var engine = new Engine(uri, false);
       if (aCallback) {
-        engine._installCallback = function (errorCode) {
+        engine._installCallback = function(errorCode) {
           try {
             if (errorCode == null)
               aCallback.onSuccess(engine);

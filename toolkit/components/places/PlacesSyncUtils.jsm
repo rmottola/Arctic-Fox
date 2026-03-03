@@ -888,7 +888,7 @@ function findAnnoItems(anno, val) {
     annos.getItemAnnotation(id, anno) == val);
 }
 
-var tagItem = Task.async(function (item, tags) {
+var tagItem = Task.async(function(item, tags) {
   if (!item.url) {
     return [];
   }

@@ -38,7 +38,7 @@ let Assert = {
 function add_task_in_parent_process(taskFn, taskIdOverride) {
   let taskId = taskIdOverride || getTaskId(Components.stack.caller);
   Output.print("Registering in the parent process: " + taskId);
-  addMessageListener("start_task_" + taskId, function () {
+  addMessageListener("start_task_" + taskId, function() {
     Task.spawn(function* () {
       try {
         Output.print("Running in the parent process " + taskId);

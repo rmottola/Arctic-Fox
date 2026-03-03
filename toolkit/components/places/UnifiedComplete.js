@@ -343,7 +343,7 @@ XPCOMUtils.defineLazyGetter(this, "SwitchToTabStorage", () => Object.seal({
     , { url: uri.spec });
   },
 
-  shutdown: function () {
+  shutdown: function() {
     this._conn = null;
     this._queue.clear();
   }
@@ -382,7 +382,7 @@ XPCOMUtils.defineLazyGetter(this, "Prefs", () => {
     }
   }
 
-  function loadSyncedPrefs () {
+  function loadSyncedPrefs() {
     store.enabled = prefs.get(...PREF_ENABLED);
     store.suggestHistory = prefs.get(...PREF_SUGGEST_HISTORY);
     store.suggestBookmark = prefs.get(...PREF_SUGGEST_BOOKMARK);
@@ -741,7 +741,7 @@ Search.prototype = {
    * @param type
    *        The behavior type to set.
    */
-  setBehavior: function (type) {
+  setBehavior: function(type) {
     type = type.toUpperCase();
     this._behavior |=
       Ci.mozIPlacesAutoComplete["BEHAVIOR_" + type];
@@ -759,7 +759,7 @@ Search.prototype = {
    *        The behavior type to test for.
    * @return true if the behavior is set, false otherwise.
    */
-  hasBehavior: function (type) {
+  hasBehavior: function(type) {
     let behavior = Ci.mozIPlacesAutoComplete["BEHAVIOR_" + type.toUpperCase()];
 
     if (this._disablePrivateActions &&
@@ -775,7 +775,7 @@ Search.prototype = {
    * typing.
    */
   _sleepDeferred: null,
-  _sleep: function (aTimeMs) {
+  _sleep: function(aTimeMs) {
     // Reuse a single instance to try shaving off some usless work before
     // the first query.
     if (!this._sleepTimer)
@@ -794,7 +794,7 @@ Search.prototype = {
    *        An array of search tokens.
    * @return the filtered list of tokens to search with.
    */
-  filterTokens: function (tokens) {
+  filterTokens: function(tokens) {
     let foundToken = false;
     // Set the proper behavior while filtering tokens.
     for (let i = tokens.length - 1; i >= 0; i--) {
@@ -1368,7 +1368,7 @@ Search.prototype = {
     return true;
   },
 
-  _onResultRow: function (row) {
+  _onResultRow: function(row) {
     if (this._localMatchesCount == 0) {
       TelemetryStopwatch.finish(TELEMETRY_1ST_RESULT, this);
     }
@@ -1394,7 +1394,7 @@ Search.prototype = {
       throw StopIteration;
   },
 
-  _maybeRestyleSearchMatch: function (match) {
+  _maybeRestyleSearchMatch: function(match) {
     // Return if the URL does not represent a search result.
     let parseResult =
       PlacesSearchAutocompleteProvider.parseSubmissionURL(match.value);
@@ -1490,7 +1490,7 @@ Search.prototype = {
     return index;
   },
 
-  _processHostRow: function (row) {
+  _processHostRow: function(row) {
     let match = {};
     let trimmedHost = row.getResultByIndex(QUERYINDEX_URL);
     let untrimmedHost = row.getResultByIndex(QUERYINDEX_TITLE);
@@ -1519,7 +1519,7 @@ Search.prototype = {
     return match;
   },
 
-  _processUrlRow: function (row) {
+  _processUrlRow: function(row) {
     let match = {};
     let value = row.getResultByIndex(QUERYINDEX_URL);
     let url = fixupSearchText(value);
@@ -1561,7 +1561,7 @@ Search.prototype = {
     return match;
   },
 
-  _processRow: function (row) {
+  _processRow: function(row) {
     let match = {};
     match.placeId = row.getResultByIndex(QUERYINDEX_PLACEID);
     let queryType = row.getResultByIndex(QUERYINDEX_QUERYTYPE);
@@ -1836,7 +1836,7 @@ Search.prototype = {
    * @param searchOngoing
    *        Indicates whether the search is ongoing.
    */
-  notifyResults: function (searchOngoing) {
+  notifyResults: function(searchOngoing) {
     let result = this._result;
     let resultCode = result.matchCount ? "RESULT_SUCCESS" : "RESULT_NOMATCH";
     if (searchOngoing) {
@@ -1874,7 +1874,7 @@ UnifiedComplete.prototype = {
    * @resolves to the Sqlite database handle (according to Sqlite.jsm).
    * @rejects javascript exception.
    */
-  getDatabaseHandle: function () {
+  getDatabaseHandle: function() {
     if (Prefs.enabled && !this._promiseDatabase) {
       this._promiseDatabase = Task.spawn(function* () {
         let conn = yield Sqlite.cloneStorageConnection({
@@ -1921,7 +1921,7 @@ UnifiedComplete.prototype = {
 
   // nsIAutoCompleteSearch
 
-  startSearch: function (searchString, searchParam, previousResult, listener) {
+  startSearch: function(searchString, searchParam, previousResult, listener) {
     // Stop the search in case the controller has not taken care of it.
     if (this._currentSearch) {
       this.stopSearch();
@@ -1960,7 +1960,7 @@ UnifiedComplete.prototype = {
                             });
   },
 
-  stopSearch: function () {
+  stopSearch: function() {
     if (this._currentSearch) {
       this._currentSearch.stop();
     }
@@ -1976,7 +1976,7 @@ UnifiedComplete.prototype = {
    *        Indicates if we should notify the AutoComplete listener about our
    *        results or not.
    */
-  finishSearch: function (notify = false) {
+  finishSearch: function(notify = false) {
     TelemetryStopwatch.cancel(TELEMETRY_1ST_RESULT, this);
     TelemetryStopwatch.cancel(TELEMETRY_6_FIRST_RESULTS, this);
     // Clear state now to avoid race conditions, see below.
@@ -2003,7 +2003,7 @@ UnifiedComplete.prototype = {
 
   // nsIAutoCompleteSimpleResultListener
 
-  onValueRemoved: function (result, spec, removeFromDB) {
+  onValueRemoved: function(result, spec, removeFromDB) {
     if (removeFromDB) {
       PlacesUtils.history.removePage(NetUtil.newURI(spec));
     }

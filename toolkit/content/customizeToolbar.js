@@ -34,7 +34,7 @@ function InitWithToolbox(aToolbox)
   dispatchCustomizationEvent("beforecustomization");
   gToolboxDocument = gToolbox.ownerDocument;
   gToolbox.customizing = true;
-  forEachCustomizableToolbar(function (toolbar) {
+  forEachCustomizableToolbar(function(toolbar) {
     toolbar.setAttribute("customizing", "true");
   });
   gPaletteBox = document.getElementById("palette-box");
@@ -70,7 +70,7 @@ function finishToolbarCustomization()
   unwrapToolbarItems();
   persistCurrentSets();
   gToolbox.customizing = false;
-  forEachCustomizableToolbar(function (toolbar) {
+  forEachCustomizableToolbar(function(toolbar) {
     toolbar.removeAttribute("customizing");
   });
 
@@ -164,7 +164,7 @@ function persistCurrentSets()
     return;
 
   var customCount = 0;
-  forEachCustomizableToolbar(function (toolbar) {
+  forEachCustomizableToolbar(function(toolbar) {
     // Calculate currentset and store it in the attribute.
     var currentSet = toolbar.currentSet;
     toolbar.setAttribute("currentset", currentSet);
@@ -211,8 +211,8 @@ function persistCurrentSets()
  */
 function wrapToolbarItems()
 {
-  forEachCustomizableToolbar(function (toolbar) {
-    Array.forEach(toolbar.childNodes, function (item) {
+  forEachCustomizableToolbar(function(toolbar) {
+    Array.forEach(toolbar.childNodes, function(item) {
       if (AppConstants.platform == "macosx") {
         if (item.firstChild && item.firstChild.localName == "menubar")
           return;
@@ -302,7 +302,7 @@ function wrapToolbarItem(aToolbarItem)
 function getCurrentItemIds()
 {
   var currentItems = {};
-  forEachCustomizableToolbar(function (toolbar) {
+  forEachCustomizableToolbar(function(toolbar) {
     var child = toolbar.firstChild;
     while (child) {
       if (isToolbarItem(child))
@@ -554,7 +554,7 @@ function restoreDefaultSet()
   }
 
   // Restore the defaultset for fixed toolbars.
-  forEachCustomizableToolbar(function (toolbar) {
+  forEachCustomizableToolbar(function(toolbar) {
     var defaultSet = toolbar.getAttribute("defaultset");
     if (defaultSet)
       toolbar.currentSet = defaultSet;
@@ -593,7 +593,7 @@ function updateToolboxProperty(aProp, aValue, aToolkitDefault) {
   gToolbox.setAttribute(aProp, aValue || toolboxDefault);
   gToolboxDocument.persist(gToolbox.id, aProp);
 
-  forEachCustomizableToolbar(function (toolbar) {
+  forEachCustomizableToolbar(function(toolbar) {
     var toolbarDefault = toolbar.getAttribute("default" + aProp) ||
                          toolboxDefault;
     if (toolbar.getAttribute("lock" + aProp) == "true" &&
