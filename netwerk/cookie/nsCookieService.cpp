@@ -487,7 +487,7 @@ public:
   {
     nsCOMPtr<mozIStorageRow> row;
 
-    while (1) {
+    while (true) {
       DebugOnly<nsresult> rv = aResult->GetNextRow(getter_AddRefs(row));
       NS_ASSERT_SUCCESS(rv);
 
@@ -1034,7 +1034,7 @@ nsCookieService::TryInitDB(bool aRecreateDB)
 
         nsCString baseDomain, host;
         bool hasResult;
-        while (1) {
+        while (true) {
           rv = select->ExecuteStep(&hasResult);
           NS_ENSURE_SUCCESS(rv, RESULT_RETRY);
 
@@ -1111,7 +1111,7 @@ nsCookieService::TryInitDB(bool aRecreateDB)
           select->GetUTF8String(SCHEMA3_IDX_PATH, path1);
 
           nsCString name2, host2, path2;
-          while (1) {
+          while (true) {
             // Read the second row.
             rv = select->ExecuteStep(&hasResult);
             NS_ENSURE_SUCCESS(rv, RESULT_RETRY);
@@ -2144,7 +2144,7 @@ nsCookieService::NotifyThirdParty(nsIURI *aHostURI, bool aIsAccepted, nsIChannel
     nsAutoString referringHostUTF16 = NS_ConvertUTF8toUTF16(referringHost);
     os->NotifyObservers(aHostURI, topic, referringHostUTF16.get());
     return;
-  } while (0);
+  } while (false);
 
   // This can fail for a number of reasons, in which kind we fallback to "?"
   os->NotifyObservers(aHostURI, topic, u"?");
@@ -2717,7 +2717,7 @@ nsCookieService::EnsureReadDomain(const nsCookieKey &aKey)
   bool hasResult;
   nsCString name, value, host, path;
   AutoTArray<RefPtr<nsCookie>, kMaxCookiesPerHost> array;
-  while (1) {
+  while (true) {
     rv = mDefaultDBState->stmtReadDomain->ExecuteStep(&hasResult);
     if (NS_FAILED(rv)) {
       // Recreate the database.
@@ -2794,7 +2794,7 @@ nsCookieService::EnsureReadComplete()
   nsCString baseDomain, name, value, host, path;
   bool hasResult;
   nsTArray<CookieDomainTuple> array(kMaxNumberOfCookies);
-  while (1) {
+  while (true) {
     rv = stmt->ExecuteStep(&hasResult);
     if (NS_FAILED(rv)) {
       // Recreate the database.
