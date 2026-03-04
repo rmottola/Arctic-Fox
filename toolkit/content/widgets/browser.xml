@@ -713,7 +713,7 @@
         <body>
           <![CDATA[
             let event = document.createEvent("Events");
-            event.initEvent("DOMAudioPlaybackStarted", true, true);
+            event.initEvent("DOMAudioPlaybackStarted", true, false);
             this.dispatchEvent(event);
           ]]>
         </body>
@@ -723,7 +723,7 @@
         <body>
           <![CDATA[
             let event = document.createEvent("Events");
-            event.initEvent("DOMAudioPlaybackStopped", true, true);
+            event.initEvent("DOMAudioPlaybackStopped", true, false);
             this.dispatchEvent(event);
           ]]>
         </body>
