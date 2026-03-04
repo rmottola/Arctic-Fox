@@ -138,19 +138,15 @@
   list-style-image: url("chrome://browser/skin/tabbrowser/crashed.svg");
 }
 
-.tab-icon-overlay[crashed],
-.tab-icon-overlay[soundplaying][pinned],
-.tab-icon-overlay[muted][pinned]:not([crashed]) {
-  display: -moz-box;
+.tab-icon-overlay[soundplaying],
+.tab-icon-overlay[muted]:not([crashed]),
+.tab-icon-overlay[blocked]:not([crashed]) {
+  border-radius: 10px;
 }
 
-.tab-icon-overlay[soundplaying][pinned],
-.tab-icon-overlay[muted][pinned]:not([crashed]) {
-  border-radius: 8px;
-}
-
-.tab-icon-overlay[soundplaying][pinned]:hover,
-.tab-icon-overlay[muted][pinned]:not([crashed]):hover {
+.tab-icon-overlay[soundplaying]:hover,
+.tab-icon-overlay[muted]:not([crashed]):hover,
+.tab-icon-overlay[blocked]:not([crashed]):hover {
   background-color: white;
 }
 
@@ -180,6 +176,11 @@
   list-style-image: url("chrome://browser/skin/tabbrowser/tab-audio-small.svg#tab-audio-white-muted");
 }
 
+#TabsToolbar[brighttext] .tab-icon-overlay[blocked]:not([crashed]):not([selected]):not(:hover),
+.tab-icon-overlay[blocked][selected]:-moz-lwtheme-brighttext:not(:hover) {
+  list-style-image: url("chrome://browser/skin/tabbrowser/tab-audio-small.svg#tab-audio-white-blocked");
+}
+
 .tab-throbber[busy] {
   list-style-image: url("chrome://browser/skin/tabbrowser/connecting.png");
 }
@@ -206,21 +207,12 @@
   padding: 0;
 }
 
-.tab-icon-sound:not([soundplaying]):not([muted]),
-.tab-icon-sound[pinned] {
-  display: none;
-}
-
-.tab-icon-sound[soundplaying] {
-  list-style-image: url("chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio");
-}
-
-.tab-icon-sound[soundplaying]:hover {
-  list-style-image: url("chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-hover");
-}
-
-.tab-icon-sound[soundplaying]:hover:active {
-  list-style-image: url("chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-pressed");
+.tab-icon-sound[soundplaying],
+.tab-icon-sound[muted],
+.tab-icon-sound[blocked] {
+  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
+  filter: url(chrome://browser/skin/filters.svg#fill);
+  fill: currentColor;
 }
 
 .tab-icon-sound[muted] {
@@ -442,6 +434,7 @@
 .tabs-newtab-button,
 .tab-icon-overlay[soundplaying],
 .tab-icon-overlay[muted]:not([crashed]),
+.tab-icon-overlay[blocked]:not([crashed]),
 .tab-icon-sound,
 .tab-close-button {
   pointer-events: auto;
@@ -512,7 +505,8 @@
 }
 
 .alltabs-endimage[soundplaying],
-.alltabs-endimage[muted] {
+.alltabs-endimage[muted],
+.alltabs-endimage[blocked] {
   list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
   filter: url(chrome://browser/skin/filters.svg#fill);
   fill: currentColor;
@@ -520,4 +514,8 @@
 
 .alltabs-endimage[muted] {
   list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-muted);
+}
+
+.alltabs-endimage[blocked] {
+  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-blocked);
 }
