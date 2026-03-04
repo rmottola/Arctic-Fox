@@ -302,6 +302,11 @@ window:not([chromehidden~="toolbar"]) #urlbar-wrapper {
   background-color: var(--tab-selection-background-color);
 }
 
+.tab-icon-sound[soundplaying],
+.tab-icon-sound[muted] {
+  filter: url(chrome://browser/skin/filters.svg#fill) !important; /* removes drop-shadow filter */
+}
+
 /* Don't need space for the tab curves (66px - 30px) */
 .tabs-newtab-button {
   width: 36px;
