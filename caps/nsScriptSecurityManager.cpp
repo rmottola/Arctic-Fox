@@ -829,12 +829,9 @@ nsScriptSecurityManager::CheckLoadURIFlags(nsIURI *aSourceURI,
     if (hasFlags) {
         if (aFlags & nsIScriptSecurityManager::ALLOW_CHROME) {
 
-            // For now, don't change behavior for resource:// and
-            // just allow it. This is required for extensions injecting
-            // extension-internal resource URLs in snippets in pages, e.g.
-            // Adding custom controls in-page.
-            if (!targetScheme.EqualsLiteral("chrome") &&
-                !targetScheme.EqualsLiteral("moz-icon")) {
+            // For now, don't change behavior for resource:// or moz-icon:// and
+            // just allow them.
+            if (!targetScheme.EqualsLiteral("chrome")) {
                 return NS_OK;
             }
 
