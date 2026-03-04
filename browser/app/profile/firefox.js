@@ -1485,7 +1485,15 @@ pref("privacy.trackingprotection.ui.enabled", false);
 #endif
 
 // Enable Contextual Identity Containers
+#ifdef NIGHTLY_BUILD
+pref("privacy.userContext.enabled", true);
+pref("privacy.userContext.ui.enabled", true);
+pref("privacy.usercontext.about_newtab_segregation.enabled", true);
+#else
 pref("privacy.userContext.enabled", false);
+pref("privacy.userContext.ui.enabled", false);
+pref("privacy.usercontext.about_newtab_segregation.enabled", false);
+#endif
 
 #ifndef RELEASE_OR_BETA
 // At the moment, autostart.2 is used, while autostart.1 is unused.
