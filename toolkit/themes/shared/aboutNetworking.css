@@ -23,10 +23,17 @@ body {
   margin-bottom: 0.5em;
 }
 
+#refreshButton {
+  vertical-align: middle;
+}
+
 /** Categories **/
 
 .category {
   cursor: pointer;
+  /* Center category names */
+  display: flex;
+  align-items: center;
 }
 
 .category .category-name {
@@ -44,6 +51,7 @@ body {
 .warningBackground:not([hidden]) {
   display: flex;
 }
+
 .warningBackground {
   flex-direction: column;
   box-sizing: border-box;
@@ -62,7 +70,7 @@ body {
 .title {
   position: relative;
   border-bottom: 1px solid var(--in-content-box-border-color);
-  margin-bottom: 2em;
+  margin-bottom: 1em;
   padding-bottom: 0.5em;
 }
 
@@ -91,11 +99,10 @@ body {
 }
 
 .tab {
-  padding: 0.5em;
+  padding: 0.5em 0;
 }
 
 .tab table {
-  border: 1;
   width: 100%;
 }
 
