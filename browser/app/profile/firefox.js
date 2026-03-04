@@ -480,6 +480,8 @@ pref("browser.tabs.showAudioPlayingIcon", false);
 #else
 pref("browser.tabs.showAudioPlayingIcon", true);
 #endif
+// This should match Chromium's audio indicator delay.
+pref("browser.tabs.delayHidingAudioPlayingIconMS", 3000);
 
 pref("browser.tabs.dontfocusfordialogs", true);
 
