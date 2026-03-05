@@ -817,10 +817,8 @@ bool nsIDNService::isLabelSafe(const nsAString &label)
     // Check for restricted characters; aspirational scripts are NOT permitted,
     // in anticipation of the category being merged into Limited-Use scripts
     // in the upcoming (Unicode 10.0-based) revision of UAX #31.
-    // See: http://www.unicode.org/reports/tr31/#Aspirational_Use_Scripts
-    XidmodType xm = GetIdentifierModification(ch);
-    if (xm != XIDMOD_RECOMMENDED &&
-        xm != XIDMOD_INCLUSION) {
+    IdentifierType idType = GetIdentifierType(ch);
+    if (idType == IDTYPE_RESTRICTED || idType == IDTYPE_ASPIRATIONAL) {
       return false;
     }
 
@@ -862,7 +860,7 @@ bool nsIDNService::isLabelSafe(const nsAString &label)
     } else {
        baseChar = ch;
     }
-    
+
     // Simplified/Traditional Chinese check temporarily disabled -- bug 857481
 #if 0
 
