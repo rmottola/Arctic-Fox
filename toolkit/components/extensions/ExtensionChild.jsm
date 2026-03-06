@@ -117,7 +117,6 @@ class PseudoChildAPIManager extends ChildAPIManager {
     // Incompatible APIs are listed here.
     if (namespace == "runtime" && name == "connectNative" || // Returns a custom Port.
         namespace == "runtime" && name == "sendNativeMessage" || // Fix together with connectNative.
-        namespace == "tabs" && name == "onRemoved" || // bugzil.la/1300234
         namespace == "webNavigation" || // ChildAPIManager is oblivious to filters.
         namespace == "webRequest") { // Incompatible by design (synchronous).
       shouldSynchronouslyUseParentAPI = true;
@@ -363,7 +362,6 @@ class ContentGlobal {
     }
   }
 }
-
 
 this.ExtensionChild = {
   // Map<nsIContentFrameMessageManager, ContentGlobal>

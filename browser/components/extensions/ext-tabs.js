@@ -106,13 +106,6 @@ let tabListener = {
     this.initialized = true;
   },
 
-  destroy() {
-    AllWindowEvents.removeListener("TabClose", this);
-    AllWindowEvents.removeListener("TabOpen", this);
-    WindowListManager.removeOpenListener(this.handleWindowOpen);
-    WindowListManager.removeCloseListener(this.handleWindowClose);
-  },
-
   handleEvent(event) {
     switch (event.type) {
       case "TabOpen":
@@ -209,7 +202,17 @@ let tabListener = {
     let windowId = WindowManager.getId(tab.ownerGlobal);
     let tabId = TabManager.getId(tab);
 
-    this.emit("tab-removed", {tab, tabId, windowId, isWindowClosing});
+    // When addons run in-process, `window.close()` is synchronous. Most other
+    // addon-invoked calls are asynchronous since they go through a proxy
+    // context via the message manager. This includes event registrations such
+    // as `tabs.onRemoved.addListener`.
+    // So, even if `window.close()` were to be called (in-process) after calling
+    // `tabs.onRemoved.addListener`, then the tab would be closed before the
+    // event listener is registered. To make sure that the event listener is
+    // notified, we dispatch `tabs.onRemoved` asynchronously.
+    Services.tm.mainThread.dispatch(() => {
+      this.emit("tab-removed", {tab, tabId, windowId, isWindowClosing});
+    }, Ci.nsIThread.DISPATCH_NORMAL);
   },
 
   tabReadyInitialized: false,
@@ -243,6 +246,12 @@ let tabListener = {
   },
 };
 
+/* eslint-disable mozilla/balanced-listeners */
+extensions.on("startup", () => {
+  tabListener.init();
+});
+/* eslint-enable mozilla/balanced-listeners */
+
 extensions.registerSchemaAPI("tabs", "addon_parent", context => {
   let {extension} = context;
   let self = {
@@ -259,7 +268,6 @@ extensions.registerSchemaAPI("tabs", "addon_parent", context => {
           fire(TabManager.convert(extension, event.tab));
         };
 
-        tabListener.init();
         tabListener.on("tab-created", listener);
         return () => {
           tabListener.off("tab-created", listener);
@@ -284,7 +292,6 @@ extensions.registerSchemaAPI("tabs", "addon_parent", context => {
           fire(event.tabId, {newWindowId: event.newWindowId, newPosition: event.newPosition});
         };
 
-        tabListener.init();
         tabListener.on("tab-attached", listener);
         return () => {
           tabListener.off("tab-attached", listener);
@@ -296,7 +303,6 @@ extensions.registerSchemaAPI("tabs", "addon_parent", context => {
           fire(event.tabId, {oldWindowId: event.oldWindowId, oldPosition: event.oldPosition});
         };
 
-        tabListener.init();
         tabListener.on("tab-detached", listener);
         return () => {
           tabListener.off("tab-detached", listener);
@@ -308,7 +314,6 @@ extensions.registerSchemaAPI("tabs", "addon_parent", context => {
           fire(event.tabId, {windowId: event.windowId, isWindowClosing: event.isWindowClosing});
         };
 
-        tabListener.init();
         tabListener.on("tab-removed", listener);
         return () => {
           tabListener.off("tab-removed", listener);
@@ -1003,7 +1008,6 @@ extensions.registerSchemaAPI("tabs", "addon_parent", context => {
           }
         };
 
-        tabListener.init();
         tabListener.on("tab-attached", tabCreated);
         tabListener.on("tab-created", tabCreated);
 
