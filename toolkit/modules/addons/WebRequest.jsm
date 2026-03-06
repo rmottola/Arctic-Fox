@@ -486,9 +486,11 @@ HttpObserverManager = {
       case "http-on-modify-request":
         this.modify(channel, topic, data);
         break;
-      case "http-on-examine-response":
       case "http-on-examine-cached-response":
       case "http-on-examine-merged-response":
+        getData(channel).fromCache = true;
+        // falls through
+      case "http-on-examine-response":
         this.examine(channel, topic, data);
         break;
     }
@@ -603,6 +605,7 @@ HttpObserverManager = {
           method: channel.requestMethod,
           browser: browser,
           type: WebRequestCommon.typeForPolicyType(policyType),
+          fromCache: getData(channel).fromCache,
         };
 
         if (loadInfo) {
