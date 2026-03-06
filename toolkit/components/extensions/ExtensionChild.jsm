@@ -992,6 +992,10 @@ class ContentGlobal {
         this.global.removeMessageListener("Extension:InitExtensionView", this);
         this.viewType = data.viewType;
 
+        if (data.devtoolsToolboxInfo) {
+          this.devtoolsToolboxInfo = data.devtoolsToolboxInfo;
+        }
+
         promiseEvent(this.global, "DOMContentLoaded", true).then(() => {
           this.global.sendAsyncMessage("Extension:ExtensionViewLoaded");
         });
@@ -1082,10 +1086,7 @@ ExtensionChild = {
                           .QueryInterface(Ci.nsIInterfaceRequestor)
                           .getInterface(Ci.nsIContentFrameMessageManager);
 
-    let {
-      viewType, tabId,
-      devtoolsToolboxInfo,
-    } = this.contentGlobals.get(mm).ensureInitialized();
+    let {viewType, tabId, devtoolsToolboxInfo} = this.contentGlobals.get(mm).ensureInitialized();
 
     let uri = contentWindow.document.documentURIObject;
 
@@ -1096,6 +1097,7 @@ ExtensionChild = {
     } else {
       context = new ExtensionPageContextChild(extension, {viewType, contentWindow, uri, tabId});
     }
+
     this.extensionContexts.set(windowId, context);
   },
 
