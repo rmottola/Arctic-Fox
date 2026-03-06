@@ -375,7 +375,7 @@ public:
 class InsertCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "INSERT"; }
+  const char *GetOpType() override { return "INSERT"; }
 
   ~InsertCookieDBListener() = default;
 
@@ -411,7 +411,7 @@ NS_IMPL_ISUPPORTS(InsertCookieDBListener, mozIStorageStatementCallback)
 class UpdateCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "UPDATE"; }
+  const char *GetOpType() override { return "UPDATE"; }
 
   ~UpdateCookieDBListener() = default;
 
@@ -439,7 +439,7 @@ NS_IMPL_ISUPPORTS(UpdateCookieDBListener, mozIStorageStatementCallback)
 class RemoveCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "REMOVE"; }
+  const char *GetOpType() override { return "REMOVE"; }
 
   ~RemoveCookieDBListener() = default;
 
@@ -467,7 +467,7 @@ NS_IMPL_ISUPPORTS(RemoveCookieDBListener, mozIStorageStatementCallback)
 class ReadCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "READ"; }
+  const char *GetOpType() override { return "READ"; }
   bool mCanceled;
 
   ~ReadCookieDBListener() = default;
