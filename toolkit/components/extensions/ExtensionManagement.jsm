@@ -306,7 +306,8 @@ function getAPILevelForWindow(window, addonId) {
 
 ExtensionManagement = {
   get isExtensionProcess() {
-    return Services.appinfo.processType === Services.appinfo.PROCESS_TYPE_DEFAULT;
+    return (this.useRemoteWebExtensions ||
+            Services.appinfo.processType === Services.appinfo.PROCESS_TYPE_DEFAULT);
   },
 
   startupExtension: Service.startupExtension.bind(Service),
@@ -327,3 +328,6 @@ ExtensionManagement = {
 
   APIs,
 };
+
+XPCOMUtils.defineLazyPreferenceGetter(ExtensionManagement, "useRemoteWebExtensions",
+                                      "extensions.webextensions.remote", false);
