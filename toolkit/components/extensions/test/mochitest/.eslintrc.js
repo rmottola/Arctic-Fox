@@ -2,10 +2,13 @@
   "extends": "../../.eslintrc",
 
   "globals": {
+    "ChromeWorker": false,
+    "onmessage": true,
     "sendAsyncMessage": false,
 
     "ExtensionTestUtils": false,
     "NetUtil": true,
+    "webrequest_test": false,
     "XPCOMUtils": true,
 
     "waitForLoad": true,
