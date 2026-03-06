@@ -183,6 +183,6 @@ function makeTestAPI(context) {
   };
 }
 
-extensions.registerSchemaAPI("test", "addon_child", testApiFactory);
-extensions.registerSchemaAPI("test", "content_child", testApiFactory);
-
+extensions.registerSchemaAPI("test", "addon_child", makeTestAPI);
+extensions.registerSchemaAPI("test", "content_child", makeTestAPI);
+extensions.registerSchemaAPI("test", "devtools_child", makeTestAPI);
