@@ -689,7 +689,6 @@ function SingletonEventManager(context, name, register) {
   this.name = name;
   this.register = register;
   this.unregister = new Map();
-  context.callOnClose(this);
 }
 
 SingletonEventManager.prototype = {
@@ -704,6 +703,7 @@ SingletonEventManager.prototype = {
 
     let unregister = this.register(wrappedCallback, ...args);
     this.unregister.set(callback, unregister);
+    this.context.callOnClose(this);
   },
 
   removeListener(callback) {
