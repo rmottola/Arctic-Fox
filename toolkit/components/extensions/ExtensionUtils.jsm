@@ -1512,7 +1512,7 @@ Messenger.prototype = {
     }).api();
   },
 
-  connect(messageManager, name, recipient) {
+  connectGetRawPort(messageManager, name, recipient) {
     let portId = `${gNextPortId++}-${Services.appinfo.uniqueProcessID}`;
     let port = new Port(this.context, messageManager, this.messageManagers, name, portId, null, recipient);
     let msg = {name, portId};
@@ -1525,6 +1525,11 @@ Messenger.prototype = {
         }
         port.disconnectByOtherEnd(e);
       });
+    return port;
+  },
+
+  connect(messageManager, name, recipient) {
+    let port = this.connectGetRawPort(messageManager, name, recipient);
     return port.api();
   },
 
