@@ -61,6 +61,7 @@ BackgroundPage.prototype = {
                                        .getInterface(Ci.nsIDocShell)
                                        .QueryInterface(Ci.nsIWebNavigation);
 
+    chromeShell.useGlobalHistory = false;
     chromeShell.createAboutBlankContentViewer(system);
     chromeShell.loadURI(XUL_URL, 0, null, null, null);
 
