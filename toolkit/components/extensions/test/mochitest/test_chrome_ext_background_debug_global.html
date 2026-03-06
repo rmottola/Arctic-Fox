@@ -17,6 +17,11 @@ const {
 } = Components;
 
 Cu.import("resource://devtools/client/framework/ToolboxProcess.jsm");
+Cu.import("resource://gre/modules/AddonManager.jsm");
+
+const {
+  XPIProvider,
+} = Components.utils.import("resource://gre/modules/addons/XPIProvider.jsm");
 
 /**
  * This test is asserting that ext-backgroundPage.js successfully sets its
@@ -44,7 +49,6 @@ let extensionData = {
 add_task(function* () {
   let extension = ExtensionTestUtils.loadExtension(extensionData);
   yield extension.startup();
-  info("extension loaded");
 
   yield extension.awaitFinish("background script ran");
 
