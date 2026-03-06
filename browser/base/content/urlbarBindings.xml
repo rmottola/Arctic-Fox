@@ -1379,6 +1379,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             this.style.marginLeft = offset + "px";
           }
 
+          /* FIXME - RM - no working nav-bar-cusomization yet
           // Keep the popup items' site icons aligned with the urlbar's identity
           // icon if it's not too far from the edge of the window.  If there are
           // at most two toolbar buttons between the window edge and the urlbar,
@@ -1397,7 +1398,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             this.siteIconStart = popupDirection == "rtl" ? identityRect.right
                                                          : identityRect.left;
           }
-          else {
+          else */ {
             // Reset the alignment so that the site icons are positioned
             // according to whatever's in the CSS.
             this.siteIconStart = undefined;

@@ -1300,13 +1300,14 @@ extends="chrome://global/content/bindings/popup.xml#popup">
             }
 
             // The binding may have not been applied yet.
+/* FIXME - RM no adjustSiteIconStart
             setTimeout(() => {
               let changed = item.adjustSiteIconStart(this._siteIconStart);
               if (changed) {
                 item.handleOverUnderflow();
               }
             }, 0);
-
+*/
             this._currentIndex++;
           }
 
