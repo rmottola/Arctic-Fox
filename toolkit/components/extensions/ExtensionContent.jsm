@@ -291,10 +291,13 @@ function getWindowMessageManager(contentWindow) {
 var DocumentManager;
 var ExtensionManager;
 
-// Scope in which extension content script code can run. It uses
-// Cu.Sandbox to run the code. There is a separate scope for each
-// frame.
-class ExtensionContext extends BaseContext {
+/**
+ * An execution context for semi-privileged extension content scripts.
+ *
+ * This is the child side of the ContentScriptContextParent class
+ * defined in ExtensionParent.jsm.
+ */
+class ContentScriptContextChild extends BaseContext {
   constructor(extension, contentWindow, contextOptions = {}) {
     super("content_child", extension);
 
@@ -444,7 +447,7 @@ class ExtensionContext extends BaseContext {
   }
 }
 
-defineLazyGetter(ExtensionContext.prototype, "messenger", function() {
+defineLazyGetter(ContentScriptContextChild.prototype, "messenger", function() {
   // The |sender| parameter is passed directly to the extension.
   let sender = {id: this.extension.uuid, frameId: this.frameId, url: this.url};
   let filter = {extensionId: this.extension.id};
@@ -453,7 +456,7 @@ defineLazyGetter(ExtensionContext.prototype, "messenger", function() {
   return new Messenger(this, [this.messageManager], sender, filter, optionalFilter);
 });
 
-defineLazyGetter(ExtensionContext.prototype, "childManager", function() {
+defineLazyGetter(ContentScriptContextChild.prototype, "childManager", function() {
   let localApis = {};
   apiManager.generateAPIs(this, localApis);
 
@@ -472,10 +475,10 @@ defineLazyGetter(ExtensionContext.prototype, "childManager", function() {
 DocumentManager = {
   extensionCount: 0,
 
-  // Map[windowId -> Map[extensionId -> ExtensionContext]]
+  // Map[windowId -> Map[extensionId -> ContentScriptContextChild]]
   contentScriptWindows: new Map(),
 
-  // Map[windowId -> ExtensionContext]
+  // Map[windowId -> ContentScriptContextChild]
   extensionPageWindows: new Map(),
 
   init() {
@@ -674,7 +677,7 @@ DocumentManager = {
 
     let extensions = this.contentScriptWindows.get(winId);
     if (!extensions.has(extension.id)) {
-      let context = new ExtensionContext(extension, window);
+      let context = new ContentScriptContextChild(extension, window);
       extensions.set(extension.id, context);
     }
 
@@ -686,7 +689,7 @@ DocumentManager = {
 
     let context = this.extensionPageWindows.get(winId);
     if (!context) {
-      let context = new ExtensionContext(extension, window, {isExtensionPage: true});
+      let context = new ContentScriptContextChild(extension, window, {isExtensionPage: true});
       this.extensionPageWindows.set(winId, context);
     }
 
