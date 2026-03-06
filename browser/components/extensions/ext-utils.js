@@ -670,7 +670,9 @@ ExtensionTabManager.prototype = {
   },
 
   getTabs(window) {
-    return Array.from(window.gBrowser.tabs, tab => this.convert(tab));
+    return Array.from(window.gBrowser.tabs)
+                .filter(tab => !tab.closing)
+                .map(tab => this.convert(tab));
   },
 };
 
