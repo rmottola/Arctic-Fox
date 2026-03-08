@@ -8516,6 +8516,11 @@ Object.assign(SystemAddonInstallLocation.prototype, {
       return false;
     }
 
+    if (!aAddon.multiprocessCompatible) {
+      logger.warn(`System add-on ${aAddon.id} isn't multiprocess compatible.`);
+      return false;
+    }
+
     return true;
   },
 
