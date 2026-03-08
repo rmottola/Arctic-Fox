@@ -2691,7 +2691,7 @@ this.XPIProvider = {
 
       logger.debug("startup");
       this.runPhase = XPI_STARTING;
-      this.installs = [];
+      this.installs = new Set();
       this.installLocations = [];
       this.installLocationsByName = {};
       // Hook for tests to detect when saving database at shutdown time fails
@@ -4116,13 +4116,7 @@ this.XPIProvider = {
    *         The AddonInstall to remove
    */
   removeActiveInstall: function(aInstall) {
-    let where = this.installs.indexOf(aInstall);
-    if (where == -1) {
-      logger.warn("removeActiveInstall: could not find active install for "
-          + aInstall.sourceURI.spec);
-      return;
-    }
-    this.installs.splice(where, 1);
+    this.installs.delete(aInstall);
   },
 
   /**
@@ -4201,7 +4195,7 @@ this.XPIProvider = {
    *         A callback to pass the array of AddonInstalls to
    */
   getInstallsByTypes: function(aTypes, aCallback) {
-    let results = this.installs.slice(0);
+    let results = [...this.installs];
     if (aTypes) {
       results = results.filter(install => {
         return aTypes.includes(getExternalType(install.type));
@@ -5328,6 +5322,8 @@ function AddonInstall(aInstallLocation, aUrl, aHash, aReleaseNotesURI,
 
   // Giving each instance of AddonInstall a reference to the logger.
   this.logger = logger;
+
+  XPIProvider.installs.add(this);
 }
 
 AddonInstall.prototype = {
@@ -5375,16 +5371,19 @@ AddonInstall.prototype = {
     this.icons = aManifest.icons;
     this.releaseNotesURI = aManifest.releaseNotesURI ?
                            NetUtil.newURI(aManifest.releaseNotesURI) :
-                           null
+                           null;
     this.sourceURI = aManifest.sourceURI ?
                      NetUtil.newURI(aManifest.sourceURI) :
                      null;
-    this.file = null;
+    this.file = this.sourceURI;
+    this._sourceBundle = this.sourceURI;
     this.addon = aManifest;
+    this.addon.sourceURI = this.sourceURI;
 
     this.state = AddonManager.STATE_INSTALLED;
 
-    XPIProvider.installs.push(this);
+    XPIProvider.installs.add(this);
+    return this;
   },
 
   /**
@@ -5401,6 +5400,7 @@ AddonInstall.prototype = {
       logger.warn("XPI file " + this.file.path + " does not exist");
       this.state = AddonManager.STATE_DOWNLOAD_FAILED;
       this.error = AddonManager.ERROR_NETWORK_FAILURE;
+      XPIProvider.removeActiveInstall(this);
       aCallback(this);
       return;
     }
@@ -5419,6 +5419,7 @@ AddonInstall.prototype = {
         logger.warn("Unknown hash algorithm '" + this.hash.algorithm + "' for addon " + this.sourceURI.spec, e);
         this.state = AddonManager.STATE_DOWNLOAD_FAILED;
         this.error = AddonManager.ERROR_INCORRECT_HASH;
+        XPIProvider.removeActiveInstall(this);
         aCallback(this);
         return;
       }
@@ -5433,6 +5434,7 @@ AddonInstall.prototype = {
              this.hash.data + ")");
         this.state = AddonManager.STATE_DOWNLOAD_FAILED;
         this.error = AddonManager.ERROR_INCORRECT_HASH;
+        XPIProvider.removeActiveInstall(this);
         aCallback(this);
         return;
       }
@@ -5452,7 +5454,6 @@ AddonInstall.prototype = {
           new UpdateChecker(this.addon, {
             onUpdateFinished: aAddon => {
               this.state = AddonManager.STATE_DOWNLOADED;
-              XPIProvider.installs.push(this);
               AddonManagerPrivate.callInstallListeners("onNewInstall",
                                                        this.listeners,
                                                        this.wrapper);
@@ -5462,7 +5463,6 @@ AddonInstall.prototype = {
           }, AddonManager.UPDATE_WHEN_ADDON_INSTALLED);
         }
         else {
-          XPIProvider.installs.push(this);
           AddonManagerPrivate.callInstallListeners("onNewInstall",
                                                    this.listeners,
                                                    this.wrapper);
@@ -5474,6 +5474,7 @@ AddonInstall.prototype = {
       logger.warn("Invalid XPI", message);
       this.state = AddonManager.STATE_DOWNLOAD_FAILED;
       this.error = error;
+      XPIProvider.removeActiveInstall(this);
       AddonManagerPrivate.callInstallListeners("onNewInstall",
                                                this.listeners,
                                                this.wrapper);
@@ -5505,7 +5506,6 @@ AddonInstall.prototype = {
     this.progress = 0;
     this.maxProgress = -1;
 
-    XPIProvider.installs.push(this);
     AddonManagerPrivate.callInstallListeners("onNewInstall", this.listeners,
                                              this.wrapper);
 
@@ -5535,7 +5535,6 @@ AddonInstall.prototype = {
       this.progress = 0;
       this.maxProgress = -1;
       this.hash = this.originalHash;
-      XPIProvider.installs.push(this);
       this.startDownload();
       break;
     case AddonManager.STATE_POSTPONED:
@@ -6562,6 +6561,7 @@ AddonInstall.createInstall = function(aCallback, aFile) {
   }
   catch (e) {
     logger.error("Error creating install", e);
+    XPIProvider.removeActiveInstall(this);
     makeSafe(aCallback)(null);
   }
 };
