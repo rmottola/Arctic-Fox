@@ -1016,9 +1016,8 @@ var loadManifestFromWebManifest = Task.async(function*(aUri) {
 
   addon.targetApplications = [{
     id: TOOLKIT_ID,
-    minVersion: (bss.strict_min_version ||
-                 AddonManagerPrivate.webExtensionsMinPlatformVersion),
-    maxVersion: bss.strict_max_version || "*",
+    minVersion: bss.strict_min_version,
+    maxVersion: bss.strict_max_version,
   }];
 
   addon.targetPlatforms = [];
@@ -4028,6 +4027,13 @@ this.XPIProvider = {
       flushJarCache(aFile);
     }
     let addon = yield loadManifestFromFile(aFile, TemporaryInstallLocation);
+
+    if (!addon.isCompatible) {
+      let app = addon.matchingTargetApplication;
+      throw new Error(`Add-on ${addon.id} is not compatible with application version. ` +
+                      `add-on minVersion: ${app.minVersion}, ` +
+                      `add-on maxVersion: ${app.maxVersion}`);
+    }
 
     if (!addon.bootstrap) {
       throw new Error("Only restartless (bootstrap) add-ons"
@@ -7095,6 +7101,10 @@ AddonInternal.prototype = {
     if (!app)
       return false;
 
+    // set reasonable defaults for minVersion and maxVersion
+    let minVersion = app.minVersion || "0";
+    let maxVersion = app.maxVersion || "*";
+
     if (!aAppVersion)
       aAppVersion = Services.appinfo.version;
     if (!aPlatformVersion)
@@ -7135,14 +7145,14 @@ AddonInternal.prototype = {
         minCompatVersion = XPIProvider.minCompatiblePlatformVersion;
 
       if (minCompatVersion &&
-          Services.vc.compare(minCompatVersion, app.maxVersion) > 0)
+          Services.vc.compare(minCompatVersion, maxVersion) > 0)
         return false;
 
-      return Services.vc.compare(version, app.minVersion) >= 0;
+      return Services.vc.compare(version, minVersion) >= 0;
     }
 
-    return (Services.vc.compare(version, app.minVersion) >= 0) &&
-           (Services.vc.compare(version, app.maxVersion) <= 0)
+    return (Services.vc.compare(version, minVersion) >= 0) &&
+           (Services.vc.compare(version, maxVersion) <= 0)
   },
 
   get matchingTargetApplication() {
