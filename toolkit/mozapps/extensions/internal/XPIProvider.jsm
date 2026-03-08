@@ -1019,7 +1019,7 @@ var loadManifestFromWebManifest = Task.async(function*(aUri) {
  * @throws if the install manifest in the RDF stream is corrupt or could not
  *         be read
  */
-function loadManifestFromRDF(aUri, aStream) {
+let loadManifestFromRDF = Task.async(function*(aUri, aStream) {
   function getPropertyArray(aDs, aSource, aProperty) {
     let values = [];
     let targets = aDs.GetTargets(aSource, EM_R(aProperty), true);
@@ -1156,12 +1156,26 @@ function loadManifestFromRDF(aUri, aStream) {
     addon.bootstrap = getRDFProperty(ds, root, "bootstrap") == "true";
     addon.multiprocessCompatible = getRDFProperty(ds, root, "multiprocessCompatible") == "true";
     addon.hasEmbeddedWebExtension = getRDFProperty(ds, root, "hasEmbeddedWebExtension") == "true";
+
     if (addon.optionsType &&
         addon.optionsType != AddonManager.OPTIONS_TYPE_DIALOG &&
         addon.optionsType != AddonManager.OPTIONS_TYPE_INLINE &&
         addon.optionsType != AddonManager.OPTIONS_TYPE_TAB &&
         addon.optionsType != AddonManager.OPTIONS_TYPE_INLINE_INFO) {
       throw new Error("Install manifest specifies unknown type: " + addon.optionsType);
+    }
+
+    if (addon.hasEmbeddedWebExtension) {
+      let uri = NetUtil.newURI("webextension/manifest.json", null, aUri);
+      let embeddedAddon = yield loadManifestFromWebManifest(uri);
+      if (embeddedAddon.optionsURL) {
+        if (addon.optionsType || addon.optionsURL)
+          logger.warn(`Addon ${addon.id} specifies optionsType or optionsURL ` +
+                      `in both install.rdf and manifest.json`);
+
+        addon.optionsURL = embeddedAddon.optionsURL;
+        addon.optionsType = embeddedAddon.optionsType;
+      }
     }
   }
   else {
@@ -1280,7 +1294,7 @@ function loadManifestFromRDF(aUri, aStream) {
   addon.icons = {};
 
   return addon;
-}
+});
 
 function defineSyncGUID(aAddon) {
   // Define .syncGUID as a lazy property which is also settable
@@ -1329,7 +1343,7 @@ var loadManifestFromDir = Task.async(function*(aDir, aInstallLocation) {
     return size;
   }
 
-  function loadFromRDF(aUri) {
+  function* loadFromRDF(aUri) {
     let fis = Cc["@mozilla.org/network/file-input-stream;1"].
               createInstance(Ci.nsIFileInputStream);
     fis.init(aUri.file, -1, -1, false);
@@ -1337,7 +1351,7 @@ var loadManifestFromDir = Task.async(function*(aDir, aInstallLocation) {
               createInstance(Ci.nsIBufferedInputStream);
     bis.init(fis, 4096);
     try {
-      var addon = loadManifestFromRDF(aUri, bis);
+      var addon = yield loadManifestFromRDF(aUri, bis);
     } finally {
       bis.close();
       fis.close();
@@ -1397,7 +1411,7 @@ var loadManifestFromDir = Task.async(function*(aDir, aInstallLocation) {
       }
     }
   } else {
-    addon = loadFromRDF(uri);
+    addon = yield loadFromRDF(uri);
   }
 
   addon._sourceBundle = aDir.clone();
@@ -1421,13 +1435,13 @@ var loadManifestFromDir = Task.async(function*(aDir, aInstallLocation) {
  * @throws if the XPI file does not contain a valid install manifest
  */
 var loadManifestFromZipReader = Task.async(function*(aZipReader, aInstallLocation) {
-  function loadFromRDF(aUri) {
+  function* loadFromRDF(aUri) {
     let zis = aZipReader.getInputStream(entry);
     let bis = Cc["@mozilla.org/network/buffered-input-stream;1"].
               createInstance(Ci.nsIBufferedInputStream);
     bis.init(zis, 4096);
     try {
-      var addon = loadManifestFromRDF(aUri, bis);
+      var addon = yield loadManifestFromRDF(aUri, bis);
     } finally {
       bis.close();
       zis.close();
@@ -1467,7 +1481,7 @@ var loadManifestFromZipReader = Task.async(function*(aZipReader, aInstallLocatio
 
   let addon = isWebExtension ?
               yield loadManifestFromWebManifest(uri) :
-              loadFromRDF(uri);
+              yield loadFromRDF(uri);
 
   addon._sourceBundle = aZipReader.file;
   addon._installLocation = aInstallLocation;
@@ -7279,7 +7293,7 @@ AddonWrapper.prototype = {
 
     let addon = addonFor(this);
     if (addon.optionsURL) {
-      if (this.isWebExtension) {
+      if (this.isWebExtension || this.hasEmbeddedWebExtension) {
         // The internal object's optionsURL property comes from the addons
         // DB and should be a relative URL.  However, extensions with
         // options pages installed before bug 1293721 was fixed got absolute
