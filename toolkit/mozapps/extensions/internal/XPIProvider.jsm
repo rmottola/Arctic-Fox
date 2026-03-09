@@ -1969,7 +1969,7 @@ function removeAsync(aFile) {
         yield OS.File.remove(aFile.path);
     }
     catch (e) {
-      if (!(e instanceof OS.File.Error) || ! e.becauseNoSuchFile)
+      if (!(e instanceof OS.File.Error) || !e.becauseNoSuchFile)
         throw e;
       // The file has already gone away
       return;
@@ -4927,13 +4927,11 @@ this.XPIProvider = {
         activeAddon = this.activeAddons.get(aAddon.id);
       }
 
-      if (aAddon.bootstrap) {
-        if (aMethod == "startup" || aMethod == "shutdown") {
-          if (!aExtraParams) {
-            aExtraParams = {};
-          }
-          aExtraParams["instanceID"] = this.activeAddons.get(aAddon.id).instanceID;
+      if (aMethod == "startup" || aMethod == "shutdown") {
+        if (!aExtraParams) {
+          aExtraParams = {};
         }
+        aExtraParams["instanceID"] = this.activeAddons.get(aAddon.id).instanceID;
       }
 
       // Nothing to call for locales
