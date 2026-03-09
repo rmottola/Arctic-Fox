@@ -1545,6 +1545,9 @@ var loadManifestFromZipReader = Task.async(function*(aZipReader, aInstallLocatio
   addon.signedState = signedState;
   if (isWebExtension && !addon.id && cert) {
     addon.id = cert.commonName;
+    if (!gIDTest.test(addon.id)) {
+      throw new Error(`Webextension is signed with an invalid id (${addon.id})`);
+    }
   }
   addon.appDisabled = !isUsableAddon(addon);
 
