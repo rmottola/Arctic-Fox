@@ -16,6 +16,8 @@ const HTTP_PORT = 8888;
 var prefs = new Preferences();
 
 prefs.set("extensions.getAddons.get.url", "http://localhost:8888/search/guid:%IDS%");
+prefs.set("extensions.install.requireSecureOrigin", false);
+
 loadAddonTestFunctions();
 startupManager();
 
@@ -194,7 +196,6 @@ add_test(function test_apply_uninstall() {
 add_test(function test_addon_syncability() {
   _("Ensure isAddonSyncable functions properly.");
 
-  Svc.Prefs.set("addons.ignoreRepositoryChecking", true);
   Svc.Prefs.set("addons.trustedSourceHostnames",
                 "addons.mozilla.org,other.example.com");
 
@@ -272,8 +273,6 @@ add_test(function test_addon_syncability() {
 add_test(function test_ignore_hotfixes() {
   _("Ensure that hotfix extensions are ignored.");
 
-  Svc.Prefs.set("addons.ignoreRepositoryChecking", true);
-
   // A hotfix extension is one that has the id the same as the
   // extensions.hotfix.id pref.
   let prefs = new Preferences("extensions.");
@@ -305,7 +304,6 @@ add_test(function test_ignore_hotfixes() {
 
   uninstallAddon(addon);
 
-  Svc.Prefs.reset("addons.ignoreRepositoryChecking");
   prefs.reset("hotfix.id");
 
   run_next_test();
@@ -314,8 +312,6 @@ add_test(function test_ignore_hotfixes() {
 
 add_test(function test_get_all_ids() {
   _("Ensures that getAllIDs() returns an appropriate set.");
-
-  Svc.Prefs.set("addons.ignoreRepositoryChecking", true);
 
   _("Installing two addons.");
   let addon1 = installAddon("test_install1");
@@ -335,7 +331,6 @@ add_test(function test_get_all_ids() {
   addon1.install.cancel();
   uninstallAddon(addon2);
 
-  Svc.Prefs.reset("addons.ignoreRepositoryChecking");
   run_next_test();
 });
 
@@ -361,9 +356,6 @@ add_test(function test_change_item_id() {
 add_test(function test_create() {
   _("Ensure creating/installing an add-on from a record works.");
 
-  // Set this so that getInstallFromSearchResult doesn't end up
-  // failing the install due to an insecure source URI scheme.
-  Svc.Prefs.set("addons.ignoreRepositoryChecking", true);
   let server = createAndStartHTTPServer(HTTP_PORT);
 
   let addon = installAddon("test_bootstrap1_1");
@@ -383,7 +375,6 @@ add_test(function test_create() {
 
   uninstallAddon(newAddon);
 
-  Svc.Prefs.reset("addons.ignoreRepositoryChecking");
   server.stop(run_next_test);
 });
 
@@ -435,13 +426,10 @@ add_test(function test_wipe() {
 
   let addon1 = installAddon("test_bootstrap1_1");
 
-  Svc.Prefs.set("addons.ignoreRepositoryChecking", true);
   store.wipe();
 
   let addon = getAddonFromAddonManagerByID(addon1.id);
   do_check_eq(null, addon);
-
-  Svc.Prefs.reset("addons.ignoreRepositoryChecking");
 
   run_next_test();
 });
@@ -457,7 +445,6 @@ add_test(function test_wipe_and_install() {
   let record = createRecordForThisApp(installed.syncGUID, installed.id, true,
                                       false);
 
-  Svc.Prefs.set("addons.ignoreRepositoryChecking", true);
   store.wipe();
 
   let deleted = getAddonFromAddonManagerByID(installed.id);
@@ -471,7 +458,6 @@ add_test(function test_wipe_and_install() {
   let fetched = getAddonFromAddonManagerByID(record.addonID);
   do_check_true(!!fetched);
 
-  Svc.Prefs.reset("addons.ignoreRepositoryChecking");
   server.stop(run_next_test);
 });
 
