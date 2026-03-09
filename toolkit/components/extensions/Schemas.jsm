@@ -731,7 +731,7 @@ class Type extends Entry {
   // |baseType| (one of the possible getValueBaseType results) is
   // valid for this type. It returns true or false. It's used to fill
   // in optional arguments to functions before actually type checking
-  // the arguments.
+
   checkBaseType(baseType) {
     return false;
   }
