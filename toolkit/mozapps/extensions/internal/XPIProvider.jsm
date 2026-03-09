@@ -76,6 +76,10 @@ XPCOMUtils.defineLazyServiceGetter(this,
                                    "AddonPolicyService",
                                    "@mozilla.org/addons/policy-service;1",
                                    "nsIAddonPolicyService");
+XPCOMUtils.defineLazyServiceGetter(this,
+                                   "AddonPathService",
+                                   "@mozilla.org/addon-path-service;1",
+                                   "amIAddonPathService");
 
 XPCOMUtils.defineLazyGetter(this, "CertUtils", function() {
   let certUtils = {};
@@ -2589,8 +2593,7 @@ this.XPIProvider = {
     logger.info("Mapping " + aID + " to " + aFile.path);
     this._addonFileMap.set(aID, aFile.path);
 
-    let service = Cc["@mozilla.org/addon-path-service;1"].getService(Ci.amIAddonPathService);
-    service.insertPath(aFile.path, aID);
+    AddonPathService.insertPath(aFile.path, aID);
   },
 
   /**
@@ -4308,20 +4311,8 @@ this.XPIProvider = {
    * @see    amIAddonManager.mapURIToAddonID
    */
   mapURIToAddonID: function(aURI) {
-    if (aURI.scheme == "moz-extension") {
-      return AddonPolicyService.extensionURIToAddonId(aURI);
-    }
-
-    let resolved = this._resolveURIToFile(aURI);
-    if (!resolved || !(resolved instanceof Ci.nsIFileURL))
-      return null;
-
-    for (let [id, path] of this._addonFileMap) {
-      if (resolved.file.path.startsWith(path))
-        return id;
-    }
-
-    return null;
+    // Returns `null` instead of empty string if the URI can't be mapped.
+    return AddonPathService.mapURIToAddonId(aURI) || null;
   },
 
   /**
