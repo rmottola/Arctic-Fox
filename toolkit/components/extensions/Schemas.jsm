@@ -643,13 +643,12 @@ class Entry {
    * `context` is used to call the actual implementation
    * of a given function or event.
    *
-   * @param {SchemaAPIInterface} apiImpl The implementation of the API.
    * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
    * @param {string} name The method name, e.g. "get".
    * @param {object} dest The object where `path`.`name` should be stored.
    * @param {InjectionContext} context
    */
-  inject(apiImpl, path, name, dest, context) {
+  inject(path, name, dest, context) {
   }
 }
 
@@ -973,7 +972,7 @@ class StringType extends Type {
     return baseType == "string";
   }
 
-  inject(apiImpl, path, name, dest, context) {
+  inject(path, name, dest, context) {
     if (this.enumeration) {
       exportLazyGetter(dest, name, () => {
         let obj = Cu.createObjectIn(dest);
@@ -1458,7 +1457,7 @@ class ValueProperty extends Entry {
     this.value = value;
   }
 
-  inject(apiImpl, path, name, dest, context) {
+  inject(path, name, dest, context) {
     dest[name] = this.value;
   }
 }
@@ -1478,10 +1477,12 @@ class TypeProperty extends Entry {
     throw context.makeError(`${msg} for ${this.namespaceName}.${this.name}.`);
   }
 
-  inject(apiImpl, path, name, dest, context) {
+  inject(path, name, dest, context) {
     if (this.unsupported) {
       return;
     }
+
+    let apiImpl = context.getImplementation(path.join("."), name);
 
     let getStub = () => {
       this.checkDeprecated(context);
@@ -1531,7 +1532,7 @@ class SubModuleProperty extends Entry {
     this.properties = properties;
   }
 
-  inject(apiImpl, path, name, dest, context) {
+  inject(path, name, dest, context) {
     exportLazyGetter(dest, name, () => {
       let obj = Cu.createObjectIn(dest);
 
@@ -1665,7 +1666,7 @@ class FunctionEntry extends CallEntry {
     this.hasAsyncCallback = type.hasAsyncCallback;
   }
 
-  inject(apiImpl, path, name, dest, context) {
+  inject(path, name, dest, context) {
     if (this.unsupported) {
       return;
     }
@@ -1729,7 +1730,7 @@ class Event extends CallEntry {
     return r.value;
   }
 
-  inject(apiImpl, path, name, dest, context) {
+  inject(path, name, dest, context) {
     if (this.unsupported) {
       return;
     }
