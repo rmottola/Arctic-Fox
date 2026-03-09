@@ -26,16 +26,16 @@ const IMPLICIT_ID_ID = "webext_implicit_id@tests.mozilla.org";
 add_task(function* test_implicit_id() {
   // This test needs to read the xpi certificate which only works
   // if signing is enabled.
-  ok(ADDON_SIGNING, "Addon signing is enabled");
+  ok(ADDON_SIGNING, "Add-on signing is enabled");
 
   let addon = yield promiseAddonByID(IMPLICIT_ID_ID);
-  do_check_eq(addon, null);
+  equal(addon, null, "Add-on is not installed");
 
   let xpifile = do_get_file(IMPLICIT_ID_XPI);
   yield promiseInstallAllFiles([xpifile]);
 
   addon = yield promiseAddonByID(IMPLICIT_ID_ID);
-  do_check_neq(addon, null);
+  notEqual(addon, null, "Add-on is installed");
 
   addon.uninstall();
 });
@@ -113,7 +113,7 @@ add_task(function* test_multiple_no_id_extensions() {
   do_print(`Found these add-ons: ${allAddons.map(a => a.name).join(", ")}`);
   const filtered = allAddons.filter(addon => addon.name === manifest.name);
   // Make sure we have two add-ons by the same name.
-  equal(filtered.length, 2);
+  equal(filtered.length, 2, "Two add-ons are installed with the same name");
 
   firstAddon.uninstall();
   Services.obs.notifyObservers(firstAddonDir, "flush-cache-entry", null);
@@ -142,13 +142,13 @@ add_task(function* test_bss_id() {
   };
 
   let addon = yield promiseAddonByID(ID);
-  do_check_eq(addon, null);
+  equal(addon, null, "Add-on is not installed");
 
   yield promiseWriteWebManifestForExtension(manifest, profileDir, ID);
   yield promiseRestartManager();
 
   addon = yield promiseAddonByID(ID);
-  do_check_neq(addon, null);
+  notEqual(addon, null, "Add-on is installed");
 
   addon.uninstall();
 });
@@ -182,9 +182,9 @@ add_task(function* test_two_ids() {
   yield promiseRestartManager();
 
   let addon = yield promiseAddonByID(BAD_ID);
-  do_check_eq(addon, null);
+  equal(addon, null, "Add-on is not found using bad ID");
   addon = yield promiseAddonByID(GOOD_ID);
-  do_check_neq(addon, null);
+  notEqual(addon, null, "Add-on is found using good ID");
 
   addon.uninstall();
 });
@@ -223,13 +223,13 @@ add_task(function* test_strict_min_max() {
                                               "the-addon-sub-dir");
 
   let expectedMsg = new RegExp("Add-on strict_min_max@tests.mozilla.org is not compatible with application version. " +
-                               "add-on minVersion: 1, add-on maxVersion: 1");
+                               "add-on minVersion: 1. add-on maxVersion: 1.");
   yield Assert.rejects(AddonManager.installTemporaryAddon(addonDir),
                        expectedMsg,
                        "Install rejects when specified maxVersion is not valid");
 
   let addon = yield promiseAddonByID(addonId);
-  do_check_eq(addon, null);
+  equal(addon, null, "Add-on is not installed");
   flushAndRemove(addonDir);
 
   // bad min good max
@@ -248,13 +248,13 @@ add_task(function* test_strict_min_max() {
                                           "the-addon-sub-dir");
 
   expectedMsg = new RegExp("Add-on strict_min_max@tests.mozilla.org is not compatible with application version. " +
-                               "add-on minVersion: 2, add-on maxVersion: 2");
+                               "add-on minVersion: 2. add-on maxVersion: 2.");
   yield Assert.rejects(AddonManager.installTemporaryAddon(addonDir),
                        expectedMsg,
                        "Install rejects when specified minVersion is not valid");
 
   addon = yield promiseAddonByID(addonId);
-  do_check_eq(addon, null);
+  equal(addon, null, "Add-on is not installed");
   flushAndRemove(addonDir);
 
   // bad both
@@ -273,13 +273,61 @@ add_task(function* test_strict_min_max() {
                                           "the-addon-sub-dir");
 
   expectedMsg = new RegExp("Add-on strict_min_max@tests.mozilla.org is not compatible with application version. " +
-                               "add-on minVersion: 2, add-on maxVersion: 1");
+                               "add-on minVersion: 2. add-on maxVersion: 1.");
   yield Assert.rejects(AddonManager.installTemporaryAddon(addonDir),
                        expectedMsg,
                        "Install rejects when specified minVersion and maxVersion are not valid");
 
   addon = yield promiseAddonByID(addonId);
-  do_check_eq(addon, null);
+  equal(addon, null, "Add-on is not installed");
+  flushAndRemove(addonDir);
+
+  // bad only min
+  apps = {
+    applications: {
+      gecko: {
+        id: addonId,
+        strict_min_version: "2"
+      },
+    },
+  }
+  testManifest = Object.assign(apps, MANIFEST);
+
+  addonDir = yield promiseWriteWebManifestForExtension(testManifest, gTmpD,
+                                          "the-addon-sub-dir");
+
+  expectedMsg = new RegExp("Add-on strict_min_max@tests.mozilla.org is not compatible with application version\. " +
+                           "add-on minVersion: 2\.");
+  yield Assert.rejects(AddonManager.installTemporaryAddon(addonDir),
+                       expectedMsg,
+                       "Install rejects when specified minVersion and maxVersion are not valid");
+
+  addon = yield promiseAddonByID(addonId);
+  equal(addon, null, "Add-on is not installed");
+  flushAndRemove(addonDir);
+
+  // bad only max
+  apps = {
+    applications: {
+      gecko: {
+        id: addonId,
+        strict_max_version: "1"
+      },
+    },
+  }
+  testManifest = Object.assign(apps, MANIFEST);
+
+  addonDir = yield promiseWriteWebManifestForExtension(testManifest, gTmpD,
+                                          "the-addon-sub-dir");
+
+  expectedMsg = new RegExp("Add-on strict_min_max@tests.mozilla.org is not compatible with application version\. " +
+                           "add-on maxVersion: 1\.");
+  yield Assert.rejects(AddonManager.installTemporaryAddon(addonDir),
+                       expectedMsg,
+                       "Install rejects when specified minVersion and maxVersion are not valid");
+
+  addon = yield promiseAddonByID(addonId);
+  equal(addon, null, "Add-on is not installed");
   flushAndRemove(addonDir);
 
   // good both
@@ -300,8 +348,8 @@ add_task(function* test_strict_min_max() {
   yield AddonManager.installTemporaryAddon(addonDir);
   addon = yield promiseAddonByID(addonId);
 
-  do_check_neq(addon, null);
-  do_check_eq(addon.id, addonId);
+  notEqual(addon, null, "Add-on is installed");
+  equal(addon.id, addonId, "Installed add-on has the expected ID");
   addon.uninstall();
   flushAndRemove(addonDir);
 
@@ -323,8 +371,8 @@ add_task(function* test_strict_min_max() {
   yield AddonManager.installTemporaryAddon(addonDir);
   addon = yield promiseAddonByID(newId);
 
-  do_check_neq(addon, null);
-  do_check_eq(addon.id, newId);
+  notEqual(addon, null, "Add-on is installed");
+  equal(addon.id, newId, "Installed add-on has the expected ID");
 
   addon.uninstall();
   flushAndRemove(addonDir);
@@ -347,8 +395,8 @@ add_task(function* test_strict_min_max() {
   yield AddonManager.installTemporaryAddon(addonDir);
   addon = yield promiseAddonByID(newId);
 
-  do_check_neq(addon, null);
-  do_check_eq(addon.id, newId);
+  notEqual(addon, null, "Add-on is installed");
+  equal(addon.id, newId, "Installed add-on has the expected ID");
 
   addon.uninstall();
   flushAndRemove(addonDir);
@@ -383,4 +431,31 @@ add_task(function* test_strict_min_max() {
     addon.uninstall();
     flushAndRemove(addonDir);
   }
+
+  // incompatible extension but with compatibility checking off
+  newId = "checkCompatibility@tests.mozilla.org";
+  apps = {
+    applications: {
+      gecko: {
+        id: newId,
+        strict_max_version: "1",
+      },
+    },
+  }
+  testManifest = Object.assign(apps, MANIFEST);
+
+  addonDir = yield promiseWriteWebManifestForExtension(testManifest, gTmpD,
+                                          "checkCompatibility");
+
+  let savedCheckCompatibilityValue = AddonManager.checkCompatibility;
+  AddonManager.checkCompatibility = false;
+  yield AddonManager.installTemporaryAddon(addonDir);
+  addon = yield promiseAddonByID(newId);
+
+  notEqual(addon, null, "Add-on is installed");
+  equal(addon.id, newId, "Installed add-on has the expected ID");
+
+  addon.uninstall();
+  flushAndRemove(addonDir);
+  AddonManager.checkCompatibility = savedCheckCompatibilityValue;
 });
