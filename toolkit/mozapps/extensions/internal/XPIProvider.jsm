@@ -733,21 +733,6 @@ function canRunInSafeMode(aAddon) {
 }
 
 /**
- * Evaluates whether an add-on is allowed to run in safe mode.
- *
- * @param  aAddon
- *         The add-on to check
- * @return true if the add-on should run in safe mode
- */
-function canRunInSafeMode(aAddon) {
-  // Even though the updated system add-ons aren't generally run in safe mode we
-  // include them here so their uninstall functions get called when switching
-  // back to the default set.
-  return aAddon._installLocation.name == KEY_APP_SYSTEM_DEFAULTS ||
-         aAddon._installLocation.name == KEY_APP_SYSTEM_ADDONS;
-}
-
-/**
  * Calculates whether an add-on should be appDisabled or not.
  *
  * @param  aAddon
@@ -7236,13 +7221,9 @@ AddonInternal.prototype = {
     if (!aPlatformVersion)
       aPlatformVersion = Services.appinfo.platformVersion;
 
-    this.native = false;
-  
     let version;
-    if (app.id == Services.appinfo.ID) {
+    if (app.id == Services.appinfo.ID)
       version = aAppVersion;
-      this.native = true;
-    }
     else if (app.id == TOOLKIT_ID)
       version = aPlatformVersion
 
@@ -7794,6 +7775,17 @@ AddonWrapper.prototype = {
     let addon = addonFor(this);
     return (addon._installLocation.name == KEY_APP_SYSTEM_DEFAULTS ||
             addon._installLocation.name == KEY_APP_SYSTEM_ADDONS);
+  },
+
+  // Returns true if Firefox Sync should sync this addon. Only non-hotfixes
+  // directly in the profile are considered syncable.
+  get isSyncable() {
+    let addon = addonFor(this);
+    let hotfixID = Preferences.get(PREF_EM_HOTFIX_ID, undefined);
+    if (hotfixID && hotfixID == addon.id) {
+      return false;
+    }
+    return (addon._installLocation.name == KEY_APP_PROFILE);
   },
 
   isCompatibleWith: function(aAppVersion, aPlatformVersion) {
