@@ -420,7 +420,7 @@ function* setup_conditions(setup) {
   yield check_installed(...setup.initialState);
 }
 
-function* verify_state(initialState, finalState = undefined) {
+function* verify_state(initialState, finalState = undefined, alreadyUpgraded = false) {
   let expectedDirs = 0;
 
   // If the initial state was using the profile set then that directory will
@@ -436,13 +436,17 @@ function* verify_state(initialState, finalState = undefined) {
     expectedDirs++;
   }
 
+  // Since upgrades are restartless now, the previous update dir hasn't been removed.
+  if (alreadyUpgraded) {
+    expectedDirs++;
+  }
+
   do_print("Checking final state.");
 
   let dirs = yield get_directories();
   do_check_eq(dirs.length, expectedDirs);
 
-  // Bug 1204156: Currently switching to the new state requires a restart
-  // yield check_installed(...finalState);
+  yield check_installed(...finalState);
 
   // Check that the new state is active after a restart
   yield promiseRestartManager();
@@ -457,7 +461,7 @@ function* exec_test(setup, test) {
       yield test.test();
     }
     else {
-      yield install_system_addons(yield build_xml(test.updateList));
+      yield installSystemAddons(yield buildSystemAddonUpdates(test.updateList, root), testserver);
     }
 
     if (test.fails) {
@@ -493,10 +497,10 @@ add_task(function*() {
 add_task(function* test_addon_update() {
   yield setup_conditions(TEST_CONDITIONS.blank);
 
-  yield update_all_addons(yield build_xml([
+  yield updateAllSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "system2_2.xpi" },
     { id: "system3@tests.mozilla.org", version: "2.0", path: "system3_2.xpi" }
-  ]));
+  ], root), testserver);
 
   yield verify_state(TEST_CONDITIONS.blank.initialState,
                      [true, null, "2.0", "2.0", null, null]);
@@ -509,10 +513,10 @@ add_task(function* test_app_update_disabled() {
   yield setup_conditions(TEST_CONDITIONS.blank);
 
   Services.prefs.setBoolPref(PREF_APP_UPDATE_ENABLED, false);
-  yield update_all_addons(yield build_xml([
+  yield updateAllSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "system2_2.xpi" },
     { id: "system3@tests.mozilla.org", version: "2.0", path: "system3_2.xpi" }
-  ]));
+  ], root), testserver);
   Services.prefs.clearUserPref(PREF_APP_UPDATE_ENABLED);
 
   yield verify_state(TEST_CONDITIONS.blank.initialState);
@@ -527,10 +531,10 @@ add_task(function* test_safe_mode() {
   yield setup_conditions(TEST_CONDITIONS.blank);
 
   Services.prefs.setBoolPref(PREF_APP_UPDATE_ENABLED, false);
-  yield update_all_addons(yield build_xml([
+  yield updateAllSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "system2_2.xpi" },
     { id: "system3@tests.mozilla.org", version: "2.0", path: "system3_2.xpi" }
-  ]));
+  ], root), testserver);
   Services.prefs.clearUserPref(PREF_APP_UPDATE_ENABLED);
 
   yield verify_state(TEST_CONDITIONS.blank.initialState);
@@ -544,10 +548,10 @@ add_task(function* test_safe_mode() {
 add_task(function* test_match_default() {
   yield setup_conditions(TEST_CONDITIONS.withAppSet);
 
-  yield install_system_addons(yield build_xml([
+  yield installSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "system2_2.xpi" },
     { id: "system3@tests.mozilla.org", version: "2.0", path: "system3_2.xpi" }
-  ]));
+  ], root), testserver);
 
   // Shouldn't have installed an updated set
   yield verify_state(TEST_CONDITIONS.withAppSet.initialState);
@@ -559,10 +563,10 @@ add_task(function* test_match_default() {
 add_task(function* test_match_default_revert() {
   yield setup_conditions(TEST_CONDITIONS.withBothSets);
 
-  yield install_system_addons(yield build_xml([
+  yield installSystemAddons(yield buildSystemAddonUpdates([
     { id: "system1@tests.mozilla.org", version: "1.0", path: "system1_1.xpi" },
     { id: "system2@tests.mozilla.org", version: "1.0", path: "system2_1.xpi" }
-  ]));
+  ], root), testserver);
 
   // This should revert to the default set instead of installing new versions
   // into an updated set.
@@ -576,10 +580,10 @@ add_task(function* test_match_default_revert() {
 add_task(function* test_match_current() {
   yield setup_conditions(TEST_CONDITIONS.withBothSets);
 
-  yield install_system_addons(yield build_xml([
+  yield installSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "system2_2.xpi" },
     { id: "system3@tests.mozilla.org", version: "2.0", path: "system3_2.xpi" }
-  ]));
+  ], root), testserver);
 
   // This should remain with the current set instead of creating a new copy
   let set = JSON.parse(Services.prefs.getCharPref(PREF_SYSTEM_ADDON_SET));
@@ -595,10 +599,10 @@ add_task(function* test_no_download() {
   yield setup_conditions(TEST_CONDITIONS.withBothSets);
 
   // The missing file here is unneeded since there is a local version already
-  yield install_system_addons(yield build_xml([
+  yield installSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "missing.xpi" },
     { id: "system4@tests.mozilla.org", version: "1.0", path: "system4_1.xpi" }
-  ]));
+  ], root), testserver);
 
   yield verify_state(TEST_CONDITIONS.withBothSets.initialState,
                      [true, null, "2.0", null, "1.0", null]);
@@ -610,15 +614,15 @@ add_task(function* test_no_download() {
 add_task(function* test_double_update() {
   yield setup_conditions(TEST_CONDITIONS.withAppSet);
 
-  yield install_system_addons(yield build_xml([
+  yield installSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "system2_2.xpi" },
     { id: "system3@tests.mozilla.org", version: "1.0", path: "system3_1.xpi" }
-  ]));
+  ], root), testserver);
 
-  yield install_system_addons(yield build_xml([
+  yield installSystemAddons(yield buildSystemAddonUpdates([
     { id: "system3@tests.mozilla.org", version: "2.0", path: "system3_2.xpi" },
     { id: "system4@tests.mozilla.org", version: "1.0", path: "system4_1.xpi" }
-  ]));
+  ], root), testserver);
 
   yield verify_state(TEST_CONDITIONS.withAppSet.initialState,
                      [true, null, null, "2.0", "1.0", null]);
@@ -630,15 +634,15 @@ add_task(function* test_double_update() {
 add_task(function* test_update_purges() {
   yield setup_conditions(TEST_CONDITIONS.withBothSets);
 
-  yield install_system_addons(yield build_xml([
+  yield installSystemAddons(yield buildSystemAddonUpdates([
     { id: "system2@tests.mozilla.org", version: "2.0", path: "system2_2.xpi" },
     { id: "system3@tests.mozilla.org", version: "1.0", path: "system3_1.xpi" }
-  ]));
+  ], root), testserver);
 
   yield verify_state(TEST_CONDITIONS.withBothSets.initialState,
                      [true, null, "2.0", "1.0", null, null]);
 
-  yield install_system_addons(yield build_xml(null));
+  yield installSystemAddons(yield buildSystemAddonUpdates(null), testserver);
 
   let dirs = yield get_directories();
   do_check_eq(dirs.length, 1);
