@@ -1038,7 +1038,12 @@ class ObjectType extends Type {
     // Parse "additionalProperties" schema.
     let additionalProperties = null;
     if (schema.additionalProperties) {
-      additionalProperties = Schemas.parseSchema(schema.additionalProperties, path);
+      let type = schema.additionalProperties;
+      if (type === true) {
+        type = {"type": "any"};
+      }
+
+      additionalProperties = Schemas.parseSchema(type, path);
     }
 
     return new this(schema, properties, additionalProperties, patternProperties, schema.isInstanceOf || null);
@@ -1387,7 +1392,7 @@ class FunctionType extends Type {
     this.checkSchemaProperties(schema, path, extraProperties);
 
     let isAsync = !!schema.async;
-    let isExpectingCallback = isAsync;
+    let isExpectingCallback = typeof schema.async === "string";
     let parameters = null;
     if ("parameters" in schema) {
       parameters = [];
@@ -1413,9 +1418,10 @@ class FunctionType extends Type {
 
     let hasAsyncCallback = false;
     if (isAsync) {
-      if (parameters && parameters.length && parameters[parameters.length - 1].name == schema.async) {
-        hasAsyncCallback = true;
-      }
+      hasAsyncCallback = (parameters &&
+                          parameters.length &&
+                          parameters[parameters.length - 1].name == schema.async);
+
       if (schema.returns) {
         throw new Error("Internal error: Async functions must not have return values.");
       }
@@ -1954,7 +1960,11 @@ this.Schemas = {
     });
 
     for (let json of this.schemaJSON.values()) {
-      this.loadSchema(json);
+      try {
+        this.loadSchema(json);
+      } catch (e) {
+        Cu.reportError(e);
+      }
     }
 
     return this.namespaces;
