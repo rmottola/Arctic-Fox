@@ -1454,6 +1454,8 @@ SyncEngine.prototype = {
       this._log.trace("Preparing " + modifiedIDs.length +
                       " outgoing records");
 
+      let counts = { sent: modifiedIDs.length, failed: 0 };
+
       // collection we'll upload
       let up = new Collection(this.engineURL, null, this.service);
       let handleResponse = resp => {
@@ -1469,6 +1471,7 @@ SyncEngine.prototype = {
           this.lastSync = modified;
 
         let failed_ids = Object.keys(resp.obj.failed);
+        counts.failed += failed_ids.length;
         if (failed_ids.length)
           this._log.debug("Records that will be uploaded again because "
                           + "the server couldn't store them: "
@@ -1505,6 +1508,7 @@ SyncEngine.prototype = {
         this._store._sleep(0);
       }
       postQueue.flush();
+      Observers.notify("weave:engine:sync:uploaded", counts, this.name);
     }
   },
 
