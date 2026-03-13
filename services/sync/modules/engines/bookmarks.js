@@ -1259,7 +1259,8 @@ BookmarksTracker.prototype = {
   // *each change*.
   onItemChanged: function BMT_onItemChanged(itemId, property, isAnno, value,
                                             lastModified, itemType, parentId,
-                                            guid, parentGuid, source) {
+                                            guid, parentGuid, oldValue,
+                                            source) {
     if (IGNORED_SOURCES.includes(source)) {
       return;
     }
