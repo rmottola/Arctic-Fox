@@ -1240,9 +1240,17 @@ BookmarksTracker.prototype = {
       PlacesUtils.annotations.setItemAnnotation(query, BookmarkAnnos.EXCLUDEBACKUP_ANNO, 1, 0,
                                   PlacesUtils.annotations.EXPIRE_NEVER);
     }
-    // Make sure the existing title is correct
-    else if (PlacesUtils.bookmarks.getItemTitle(mobile[0]) != title) {
-      PlacesUtils.bookmarks.setItemTitle(mobile[0], title);
+    else {
+      let queryTitle = PlacesUtils.bookmarks.getItemTitle(mobile[0]);
+      if (queryTitle != title) {
+        PlacesUtils.bookmarks.setItemTitle(mobile[0], title, SOURCE_SYNC);
+      }
+      let rootTitle =
+        PlacesUtils.bookmarks.getItemTitle(PlacesUtils.mobileFolderId);
+      if (rootTitle != title) {
+        PlacesUtils.bookmarks.setItemTitle(PlacesUtils.mobileFolderId, title,
+                                           SOURCE_SYNC);
+      }
     }
   },
 
