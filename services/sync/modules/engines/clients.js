@@ -76,6 +76,16 @@ ClientEngine.prototype = {
     Svc.Prefs.set(this.name + ".lastRecordUpload", Math.floor(value));
   },
 
+  get remoteClients() {
+    // return all non-stale clients for external consumption.
+    return Object.values(this._store._remoteClients).filter(v => !v.stale);
+  },
+
+  remoteClientExists(id) {
+    let client = this._store._remoteClients[id];
+    return !!(client && !client.stale);
+  },
+
   // Aggregate some stats on the composition of clients on this account
   get stats() {
     let stats = {
@@ -85,10 +95,12 @@ ClientEngine.prototype = {
     };
 
     for (let id in this._store._remoteClients) {
-      let {name, type} = this._store._remoteClients[id];
-      stats.hasMobile = stats.hasMobile || type == DEVICE_TYPE_MOBILE;
-      stats.names.push(name);
-      stats.numClients++;
+      let {name, type, stale} = this._store._remoteClients[id];
+      if (!stale) {
+        stats.hasMobile = stats.hasMobile || type == DEVICE_TYPE_MOBILE;
+        stats.names.push(name);
+        stats.numClients++;
+      }
     }
 
     return stats;
@@ -106,6 +118,9 @@ ClientEngine.prototype = {
 
     for (let id in this._store._remoteClients) {
       let record = this._store._remoteClients[id];
+      if (record.stale) {
+        continue; // pretend "stale" records don't exist.
+      }
       let type = record.type;
       if (!counts.has(type)) {
         counts.set(type, 0);
@@ -144,10 +159,6 @@ ClientEngine.prototype = {
   },
   set localType(value) {
     Svc.Prefs.set("client.type", value);
-  },
-
-  remoteClientExists(id) {
-    return !!this._store._remoteClients[id];
   },
 
   getClientFxaDeviceId(id) {
@@ -190,8 +201,10 @@ ClientEngine.prototype = {
         }
       }
       // Bug 1264498: Mobile clients don't remove themselves from the clients
-      // collection when the user disconnects Sync, so we filter out clients
+      // collection when the user disconnects Sync, so we mark as stale clients
       // with the same name that haven't synced in over a week.
+      // (Note we can't simply delete them, or we re-apply them next sync - see
+      // bug 1287687)
       delete this._incomingClients[this.localID];
       let names = new Set([this.localName]);
       for (let id in this._incomingClients) {
@@ -203,12 +216,17 @@ ClientEngine.prototype = {
         let remoteAge = AsyncResource.serverTime - this._incomingClients[id];
         if (remoteAge > STALE_CLIENT_REMOTE_AGE) {
           this._log.info(`Hiding stale client ${id} with age ${remoteAge}`);
-          this._removeRemoteClient(id);
+          record.stale = true;
         }
       }
     } finally {
       this._incomingClients = null;
     }
+  },
+
+  _uploadOutgoing() {
+    this._clearedCommands = null;
+    SyncEngine.prototype._uploadOutgoing.call(this);
   },
 
   _onRecordsWritten(succeeded, failed) {
@@ -234,11 +252,6 @@ ClientEngine.prototype = {
       }
     };
     fxAccounts.notifyDevices(ids, message, NOTIFY_TAB_SENT_TTL_SECS);
-  },
-
-  _uploadOutgoing() {
-    this._clearedCommands = null;
-    SyncEngine.prototype._uploadOutgoing.call(this);
   },
 
   _syncFinish() {
@@ -357,6 +370,9 @@ ClientEngine.prototype = {
     let client = this._store._remoteClients[clientId];
     if (!client) {
       throw new Error("Unknown remote client ID: '" + clientId + "'.");
+    }
+    if (client.stale) {
+      throw new Error("Stale remote client ID: '" + clientId + "'.");
     }
 
     let action = {
@@ -624,6 +640,12 @@ ClientStore.prototype = {
       // record.formfactor = "";        // Bug 1100722
     } else {
       record.cleartext = this._remoteClients[id];
+      if (record.cleartext.stale) {
+        // It's almost certainly a logic error for us to upload a record we
+        // consider stale, so make log noise, but still remove the flag.
+        this._log.error(`Preparing to upload record ${id} that we consider stale`);
+        delete record.cleartext.stale;
+      }
     }
 
     return record;
