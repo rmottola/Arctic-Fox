@@ -716,6 +716,15 @@ Engine.prototype = {
 
   wipeClient: function () {
     this._notify("wipe-client", this.name, this._wipeClient)();
+  },
+
+  /**
+   * If one exists, initialize and return a validator for this engine (which
+   * must have a `validate(engine)` method that returns a promise to an object
+   * with a getSummary method). Otherwise return null.
+   */
+  getValidator: function () {
+    return null;
   }
 };
 
@@ -960,7 +969,7 @@ SyncEngine.prototype = {
    * A tiny abstraction to make it easier to test incoming record
    * application.
    */
-  _itemSource: function () {
+  itemSource: function () {
     return new Collection(this.engineURL, this._recordObj, this.service);
   },
 
@@ -977,7 +986,7 @@ SyncEngine.prototype = {
     let isMobile = (Svc.Prefs.get("client.type") == "mobile");
 
     if (!newitems) {
-      newitems = this._itemSource();
+      newitems = this.itemSource();
     }
 
     if (this._defaultSort) {

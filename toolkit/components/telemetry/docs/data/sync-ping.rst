@@ -69,14 +69,23 @@ Structure:
               failureReason: { ... }, // Same as above.
 
               // Optional, excluded if it would be empty or if the engine cannot
-              // or did not run validation on itself. Entries with a count of 0
-              // are excluded.
-              validation: [
-                {
-                  name: <string>, // The problem identified.
-                  count: <integer>, // Number of times it occurred.
-                }
-              ]
+              // or did not run validation on itself.
+              validation: {
+                // Optional validator version, default of 0.
+                version: <integer>,
+                checked: <integer>,
+                took: <non-monotonic integer duration in milliseconds>,
+                // Entries with a count of 0 are excluded, the array is excluded if no problems are found.
+                problems: [
+                  {
+                    name: <string>, // The problem identified.
+                    count: <integer>, // Number of times it occurred.
+                  }
+                ],
+                // Format is same as above, this is only included if we tried and failed
+                // to run validation, and if it's present, all other fields in this object are optional.
+                failureReason: { ... },
+              }
             }
           ]
         }]
