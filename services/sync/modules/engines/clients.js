@@ -28,6 +28,9 @@ const STALE_CLIENT_REMOTE_AGE = 604800; // 7 days
 const SUPPORTED_PROTOCOL_VERSIONS = ["1.1", "1.5"];
 
 function hasDupeCommand(commands, action) {
+  if (!commands) {
+    return false;
+  }
   return commands.some(other => other.command == action.command &&
     Utils.deepEquals(other.args, action.args));
 }
@@ -233,6 +236,11 @@ ClientEngine.prototype = {
     fxAccounts.notifyDevices(ids, message, NOTIFY_TAB_SENT_TTL_SECS);
   },
 
+  _uploadOutgoing() {
+    this._clearedCommands = null;
+    SyncEngine.prototype._uploadOutgoing.call(this);
+  },
+
   _syncFinish() {
     // Record histograms for our device types, and also write them to a pref
     // so non-histogram telemetry (eg, UITelemetry) has easy access to them.
@@ -283,6 +291,7 @@ ClientEngine.prototype = {
 
   _wipeClient: function _wipeClient() {
     SyncEngine.prototype._resetClient.call(this);
+    delete this.localCommands;
     this._store.wipe();
   },
 
@@ -325,6 +334,12 @@ ClientEngine.prototype = {
    * Remove any commands for the local client and mark it for upload.
    */
   clearCommands: function clearCommands() {
+    if (!this._clearedCommands) {
+      this._clearedCommands = [];
+    }
+    // Keep track of cleared local commands until the next sync, so that we
+    // don't reupload them.
+    this._clearedCommands = this._clearedCommands.concat(this.localCommands);
     delete this.localCommands;
     this._tracker.addChangedID(this.localID);
   },
@@ -529,21 +544,56 @@ ClientStore.prototype = {
   },
 
   update: function update(record) {
-    // Only grab commands from the server; local name/type always wins
-    if (record.id == this.engine.localID)
-      this.engine.localCommands = record.commands;
-    else {
-      let currentRecord = this._remoteClients[record.id];
-      if (currentRecord && currentRecord.commands) {
-        // Merge commands.
-        for (let action of currentRecord.commands) {
-          if (!hasDupeCommand(record.cleartext.commands, action)) {
-            record.cleartext.commands.push(action);
-          }
-        }
-      }
-      this._remoteClients[record.id] = record.cleartext;
+    if (record.id == this.engine.localID) {
+      this._updateLocalRecord(record);
+    } else {
+      this._updateRemoteRecord(record);
     }
+  },
+
+  _updateLocalRecord(record) {
+    // Local changes for our client means we're clearing commands or
+    // uploading a new record.
+    let incomingCommands = record.commands;
+    if (incomingCommands) {
+      // Filter out incoming commands that we've cleared.
+      incomingCommands = incomingCommands.filter(action =>
+        !hasDupeCommand(this.engine._clearedCommands, action));
+      if (!incomingCommands.length) {
+        // Use `undefined` instead of `null` to avoid creating a null field
+        // in the uploaded record.
+        incomingCommands = undefined;
+      }
+    }
+    // Only grab commands from the server; local name/type always wins
+    this.engine.localCommands = incomingCommands;
+  },
+
+  _updateRemoteRecord(record) {
+    let currentRecord = this._remoteClients[record.id];
+    if (!currentRecord || !currentRecord.commands ||
+        !(record.id in this.engine._modified)) {
+
+      // If we have a new incoming record or no outgoing commands, use the
+      // full incoming record from the server.
+      this._remoteClients[record.id] = record.cleartext;
+      return;
+    }
+
+    // Otherwise, we have outgoing commands for a client, so merge them
+    // with the commands that we downloaded from the server.
+    for (let action of currentRecord.commands) {
+      if (hasDupeCommand(record.cleartext.commands, action)) {
+        // Ignore commands the server already knows about.
+        continue;
+      }
+      if (record.cleartext.commands) {
+        record.cleartext.commands.push(action);
+      } else {
+        record.cleartext.commands = [action];
+      }
+    }
+    this._remoteClients[record.id] = record.cleartext;
   },
 
   createRecord: function createRecord(id, collection) {
