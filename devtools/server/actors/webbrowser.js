@@ -920,8 +920,6 @@ TabActor.prototype = {
     return this._contextPool;
   },
 
-  _pendingNavigation: null,
-
   // A constant prefix that will be used to form the actor ID by the server.
   actorPrefix: "tab",
 
@@ -1805,10 +1803,6 @@ TabActor.prototype = {
                           .getInterface(Ci.nsIDOMWindowUtils);
     windowUtils.resumeTimeouts();
     windowUtils.suppressEventHandling(false);
-    if (this._pendingNavigation) {
-      this._pendingNavigation.resume();
-      this._pendingNavigation = null;
-    }
   },
 
   _changeTopLevelDocument(window) {
@@ -1946,12 +1940,10 @@ TabActor.prototype = {
     // TODO bug 997119: move that code to ThreadActor by listening to
     // will-navigate
     let threadActor = this.threadActor;
-    if (request && threadActor.state == "paused") {
-      request.suspend();
+    if (threadActor.state == "paused") {
       this.conn.send(
         threadActor.unsafeSynchronize(Promise.resolve(threadActor.onResume())));
       threadActor.dbg.enabled = false;
-      this._pendingNavigation = request;
     }
     threadActor.disableAllBreakpoints();
 
