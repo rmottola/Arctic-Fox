@@ -527,7 +527,8 @@ void GestureEventListener::CreateMaxTapTimeoutTask()
 {
   mLastTapInput = mLastTouchInput;
 
-  TouchBlockState* block = mAsyncPanZoomController->GetInputQueue()->CurrentTouchBlock();
+  TouchBlockState* block = mAsyncPanZoomController->GetInputQueue()->GetCurrentTouchBlock();
+  MOZ_ASSERT(block);
   RefPtr<CancelableRunnable> task =
     NewCancelableRunnableMethod<bool>(this,
                                       &GestureEventListener::HandleInputTimeoutMaxTap,
