@@ -734,7 +734,7 @@ TextPropertyEditor.prototype = {
       return;
     }
 
-    if (this.isDisplayGrid) {
+    if (this.isDisplayGrid()) {
       this.ruleView.highlighters._hideGridHighlighter();
     }
 
