@@ -509,9 +509,14 @@ var insertSyncBookmark = Task.async(function* (insertInfo) {
 
 // Inserts a synced livemark.
 var insertSyncLivemark = Task.async(function* (insertInfo) {
-  let parentId = yield PlacesUtils.promiseItemId(insertInfo.parentGuid);
-  let parentIsLivemark = PlacesUtils.annotations.itemHasAnnotation(parentId,
-    PlacesUtils.LMANNO_FEEDURI);
+  if (!insertInfo.feed) {
+    BookmarkSyncLog.debug(`insertSyncLivemark: ${
+      insertInfo.syncId} missing feed URL`);
+    return null;
+  }
+  let livemarkInfo = syncBookmarkToPlacesBookmark(insertInfo);
+  let parentIsLivemark = yield getAnno(livemarkInfo.parentGuid,
+                                       PlacesUtils.LMANNO_FEEDURI);
   if (parentIsLivemark) {
     // A livemark can't be a descendant of another livemark.
     BookmarkSyncLog.debug(`insertSyncLivemark: Invalid parent ${
@@ -852,9 +857,9 @@ function validateNewBookmark(info) {
                                    , BookmarkSyncUtils.KINDS.FOLDER
                                    , BookmarkSyncUtils.KINDS.LIVEMARK ].includes(b.kind) }
     , loadInSidebar: { validIf: b => [ BookmarkSyncUtils.KINDS.BOOKMARK
-                                     , BookmarkSyncUtils.KINDS.MICROSUMMARY ].includes(b.kind) }
-    , feed: { requiredIf: b => b.kind == BookmarkSyncUtils.KINDS.LIVEMARK
-            , validIf: b => b.kind == BookmarkSyncUtils.KINDS.LIVEMARK }
+                                     , BookmarkSyncUtils.KINDS.MICROSUMMARY
+                                     , BookmarkSyncUtils.KINDS.QUERY ].includes(b.kind) }
+    , feed: { validIf: b => b.kind == BookmarkSyncUtils.KINDS.LIVEMARK }
     , site: { validIf: b => b.kind == BookmarkSyncUtils.KINDS.LIVEMARK }
     });
 

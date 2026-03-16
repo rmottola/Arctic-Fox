@@ -282,7 +282,7 @@ const SYNC_BOOKMARK_VALIDATORS = Object.freeze(Object.assign({
   keyword: simpleValidateFunc(v => v === null || typeof v == "string"),
   description: simpleValidateFunc(v => v === null || typeof v == "string"),
   loadInSidebar: simpleValidateFunc(v => v === true || v === false),
-  feed: BOOKMARK_VALIDATORS.url,
+  feed: v => v === null ? v : BOOKMARK_VALIDATORS.url(v),
   site: v => v === null ? v : BOOKMARK_VALIDATORS.url(v),
 }, BOOKMARK_VALIDATORS));
 
