@@ -117,19 +117,19 @@ extensions.registerSchemaAPI("windows", "addon_parent", context => {
           }
           createData.incognito = incognito;
 
-          args.appendElement(tab, /*weak =*/ false);
+          args.appendElement(tab, /* weak = */ false);
         } else if (createData.url !== null) {
           if (Array.isArray(createData.url)) {
             let array = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
             for (let url of createData.url) {
               array.appendElement(mkstr(url), /* weak = */ false);
             }
-            args.appendElement(array, /*weak =*/ false);
+            args.appendElement(array, /* weak = */ false);
           } else {
-            args.appendElement(mkstr(createData.url), /*weak =*/ false);
+            args.appendElement(mkstr(createData.url), /* weak = */ false);
           }
         } else {
-          args.appendElement(mkstr(aboutNewTabService.newTabURL), /*weak =*/ false);
+          args.appendElement(mkstr(aboutNewTabService.newTabURL), /* weak = */ false);
         }
 
         let features = ["chrome"];
