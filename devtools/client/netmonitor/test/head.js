@@ -490,3 +490,23 @@ function waitForContentMessage(name) {
   });
   return def.promise;
 }
+
+/**
+ * Open the requestMenu menu and return all of it's items in a flat array
+ * @param {netmonitorPanel} netmonitor
+ * @param {Event} event mouse event with screenX and screenX coordinates
+ * @return An array of MenuItems
+ */
+function openContextMenuAndGetAllItems(netmonitor, event) {
+  let menu = netmonitor.RequestsMenu.contextMenu.open(event);
+
+  // Flatten all menu items into a single array to make searching through it easier
+  let allItems = [].concat.apply([], menu.items.map(function addItem(item) {
+    if (item.submenu) {
+      return addItem(item.submenu.items);
+    }
+    return item;
+  }));
+
+  return allItems;
+}

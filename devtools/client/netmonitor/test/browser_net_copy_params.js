@@ -73,7 +73,7 @@ add_task(function* () {
 
   function* testCopyUrlParams(queryString) {
     yield waitForClipboardPromise(function setup() {
-      RequestsMenu.copyUrlParams();
+      RequestsMenu.contextMenu.copyUrlParams();
     }, queryString);
     ok(true, "The url query string copied from the selected item is correct.");
   }
@@ -87,7 +87,7 @@ add_task(function* () {
 
   function* testCopyPostData(postData) {
     yield waitForClipboardPromise(function setup() {
-      RequestsMenu.copyPostData();
+      RequestsMenu.contextMenu.copyPostData();
     }, postData);
     ok(true, "The post data string copied from the selected item is correct.");
   }
