@@ -52,6 +52,26 @@ const MOBILE_ANNO = "MobileBookmarks";
 // the tracker doesn't currently distinguish between the two.
 const IGNORED_SOURCES = [SOURCE_SYNC, SOURCE_IMPORT, SOURCE_IMPORT_REPLACE];
 
+// Returns the constructor for a bookmark record type.
+function getTypeObject(type) {
+  switch (type) {
+    case "bookmark":
+    case "microsummary":
+      return Bookmark;
+    case "query":
+      return BookmarkQuery;
+    case "folder":
+      return BookmarkFolder;
+    case "livemark":
+      return Livemark;
+    case "separator":
+      return BookmarkSeparator;
+    case "item":
+      return PlacesItem;
+  }
+  return null;
+}
+
 this.PlacesItem = function PlacesItem(collection, id, type) {
   CryptoWrapper.call(this, collection, id);
   this.type = type || "item";
@@ -69,26 +89,22 @@ PlacesItem.prototype = {
   },
 
   getTypeObject: function PlacesItem_getTypeObject(type) {
-    switch (type) {
-      case "bookmark":
-      case "microsummary":
-        return Bookmark;
-      case "query":
-        return BookmarkQuery;
-      case "folder":
-        return BookmarkFolder;
-      case "livemark":
-        return Livemark;
-      case "separator":
-        return BookmarkSeparator;
-      case "item":
-        return PlacesItem;
+    let recordObj = getTypeObject(type);
+    if (!recordObj) {
+      throw new Error("Unknown places item object type: " + type);
     }
-    throw "Unknown places item object type: " + type;
+    return recordObj;
   },
 
   __proto__: CryptoWrapper.prototype,
   _logName: "Sync.Record.PlacesItem",
+
+  // Populates the record from a Sync bookmark object returned from
+  // `PlacesSyncUtils.bookmarks.fetch`.
+  fromSyncBookmark(item) {
+    this.parentid = item.parentSyncId;
+    this.parentName = item.parentTitle;
+  },
 };
 
 Utils.deferGetSet(PlacesItem,
@@ -101,6 +117,16 @@ this.Bookmark = function Bookmark(collection, id, type) {
 Bookmark.prototype = {
   __proto__: PlacesItem.prototype,
   _logName: "Sync.Record.Bookmark",
+
+  fromSyncBookmark(item) {
+    PlacesItem.prototype.fromSyncBookmark.call(this, item);
+    this.title = item.title;
+    this.bmkUri = item.url.href;
+    this.description = item.description;
+    this.loadInSidebar = item.loadInSidebar;
+    this.tags = item.tags;
+    this.keyword = item.keyword;
+  },
 };
 
 Utils.deferGetSet(Bookmark,
@@ -114,6 +140,11 @@ this.BookmarkQuery = function BookmarkQuery(collection, id) {
 BookmarkQuery.prototype = {
   __proto__: Bookmark.prototype,
   _logName: "Sync.Record.BookmarkQuery",
+  fromSyncBookmark(item) {
+    Bookmark.prototype.fromSyncBookmark.call(this, item);
+    this.folderName = item.folder;
+    this.queryId = item.query;
+  },
 };
 
 Utils.deferGetSet(BookmarkQuery,
@@ -126,6 +157,12 @@ this.BookmarkFolder = function BookmarkFolder(collection, id, type) {
 BookmarkFolder.prototype = {
   __proto__: PlacesItem.prototype,
   _logName: "Sync.Record.Folder",
+  fromSyncBookmark(item) {
+    PlacesItem.prototype.fromSyncBookmark.call(this, item);
+    this.title = item.title;
+    this.description = item.description;
+    this.children = item.childSyncIds;
+  },
 };
 
 Utils.deferGetSet(BookmarkFolder, "cleartext", ["description", "title",
@@ -137,6 +174,13 @@ this.Livemark = function Livemark(collection, id) {
 Livemark.prototype = {
   __proto__: BookmarkFolder.prototype,
   _logName: "Sync.Record.Livemark",
+  fromSyncBookmark(item) {
+    BookmarkFolder.prototype.fromSyncBookmark.call(this, item);
+    this.feedUri = item.feed.href;
+    if (item.site) {
+      this.siteUri = item.site.href;
+    }
+  },
 };
 
 Utils.deferGetSet(Livemark, "cleartext", ["siteUri", "feedUri"]);
@@ -147,6 +191,11 @@ this.BookmarkSeparator = function BookmarkSeparator(collection, id) {
 BookmarkSeparator.prototype = {
   __proto__: PlacesItem.prototype,
   _logName: "Sync.Record.Separator",
+
+  fromSyncBookmark(item) {
+    PlacesItem.prototype.fromSyncBookmark.call(this, item);
+    this.pos = item.index;
+  },
 };
 
 Utils.deferGetSet(BookmarkSeparator, "cleartext", "pos");
@@ -750,121 +799,23 @@ BookmarksStore.prototype = {
     Async.promiseSpinningly(PlacesSyncUtils.bookmarks.changeGuid(oldID, newID));
   },
 
-  _getTags: function BStore__getTags(uri) {
-    try {
-      if (typeof(uri) == "string")
-        uri = Utils.makeURI(uri);
-    } catch(e) {
-      this._log.warn("Could not parse URI \"" + uri + "\": " + e);
-    }
-    return PlacesUtils.tagging.getTagsForURI(uri, {});
-  },
-
-  _getDescription: function BStore__getDescription(id) {
-    try {
-      return PlacesUtils.annotations.getItemAnnotation(id,
-        PlacesSyncUtils.bookmarks.DESCRIPTION_ANNO);
-    } catch (e) {
-      return null;
-    }
-  },
-
-  _isLoadInSidebar: function BStore__isLoadInSidebar(id) {
-    return PlacesUtils.annotations.itemHasAnnotation(id,
-      PlacesSyncUtils.bookmarks.SIDEBAR_ANNO);
-  },
-
   // Create a record starting from the weave id (places guid)
   createRecord: function createRecord(id, collection) {
-    let placeId = this.idForGUID(id);
-    let record;
-    if (placeId <= 0) { // deleted item
-      record = new PlacesItem(collection, id);
+    let item = Async.promiseSpinningly(PlacesSyncUtils.bookmarks.fetch(id));
+    if (!item) { // deleted item
+      let record = new PlacesItem(collection, id);
       record.deleted = true;
       return record;
     }
 
-    let parent = PlacesUtils.bookmarks.getFolderIdForItem(placeId);
-    switch (PlacesUtils.bookmarks.getItemType(placeId)) {
-    case PlacesUtils.bookmarks.TYPE_BOOKMARK:
-      let bmkUri = PlacesUtils.bookmarks.getBookmarkURI(placeId).spec;
-      if (bmkUri.indexOf("place:") == 0) {
-        record = new BookmarkQuery(collection, id);
-
-        // Get the actual tag name instead of the local itemId
-        let folder = bmkUri.match(/[:&]folder=(\d+)/);
-        try {
-          // There might not be the tag yet when creating on a new client
-          if (folder != null) {
-            folder = folder[1];
-            record.folderName = PlacesUtils.bookmarks.getItemTitle(folder);
-            this._log.trace("query id: " + folder + " = " + record.folderName);
-          }
-        }
-        catch(ex) {}
-
-        // Persist the Smart Bookmark anno, if found.
-        try {
-          let anno = PlacesUtils.annotations.getItemAnnotation(placeId,
-            PlacesSyncUtils.bookmarks.SMART_BOOKMARKS_ANNO);
-          if (anno != null) {
-            this._log.trace("query anno: " +
-                            PlacesSyncUtils.bookmarks.SMART_BOOKMARKS_ANNO +
-                            " = " + anno);
-            record.queryId = anno;
-          }
-        }
-        catch(ex) {}
-      }
-      else {
-        record = new Bookmark(collection, id);
-      }
-      record.title = PlacesUtils.bookmarks.getItemTitle(placeId);
-
-      record.parentName = PlacesUtils.bookmarks.getItemTitle(parent);
-      record.bmkUri = bmkUri;
-      record.tags = this._getTags(record.bmkUri);
-      record.keyword = PlacesUtils.bookmarks.getKeywordForBookmark(placeId);
-      record.description = this._getDescription(placeId);
-      record.loadInSidebar = this._isLoadInSidebar(placeId);
-      break;
-
-    case PlacesUtils.bookmarks.TYPE_FOLDER:
-      if (PlacesUtils.annotations
-                     .itemHasAnnotation(placeId, PlacesUtils.LMANNO_FEEDURI)) {
-        record = new Livemark(collection, id);
-        let as = PlacesUtils.annotations;
-        record.feedUri = as.getItemAnnotation(placeId, PlacesUtils.LMANNO_FEEDURI);
-        try {
-          record.siteUri = as.getItemAnnotation(placeId, PlacesUtils.LMANNO_SITEURI);
-        } catch (ex) {}
-      } else {
-        record = new BookmarkFolder(collection, id);
-      }
-
-      if (parent > 0)
-        record.parentName = PlacesUtils.bookmarks.getItemTitle(parent);
-      record.title = PlacesUtils.bookmarks.getItemTitle(placeId);
-      record.description = this._getDescription(placeId);
-      record.children = Async.promiseSpinningly(
-        PlacesSyncUtils.bookmarks.fetchChildSyncIds(id));
-      break;
-
-    case PlacesUtils.bookmarks.TYPE_SEPARATOR:
-      record = new BookmarkSeparator(collection, id);
-      if (parent > 0)
-        record.parentName = PlacesUtils.bookmarks.getItemTitle(parent);
-      // Create a positioning identifier for the separator, used by _mapDupe
-      record.pos = PlacesUtils.bookmarks.getItemIndex(placeId);
-      break;
-
-    default:
-      record = new PlacesItem(collection, id);
-      this._log.warn("Unknown item type, cannot serialize: " +
-                     PlacesUtils.bookmarks.getItemType(placeId));
+    let recordObj = getTypeObject(item.kind);
+    if (!recordObj) {
+      this._log.warn("Unknown item type, cannot serialize: " + item.kind);
+      recordObj = PlacesItem;
     }
+    let record = new recordObj(collection, id);
+    record.fromSyncBookmark(item);
 
-    record.parentid = this.GUIDForId(parent);
     record.sortindex = this._calculateIndex(record);
 
     return record;
@@ -1225,7 +1176,8 @@ BookmarksTracker.prototype = {
     }
 
     // Remove any position annotations now that the user moved the item
-    PlacesUtils.annotations.removeItemAnnotation(itemId, BookmarkAnnos.PARENT_ANNO);
+    PlacesUtils.annotations.removeItemAnnotation(itemId,
+      PlacesSyncUtils.bookmarks.SYNC_PARENT_ANNO, SOURCE_SYNC);
   },
 
   onBeginUpdateBatch: function () {
