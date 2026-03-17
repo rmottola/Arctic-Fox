@@ -44,7 +44,6 @@
       <field name="mController">null</field>
       <field name="mSearchNames">null</field>
       <field name="mIgnoreInput">false</field>
-      <field name="mEnterEvent">null</field>
 
       <field name="_searchBeginHandler">null</field>
       <field name="_searchCompleteHandler">null</field>
@@ -232,11 +231,12 @@
       </method>
 
       <method name="onTextEntered">
+        <parameter name="event"/>
         <body><![CDATA[
           let rv = false;
-          if (this._textEnteredHandler)
-            rv = this._textEnteredHandler(this.mEnterEvent);
-          this.mEnterEvent = null;
+          if (this._textEnteredHandler) {
+            rv = this._textEnteredHandler(event);
+          }
           return rv;
         ]]></body>
       </method>
@@ -497,14 +497,13 @@
                 if (aEvent.metaKey)
                   aEvent.preventDefault();
               }
-              this.mEnterEvent = aEvent;
               if (this.mController.selection) {
                 this._selectionDetails = {
                   index: this.mController.selection.currentIndex,
                   kind: "key"
                 };
               }
-              cancel = this.handleEnter();
+              cancel = this.handleEnter(aEvent);
               break;
             case KeyEvent.DOM_VK_DELETE:
               if (AppConstants.platform == "macosx" && !aEvent.shiftKey) {
@@ -539,8 +538,9 @@
       </method>
 
       <method name="handleEnter">
+        <parameter name="event"/>
         <body><![CDATA[
-          return this.mController.handleEnter(false);
+          return this.mController.handleEnter(false, event || null);
         ]]></body>
       </method>
 
@@ -957,7 +957,7 @@ extends="chrome://global/content/bindings/popup.xml#popup">
         <parameter name="aEvent"/>
         <body><![CDATA[
           var controller = this.view.QueryInterface(Components.interfaces.nsIAutoCompleteController);
-          controller.handleEnter(true);
+          controller.handleEnter(true, aEvent);
         ]]></body>
       </method>
     </implementation>
@@ -1268,9 +1268,18 @@ extends="chrome://global/content/bindings/popup.xml#popup">
                   invalidateReason == iface.INVALIDATE_REASON_NEW_RESULT &&
                   (item.getAttribute("url") == url ||
                    this.richlistbox.mouseSelectedIndex === this._currentIndex)) {
-                item.collapsed = false;
-                this._currentIndex++;
-                continue;
+                // Additionally, if the item is a searchengine action, then it
+                // should only be reused if the engine name is the same as the
+                // popup's override engine name, if any.
+                let action = item._parseActionUrl(url);
+                if (!action ||
+                    action.type != "searchengine" ||
+                    !this.overrideSearchEngineName ||
+                    action.params.engineName == this.overrideSearchEngineName) {
+                  item.collapsed = false;
+                  this._currentIndex++;
+                  continue;
+                }
               }
             }
             else {
@@ -1284,7 +1293,7 @@ extends="chrome://global/content/bindings/popup.xml#popup">
             item.setAttribute("image", iconURI);
             item.setAttribute("url", url);
             item.setAttribute("title", controller.getCommentAt(this._currentIndex));
-            item.setAttribute("type", controller.getStyleAt(this._currentIndex));
+            item.setAttribute("originaltype", controller.getStyleAt(this._currentIndex));
             item.setAttribute("text", trimmedSearchString);
 
             if (this._currentIndex < existingItemsCount) {
@@ -1300,14 +1309,6 @@ extends="chrome://global/content/bindings/popup.xml#popup">
             }
 
             // The binding may have not been applied yet.
-/* FIXME - RM no adjustSiteIconStart
-            setTimeout(() => {
-              let changed = item.adjustSiteIconStart(this._siteIconStart);
-              if (changed) {
-                item.handleOverUnderflow();
-              }
-            }, 0);
-*/
             this._currentIndex++;
           }
 
@@ -1565,6 +1566,9 @@ extends="chrome://global/content/bindings/popup.xml#popup">
         <body>
           <![CDATA[
           // Get rid of all previous text
+          if (!aDescriptionElement) {
+            return;
+          }
           while (aDescriptionElement.hasChildNodes())
             aDescriptionElement.removeChild(aDescriptionElement.firstChild);
 
@@ -1728,9 +1732,17 @@ extends="chrome://global/content/bindings/popup.xml#popup">
       <method name="_adjustAcItem">
         <body>
           <![CDATA[
+          let popup = this.parentNode.parentNode;
+          if (!popup.popupOpen) {
+            // Removing the max-width and resetting it later when overflow is
+            // handled is jarring when the item is visible, so skip this when
+            // the popup is open.
+            this._removeMaxWidths();
+          }
+
           let originalUrl = this.getAttribute("url");
           let title = this.getAttribute("title");
-          let type = this.getAttribute("type");
+          let type = this.getAttribute("originaltype");
 
           let displayUrl;
           let emphasiseTitle = true;
@@ -1752,9 +1764,8 @@ extends="chrome://global/content/bindings/popup.xml#popup">
           this._titleOverflowEllipsis.hidden = false;
 
           let types = new Set(type.split(/\s+/));
-
-          // Remove types that should ultimately not be in the `type` string.
           let initialTypes = new Set(types);
+          // Remove types that should ultimately not be in the `type` string.
           types.delete("action");
           types.delete("autofill");
           types.delete("heuristic");
@@ -1785,9 +1796,21 @@ extends="chrome://global/content/bindings/popup.xml#popup">
               // changed the order while it was possible, so doesn't look like
               // there's a strong need for that.
               let {engineName, searchSuggestion, searchQuery} = action.params;
-              let engineStr = "- " +
+
+              // Override the engine name if the popup defines an override.
+              let override = popup.overrideSearchEngineName;
+              if (override && override != engineName) {
+                engineName = override;
+                action.params.engineName = override;
+                let newURL =
+                  PlacesUtils.mozActionURI(action.type, action.params);
+                this.setAttribute("url", newURL);
+              }
+
+              let engineStr =
                 this._stringBundle.formatStringFromName("searchWithEngine",
                                                         [engineName], 1);
+              this._setUpDescription(this._actionText, engineStr, true);
 
               // Make the title by generating an array of pairs and its
               // corresponding interpolation string (e.g., "%1$S") to pass to
@@ -1958,6 +1981,13 @@ extends="chrome://global/content/bindings/popup.xml#popup">
           // might not have a width yet even though we just changed them
           setTimeout(this._setUpOverflow, 0, this._titleBox, this._titleOverflowEllipsis);
           setTimeout(this._setUpOverflow, 0, this._urlBox, this._urlOverflowEllipsis);
+          ]]>
+        </body>
+      </method>
+
+      <method name="_removeMaxWidths">
+        <body>
+          <![CDATA[
           ]]>
         </body>
       </method>

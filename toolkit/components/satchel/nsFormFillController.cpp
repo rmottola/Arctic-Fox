@@ -217,7 +217,7 @@ void
 nsFormFillController::MaybeRemoveMutationObserver(nsINode* aNode)
 {
   // Nodes being tracked in mPwmgrInputs will have their observers removed when
-  // they stop being tracked. 
+  // they stop being tracked.
   if (!mPwmgrInputs.Get(aNode)) {
     aNode->RemoveMutationObserver(this);
   }
@@ -561,7 +561,8 @@ nsFormFillController::OnSearchComplete()
 }
 
 NS_IMETHODIMP
-nsFormFillController::OnTextEntered(bool* aPrevent)
+nsFormFillController::OnTextEntered(nsIDOMEvent* aEvent,
+                                    bool* aPrevent)
 {
   NS_ENSURE_ARG(aPrevent);
   NS_ENSURE_TRUE(mFocusedInput, NS_OK);
@@ -973,7 +974,7 @@ nsFormFillController::KeyPress(nsIDOMEvent* aEvent)
       if (isCtrl || isAlt || isMeta)
         break;
     }
-    /* fall through */
+    MOZ_FALLTHROUGH;
   case nsIDOMKeyEvent::DOM_VK_UP:
   case nsIDOMKeyEvent::DOM_VK_DOWN:
   case nsIDOMKeyEvent::DOM_VK_LEFT:
@@ -1018,7 +1019,7 @@ nsFormFillController::KeyPress(nsIDOMEvent* aEvent)
     cancel = false;
     break;
   case nsIDOMKeyEvent::DOM_VK_RETURN:
-    mController->HandleEnter(false, &cancel);
+    mController->HandleEnter(false, aEvent, &cancel);
     break;
   }
 
