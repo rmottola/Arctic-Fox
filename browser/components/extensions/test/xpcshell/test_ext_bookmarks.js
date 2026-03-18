@@ -6,6 +6,8 @@ function backgroundScript() {
   let unsortedId, ourId;
   let initialBookmarkCount = 0;
   let createdBookmarks = new Set();
+  let createdFolderId;
+  let collectedEvents = [];
   const nonExistentId = "000000000000";
   const bookmarkGuids = {
     menuGuid:    "menu________",
@@ -37,6 +39,73 @@ function backgroundScript() {
     browser.test.fail("Did not get expected error");
   }
 
+  function checkOnCreated(id, parentId, index, title, url, dateAdded) {
+    let createdData = collectedEvents.pop();
+    browser.test.assertEq("onCreated", createdData.event, "onCreated was the last event received");
+    browser.test.assertEq(id, createdData.id, "onCreated event received the expected id");
+    let bookmark = createdData.bookmark;
+    browser.test.assertEq(id, bookmark.id, "onCreated event received the expected bookmark id");
+    browser.test.assertEq(parentId, bookmark.parentId, "onCreated event received the expected bookmark parentId");
+    browser.test.assertEq(index, bookmark.index, "onCreated event received the expected bookmark index");
+    browser.test.assertEq(title, bookmark.title, "onCreated event received the expected bookmark title");
+    browser.test.assertEq(url, bookmark.url, "onCreated event received the expected bookmark url");
+    browser.test.assertEq(dateAdded, bookmark.dateAdded, "onCreated event received the expected bookmark dateAdded");
+  }
+
+  function checkOnChanged(id, url, title) {
+    // If both url and title are changed, then url is fired last.
+    let changedData = collectedEvents.pop();
+    browser.test.assertEq("onChanged", changedData.event, "onChanged was the last event received");
+    browser.test.assertEq(id, changedData.id, "onChanged event received the expected id");
+    browser.test.assertEq(url, changedData.info.url, "onChanged event received the expected url");
+    // title is fired first.
+    changedData = collectedEvents.pop();
+    browser.test.assertEq("onChanged", changedData.event, "onChanged was the last event received");
+    browser.test.assertEq(id, changedData.id, "onChanged event received the expected id");
+    browser.test.assertEq(title, changedData.info.title, "onChanged event received the expected title");
+  }
+
+  function checkOnMoved(id, parentId, oldParentId, index, oldIndex) {
+    let movedData = collectedEvents.pop();
+    browser.test.assertEq("onMoved", movedData.event, "onMoved was the last event received");
+    browser.test.assertEq(id, movedData.id, "onMoved event received the expected id");
+    let info = movedData.info;
+    browser.test.assertEq(parentId, info.parentId, "onMoved event received the expected parentId");
+    browser.test.assertEq(oldParentId, info.oldParentId, "onMoved event received the expected oldParentId");
+    browser.test.assertEq(index, info.index, "onMoved event received the expected index");
+    browser.test.assertEq(oldIndex, info.oldIndex, "onMoved event received the expected oldIndex");
+  }
+
+  function checkOnRemoved(id, parentId, index, url) {
+    let removedData = collectedEvents.pop();
+    browser.test.assertEq("onRemoved", removedData.event, "onRemoved was the last event received");
+    browser.test.assertEq(id, removedData.id, "onRemoved event received the expected id");
+    let info = removedData.info;
+    browser.test.assertEq(parentId, removedData.info.parentId, "onRemoved event received the expected parentId");
+    browser.test.assertEq(index, removedData.info.index, "onRemoved event received the expected index");
+    let node = info.node;
+    browser.test.assertEq(id, node.id, "onRemoved event received the expected node id");
+    browser.test.assertEq(parentId, node.parentId, "onRemoved event received the expected node parentId");
+    browser.test.assertEq(index, node.index, "onRemoved event received the expected node index");
+    browser.test.assertEq(url, node.url, "onRemoved event received the expected node url");
+  }
+
+  browser.bookmarks.onChanged.addListener((id, info) => {
+    collectedEvents.push({event: "onChanged", id, info});
+  });
+
+  browser.bookmarks.onCreated.addListener((id, bookmark) => {
+    collectedEvents.push({event: "onCreated", id, bookmark});
+  });
+
+  browser.bookmarks.onMoved.addListener((id, info) => {
+    collectedEvents.push({event: "onMoved", id, info});
+  });
+
+  browser.bookmarks.onRemoved.addListener((id, info) => {
+    collectedEvents.push({event: "onRemoved", id, info});
+  });
+
   browser.bookmarks.get(["not-a-bookmark-guid"]).then(expectedError, error => {
     browser.test.assertTrue(
       error.message.includes("Invalid value for property 'guid': not-a-bookmark-guid"),
@@ -57,6 +126,8 @@ function backgroundScript() {
   }).then(result => {
     ourId = result.id;
     checkOurBookmark(result);
+    browser.test.assertEq(1, collectedEvents.length, "1 expected event received");
+    checkOnCreated(ourId, bookmarkGuids.unfiledGuid, 0, "test bookmark", "http://example.org/", result.dateAdded);
 
     return browser.bookmarks.get(ourId);
   }).then(results => {
@@ -96,6 +167,9 @@ function backgroundScript() {
     browser.test.assertEq("http://example.com/", result.url, "Updated bookmark has the expected URL");
     browser.test.assertEq(ourId, result.id, "Updated bookmark has the expected id");
 
+    browser.test.assertEq(2, collectedEvents.length, "2 expected events received");
+    checkOnChanged(ourId, "http://example.com/", "new test title");
+
     return Promise.resolve().then(() => {
       return browser.bookmarks.update(ourId, {url: "this is not a valid url"});
     }).then(expectedError, error => {
@@ -128,6 +202,9 @@ function backgroundScript() {
     return browser.bookmarks.remove(ourId);
   }).then(result => {
     browser.test.assertEq(undefined, result, "Removing a bookmark returns undefined");
+
+    browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+    checkOnRemoved(ourId, bookmarkGuids.unfiledGuid, 0, "http://example.com/");
 
     return browser.bookmarks.get(ourId).then(expectedError, error => {
       browser.test.assertTrue(
@@ -373,20 +450,33 @@ function backgroundScript() {
     return browser.bookmarks.move(corporationBookmark.id, {index: 0}).then(result => {
       browser.test.assertEq(0, result.index, "Bookmark has the expected index");
 
+      browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+      checkOnMoved(corporationBookmark.id, createdFolderId, createdFolderId, 0, 2);
+
       return browser.bookmarks.move(corporationBookmark.id, {parentId: bookmarkGuids.menuGuid});
     }).then(result => {
       browser.test.assertEq(bookmarkGuids.menuGuid, result.parentId, "Bookmark has the expected parent");
       browser.test.assertEq(childCount, result.index, "Bookmark has the expected index");
 
-      return browser.bookmarks.move(corporationBookmark.id, {index: 1});
+      browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+      checkOnMoved(corporationBookmark.id, bookmarkGuids.menuGuid, createdFolderId, 1, 0);
+
+      return browser.bookmarks.move(corporationBookmark.id, {index: 0});
     }).then(result => {
       browser.test.assertEq(bookmarkGuids.menuGuid, result.parentId, "Bookmark has the expected parent");
-      browser.test.assertEq(1, result.index, "Bookmark has the expected index");
+      browser.test.assertEq(0, result.index, "Bookmark has the expected index");
+
+      browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+      checkOnMoved(corporationBookmark.id, bookmarkGuids.menuGuid, bookmarkGuids.menuGuid, 0, 1);
 
       return browser.bookmarks.move(corporationBookmark.id, {parentId: bookmarkGuids.toolbarGuid, index: 1});
     }).then(result => {
       browser.test.assertEq(bookmarkGuids.toolbarGuid, result.parentId, "Bookmark has the expected parent");
       browser.test.assertEq(1, result.index, "Bookmark has the expected index");
+
+      browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+      checkOnMoved(corporationBookmark.id, bookmarkGuids.toolbarGuid, bookmarkGuids.menuGuid, 1, 0);
+
       createdBookmarks.add(corporationBookmark.id);
     });
   }).then(() => {
@@ -413,6 +503,9 @@ function backgroundScript() {
     return browser.bookmarks.search({title: "Mozilla Folder"}).then(result => {
       return browser.bookmarks.removeTree(result[0].id);
     }).then(() => {
+      browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+      checkOnRemoved(createdFolderId, bookmarkGuids.unfiledGuid, 1);
+
       return browser.bookmarks.search({}).then(results => {
         browser.test.assertEq(
           startBookmarkCount - 4,
@@ -424,8 +517,15 @@ function backgroundScript() {
     return browser.bookmarks.create({title: "Empty Folder"});
   }).then(result => {
     let emptyFolderId = result.id;
+
+    browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+    checkOnCreated(emptyFolderId, bookmarkGuids.unfiledGuid, 3, "Empty Folder", undefined, result.dateAdded);
+
     browser.test.assertEq("Empty Folder", result.title, "Folder has the expected title");
     return browser.bookmarks.remove(emptyFolderId).then(() => {
+      browser.test.assertEq(1, collectedEvents.length, "1 expected events received");
+      checkOnRemoved(emptyFolderId, bookmarkGuids.unfiledGuid, 3);
+
       return browser.bookmarks.get(emptyFolderId).then(expectedError, error => {
         browser.test.assertTrue(
           error.message.includes("Bookmark not found"),
@@ -454,9 +554,12 @@ function backgroundScript() {
     let promises = Array.from(createdBookmarks, guid => browser.bookmarks.remove(guid));
     return Promise.all(promises);
   }).then(() => {
+    browser.test.assertEq(createdBookmarks.size, collectedEvents.length, "expected number of events received");
+
     return browser.bookmarks.search({});
   }).then(results => {
     browser.test.assertEq(initialBookmarkCount, results.length, "All created bookmarks have been removed");
+
     return browser.test.notifyPass("bookmarks");
   }).catch(error => {
     browser.test.fail(`Error: ${String(error)} :: ${error.stack}`);
