@@ -41,6 +41,8 @@ this.EXPORTED_SYMBOLS = ["BookmarkValidator", "BookmarkProblemData"];
  * - wrongParentName (array of ids): list of records whose parentName does
  *   not match the parent's actual title
  * - rootOnServer (boolean): true if the root came from the server
+ * - badClientRoots (array of ids): Contains any client-side root ids where
+ *   the root is missing or isn't a (direct) child of the places root.
  *
  * - clientMissing: Array of ids on the server missing from the client
  * - serverMissing: Array of ids on the client missing from the server
@@ -69,6 +71,7 @@ class BookmarkProblemData {
     this.parentNotFolder = [];
     this.wrongParentName = [];
 
+    this.badClientRoots = [];
     this.clientMissing = [];
     this.serverMissing = [];
     this.serverDeleted = [];
@@ -120,6 +123,7 @@ class BookmarkProblemData {
       { name: "duplicates", count: this.duplicates.length },
       { name: "parentChildMismatches", count: this.parentChildMismatches.length },
       { name: "cycles", count: this.cycles.length },
+      { name: "badClientRoots", count: this.badClientRoots.length },
       { name: "orphans", count: this.orphans.length },
       { name: "missingChildren", count: this.missingChildren.length },
       { name: "multipleParents", count: this.multipleParents.length },
@@ -474,6 +478,8 @@ class BookmarkValidator {
     // Mainly do this to remove deleted items and normalize child guids.
     serverRecords = inspectionInfo.records;
     let problemData = inspectionInfo.problemData;
+
+    this._validateClient(problemData, clientRecords);
 
     let matches = [];
 
