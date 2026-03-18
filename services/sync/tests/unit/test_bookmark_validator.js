@@ -118,7 +118,7 @@ add_test(function test_isr_duplicateChildren()  {
 function getDummyServerAndClient() {
   let server = [
     {
-      id: 'aaaaaaaaaaaa',
+      id: 'menu',
       parentid: 'places',
       type: 'folder',
       parentName: '',
@@ -128,14 +128,14 @@ function getDummyServerAndClient() {
     {
       id: 'bbbbbbbbbbbb',
       type: 'bookmark',
-      parentid: 'aaaaaaaaaaaa',
+      parentid: 'menu',
       parentName: 'foo',
       title: 'bar',
       bmkUri: 'http://baz.com'
     },
     {
       id: 'cccccccccccc',
-      parentid: 'aaaaaaaaaaaa',
+      parentid: 'menu',
       parentName: 'foo',
       title: '',
       type: 'query',
@@ -150,7 +150,7 @@ function getDummyServerAndClient() {
     "type": "text/x-moz-place-container",
     "children": [
       {
-        "guid": "aaaaaaaaaaaa",
+        "guid": "menu________",
         "title": "foo",
         "id": 1000,
         "type": "text/x-moz-place-container",
@@ -202,7 +202,7 @@ add_test(function test_cswc_serverMissing() {
   let c = new BookmarkValidator().compareServerWithClient(server, client).problemData;
   deepEqual(c.serverMissing, ['cccccccccccc']);
   equal(c.clientMissing.length, 0);
-  deepEqual(c.structuralDifferences, [{id: 'aaaaaaaaaaaa', differences: ['childGUIDs']}]);
+  deepEqual(c.structuralDifferences, [{id: 'menu', differences: ['childGUIDs']}]);
   run_next_test();
 });
 
@@ -213,7 +213,7 @@ add_test(function test_cswc_clientMissing() {
   let c = new BookmarkValidator().compareServerWithClient(server, client).problemData;
   deepEqual(c.clientMissing, ['cccccccccccc']);
   equal(c.serverMissing.length, 0);
-  deepEqual(c.structuralDifferences, [{id: 'aaaaaaaaaaaa', differences: ['childGUIDs']}]);
+  deepEqual(c.structuralDifferences, [{id: 'menu', differences: ['childGUIDs']}]);
   run_next_test();
 });
 

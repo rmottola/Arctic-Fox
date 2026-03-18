@@ -137,16 +137,30 @@ class BookmarkProblemData {
   }
 }
 
+// Defined lazily to avoid initializing PlacesUtils.bookmarks too soon.
+XPCOMUtils.defineLazyGetter(this, "SYNCED_ROOTS", () => [
+  PlacesUtils.bookmarks.menuGuid,
+  PlacesUtils.bookmarks.toolbarGuid,
+  PlacesUtils.bookmarks.unfiledGuid,
+  PlacesUtils.bookmarks.mobileGuid,
+]);
+
 class BookmarkValidator {
 
   createClientRecordsFromTree(clientTree) {
     // Iterate over the treeNode, converting it to something more similar to what
     // the server stores.
     let records = [];
-    function traverse(treeNode) {
+    let syncedRoots = SYNCED_ROOTS;
+    function traverse(treeNode, synced) {
+      if (!synced) {
+        synced = syncedRoots.includes(treeNode.guid);
+      } else if (isNodeIgnored(treeNode)) {
+        synced = false;
+      }
       let guid = PlacesSyncUtils.bookmarks.guidToSyncId(treeNode.guid);
       let itemType = 'item';
-      treeNode.ignored = PlacesUtils.annotations.itemHasAnnotation(treeNode.id, PlacesUtils.EXCLUDE_FROM_BACKUP_ANNO);
+      treeNode.ignored = !synced;
       treeNode.id = guid;
       switch (treeNode.type) {
         case PlacesUtils.TYPE_X_MOZ_PLACE:
@@ -196,7 +210,7 @@ class BookmarkValidator {
           treeNode.children = [];
         }
         for (let child of treeNode.children) {
-          traverse(child);
+          traverse(child, synced);
           child.parent = treeNode;
           child.parentid = guid;
           child.parentName = treeNode.title;
@@ -204,7 +218,7 @@ class BookmarkValidator {
         }
       }
     }
-    traverse(clientTree);
+    traverse(clientTree, false);
     clientTree.id = 'places';
     return records;
   }
@@ -293,7 +307,7 @@ class BookmarkValidator {
     if (!root) {
       // Fabricate a root. We want to remember that it's fake so that we can
       // avoid complaining about stuff like it missing it's childGUIDs later.
-      root = { id: 'places', children: [], type: 'folder', title: '' };
+      root = { id: 'places', children: [], type: 'folder', title: '', fake: true };
       resultRecords.push(root);
       idToRecord.set('places', root);
     } else {
@@ -429,6 +443,18 @@ class BookmarkValidator {
     return cycles;
   }
 
+  // Perform client-side sanity checking that doesn't involve server data
+  _validateClient(problemData, clientRecords) {
+    problemData.clientCycles = this._detectCycles(clientRecords);
+    for (let rootGUID of SYNCED_ROOTS) {
+      let record = clientRecords.find(record =>
+        record.guid === rootGUID);
+      if (!record || record.parentid !== "places") {
+        problemData.badClientRoots.push(rootGUID);
+      }
+    }
+  }
+
   /**
    * Compare the list of server records with the client tree.
    *
@@ -455,6 +481,9 @@ class BookmarkValidator {
     let serverDeletedLookup = new Set(inspectionInfo.deletedRecords.map(r => r.id));
 
     for (let sr of serverRecords) {
+      if (sr.fake) {
+        continue;
+      }
       allRecords.set(sr.id, {client: null, server: sr});
     }
 
