@@ -42,8 +42,6 @@ this.EXPORTED_SYMBOLS = ["BookmarkValidator", "BookmarkProblemData"];
  *   child listed multiple times in their children array
  * - parentNotFolder (array of ids): list of records that have parents that
  *   aren't folders
- * - wrongParentName (array of ids): list of records whose parentName does
- *   not match the parent's actual title
  * - rootOnServer (boolean): true if the root came from the server
  * - badClientRoots (array of ids): Contains any client-side root ids where
  *   the root is missing or isn't a (direct) child of the places root.
@@ -75,7 +73,6 @@ class BookmarkProblemData {
     this.childrenOnNonFolder = [];
     this.duplicateChildren = [];
     this.parentNotFolder = [];
-    this.wrongParentName = [];
 
     this.badClientRoots = [];
     this.clientMissing = [];
@@ -139,7 +136,6 @@ class BookmarkProblemData {
       { name: "childrenOnNonFolder", count: this.childrenOnNonFolder.length },
       { name: "duplicateChildren", count: this.duplicateChildren.length },
       { name: "parentNotFolder", count: this.parentNotFolder.length },
-      { name: "wrongParentName", count: this.wrongParentName.length },
     ];
     if (full) {
       let structural = this._summarizeDifferences("sdiff", this.structuralDifferences);
@@ -277,7 +273,6 @@ class BookmarkValidator {
           traverse(child, synced);
           child.parent = treeNode;
           child.parentid = guid;
-          child.parentName = treeNode.title;
           treeNode.childGUIDs.push(child.guid);
         }
       }
@@ -440,9 +435,10 @@ class BookmarkValidator {
         problemData.deletedParents.push(record.id);
       }
 
-      if (record.parentName !== parent.title && parent.id !== 'unfiled') {
-        problemData.wrongParentName.push(record.id);
-      }
+      // We used to check if the parentName on the server matches the actual
+      // local parent name, but given this is used only for de-duping a record
+      // the first time it is seen and expensive to keep up-to-date, we decided
+      // to just stop recording it. See bug 1276969 for more.
     }
 
     // Check that we aren't missing any children.
@@ -666,12 +662,6 @@ class BookmarkValidator {
       if (client.parentid || server.parentid) {
         if (client.parentid !== server.parentid) {
           structuralDifferences.push('parentid');
-        }
-        // Need to special case 'unfiled' due to it's recent name change
-        // ("Other Bookmarks" vs "Unsorted Bookmarks"), otherwise this has a lot
-        // of false positives.
-        if (client.parentName !== server.parentName && server.parentid !== 'unfiled') {
-          differences.push('parentName');
         }
       }
 
