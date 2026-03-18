@@ -14,6 +14,15 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 this.EXPORTED_SYMBOLS = ["BookmarkValidator", "BookmarkProblemData"];
 
+const LEFT_PANE_ROOT_ANNO = "PlacesOrganizer/OrganizerFolder";
+const LEFT_PANE_QUERY_ANNO = "PlacesOrganizer/OrganizerQuery";
+
+// Indicates if a local bookmark tree node should be excluded from syncing.
+function isNodeIgnored(treeNode) {
+  return treeNode.annos && treeNode.annos.some(anno => anno.name == LEFT_PANE_ROOT_ANNO ||
+                                                       anno.name == LEFT_PANE_QUERY_ANNO);
+}
+
 /**
  * Result of bookmark validation. Contains the following fields which describe
  * server-side problems unless otherwise specified.
