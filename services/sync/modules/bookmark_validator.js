@@ -578,7 +578,10 @@ class BookmarkValidator {
       item.decrypt(collectionKey);
       items.push(item.cleartext);
     };
-    collection.get();
+    let resp = collection.getBatched();
+    if (!resp.success) {
+      throw resp;
+    }
     return items;
   }
 
