@@ -31,7 +31,6 @@ pref("services.sync.engine.passwords", true);
 pref("services.sync.engine.prefs", true);
 pref("services.sync.engine.tabs", true);
 pref("services.sync.engine.tabs.filteredUrls", "^(about:.*|chrome://weave/.*|wyciwyg:.*|file:.*)$");
-pref("services.sync.engine.extension-storage", true);
 
 pref("services.sync.jpake.serverURL", "https://keyserver.palemoon.org/");
 pref("services.sync.jpake.pollInterval", 1000);
