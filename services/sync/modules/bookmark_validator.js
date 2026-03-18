@@ -622,8 +622,6 @@ class BookmarkValidator {
 
     this._validateClient(problemData, clientRecords);
 
-    problemData.clientCycles = this._detectCycles(clientRecords);
-
     let matches = [];
 
     let allRecords = new Map();
