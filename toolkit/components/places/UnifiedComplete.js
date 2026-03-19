@@ -569,24 +569,6 @@ function stripHttpAndTrim(spec) {
 }
 
 /**
- * Make a moz-action: URL for a given action and set of parameters.
- *
- * @param action
- *        Name of the action
- * @param params
- *        Object, whose keys are parameter names and values are the
- *        corresponding parameter values.
- * @return String representation of the built moz-action: URL
- */
-function makeActionURL(action, params) {
-  let encodedParams = {};
-  for (let key in params) {
-    encodedParams[key] = encodeURIComponent(params[key]);
-  }
-  return "moz-action:" + action + "," + JSON.stringify(encodedParams);
-}
-
-/**
  * Returns the key to be used for a URL in a map for the purposes of removing
  * duplicate entries - any 2 URLs that should be considered the same should
  * return the same key. For some moz-action URLs this will unwrap the params
@@ -1151,8 +1133,10 @@ Search.prototype = {
     let escapedURL = entry.url.href.replace("%s", queryString);
 
     let style = (this._enableActions ? "action " : "") + "keyword";
-    let actionURL = makeActionURL("keyword", { url: escapedURL,
-                                               input: this._originalSearchString });
+    let actionURL = PlacesUtils.mozActionURI("keyword", {
+      url: escapedURL,
+      input: this._originalSearchString,
+    });
     let value = this._enableActions ? actionURL : escapedURL;
     // The title will end up being "host: queryString"
     let comment = entry.url.host;
@@ -1249,7 +1233,7 @@ Search.prototype = {
     if (match.engineAlias) {
       actionURLParams.alias = match.engineAlias;
     }
-    let value = makeActionURL("searchengine", actionURLParams);
+    let value = PlacesUtils.mozActionURI("searchengine", actionURLParams);
 
     this._addMatch({
       value: value,
@@ -1281,9 +1265,9 @@ Search.prototype = {
       let match = {
         // We include the deviceName in the action URL so we can render it in
         // the URLBar.
-        value: makeActionURL("remotetab", { url, deviceName }),
+        value: PlacesUtils.mozActionURI("remotetab", { url, deviceName }),
         comment: title || url,
-        style: "action",
+        style: "action remotetab",
         // we want frecency > FRECENCY_DEFAULT so it doesn't get pushed out
         // by "remote" matches.
         frecency: FRECENCY_DEFAULT + 1,
@@ -1341,7 +1325,7 @@ Search.prototype = {
     let escapedURL = uri.spec;
     let displayURL = textURIService.unEscapeURIForUI("UTF-8", uri.spec);
 
-    let value = makeActionURL("visiturl", {
+    let value = PlacesUtils.mozActionURI("visiturl", {
       url: escapedURL,
       input: this._originalSearchString,
     });
@@ -1581,7 +1565,7 @@ Search.prototype = {
     let url = escapedURL;
     let action = null;
     if (this._enableActions && openPageCount > 0 && this.hasBehavior("openpage")) {
-      url = makeActionURL("switchtab", {url: escapedURL});
+      url = PlacesUtils.mozActionURI("switchtab", {url: escapedURL});
       action = "switchtab";
     }
 

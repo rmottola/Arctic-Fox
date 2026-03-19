@@ -2051,6 +2051,9 @@ extends="chrome://global/content/bindings/popup.xml#popup">
         <body>
           <![CDATA[
           this._titleText.style.removeProperty("max-width");
+          this._tagsText.style.removeProperty("max-width");
+          this._urlText.style.removeProperty("max-width");
+          this._actionText.style.removeProperty("max-width");
           ]]>
         </body>
       </method>

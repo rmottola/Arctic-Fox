@@ -333,6 +333,12 @@ pref("browser.urlbar.suggest.history.onlyTyped",    false);
 pref("browser.urlbar.formatting.enabled", true);
 pref("browser.urlbar.trimURLs", true);
 
+#if defined(NIGHTLY_BUILD)
+pref("browser.urlbar.oneOffSearches", true);
+#else
+pref("browser.urlbar.oneOffSearches", false);
+#endif
+
 // Display punycode in identity panel:
 // 0 = Display IDN name
 // 1 = Display punycode name for DV domains
