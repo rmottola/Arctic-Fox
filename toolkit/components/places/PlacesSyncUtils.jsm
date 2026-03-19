@@ -929,8 +929,108 @@ var getOrCreateTagFolder = Task.async(function* (tag) {
     type: PlacesUtils.bookmarks.TYPE_FOLDER,
     parentGuid: PlacesUtils.bookmarks.tagsGuid,
     title: tag,
+    source: SOURCE_SYNC,
   });
   return PlacesUtils.promiseItemId(item.guid);
+});
+
+// Converts a Places bookmark or livemark to a Sync bookmark. This function
+// maps Places GUIDs to sync IDs and filters out extra Places properties like
+// date added, last modified, and index.
+var placesBookmarkToSyncBookmark = Task.async(function* (bookmarkItem) {
+  let item = {};
+
+  for (let prop in bookmarkItem) {
+    switch (prop) {
+      // Sync IDs are identical to Places GUIDs for all items except roots.
+      case "guid":
+        item.syncId = BookmarkSyncUtils.guidToSyncId(bookmarkItem.guid);
+        break;
+
+      case "parentGuid":
+        item.parentSyncId =
+          BookmarkSyncUtils.guidToSyncId(bookmarkItem.parentGuid);
+        break;
+
+      // Sync uses kinds instead of types, which distinguish between folders,
+      // livemarks, bookmarks, and queries.
+      case "type":
+        item.kind = yield getKindForItem(bookmarkItem);
+        break;
+
+      case "title":
+      case "url":
+        item[prop] = bookmarkItem[prop];
+        break;
+
+      // Livemark objects contain additional properties. The feed URL is
+      // required; the site URL is optional.
+      case "feedURI":
+        item.feed = new URL(bookmarkItem.feedURI.spec);
+        break;
+
+      case "siteURI":
+        if (bookmarkItem.siteURI) {
+          item.site = new URL(bookmarkItem.siteURI.spec);
+        }
+        break;
+    }
+  }
+
+  return item;
+});
+
+// Converts a Sync bookmark object to a Places bookmark or livemark object.
+// This function maps sync IDs to Places GUIDs, and filters out extra Sync
+// properties like keywords, tags, and descriptions. Returns an object that can
+// be passed to `PlacesUtils.livemarks.addLivemark` or
+// `PlacesUtils.bookmarks.{insert, update}`.
+function syncBookmarkToPlacesBookmark(info) {
+  let bookmarkInfo = {
+    source: SOURCE_SYNC,
+  };
+
+  for (let prop in info) {
+    switch (prop) {
+      case "kind":
+        bookmarkInfo.type = getTypeForKind(info.kind);
+        break;
+
+      // Convert sync IDs to Places GUIDs for roots.
+      case "syncId":
+        bookmarkInfo.guid = BookmarkSyncUtils.syncIdToGuid(info.syncId);
+        break;
+
+      case "parentSyncId":
+        bookmarkInfo.parentGuid =
+          BookmarkSyncUtils.syncIdToGuid(info.parentSyncId);
+        // Instead of providing an index, Sync reorders children at the end of
+        // the sync using `BookmarkSyncUtils.order`. We explicitly specify the
+        // default index here to prevent `PlacesUtils.bookmarks.update` and
+        // `PlacesUtils.livemarks.addLivemark` from throwing.
+        bookmarkInfo.index = PlacesUtils.bookmarks.DEFAULT_INDEX;
+        break;
+
+      case "title":
+      case "url":
+        bookmarkInfo[prop] = info[prop];
+        break;
+
+      // Livemark-specific properties.
+      case "feed":
+        bookmarkInfo.feedURI = PlacesUtils.toURI(info.feed);
+        break;
+
+      case "site":
+        if (info.site) {
+          bookmarkInfo.siteURI = PlacesUtils.toURI(info.site);
+        }
+        break;
+    }
+  }
+
+  return bookmarkInfo;
+}
 
 // Creates and returns a Sync bookmark object containing the bookmark's
 // tags, keyword, description, and whether it loads in the sidebar.
@@ -1054,103 +1154,4 @@ function getItemDescription(id) {
       BookmarkSyncUtils.DESCRIPTION_ANNO);
   } catch (ex) {}
   return null;
-}
-});
-
-// Converts a Places bookmark or livemark to a Sync bookmark. This function
-// maps Places GUIDs to sync IDs and filters out extra Places properties like
-// date added, last modified, and index.
-var placesBookmarkToSyncBookmark = Task.async(function* (bookmarkItem) {
-  let item = {};
-
-  for (let prop in bookmarkItem) {
-    switch (prop) {
-      // Sync IDs are identical to Places GUIDs for all items except roots.
-      case "guid":
-        item.syncId = BookmarkSyncUtils.guidToSyncId(bookmarkItem.guid);
-        break;
-
-      case "parentGuid":
-        item.parentSyncId =
-          BookmarkSyncUtils.guidToSyncId(bookmarkItem.parentGuid);
-        break;
-
-      // Sync uses kinds instead of types, which distinguish between folders,
-      // livemarks, bookmarks, and queries.
-      case "type":
-        item.kind = yield getKindForItem(bookmarkItem);
-        break;
-
-      case "title":
-      case "url":
-        item[prop] = bookmarkItem[prop];
-        break;
-
-      // Livemark objects contain additional properties. The feed URL is
-      // required; the site URL is optional.
-      case "feedURI":
-        item.feed = new URL(bookmarkItem.feedURI.spec);
-        break;
-
-      case "siteURI":
-        if (bookmarkItem.siteURI) {
-          item.site = new URL(bookmarkItem.siteURI.spec);
-        }
-        break;
-    }
-  }
-
-  return item;
-});
-
-// Converts a Sync bookmark object to a Places bookmark or livemark object.
-// This function maps sync IDs to Places GUIDs, and filters out extra Sync
-// properties like keywords, tags, and descriptions. Returns an object that can
-// be passed to `PlacesUtils.livemarks.addLivemark` or
-// `PlacesUtils.bookmarks.{insert, update}`.
-function syncBookmarkToPlacesBookmark(info) {
-  let bookmarkInfo = {
-    source: SOURCE_SYNC,
-  };
-
-  for (let prop in info) {
-    switch (prop) {
-      case "kind":
-        bookmarkInfo.type = getTypeForKind(info.kind);
-        break;
-
-      // Convert sync IDs to Places GUIDs for roots.
-      case "syncId":
-        bookmarkInfo.guid = BookmarkSyncUtils.syncIdToGuid(info.syncId);
-        break;
-
-      case "parentSyncId":
-        bookmarkInfo.parentGuid =
-          BookmarkSyncUtils.syncIdToGuid(info.parentSyncId);
-        // Instead of providing an index, Sync reorders children at the end of
-        // the sync using `BookmarkSyncUtils.order`. We explicitly specify the
-        // default index here to prevent `PlacesUtils.bookmarks.update` and
-        // `PlacesUtils.livemarks.addLivemark` from throwing.
-        bookmarkInfo.index = PlacesUtils.bookmarks.DEFAULT_INDEX;
-        break;
-
-      case "title":
-      case "url":
-        bookmarkInfo[prop] = info[prop];
-        break;
-
-      // Livemark-specific properties.
-      case "feed":
-        bookmarkInfo.feedURI = PlacesUtils.toURI(info.feed);
-        break;
-
-      case "site":
-        if (info.site) {
-          bookmarkInfo.siteURI = PlacesUtils.toURI(info.site);
-        }
-        break;
-    }
-  }
-
-  return bookmarkInfo;
 }
