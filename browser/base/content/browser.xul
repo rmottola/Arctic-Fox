@@ -150,7 +150,8 @@
     <panel type="autocomplete-richlistbox"
            id="PopupAutoCompleteRichResult"
            noautofocus="true"
-           hidden="true"/>
+           hidden="true"
+           flip="none"/>
 
     <panel id="DateTimePickerPanel"
            hidden="true"
