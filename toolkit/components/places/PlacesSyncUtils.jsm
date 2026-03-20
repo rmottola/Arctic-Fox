@@ -856,13 +856,6 @@ function validateNewBookmark(info) {
     , site: { validIf: b => b.kind == BookmarkSyncUtils.KINDS.LIVEMARK }
     });
 
-  // Sync doesn't track modification times, so use the default.
-  let time = new Date();
-  insertInfo.dateAdded = insertInfo.lastModified = time;
-
-  insertInfo.type = getTypeForKind(insertInfo.kind);
-  insertInfo.source = SOURCE_SYNC;
-
   return insertInfo;
 }
 
