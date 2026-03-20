@@ -347,24 +347,32 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
           let matchLastLocationChange = true;
           if (action) {
-            if (action.type == "switchtab") {
-              url = action.params.url;
-              if (this.hasAttribute("actiontype")) {
-                this.handleRevert();
-                let prevTab = gBrowser.selectedTab;
-                if (switchToTabHavingURI(url) && isTabEmpty(prevTab)) {
-                  gBrowser.removeTab(prevTab);
+            switch (action.type) {
+              case "visiturl":
+              case "keyword":
+              case "remotetab":
+                url = action.params.url;
+                break;
+              case "switchtab":
+                url = action.params.url;
+                if (this.hasAttribute("actiontype")) {
+                  this.handleRevert();
+                  let prevTab = gBrowser.selectedTab;
+                  if (switchToTabHavingURI(url) && isTabEmpty(prevTab)) {
+                    gBrowser.removeTab(prevTab);
+                  }
+                  return;
                 }
-                return;
-              }
-            } else if (action.type == "remotetab") {
-              url = action.params.url;
-            } else if (action.type == "keyword") {
-              url = action.params.url;
-            } else if (action.type == "searchengine") {
-              [url, postData] = this._parseAndRecordSearchEngineAction(action);
-            } else if (action.type == "visiturl") {
-              url = action.params.url;
+                break;
+              case "searchengine":
+                [url, postData] = this._recordSearchEngineLoad(
+                  action.params.engineName,
+                  action.params.searchSuggestion || action.params.searchQuery,
+                  event,
+                  where,
+                  openUILinkParams
+                );
+                break;
             }
             continueOperation.call(this);
           }
