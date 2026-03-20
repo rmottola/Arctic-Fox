@@ -90,6 +90,26 @@ nsAutoCompleteController::GetInput(nsIAutoCompleteInput **aInput)
 }
 
 NS_IMETHODIMP
+nsAutoCompleteController::SetInitiallySelectedIndex(int32_t aSelectedIndex)
+{
+  // First forward to the popup.
+  nsCOMPtr<nsIAutoCompleteInput> input(mInput);
+  NS_ENSURE_STATE(input);
+  nsCOMPtr<nsIAutoCompletePopup> popup;
+  input->GetPopup(getter_AddRefs(popup));
+  NS_ENSURE_STATE(popup);
+  popup->SetSelectedIndex(aSelectedIndex);
+
+  // Now take care of internal stuff.
+  bool completeSelection;
+  if (NS_SUCCEEDED(input->GetCompleteSelectedIndex(&completeSelection)) &&
+      completeSelection) {
+    mCompletedSelectionIndex = aSelectedIndex;
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsAutoCompleteController::SetInput(nsIAutoCompleteInput *aInput)
 {
   // Don't do anything if the input isn't changing.
