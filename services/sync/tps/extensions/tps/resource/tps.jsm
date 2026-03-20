@@ -617,7 +617,7 @@ var TPS = {
     }
   },
 
- /**
+  /**
    * Use Sync's bookmark validation code to see if we've corrupted the tree.
    */
   ValidateBookmarks() {
@@ -1334,9 +1334,6 @@ var Windows = {
     TPS.StartAsyncOperation();
     TPS.HandleWindows(aWindow, ACTION_ADD);
   },
-  skipValidation() {
-    TPS.shouldValidateAddons = false;
-  }
 };
 
 // Initialize TPS
