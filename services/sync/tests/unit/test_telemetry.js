@@ -407,7 +407,6 @@ add_task(function* test_nserror() {
   }
 });
 
-
 add_identity_test(this, function *test_discarding() {
   let helper = track_collections_helper();
   let upd = helper.with_updated_collection;
@@ -454,5 +453,50 @@ add_identity_test(this, function *test_discarding() {
   }
 })
 
+add_task(function* test_no_foreign_engines_in_error_ping() {
+  Service.engineManager.register(BogusEngine);
+  let engine = Service.engineManager.get("bogus");
+  engine.enabled = true;
+  let store  = engine._store;
+  let server = serverForUsers({"foo": "password"}, {
+    meta: {global: {engines: {bogus: {version: engine.version, syncID: engine.syncID}}}},
+    steam: {}
+  });
+  engine._errToThrow = new Error("Oh no!");
+  new SyncTestingInfrastructure(server.server);
+  try {
+    let ping = yield sync_and_validate_telem(true);
+    equal(ping.status.service, SYNC_FAILED_PARTIAL);
+    ok(ping.engines.every(e => e.name !== "bogus"));
+  } finally {
+    Service.engineManager.unregister(engine);
+    yield cleanAndGo(server);
+  }
+});
 
+add_task(function* test_sql_error() {
+  Service.engineManager.register(SteamEngine);
+  let engine = Service.engineManager.get("steam");
+  engine.enabled = true;
+  let store  = engine._store;
+  let server = serverForUsers({"foo": "password"}, {
+    meta: {global: {engines: {steam: {version: engine.version,
+                                      syncID: engine.syncID}}}},
+    steam: {}
+  });
+  new SyncTestingInfrastructure(server.server);
+  engine._sync = function() {
+    // Just grab a DB connection and issue a bogus SQL statement synchronously.
+    let db = PlacesUtils.history.QueryInterface(Ci.nsPIPlacesDatabase).DBConnection;
+    Async.querySpinningly(db.createAsyncStatement("select bar from foo"));
+  };
+  try {
+    let ping = yield sync_and_validate_telem(true);
+    let enginePing = ping.engines.find(e => e.name === "steam");
+    deepEqual(enginePing.failureReason, { name: "sqlerror", code: 1 });
+  } finally {
+    Service.engineManager.unregister(engine);
+    yield cleanAndGo(server);
+  }
+});
 
