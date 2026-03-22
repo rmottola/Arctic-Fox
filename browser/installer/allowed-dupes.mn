@@ -214,6 +214,16 @@ res/table-remove-column.gif
 res/table-remove-row-active.gif
 res/table-remove-row-hover.gif
 res/table-remove-row.gif
+
+browser/chrome/devtools/modules/devtools/client/themes/splitters.css
+browser/chrome/devtools/skin/splitters.css
+browser/chrome/devtools/modules/devtools/acorn/walk.js
+browser/chrome/devtools/modules/devtools/shared/acorn/walk.js
+browser/chrome/devtools/modules/devtools/acorn/acorn_loose.js
+browser/chrome/devtools/modules/devtools/shared/acorn/acorn_loose.js
+browser/chrome/devtools/modules/devtools/acorn/acorn.js
+browser/chrome/devtools/modules/devtools/shared/acorn/acorn.js
+
 # added for current AcrticFox compatibility - Riccardo Mottola - check in the future
 # (I think several of these are real duplicates that need to be fixed)
 browser/chrome/browser/skin/classic/browser/Push-16.png
