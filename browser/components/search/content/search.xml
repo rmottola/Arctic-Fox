@@ -96,6 +96,11 @@
       ]]></constructor>
 
       <destructor><![CDATA[
+        this.destroy();
+      ]]></destructor>
+
+      <method name="destroy">
+        <body><![CDATA[
         if (this._initialized) {
           this._initialized = false;
 
@@ -106,7 +111,8 @@
         // the world. But make sure it's actually pointing to us.
         if (this._textbox.mController.input == this)
           this._textbox.mController.input = null;
-      ]]></destructor>
+        ]]></body>
+      </method>
 
       <field name="_stringBundle">document.getAnonymousElementByAttribute(this,
           "anonid", "searchbar-stringbundle");</field>
