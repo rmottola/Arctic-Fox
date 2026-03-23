@@ -1602,6 +1602,8 @@ html|*.urlbar-input:-moz-lwtheme::placeholder,
 
 /* autocomplete */
 
+%include ../shared/autocomplete.inc.css
+
 #treecolAutoCompleteImage {
   max-width: 36px;
 }

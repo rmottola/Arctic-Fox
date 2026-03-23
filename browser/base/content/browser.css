@@ -210,6 +210,7 @@ toolbar[printpreview="true"] {
 .titlebar-placeholder[type="fullscreen-button"]:-moz-locale-dir(rtl) {
   -moz-box-ordinal-group: 0;
 }
+
 %else
 /* On non-OSX, these should be start-aligned */
 #titlebar-buttonbox-container {
@@ -440,10 +441,10 @@ splitmenu {
 /* For action items in a noactions popup, show the URL text and hide the action
    text and type icon. */
 #PopupAutoCompleteRichResult[noactions] > richlistbox > richlistitem.overridable-action > .ac-url {
-  visibility: visible;
+  display: -moz-box;
 }
 #PopupAutoCompleteRichResult[noactions] > richlistbox > richlistitem.overridable-action > .ac-action {
-  visibility: collapse;
+  display: none;
 }
 #PopupAutoCompleteRichResult[noactions] > richlistbox > richlistitem.overridable-action > .ac-type-icon {
   list-style-image: none;
@@ -459,8 +460,16 @@ splitmenu {
   cursor: -moz-grab;
 }
 
-#PopupAutoComplete {
-  -moz-binding: url("chrome://browser/content/urlbarBindings.xml#browser-autocomplete-result-popup");
+#PopupAutoComplete > richlistbox > richlistitem > .ac-type-icon,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-site-icon,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-tags,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-separator,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-url {
+  display: none;
+}
+
+#PopupSearchAutoComplete {
+  -moz-binding: url("chrome://browser/content/search/search.xml#browser-search-autocomplete-result-popup");
 }
 
 /* Overlay a badge on top of the icon of additional open search providers

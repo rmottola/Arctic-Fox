@@ -29,7 +29,7 @@
                    type="autocomplete"
                    inputtype="search"
                    flex="1"
-                   autocompletepopup="PopupAutoComplete"
+                   autocompletepopup="PopupSearchAutoComplete"
                    autocompletesearch="search-autocomplete"
                    autocompletesearchparam="searchbar-history"
                    timeout="250"
