@@ -22,6 +22,7 @@
   <script type="application/javascript"><![CDATA[
     const {interfaces: Ci, classes: Cc, results: Cr, utils: Cu} = Components;
     Cu.import("resource://gre/modules/Task.jsm");
+    Cu.import("resource://testing-common/BrowserTestUtils.jsm");
     Cu.import("resource://testing-common/ContentTask.jsm");
     ContentTask.setTestScope(window.opener.wrappedJSObject);
 
@@ -92,14 +93,7 @@
       // Tests delays the loading of a document for one second.
       yield new Promise(resolve => setTimeout(resolve, 1000));
 
-      let promise = ContentTask.spawn(gBrowser, null, function* () {
-        return new Promise(resolve => {
-          addEventListener("DOMContentLoaded", function listener() {
-            removeEventListener("DOMContentLoaded", listener);
-            resolve();
-          });
-        });
-      });
+      let promise = BrowserTestUtils.browserLoaded(gBrowser);
       gBrowser.loadURI("data:text/html,<h2 id='h2'>" + SEARCH_TEXT +
         "</h2><h2><a href='" + SAMPLE_URL + "'>Link Test</a></h2><input id='text' type='text' value='" +
         SAMPLE_TEXT + "'></input><input id='button' type='button'></input><img id='img' width='50' height='50'/>");
@@ -276,6 +270,17 @@
         }
       }
     });
+
+    function promiseExpectRangeCount(rangeCount) {
+      return ContentTask.spawn(gBrowser, { rangeCount }, function* (args) {
+        let controller = docShell.QueryInterface(Ci.nsIInterfaceRequestor)
+                                 .getInterface(Ci.nsISelectionDisplay)
+                                 .QueryInterface(Ci.nsISelectionController);
+        let sel = controller.getSelection(Ci.nsISelectionController.SELECTION_FIND);
+        Assert.equal(sel.rangeCount, args.rangeCount,
+          "Expected the correct amount of ranges inside the Find selection");
+      });
+    }
 
     // also test match-case
     function* testNormalFind() {
