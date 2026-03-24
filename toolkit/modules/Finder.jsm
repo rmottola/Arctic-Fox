@@ -475,7 +475,7 @@ Finder.prototype = {
     };
   },
 
-  _getWindow: function () {
+  _getWindow: function() {
     try {
       return this._docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow);
     } catch(e) {
