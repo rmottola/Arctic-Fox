@@ -63,6 +63,9 @@ const kModalStyles = {
     ["position", "absolute"],
     ["z-index", 1]
   ],
+  maskNodeTransition: [
+    ["transition", "background .2s ease-in"]
+  ],
   maskNodeDebug: [
     ["z-index", 2147483646],
     ["top", 0],
@@ -211,8 +214,10 @@ FinderHighlighter.prototype = {
         return this._found;
       if (params) {
         yield this.iterator.start(params);
-        if (this._found)
+        if (this._found) {
           this.finder._outlineLink(true);
+          dict.updateAllRanges = true;
+        }
       }
     } else {
       this.hide(window);
@@ -1055,6 +1060,7 @@ FinderHighlighter.prototype = {
     let maskStyle = this._getStyleString(kModalStyles.maskNode,
       [ ["width", width + "px"], ["height", height + "px"] ],
       dict.brightText ? kModalStyles.maskNodeBrightText : [],
+      paintContent ? kModalStyles.maskNodeTransition : [],
       kDebug ? kModalStyles.maskNodeDebug : []);
     dict.modalHighlightAllMask.setAttributeForElement(kMaskId, "style", maskStyle);
     if (dict.brightText)
