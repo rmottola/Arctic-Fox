@@ -281,7 +281,7 @@
         if (waitForResult) {
           promise = promiseFindResult();
         }
-        let event = document.createEvent("KeyEvents");
+        let event = document.createEvent("KeyboardEvent");
         event.initKeyEvent("keypress", true, true, null, false, false,
                            false, false, 0, str.charCodeAt(i));
         gFindBar._findField.inputField.dispatchEvent(event);
@@ -441,7 +441,7 @@
 
       yield ContentTask.spawn(gBrowser, null, function* () {
         let document = content.document;
-        let event = document.createEvent("KeyEvents");
+        let event = document.createEvent("KeyboardEvent");
         event.initKeyEvent("keypress", true, true, null, false, false,
                            false, false, 0, "'".charCodeAt(0));
         document.documentElement.dispatchEvent(event);
@@ -560,7 +560,7 @@
 
       yield ContentTask.spawn(gBrowser, null, function* () {
         let document = content.document;
-        let event = document.createEvent("KeyEvents");
+        let event = document.createEvent("KeyboardEvent");
         event.initKeyEvent("keypress", true, true, null, false, false,
                            false, false, 0, "/".charCodeAt(0));
         document.documentElement.dispatchEvent(event);
