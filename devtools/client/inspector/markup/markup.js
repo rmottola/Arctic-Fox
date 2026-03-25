@@ -109,6 +109,7 @@ function MarkupView(inspector, frame, controllerWindow) {
   this._onFocus = this._onFocus.bind(this);
   this._onMouseMove = this._onMouseMove.bind(this);
   this._onMouseOut = this._onMouseOut.bind(this);
+  this._onToolboxPickerCanceled = this._onToolboxPickerCanceled.bind(this);
   this._onToolboxPickerHover = this._onToolboxPickerHover.bind(this);
   this._onCollapseAttributesPrefChange =
     this._onCollapseAttributesPrefChange.bind(this);
@@ -128,6 +129,7 @@ function MarkupView(inspector, frame, controllerWindow) {
   this.walker.on("mutations", this._mutationObserver);
   this.walker.on("display-change", this._onDisplayChange);
   this.inspector.selection.on("new-node-front", this._onNewSelection);
+  this.toolbox.on("picker-canceled", this._onToolboxPickerCanceled);
   this.toolbox.on("picker-node-hovered", this._onToolboxPickerHover);
 
   this._onNewSelection();
@@ -188,6 +190,16 @@ MarkupView.prototype = {
     this.showNode(nodeFront).then(() => {
       this._showContainerAsHovered(nodeFront);
     }, e => console.error(e));
+  },
+
+  /**
+   * If the element picker gets canceled, make sure and re-center the view on the
+   * current selected element.
+   */
+  _onToolboxPickerCanceled: function () {
+    if (this._selectedContainer) {
+      scrollIntoViewIfNeeded(this._selectedContainer.editor.elt);
+    }
   },
 
   isDragging: false,
@@ -376,6 +388,9 @@ MarkupView.prototype = {
 
     this.getContainer(nodeFront).hovered = true;
     this._hoveredNode = nodeFront;
+    // Emit an event that the container view is actually hovered now, as this function
+    // can be called by an asynchronous caller.
+    this.emit("showcontainerhovered");
   },
 
   _onMouseOut: function (event) {
