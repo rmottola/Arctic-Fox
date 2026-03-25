@@ -473,7 +473,23 @@ toolbarbutton.bookmark-item > menupopup {
   height: 16px;
 }
 
-/* ::::: primary toolbar buttons ::::: */
+/* ----- PRIMARY TOOLBAR BUTTONS ----- */
+
+.findbar-button,
+toolbar .toolbarbutton-1:not(:-moz-any([type="menu-button"],#back-button,#forward-button)),
+toolbar .toolbarbutton-1 > .toolbarbutton-menubutton-button,
+toolbar .toolbarbutton-1 > .toolbarbutton-menubutton-dropmarker {
+  border: 1px solid transparent;
+  border-radius: @toolbarbuttonCornerRadius@;
+  transition-property: background, border-color;
+  transition-duration: 250ms;
+}
+
+.findbar-button {
+  background: none;
+  box-shadow: none;
+}
+
 
 .toolbarbutton-1 {
     list-style-image: url("chrome://browser/skin/Toolbar.png");

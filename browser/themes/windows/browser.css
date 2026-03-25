@@ -839,6 +839,7 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
   counter-reset: smallicons;
 }
 
+.findbar-button,
 @navbarLargeIcons@ .toolbarbutton-1,
 @navbarLargeIcons@ .toolbarbutton-1 > .toolbarbutton-menubutton-button {
   -moz-appearance: none;
