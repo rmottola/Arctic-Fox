@@ -30,6 +30,7 @@ define(function (require, exports, module) {
   const { RegExp } = require("./regexp");
   const { StyleSheet } = require("./stylesheet");
   const { CommentNode } = require("./comment-node");
+  const { ElementNode } = require("./element-node");
   const { TextNode } = require("./text-node");
   const { Window } = require("./window");
   const { ObjectWithText } = require("./object-with-text");
@@ -46,6 +47,7 @@ define(function (require, exports, module) {
     Event,
     DateTime,
     CommentNode,
+    ElementNode,
     TextNode,
     Attribute,
     Func,
