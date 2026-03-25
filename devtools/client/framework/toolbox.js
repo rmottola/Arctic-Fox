@@ -69,10 +69,6 @@ loader.lazyGetter(this, "registerHarOverlay", () => {
 // addons that have manually inserted toolbarbuttons into DOM.
 // (By default, supported target is only local tab)
 const ToolboxButtons = exports.ToolboxButtons = [
-  { id: "command-button-pick",
-    isTargetSupported: target =>
-      target.getTrait("highlightable")
-  },
   { id: "command-button-frames",
     isTargetSupported: target => {
       return target.activeTab && target.activeTab.traits.frames;
@@ -994,7 +990,7 @@ Toolbox.prototype = {
    * Add buttons to the UI as specified in the devtools.toolbox.toolbarSpec pref
    */
   _buildButtons: function () {
-    if (!this.target.isAddon || this.target.isWebExtension) {
+    if (this.target.getTrait("highlightable")) {
       this._buildPickerButton();
     }
 
@@ -1039,7 +1035,6 @@ Toolbox.prototype = {
     this._pickerButton.className =
       "command-button command-button-invertable devtools-button";
     this._pickerButton.setAttribute("title", L10N.getStr("pickButton.tooltip"));
-    this._pickerButton.setAttribute("hidden", "true");
 
     let container = this.doc.querySelector("#toolbox-picker-container");
     container.appendChild(this._pickerButton);
