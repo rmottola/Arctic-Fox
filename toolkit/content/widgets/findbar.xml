@@ -162,21 +162,9 @@
     <content hidden="true">
     <xul:hbox anonid="findbar-container" class="findbar-container" flex="1" align="center">
       <xul:hbox anonid="findbar-textbox-wrapper" align="stretch">
-        <xul:toolbarbutton anonid="find-closebutton"
-                           class="findbar-closebutton close-icon"
-                           tooltiptext="&findCloseButton.tooltip;"
-                           oncommand="close();"/>
         <xul:textbox anonid="findbar-textbox"
                      class="findbar-textbox findbar-find-fast"
                      xbl:inherits="flash"/>
-        <xul:toolbarbutton anonid="find-next"
-                           class="findbar-find-next tabbable"
-                           label="&next.label;"
-                           accesskey="&next.accesskey;"
-                           tooltiptext="&next.tooltip;"
-                           oncommand="onFindAgainCommand(false);"
-                           disabled="true"
-                           xbl:inherits="accesskey=findnextaccesskey"/>
         <xul:toolbarbutton anonid="find-previous"
                            class="findbar-find-previous tabbable"
                            label="&previous.label;"
@@ -185,6 +173,14 @@
                            oncommand="onFindAgainCommand(true);"
                            disabled="true"
                            xbl:inherits="accesskey=findpreviousaccesskey"/>
+        <xul:toolbarbutton anonid="find-next"
+                           class="findbar-find-next tabbable"
+                           label="&next.label;"
+                           accesskey="&next.accesskey;"
+                           tooltiptext="&next.tooltip;"
+                           oncommand="onFindAgainCommand(false);"
+                           disabled="true"
+                           xbl:inherits="accesskey=findnextaccesskey"/>
       </xul:hbox>
       <xul:toolbarbutton anonid="highlight"
                          class="findbar-highlight findbar-button tabbable"
@@ -194,8 +190,8 @@
                          oncommand="toggleHighlight(this.checked);"
                          type="checkbox"
                          xbl:inherits="accesskey=highlightaccesskey"/>
-      <xul:checkbox anonid="find-case-sensitive"
-                         class="findbar-case-sensitive tabbable"
+      <xul:toolbarbutton anonid="find-case-sensitive"
+                         class="findbar-case-sensitive findbar-button tabbable"
                          label="&caseSensitive.label;"
                          accesskey="&caseSensitive.accesskey;"
                          tooltiptext="&caseSensitive.tooltiptext;"
@@ -220,6 +216,10 @@
       <!-- Do not use value, first child is used because it provides a11y with text change events -->
       </xul:description>
     </xul:hbox>
+    <xul:toolbarbutton anonid="find-closebutton"
+                       class="findbar-closebutton close-icon"
+                       tooltiptext="&findCloseButton.tooltip;"
+                       oncommand="close();"/>
     </content>
 
     <implementation implements="nsIMessageListener, nsIEditActionListener">
@@ -1124,7 +1124,6 @@
           return this.dispatchEvent(event);
         ]]></body>
       </method>
-
 
       <!--
         - Opens the findbar, focuses the findfield and selects its contents.
