@@ -17,6 +17,8 @@ DevToolsModules(
     'grip-array.js',
     'grip-map.js',
     'grip.js',
+    'infinity.js',
+    'nan.js',
     'null.js',
     'number.js',
     'object-with-text.js',
