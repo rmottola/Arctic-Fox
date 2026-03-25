@@ -167,16 +167,12 @@
                      xbl:inherits="flash"/>
         <xul:toolbarbutton anonid="find-previous"
                            class="findbar-find-previous tabbable"
-                           label="&previous.label;"
-                           accesskey="&previous.accesskey;"
                            tooltiptext="&previous.tooltip;"
                            oncommand="onFindAgainCommand(true);"
                            disabled="true"
                            xbl:inherits="accesskey=findpreviousaccesskey"/>
         <xul:toolbarbutton anonid="find-next"
                            class="findbar-find-next tabbable"
-                           label="&next.label;"
-                           accesskey="&next.accesskey;"
                            tooltiptext="&next.tooltip;"
                            oncommand="onFindAgainCommand(false);"
                            disabled="true"
