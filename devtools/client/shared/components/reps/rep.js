@@ -20,6 +20,7 @@ define(function (require, exports, module) {
   const { Number } = require("./number");
   const { ArrayRep } = require("./array");
   const { Obj } = require("./object");
+  const { SymbolRep } = require("./symbol");
 
   // DOM types (grips)
   const { Attribute } = require("./attribute");
@@ -62,6 +63,7 @@ define(function (require, exports, module) {
     Null,
     StringRep,
     Number,
+    SymbolRep,
   ];
 
   /**
@@ -101,6 +103,8 @@ define(function (require, exports, module) {
     let type = typeof object;
     if (type == "object" && object instanceof String) {
       type = "string";
+    } else if (type == "object" && object.type === "symbol") {
+      type = "symbol";
     }
 
     if (isGrip(object)) {
