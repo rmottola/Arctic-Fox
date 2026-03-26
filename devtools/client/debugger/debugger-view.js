@@ -412,7 +412,7 @@ var DebuggerView = {
     }
 
     if (aContentType === "text/wasm") {
-      return void this.editor.setMode(Editor.modes.wasm);
+      return void this.editor.setMode(Editor.modes.text);
     }
 
     // Use HTML mode for files in which the first non whitespace character is
