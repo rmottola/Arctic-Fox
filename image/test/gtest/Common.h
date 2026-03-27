@@ -394,6 +394,8 @@ ImageTestCase DownscaledICOTestCase();
 ImageTestCase DownscaledIconTestCase();
 ImageTestCase DownscaledTransparentICOWithANDMaskTestCase();
 
+ImageTestCase TruncatedSmallGIFTestCase();
+
 } // namespace image
 } // namespace mozilla
 
