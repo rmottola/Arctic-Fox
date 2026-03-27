@@ -107,7 +107,8 @@ p {
 // Evaluation Result
 const evaluationResultCommands = [
   "new Date(0)",
-  "asdf()"
+  "asdf()",
+  "1 + @"
 ];
 
 let evaluationResult = new Map(evaluationResultCommands.map(cmd => [cmd, cmd]));
