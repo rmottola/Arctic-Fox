@@ -36,6 +36,7 @@ define(function (require, exports, module) {
   const { CommentNode } = require("./comment-node");
   const { ElementNode } = require("./element-node");
   const { TextNode } = require("./text-node");
+  const { ErrorRep } = require("./error");
   const { Window } = require("./window");
   const { ObjectWithText } = require("./object-with-text");
   const { ObjectWithURL } = require("./object-with-url");
@@ -62,6 +63,7 @@ define(function (require, exports, module) {
     Window,
     ObjectWithText,
     ObjectWithURL,
+    ErrorRep,
     GripArray,
     GripMap,
     Grip,
