@@ -369,6 +369,11 @@ TEST_F(ImageDecoders, CorruptICOWithBadBMPHeightMultiChunk)
   CheckDecoderMultiChunk(CorruptICOWithBadBMPHeightTestCase());
 }
 
+TEST_F(ImageDecoders, CorruptICOWithBadBppSingleChunk)
+{
+  CheckDecoderSingleChunk(CorruptICOWithBadBppTestCase());
+}
+
 TEST_F(ImageDecoders, AnimatedGIFWithFRAME_FIRST)
 {
   ImageTestCase testCase = GreenFirstFrameAnimatedGIFTestCase();
