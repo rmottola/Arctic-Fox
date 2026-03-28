@@ -336,7 +336,7 @@ class Process extends BaseProcess {
    */
   kill() {
     this.killed = true;
-    libc.TerminateProcess(this.handle, TERMINATE_EXIT_CODE);
+    libc.TerminateJobObject(this.jobHandle, TERMINATE_EXIT_CODE);
   }
 
   /**
@@ -452,18 +452,36 @@ class Process extends BaseProcess {
     let handles = this.initPipes(options);
 
     let processFlags = win32.CREATE_NO_WINDOW
+                     | win32.CREATE_SUSPENDED
                      | win32.CREATE_UNICODE_ENVIRONMENT;
 
-    let startupInfo = new win32.STARTUPINFOW();
-    startupInfo.cb = win32.STARTUPINFOW.size;
-    startupInfo.dwFlags = win32.STARTF_USESTDHANDLES;
+    if (io.breakAwayFromJob) {
+      processFlags |= win32.CREATE_BREAKAWAY_FROM_JOB;
+    }
+
+    let startupInfoEx = new win32.STARTUPINFOEXW();
+    let startupInfo = startupInfoEx.StartupInfo;
 
     startupInfo.hStdInput = handles[0];
     startupInfo.hStdOutput = handles[1];
     startupInfo.hStdError = handles[2];
 
+    // Note: This needs to be kept alive until we destroy the attribute list.
+    let handleArray = win32.HANDLE.array()(handles);
+
+    let threadAttrs = win32.createThreadAttributeList(handleArray);
+    if (threadAttrs) {
+      // If have thread attributes to pass, pass the size of the full extended
+      // startup info struct.
+      processFlags |= win32.EXTENDED_STARTUPINFO_PRESENT;
+      startupInfo.cb = win32.STARTUPINFOEXW.size;
+
+      startupInfoEx.lpAttributeList = threadAttrs;
+    }
+
     let procInfo = new win32.PROCESS_INFORMATION();
 
+    let errorMessage = "Failed to create process";
     let ok = libc.CreateProcessW(
       command, args.join(" "),
       null, /* Security attributes */
@@ -477,17 +495,28 @@ class Process extends BaseProcess {
       handle.dispose();
     }
 
+    if (threadAttrs) {
+      libc.DeleteProcThreadAttributeList(threadAttrs);
+    }
+
+    if (ok) {
+      this.jobHandle = win32.Handle(libc.CreateJobObjectW(null, null));
+      ok = libc.AssignProcessToJobObject(this.jobHandle, procInfo.hProcess);
+      errorMessage = `Failed to attach process to job object: 0x${(ctypes.winLastError || 0).toString(16)}`;
+    }
+
     if (!ok) {
       for (let pipe of this.pipes) {
         pipe.close();
       }
-      throw new Error("Failed to create process");
+      throw new Error(errorMessage);
     }
-
-    libc.CloseHandle(procInfo.hThread);
 
     this.handle = win32.Handle(procInfo.hProcess);
     this.pid = procInfo.dwProcessId;
+
+    libc.ResumeThread(procInfo.hThread);
+    libc.CloseHandle(procInfo.hThread);
   }
 
   /**
@@ -527,6 +556,10 @@ class Process extends BaseProcess {
       this.handle.dispose();
       this.handle = null;
 
+      libc.TerminateJobObject(this.jobHandle, TERMINATE_EXIT_CODE);
+      this.jobHandle.dispose();
+      this.jobHandle = null;
+
       for (let pipe of this.pipes) {
         pipe.maybeClose();
       }
@@ -555,6 +588,8 @@ io = {
                                   win32.HANDLE);
     this.signal = new Signal(signalEvent);
     this.updatePollEvents();
+
+    this.breakAwayFromJob = details.breakAwayFromJob;
 
     setTimeout(this.loop.bind(this), 0);
   },
