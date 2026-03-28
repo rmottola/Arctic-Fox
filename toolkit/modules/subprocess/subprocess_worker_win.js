@@ -462,6 +462,9 @@ class Process extends BaseProcess {
     let startupInfoEx = new win32.STARTUPINFOEXW();
     let startupInfo = startupInfoEx.StartupInfo;
 
+    startupInfo.cb = win32.STARTUPINFOW.size;
+    startupInfo.dwFlags = win32.STARTF_USESTDHANDLES;
+
     startupInfo.hStdInput = handles[0];
     startupInfo.hStdOutput = handles[1];
     startupInfo.hStdError = handles[2];
