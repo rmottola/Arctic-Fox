@@ -173,6 +173,9 @@ public:
   {
   }
 
+  nsCycleCollectingAutoRefCnt(const nsCycleCollectingAutoRefCnt&) = delete;
+  void operator=(const nsCycleCollectingAutoRefCnt&) = delete;
+
   MOZ_ALWAYS_INLINE uintptr_t incr(nsISupports* aOwner)
   {
     return incr(aOwner, nullptr);
@@ -267,6 +270,9 @@ public:
   nsAutoRefCnt() : mValue(0) {}
   explicit nsAutoRefCnt(nsrefcnt aValue) : mValue(aValue) {}
 
+  nsAutoRefCnt(const nsAutoRefCnt&) = delete;
+  void operator=(const nsAutoRefCnt&) = delete;
+
   // only support prefix increment/decrement
   nsrefcnt operator++() { return ++mValue; }
   nsrefcnt operator--() { return --mValue; }
@@ -288,6 +294,9 @@ class ThreadSafeAutoRefCnt
 public:
   ThreadSafeAutoRefCnt() : mValue(0) {}
   explicit ThreadSafeAutoRefCnt(nsrefcnt aValue) : mValue(aValue) {}
+
+  ThreadSafeAutoRefCnt(const ThreadSafeAutoRefCnt&) = delete;
+  void operator=(const ThreadSafeAutoRefCnt&) = delete;
 
   // only support prefix increment/decrement
   MOZ_ALWAYS_INLINE nsrefcnt operator++() { return ++mValue; }
