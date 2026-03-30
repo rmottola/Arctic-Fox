@@ -107,7 +107,6 @@ function* closeLastTab(selector) {
   if (!lastTab) {
     return;
   }
-  let browserWindow = Services.wm.getMostRecentWindow("navigator:browser");
   yield BrowserTestUtils.removeTab(lastTab);
   lastTab = null;
 }
