@@ -105,6 +105,11 @@ pref("browser.escape_to_blank", false);
 // default=2 minutes
 pref("app.update.timerMinimumDelay", 120);
 
+// The minimum delay in milliseconds for the first firing after startup of the timer
+// to notify consumers of the timer manager.
+// minimum=10 seconds, default=30 seconds, and maximum=120 seconds
+pref("app.update.timerFirstInterval", 30000);
+
 // App-specific update preferences
 
 // The interval to check for updates (app.update.interval) is defined in
@@ -258,6 +263,7 @@ pref("general.useragent.complexOverride.moodle", false); // bug 797703
 // At startup, check if we're the default browser and prompt user if not.
 pref("browser.shell.checkDefaultBrowser", true);
 pref("browser.shell.shortcutFavicons",true);
+pref("browser.shell.mostRecentDateSetAsDefault", "");
 pref("browser.shell.skipDefaultBrowserCheck", true);
 pref("browser.shell.defaultBrowserCheckCount", 0);
 
@@ -269,6 +275,11 @@ pref("browser.startup.homepage",            "chrome://branding/locale/browsercon
 pref("browser.slowStartup.notificationDisabled", false);
 pref("browser.slowStartup.timeThreshold", 60000);
 pref("browser.slowStartup.maxSamples", 5);
+
+// This url, if changed, MUST continue to point to an https url. Pulling arbitrary content to inject into
+// this page over http opens us up to a man-in-the-middle attack that we'd rather not face. If you are a downstream
+// repackager of this code using an alternate snippet url, please keep your users safe
+pref("browser.aboutHomeSnippets.updateUrl", "https://snippets.cdn.mozilla.net/%STARTPAGE_VERSION%/%NAME%/%VERSION%/%APPBUILDID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/");
 
 pref("browser.enable_automatic_image_resizing", true);
 pref("browser.casting.enabled", true);
@@ -296,7 +307,7 @@ pref("browser.urlbar.matchBehavior", 1);
 pref("browser.urlbar.filter.javascript", true);
 
 // the maximum number of results to show in autocomplete when doing richResults
-pref("browser.urlbar.maxRichResults", 12);
+pref("browser.urlbar.maxRichResults", 10);
 // The amount of time (ms) to wait after the user has stopped typing
 // before starting to perform autocomplete.  50 is the default set in
 // autocomplete.xml.
@@ -610,10 +621,9 @@ pref("browser.gesture.tap", "cmd_fullZoomReset");
 pref("browser.snapshots.limit", 0);
 
 // 0: Nothing happens
-// 1: Scroll contents
+// 1: Scrolling contents
 // 2: Go back or go forward, in your history
-// 3: Zoom in or out
-// 4: Scroll contents with X and Y swapped
+// 3: Zoom in or out.
 #ifdef XP_MACOSX
 // On OS X, if the wheel has one axis only, shift+wheel comes through as a
 // horizontal scroll event. Thus, we can't assign anything other than normal
@@ -695,6 +705,10 @@ pref("plugins.hide_infobar_for_outdated_plugin", false);
 pref("plugins.click_to_play", true);
 pref("plugins.testmode", false);
 
+pref("plugin.default.state", 1);
+
+// Plugins bundled in XPIs are enabled by default.
+pref("plugin.defaultXpi.state", 2);
 
 #ifdef XP_MACOSX
 pref("browser.preferences.animateFadeIn", true);
@@ -1014,6 +1028,17 @@ pref("browser.tabs.remote.desktopbehavior", true);
 // This will require a restart.
 pref("security.sandbox.windows.log", false);
 
+// Controls whether and how the Windows NPAPI plugin process is sandboxed.
+// To get a different setting for a particular plugin replace "default", with
+// the plugin's nice file name, see: nsPluginTag::GetNiceFileName.
+// On windows these levels are:
+// 0 - no sandbox
+// 1 - sandbox with USER_NON_ADMIN access token level
+// 2 - a more strict sandbox, which might cause functionality issues. This now
+//     includes running at low integrity.
+// 3 - the strongest settings we seem to be able to use without breaking
+//     everything, but will probably cause some functionality restrictions
+pref("dom.ipc.plugins.sandbox-level.default", 0);
 #if defined(_AMD64_)
 // The lines in PluginModuleParent.cpp should be changed in line with this.
 pref("dom.ipc.plugins.sandbox-level.flash", 2);
@@ -1357,6 +1382,11 @@ pref("geo.provider.use_gpsd", true);
 // currently irrelevant for desktop e10s
 pref("network.disable.ipc.security", true);
 
+// CustomizableUI debug logging.
+pref("browser.uiCustomization.debug", false);
+
+// CustomizableUI state of the browser's user interface
+pref("browser.uiCustomization.state", "");
 
 // Whether we display profile images in the UI or not.
 pref("identity.fxaccounts.profile_image.enabled", true);
@@ -1376,19 +1406,24 @@ pref("reader.parse-on-load.enabled", false);
 // Token server used by the FxA Sync identity.
 pref("identity.sync.tokenserver.uri", "https://token.services.mozilla.com/1.0/sync/1.5");
 
-// ****************** domain-specific UAs ******************
-
-// AMO needs "Firefox", obviously - pass on the OS (determined at build time)
-#ifdef XP_UNIX
-#ifdef XP_MACOSX
-pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:52.0) Gecko/20100101 Firefox/52.0");
-#else
-pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Linux; X11; rv:52.0) Gecko/20100101 Firefox/52.0");
-#endif
-#else
-pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Windows NT 6.1; WOW64; rv:52.0) Gecko/20100101 Firefox/52.0");
+// On GTK, we now default to showing the menubar only when alt is pressed:
+#ifdef MOZ_WIDGET_GTK
+pref("ui.key.menuAccessKeyFocuses", true);
 #endif
 
+// Encrypted media extensions.
+#ifdef XP_LINUX
+// On Linux EME is visible but disabled by default. This is so that the
+// "Play DRM content" checkbox in the Firefox UI is unchecked by default.
+// DRM requires downloading and installing proprietary binaries, which
+// users on an open source operating systems didn't opt into. The first
+// time a site using EME is encountered, the user will be prompted to
+// enable DRM, whereupon the EME plugin binaries will be downloaded if
+// permission is granted.
+pref("media.eme.enabled", false);
+#else
+pref("media.eme.enabled", true);
+#endif
 
 // Decode using Gecko Media Plugins in <video>, if a system decoder is not
 // availble and the preferred GMP is available.
@@ -1478,17 +1513,13 @@ pref("experiments.supported", true);
 // Enable GMP support in the addon manager.
 pref("media.gmp-provider.enabled", false);
 
-// For the about:tabcrashed page
-pref("browser.tabs.crashReporting.sendReport", true);
-pref("browser.tabs.crashReporting.includeURL", false);
-pref("browser.tabs.crashReporting.emailMe", false);
-pref("browser.tabs.crashReporting.email", "");
-
 #ifdef NIGHTLY_BUILD
 pref("privacy.trackingprotection.ui.enabled", false);
 #else
 pref("privacy.trackingprotection.ui.enabled", false);
 #endif
+pref("privacy.trackingprotection.introCount", 0);
+pref("privacy.trackingprotection.introURL", "https://www.mozilla.org/%LOCALE%/firefox/%VERSION%/tracking-protection/start/");
 
 // Enable Contextual Identity Containers
 #ifdef NIGHTLY_BUILD
@@ -1509,9 +1540,23 @@ pref("browser.tabs.remote.autostart.1", false);
 pref("browser.tabs.remote.autostart.2", true);
 #endif
 
+// For the about:tabcrashed page
+pref("browser.tabs.crashReporting.sendReport", true);
+pref("browser.tabs.crashReporting.includeURL", false);
+pref("browser.tabs.crashReporting.requestEmail", false);
+pref("browser.tabs.crashReporting.emailMe", false);
+pref("browser.tabs.crashReporting.email", "");
+
 // Enable e10s add-on interposition by default.
 pref("extensions.interposition.enabled", true);
 pref("extensions.interposition.prefetching", true);
+
+// Enable blocking of e10s for add-on users on beta/release.
+#ifdef RELEASE_OR_BETA
+pref("extensions.e10sBlocksEnabling", true);
+#endif
+
+pref("browser.defaultbrowser.notificationbar", false);
 
 // How often to check for CPOW timeouts. CPOWs are only timed out by
 // the hang monitor.
@@ -1519,6 +1564,12 @@ pref("dom.ipc.cpow.timeout", 500);
 
 // Causes access on unsafe CPOWs from browser code to throw by default.
 pref("dom.ipc.cpows.forbid-unsafe-from-browser", true);
+
+// Don't allow add-ons marked as multiprocessCompatible to use CPOWs.
+pref("dom.ipc.cpows.forbid-cpows-in-compat-addons", true);
+
+// ...except for these add-ons:
+pref("dom.ipc.cpows.allow-cpows-in-compat-addons", "{b9db16a4-6edc-47ec-a1f4-b86292ed211d},firegestures@xuldev.org,{DDC359D1-844A-42a7-9AA1-88A850A938A8},privateTab@infocatcher,mousegesturessuite@lemon_juice.addons.mozilla.org,treestyletab@piro.sakura.ne.jp,cliqz@cliqz.com,{AE93811A-5C9A-4d34-8462-F7B864FC4696},contextsearch2@lwz.addons.mozilla.org,{EF522540-89F5-46b9-B6FE-1829E2B572C6},{677a8f98-fd64-40b0-a883-b8c95d0cbf17},images@wink.su,fx-devtools,toolkit/require,url_advisor@kaspersky.com,{d10d0bf8-f5b5-c8b4-a8b2-2b9879e08c5d},{dc572301-7619-498c-a57d-39143191b318},dta@downthemall.net,{86095750-AD15-46d8-BF32-C0789F7E6A32},screenwise-prod@google.com,{91aa5abe-9de4-4347-b7b5-322c38dd9271},secureLogin@blueimp.net,ich@maltegoetz.de,come.back.block.image.from@cat-in-136.blogspot.com,{7b1bf0b6-a1b9-42b0-b75d-252036438bdc},s3crypto@data,{1e0fd655-5aea-4b4c-a583-f76ef1e3af9c},akahuku.fx.sp@toshiakisp.github.io,{aff87fa2-a58e-4edd-b852-0a20203c1e17},{1018e4d6-728f-4b20-ad56-37578a4de76b},rehostimage@engy.us,lazarus@interclue.com,{b2e69492-2358-071a-7056-24ad0c3defb1},flashstopper@byo.co.il,{e4a8a97b-f2ed-450b-b12d-ee082ba24781},jid1-f3mYMbCpz2AZYl@jetpack,{8c550e28-88c9-4764-bb52-aa489cf2efcd},{37fa1426-b82d-11db-8314-0800200c9a66},{ac2cfa60-bc96-11e0-962b-0800200c9a66},igetter@presenta.net,killspinners@byo.co.il,abhere2@moztw.org,{fc6339b8-9581-4fc7-b824-dffcb091fcb7},wampi@wink.su,backtrack@byalexv.co.uk,Gladiator_X@mail.ru,{73a6fe31-595d-460b-a920-fcc0f8843232},{46551EC9-40F0-4e47-8E18-8E5CF550CFB8},acewebextension_unlisted@acestream.org,@screen_maker,yasearch@yandex.ru,sp@avast.com,s3google@translator,igetterextension@presenta.net,{C1A2A613-35F1-4FCF-B27F-2840527B6556},screenwise-testing@google.com,helper-sig@savefrom.net,browser-loader,ImageSaver@Merci.chao,proxtube@abz.agency,wrc@avast.com,{9AA46F4F-4DC7-4c06-97AF-5035170634FE},jid1-CikLKKPVkw6ipw@jetpack,artur.dubovoy@gmail.com,nlgfeb@nlgfeb.ext,{A065A84F-95B6-433A-A0C8-4C040B77CE8A},fdm_ffext@freedownloadmanager.org");
 
 // Enable e10s hang monitoring (slow script checking and plugin hang
 // detection).
@@ -1554,6 +1605,9 @@ pref("dom.push.enabled", true);
 // by about:newtab. These values are in CSS pixels.
 pref("toolkit.pageThumbs.minWidth", 280);
 pref("toolkit.pageThumbs.minHeight", 190);
+
+// Enable speech synthesis
+pref("media.webspeech.synth.enabled", false);
 
 pref("browser.esedbreader.loglevel", "Error");
 
@@ -1594,3 +1648,17 @@ pref("browser.crashReports.unsubmittedCheck.autoSubmit", false);
 // controlling validation are located in /services/sync/services-sync.js
 pref("services.sync.validation.enabled", true);
 #endif
+
+// ****************** domain-specific UAs ******************
+
+// AMO needs "Firefox", obviously - pass on the OS (determined at build time)
+#ifdef XP_UNIX
+#ifdef XP_MACOSX
+pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:52.0) Gecko/20100101 Firefox/52.0");
+#else
+pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Linux; X11; rv:52.0) Gecko/20100101 Firefox/52.0");
+#endif
+#else
+pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Windows NT 6.1; WOW64; rv:52.0) Gecko/20100101 Firefox/52.0");
+#endif
+
