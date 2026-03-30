@@ -9,6 +9,7 @@ this.EXPORTED_SYMBOLS = ["MigrationUtils", "MigratorPrototype"];
 const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
 const TOPIC_WILL_IMPORT_BOOKMARKS = "initial-migration-will-import-default-bookmarks";
 const TOPIC_DID_IMPORT_BOOKMARKS = "initial-migration-did-import-default-bookmarks";
+const TOPIC_PLACES_DEFAULTS_FINISHED = "places-browser-init-complete";
 
 Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -224,7 +225,7 @@ this.MigratorPrototype = {
       resources = resources.filter(r => aItems & r.type);
 
     // Used to periodically give back control to the main-thread loop.
-    let unblockMainThread = function () {
+    let unblockMainThread = function() {
       return new Promise(resolve => {
         Services.tm.mainThread.dispatch(resolve, Ci.nsIThread.DISPATCH_NORMAL);
       });
@@ -340,28 +341,35 @@ this.MigratorPrototype = {
 
     if (MigrationUtils.isStartupMigration && !this.startupOnlyMigrator) {
       MigrationUtils.profileStartup.doStartup();
-
-      // If we're about to migrate bookmarks, first import the default bookmarks.
-      // Note We do not need to do so for the Firefox migrator
+      // First import the default bookmarks.
+      // Note: We do not need to do so for the Firefox migrator
       // (=startupOnlyMigrator), as it just copies over the places database
       // from another profile.
-      const BOOKMARKS = MigrationUtils.resourceTypes.BOOKMARKS;
-      let migratingBookmarks = resources.some(r => r.type == BOOKMARKS);
-      if (migratingBookmarks) {
+      Task.spawn(function* () {
+        // Tell nsBrowserGlue we're importing default bookmarks.
         let browserGlue = Cc["@mozilla.org/browser/browserglue;1"].
                           getService(Ci.nsIObserver);
         browserGlue.observe(null, TOPIC_WILL_IMPORT_BOOKMARKS, "");
 
-        // Note doMigrate doesn't care about the success of the import.
-        let onImportComplete = function() {
-          browserGlue.observe(null, TOPIC_DID_IMPORT_BOOKMARKS, "");
-          doMigrate();
-        };
-        BookmarkHTMLUtils.importFromURL(
-          "chrome://browser/locale/bookmarks.html", true).then(
-          onImportComplete, onImportComplete);
-        return;
-      }
+        // Import the default bookmarks. We ignore whether or not we succeed.
+        yield BookmarkHTMLUtils.importFromURL(
+          "chrome://browser/locale/bookmarks.html", true).catch(r => r);
+
+        // We'll tell nsBrowserGlue we've imported bookmarks, but before that
+        // we need to make sure we're going to know when it's finished
+        // initializing places:
+        let placesInitedPromise = new Promise(resolve => {
+          let onPlacesInited = function() {
+            Services.obs.removeObserver(onPlacesInited, TOPIC_PLACES_DEFAULTS_FINISHED);
+            resolve();
+          };
+          Services.obs.addObserver(onPlacesInited, TOPIC_PLACES_DEFAULTS_FINISHED, false);
+        });
+        browserGlue.observe(null, TOPIC_DID_IMPORT_BOOKMARKS, "");
+        yield placesInitedPromise;
+        doMigrate();
+      });
+      return;
     }
     doMigrate();
   },
@@ -683,6 +691,7 @@ this.MigrationUtils = Object.freeze({
       "Microsoft Edge":                    "edge",
       "Safari":                            "safari",
       "Firefox":                           "firefox",
+      "Nightly":                           "firefox",
       "Google Chrome":                     "chrome",  // Windows, Linux
       "Chrome":                            "chrome",  // OS X
       "Chromium":                          "chromium", // Windows, OS X
@@ -697,6 +706,10 @@ this.MigrationUtils = Object.freeze({
           .getService(Ci.nsIExternalProtocolService)
           .getApplicationDescription("http");
       key = APP_DESC_TO_KEY[browserDesc] || "";
+      // Handle devedition, as well as "FirefoxNightly" on OS X.
+      if (!key && browserDesc.startsWith("Firefox")) {
+        key = "firefox";
+      }
     }
     catch (ex) {
       Cu.reportError("Could not detect default browser: " + ex);
