@@ -1695,7 +1695,7 @@ BrowserGlue.prototype = {
 
     }.bind(this)).catch(ex => {
       Cu.reportError(ex);
-    }).then(result => {
+    }).then(() => {
       // NB: deliberately after the catch so that we always do this, even if
       // we threw halfway through initializing in the Task above.
       Services.obs.notifyObservers(null, "places-browser-init-complete", "");
