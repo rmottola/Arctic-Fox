@@ -43,7 +43,6 @@ EXTRA_JS_MODULES += [
     'RemotePrompt.jsm',
     'Sanitizer.jsm',
     'SitePermissions.jsm',
-    'TabGroupsMigrator.jsm',
     'TransientPrefs.jsm',
     'webrtcUI.jsm',
 ]
