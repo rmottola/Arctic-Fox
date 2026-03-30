@@ -56,6 +56,13 @@ const ITEM_NAME_MAX_LENGTH = 32;
 
 function addEllipsis(name) {
   if (name.length > ITEM_NAME_MAX_LENGTH) {
+    if (/^https?:/.test(name)) {
+      // For URLs, add ellipsis in the middle
+      const halfLen = ITEM_NAME_MAX_LENGTH / 2;
+      return name.slice(0, halfLen) + ELLIPSIS + name.slice(-halfLen);
+    }
+
+    // For other strings, add ellipsis at the end
     return name.substr(0, ITEM_NAME_MAX_LENGTH) + ELLIPSIS;
   }
 
@@ -146,7 +153,7 @@ function StorageUI(front, target, panelWin, toolbox) {
   this.onRemoveItem = this.onRemoveItem.bind(this);
   this.onRemoveAllFrom = this.onRemoveAllFrom.bind(this);
   this.onRemoveAll = this.onRemoveAll.bind(this);
-  this.onRemoveDatabase = this.onRemoveDatabase.bind(this);
+  this.onRemoveTreeItem = this.onRemoveTreeItem.bind(this);
 
   this._tablePopupDelete = this._panelDoc.getElementById(
     "storage-table-popup-delete");
@@ -165,10 +172,8 @@ function StorageUI(front, target, panelWin, toolbox) {
     "storage-tree-popup-delete-all");
   this._treePopupDeleteAll.addEventListener("command", this.onRemoveAll);
 
-  this._treePopupDeleteDatabase = this._panelDoc.getElementById(
-    "storage-tree-popup-delete-database");
-  this._treePopupDeleteDatabase.addEventListener("command",
-    this.onRemoveDatabase);
+  this._treePopupDelete = this._panelDoc.getElementById("storage-tree-popup-delete");
+  this._treePopupDelete.addEventListener("command", this.onRemoveTreeItem);
 }
 
 exports.StorageUI = StorageUI;
@@ -194,21 +199,14 @@ StorageUI.prototype = {
     this.searchBox.removeEventListener("input", this.filterItems);
     this.searchBox = null;
 
-    this._treePopup.removeEventListener("popupshowing",
-      this.onTreePopupShowing);
-    this._treePopupDeleteAll.removeEventListener("command",
-      this.onRemoveAll);
-    this._treePopupDeleteDatabase.removeEventListener("command",
-      this.onRemoveDatabase);
+    this._treePopup.removeEventListener("popupshowing", this.onTreePopupShowing);
+    this._treePopupDeleteAll.removeEventListener("command", this.onRemoveAll);
+    this._treePopupDelete.removeEventListener("command", this.onRemoveTreeItem);
 
-    this._tablePopup.removeEventListener("popupshowing",
-      this.onTablePopupShowing);
-    this._tablePopupDelete.removeEventListener("command",
-      this.onRemoveItem);
-    this._tablePopupDeleteAllFrom.removeEventListener("command",
-      this.onRemoveAllFrom);
-    this._tablePopupDeleteAll.removeEventListener("command",
-      this.onRemoveAll);
+    this._tablePopup.removeEventListener("popupshowing", this.onTablePopupShowing);
+    this._tablePopupDelete.removeEventListener("command", this.onRemoveItem);
+    this._tablePopupDeleteAllFrom.removeEventListener("command", this.onRemoveAllFrom);
+    this._tablePopupDeleteAll.removeEventListener("command", this.onRemoveAll);
   },
 
   /**
@@ -925,24 +923,39 @@ StorageUI.prototype = {
       let actor = this.storageTypes[type];
 
       // The delete all (aka clear) action is displayed for IndexedDB object stores
-      // (level 4 of tree) and for the whole host (level 2 of tree) of other storage
-      // types (cookies, localStorage, ...).
-      let showDeleteAll = actor.removeAll &&
-        (selectedItem.length === (type === "indexedDB" ? 4 : 2));
+      // (level 4 of tree), for Cache objects (level 3) and for the whole host (level 2)
+      // for other storage types (cookies, localStorage, ...).
+      let showDeleteAll = false;
+      if (actor.removeAll) {
+        let level;
+        if (type == "indexedDB") {
+          level = 4;
+        } else if (type == "Cache") {
+          level = 3;
+        } else {
+          level = 2;
+        }
+
+        if (selectedItem.length == level) {
+          showDeleteAll = true;
+        }
+      }
 
       this._treePopupDeleteAll.hidden = !showDeleteAll;
 
-      // The action to delete database is available for IndexedDB databases, i.e.,
-      // at level 3 of the tree.
-      let showDeleteDb = actor.removeDatabase && selectedItem.length === 3;
-      this._treePopupDeleteDatabase.hidden = !showDeleteDb;
-      if (showDeleteDb) {
-        let dbName = addEllipsis(selectedItem[2]);
-        this._treePopupDeleteDatabase.setAttribute("label",
-          L10N.getFormatStr("storage.popupMenu.deleteLabel", dbName));
+      // The delete action is displayed for:
+      // - IndexedDB databases (level 3 of the tree)
+      // - Cache objects (level 3 of the tree)
+      let showDelete = (type == "indexedDB" || type == "Cache") &&
+                       selectedItem.length == 3;
+      this._treePopupDelete.hidden = !showDelete;
+      if (showDelete) {
+        let itemName = addEllipsis(selectedItem[selectedItem.length - 1]);
+        this._treePopupDelete.setAttribute("label",
+          L10N.getFormatStr("storage.popupMenu.deleteLabel", itemName));
       }
 
-      showMenu = showDeleteAll || showDeleteDb;
+      showMenu = showDeleteAll || showDelete;
     }
 
     if (!showMenu) {
@@ -991,15 +1004,24 @@ StorageUI.prototype = {
     actor.removeAll(host, data.host);
   },
 
-  onRemoveDatabase: function () {
-    let [type, host, name] = this.tree.selectedItem;
-    let actor = this.storageTypes[type];
+  onRemoveTreeItem: function () {
+    let [type, host, ...path] = this.tree.selectedItem;
 
-    actor.removeDatabase(host, name).then(result => {
+    if (type == "indexedDB" && path.length == 1) {
+      this.removeDatabase(host, path[0]);
+    } else if (type == "Cache" && path.length == 1) {
+      this.removeCache(host, path[0]);
+    }
+  },
+
+  removeDatabase: function (host, dbName) {
+    let actor = this.storageTypes.indexedDB;
+
+    actor.removeDatabase(host, dbName).then(result => {
       if (result.blocked) {
         let notificationBox = this._toolbox.getNotificationBox();
         notificationBox.appendNotification(
-          L10N.getFormatStr("storage.idb.deleteBlocked", name),
+          L10N.getFormatStr("storage.idb.deleteBlocked", dbName),
           "storage-idb-delete-blocked",
           null,
           notificationBox.PRIORITY_WARNING_LOW);
@@ -1007,10 +1029,16 @@ StorageUI.prototype = {
     }).catch(error => {
       let notificationBox = this._toolbox.getNotificationBox();
       notificationBox.appendNotification(
-        L10N.getFormatStr("storage.idb.deleteError", name),
+        L10N.getFormatStr("storage.idb.deleteError", dbName),
         "storage-idb-delete-error",
         null,
         notificationBox.PRIORITY_CRITICAL_LOW);
     });
-  }
+  },
+
+  removeCache: function (host, cacheName) {
+    let actor = this.storageTypes.Cache;
+
+    actor.removeItem(host, JSON.stringify([ cacheName ]));
+  },
 };
