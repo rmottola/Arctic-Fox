@@ -12,5 +12,5 @@ add_task(function* capture() {
   }
   let sets = ["Preferences"];
 
-  yield TestRunner.start(sets);
+  yield TestRunner.start(sets, "preferences");
 });

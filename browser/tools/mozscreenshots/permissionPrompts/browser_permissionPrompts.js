@@ -12,5 +12,5 @@ add_task(function* capture() {
   }
   let sets = ["LightweightThemes", "PermissionPrompts"];
 
-  yield TestRunner.start(sets);
+  yield TestRunner.start(sets, "permissionPrompts");
 });
