@@ -129,22 +129,11 @@ input[type=button] {
  * toolkit.pageThumbs.minHeight
  */
 /* CELLS */
-.newtab-cell,
-.newtab-intro-cell,
-.newtab-intro-cell-hover {
+.newtab-cell {
   display: -moz-box;
   height: 210px;
   margin: 20px 10px 35px;
   width: 290px;
-}
-
-.newtab-intro-cell-wrapper {
-  margin-top: -12px;
-}
-
-.newtab-intro-cell,
-.newtab-intro-cell-hover {
-  margin: 0;
 }
 
 /* SITES */
@@ -304,8 +293,7 @@ input[type=button] {
 }
 
 .newtab-control:-moz-focusring,
-.newtab-cell:not([ignorehover]) > .newtab-site:hover > .newtab-control,
-.newtab-intro-cell-hover .newtab-control {
+.newtab-cell:not([ignorehover]) > .newtab-site:hover > .newtab-control {
   opacity: 1;
 }
 
