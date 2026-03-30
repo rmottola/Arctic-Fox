@@ -5,12 +5,6 @@
  * Tests that preferences are properly set by distribution.ini
  */
 
-var Ci = Components.interfaces;
-var Cc = Components.classes;
-var Cr = Components.results;
-var Cu = Components.utils;
-
-Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/LoadContextInfo.jsm");
 
 // Import common head.
@@ -31,8 +25,6 @@ const TOPIC_BROWSERGLUE_TEST = "browser-glue-test";
  */
 function installDistributionEngine() {
   const XRE_APP_DISTRIBUTION_DIR = "XREAppDist";
-
-  const gProfD = do_get_profile().QueryInterface(Ci.nsILocalFile);
 
   let dir = gProfD.clone();
   dir.append("distribution");
