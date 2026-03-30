@@ -138,6 +138,9 @@ function matchSearchFilters(message, filters) {
 }
 
 function isTextInFrame(text, frame) {
+  if (!frame) {
+    return false;
+  }
   // @TODO Change this to Object.values once it's supported in Node's version of V8
   return Object.keys(frame)
     .map(key => frame[key])
