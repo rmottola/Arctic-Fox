@@ -1754,6 +1754,14 @@ var WalkerActor = protocol.ActorClassWithSpec(walkerSpec, {
       return;
     }
 
+    // There can be only one node locked per pseudo, so dismiss all existing
+    // ones
+    for (let locked of this._activePseudoClassLocks) {
+      if (DOMUtils.hasPseudoClassLock(locked.rawNode, pseudo)) {
+        this._removePseudoClassLock(locked, pseudo);
+      }
+    }
+
     this._addPseudoClassLock(node, pseudo);
 
     if (!options.parents) {
