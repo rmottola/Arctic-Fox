@@ -423,6 +423,9 @@ MessageManagerTunnel.prototype = {
     "Finder:",
     // Messages sent from InlineSpellChecker.jsm
     "InlineSpellChecker:",
+    // Messages sent from browser-social.js
+    "Social:",
+    "PageMetadata:",
   ],
 
   INNER_TO_OUTER_MESSAGE_PREFIXES: [
@@ -434,6 +437,9 @@ MessageManagerTunnel.prototype = {
     "Findbar:",
     // Messages sent to RemoteFinder.jsm
     "Finder:",
+    // Messages sent to browser-social.js
+    "Social:",
+    "PageMetadata:",
   ],
 
   OUTER_TO_INNER_FRAME_SCRIPTS: [
