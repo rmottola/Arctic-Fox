@@ -173,9 +173,11 @@ function* testViewportResize(ui, selector, moveBy,
                              expectedViewportSize, expectedHandleMove) {
   let win = ui.toolWindow;
 
+  let changed = once(ui, "viewport-device-changed");
   let resized = waitForViewportResizeTo(ui, ...expectedViewportSize);
   let startRect = dragElementBy(selector, ...moveBy, win);
   yield resized;
+  yield changed;
 
   let endRect = getElRect(selector, win);
   is(endRect.left - startRect.left, expectedHandleMove[0],
@@ -235,13 +237,17 @@ function changeSelectValue({ toolWindow }, selector, value) {
   });
 }
 
-function switchDevice(ui, value) {
-  return switchSelector(ui, ".viewport-device-selector", value);
-}
+let switchDevice = Task.async(function* (ui, value) {
+  let changed = once(ui, "viewport-device-changed");
+  yield switchSelector(ui, ".viewport-device-selector", value);
+  yield changed;
+});
 
-function switchNetworkThrottling(ui, value) {
-  return switchSelector(ui, "#global-network-throttling-selector", value);
-}
+let switchNetworkThrottling = Task.async(function* (ui, value) {
+  let changed = once(ui, "network-throttling-changed");
+  yield switchSelector(ui, "#global-network-throttling-selector", value);
+  yield changed;
+});
 
 function getSessionHistory(browser) {
   return ContentTask.spawn(browser, {}, function* () {

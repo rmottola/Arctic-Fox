@@ -474,12 +474,14 @@ ResponsiveUI.prototype = {
     this.emit("network-throttling-changed");
   }),
 
-  onChangeViewportDevice(event) {
+  onChangeViewportDevice: Task.async(function* (event) {
     let { userAgent, pixelRatio, touch } = event.data.device;
-    this.updateUserAgent(userAgent);
-    this.updateDPPX(pixelRatio);
-    this.updateTouchSimulation(touch);
-  },
+    yield this.updateUserAgent(userAgent);
+    yield this.updateDPPX(pixelRatio);
+    yield this.updateTouchSimulation(touch);
+    // Used by tests
+    this.emit("viewport-device-changed");
+  }),
 
   onContentResize(event) {
     let { width, height } = event.data;
@@ -499,13 +501,13 @@ ResponsiveUI.prototype = {
     this.updateTouchSimulation(enabled);
   },
 
-  updateDPPX(dppx) {
+  updateDPPX: Task.async(function* (dppx) {
     if (!dppx) {
-      this.emulationFront.clearDPPXOverride();
+      yield this.emulationFront.clearDPPXOverride();
       return;
     }
-    this.emulationFront.setDPPXOverride(dppx);
-  },
+    yield this.emulationFront.setDPPXOverride(dppx);
+  }),
 
   updateNetworkThrottling: Task.async(function* (enabled, profile) {
     if (!enabled) {
@@ -521,13 +523,13 @@ ResponsiveUI.prototype = {
     });
   }),
 
-  updateUserAgent(userAgent) {
+  updateUserAgent: Task.async(function* (userAgent) {
     if (!userAgent) {
-      this.emulationFront.clearUserAgentOverride();
+      yield this.emulationFront.clearUserAgentOverride();
       return;
     }
-    this.emulationFront.setUserAgentOverride(userAgent);
-  },
+    yield this.emulationFront.setUserAgentOverride(userAgent);
+  }),
 
   updateTouchSimulation: Task.async(function* (enabled) {
     if (!enabled) {
