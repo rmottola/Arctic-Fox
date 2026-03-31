@@ -92,12 +92,19 @@ CssColor.prototype = {
   // A lower-cased copy of |authored|.
   lowerCased: null,
 
+  _setColorUnitUppercase: function (color) {
+    // Specifically exclude the case where the color is
+    // case-insensitive.  This makes it so that "#000" isn't
+    // considered "upper case" for the purposes of color cycling.
+    this._colorUnitUppercase = (color === color.toUpperCase()) &&
+      (color !== color.toLowerCase());
+  },
+
   get colorUnit() {
     if (this._colorUnit === null) {
       let defaultUnit = Services.prefs.getCharPref(COLOR_UNIT_PREF);
       this._colorUnit = CssColor.COLORUNIT[defaultUnit];
-      this._colorUnitUppercase =
-        (this.authored === this.authored.toUpperCase());
+      this._setColorUnitUppercase(this.authored);
     }
     return this._colorUnit;
   },
@@ -117,7 +124,7 @@ CssColor.prototype = {
     if (Services.prefs.getCharPref(COLOR_UNIT_PREF) ===
         CssColor.COLORUNIT.authored) {
       this._colorUnit = classifyColor(color);
-      this._colorUnitUppercase = (color === color.toUpperCase());
+      this._setColorUnitUppercase(color);
     }
   },
 
@@ -324,6 +331,7 @@ CssColor.prototype = {
     // returned when needed.
     this.lowerCased = color.toLowerCase();
     this.authored = color;
+    this._setColorUnitUppercase(color);
     return this;
   },
 
