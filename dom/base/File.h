@@ -823,19 +823,23 @@ private:
 };
 
 class BlobImplStream final : public BlobImplBase
+                           , public nsIMemoryReporter
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_NSIMEMORYREPORTER
 
-  BlobImplStream(nsIInputStream* aInputStream,
-                 const nsAString& aContentType,
-                 uint64_t aLength);
+  static already_AddRefed<BlobImplStream>
+  Create(nsIInputStream* aInputStream,
+         const nsAString& aContentType,
+         uint64_t aLength);
 
-  BlobImplStream(nsIInputStream* aInputStream,
-                 const nsAString& aName,
-                 const nsAString& aContentType,
-                 int64_t aLastModifiedDate,
-                 uint64_t aLength);
+  static already_AddRefed<BlobImplStream>
+  Create(nsIInputStream* aInputStream,
+         const nsAString& aName,
+         const nsAString& aContentType,
+         int64_t aLastModifiedDate,
+         uint64_t aLength);
 
   virtual void GetInternalStream(nsIInputStream** aStream,
                                  ErrorResult& aRv) override;
@@ -850,12 +854,24 @@ public:
   }
 
 private:
+  BlobImplStream(nsIInputStream* aInputStream,
+                 const nsAString& aContentType,
+                 uint64_t aLength);
+
+  BlobImplStream(nsIInputStream* aInputStream,
+                 const nsAString& aName,
+                 const nsAString& aContentType,
+                 int64_t aLastModifiedDate,
+                 uint64_t aLength);
+
   BlobImplStream(BlobImplStream* aOther,
                  const nsAString& aContentType,
                  uint64_t aStart,
                  uint64_t aLength);
 
   ~BlobImplStream();
+
+  void MaybeRegisterMemoryReporter();
 
   nsCOMPtr<nsIInputStream> mInputStream;
 };
