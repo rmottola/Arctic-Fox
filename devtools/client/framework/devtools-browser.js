@@ -734,9 +734,6 @@ gDevTools.on("tool-registered", function (ev, toolId) {
 });
 
 gDevTools.on("tool-unregistered", function (ev, toolId) {
-  if (typeof toolId != "string") {
-    toolId = toolId.id;
-  }
   gDevToolsBrowser._removeToolFromWindows(toolId);
 });
 
