@@ -2,50 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#layout-container {
+#layoutview-container {
   height: 100%;
   width: 100%;
-  overflow: auto;
 }
 
-/**
- * Grid Container
- */
-
-#layout-grid-container {
-  margin: 5px;
-}
-
-/**
- * Grid List
- */
-
-.layout-grid-list-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.layout-grid-list-container > span {
-  font-weight: bold;
-  margin-bottom: 3px;
-}
-
-#layout-grid-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-#layout-grid-list li {
-  padding: 4px 0;
-}
-
-/**
- * Container when no grids are present
- */
-
-.layout-no-grids {
+.layoutview-no-grids {
   font-style: italic;
   text-align: center;
   padding: 0.5em;
