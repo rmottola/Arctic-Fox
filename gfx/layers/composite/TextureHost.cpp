@@ -502,7 +502,10 @@ BufferTextureHost::SetCompositor(Compositor* aCompositor)
   if (mFirstSource && mFirstSource->IsOwnedBy(this)) {
     mFirstSource->SetOwner(nullptr);
   }
-  mFirstSource = nullptr;
+  if (mFirstSource) {
+    mFirstSource = nullptr;
+    mNeedsFullUpdate = true;
+  }
   mCompositor = aCompositor;
 }
 
@@ -673,6 +676,7 @@ BufferTextureHost::PrepareTextureSource(CompositableTextureSourceRef& aTexture)
     aTexture->AsSourceBasic()->SetBufferTextureHost(this);
     aTexture->AsDataTextureSource()->SetOwner(this);
     mFirstSource = aTexture->AsDataTextureSource();
+    mNeedsFullUpdate = true;
   }
 
   if (!mHasIntermediateBuffer) {
