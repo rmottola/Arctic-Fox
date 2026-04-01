@@ -34,10 +34,10 @@ XPCOMUtils.defineLazyServiceGetter(this, "eTLD",
 XPCOMUtils.defineLazyGetter(this, "gTextDecoder", () => {
   return new TextDecoder();
 });
-XPCOMUtils.defineLazyGetter(this, "gCryptoHash", function () {
+XPCOMUtils.defineLazyGetter(this, "gCryptoHash", function() {
   return Cc["@mozilla.org/security/hash;1"].createInstance(Ci.nsICryptoHash);
 });
-XPCOMUtils.defineLazyGetter(this, "gUnicodeConverter", function () {
+XPCOMUtils.defineLazyGetter(this, "gUnicodeConverter", function() {
   let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
                     .createInstance(Ci.nsIScriptableUnicodeConverter);
   converter.charset = 'utf8';
@@ -361,7 +361,7 @@ var DirectoryLinksProvider = {
   /**
    * @return true if download is needed, false otherwise
    */
-  get _needsDownload () {
+  get _needsDownload() {
     // fail if last download occured less then 24 hours ago
     if ((Date.now() - this._lastDownloadMS) > this._downloadIntervalMS) {
       return true;
@@ -526,7 +526,6 @@ var DirectoryLinksProvider = {
    * @return download promise
    */
   reportSitesAction: function DirectoryLinksProvider_reportSitesAction(sites, action, triggeringSiteIndex) {
-    let pastImpressions;
     // Check if the suggested tile was shown
     if (action == "view") {
       sites.slice(0, triggeringSiteIndex + 1).filter(s => s).forEach(site => {
@@ -544,13 +543,6 @@ var DirectoryLinksProvider = {
       // suggested tile has targetedSite, or frecent_sites if it was pinned
       let {frecent_sites, targetedSite, url} = sites[triggeringSiteIndex].link;
       if (frecent_sites || targetedSite) {
-        // skip past_impressions for "unpin" to avoid chance of tracking
-        if (this._frequencyCaps[url] && action != "unpin") {
-          pastImpressions = {
-            total: this._frequencyCaps[url].totalViews,
-            daily: this._frequencyCaps[url].dailyViews
-          };
-        }
         this._setFrequencyCapClick(url);
       }
     }
@@ -776,7 +768,7 @@ var DirectoryLinksProvider = {
     return false;
   },
 
-  _populatePlacesLinks: function () {
+  _populatePlacesLinks: function() {
     NewTabUtils.links.populateProviderCache(NewTabUtils.placesProvider, () => {
       this._handleManyLinksChanged();
     });
@@ -798,7 +790,7 @@ var DirectoryLinksProvider = {
     });
   },
 
-  onLinkChanged: function (aProvider, aLink) {
+  onLinkChanged: function(aProvider, aLink) {
     // Make sure NewTabUtils.links handles the notification first.
     setTimeout(() => {
       if (this._handleLinkChanged(aLink) || this._shouldUpdateSuggestedTile()) {
@@ -807,7 +799,7 @@ var DirectoryLinksProvider = {
     }, 0);
   },
 
-  onManyLinksChanged: function () {
+  onManyLinksChanged: function() {
     // Make sure NewTabUtils.links handles the notification first.
     setTimeout(() => {
       this._handleManyLinksChanged();
