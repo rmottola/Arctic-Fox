@@ -708,6 +708,15 @@ KeyframeEffectReadOnly::Constructor(
                                                          aRv);
 }
 
+/* static */ already_AddRefed<KeyframeEffectReadOnly>
+KeyframeEffectReadOnly::Constructor(const GlobalObject& aGlobal,
+                                    KeyframeEffectReadOnly& aSource,
+                                    ErrorResult& aRv)
+{
+  // TODO: Implement this in the later patches.
+  return nullptr;
+}
+
 void
 KeyframeEffectReadOnly::GetTarget(
     Nullable<OwningElementOrCSSPseudoElement>& aRv) const
