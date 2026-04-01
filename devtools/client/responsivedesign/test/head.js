@@ -204,12 +204,6 @@ var addTab = Task.async(function* (url) {
   return tab;
 });
 
-function wait(ms) {
-  let def = promise.defer();
-  setTimeout(def.resolve, ms);
-  return def.promise;
-}
-
 /**
  * Waits for the next load to complete in the current browser.
  *

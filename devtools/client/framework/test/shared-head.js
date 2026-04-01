@@ -96,6 +96,7 @@ registerCleanupFunction(() => {
   Services.prefs.clearUserPref("devtools.dump.emit");
   Services.prefs.clearUserPref("devtools.toolbox.host");
   Services.prefs.clearUserPref("devtools.toolbox.previousHost");
+  Services.prefs.clearUserPref("devtools.toolbox.splitconsoleEnabled");
 });
 
 registerCleanupFunction(function* cleanup() {
@@ -107,13 +108,22 @@ registerCleanupFunction(function* cleanup() {
 /**
  * Add a new test tab in the browser and load the given url.
  * @param {String} url The url to be loaded in the new tab
+ * @param {Object} options Object with various optional fields:
+ *   - {Boolean} background If true, open the tab in background
+ *   - {ChromeWindow} window Firefox top level window we should use to open the tab
  * @return a promise that resolves to the tab object when the url is loaded
  */
-var addTab = Task.async(function* (url) {
+var addTab = Task.async(function* (url, options = { background: false, window: window }) {
   info("Adding a new tab with URL: " + url);
 
-  let tab = gBrowser.selectedTab = gBrowser.addTab(url);
-  yield BrowserTestUtils.browserLoaded(gBrowser.selectedBrowser);
+  let { background } = options;
+  let { gBrowser } = options.window ? options.window : window;
+
+  let tab = gBrowser.addTab(url);
+  if (!background) {
+    gBrowser.selectedTab = tab;
+  }
+  yield BrowserTestUtils.browserLoaded(tab.linkedBrowser);
 
   info("Tab added and finished loading");
 
@@ -128,6 +138,7 @@ var addTab = Task.async(function* (url) {
 var removeTab = Task.async(function* (tab) {
   info("Removing tab.");
 
+  let { gBrowser } = tab.ownerDocument.defaultView;
   let onClose = once(gBrowser.tabContainer, "TabClose");
   gBrowser.removeTab(tab);
   yield onClose;
@@ -294,9 +305,7 @@ function waitForTick() {
  * @return A promise that resolves when the time is passed
  */
 function wait(ms) {
-  let def = defer();
-  content.setTimeout(def.resolve, ms);
-  return def.promise;
+  return new promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -556,12 +565,20 @@ function stopRecordingTelemetryLogs(Telemetry) {
 }
 
 /**
- * Clean the OS clipboard content.
+ * Clean the logical clipboard content. This method only clears the OS clipboard on
+ * Windows (see Bug 666254).
  */
 function emptyClipboard() {
   let clipboard = Cc["@mozilla.org/widget/clipboard;1"]
     .getService(SpecialPowers.Ci.nsIClipboard);
-  clipboard.emptyClipboard(1);
+  clipboard.emptyClipboard(clipboard.kGlobalClipboard);
+}
+
+/**
+ * Check if the current operating system is Windows.
+ */
+function isWindows() {
+  return Services.appinfo.OS === "WINNT";
 }
 
 /**

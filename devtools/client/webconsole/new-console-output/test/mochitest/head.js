@@ -13,7 +13,7 @@ Services.scriptloader.loadSubScript(
   this);
 
 var {Utils: WebConsoleUtils} = require("devtools/client/webconsole/utils");
-const WEBCONSOLE_STRINGS_URI = "devtools/locale/webconsole.properties";
+const WEBCONSOLE_STRINGS_URI = "devtools/client/locales/webconsole.properties";
 var WCUL10n = new WebConsoleUtils.L10n(WEBCONSOLE_STRINGS_URI);
 
 Services.prefs.setBoolPref("devtools.webconsole.new-frontend-enabled", true);
@@ -113,9 +113,25 @@ function* waitFor(condition, message = "waitFor", interval = 100, maxTries = 50)
  *        The selector to use in finding the message.
  */
 function findMessage(hud, text, selector = ".message") {
+  const elements = findMessages(hud, text, selector);
+  return elements.pop();
+}
+
+/**
+ * Find multiple messages in the output.
+ *
+ * @param object hud
+ *        The web console.
+ * @param string text
+ *        A substring that can be found in the message.
+ * @param selector [optional]
+ *        The selector to use in finding the message.
+ */
+function findMessages(hud, text, selector = ".message") {
+  const messages = hud.ui.experimentalOutputNode.querySelectorAll(selector);
   const elements = Array.prototype.filter.call(
-    hud.ui.experimentalOutputNode.querySelectorAll(selector),
+    messages,
     (el) => el.textContent.includes(text)
   );
-  return elements.length > 0 ? elements.pop() : false;
+  return elements;
 }

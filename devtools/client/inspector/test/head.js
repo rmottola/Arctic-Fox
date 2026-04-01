@@ -55,45 +55,24 @@ registerCleanupFunction(function* () {
   EventUtils.synthesizeMouseAtPoint(1, 1, {type: "mousemove"}, window);
 });
 
-var navigateTo = function (toolbox, url) {
-  let activeTab = toolbox.target.activeTab;
-  return activeTab.navigateTo(url);
-};
+var navigateTo = Task.async(function* (inspector, url) {
+  let markuploaded = inspector.once("markuploaded");
+  let onNewRoot = inspector.once("new-root");
+  let onUpdated = inspector.once("inspector-updated");
 
-/**
- * Simple DOM node accesor function that takes either a node or a string css
- * selector as argument and returns the corresponding node
- * @param {String|DOMNode} nodeOrSelector
- * @param {Object} options
- *        An object containing any of the following options:
- *        - document: HTMLDocument that should be queried for the selector.
- *                    Default: content.document.
- *        - expectNoMatch: If true and a node matches the given selector, a
- *                         failure is logged for an unexpected match.
- *                         If false and nothing matches the given selector, a
- *                         failure is logged for a missing match.
- *                         Default: false.
- * @return {DOMNode}
- */
-function getNode(nodeOrSelector, options = {}) {
-  let document = options.document || content.document;
-  let noMatches = !!options.expectNoMatch;
+  info("Navigating to: " + url);
+  let activeTab = inspector.toolbox.target.activeTab;
+  yield activeTab.navigateTo(url);
 
-  if (typeof nodeOrSelector === "string") {
-    info("Looking for a node that matches selector " + nodeOrSelector);
-    let node = document.querySelector(nodeOrSelector);
-    if (noMatches) {
-      ok(!node, "Selector " + nodeOrSelector + " didn't match any nodes.");
-    } else {
-      ok(node, "Selector " + nodeOrSelector + " matched a node.");
-    }
+  info("Waiting for markup view to load after navigation.");
+  yield markuploaded;
 
-    return node;
-  }
+  info("Waiting for new root.");
+  yield onNewRoot;
 
-  info("Looking for a node but selector was not a string.");
-  return nodeOrSelector;
-}
+  info("Waiting for inspector to update after new-root event.");
+  yield onUpdated;
+});
 
 /**
  * Start the element picker and focus the content window.
@@ -727,4 +706,27 @@ function getRuleViewRuleEditor(view, childrenIndex, nodeIndex) {
   return nodeIndex !== undefined ?
     view.element.children[childrenIndex].childNodes[nodeIndex]._ruleEditor :
     view.element.children[childrenIndex]._ruleEditor;
+}
+
+/**
+ * Get the text displayed for a given DOM Element's textContent within the
+ * markup view.
+ *
+ * @param {String} selector
+ * @param {InspectorPanel} inspector
+ * @return {String} The text displayed in the markup view
+ */
+function* getDisplayedNodeTextContent(selector, inspector) {
+  // We have to ensure that the textContent is displayed, for that the DOM
+  // Element has to be selected in the markup view and to be expanded.
+  yield selectNode(selector, inspector);
+
+  let container = yield getContainerForSelector(selector, inspector);
+  yield inspector.markup.expandNode(container.node);
+  yield waitForMultipleChildrenUpdates(inspector);
+  if (container) {
+    let textContainer = container.elt.querySelector("pre");
+    return textContainer.textContent;
+  }
+  return null;
 }

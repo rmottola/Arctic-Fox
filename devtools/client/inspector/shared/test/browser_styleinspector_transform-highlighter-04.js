@@ -36,7 +36,7 @@ add_task(function* () {
 
   info("Faking a mousemove on the overriden property");
   let {valueSpan} = getRuleViewProperty(view, "div", "transform");
-  hs.onMouseMove({target: valueSpan});
+  hs._onMouseMove({target: valueSpan});
   ok(!hs.highlighters[TYPE],
     "No highlighter was created for the overriden property");
 
@@ -48,13 +48,13 @@ add_task(function* () {
 
   info("Faking a mousemove on the disabled property");
   ({valueSpan} = getRuleViewProperty(view, ".test", "transform"));
-  hs.onMouseMove({target: valueSpan});
+  hs._onMouseMove({target: valueSpan});
   ok(!hs.highlighters[TYPE],
     "No highlighter was created for the disabled property");
 
   info("Faking a mousemove on the now unoverriden property");
   ({valueSpan} = getRuleViewProperty(view, "div", "transform"));
   let onHighlighterShown = hs.once("highlighter-shown");
-  hs.onMouseMove({target: valueSpan});
+  hs._onMouseMove({target: valueSpan});
   yield onHighlighterShown;
 });

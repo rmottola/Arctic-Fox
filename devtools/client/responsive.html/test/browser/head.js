@@ -31,6 +31,7 @@ Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/devtools/client/inspector/test/shared-head.js",
   this);
 
+const E10S_MULTI_ENABLED = Services.prefs.getIntPref("dom.ipc.processCount") > 1;
 const TEST_URI_ROOT = "http://example.com/browser/devtools/client/responsive.html/test/browser/";
 const OPEN_DEVICE_MODAL_VALUE = "OPEN_DEVICE_MODAL";
 
@@ -123,18 +124,42 @@ function waitForFrameLoad(ui, targetURL) {
 }
 
 function waitForViewportResizeTo(ui, width, height) {
-  return new Promise(resolve => {
+  return new Promise(Task.async(function* (resolve) {
+    let isSizeMatching = (data) => data.width == width && data.height == height;
+
+    // If the viewport has already the expected size, we resolve the promise immediately.
+    let size = yield getContentSize(ui);
+    if (isSizeMatching(size)) {
+      resolve();
+      return;
+    }
+
+    // Otherwise, we'll listen to both content's resize event and browser's load end;
+    // since a racing condition can happen, where the content's listener is added after
+    // the resize, because the content's document was reloaded; therefore the test would
+    // hang forever. See bug 1302879.
+    let browser = ui.getViewportBrowser();
+
     let onResize = (_, data) => {
-      if (data.width != width || data.height != height) {
+      if (!isSizeMatching(data)) {
         return;
       }
       ui.off("content-resize", onResize);
+      browser.removeEventListener("mozbrowserloadend", onBrowserLoadEnd);
       info(`Got content-resize to ${width} x ${height}`);
       resolve();
     };
+
+    let onBrowserLoadEnd = Task.async(function* () {
+      let data = yield getContentSize(ui);
+      onResize(undefined, data);
+    });
+
     info(`Waiting for content-resize to ${width} x ${height}`);
     ui.on("content-resize", onResize);
-  });
+    browser.addEventListener("mozbrowserloadend",
+      onBrowserLoadEnd, { once: true });
+  }));
 }
 
 var setViewportSize = Task.async(function* (ui, manager, width, height) {
@@ -237,17 +262,18 @@ function changeSelectValue({ toolWindow }, selector, value) {
   });
 }
 
-let switchDevice = Task.async(function* (ui, value) {
-  let changed = once(ui, "viewport-device-changed");
-  yield switchSelector(ui, ".viewport-device-selector", value);
-  yield changed;
-});
+const selectDevice = (ui, value) => Promise.all([
+  once(ui, "viewport-device-changed"),
+  changeSelectValue(ui, ".viewport-device-selector", value)
+]);
 
-let switchNetworkThrottling = Task.async(function* (ui, value) {
-  let changed = once(ui, "network-throttling-changed");
-  yield switchSelector(ui, "#global-network-throttling-selector", value);
-  yield changed;
-});
+const selectDPR = (ui, value) =>
+  changeSelectValue(ui, "#global-dpr-selector > select", value);
+
+const selectNetworkThrottling = (ui, value) => Promise.all([
+  once(ui, "network-throttling-changed"),
+  changeSelectValue(ui, "#global-network-throttling-selector", value)
+]);
 
 function getSessionHistory(browser) {
   return ContentTask.spawn(browser, {}, function* () {
@@ -271,6 +297,13 @@ function getSessionHistory(browser) {
     return result;
     /* eslint-enable no-undef */
   });
+}
+
+function getContentSize(ui) {
+  return spawnViewportTask(ui, {}, () => ({
+    width: content.screen.width,
+    height: content.screen.height
+  }));
 }
 
 function waitForPageShow(browser) {
