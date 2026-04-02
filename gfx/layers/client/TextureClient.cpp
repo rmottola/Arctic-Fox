@@ -1012,7 +1012,6 @@ TextureClient::CreateForDrawing(TextureForwarder* aAllocator,
   gfx::BackendType moz2DBackend = BackendTypeForBackendSelector(aLayersBackend, aSelector);
 
   // also test the validity of aAllocator
-  MOZ_ASSERT(aAllocator && aAllocator->IPCOpen());
   if (!aAllocator || !aAllocator->IPCOpen()) {
     return nullptr;
   }
@@ -1103,7 +1102,6 @@ TextureClient::CreateFromSurface(KnowsCompositor* aAllocator,
                                  TextureAllocationFlags aAllocFlags)
 {
   // also test the validity of aAllocator
-  MOZ_ASSERT(aAllocator && aAllocator->GetTextureForwarder()->IPCOpen());
   if (!aAllocator || !aAllocator->GetTextureForwarder()->IPCOpen()) {
     return nullptr;
   }
