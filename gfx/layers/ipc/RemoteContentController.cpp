@@ -263,6 +263,7 @@ void
 RemoteContentController::Destroy()
 {
   if (mCanSend) {
+    mCanSend = false;
     Unused << SendDestroy();
   }
 }
