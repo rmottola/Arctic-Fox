@@ -362,10 +362,6 @@ gfxWindowsPlatform::InitAcceleration()
   DeviceManagerDx::Init();
   DeviceManagerD3D9::Init();
 
-  // CanUseHardwareVideoDecoding depends on DeviceManagerDx state,
-  // so update the cached value now.
-  UpdateCanUseHardwareVideoDecoding();
-
   InitializeConfig();
   InitializeDevices();
   UpdateANGLEConfig();
@@ -375,6 +371,10 @@ gfxWindowsPlatform::InitAcceleration()
   if (!mDWriteFactory && GetDefaultContentBackend() == BackendType::SKIA) {
     InitDWriteSupport();
   }
+
+  // CanUseHardwareVideoDecoding depends on DeviceManagerDx state,
+  // so update the cached value now.
+  UpdateCanUseHardwareVideoDecoding();
 }
 
 bool
