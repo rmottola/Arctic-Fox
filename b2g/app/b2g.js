@@ -963,11 +963,6 @@ pref("dom.apps.reviewer_paths", "/reviewers/,/extension/reviewers/");
 // New implementation to unify touch-caret and selection-carets.
 pref("layout.accessiblecaret.enabled", true);
 
-// APZ on real devices supports long tap events.
-#ifdef MOZ_WIDGET_GONK
-pref("layout.accessiblecaret.use_long_tap_injector", false);
-#endif
-
 // The active caret is disallow to be dragged across the other (inactive) caret.
 pref("layout.accessiblecaret.allow_dragging_across_other_caret", false);
 
