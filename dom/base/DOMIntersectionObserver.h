@@ -30,13 +30,15 @@ public:
                                RefPtr<DOMRect> aRootBounds,
                                RefPtr<DOMRect> aBoundingClientRect,
                                RefPtr<DOMRect> aIntersectionRect,
-                               Element* aTarget)
+                               Element* aTarget,
+                               double aIntersectionRatio)
   : mOwner(aOwner),
     mTime(aTime),
     mRootBounds(aRootBounds),
     mBoundingClientRect(aBoundingClientRect),
     mIntersectionRect(aIntersectionRect),
-    mTarget(aTarget)
+    mTarget(aTarget),
+    mIntersectionRatio(aIntersectionRatio)
   {
   }
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
@@ -72,7 +74,10 @@ public:
     return mIntersectionRect;
   }
 
-  double IntersectionRatio();
+  double IntersectionRatio()
+  {
+    return mIntersectionRatio;
+  }
 
   Element* Target()
   {
@@ -86,6 +91,7 @@ protected:
   RefPtr<DOMRect>       mBoundingClientRect;
   RefPtr<DOMRect>       mIntersectionRect;
   RefPtr<Element>       mTarget;
+  double                mIntersectionRatio;
 };
 
 #define NS_DOM_INTERSECTION_OBSERVER_IID \
@@ -156,7 +162,8 @@ protected:
                                       DOMHighResTimeStamp time,
                                       const Maybe<nsRect>& aRootRect,
                                       const nsRect& aTargetRect,
-                                      const Maybe<nsRect>& aIntersectionRect);
+                                      const Maybe<nsRect>& aIntersectionRect,
+                                      double aIntersectionRatio);
 
   nsCOMPtr<nsPIDOMWindowInner>                    mOwner;
   RefPtr<mozilla::dom::IntersectionCallback>      mCallback;

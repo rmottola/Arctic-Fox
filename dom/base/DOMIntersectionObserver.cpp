@@ -26,15 +26,6 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(DOMIntersectionObserverEntry, mOwner,
                                       mRootBounds, mBoundingClientRect,
                                       mIntersectionRect, mTarget)
 
-double
-DOMIntersectionObserverEntry::IntersectionRatio()
-{
-  double targetArea = mBoundingClientRect->Width() * mBoundingClientRect->Height();
-  double intersectionArea = mIntersectionRect->Width() * mIntersectionRect->Height();
-  double intersectionRatio = targetArea > 0.0 ? intersectionArea / targetArea : 0.0;
-  return intersectionRatio;
-}
-
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(DOMIntersectionObserver)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
   NS_INTERFACE_MAP_ENTRY(nsISupports)
@@ -319,8 +310,25 @@ DOMIntersectionObserver::Update(nsIDocument* aDocument, DOMHighResTimeStamp time
     nsRect targetRect;
     Maybe<nsRect> intersectionRect;
 
-    if (rootFrame && targetFrame &&
-       (!mRoot || nsLayoutUtils::IsAncestorFrameCrossDoc(rootFrame, targetFrame))) {
+    if (rootFrame && targetFrame) {
+      // If mRoot is set we are testing intersection with a container element
+      // instead of the implicit root.
+      if (mRoot) {
+        // Skip further processing of this target if it is not in the same
+        // Document as the intersection root, e.g. if root is an element of
+        // the main document and target an element from an embedded iframe.
+        if (target->GetComposedDoc() != root->GetComposedDoc()) {
+          continue;
+        }
+        // Skip further processing of this target if is not a descendant of the
+        // intersection root in the containing block chain. E.g. this would be
+        // the case if the target is in a position:absolute element whose
+        // containing block is an ancestor of root.
+        if (!nsLayoutUtils::IsAncestorFrameCrossDoc(rootFrame, targetFrame)) {
+          continue;
+        }
+      }
+
       targetRect = nsLayoutUtils::GetAllInFlowRectsUnion(
         targetFrame,
         nsLayoutUtils::GetContainingBlockForClientRect(targetFrame),
@@ -386,7 +394,8 @@ DOMIntersectionObserver::Update(nsIDocument* aDocument, DOMHighResTimeStamp time
 
     size_t threshold = -1;
     if (intersectionRatio > 0.0) {
-      if (intersectionRatio == 1.0) {
+      if (intersectionRatio >= 1.0) {
+        intersectionRatio = 1.0;
         threshold = mThresholds.Length();
       } else {
         for (size_t k = 0; k < mThresholds.Length(); ++k) {
@@ -405,7 +414,7 @@ DOMIntersectionObserver::Update(nsIDocument* aDocument, DOMHighResTimeStamp time
       QueueIntersectionObserverEntry(
         target, time,
         isInSimilarOriginBrowsingContext ? Some(rootIntersectionRect) : Nothing(),
-        targetRect, intersectionRect
+        targetRect, intersectionRect, intersectionRatio
       );
     }
   }
@@ -416,7 +425,8 @@ DOMIntersectionObserver::QueueIntersectionObserverEntry(Element* aTarget,
                                                         DOMHighResTimeStamp time,
                                                         const Maybe<nsRect>& aRootRect,
                                                         const nsRect& aTargetRect,
-                                                        const Maybe<nsRect>& aIntersectionRect)
+                                                        const Maybe<nsRect>& aIntersectionRect,
+                                                        double aIntersectionRatio)
 {
   RefPtr<DOMRect> rootBounds;
   if (aRootRect.isSome()) {
@@ -435,7 +445,7 @@ DOMIntersectionObserver::QueueIntersectionObserverEntry(Element* aTarget,
     rootBounds.forget(),
     boundingClientRect.forget(),
     intersectionRect.forget(),
-    aTarget);
+    aTarget, aIntersectionRatio);
   mQueuedEntries.AppendElement(entry.forget());
 }
 
