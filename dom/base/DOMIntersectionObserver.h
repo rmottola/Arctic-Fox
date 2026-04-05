@@ -95,7 +95,9 @@ protected:
 class DOMIntersectionObserver final : public nsISupports,
                                       public nsWrapperCache
 {
-  virtual ~DOMIntersectionObserver() { }
+  virtual ~DOMIntersectionObserver() {
+    Disconnect();
+  }
 
 public:
   DOMIntersectionObserver(already_AddRefed<nsPIDOMWindowInner>&& aOwner,
@@ -136,7 +138,9 @@ public:
   void Observe(Element& aTarget);
   void Unobserve(Element& aTarget);
 
+  bool UnlinkTarget(Element& aTarget);
   void Disconnect();
+
   void TakeRecords(nsTArray<RefPtr<DOMIntersectionObserverEntry>>& aRetVal);
 
   mozilla::dom::IntersectionCallback* IntersectionCallback() { return mCallback; }
