@@ -1305,7 +1305,7 @@ PresShell::Destroy()
     mHiddenInvalidationObserverRefreshDriver->RemovePresShellToInvalidateIfHidden(this);
   }
 
-  if (rd->PresContext() == GetPresContext()) {
+  if (rd->GetPresContext() == GetPresContext()) {
     rd->RevokeViewManagerFlush();
   }
 
@@ -9013,7 +9013,7 @@ PresShell::Freeze()
 
   nsPresContext* presContext = GetPresContext();
   if (presContext &&
-      presContext->RefreshDriver()->PresContext() == presContext) {
+      presContext->RefreshDriver()->GetPresContext() == presContext) {
     presContext->RefreshDriver()->Freeze();
   }
 
@@ -9071,7 +9071,7 @@ PresShell::Thaw()
 {
   nsPresContext* presContext = GetPresContext();
   if (presContext &&
-      presContext->RefreshDriver()->PresContext() == presContext) {
+      presContext->RefreshDriver()->GetPresContext() == presContext) {
     presContext->RefreshDriver()->Thaw();
   }
 
@@ -10924,7 +10924,7 @@ PresShell::SetIsActive(bool aIsActive)
 
   nsPresContext* presContext = GetPresContext();
   if (presContext &&
-      presContext->RefreshDriver()->PresContext() == presContext) {
+      presContext->RefreshDriver()->GetPresContext() == presContext) {
     presContext->RefreshDriver()->SetThrottled(!mIsActive);
   }
 
@@ -11155,7 +11155,7 @@ nsIPresShell::FontSizeInflationEnabled()
 void
 PresShell::PausePainting()
 {
-  if (GetPresContext()->RefreshDriver()->PresContext() != GetPresContext())
+  if (GetPresContext()->RefreshDriver()->GetPresContext() != GetPresContext())
     return;
 
   mPaintingIsFrozen = true;
@@ -11165,7 +11165,7 @@ PresShell::PausePainting()
 void
 PresShell::ResumePainting()
 {
-  if (GetPresContext()->RefreshDriver()->PresContext() != GetPresContext())
+  if (GetPresContext()->RefreshDriver()->GetPresContext() != GetPresContext())
     return;
 
   mPaintingIsFrozen = false;
