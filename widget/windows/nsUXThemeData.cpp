@@ -243,7 +243,16 @@ struct THEMELIST {
 
 const THEMELIST knownThemes[] = {
   { L"aero.msstyles", WINTHEME_AERO },
-  { L"aerolite.msstyles", WINTHEME_AERO_LITE }
+  { L"aerolite.msstyles", WINTHEME_AERO_LITE },
+  { L"luna.msstyles", WINTHEME_LUNA },
+  { L"zune.msstyles", WINTHEME_ZUNE },
+  { L"royale.msstyles", WINTHEME_ROYALE }
+};
+
+const THEMELIST knownColors[] = {
+  { L"normalcolor", WINTHEMECOLOR_NORMAL },
+  { L"homestead",   WINTHEMECOLOR_HOMESTEAD },
+  { L"metallic",    WINTHEMECOLOR_METALLIC }
 };
 
 LookAndFeel::WindowsTheme
@@ -330,24 +339,57 @@ nsUXThemeData::UpdateNativeThemeInfo()
   if (theme == WINTHEME_UNRECOGNIZED)
     return;
 
-  // We're using the default theme if we're using any of Aero or Aero Lite.
-  // However, on Win8, GetCurrentThemeName (see above) returns
-  // AeroLite.msstyles for the 4 builtin high contrast themes as well. Those
+  // We're using the default theme if we're using any of Aero, Aero Lite, or
+  // luna. However, on Win8, GetCurrentThemeName (see above) returns
+  // AeroLite.msstyles for the 4 builtin highcontrast themes as well. Those
   // themes "don't count" as default themes, so we specifically check for high
   // contrast mode in that situation.
   if (!(IsWin8OrLater() && sIsHighContrastOn) &&
-      (theme == WINTHEME_AERO || theme == WINTHEME_AERO_LITE)) {
+      (theme == WINTHEME_AERO || theme == WINTHEME_AERO_LITE || theme == WINTHEME_LUNA)) {
     sIsDefaultWindowsTheme = true;
   }
 
-  switch(theme) {
-    case WINTHEME_AERO:
-      sThemeId = LookAndFeel::eWindowsTheme_Aero;
+  if (theme != WINTHEME_LUNA) {
+    switch(theme) {
+      case WINTHEME_AERO:
+        sThemeId = LookAndFeel::eWindowsTheme_Aero;
+        return;
+      case WINTHEME_AERO_LITE:
+        sThemeId = LookAndFeel::eWindowsTheme_AeroLite;
+        return;
+      case WINTHEME_ZUNE:
+        sThemeId = LookAndFeel::eWindowsTheme_Zune;
+        return;
+      case WINTHEME_ROYALE:
+        sThemeId = LookAndFeel::eWindowsTheme_Royale;
+        return;
+      default:
+        NS_WARNING("unhandled theme type.");
+        return;
+    }
+  }
+
+  // calculate the luna color scheme
+  WindowsThemeColor color = WINTHEMECOLOR_UNRECOGNIZED;
+  for (size_t i = 0; i < ArrayLength(knownColors); ++i) {
+    if (!lstrcmpiW(themeColor, knownColors[i].name)) {
+      color = (WindowsThemeColor)knownColors[i].type;
       break;
-    case WINTHEME_AERO_LITE:
-      sThemeId = LookAndFeel::eWindowsTheme_AeroLite;
-      break;
+    }
+  }
+
+  switch(color) {
+    case WINTHEMECOLOR_NORMAL:
+      sThemeId = LookAndFeel::eWindowsTheme_LunaBlue;
+      return;
+    case WINTHEMECOLOR_HOMESTEAD:
+      sThemeId = LookAndFeel::eWindowsTheme_LunaOlive;
+      return;
+    case WINTHEMECOLOR_METALLIC:
+      sThemeId = LookAndFeel::eWindowsTheme_LunaSilver;
+      return;
     default:
-      NS_WARNING("unhandled theme type.");
+      NS_WARNING("unhandled theme color.");
+      return;
   }
 }
