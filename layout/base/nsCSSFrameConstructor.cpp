@@ -10635,7 +10635,8 @@ nsCSSFrameConstructor::AddFCItemsForAnonymousContent(
       // If we don't have an explicit style context, that means we need the
       // ordinary computed values. Make sure we eagerly cascaded them when the
       // anonymous nodes were created.
-      MOZ_ASSERT_IF(content->IsStyledByServo(), content->HasServoData());
+      MOZ_ASSERT_IF(content->IsStyledByServo() && content->IsElement(),
+                    content->HasServoData());
       styleContext = ResolveStyleContext(aFrame, content, &aState);
     }
 
