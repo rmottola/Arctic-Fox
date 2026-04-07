@@ -183,8 +183,7 @@ var gEditItemOverlay = {
     if (this.initialized)
       this.uninitPanel(false);
 
-    let { itemId, itemGuid, isItem,
-          isURI, uri, title,
+    let { itemId, isItem, isURI,
           isBookmark, bulkTagging, uris,
           visibleRows, focusedElement } = this._setPaneInfo(aInfo);
 
@@ -614,7 +613,6 @@ var gEditItemOverlay = {
       return;
 
     if (!PlacesUIUtils.useAsyncTransactions) {
-      let itemId = this._paneInfo.itemId;
       let txn = new PlacesEditBookmarkURITransaction(this._paneInfo.itemId, newURI);
       PlacesUtils.transactionManager.doTransaction(txn);
       return;

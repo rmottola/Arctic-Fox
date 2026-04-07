@@ -946,8 +946,6 @@
             case "cmd_clearhistory":
               var param = this._self.getAttribute("autocompletesearchparam");
 
-              let searchBar = this._self.parentNode;
-
               BrowserSearch.searchBar.FormHistory.update({ op : "remove", fieldname : param }, null);
               this._self.value = "";
               break;

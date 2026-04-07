@@ -390,7 +390,7 @@ PlacesController.prototype = {
         return false;
 
       // unwrapNodes() will throw if the data blob is malformed.
-      var unwrappedNodes = PlacesUtils.unwrapNodes(data, type.value);
+      PlacesUtils.unwrapNodes(data, type.value);
       return this._view.insertionPoint != null;
     }
     catch (e) {
@@ -1597,7 +1597,6 @@ var PlacesControllerDragHelper = {
                data.ownerGlobal instanceof ChromeWindow) {
         let uri = data.linkedBrowser.currentURI;
         let spec = uri ? uri.spec : "about:blank";
-        let title = data.label;
         unwrapped = { uri: spec,
                       title: data.label,
                       type: PlacesUtils.TYPE_X_MOZ_URL};
@@ -1734,4 +1733,3 @@ function goDoPlacesCommand(aCommand)
   if (controller && controller.isCommandEnabled(aCommand))
     controller.doCommand(aCommand);
 }
-
