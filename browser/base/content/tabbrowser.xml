@@ -570,18 +570,18 @@
             // count of open requests (should always be 0 or 1)
             mRequestCount: 0,
 
-            destroy: function () {
+            destroy: function() {
               delete this.mTab;
               delete this.mBrowser;
               delete this.mTabBrowser;
             },
 
-            _callProgressListeners: function () {
+            _callProgressListeners: function() {
               Array.unshift(arguments, this.mBrowser);
               return this.mTabBrowser._callProgressListeners.apply(this.mTabBrowser, arguments);
             },
 
-            _shouldShowProgress: function (aRequest) {
+            _shouldShowProgress: function(aRequest) {
               if (this.mBlank)
                 return false;
 
@@ -598,9 +598,9 @@
               return true;
             },
 
-            onProgressChange: function (aWebProgress, aRequest,
-                                        aCurSelfProgress, aMaxSelfProgress,
-                                        aCurTotalProgress, aMaxTotalProgress) {
+            onProgressChange: function(aWebProgress, aRequest,
+                                       aCurSelfProgress, aMaxSelfProgress,
+                                       aCurTotalProgress, aMaxTotalProgress) {
               this.mTotalProgress = aMaxTotalProgress ? aCurTotalProgress / aMaxTotalProgress : 0;
 
               if (!this._shouldShowProgress(aRequest))
@@ -615,15 +615,15 @@
                                            aCurTotalProgress, aMaxTotalProgress]);
             },
 
-            onProgressChange64: function (aWebProgress, aRequest,
-                                          aCurSelfProgress, aMaxSelfProgress,
-                                          aCurTotalProgress, aMaxTotalProgress) {
+            onProgressChange64: function(aWebProgress, aRequest,
+                                         aCurSelfProgress, aMaxSelfProgress,
+                                         aCurTotalProgress, aMaxTotalProgress) {
               return this.onProgressChange(aWebProgress, aRequest,
                 aCurSelfProgress, aMaxSelfProgress, aCurTotalProgress,
                 aMaxTotalProgress);
             },
 
-            onStateChange: function (aWebProgress, aRequest, aStateFlags, aStatus) {
+            onStateChange: function(aWebProgress, aRequest, aStateFlags, aStatus) {
               if (!aRequest)
                 return;
 
@@ -764,8 +764,8 @@
               this.mStatus = aStatus;
             },
 
-            onLocationChange: function (aWebProgress, aRequest, aLocation,
-                                        aFlags) {
+            onLocationChange: function(aWebProgress, aRequest, aLocation,
+                                       aFlags) {
               // OnLocationChange is called for both the top-level content
               // and the subframes.
               let topLevel = aWebProgress.isTopLevel;
@@ -845,7 +845,7 @@
               }
             },
 
-            onStatusChange: function (aWebProgress, aRequest, aStatus, aMessage) {
+            onStatusChange: function(aWebProgress, aRequest, aStatus, aMessage) {
               if (this.mBlank)
                 return;
 
@@ -855,17 +855,17 @@
               this.mMessage = aMessage;
             },
 
-            onSecurityChange: function (aWebProgress, aRequest, aState) {
+            onSecurityChange: function(aWebProgress, aRequest, aState) {
               this._callProgressListeners("onSecurityChange",
                                           [aWebProgress, aRequest, aState]);
             },
 
-            onRefreshAttempted: function (aWebProgress, aURI, aDelay, aSameURI) {
+            onRefreshAttempted: function(aWebProgress, aURI, aDelay, aSameURI) {
               return this._callProgressListeners("onRefreshAttempted",
                                                  [aWebProgress, aURI, aDelay, aSameURI]);
             },
 
-            QueryInterface: function (aIID) {
+            QueryInterface: function(aIID) {
               if (aIID.equals(Components.interfaces.nsIWebProgressListener) ||
                   aIID.equals(Components.interfaces.nsIWebProgressListener2) ||
                   aIID.equals(Components.interfaces.nsISupportsWeakReference) ||
@@ -1708,13 +1708,17 @@
               return false;
             }
 
+            let tab = this.getTabForBrowser(aBrowser);
+            let evt = document.createEvent("Events");
+            evt.initEvent("BeforeTabRemotenessChange", true, false);
+            tab.dispatchEvent(evt);
+
             let wasActive = document.activeElement == aBrowser;
 
             // Unmap the old outerWindowID.
             this._outerWindowIDBrowserMap.delete(aBrowser.outerWindowID);
 
             // Unhook our progress listener.
-            let tab = this.getTabForBrowser(aBrowser);
             let filter = this._tabFilters.get(tab);
             let listener = this._tabListeners.get(tab);
             aBrowser.webProgress.removeProgressListener(filter);
@@ -1819,7 +1823,7 @@
               this.getFindBar(tab).browser = aBrowser;
             }
 
-            let evt = document.createEvent("Events");
+            evt = document.createEvent("Events");
             evt.initEvent("TabRemotenessChange", true, false);
             tab.dispatchEvent(evt);
 
@@ -2206,7 +2210,7 @@
                           Services.prefs.getBoolPref("browser.tabs.animate");
             if (!animate) {
               t.setAttribute("fadein", "true");
-              setTimeout(function (tabContainer) {
+              setTimeout(function(tabContainer) {
                 tabContainer._handleNewTab(t);
               }, 0, this.tabContainer);
             }
@@ -2302,7 +2306,7 @@
             }
 
             if (animate) {
-              requestAnimationFrame(function () {
+              requestAnimationFrame(function() {
                 this.tabContainer._handleTabTelemetryStart(t, aURI);
 
                 // kick the animation off
@@ -2508,7 +2512,7 @@
               this.tabContainer.adjustTabstrip();
             }
 
-            setTimeout(function (tab, tabbrowser) {
+            setTimeout(function(tab, tabbrowser) {
               if (tab.parentNode &&
                   window.getComputedStyle(tab).maxWidth == "0.1px") {
                 NS_ASSERT(false, "Giving up waiting for the tab closing animation to finish (bug 608589)");
@@ -3178,7 +3182,7 @@
           <![CDATA[
           if (gNavToolbox.collapsed) {
             return this.mTabBox.selectedTab;
-          }         
+          }
           // Update the tab
           this.mTabBox.selectedTab = val;
           return val;
@@ -4163,7 +4167,7 @@
              * timing.
              */
 
-            startTabSwitch: function () {
+            startTabSwitch: function() {
               TelemetryStopwatch.cancel("FX_TAB_SWITCH_TOTAL_E10S_MS", window);
               TelemetryStopwatch.start("FX_TAB_SWITCH_TOTAL_E10S_MS", window);
               this.addMarker("AsyncTabSwitch:Start");
@@ -4176,7 +4180,7 @@
              * are hidden). This checks to make sure all conditions are
              * satisfied, and then records the tab switch as finished.
              */
-            maybeFinishTabSwitch: function () {
+            maybeFinishTabSwitch: function() {
               if (this.switchInProgress && this.requestedTab &&
                   this.getTabState(this.requestedTab) == this.STATE_LOADED) {
                 // After this point the tab has switched from the content thread's point of view.
@@ -4196,13 +4200,13 @@
               }
             },
 
-            spinnerDisplayed: function () {
+            spinnerDisplayed: function() {
               this.assert(!this.spinnerTab);
               TelemetryStopwatch.start("FX_TAB_SWITCH_SPINNER_VISIBLE_MS", window);
               this.addMarker("AsyncTabSwitch:SpinnerShown");
             },
 
-            spinnerHidden: function () {
+            spinnerHidden: function() {
               this.assert(this.spinnerTab);
               this.log("DEBUG: spinner time = " +
                        TelemetryStopwatch.timeElapsed("FX_TAB_SWITCH_SPINNER_VISIBLE_MS", window));
@@ -4225,7 +4229,7 @@
             _useDumpForLogging: false,
             _logInit: false,
 
-            logging: function () {
+            logging: function() {
               if (this._useDumpForLogging)
                 return true;
               if (this._logInit)
@@ -5924,7 +5928,7 @@
 
           if (!this._animateElement.hasAttribute("notifybgtab")) {
             this._animateElement.setAttribute("notifybgtab", "true");
-            setTimeout(function (ele) {
+            setTimeout(function(ele) {
               ele.removeAttribute("notifybgtab");
             }, 150, this._animateElement);
           }
