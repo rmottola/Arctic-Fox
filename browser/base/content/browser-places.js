@@ -1618,7 +1618,7 @@ var BookmarkingUI = {
       }
 
       delete this._pendingStmt;
-    }, this);
+    });
   },
 
   _updateStar: function BUI__updateStar() {
