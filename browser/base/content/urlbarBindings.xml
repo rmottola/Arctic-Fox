@@ -67,9 +67,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         this.timeout = this._prefs.getIntPref("delay");
         this._formattingEnabled = this._prefs.getBoolPref("formatting.enabled");
         this._mayTrimURLs = this._prefs.getBoolPref("trimURLs");
-        this._userMadeSearchSuggestionsChoice =
-          this._prefs.getBoolPref("userMadeSearchSuggestionsChoice");
-
+        this._cacheUserMadeSearchSuggestionsChoice();
         this.inputField.controllers.insertControllerAt(0, this._copyCutController);
         this.inputField.addEventListener("paste", this, false);
         this.inputField.addEventListener("mousedown", this, false);
@@ -792,8 +790,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 this._formattingEnabled = this._prefs.getBoolPref(aData);
                 break;
               case "userMadeSearchSuggestionsChoice":
-                this._userMadeSearchSuggestionsChoice =
-                  this._prefs.getBoolPref(aData);
+              case "suggest.searches":
+                this._cacheUserMadeSearchSuggestionsChoice();
+                if (this._userMadeSearchSuggestionsChoice) {
+                  this.popup.searchSuggestionsNotificationWasDismissed(
+                    this._prefs.getBoolPref("suggest.searches")
+                  );
+                }
                 break;
               case "trimURLs":
                 this._mayTrimURLs = this._prefs.getBoolPref(aData);
@@ -1019,18 +1022,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         false
       ]]></field>
 
-      <method name="_maybeShowSearchSuggestionsNotification">
+      <method name="_cacheUserMadeSearchSuggestionsChoice">
         <body><![CDATA[
-          let showNotification =
-            !this._userMadeSearchSuggestionsChoice &&
-            // When _urlbarFocused is true, tabbrowser would close the popup if
-            // it's opened here, so don't show the notification.
-            !gBrowser.selectedBrowser._urlbarFocused &&
-            Services.prefs.getBoolPref("browser.search.suggest.enabled") &&
-            this._prefs.getBoolPref("unifiedcomplete");
-          if (showNotification) {
-            this.popup.showSearchSuggestionsNotification(this, this);
-          }
+          this._userMadeSearchSuggestionsChoice =
+            this._prefs.getBoolPref("userMadeSearchSuggestionsChoice") ||
+            this._prefs.getBoolPref("suggest.searches");
         ]]></body>
       </method>
 
@@ -1064,7 +1060,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         if (event.originalTarget == this.inputField) {
           this._hideURLTooltip();
           this.formatValue();
-          this._maybeShowSearchSuggestionsNotification();
         }
       ]]></handler>
 
