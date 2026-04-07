@@ -525,6 +525,13 @@ nsFormFillController::SetTextValue(const nsAString & aTextValue)
 }
 
 NS_IMETHODIMP
+nsFormFillController::SetTextValueWithReason(const nsAString & aTextValue,
+                                             uint16_t aReason)
+{
+  return SetTextValue(aTextValue);
+}
+
+NS_IMETHODIMP
 nsFormFillController::GetSelectionStart(int32_t *aSelectionStart)
 {
   if (mFocusedInput)
