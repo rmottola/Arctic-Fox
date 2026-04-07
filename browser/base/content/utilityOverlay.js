@@ -397,7 +397,7 @@ function openLinkIn(url, where, params) {
     loadInBackground = !loadInBackground;
     // fall through
   case "tab":
-    w.gBrowser.loadOneTab(url, {
+    let tabUsedForLoad = w.gBrowser.loadOneTab(url, {
       referrerURI: aReferrerURI,
       referrerPolicy: aReferrerPolicy,
       charset: aCharset,
