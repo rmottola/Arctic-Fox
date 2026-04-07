@@ -1633,15 +1633,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         event.preventDefault();
       ]]></handler>
 
-      <handler event="mousedown"><![CDATA[
-        // Required to make the xul:label.text-link elements in the search
-        // suggestions notification work correctly when clicked on Linux.
-        // This is copied from the mousedown handler in
-        // browser-search-autocomplete-result-popup, which apparently had a
-        // similar problem.
-        event.preventDefault();
-      ]]></handler>
-
     </handlers>
   </binding>
 
