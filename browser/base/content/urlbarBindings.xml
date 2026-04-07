@@ -1178,7 +1178,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           // Check for unmodified left-click, and use default behavior
           if (aEvent.button == 0 && !aEvent.shiftKey && !aEvent.ctrlKey &&
               !aEvent.altKey && !aEvent.metaKey) {
-            controller.handleEnter(true);
+            controller.handleEnter(true, aEvent);
             return;
           }
 
