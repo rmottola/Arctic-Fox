@@ -123,7 +123,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
       <field name="_value">""</field>
       <field name="gotResultForCurrentQuery">false</field>
-      <field name="handleEnterWhenGotResult">false</field>
+
+      <!--
+        This is set around HandleHenter so it can be used in handleCommand.
+        It is also used to track whether we must handle a delayed handleEnter,
+        by checking if it has been cleared.
+      -->
+      <field name="handleEnterInstance">null</field>
 
       <!--
         For performance reasons we want to limit the size of the text runs we
@@ -1000,11 +1006,22 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           // However, if the default result is automatically selected, we
           // ensure that it corresponds to the current input.
 
-          if (this.popup.selectedIndex != 0 || this.gotResultForCurrentQuery) {
-            return this.mController.handleEnter(false);
-          }
+          // Store the current search string so it can be used in
+          // handleCommand, which will be called as a result of
+          // mController.handleEnter().
+          // Note this is also used to detect if we should perform a delayed
+          // handleEnter, in such a case it won't have been cleared.
+          this.handleEnterInstance = {
+            searchString: this.mController.searchString,
+            event: event
+          };
 
-          this.handleEnterWhenGotResult = true;
+          if (this.popup.selectedIndex != 0 || this.gotResultForCurrentQuery) {
+            this.maybeCanonizeURL(event, this.value);
+            let rv = this.mController.handleEnter(false, event);
+            this.handleEnterInstance = null;
+            return rv;
+          }
 
           return true;
         ]]></body>
@@ -1562,16 +1579,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             // If nothing is selected yet, select the first result if it is a
             // pre-selected "heuristic" result.  (See UnifiedComplete.js.)
             if (this.selectedIndex == -1 && this._isFirstResultHeuristic) {
-              // Don't handle this as a user-initiated action.
-              this._ignoreNextSelect = true;
-
               // Don't fire DOMMenuItemActive so that screen readers still see
               // the input as being focused.
               this.richlistbox.suppressMenuItemEvent = true;
-
               this.selectedIndex = 0;
               this.richlistbox.suppressMenuItemEvent = false;
-              this._ignoreNextSelect = false;
             }
 
             this.input.gotResultForCurrentQuery = true;
@@ -1593,6 +1605,23 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             }
           ]]>
         </body>
+      </method>
+
+      <method name="_onSearchBegin">
+        <body><![CDATA[
+          // Set the selected index to 0 (heuristic) until a result comes back
+          // and we can evaluate it better.
+          //
+          // This is required to properly manage delayed handleEnter:
+          // 1. if a search starts we set selectedIndex to 0 here, and it will
+          //    be updated by onResultsAdded. Since selectedIndex is 0,
+          //    handleEnter will delay the action if a result didn't arrive yet.
+          // 2. if a search doesn't start (for example if autocomplete is
+          //    disabled), this won't be called, and the selectedIndex will be
+          //    the default -1 value. Then handleEnter will know it should not
+          //    delay the action, cause a result wont't ever arrive.
+          this.selectedIndex = 0;
+        ]]></body>
       </method>
 
     </implementation>
