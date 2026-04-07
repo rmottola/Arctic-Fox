@@ -493,9 +493,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           let params = {
             postData: postData,
             allowThirdPartyFixup: true,
-            currentBrowser: browser,
           };
           if (openUILinkWhere == "current") {
+            params.targetBrowser = browser;
             params.indicateErrorPageLoad = true;
             params.allowPinnedTabHostChange = true;
             params.disallowInheritPrincipal = !mayInheritPrincipal;
