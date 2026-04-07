@@ -365,6 +365,19 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           }
 
           let where = openUILinkWhere;
+          if (!where) {
+            if (isMouseEvent) {
+              where = whereToOpenLink(event, false, false);
+            } else {
+              // If the current tab is empty, ignore Alt+Enter (reuse this tab)
+              let altEnter = !isMouseEvent &&
+                             event &&
+                             event.altKey &&
+                             !isTabEmpty(gBrowser.selectedTab);
+              where = altEnter ? "tab" : "current";
+            }
+          }
+
           let url = this.value;
           if (!url) {
             return;
