@@ -528,10 +528,6 @@ TagAutoCompleteResult.prototype = {
     return this._results.length;
   },
 
-  get typeAheadResult() {
-    return false;
-  },
-
   /**
    * Get the value of the result at the given index
    */
