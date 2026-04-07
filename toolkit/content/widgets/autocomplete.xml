@@ -2009,6 +2009,7 @@ extends="chrome://global/content/bindings/popup.xml#popup">
           // Show the domain as the title if we don't have a title.
           if (!title) {
             title = displayUrl;
+            titleLooksLikeUrl = true;
             try {
               let uri = Services.io.newURI(originalUrl, null, null);
               // Not all valid URLs have a domain.

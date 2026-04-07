@@ -428,7 +428,9 @@ splitmenu {
 }
 
 /* Always show URLs LTR. */
-.ac-url-text:-moz-locale-dir(rtl) {
+.ac-url-text:-moz-locale-dir(rtl),
+.ac-title-text[lookslikeurl]:-moz-locale-dir(rtl) {
+  direction: ltr !important;
 }
 
 /* For non-action items, hide the action text; for action items, hide the URL
