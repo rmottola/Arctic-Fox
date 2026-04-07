@@ -1129,9 +1129,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                .getService(Ci.nsIClipboard)
                .supportsSelectionClipboard())
           return;
-        
-        // Check if this selection was actually user-generated, and exit if not
-        // to prevent copying the selection (e.g autofill) to clipboard/primary
+
         if (!window.QueryInterface(Ci.nsIInterfaceRequestor)
                    .getInterface(Ci.nsIDOMWindowUtils)
                    .isHandlingUserInput)
@@ -2545,13 +2543,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         if (this.getAttribute("active") != "true") {
           this.setAttribute("active", "true");
 
-          let event = document.createEvent("Events");
-          event.initEvent("DOMMenuItemActive", true, false);
-          this.dispatchEvent(event);
+          let menuItemActiveEvent = document.createEvent("Events");
+          menuItemActiveEvent.initEvent("DOMMenuItemActive", true, false);
+          this.dispatchEvent(menuItemActiveEvent);
 
           if (this.getAttribute("disabled") != "true") {
             let self = this;
-            setTimeout(function () {
+            setTimeout(function() {
               if (self.getAttribute("active") == "true")
                 self.menu.open = true;
             }, this._menuDelay);
