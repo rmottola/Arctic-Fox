@@ -1035,7 +1035,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           // a backspace on the text value instead of removing the result.
           if (this.popup.selectedIndex == 0 &&
               this.popup._isFirstResultHeuristic) {
-            return this.mController.handleText();
+            this.mController.handleText();
+            return false;
           }
           return this.mController.handleDelete();
         ]]></body>

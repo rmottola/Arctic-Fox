@@ -200,8 +200,9 @@ nsAutoCompleteController::StartSearch(const nsAString &aSearchString)
 }
 
 NS_IMETHODIMP
-nsAutoCompleteController::HandleText()
+nsAutoCompleteController::HandleText(bool *_retval)
 {
+  *_retval = false;
   // Note: the events occur in the following order when IME is used.
   // 1. a compositionstart event(HandleStartComposition)
   // 2. some input events (HandleText), eCompositionState_Composing
@@ -304,6 +305,7 @@ nsAutoCompleteController::HandleText()
     return NS_OK;
   }
 
+  *_retval = true;
   StartSearches();
 
   return NS_OK;
@@ -614,7 +616,8 @@ nsAutoCompleteController::HandleDelete(bool *_retval)
   input->GetPopupOpen(&isOpen);
   if (!isOpen || mRowCount <= 0) {
     // Nothing left to delete, proceed as normal
-    HandleText();
+    bool unused = false;
+    HandleText(&unused);
     return NS_OK;
   }
 
@@ -625,7 +628,8 @@ nsAutoCompleteController::HandleDelete(bool *_retval)
   popup->GetSelectedIndex(&index);
   if (index == -1) {
     // No row is selected in the list
-    HandleText();
+    bool unused = false;
+    HandleText(&unused);
     return NS_OK;
   }
 
@@ -1184,7 +1188,7 @@ nsAutoCompleteController::StartSearch(uint16_t aSearchType)
     nsAutoString searchParam;
     nsresult rv = input->GetSearchParam(searchParam);
     if (NS_FAILED(rv))
-        return rv;
+      return rv;
 
     // FormFill expects the searchParam to only contain the input element id,
     // other consumers may have other expectations, so this modifies it only
@@ -1609,6 +1613,10 @@ nsAutoCompleteController::ProcessResult(int32_t aSearchIndex, nsIAutoCompleteRes
       }
     }
 
+    // Try to autocomplete the default index for this search.
+    // Do this before invalidating so the binding knows about it.
+    CompleteDefaultIndex(aSearchIndex);
+
     // Refresh the popup view to display the new search results
     nsCOMPtr<nsIAutoCompletePopup> popup;
     input->GetPopup(getter_AddRefs(popup));
@@ -1626,10 +1634,9 @@ nsAutoCompleteController::ProcessResult(int32_t aSearchIndex, nsIAutoCompleteRes
     } else if (mSearchesOngoing == 0) {
       ClosePopup();
     }
-  }
 
-  if (searchResult == nsIAutoCompleteResult::RESULT_SUCCESS ||
-      searchResult == nsIAutoCompleteResult::RESULT_SUCCESS_ONGOING) {
+  } else if (searchResult == nsIAutoCompleteResult::RESULT_SUCCESS ||
+             searchResult == nsIAutoCompleteResult::RESULT_SUCCESS_ONGOING) {
     // Try to autocomplete the default index for this search.
     CompleteDefaultIndex(aSearchIndex);
   }
@@ -1718,10 +1725,11 @@ nsAutoCompleteController::CompleteDefaultIndex(int32_t aResultIndex)
     return NS_OK;
 
   nsAutoString resultValue;
-  if (NS_SUCCEEDED(GetDefaultCompleteValue(aResultIndex, true, resultValue)))
+  if (NS_SUCCEEDED(GetDefaultCompleteValue(aResultIndex, true, resultValue))) {
     CompleteValue(resultValue);
 
-  mDefaultIndexCompleted = true;
+    mDefaultIndexCompleted = true;
+  }
 
   return NS_OK;
 }
