@@ -1038,15 +1038,15 @@ BookmarkExporter.prototype = {
 
   _converterOut: null,
 
-  _write: function (aText) {
+  _write: function(aText) {
     this._converterOut.writeString(aText || "");
   },
 
-  _writeAttribute: function (aName, aValue) {
+  _writeAttribute: function(aName, aValue) {
     this._write(' ' +  aName + '="' + aValue + '"');
   },
 
-  _writeLine: function (aText) {
+  _writeLine: function(aText) {
     if (Services.sysinfo.getProperty("name") == "Windows_NT") {
       // Write CRLF line endings on Windows
       this._write(aText + "\r\n");
@@ -1055,7 +1055,7 @@ BookmarkExporter.prototype = {
     }
   },
 
-  _writeHeader: function () {
+  _writeHeader: function() {
     this._writeLine("<!DOCTYPE NETSCAPE-Bookmark-file-1>");
     this._writeLine("<!-- This is an automatically generated file.");
     this._writeLine("     It will be read and overwritten.");
