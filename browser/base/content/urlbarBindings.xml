@@ -933,13 +933,21 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         ]]></body>
       </method>
 
-      <field name="_noActionKeys"><![CDATA[
-        [
-          KeyEvent.DOM_VK_ALT,
-          KeyEvent.DOM_VK_SHIFT,
-          KeyEvent.DOM_VK_META,
-        ]
-      ]]></field>
+      <property name="_noActionKeys" readonly="true">
+        <getter><![CDATA[
+          if (!this.__noActionKeys) {
+            this.__noActionKeys = new Set([
+              KeyEvent.DOM_VK_ALT,
+              KeyEvent.DOM_VK_SHIFT,
+            ]);
+            let modifier = this.AppConstants.platform == "macosx" ?
+                           KeyEvent.DOM_VK_META :
+                           KeyEvent.DOM_VK_CONTROL;
+            this.__noActionKeys.add(modifier);
+          }
+          return this.__noActionKeys;
+        ]]></getter>
+      </property>
 
       <field name="_pressedNoActionKeys"><![CDATA[
         new Set()
@@ -1031,24 +1039,22 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
     <handlers>
       <handler event="keydown"><![CDATA[
-        if ((event.keyCode === KeyEvent.DOM_VK_ALT ||
-             event.keyCode === KeyEvent.DOM_VK_SHIFT) &&
+        if (this._noActionKeys.has(event.keyCode) &&
             this.popup.selectedIndex >= 0 &&
-            !this._noActionsKeys.has(event.keyCode)) {
-          if (this._noActionsKeys.size == 0) {
+            !this._pressedNoActionKeys.has(event.keyCode)) {
+          if (this._pressedNoActionKeys.size == 0) {
             this.popup.setAttribute("noactions", "true");
             this.removeAttribute("actiontype");
           }
-          this._noActionsKeys.add(event.keyCode);
+          this._pressedNoActionKeys.add(event.keyCode);
         }
       ]]></handler>
 
       <handler event="keyup"><![CDATA[
-        if ((event.keyCode === KeyEvent.DOM_VK_ALT ||
-             event.keyCode === KeyEvent.DOM_VK_SHIFT) &&
-            this._noActionsKeys.has(event.keyCode)) {
-          this._noActionsKeys.delete(event.keyCode);
-          if (this._noActionsKeys.size == 0)
+        if (this._noActionKeys.has(event.keyCode) &&
+            this._pressedNoActionKeys.has(event.keyCode)) {
+          this._pressedNoActionKeys.delete(event.keyCode);
+          if (this._pressedNoActionKeys.size == 0)
             this._clearNoActions();
         }
       ]]></handler>
@@ -1500,60 +1506,14 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         </body>
       </method>
 
-      <method name="onPopupClick">
+      <!-- This handles keypress changes to the selection among the one-off
+           search buttons and between the one-offs and the listbox.  It returns
+           true if the keypress was consumed and false if not. -->
+      <method name="handleKeyPress">
         <parameter name="aEvent"/>
-        <body>
-          <![CDATA[
-          // Ignore right-clicks
-          if (aEvent.button == 2)
-            return;
-
-          var controller = this.view.QueryInterface(Components.interfaces.nsIAutoCompleteController);
-
-          // Check for unmodified left-click, and use default behavior
-          if (aEvent.button == 0 && !aEvent.shiftKey && !aEvent.ctrlKey &&
-              !aEvent.altKey && !aEvent.metaKey) {
-            controller.handleEnter(true);
-            return;
-          }
-
-          // Check for middle-click or modified clicks on the URL bar
-          if (gURLBar && this.mInput == gURLBar) {
-            var url = controller.getValueAt(this.selectedIndex);
-            var options = {};
-
-            // close the autocomplete popup and revert the entered address
-            this.closePopup();
-            controller.handleEscape();
-
-            // Check if this is meant to be an action
-            let action = this.mInput._parseActionUrl(url);
-            if (action) {
-              // TODO (bug 1054816): Centralise the implementation of actions
-              // into a JS module.
-              switch (action.type) {
-                case "switchtab": // Fall through.
-                case "keyword": // Fall through.
-                case "visiturl": {
-                  url = action.params.url;
-                  break;
-                }
-                case "searchengine": {
-                  [url, options.postData] =
-                    this.input._parseAndRecordSearchEngineAction(action);
-                  break;
-                }
-                default: {
-                  return;
-                }
-              }
-            }
-
-            // respect the usual clicking subtleties
-            openUILink(url, aEvent, options);
-          }
-        ]]>
-        </body>
+        <body><![CDATA[
+          return aEvent.defaultPrevented;
+        ]]></body>
       </method>
 
       <method name="createResultLabel">
