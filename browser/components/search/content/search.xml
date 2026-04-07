@@ -403,6 +403,7 @@
           }
           else if (aShowOnlySettingsIfEmpty) {
             this.setAttribute("showonlysettings", "true");
+          }
         ]]></body>
       </method>
 
