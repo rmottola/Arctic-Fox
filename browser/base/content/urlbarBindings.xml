@@ -1136,7 +1136,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
   </binding>
 
-  <!-- Note: this binding is applied to the autocomplete popup used in the Search bar and in web page content -->
+  <!-- Note: this binding is applied to the autocomplete popup used in web page content and extended in search.xml for the searchbar. -->
   <binding id="browser-autocomplete-result-popup" extends="chrome://global/content/bindings/autocomplete.xml#autocomplete-result-popup">
     <implementation>
       <field name="AppConstants" readonly="true">
@@ -1166,6 +1166,15 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
           var controller = this.view.QueryInterface(Components.interfaces.nsIAutoCompleteController);
 
+          var searchBar = BrowserSearch.searchBar;
+          var popupForSearchBar = searchBar && searchBar.textbox == this.mInput;
+          if (popupForSearchBar) {
+            searchBar.telemetrySearchDetails = {
+              index: controller.selection.currentIndex,
+              kind: "mouse"
+            };
+          }
+
           // Check for unmodified left-click, and use default behavior
           if (aEvent.button == 0 && !aEvent.shiftKey && !aEvent.ctrlKey &&
               !aEvent.altKey && !aEvent.metaKey) {
@@ -1174,8 +1183,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           }
 
           // Check for middle-click or modified clicks on the search bar
-          var searchBar = BrowserSearch.searchBar;
-          if (searchBar && searchBar.textbox == this.mInput) {
+          if (popupForSearchBar) {
             // Handle search bar popup clicks
             var search = controller.getValueAt(this.selectedIndex);
 
