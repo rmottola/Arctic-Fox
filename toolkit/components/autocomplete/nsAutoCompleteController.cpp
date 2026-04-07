@@ -1466,7 +1466,7 @@ nsAutoCompleteController::EnterMatch(bool aIsPopupSelection,
         // differs from the user-facing value.
         nsAutoString finalValue;
         GetResultValueAt(mCompletedSelectionIndex, true, finalValue);
-        if (!finalValue.Equals(inputValue)) {
+        if (!inputValue.Equals(finalValue)) {
           value = finalValue;
         }
         // Note that if the user opens the popup, mouses over entries without

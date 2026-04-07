@@ -1254,6 +1254,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         document.getAnonymousElementByAttribute(this, "anonid", "footer");
       </field>
 
+      <field name="_overrideValue">null</field>
+      <property name="overrideValue"
+                onget="return this._overrideValue;"
+                onset="this._overrideValue = val; return val;"/>
+
       <method name="dismissSearchSuggestionsNotification">
         <parameter name="enableSuggestions"/>
         <body><![CDATA[
@@ -1573,7 +1578,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               // Don't fire DOMMenuItemActive so that screen readers still see
               // the input as being focused.
               this.richlistbox.suppressMenuItemEvent = true;
-              this.selectedIndex = 0;
+              this.input.controller.setInitiallySelectedIndex(0);
               this.richlistbox.suppressMenuItemEvent = false;
             }
 
@@ -1611,7 +1616,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           //    disabled), this won't be called, and the selectedIndex will be
           //    the default -1 value. Then handleEnter will know it should not
           //    delay the action, cause a result wont't ever arrive.
-          this.selectedIndex = 0;
+          this.input.controller.setInitiallySelectedIndex(0);
+          this.overrideValue = null;
         ]]></body>
       </method>
 
