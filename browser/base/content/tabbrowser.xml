@@ -4741,6 +4741,7 @@
                                           disableSetDesktopBackground: data.disableSetDesktopBg,
                                           loginFillInfo: data.loginFillInfo,
                                           parentAllowsMixedContent: data.parentAllowsMixedContent,
+                                          userContextId: data.userContextId,
                                         };
               let popup = browser.ownerDocument.getElementById("contentAreaContextMenu");
               let event = gContextMenuContentData.event;
