@@ -42,6 +42,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         </xul:hbox>
         <xul:dropmarker anonid="historydropmarker"
                         class="autocomplete-history-dropmarker urlbar-history-dropmarker"
+                        tooltiptext="&urlbar.openHistoryPopup.tooltip;"
                         allowevents="true"
                         xbl:inherits="open,enablehistory,parentfocused=focused"/>
         <children includes="hbox"/>
