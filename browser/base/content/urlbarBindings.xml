@@ -77,7 +77,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         this.inputField.addEventListener("overflow", this, false);
         this.inputField.addEventListener("underflow", this, false);
 
-        const kXULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
         var textBox = document.getAnonymousElementByAttribute(this,
                                                 "anonid", "textbox-input-box");
         var cxmenu = document.getAnonymousElementByAttribute(textBox,
@@ -1287,6 +1286,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       <method name="dismissSearchSuggestionsNotification">
         <parameter name="enableSuggestions"/>
         <body><![CDATA[
+          // Make sure the urlbar is focused.  It won't be, for example, if the
+          // user used an accesskey to make an opt-in choice.  mIgnoreFocus
+          // prevents the text from being selected.
+          this.input.mIgnoreFocus = true;
+          this.input.focus();
+          this.input.mIgnoreFocus = false;
+
           Services.prefs.setBoolPref(
             "browser.urlbar.suggest.searches", enableSuggestions
           );
