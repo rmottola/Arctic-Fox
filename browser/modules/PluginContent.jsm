@@ -58,6 +58,8 @@ PluginContent.prototype = {
     global.addMessageListener("BrowserPlugins:NPAPIPluginProcessCrashed", this);
     global.addMessageListener("BrowserPlugins:CrashReportSubmitted", this);
     global.addMessageListener("BrowserPlugins:Test:ClearCrashData", this);
+
+    Services.obs.addObserver(this, "decoder-doctor-notification", false);
   },
 
   uninit: function() {
@@ -80,6 +82,9 @@ PluginContent.prototype = {
     global.removeMessageListener("BrowserPlugins:NPAPIPluginProcessCrashed", this);
     global.removeMessageListener("BrowserPlugins:CrashReportSubmitted", this);
     global.removeMessageListener("BrowserPlugins:Test:ClearCrashData", this);
+
+    Services.obs.removeObserver(this, "decoder-doctor-notification");
+
     delete this.global;
     delete this.content;
   },
@@ -123,6 +128,26 @@ PluginContent.prototype = {
     }
   },
 
+  observe: function observe(aSubject, aTopic, aData) {
+    switch (aTopic) {
+      case "decoder-doctor-notification":
+        let data = JSON.parse(aData);
+        if (this.haveShownNotification &&
+            aSubject.top.document == this.content.document &&
+            data.formats.toLowerCase().includes("application/x-mpegurl", 0)) {
+          let pluginHost = Cc["@mozilla.org/plugin/host;1"].getService(Ci.nsIPluginHost);
+          let principal = this.content.document.nodePrincipal;
+          let location = this.content.document.location.href;
+          this.global.content.pluginRequiresReload = true;
+          this.global.sendAsyncMessage("PluginContent:ShowClickToPlayNotification",
+                                       { plugins: [... this.pluginData.values()],
+                                         showNow: true,
+                                         location: location,
+                                       }, null, principal);
+        }
+    }
+  },
+
   onPageShow: function(event) {
     // Ignore events that aren't from the main document.
     if (!this.content || event.target != this.content.document) {
@@ -145,6 +170,7 @@ PluginContent.prototype = {
 
     this._finishRecordingFlashPluginTelemetry();
     this.clearPluginCaches();
+    this.haveShownNotification = false;
   },
 
   getPluginUI: function(plugin, anonid) {
@@ -839,8 +865,10 @@ PluginContent.prototype = {
       this.pluginData.set(pluginInfo.permissionString, pluginInfo);
     }
 
+    this.haveShownNotification = true;
+
     this.global.sendAsyncMessage("PluginContent:ShowClickToPlayNotification", {
-      plugins: [... this.pluginData.values()],
+      plugins: [...this.pluginData.values()],
       showNow: showNow,
       location: location,
     }, null, principal);
@@ -857,7 +885,7 @@ PluginContent.prototype = {
    *        document). If this parameter is omitted, it defaults
    *        to the current top-level document.
    */
-  updateNotificationUI: function (document) {
+  updateNotificationUI: function(document) {
     document = document || this.content.document;
 
     // We're only interested in the top-level document, since that's
@@ -923,21 +951,21 @@ PluginContent.prototype = {
     // plugins that need a notification bar.
     this.global.sendAsyncMessage("PluginContent:UpdateHiddenPluginUI", {
       haveInsecure: haveInsecure,
-      actions: [... actions.values()],
+      actions: [...actions.values()],
       location: location,
     }, null, principal);
   },
 
-  removeNotification: function (name) {
+  removeNotification: function(name) {
     this.global.sendAsyncMessage("PluginContent:RemoveNotification", { name: name });
   },
 
-  clearPluginCaches: function () {
+  clearPluginCaches: function() {
     this.pluginData.clear();
     this.pluginCrashData.clear();
   },
 
-  hideNotificationBar: function (name) {
+  hideNotificationBar: function(name) {
     this.global.sendAsyncMessage("PluginContent:HideNotificationBar", { name: name });
   },
 
@@ -946,7 +974,7 @@ PluginContent.prototype = {
    * fired for both NPAPI and Gecko Media plugins. In the latter case, the
    * target of the event is the document that the GMP is being used in.
    */
-  onPluginCrashed: function (target, aEvent) {
+  onPluginCrashed: function(target, aEvent) {
     if (!(aEvent instanceof this.content.PluginCrashedEvent))
       return;
 
@@ -978,7 +1006,7 @@ PluginContent.prototype = {
     });
   },
 
-  NPAPIPluginProcessCrashed: function ({pluginName, runID, state}) {
+  NPAPIPluginProcessCrashed: function({pluginName, runID, state}) {
     let message =
       gNavigatorBundle.formatStringFromName("crashedpluginsMessage.title",
                                             [pluginName], 1);
@@ -1019,7 +1047,7 @@ PluginContent.prototype = {
     }
   },
 
-  setCrashedNPAPIPluginState: function ({plugin, state, message}) {
+  setCrashedNPAPIPluginState: function({plugin, state, message}) {
     // Force a layout flush so the binding is attached.
     plugin.clientTop;
     let overlay = this.getPluginUI(plugin, "main");
