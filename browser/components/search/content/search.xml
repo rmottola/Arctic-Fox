@@ -552,22 +552,24 @@
       <![CDATA[
         // Speculatively connect to the current engine's search URI (and
         // suggest URI, if different) to reduce request latency
+        this.currentEngine.speculativeConnect({window: window});
 
-        const SUGGEST_TYPE = "application/x-suggestions+json";
-        var engine = this.currentEngine;
-        var connector =
-            Services.io.QueryInterface(Components.interfaces.nsISpeculativeConnect);
-        var searchURI = engine.getSubmission("dummy").uri;
-        let callbacks = window.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                              .getInterface(Components.interfaces.nsIWebNavigation)
-                              .QueryInterface(Components.interfaces.nsILoadContext);
-        connector.speculativeConnect(searchURI, callbacks);
-
-        if (engine.supportsResponseType(SUGGEST_TYPE)) {
-          var suggestURI = engine.getSubmission("dummy", SUGGEST_TYPE).uri;
-          if (suggestURI.prePath != searchURI.prePath)
-            connector.speculativeConnect(suggestURI, callbacks);
+        if (this._ignoreFocus) {
+          // This window has been re-focused, don't show the suggestions
+          this._ignoreFocus = false;
+          return;
         }
+
+        // Don't open the suggestions if there is no text in the textbox.
+        if (!this._textbox.value)
+          return;
+
+        // Don't open the suggestions if the mouse was used to focus the
+        // textbox, that will be taken care of in the click handler.
+        if (Services.focus.getLastFocusMethod(window) & Services.focus.FLAG_BYMOUSE)
+          return;
+
+        this.openSuggestionsPanel();
       ]]></handler>
     </handlers>
   </binding>
