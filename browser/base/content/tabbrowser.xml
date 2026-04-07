@@ -4827,7 +4827,7 @@
         <body><![CDATA[
           let browser;
           switch (aTopic) {
-            case "live-resize-start":
+            case "live-resize-start": {
               browser = this.mCurrentTab.linkedBrowser;
               let fl = browser.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader;
               if (fl && fl.tabParent && !this.mActiveResizeDisplayportSuppression) {
@@ -4835,7 +4835,8 @@
                 this.mActiveResizeDisplayportSuppression = browser;
               }
               break;
-            case "live-resize-end":
+            }
+            case "live-resize-end": {
               browser = this.mActiveResizeDisplayportSuppression;
               if (browser) {
                 let fl = browser.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader;
@@ -4845,10 +4846,12 @@
                 }
               }
               break;
-            case "nsPref:changed":
+            }
+            case "nsPref:changed": {
               // This is the only pref observed.
               this._findAsYouType = Services.prefs.getBoolPref("accessibility.typeaheadfind");
               break;
+            }
           }
         ]]></body>
       </method>
@@ -5043,14 +5046,14 @@
             self: this,
             childNodes: [null, this.tabContextMenu, this.tabContainer],
             firstChild: { nextSibling: this.tabContextMenu },
-            getElementsByAttribute: function (attr, attrValue) {
+            getElementsByAttribute: function(attr, attrValue) {
               if (attr == "anonid" && attrValue == "tabContextMenu")
                 return [this.self.tabContextMenu];
               return [];
             },
             // Also support adding event listeners (forward to the tab container)
-            addEventListener: function (a, b, c) { this.self.tabContainer.addEventListener(a, b, c); },
-            removeEventListener: function (a, b, c) { this.self.tabContainer.removeEventListener(a, b, c); }
+            addEventListener: function(a, b, c) { this.self.tabContainer.addEventListener(a, b, c); },
+            removeEventListener: function(a, b, c) { this.self.tabContainer.removeEventListener(a, b, c); }
           });
         ]]>
         </getter>
@@ -5783,7 +5786,7 @@
                 ++mid > high)
               break;
             let boxObject = tabs[mid].boxObject;
-            let screenX = boxObject.screenX + getTabShift(tabs[mid], oldIndex);
+            screenX = boxObject.screenX + getTabShift(tabs[mid], oldIndex);
             if (screenX > tabCenter) {
               high = mid - 1;
             } else if (screenX + boxObject.width < tabCenter) {
@@ -5878,7 +5881,7 @@
       <method name="_notifyBackgroundTab">
         <parameter name="aTab"/>
         <body><![CDATA[
-          if (aTab.pinned)
+          if (aTab.pinned || aTab.hidden)
             return;
 
           var scrollRect = this.mTabstrip.scrollClientRect;
