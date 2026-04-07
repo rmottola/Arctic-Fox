@@ -700,7 +700,7 @@ protected:
 class nsNavHistoryFolderResultNode final : public nsNavHistoryContainerResultNode,
                                            public nsINavHistoryQueryResultNode,
                                            public nsINavBookmarkObserver,
-                                           public mozilla::places::AsyncStatementCallback
+                                           public mozilla::places::WeakAsyncStatementCallback
 {
 public:
   nsNavHistoryFolderResultNode(const nsACString& aTitle,
