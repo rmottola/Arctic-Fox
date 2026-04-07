@@ -23,12 +23,15 @@ XPCOMUtils.defineLazyGetter(this, "gNavigatorBundle", function() {
 XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
   "resource://gre/modules/AppConstants.jsm");
 
-this.PluginContent = function (global) {
+this.PluginContent = function(global) {
   this.init(global);
 }
 
+const FLASH_MIME_TYPE = "application/x-shockwave-flash";
+const REPLACEMENT_STYLE_SHEET = Services.io.newURI("chrome://pluginproblem/content/pluginReplaceBinding.css", null, null);
+
 PluginContent.prototype = {
-  init: function (global) {
+  init: function(global) {
     this.global = global;
     // Need to hold onto the content window or else it'll get destroyed
     this.content = this.global.content;
@@ -39,6 +42,7 @@ PluginContent.prototype = {
 
     // Note that the XBL binding is untrusted
     global.addEventListener("PluginBindingAttached", this, true, true);
+    global.addEventListener("PluginPlaceholderReplaced", this, true, true);
     global.addEventListener("PluginCrashed",         this, true);
     global.addEventListener("PluginOutdated",        this, true);
     global.addEventListener("PluginInstantiated",    this, true);
@@ -60,6 +64,7 @@ PluginContent.prototype = {
     let global = this.global;
 
     global.removeEventListener("PluginBindingAttached", this, true);
+    global.removeEventListener("PluginPlaceholderReplaced", this, true, true);
     global.removeEventListener("PluginCrashed",         this, true);
     global.removeEventListener("PluginOutdated",        this, true);
     global.removeEventListener("PluginInstantiated",    this, true);
@@ -79,7 +84,7 @@ PluginContent.prototype = {
     delete this.content;
   },
 
-  receiveMessage: function (msg) {
+  receiveMessage: function(msg) {
     switch (msg.name) {
       case "BrowserPlugins:ActivatePlugins":
         this.activatePlugins(msg.data.pluginInfo, msg.data.newState);
@@ -118,7 +123,7 @@ PluginContent.prototype = {
     }
   },
 
-  onPageShow: function (event) {
+  onPageShow: function(event) {
     // Ignore events that aren't from the main document.
     if (!this.content || event.target != this.content.document) {
       return;
@@ -132,7 +137,7 @@ PluginContent.prototype = {
     }
   },
 
-  onPageHide: function (event) {
+  onPageHide: function(event) {
     // Ignore events that aren't from the main document.
     if (!this.content || event.target != this.content.document) {
       return;
@@ -142,12 +147,21 @@ PluginContent.prototype = {
     this.clearPluginCaches();
   },
 
-  getPluginUI: function (plugin, anonid) {
+  getPluginUI: function(plugin, anonid) {
     return plugin.ownerDocument.
            getAnonymousElementByAttribute(plugin, "anonid", anonid);
   },
 
-  _getPluginInfo: function (pluginElement) {
+  _getPluginInfo: function(pluginElement) {
+    if (pluginElement instanceof Ci.nsIDOMHTMLAnchorElement) {
+      // Anchor elements are our place holders, and we only have them for Flash
+      let pluginHost = Cc["@mozilla.org/plugin/host;1"].getService(Ci.nsIPluginHost);
+      return {
+        pluginName: "Shockwave Flash",
+        mimetype: FLASH_MIME_TYPE,
+        permissionString: pluginHost.getPermissionStringForType(FLASH_MIME_TYPE)
+      };
+    }
     let pluginHost = Cc["@mozilla.org/plugin/host;1"].getService(Ci.nsIPluginHost);
     pluginElement.QueryInterface(Ci.nsIObjectLoadingContent);
 
@@ -196,7 +210,7 @@ PluginContent.prototype = {
            };
   },
 
-  _getPluginInfoForTag: function (pluginTag, tagMimetype) {
+  _getPluginInfoForTag: function(pluginTag, tagMimetype) {
     let pluginHost = Cc["@mozilla.org/plugin/host;1"].getService(Ci.nsIPluginHost);
 
     let pluginName = gNavigatorBundle.GetStringFromName("pluginInfo.unknownPlugin");
@@ -238,7 +252,7 @@ PluginContent.prototype = {
   /**
    * Update the visibility of the plugin overlay.
    */
-  setVisibility : function (plugin, overlay, shouldShow) {
+  setVisibility : function(plugin, overlay, shouldShow) {
     overlay.classList.toggle("visible", shouldShow);
     if (shouldShow) {
       overlay.removeAttribute("dismissed");
@@ -253,7 +267,7 @@ PluginContent.prototype = {
    * This function will handle showing or hiding the overlay.
    * @returns true if the plugin is invisible.
    */
-  shouldShowOverlay : function (plugin, overlay) {
+  shouldShowOverlay : function(plugin, overlay) {
     // If the overlay size is 0, we haven't done layout yet. Presume that
     // plugins are visible until we know otherwise.
     if (overlay.scrollWidth == 0) {
@@ -302,7 +316,7 @@ PluginContent.prototype = {
     return true;
   },
 
-  addLinkClickCallback: function (linkNode, callbackName /* callbackArgs...*/) {
+  addLinkClickCallback: function(linkNode, callbackName /* callbackArgs...*/) {
     // XXX just doing (callback)(arg) was giving a same-origin error. bug?
     let self = this;
     let callbackArgs = Array.prototype.slice.call(arguments).slice(2);
@@ -358,7 +372,7 @@ PluginContent.prototype = {
     }
   },
 
-  handleEvent: function (event) {
+  handleEvent: function(event) {
     let eventType = event.type;
 
     if (eventType == "unload") {
@@ -395,15 +409,37 @@ PluginContent.prototype = {
     }
 
     if (eventType == "HiddenPlugin") {
-      let pluginTag = event.tag.QueryInterface(Ci.nsIPluginTag);
-      if (event.target.defaultView.top.document != this.content.document) {
-        return;
+      let win = event.target.defaultView;
+      if (!win.mozHiddenPluginTouched) {
+        let pluginTag = event.tag.QueryInterface(Ci.nsIPluginTag);
+        if (win.top.document != this.content.document) {
+          return;
+        }
+        this._showClickToPlayNotification(pluginTag, false);
+        let winUtils = win.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindowUtils);
+        try {
+          winUtils.loadSheet(REPLACEMENT_STYLE_SHEET, win.AGENT_SHEET);
+          win.mozHiddenPluginTouched = true;
+        } catch (e) {
+          Cu.reportError("Error adding plugin replacement style sheet: " + e);
+        }
       }
-      this._showClickToPlayNotification(pluginTag, false);
     }
 
     let plugin = event.target;
     let doc = plugin.ownerDocument;
+
+    if (eventType == "PluginPlaceholderReplaced") {
+      plugin.removeAttribute("href");
+      let overlay = this.getPluginUI(plugin, "main");
+      this.setVisibility(plugin, overlay, true);
+      let inIDOMUtils = Cc["@mozilla.org/inspector/dom-utils;1"]
+                          .getService(Ci.inIDOMUtils);
+      // Add psuedo class so our styling will take effect
+      inIDOMUtils.addPseudoClassLock(plugin, "-moz-handler-clicktoplay");
+      overlay.addEventListener("click", this, true);
+      return;
+    }
 
     if (!(plugin instanceof Ci.nsIObjectLoadingContent))
       return;
@@ -483,7 +519,7 @@ PluginContent.prototype = {
         break;
     }
 
-    if (this._getPluginInfo(plugin).mimetype === "application/x-shockwave-flash") {
+    if (this._getPluginInfo(plugin).mimetype === FLASH_MIME_TYPE) {
       this._recordFlashPluginTelemetry(eventType, plugin);
     }
 
@@ -518,7 +554,7 @@ PluginContent.prototype = {
     }
   },
 
-  _recordFlashPluginTelemetry: function (eventType, plugin) {
+  _recordFlashPluginTelemetry: function(eventType, plugin) {
     if (!Services.telemetry.canRecordExtended) {
       return;
     }
@@ -553,7 +589,7 @@ PluginContent.prototype = {
     }
   },
 
-  _finishRecordingFlashPluginTelemetry: function () {
+  _finishRecordingFlashPluginTelemetry: function() {
     if (this.flashPluginStats) {
       Services.telemetry.getHistogramById('FLASH_PLUGIN_INSTANCES_ON_PAGE')
                         .add(this.flashPluginStats.instancesCount);
@@ -561,12 +597,12 @@ PluginContent.prototype = {
     }
   },
 
-  isKnownPlugin: function (objLoadingContent) {
+  isKnownPlugin: function(objLoadingContent) {
     return (objLoadingContent.getContentTypeForMIMEType(objLoadingContent.actualType) ==
             Ci.nsIObjectLoadingContent.TYPE_PLUGIN);
   },
 
-  canActivatePlugin: function (objLoadingContent) {
+  canActivatePlugin: function(objLoadingContent) {
     // if this isn't a known plugin, we can't activate it
     // (this also guards pluginHost.getPermissionStringForType against
     // unexpected input)
@@ -587,7 +623,7 @@ PluginContent.prototype = {
            isFallbackTypeValid;
   },
 
-  hideClickToPlayOverlay: function (plugin) {
+  hideClickToPlayOverlay: function(plugin) {
     let overlay = this.getPluginUI(plugin, "main");
     if (overlay) {
       overlay.classList.remove("visible");
@@ -595,7 +631,7 @@ PluginContent.prototype = {
   },
 
   // Forward a link click callback to the chrome process.
-  forwardCallback: function (name, pluginTag) {
+  forwardCallback: function(name, pluginTag) {
     this.global.sendAsyncMessage("PluginContent:LinkClickCallback",
       { name, pluginTag });
   },
@@ -627,20 +663,27 @@ PluginContent.prototype = {
                                  { runID, keyVals, submitURLOptIn });
   },
 
-  reloadPage: function () {
+  reloadPage: function() {
     this.global.content.location.reload();
   },
 
   // Event listener for click-to-play plugins.
-  _handleClickToPlayEvent: function (plugin) {
+  _handleClickToPlayEvent: function(plugin) {
     let doc = plugin.ownerDocument;
     let pluginHost = Cc["@mozilla.org/plugin/host;1"].getService(Ci.nsIPluginHost);
-    let objLoadingContent = plugin.QueryInterface(Ci.nsIObjectLoadingContent);
-    // guard against giving pluginHost.getPermissionStringForType a type
-    // not associated with any known plugin
-    if (!this.isKnownPlugin(objLoadingContent))
-      return;
-    let permissionString = pluginHost.getPermissionStringForType(objLoadingContent.actualType);
+    let permissionString;
+    if (plugin instanceof Ci.nsIDOMHTMLAnchorElement) {
+      // We only have replacement content for Flash installs
+      permissionString = pluginHost.getPermissionStringForType(FLASH_MIME_TYPE);
+    } else {
+      let objLoadingContent = plugin.QueryInterface(Ci.nsIObjectLoadingContent);
+      // guard against giving pluginHost.getPermissionStringForType a type
+      // not associated with any known plugin
+      if (!this.isKnownPlugin(objLoadingContent))
+        return;
+      permissionString = pluginHost.getPermissionStringForType(objLoadingContent.actualType);
+    }
+
     let principal = doc.defaultView.top.document.nodePrincipal;
     let pluginPermission = Services.perms.testPermissionFromPrincipal(principal, permissionString);
 
@@ -658,11 +701,10 @@ PluginContent.prototype = {
     }
   },
 
-  onOverlayClick: function (event) {
+  onOverlayClick: function(event) {
     let document = event.target.ownerDocument;
     let plugin = document.getBindingParent(event.target);
     let contentWindow = plugin.ownerGlobal.top;
-    let objLoadingContent = plugin.QueryInterface(Ci.nsIObjectLoadingContent);
     let overlay = this.getPluginUI(plugin, "main");
     // Have to check that the target is not the link to update the plugin
     if (!(event.originalTarget instanceof contentWindow.HTMLAnchorElement) &&
@@ -676,7 +718,7 @@ PluginContent.prototype = {
     }
   },
 
-  reshowClickToPlayNotification: function () {
+  reshowClickToPlayNotification: function() {
     let contentWindow = this.global.content;
     let cwu = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                            .getInterface(Ci.nsIDOMWindowUtils);
@@ -695,7 +737,7 @@ PluginContent.prototype = {
   /**
    * Activate the plugins that the user has specified.
    */
-  activatePlugins: function (pluginInfo, newState) {
+  activatePlugins: function(pluginInfo, newState) {
     let contentWindow = this.global.content;
     let cwu = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                            .getInterface(Ci.nsIDOMWindowUtils);
@@ -703,6 +745,7 @@ PluginContent.prototype = {
     let pluginHost = Cc["@mozilla.org/plugin/host;1"].getService(Ci.nsIPluginHost);
 
     let pluginFound = false;
+    let placeHolderFound = false;
     for (let plugin of plugins) {
       plugin.QueryInterface(Ci.nsIObjectLoadingContent);
       if (!this.isKnownPlugin(plugin)) {
@@ -710,7 +753,11 @@ PluginContent.prototype = {
       }
       if (pluginInfo.permissionString == pluginHost.getPermissionStringForType(plugin.actualType)) {
         let overlay = this.getPluginUI(plugin, "main");
-        pluginFound = true;
+        if (plugin instanceof Ci.nsIDOMHTMLAnchorElement) {
+          placeHolderFound = true;
+        } else {
+          pluginFound = true;
+        }
         if (newState == "block") {
           if (overlay) {
             overlay.addEventListener("click", this, true);
@@ -726,14 +773,17 @@ PluginContent.prototype = {
     }
 
     // If there are no instances of the plugin on the page any more, what the
-    // user probably needs is for us to allow and then refresh.
-    if (newState != "block" && !pluginFound) {
+    // user probably needs is for us to allow and then refresh. Additionally, if
+    // this is content that requires HLS or we replaced the placeholder the page
+    // needs to be refreshed for it to insert its plugins
+    if (newState != "block" &&
+       (!pluginFound || placeHolderFound || contentWindow.pluginRequiresReload)) {
       this.reloadPage();
     }
     this.updateNotificationUI();
   },
 
-  _showClickToPlayNotification: function (plugin, showNow) {
+  _showClickToPlayNotification: function(plugin, showNow) {
     let plugins = [];
 
     // If plugin is null, that means the user has navigated back to a page with
