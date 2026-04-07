@@ -1643,7 +1643,6 @@ var gBrowserInit = {
     }
 
     // Final window teardown, do this last.
-    window.XULBrowserWindow.destroy();
     window.XULBrowserWindow = null;
     window.QueryInterface(Ci.nsIInterfaceRequestor)
           .getInterface(Ci.nsIWebNavigation)
