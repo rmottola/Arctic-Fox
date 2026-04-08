@@ -452,8 +452,15 @@ splitmenu {
   list-style-image: none;
 }
 
-#urlbar:not([actiontype]) > #urlbar-display-box,
-#urlbar:not([actiontype="switchtab"]) > #urlbar-display-box > .urlbar-display-switchtab {
+#urlbar:not([actiontype="switchtab"]):not([actiontype="extension"]) > #urlbar-display-box {
+  display: none;
+}
+
+#urlbar:not([actiontype="switchtab"]) > #urlbar-display-box > #switchtab {
+  display: none;
+}
+
+#urlbar:not([actiontype="extension"]) > #urlbar-display-box > #extension {
   display: none;
 }
 

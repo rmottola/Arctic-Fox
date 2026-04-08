@@ -56,6 +56,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       <field name="AppConstants" readonly="true">
         (Components.utils.import("resource://gre/modules/AppConstants.jsm", {})).AppConstants;
       </field>
+
+      <field name="ExtensionSearchHandler" readonly="true">
+        (Components.utils.import("resource://gre/modules/ExtensionSearchHandler.jsm", {})).ExtensionSearchHandler;
+      </field>
+
       <constructor><![CDATA[
         this._prefs = Components.classes["@mozilla.org/preferences-service;1"]
                                 .getService(Components.interfaces.nsIPrefService)
@@ -170,6 +175,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               case "keyword": // Fall through.
               case "searchengine": {
                 returnValue = action.params.input;
+                break;
+              }
+              case "extension": {
+                returnValue = action.params.content;
                 break;
               }
             }
@@ -441,6 +450,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                   actionDetails
                 );
                 break;
+              case "extension":
+                this.handleRevert();
+                // Give the extension control of handling the command.
+                let searchString = action.params.content;
+                let keyword = action.params.keyword;
+                this.ExtensionSearchHandler.handleInputEntered(keyword, searchString, where);
+                return;
             }
           } else {
             // This is a fallback for add-ons and old testing code that directly
@@ -1096,6 +1112,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         if (event.originalTarget == this.inputField) {
           this._clearNoActions();
           this.formatValue();
+        }
+        if (ExtensionSearchHandler.hasActiveInputSession()) {
+          ExtensionSearchHandler.handleInputCancelled();
         }
       ]]></handler>
 
