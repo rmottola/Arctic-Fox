@@ -443,7 +443,7 @@ var dataProviders = {
         canvas.height = 1;
 
 
-        let creationError = "(no info)";
+        let creationError = null;
 
         canvas.addEventListener(
             "webglcontextcreationerror",
@@ -455,9 +455,17 @@ var dataProviders = {
             false
         );
 
-        let gl = canvas.getContext(contextType);
+        let gl = null;
+        try {
+          gl = canvas.getContext(contextType);
+        }
+        catch (e) {
+          if (!creationError) {
+            creationError = e.toString();
+          }
+        }
         if (!gl)
-            return creationError;
+            return creationError || "(no info)";
 
 
         let infoExt = gl.getExtension("WEBGL_debug_renderer_info");
