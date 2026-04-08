@@ -205,7 +205,7 @@ var dataProviders = {
 
     data.numTotalWindows = 0;
     data.numRemoteWindows = 0;
-    let winEnumer = Services.ww.getWindowEnumerator("navigator:browser");
+    let winEnumer = Services.wm.getEnumerator("navigator:browser");
     while (winEnumer.hasMoreElements()) {
       let winUtils = winEnumer.getNext().
                      QueryInterface(Ci.nsIInterfaceRequestor).
