@@ -76,6 +76,7 @@ class MachCommands(MachCommandBase):
         from mozlint import cli
         lintargs['exclude'] = ['obj*']
         cli.SEARCH_PATHS.append(here)
+        self._activate_virtualenv()
         return cli.run(*runargs, **lintargs)
 
     @Command('eslint', category='devenv',
