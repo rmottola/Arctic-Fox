@@ -2796,7 +2796,9 @@ nsDownload::SetState(DownloadState aState)
             if (mimeInfo)
               mimeInfo->GetMIMEType(contentType);
 
-            java::DownloadsIntegration::ScanMedia(path, NS_ConvertUTF8toUTF16(contentType));
+            if (jni::IsFennec()) {
+                java::DownloadsIntegration::ScanMedia(path, NS_ConvertUTF8toUTF16(contentType));
+            }
           }
 #else
           if (addToRecentDocs && !mPrivate) {
