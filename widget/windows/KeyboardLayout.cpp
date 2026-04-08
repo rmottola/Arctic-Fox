@@ -860,6 +860,7 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
   , mScanCode(0)
   , mIsExtended(false)
   , mIsDeadKey(false)
+  , mIsFollowedByNonControlCharMessage(false)
   , mFakeCharMsgs(aFakeCharMsgs && aFakeCharMsgs->Length() ?
                     aFakeCharMsgs : nullptr)
 {
@@ -1044,7 +1045,12 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
 
   mDOMKeyCode =
     keyboardLayout->ConvertNativeKeyCodeToDOMKeyCode(mOriginalVirtualKeyCode);
-  mKeyNameIndex =
+  // Be aware, keyboard utilities can change non-printable keys to printable
+  // keys.  In such case, we should make the key value as a printable key.
+  mIsFollowedByNonControlCharMessage =
+    IsKeyDownMessage() && IsFollowedByNonControlCharMessage();
+  mKeyNameIndex = mIsFollowedByNonControlCharMessage ?
+    KEY_NAME_INDEX_USE_STRING :
     keyboardLayout->ConvertNativeKeyCodeToKeyNameIndex(mOriginalVirtualKeyCode);
   mCodeNameIndex =
     KeyboardLayout::ConvertScanCodeToCodeNameIndex(
@@ -1055,7 +1061,9 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
   mIsDeadKey =
     (IsFollowedByDeadCharMessage() ||
      keyboardLayout->IsDeadKey(mOriginalVirtualKeyCode, mModKeyState));
-  mIsPrintableKey = KeyboardLayout::IsPrintableCharKey(mOriginalVirtualKeyCode);
+  mIsPrintableKey =
+    mKeyNameIndex == KEY_NAME_INDEX_USE_STRING ||
+    KeyboardLayout::IsPrintableCharKey(mOriginalVirtualKeyCode);
 
   if (IsKeyDownMessage()) {
     // Compute some strings which may be inputted by the key with various
@@ -1216,6 +1224,24 @@ NativeKey::IsFollowedByDeadCharMessage() const
     }
   }
   return IsDeadCharMessage(nextMsg);
+}
+
+bool
+NativeKey::IsFollowedByNonControlCharMessage() const
+{
+  MSG nextMsg;
+  if (mFakeCharMsgs) {
+    nextMsg = mFakeCharMsgs->ElementAt(0).GetCharMsg(mMsg.hwnd);
+  } else if (IsKeyMessageOnPlugin()) {
+    return false;
+  } else {
+    if (!WinUtils::PeekMessage(&nextMsg, mMsg.hwnd, WM_KEYFIRST, WM_KEYLAST,
+                               PM_NOREMOVE | PM_NOYIELD)) {
+      return false;
+    }
+  }
+  return nextMsg.message == WM_CHAR &&
+         !IsControlChar(static_cast<char16_t>(nextMsg.wParam));
 }
 
 bool
@@ -2005,6 +2031,13 @@ NativeKey::NeedsToHandleWithoutFollowingCharMessages() const
   // whole following char messages.
   if (mCommittedCharsAndModifiers.mLength > 1) {
     return true;
+  }
+
+  // If keydown message is followed by WM_CHAR whose wParam isn't a control
+  // character, we should dispatch keypress event with the char message
+  // even with any modifier state.
+  if (mIsFollowedByNonControlCharMessage) {
+    return false;
   }
 
   // If any modifier keys which may cause printable keys becoming non-printable
