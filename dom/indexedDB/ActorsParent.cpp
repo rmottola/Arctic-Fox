@@ -9079,7 +9079,7 @@ public:
   {
     AssertIsOnBackgroundThread();
     MOZ_ASSERT(aMaintenance);
-    MOZ_ASSERT(mCurrentMaintenance = aMaintenance);
+    MOZ_ASSERT(mCurrentMaintenance == aMaintenance);
 
     mCurrentMaintenance = nullptr;
     ProcessMaintenanceQueue();
