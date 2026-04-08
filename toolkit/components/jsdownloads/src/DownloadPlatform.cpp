@@ -31,7 +31,7 @@
 #endif
 
 #ifdef MOZ_WIDGET_ANDROID
-#include "GeneratedJNIWrappers.h"
+#include "FennecJNIWrappers.h"
 #endif
 
 #ifdef MOZ_WIDGET_GTK
@@ -113,7 +113,7 @@ nsresult DownloadPlatform::DownloadDone(nsIURI* aSource, nsIURI* aReferrer, nsIF
       bool addToRecentDocs = Preferences::GetBool(PREF_BDM_ADDTORECENTDOCS);
 #ifdef MOZ_WIDGET_ANDROID
       if (addToRecentDocs) {
-        java::DownloadsIntegration::ScanMedia(path, NS_ConvertUTF8toUTF16(aContentType));
+        java::DownloadsIntegration::ScanMedia(path, aContentType);
       }
 #else
       if (addToRecentDocs && !aIsPrivate) {
