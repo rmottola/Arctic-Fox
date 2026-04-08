@@ -122,9 +122,7 @@ function NarrateControls(mm, win) {
   dropdown.addEventListener("click", this, true);
 
   let rateRange = dropdown.querySelector("#narrate-rate > input");
-  rateRange.addEventListener("input", this);
-  rateRange.addEventListener("mousedown", this);
-  rateRange.addEventListener("mouseup", this);
+  rateRange.addEventListener("change", this);
 
   // The rate is stored as an integer.
   rateRange.value = branch.getIntPref("rate");
@@ -136,17 +134,12 @@ function NarrateControls(mm, win) {
 NarrateControls.prototype = {
   handleEvent: function(evt) {
     switch (evt.type) {
-      case "mousedown":
-        this._rateMousedown = true;
-        break;
-      case "mouseup":
-        this._rateMousedown = false;
-        break;
-      case "input":
-        this._onRateInput(evt);
-        break;
       case "change":
-        this._onVoiceChange();
+        if (evt.target.id == "narrate-rate-input") {
+          this._onRateInput(evt);
+        } else {
+          this._onVoiceChange();
+        }
         break;
       case "click":
         this._onButtonClick(evt);
@@ -178,10 +171,8 @@ NarrateControls.prototype = {
   },
 
   _onRateInput: function(evt) {
-    if (!this._rateMousedown) {
-      AsyncPrefs.set("narrate.rate", parseInt(evt.target.value, 10));
-      this.narrator.setRate(this._convertRate(evt.target.value));
-    }
+    AsyncPrefs.set("narrate.rate", parseInt(evt.target.value, 10));
+    this.narrator.setRate(this._convertRate(evt.target.value));
   },
 
   _onVoiceChange: function() {
