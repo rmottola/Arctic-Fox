@@ -1660,10 +1660,12 @@ NativeKey::IsFollowedByDeadCharMessage() const
 bool
 NativeKey::IsFollowedByNonControlCharMessage() const
 {
-  if (mFollowingCharMsgs.IsEmpty()) {
-    return false;
+  for (size_t i = 0; i < mFollowingCharMsgs.Length(); ++i) {
+    if (IsPrintableCharMessage(mFollowingCharMsgs[i])) {
+      return true;
+    }
   }
-  return IsPrintableCharMessage(mFollowingCharMsgs[0]);
+  return false;
 }
 
 bool
