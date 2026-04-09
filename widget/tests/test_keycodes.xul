@@ -2065,6 +2065,20 @@ function* runKeyEventTests()
                    modifiers:{}, chars:"a"},
                   ["a", "a", "F4"], "F4", nsIDOMKeyEvent.DOM_VK_F4, "a", SHOULD_DELIVER_ALL, KeyboardEvent.DOM_KEY_LOCATION_STANDARD);
 
+    // Backspace and Enter are handled with special path in mozilla::widget::NativeKey.  So, let's test them with modifiers too.
+    yield testKey({layout:KEYBOARD_LAYOUT_EN_US, keyCode:WIN_VK_BACK,
+                   modifiers:{ctrlKey:1}, chars:"\u007F"},
+                  nsIDOMKeyEvent.DOM_VK_BACK_SPACE, "", SHOULD_DELIVER_ALL, KeyboardEvent.DOM_KEY_LOCATION_STANDARD);
+    yield testKey({layout:KEYBOARD_LAYOUT_EN_US, keyCode:WIN_VK_BACK,
+                   modifiers:{altKey:1}, chars:"\u0008"},
+                  nsIDOMKeyEvent.DOM_VK_BACK_SPACE, "", SHOULD_DELIVER_ALL, KeyboardEvent.DOM_KEY_LOCATION_STANDARD);
+    yield testKey({layout:KEYBOARD_LAYOUT_EN_US, keyCode:WIN_VK_RETURN,
+                   modifiers:{ctrlKey:1}, chars:"\n"},
+                  nsIDOMKeyEvent.DOM_VK_RETURN, "", SHOULD_DELIVER_ALL, KeyboardEvent.DOM_KEY_LOCATION_STANDARD);
+    yield testKey({layout:KEYBOARD_LAYOUT_EN_US, keyCode:WIN_VK_RETURN,
+                   modifiers:{altKey:1}, chars:"\r"},
+                  nsIDOMKeyEvent.DOM_VK_RETURN, "", SHOULD_DELIVER_ALL, KeyboardEvent.DOM_KEY_LOCATION_STANDARD);
+
     // US
     // Alphabet
     yield testKey({layout:KEYBOARD_LAYOUT_EN_US, keyCode:WIN_VK_A,
