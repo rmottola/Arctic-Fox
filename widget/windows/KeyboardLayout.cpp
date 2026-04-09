@@ -2489,6 +2489,13 @@ NativeKey::HandleKeyDownMessage(bool* aEventDispatched) const
 }
 
 bool
+NativeKey::HandleCharMessage(bool* aEventDispatched) const
+{
+  MOZ_ASSERT(IsCharOrSysCharMessage(mMsg));
+  return HandleCharMessage(mMsg, aEventDispatched);
+}
+
+bool
 NativeKey::HandleCharMessage(const MSG& aCharMsg,
                              bool* aEventDispatched) const
 {

@@ -227,11 +227,10 @@ public:
 
   /**
    * Handles WM_CHAR message or WM_SYSCHAR message.  The instance must be
-   * initialized with WM_KEYDOWN, WM_SYSKEYDOWN or them.
+   * initialized with them.
    * Returns true if dispatched keypress event is consumed.  Otherwise, false.
    */
-  bool HandleCharMessage(const MSG& aCharMsg,
-                         bool* aEventDispatched = nullptr) const;
+  bool HandleCharMessage(bool* aEventDispatched = nullptr) const;
 
   /**
    * Handles keyup message.  Returns true if the event is consumed.
@@ -562,6 +561,14 @@ private:
   {
     return mFocusedWndBeforeDispatch != ::GetFocus();
   }
+
+  /**
+   * Handles WM_CHAR message or WM_SYSCHAR message.  The instance must be
+   * initialized with WM_KEYDOWN, WM_SYSKEYDOWN or them.
+   * Returns true if dispatched keypress event is consumed.  Otherwise, false.
+   */
+  bool HandleCharMessage(const MSG& aCharMsg,
+                         bool* aEventDispatched = nullptr) const;
 
   // Calls of PeekMessage() from NativeKey might cause nested message handling
   // due to (perhaps) odd API hook.  NativeKey should do nothing if given
