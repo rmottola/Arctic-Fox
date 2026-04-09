@@ -8289,8 +8289,7 @@ public:
   { }
 
 private:
-  virtual ~SCInputStream()
-  { }
+  virtual ~SCInputStream() = default;
 
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIINPUTSTREAM
@@ -22799,7 +22798,7 @@ DeleteDatabaseOp::SendBlockedNotification()
   MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose);
 
   if (!IsActorDestroyed()) {
-    Unused << SendBlocked(0);
+    Unused << SendBlocked(mPreviousVersion);
   }
 }
 
