@@ -279,12 +279,9 @@ function* runKeyEventTests()
   const SHOULD_DELIVER_KEYDOWN          = 0x1;
   const SHOULD_DELIVER_KEYPRESS         = 0x2;
   const SHOULD_DELIVER_KEYUP            = 0x4;
-  const SHOULD_NOT_CAUSE_INPUT          = 0x8;
   const SHOULD_DELIVER_ALL              = SHOULD_DELIVER_KEYDOWN |
                                           SHOULD_DELIVER_KEYPRESS |
                                           SHOULD_DELIVER_KEYUP;
-  const SHOULD_DELIVER_ALL_BUT_NOT_CAUSE_INPUT = SHOULD_DELIVER_ALL |
-                                          SHOULD_NOT_CAUSE_INPUT;
   const SHOULD_DELIVER_KEYDOWN_KEYUP    = SHOULD_DELIVER_KEYDOWN |
                                           SHOULD_DELIVER_KEYUP;
   const SHOULD_DELIVER_KEYDOWN_KEYPRESS = SHOULD_DELIVER_KEYDOWN |
