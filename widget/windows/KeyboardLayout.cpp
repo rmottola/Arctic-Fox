@@ -3514,6 +3514,7 @@ KeyboardLayout::IsSysKey(uint8_t aVirtualKey,
   // If Alt key is not pressed, it's never a system key combination.
   // Additionally, if Ctrl key is pressed, it's never a system key combination
   // too.
+  // FYI: Windows logo key state won't affect if it's a system key.
   if (!aModKeyState.IsAlt() || aModKeyState.IsControl()) {
     return false;
   }
@@ -3531,7 +3532,7 @@ KeyboardLayout::IsSysKey(uint8_t aVirtualKey,
 
   // If the Alt key state isn't consumed, that means that the key with Alt
   // doesn't cause text input.  So, the combination is a system key.
-  return inputCharsAndModifiers.mModifiers[0] != MODIFIER_ALT;
+  return !!(inputCharsAndModifiers.mModifiers[0] & MODIFIER_ALT);
 }
 
 void
