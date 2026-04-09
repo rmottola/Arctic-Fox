@@ -1152,7 +1152,6 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
   , mScanCode(0)
   , mIsExtended(false)
   , mIsDeadKey(false)
-  , mIsFollowedByNonControlCharMessage(false)
   , mFakeCharMsgs(aFakeCharMsgs && aFakeCharMsgs->Length() ?
                     aFakeCharMsgs : nullptr)
 {
@@ -1352,9 +1351,9 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
     keyboardLayout->ConvertNativeKeyCodeToDOMKeyCode(mOriginalVirtualKeyCode);
   // Be aware, keyboard utilities can change non-printable keys to printable
   // keys.  In such case, we should make the key value as a printable key.
-  mIsFollowedByNonControlCharMessage =
-    IsKeyDownMessage() && IsFollowedByNonControlCharMessage();
-  mKeyNameIndex = mIsFollowedByNonControlCharMessage ?
+  // FYI: IsFollowedByNonControlCharMessage() returns true only when it's
+  //      handling a keydown message.
+  mKeyNameIndex = IsFollowedByNonControlCharMessage() ?
     KEY_NAME_INDEX_USE_STRING :
     keyboardLayout->ConvertNativeKeyCodeToKeyNameIndex(mOriginalVirtualKeyCode);
   mCodeNameIndex =
@@ -2327,7 +2326,7 @@ NativeKey::NeedsToHandleWithoutFollowingCharMessages() const
   // If keydown message is followed by WM_CHAR whose wParam isn't a control
   // character, we should dispatch keypress event with the char message
   // even with any modifier state.
-  if (mIsFollowedByNonControlCharMessage) {
+  if (IsFollowedByNonControlCharMessage()) {
     return false;
   }
 
