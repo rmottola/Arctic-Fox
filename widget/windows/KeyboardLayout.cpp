@@ -3580,8 +3580,6 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
     "Printable key's key name index must be KEY_NAME_INDEX_USE_STRING");
 
   bool isKeyDown = aNativeKey.IsKeyDownMessage();
-  uint8_t shiftState =
-    VirtualKey::ModifiersToShiftState(aModKeyState.GetModifiers());
 
   if (IsDeadKey(virtualKey, aModKeyState)) {
     if ((isKeyDown && mActiveDeadKey < 0) ||
@@ -3590,10 +3588,11 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
       if (isKeyDown) {
         // Dead-key state activated at keydown.
         mActiveDeadKey = virtualKey;
-        mDeadKeyShiftState = shiftState;
+        mDeadKeyShiftState =
+          VirtualKey::ModifierKeyStateToShiftState(aModKeyState);
       }
       UniCharsAndModifiers deadChars =
-        mVirtualKeys[virtualKeyIndex].GetNativeUniChars(shiftState);
+        mVirtualKeys[virtualKeyIndex].GetNativeUniChars(aModKeyState);
       NS_ASSERTION(deadChars.mLength == 1,
                    "dead key must generate only one character");
       aNativeKey.mKeyNameIndex = KEY_NAME_INDEX_Dead;
@@ -3607,7 +3606,7 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
     // set only a character for current key for keyup event.
     if (mActiveDeadKey < 0) {
       aNativeKey.mCommittedCharsAndModifiers =
-        mVirtualKeys[virtualKeyIndex].GetUniChars(shiftState);
+        mVirtualKeys[virtualKeyIndex].GetUniChars(aModKeyState);
       return;
     }
 
@@ -3638,7 +3637,7 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
     UniCharsAndModifiers prevDeadChars =
       mVirtualKeys[activeDeadKeyIndex].GetUniChars(mDeadKeyShiftState);
     UniCharsAndModifiers newChars =
-      mVirtualKeys[virtualKeyIndex].GetUniChars(shiftState);
+      mVirtualKeys[virtualKeyIndex].GetUniChars(aModKeyState);
     // But keypress events should be fired for each committed character.
     aNativeKey.mCommittedCharsAndModifiers = prevDeadChars + newChars;
     if (isKeyDown) {
@@ -3652,7 +3651,7 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
   }
 
   UniCharsAndModifiers baseChars =
-    mVirtualKeys[virtualKeyIndex].GetUniChars(shiftState);
+    mVirtualKeys[virtualKeyIndex].GetUniChars(aModKeyState);
   if (mActiveDeadKey < 0) {
     // No dead-keys are active. Just return the produced characters.
     aNativeKey.mCommittedCharsAndModifiers = baseChars;
@@ -3673,8 +3672,6 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
   if (isKeyDown) {
     DeactivateDeadKeyState();
   }
-
-  return;
 }
 
 bool
@@ -3696,11 +3693,8 @@ KeyboardLayout::MaybeInitNativeKeyWithCompositeChar(
     return false;
   }
 
-  uint8_t shiftState =
-    VirtualKey::ModifiersToShiftState(aModKeyState.GetModifiers());
-
   UniCharsAndModifiers baseChars =
-    mVirtualKeys[virtualKeyIndex].GetUniChars(shiftState);
+    mVirtualKeys[virtualKeyIndex].GetUniChars(aModKeyState);
   if (baseChars.IsEmpty() || !baseChars.mChars[0]) {
     return false;
   }
