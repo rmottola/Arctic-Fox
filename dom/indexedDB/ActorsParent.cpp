@@ -10943,7 +10943,7 @@ DatabaseConnection::Close()
   AssertIsOnConnectionThread();
   MOZ_ASSERT(mStorageConnection);
   MOZ_ASSERT(!mDEBUGSavepointCount);
-  MOZ_RELEASE_ASSERT(!mInWriteTransaction);
+  MOZ_ASSERT(!mInWriteTransaction);
 
   PROFILER_LABEL("IndexedDB",
                  "DatabaseConnection::Close",
@@ -12619,7 +12619,7 @@ ConnectionPool::NoteIdleDatabase(DatabaseInfo* aDatabaseInfo)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(aDatabaseInfo);
-  MOZ_RELEASE_ASSERT(!aDatabaseInfo->TotalTransactionCount());
+  MOZ_ASSERT(!aDatabaseInfo->TotalTransactionCount());
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mThread);
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mRunnable);
   MOZ_ASSERT(!mIdleDatabases.Contains(aDatabaseInfo));
@@ -12793,7 +12793,7 @@ ConnectionPool::PerformIdleDatabaseMaintenance(DatabaseInfo* aDatabaseInfo)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(aDatabaseInfo);
-  MOZ_RELEASE_ASSERT(!aDatabaseInfo->TotalTransactionCount());
+  MOZ_ASSERT(!aDatabaseInfo->TotalTransactionCount());
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mThread);
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mRunnable);
   MOZ_ASSERT(aDatabaseInfo->mIdle);
@@ -19449,38 +19449,6 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromBlob(
 
 // static
 nsresult
-DatabaseOperationBase::BindKeyRangeToStatement(
-                                            const SerializedKeyRange& aKeyRange,
-                                            mozIStorageStatement* aStatement)
-{
-  MOZ_ASSERT(!IsOnBackgroundThread());
-  MOZ_ASSERT(aStatement);
-
-  nsresult rv = NS_OK;
-
-  if (!aKeyRange.lower().IsUnset()) {
-    rv = aKeyRange.lower().BindToStatement(aStatement, NS_LITERAL_CSTRING("lower_key"));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-  }
-
-  if (aKeyRange.isOnly()) {
-    return rv;
-  }
-
-  if (!aKeyRange.upper().IsUnset()) {
-    rv = aKeyRange.upper().BindToStatement(aStatement, NS_LITERAL_CSTRING("upper_key"));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-  }
-
-  return NS_OK;
-}
-
-// static
-nsresult
 DatabaseOperationBase::GetStructuredCloneReadInfoFromExternalBlob(
                                                  uint64_t aIntData,
                                                  FileManager* aFileManager,
@@ -19555,6 +19523,38 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromExternalBlob(
   } while (true);
 
   return rv;
+}
+
+// static
+nsresult
+DatabaseOperationBase::BindKeyRangeToStatement(
+                                            const SerializedKeyRange& aKeyRange,
+                                            mozIStorageStatement* aStatement)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aStatement);
+
+  nsresult rv = NS_OK;
+
+  if (!aKeyRange.lower().IsUnset()) {
+    rv = aKeyRange.lower().BindToStatement(aStatement, NS_LITERAL_CSTRING("lower_key"));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  if (aKeyRange.isOnly()) {
+    return rv;
+  }
+
+  if (!aKeyRange.upper().IsUnset()) {
+    rv = aKeyRange.upper().BindToStatement(aStatement, NS_LITERAL_CSTRING("upper_key"));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  return NS_OK;
 }
 
 // static
