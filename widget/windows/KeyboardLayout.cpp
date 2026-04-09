@@ -3654,7 +3654,7 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
 
   // If the key press isn't related to any dead keys, initialize aNativeKey
   // with the characters which should be caused by the key.
-  if (mActiveDeadKey < 0) {
+  if (!IsInDeadKeySequence()) {
     aNativeKey.mCommittedCharsAndModifiers = baseChars;
     return;
   }
@@ -3690,7 +3690,7 @@ KeyboardLayout::MaybeInitNativeKeyAsDeadKey(
   // If it's a keydown event but not in dead key sequence or it's a keyup
   // event of a dead key which activated current dead key sequence,
   // initialize aNativeKey as a dead key event.
-  if ((aNativeKey.IsKeyDownMessage() && mActiveDeadKey < 0) ||
+  if ((aNativeKey.IsKeyDownMessage() && !IsInDeadKeySequence()) ||
       (!aNativeKey.IsKeyDownMessage() &&
        mActiveDeadKey == aNativeKey.mOriginalVirtualKeyCode)) {
     ActivateDeadKeyState(aNativeKey, aModKeyState);
@@ -3714,7 +3714,7 @@ KeyboardLayout::MaybeInitNativeKeyAsDeadKey(
   // key before next WM_KEYDOWN.  E.g., due to auto key repeat or pressing
   // another dead key before releasing current key.  Therefore, we can
   // set only a character for current key for keyup event.
-  if (mActiveDeadKey < 0) {
+  if (!IsInDeadKeySequence()) {
     aNativeKey.mCommittedCharsAndModifiers =
       GetUniCharsAndModifiers(aNativeKey.mOriginalVirtualKeyCode, aModKeyState);
     return true;
@@ -3766,7 +3766,7 @@ KeyboardLayout::MaybeInitNativeKeyWithCompositeChar(
                   NativeKey& aNativeKey,
                   const ModifierKeyState& aModKeyState)
 {
-  if (mActiveDeadKey < 0) {
+  if (!IsInDeadKeySequence()) {
     return false;
   }
 
