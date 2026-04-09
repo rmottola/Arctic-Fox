@@ -2400,7 +2400,7 @@ NativeKey::MayBeSameCharMessage(const MSG& aCharMsg1,
 }
 
 bool
-NativeKey::GetFollowingCharMessage(MSG& aCharMsg, bool aRemove) const
+NativeKey::GetFollowingCharMessage(MSG& aCharMsg) const
 {
   MOZ_ASSERT(IsKeyDownMessage());
   MOZ_ASSERT(!IsKeyMessageOnPlugin());
@@ -2414,7 +2414,7 @@ NativeKey::GetFollowingCharMessage(MSG& aCharMsg, bool aRemove) const
         continue;
       }
       MSG charMsg = fakeCharMsg.GetCharMsg(mMsg.hwnd);
-      fakeCharMsg.mConsumed = aRemove;
+      fakeCharMsg.mConsumed = true;
       if (!IsCharMessage(charMsg)) {
         return false;
       }
@@ -2434,11 +2434,6 @@ NativeKey::GetFollowingCharMessage(MSG& aCharMsg, bool aRemove) const
                              PM_NOREMOVE | PM_NOYIELD) ||
       !IsCharMessage(nextKeyMsg)) {
     return false;
-  }
-
-  if (!aRemove) {
-    aCharMsg = nextKeyMsg;
-    return true;
   }
 
   // On Metrofox, PeekMessage() sometimes returns WM_NULL even if we specify
