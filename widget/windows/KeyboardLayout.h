@@ -657,7 +657,13 @@ private:
                                   uint16_t aShiftStatesWithBaseChars,
                                   DeadKeyEntry* aDeadKeyArray,
                                   uint32_t aMaxEntries);
+  /**
+   * Activates or deactivates dead key state.
+   */
+  void ActivateDeadKeyState(const NativeKey& aNativeKey,
+                            const ModifierKeyState& aModKeyState);
   void DeactivateDeadKeyState();
+
   const DeadKeyTable* AddDeadKeyTable(const DeadKeyEntry* aDeadKeyArray,
                                       uint32_t aEntries);
   void ReleaseDeadKeyTables();
