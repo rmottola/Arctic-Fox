@@ -1749,7 +1749,7 @@ TabChild::RecvPluginEvent(const WidgetPluginEvent& aEvent)
 
 void
 TabChild::RequestNativeKeyBindings(AutoCacheNativeKeyCommands* aAutoCache,
-                                   WidgetKeyboardEvent* aEvent)
+                                   const WidgetKeyboardEvent* aEvent)
 {
   MaybeNativeKeyBinding maybeBindings;
   if (!SendRequestNativeKeyBindings(*aEvent, &maybeBindings)) {
