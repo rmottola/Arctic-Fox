@@ -32,7 +32,6 @@
                    autocompletepopup="PopupSearchAutoComplete"
                    autocompletesearch="search-autocomplete"
                    autocompletesearchparam="searchbar-history"
-                   timeout="250"
                    maxrows="10"
                    completeselectedindex="true"
                    minresultsforpopup="0"
@@ -43,12 +42,6 @@
         children differently)
         -->
         <xul:box>
-          <xul:hbox class="searchbar-search-button-container">
-            <xul:image class="searchbar-search-button"
-                       anonid="searchbar-search-button"
-                       xbl:inherits="addengines"
-                       tooltiptext="&searchEndCap.label;"/>
-          </xul:hbox>
           <xul:button class="searchbar-engine-button"
                       type="menu"
                       anonid="searchbar-engine-button">
@@ -371,12 +364,61 @@
         ]]></body>
       </method>
 
-      <!-- This is called by the observer when the list of visible engines,
-           or the currently selected engine, has changed.
+      <!-- Rebuilds the list of visible search engines in the menu.  Does not remove
+           or update any dynamic entries (i.e., "Add this engine" items) nor the
+           Manage Engines item.  This is called by the observer when the list of
+           visible engines, or the currently selected engine, has changed.
       -->
       <method name="rebuildPopup">
         <body><![CDATA[
-          this._textbox.popup.updateHeader();
+          var popup = this._popup;
+
+          // Clear the popup, down to the first separator
+          while (popup.firstChild && popup.firstChild.localName != "menuseparator")
+            popup.removeChild(popup.firstChild);
+
+          const kXULNS =
+               "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+
+          var engines = this.engines;
+          for (var i = engines.length - 1; i >= 0; --i) {
+            var menuitem = document.createElementNS(kXULNS, "menuitem");
+            var name = engines[i].name;
+            menuitem.setAttribute("label", name);
+            menuitem.setAttribute("id", name);
+            menuitem.setAttribute("class", "menuitem-iconic searchbar-engine-menuitem menuitem-with-favicon");
+            // Since this menu is rebuilt by the observer method whenever a new
+            // engine is selected, the "selected" attribute does not need to be
+            // explicitly cleared anywhere.
+            if (engines[i] == this.currentEngine)
+              menuitem.setAttribute("selected", "true");
+            var tooltip = this._stringBundle.getFormattedString("searchtip", [name]);
+            menuitem.setAttribute("tooltiptext", tooltip);
+            if (engines[i].iconURI)
+              this.setIcon(menuitem, engines[i].iconURI.spec);
+            popup.insertBefore(menuitem, popup.firstChild);
+            menuitem.engine = engines[i];
+          }
+          this._needToBuildPopup = false;
+        ]]></body>
+      </method>
+
+      <method name="openManager">
+        <parameter name="aEvent"/>
+        <body><![CDATA[
+          var wm =
+                Components.classes["@mozilla.org/appshell/window-mediator;1"]
+                          .getService(Components.interfaces.nsIWindowMediator);
+
+          var window = wm.getMostRecentWindow("Browser:SearchManager");
+          if (window)
+            window.focus()
+          else {
+            setTimeout(function () {
+              openDialog("chrome://browser/content/search/engineManager.xul",
+                         "_blank", "chrome,dialog,modal,centerscreen,resizable");
+            }, 0);
+          }
         ]]></body>
       </method>
 
@@ -403,25 +445,6 @@
           }
           else if (aShowOnlySettingsIfEmpty) {
             this.setAttribute("showonlysettings", "true");
-          }
-        ]]></body>
-      </method>
-
-      <method name="openManager">
-        <parameter name="aEvent"/>
-        <body><![CDATA[
-          var wm =
-                Components.classes["@mozilla.org/appshell/window-mediator;1"]
-                          .getService(Components.interfaces.nsIWindowMediator);
-
-          var window = wm.getMostRecentWindow("Browser:SearchManager");
-          if (window)
-            window.focus()
-          else {
-            setTimeout(function () {
-              openDialog("chrome://browser/content/search/engineManager.xul",
-                         "_blank", "chrome,dialog,modal,centerscreen,resizable");
-            }, 0);
           }
         ]]></body>
       </method>
@@ -702,7 +725,7 @@
         <body><![CDATA[
           var popup = this.popup;
           if (!popup.mPopupOpen) {
-            // Initially the panel used for the searchbar (PopupAutoComplete
+            // Initially the panel used for the searchbar (PopupSearchAutoComplete
             // in browser.xul) is hidden to avoid impacting startup / new
             // window performance. The base binding's openPopup would normally
             // call the overriden openAutocompletePopup in urlbarBindings.xml's
@@ -1363,8 +1386,18 @@
         if (!engine)
           return;
 
-        let searchbar = document.getElementById("searchbar");
-        searchbar.handleSearchCommand(event, engine);
+        // For some reason, if the context menu had been opened prior to the
+        // click, the suggestions popup won't be closed after loading the search
+        // in the current tab - so we hide it manually. Some focusing magic
+        // that happens when a search is loaded ensures that the popup is opened
+        // again if it needs to be, so we don't need to worry about which cases
+        // require manual hiding.
+        this.popup.hidePopup();
+
+        // Select the clicked button so that consumers can easily tell which
+        // button was acted on.
+        this.selectedButton = button;
+        this.handleSearchCommand(event, engine);
       ]]></handler>
 
       <handler event="command"><![CDATA[
