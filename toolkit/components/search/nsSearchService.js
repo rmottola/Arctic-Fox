@@ -234,7 +234,7 @@ function DO_LOG(aText) {
  * default. This can be overridden at startup by the pref, see SearchService's
  * _init method.
  */
-var LOG = function(){};
+var LOG = function() {};
 
 if (AppConstants.DEBUG) {
   LOG = function (aText) {
@@ -397,7 +397,7 @@ function geoSpecificDefaultsEnabled() {
   let geoSpecificDefaults = false;
   try {
     geoSpecificDefaults = Services.prefs.getBoolPref("browser.search.geoSpecificDefaults");
-  } catch(e) {}
+  } catch (e) {}
 
   return geoSpecificDefaults;
 }
@@ -462,7 +462,7 @@ function getIsUS() {
   // If we've got a region pref, trust it.
   try {
     return Services.prefs.getCharPref("browser.search.region") == "US";
-  } catch(e) {}
+  } catch (e) {}
 
   // So we are en-US but have no region pref - fallback to hacky timezone check.
   let isNA = isUSTimezone();
@@ -507,7 +507,7 @@ var ensureKnownCountryCode = Task.async(function* (ss) {
   let countryCode;
   try {
     countryCode = Services.prefs.getCharPref("browser.search.countryCode");
-  } catch(e) {}
+  } catch (e) {}
 
   if (!countryCode) {
     // We don't have it cached, so fetch it. fetchCountryCode() will call
@@ -733,7 +733,7 @@ var fetchRegionDefault = (ss) => new Promise(resolve => {
   let cohort;
   try {
     cohort = Services.prefs.getCharPref(cohortPref);
-  } catch(e) {}
+  } catch (e) {}
   if (cohort)
     endpoint += "/" + cohort;
 
@@ -2249,7 +2249,7 @@ Engine.prototype = {
       let path;
       try {
         path = getDir(knownDirs[key]).path;
-      } catch(e) {
+      } catch (e) {
         // Getting XRE_APP_DISTRIBUTION_DIR throws during unit tests.
         continue;
       }
@@ -3184,7 +3184,7 @@ SearchService.prototype = {
       if (!json.engines || !json.engines.length)
         throw "no engine in the file";
       return json;
-    } catch(ex) {
+    } catch (ex) {
       LOG("_readCacheFile: Error reading cache file: " + ex);
     } finally {
       stream.close();
@@ -3214,7 +3214,7 @@ SearchService.prototype = {
       json._oldMetadata = metadata;
 
       return json;
-    } catch(ex) {
+    } catch (ex) {
       LOG("_readCacheFile: failed to read old metadata: " + ex);
       return {};
     } finally {
@@ -3621,7 +3621,7 @@ SearchService.prototype = {
     let searchSettings;
     try {
       searchSettings = JSON.parse(list);
-    } catch(e) {
+    } catch (e) {
       LOG("failing to parse list.json: " + e);
       return;
     }
@@ -3927,7 +3927,7 @@ SearchService.prototype = {
     this._ensureInitialized();
     function isDefault(engine) {
       return engine._isDefault;
-    };
+    }
     var engines = this._sortedEngines.filter(isDefault);
     var engineOrder = {};
     var engineName;
@@ -4263,7 +4263,7 @@ SearchService.prototype = {
     let engine;
     try {
       engine = this.defaultEngine;
-    } catch(e) {
+    } catch (e) {
       // The defaultEngine getter will throw if there's no engine at all,
       // which shouldn't happen unless an add-on or a test deleted all of them.
       // Our preferences UI doesn't let users do that.
@@ -4306,7 +4306,7 @@ SearchService.prototype = {
               sendSubmissionURL = true;
               break;
             }
-          } catch(e) {}
+          } catch (e) {}
         }
 
         let prefNameBase = getGeoSpecificPrefName(BROWSER_SEARCH_PREF + "order");
@@ -4439,8 +4439,14 @@ SearchService.prototype = {
     // Quick helper method to ensure formData filtered/sorted for compares.
     let getSortedFormData = data => {
       return data.filter(a => a.name && a.value).sort((a, b) => {
-        return (a.name > b.name) ? 1 : (b.name > a.name) ? -1 :
-               (a.value > b.value) ? 1 : (b.value > a.value) ? -1 : 0;
+        if (a.name > b.name) {
+          return 1;
+        } else if (b.name > a.name) {
+          return -1;
+        } else if (a.value > b.value) {
+          return 1;
+        }
+        return (b.value > a.value) ? -1 : 0;
       });
     };
 
@@ -4457,7 +4463,7 @@ SearchService.prototype = {
             url.template != template ||
             url.params.length != sortedFormLength) {
           return false;
-        };
+        }
 
         // Ensure engineURL formData is pre-sorted. Then, we're
         // not an engineURL match if any queryParam doesn't compare.
@@ -4469,8 +4475,8 @@ SearchService.prototype = {
               param.value != formData.value ||
               param.purpose != formData.purpose) {
             return false;
-          };
-        };
+          }
+        }
         // Else we're a match.
         return true;
       });
