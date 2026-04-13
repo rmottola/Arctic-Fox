@@ -237,7 +237,7 @@ function DO_LOG(aText) {
 var LOG = function() {};
 
 if (AppConstants.DEBUG) {
-  LOG = function (aText) {
+  LOG = function(aText) {
     if (getBoolPref(BROWSER_SEARCH_PREF + "log", false)) {
       DO_LOG(aText);
     }
@@ -2116,7 +2116,8 @@ Engine.prototype = {
     return this.getAttr("alias");
   },
   set alias(val) {
-    this.setAttr("alias", val);
+    var value = val ? val.trim() : null;
+    this.setAttr("alias", value);
     notifyAction(this, SEARCH_ENGINE_CHANGED);
   },
 
@@ -2472,7 +2473,7 @@ Engine.prototype = {
   /**
    * Returns URL parsing properties used by _buildParseSubmissionMap.
    */
-  getURLParsingInfo: function () {
+  getURLParsingInfo: function() {
     let responseType = AppConstants.platform == "android" ? this._defaultMobileResponseType :
                                                             URLTYPE_SEARCH_HTML;
 
