@@ -350,6 +350,18 @@ StringEndsWith(const std::string& name, const std::string& suffix)
   return name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
+void internal_DispatchToMainThread(already_AddRefed<nsIRunnable>&& aEvent)
+{
+  nsCOMPtr<nsIRunnable> event(aEvent);
+  nsCOMPtr<nsIThread> thread;
+  nsresult rv = NS_GetMainThread(getter_AddRefs(thread));
+  if (NS_FAILED(rv)) {
+    NS_WARNING("NS_FAILED DispatchToMainThread. Maybe we're shutting down?");
+    return;
+  }
+  thread->Dispatch(event, 0);
+}
+
 } // namespace
 
 
@@ -1372,7 +1384,7 @@ void internal_armIPCTimer()
   if (NS_IsMainThread()) {
     internal_armIPCTimerMainThread();
   } else {
-    NS_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
+    internal_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
       StaticMutexAutoLock locker(gTelemetryHistogramMutex);
       internal_armIPCTimerMainThread();
     }));
@@ -1389,7 +1401,7 @@ internal_RemoteAccumulate(mozilla::Telemetry::ID aId, uint32_t aSample)
     gAccumulations = new nsTArray<Accumulation>();
   }
   if (gAccumulations->Length() == kAccumulationsArrayHighWaterMark) {
-    NS_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
+    internal_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
       TelemetryHistogram::IPCTimerFired(nullptr, nullptr);
     }));
   }
@@ -1409,7 +1421,7 @@ internal_RemoteAccumulate(mozilla::Telemetry::ID aId,
     gKeyedAccumulations = new nsTArray<KeyedAccumulation>();
   }
   if (gKeyedAccumulations->Length() == kAccumulationsArrayHighWaterMark) {
-    NS_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
+    internal_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
       TelemetryHistogram::IPCTimerFired(nullptr, nullptr);
     }));
   }
