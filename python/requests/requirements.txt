@@ -1,5 +1,5 @@
 py==1.4.30
-pytest==2.8.1
+pytest==9.0.3
 pytest-cov==2.1.0
 pytest-httpbin==0.0.7
 httpbin==0.4.0
