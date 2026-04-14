@@ -143,9 +143,10 @@ nsUXThemeData::InitTitlebarInfo()
   sCommandButtons[3].cx = sCommandButtons[0].cx * 3;
   sCommandButtons[3].cy = sCommandButtons[0].cy;
 
-  // Trigger a refresh on the next layout.
-  sTitlebarInfoPopulatedAero = sTitlebarInfoPopulatedThemed = false;
-
+  // Use system metrics for pre-vista, otherwise trigger a
+  // refresh on the next layout.
+  sTitlebarInfoPopulatedAero = sTitlebarInfoPopulatedThemed =
+    !IsVistaOrLater();
 }
 
 // static
@@ -167,7 +168,8 @@ nsUXThemeData::UpdateTitlebarInfo(HWND aWnd)
     }
   }
 
-  if (sTitlebarInfoPopulatedThemed)
+  // NB: sTitlebarInfoPopulatedThemed is always true pre-vista.
+  if (sTitlebarInfoPopulatedThemed || IsWin8OrLater())
     return;
 
   // Query a temporary, visible window with command buttons to get
@@ -296,7 +298,7 @@ void
 nsUXThemeData::UpdateNativeThemeInfo()
 {
   // Trigger a refresh of themed button metrics if needed
-  sTitlebarInfoPopulatedThemed = false;
+  sTitlebarInfoPopulatedThemed = !IsVistaOrLater();
 
   sIsDefaultWindowsTheme = false;
   sThemeId = LookAndFeel::eWindowsTheme_Generic;
