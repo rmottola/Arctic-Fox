@@ -3,7 +3,7 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 var GMPScope = Cu.import("resource://gre/modules/addons/GMPProvider.jsm");
 Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/UpdateUtils.jsm");
@@ -26,7 +26,8 @@ for (let plugin of GMPScope.GMP_PLUGINS) {
       descriptionId: plugin.description,
   });
   gMockAddons.set(mockAddon.id, mockAddon);
-  if (mockAddon.id.indexOf("gmp-eme-") == 0) {
+  if (mockAddon.id == "gmp-widevinecdm" ||
+      mockAddon.id.indexOf("gmp-eme-") == 0) {
     gMockEmeAddons.set(mockAddon.id, mockAddon);
   }
 }
@@ -39,7 +40,10 @@ function MockGMPInstallManager() {
 }
 
 MockGMPInstallManager.prototype = {
-  checkForAddons: () => Promise.resolve([...gMockAddons.values()]),
+  checkForAddons: () => Promise.resolve({
+    usedFallback: true,
+    gmpAddons: [...gMockAddons.values()]
+  }),
 
   installAddon: addon => {
     gInstalledAddonId = addon.id;
