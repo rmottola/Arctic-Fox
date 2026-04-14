@@ -926,7 +926,6 @@ add_task(function* test_addonsWatch_InterestingChange() {
   // We only expect a single notification for each install, uninstall, enable, disable.
   const EXPECTED_NOTIFICATIONS = 4;
 
-  let deferred = PromiseUtils.defer();
   let receivedNotifications = 0;
 
   let registerCheckpointPromise = (aExpected) => {
@@ -1248,7 +1247,6 @@ add_task(function* test_collectionWithbrokenAddonData() {
                                          AddonManager.SIGNEDSTATE_NOT_REQUIRED,
   };
 
-  let deferred = PromiseUtils.defer();
   let receivedNotifications = 0;
 
   let registerCheckpointPromise = (aExpected) => {

@@ -187,7 +187,7 @@ add_task(function* setupEnvironment() {
  */
 add_task(function* test_recent_pings_sent() {
   let pingTypes = [{ num: RECENT_PINGS }];
-  let recentPings = yield createSavedPings(pingTypes);
+  yield createSavedPings(pingTypes);
 
   yield TelemetryController.reset();
   yield TelemetrySend.testWaitOnOutgoingPings();

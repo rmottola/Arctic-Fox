@@ -59,7 +59,7 @@ CrashService.prototype = Object.freeze({
     switch (topic) {
       case "profile-after-change":
         // Side-effect is the singleton is instantiated.
-        let m = Services.crashmanager;
+        Services.crashmanager;
         break;
     }
   },
