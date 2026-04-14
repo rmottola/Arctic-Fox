@@ -520,10 +520,6 @@ GMPDownloader.prototype = {
         // Success, set the prefs
         let now = Math.round(Date.now() / 1000);
         GMPPrefs.set(GMPPrefs.KEY_PLUGIN_LAST_UPDATE, now, gmpAddon.id);
-        // Reset the trial create pref, so that Gecko knows to do a test
-        // run before reporting that the GMP works to content.
-        GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_TRIAL_CREATE, gmpAddon.version,
-                       gmpAddon.id);
         // Remember our ABI, so that if the profile is migrated to another
         // platform or from 32 -> 64 bit, we notice and don't try to load the
         // unexecutable plugin library.
