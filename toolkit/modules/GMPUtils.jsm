@@ -82,15 +82,16 @@ this.GMPUtils = {
       // Windows Vista and later only supported by Adobe EME.
       return AppConstants.isPlatformAndVersionAtLeast("win", "6");
     } else if (aPlugin.id == WIDEVINE_ID) {
-      // The Widevine plugin is available for Windows versions Vista and later
-      // and Mac
-      if ((Services.appinfo.OS == "WINNT" &&
-          Services.sysinfo.getPropertyAsInt32("version") >= 6) ||
-          Services.appinfo.OS == "Darwin") {
+      // The Widevine plugin is available for Windows versions Vista and later,
+      // and Mac 10.7 or later, and Linux
+      if (AppConstants.isPlatformAndVersionAtLeast("win", "6") ||
+          AppConstants.isPlatformAndVersionAtLeast("macosx", "10.7")  ||
+          AppConstants.platform == "linux") {
         return true;
       }
       return false;
     }
+
     return true;
   },
 
