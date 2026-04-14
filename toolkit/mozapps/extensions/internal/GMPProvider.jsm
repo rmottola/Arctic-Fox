@@ -85,8 +85,6 @@ XPCOMUtils.defineLazyGetter(this, "pluginsBundle",
 XPCOMUtils.defineLazyGetter(this, "gmpService",
   () => Cc["@mozilla.org/gecko-media-plugin-service;1"].getService(Ci.mozIGeckoMediaPluginChromeService));
 
-XPCOMUtils.defineLazyGetter(this, "telemetryService", () => Services.telemetry);
-
 var messageManager = Cc["@mozilla.org/globalmessagemanager;1"]
                        .getService(Ci.nsIMessageListenerManager);
 
@@ -487,18 +485,18 @@ GMPWrapper.prototype = {
       infoName = id + ".info";
     }
 
-    return {
-      libraryMissing: !fileExists(this.gmpPath, libName),
-      infoMissing: !fileExists(this.gmpPath, infoName),
-      voucherMissing: this._plugin.id == EME_ADOBE_ID
-                      && !fileExists(this.gmpPath, id + ".voucher"),
-    };
+    return fileExists(this.gmpPath, libName) &&
+           fileExists(this.gmpPath, infoName) &&
+           (this._plugin.id != EME_ADOBE_ID || fileExists(this.gmpPath, id + ".voucher"));
   },
 
   validate: function() {
     if (!this.isInstalled) {
       // Not installed -> Valid.
-      return { installed: false, valid: true };
+      return {
+        installed: false,
+        valid: true
+      };
     }
 
     let abi = GMPPrefs.get(GMPPrefs.KEY_PLUGIN_ABI, UpdateUtils.ABI, this._plugin.id);
@@ -513,30 +511,11 @@ GMPWrapper.prototype = {
     }
 
     // Installed -> Check if files are missing.
-    let status = this._arePluginFilesOnDisk();
-    status.installed = true;
-    status.mismatchedABI = false;
-    status.valid = true;
-    status.missing = [];
-    status.telemetry = 0;
-
-    if (status.libraryMissing) {
-      status.valid = false;
-      status.missing.push('library');
-      status.telemetry += 1;
-    }
-    if (status.infoMissing) {
-      status.valid = false;
-      status.missing.push('info');
-      status.telemetry += 2;
-    }
-    if (status.voucherMissing) {
-      status.valid = false;
-      status.missing.push('voucher');
-      status.telemetry += 4;
-    }
-
-    return status;
+    let filesOnDisk = this._arePluginFilesOnDisk();
+    return {
+      installed: true,
+      valid: filesOnDisk
+    };
   },
 };
 
@@ -569,15 +548,9 @@ var GMPProvider = {
           wrapper.uninstallPlugin();
           continue;
         }
-        if (validation.installed && wrapper.missingFilesKey) {
-          telemetryService.getHistogramById(wrapper.missingFilesKey).add(validation.telemetry);
-        }
         if (!validation.valid) {
           this._log.info("startup - gmp " + plugin.id +
-                         " missing [" + validation.missing + "], uninstalling");
-          if (wrapper.missingKey) {
-            telemetryService.getHistogramById(wrapper.missingKey).add(true);
-          }
+                         " invalid, uninstalling");
           wrapper.uninstallPlugin();
           continue;
         }
