@@ -69,6 +69,9 @@ this.GMPUtils = {
    *          The plugin to check.
    */
   _isPluginSupported: function(aPlugin) {
+    if (this._isPluginForceSupported(aPlugin)) {
+      return true;
+    }
     if (aPlugin.id == EME_ADOBE_ID) {
       if (Services.appinfo.OS != "WINNT") {
         // Non-Windows OSes currently unsupported by Adobe EME
