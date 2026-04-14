@@ -73,12 +73,6 @@ this.GMPUtils = {
       return true;
     }
     if (aPlugin.id == EME_ADOBE_ID) {
-      if (Services.appinfo.OS != "WINNT") {
-        // Non-Windows OSes currently unsupported by Adobe EME
-        this.maybeReportTelemetry(aPlugin.id,
-                                  "VIDEO_EME_ADOBE_UNSUPPORTED_REASON",
-                                  GMPPluginUnsupportedReason.NOT_WINDOWS);
-      }
       // Windows Vista and later only supported by Adobe EME.
       return AppConstants.isPlatformAndVersionAtLeast("win", "6");
     } else if (aPlugin.id == WIDEVINE_ID) {
@@ -123,31 +117,6 @@ this.GMPUtils = {
   _isPluginForceSupported: function(aPlugin) {
     return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_FORCE_SUPPORTED, false, aPlugin.id);
   },
-
-  /**
-   * Report telemetry value, but only for Adobe CDM and only once per key
-   * per session.
-   */
-  maybeReportTelemetry: function(aPluginId, key, value) {
-    if (aPluginId != EME_ADOBE_ID) {
-      // Only report for Adobe CDM.
-      return;
-    }
-
-    if (!this.reportedKeys) {
-      this.reportedKeys = [];
-    }
-    if (this.reportedKeys.indexOf(key) >= 0) {
-      // Only report each key once per session.
-      return;
-    }
-    this.reportedKeys.push(key);
-
-    let hist = Services.telemetry.getHistogramById(key);
-    if (hist) {
-      hist.add(value);
-    }
-  }
 };
 
 /**
