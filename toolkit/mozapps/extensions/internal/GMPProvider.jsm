@@ -210,7 +210,7 @@ GMPWrapper.prototype = {
   get updateDate() {
     let time = Number(GMPPrefs.get(GMPPrefs.KEY_PLUGIN_LAST_UPDATE, null,
                                    this._plugin.id));
-    if (time !== NaN && this.isInstalled) {
+    if (!isNaN(time) && this.isInstalled) {
       return new Date(time * 1000)
     }
     return null;
@@ -412,7 +412,7 @@ GMPWrapper.prototype = {
       return;
     }
     let {status: status, keySystem: keySystem} = parsedData;
-    if (status == "cdm-not-installed" || status == "cdm-insufficient-version") {
+    if (status == "cdm-not-installed") {
       this.checkForUpdates(0);
     }
   },
@@ -662,7 +662,6 @@ var GMPProvider = {
   },
 
   buildPluginList: function() {
-
     this._plugins = new Map();
     for (let aPlugin of GMP_PLUGINS) {
       let plugin = {
