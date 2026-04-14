@@ -226,13 +226,18 @@ GMPInstallManager.prototype = {
       let addonsToInstall = gmpAddons.filter(function(gmpAddon) {
         log.info("Found addon: " + gmpAddon.toString());
 
-        if (gmpAddon.isInstalled) {
-          log.info("Addon |" + gmpAddon.id + "| already installed.");
+        if (!gmpAddon.isValid) {
+          log.info("Addon |" + gmpAddon.id + "| is invalid.");
           return false;
         }
 
-        if (gmpAddon.isEME && isXPOrVista64) {
-          log.info("Addon |" + gmpAddon.id + "| not supported on this platform.");
+        if (GMPUtils.isPluginHidden(gmpAddon)) {
+          log.info("Addon |" + gmpAddon.id + "| has been hidden.");
+          return false;
+        }
+
+        if (gmpAddon.isInstalled) {
+          log.info("Addon |" + gmpAddon.id + "| already installed.");
           return false;
         }
 

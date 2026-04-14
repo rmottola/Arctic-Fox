@@ -142,7 +142,7 @@ this.GMPUtils = {
     if (hist) {
       hist.add(value);
     }
-  },
+  }
 };
 
 /**
