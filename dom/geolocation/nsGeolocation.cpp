@@ -1184,11 +1184,13 @@ void
 Geolocation::GetCurrentPosition(PositionCallback& aCallback,
                                 PositionErrorCallback* aErrorCallback,
                                 const PositionOptions& aOptions,
+                                CallerType aCallerType,
                                 ErrorResult& aRv)
 {
   nsresult rv = GetCurrentPosition(GeoPositionCallback(&aCallback),
                                    GeoPositionErrorCallback(aErrorCallback),
-                                   Move(CreatePositionOptionsCopy(aOptions)));
+                                   Move(CreatePositionOptionsCopy(aOptions)),
+                                   aCallerType);
 
   if (NS_FAILED(rv)) {
     aRv.Throw(rv);
@@ -1197,22 +1199,11 @@ Geolocation::GetCurrentPosition(PositionCallback& aCallback,
   return;
 }
 
-NS_IMETHODIMP
-Geolocation::GetCurrentPosition(nsIDOMGeoPositionCallback* aCallback,
-                                nsIDOMGeoPositionErrorCallback* aErrorCallback,
-                                UniquePtr<PositionOptions>&& aOptions)
-{
-  NS_ENSURE_ARG_POINTER(aCallback);
-
-  return GetCurrentPosition(GeoPositionCallback(aCallback),
-                            GeoPositionErrorCallback(aErrorCallback),
-                            Move(aOptions));
-}
-
 nsresult
 Geolocation::GetCurrentPosition(GeoPositionCallback callback,
                                 GeoPositionErrorCallback errorCallback,
-                                UniquePtr<PositionOptions>&& options)
+                                UniquePtr<PositionOptions>&& options,
+                                CallerType aCallerType)
 {
   if (mPendingCallbacks.Length() > MAX_GEO_REQUESTS_PER_WINDOW) {
     return NS_ERROR_NOT_AVAILABLE;
@@ -1235,7 +1226,7 @@ Geolocation::GetCurrentPosition(GeoPositionCallback callback,
     return NS_OK;
   }
 
-  if (!mOwner && !nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (!mOwner && aCallerType != CallerType::System) {
     return NS_ERROR_FAILURE;
   }
 
@@ -1253,7 +1244,7 @@ Geolocation::GetCurrentPositionReady(nsGeolocationRequest* aRequest)
     return NS_OK;
   }
 
-  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (aCallerType != CallerType::System) {
     return NS_ERROR_FAILURE;
   }
 
@@ -1267,12 +1258,15 @@ int32_t
 Geolocation::WatchPosition(PositionCallback& aCallback,
                            PositionErrorCallback* aErrorCallback,
                            const PositionOptions& aOptions,
+                           CallerType aCallerType,
                            ErrorResult& aRv)
 {
   int32_t ret = 0;
   nsresult rv = WatchPosition(GeoPositionCallback(&aCallback),
                               GeoPositionErrorCallback(aErrorCallback),
-                              Move(CreatePositionOptionsCopy(aOptions)), &ret);
+                              Move(CreatePositionOptionsCopy(aOptions)),
+                              aCallerType,
+                              &ret);
 
   if (NS_FAILED(rv)) {
     aRv.Throw(rv);
@@ -1291,13 +1285,15 @@ Geolocation::WatchPosition(nsIDOMGeoPositionCallback *aCallback,
 
   return WatchPosition(GeoPositionCallback(aCallback),
                        GeoPositionErrorCallback(aErrorCallback),
-                       Move(aOptions), aRv);
+                       Move(aOptions), CallerType::System,
+                       aRv);
 }
 
 nsresult
 Geolocation::WatchPosition(GeoPositionCallback aCallback,
                            GeoPositionErrorCallback aErrorCallback,
                            UniquePtr<PositionOptions>&& aOptions,
+                           CallerType aCallerType,
                            int32_t* aRv)
 {
   if (mWatchingCallbacks.Length() > MAX_GEO_REQUESTS_PER_WINDOW) {
@@ -1322,7 +1318,7 @@ Geolocation::WatchPosition(GeoPositionCallback aCallback,
     return NS_OK;
   }
 
-  if (!mOwner && !nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (!mOwner && aCallerType != CallerType::System) {
     return NS_ERROR_FAILURE;
   }
 
@@ -1339,7 +1335,7 @@ Geolocation::WatchPositionReady(nsGeolocationRequest* aRequest)
     return NS_OK;
   }
 
-  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
+  if (aCallerType != CallerType::System) {
     return NS_ERROR_FAILURE;
   }
 
