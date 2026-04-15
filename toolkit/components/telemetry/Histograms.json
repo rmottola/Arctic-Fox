@@ -10642,5 +10642,15 @@
     "high": 300000,
     "n_buckets": 30,
     "description": "Time in MS that content is narrated in 10 second increments up to 5 minutes"
+  },
+  "TABCHILD_PAINT_TIME": {
+    "alert_emails": ["mconley@mozilla.com"],
+    "bug_numbers": [1313686],
+    "expires_in_version": "56",
+    "kind": "exponential",
+    "high": 1000,
+    "n_buckets": 50,
+    "description": "Time spent painting the contents of a remote browser (ms).",
+    "releaseChannelCollection": "opt-out"
   }
 }
