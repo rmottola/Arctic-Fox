@@ -505,6 +505,8 @@ nsGeolocationRequest::GetRequester(nsIContentPermissionRequester** aRequester)
 void
 nsGeolocationRequest::SetTimeoutTimer()
 {
+  MOZ_ASSERT(!mShutdown, "set timeout after shutdown");
+
   StopTimeoutTimer();
 
   if (mOptions && mOptions->mTimeout != 0 && mOptions->mTimeout != 0x7fffffff) {
@@ -574,7 +576,10 @@ nsGeolocationRequest::SendLocation(nsIDOMGeoPosition* aPosition)
     MOZ_ASSERT(callback);
     callback->HandleEvent(aPosition);
   }
-  SetTimeoutTimer();
+
+  if (mIsWatchPositionRequest && !mShutdown) {
+    SetTimeoutTimer();
+  }
   MOZ_ASSERT(mShutdown || mIsWatchPositionRequest,
              "non-shutdown getCurrentPosition request after callback!");
 }
