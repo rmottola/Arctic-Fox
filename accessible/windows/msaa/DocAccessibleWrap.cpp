@@ -9,7 +9,6 @@
 #include "Compatibility.h"
 #include "DocAccessibleChild.h"
 #include "nsWinUtils.h"
-#include "mozilla/dom/TabChild.h"
 #include "Role.h"
 #include "RootAccessible.h"
 #include "sdnDocAccessible.h"
@@ -136,18 +135,7 @@ DocAccessibleWrap::DoInitialUpdate()
   if (nsWinUtils::IsWindowEmulationStarted()) {
     // Create window for tab document.
     if (mDocFlags & eTabDocument) {
-      mozilla::dom::TabChild* tabChild =
-        mozilla::dom::TabChild::GetFrom(mDocumentNode->GetShell());
-
       a11y::RootAccessible* rootDocument = RootAccessible();
-
-      mozilla::WindowsHandle nativeData = 0;
-      if (tabChild)
-        tabChild->SendGetWidgetNativeData(&nativeData);
-      else
-        nativeData = reinterpret_cast<mozilla::WindowsHandle>(
-          rootDocument->GetNativeWindow());
-
       bool isActive = true;
       nsIntRect rect(CW_USEDEFAULT, CW_USEDEFAULT, 0, 0);
       if (Compatibility::IsDolphin()) {
@@ -161,7 +149,7 @@ DocAccessibleWrap::DoInitialUpdate()
         docShell->GetIsActive(&isActive);
       }
 
-      HWND parentWnd = reinterpret_cast<HWND>(nativeData);
+      HWND parentWnd = reinterpret_cast<HWND>(rootDocument->GetNativeWindow());
       mHWND = nsWinUtils::CreateNativeWindow(kClassNameTabContent, parentWnd,
                                              rect.x, rect.y,
                                              rect.width, rect.height, isActive);
