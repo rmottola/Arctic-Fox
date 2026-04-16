@@ -15,9 +15,3 @@ var gUseLegacySaver = true;
 
 var scriptFile = do_get_file("common_test_Download.js");
 Services.scriptloader.loadSubScript(NetUtil.newURI(scriptFile).spec);
-
-////////////////////////////////////////////////////////////////////////////////
-//// Termination
-
-let tailFile = do_get_file("tail.js");
-Services.scriptloader.loadSubScript(NetUtil.newURI(tailFile).spec);
