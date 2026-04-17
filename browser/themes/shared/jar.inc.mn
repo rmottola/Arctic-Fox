@@ -43,6 +43,8 @@
   skin/classic/browser/newtab/close.png                        (../shared/newtab/close.png)
   skin/classic/browser/newtab/controls.svg                     (../shared/newtab/controls.svg)
   skin/classic/browser/newtab/whimsycorn.png                   (../shared/newtab/whimsycorn.png)
+* skin/classic/browser/preferences/in-content/containers.css   (../shared/incontentprefs/containers.css)
+* skin/classic/browser/preferences/containers.css              (../shared/preferences/containers.css)
   skin/classic/browser/search-indicator.png                    (../shared/search/search-indicator.png)
   skin/classic/browser/search-indicator@2x.png                 (../shared/search/search-indicator@2x.png)
   skin/classic/browser/search-engine-placeholder.png           (../shared/search/search-engine-placeholder.png)

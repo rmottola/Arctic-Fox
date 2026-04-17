@@ -85,3 +85,5 @@
 
 <!ENTITY  clearOnCloseSettings.label     "Settings…">
 <!ENTITY  clearOnCloseSettings.accesskey "t">
+<!ENTITY  browserContainersSettings.label        "Settings…">
+<!ENTITY  browserContainersSettings.accesskey    "i">
