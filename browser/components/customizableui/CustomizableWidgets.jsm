@@ -1154,6 +1154,7 @@ const CustomizableWidgets = [
         item.setAttribute("label", label);
         item.setAttribute("usercontextid", identity.userContextId);
         item.setAttribute("class", "subviewbutton");
+        item.setAttribute("image", identity.icon);
 
         fragment.appendChild(item);
       });
