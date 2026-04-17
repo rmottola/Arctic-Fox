@@ -374,7 +374,7 @@ var ScrollPositionListener = {
 
     // Don't collect scroll data for frames created at or after the load event
     // as SessionStore can't restore scroll data for those.
-    if (frame && gFrameTree.contains(frame)) {
+    if (gFrameTree.contains(frame)) {
       MessageQueue.push("scroll", () => this.collect());
     }
   },
@@ -417,12 +417,11 @@ var FormDataListener = {
   },
 
   handleEvent: function (event) {
-    let frame = event.target &&
-                event.target.ownerGlobal;
+    let frame = event.target.ownerGlobal;
 
     // Don't collect form data for frames created at or after the load event
     // as SessionStore can't restore form data for those.
-    if (frame && gFrameTree.contains(frame)) {
+    if (gFrameTree.contains(frame)) {
       MessageQueue.push("formdata", () => this.collect());
     }
   },
