@@ -204,10 +204,16 @@ const CustomizableWidgets = [
 
       PlacesUtils.history.QueryInterface(Ci.nsPIPlacesDatabase)
                          .asyncExecuteLegacyQueries([query], 1, options, {
-        handleResult: function (aResultSet) {
-          let onItemCommand = function (aEvent) {
-            let item = aEvent.target;
-            win.openUILink(item.getAttribute("targetURI"), aEvent);
+        handleResult: function(aResultSet) {
+          let onItemCommand = function(aItemCommandEvent) {
+            // Only handle the click event for middle clicks, we're using the command
+            // event otherwise.
+            if (aItemCommandEvent.type == "click" &&
+                aItemCommandEvent.button != 1) {
+              return;
+            }
+            let item = aItemCommandEvent.target;
+            win.openUILink(item.getAttribute("targetURI"), aItemCommandEvent);
             CustomizableUI.hidePanelForNode(item);
           };
           let fragment = doc.createDocumentFragment();
@@ -222,6 +228,7 @@ const CustomizableWidgets = [
             item.setAttribute("targetURI", uri);
             item.setAttribute("class", "subviewbutton");
             item.addEventListener("command", onItemCommand);
+            item.addEventListener("click", onItemCommand);
             if (icon) {
               let iconURL = "moz-anno:favicon:" + icon;
               item.setAttribute("image", iconURL);
@@ -230,10 +237,10 @@ const CustomizableWidgets = [
           }
           items.appendChild(fragment);
         },
-        handleError: function (aError) {
+        handleError: function(aError) {
           log.debug("History view tried to show but had an error: " + aError);
         },
-        handleCompletion: function (aReason) {
+        handleCompletion: function(aReason) {
           log.debug("History view is being shown!");
         },
       });

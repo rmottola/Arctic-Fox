@@ -1424,12 +1424,6 @@ var BookmarkingUI = {
     options.maxResults = kMaxResults;
     let query = PlacesUtils.history.getNewQuery();
 
-    let onItemCommand = function (aEvent) {
-      let item = aEvent.target;
-      openUILink(item.getAttribute("targetURI"), aEvent);
-      CustomizableUI.hidePanelForNode(item);
-    };
-
     let fragment = document.createDocumentFragment();
     let root = PlacesUtils.history.executeQuery(query, options).root;
     root.containerOpen = true;
@@ -1448,7 +1442,6 @@ var BookmarkingUI = {
       item.setAttribute("simulated-places-node", true);
       item.setAttribute("class", "menuitem-iconic menuitem-with-favicon bookmark-item " +
                                  aExtraCSSClass);
-      item.addEventListener("command", onItemCommand);
       if (icon) {
         let iconURL = "moz-anno:favicon:" + icon;
         item.setAttribute("image", iconURL);
