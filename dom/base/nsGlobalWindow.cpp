@@ -1819,6 +1819,8 @@ nsGlobalWindow::FreeInnerObjects(bool aForDocumentOpen)
 
   mIndexedDB = nullptr;
 
+  UnlinkHostObjectURIs();
+
   NotifyWindowIDDestroyed("inner-window-destroyed");
 
   CleanupCachedXBLHandlers(this);
