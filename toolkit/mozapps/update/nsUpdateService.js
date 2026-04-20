@@ -28,10 +28,8 @@ const PREF_APP_UPDATE_CANCELATIONS_OSX_MAX = "app.update.cancelations.osx.max";
 const PREF_APP_UPDATE_CERT_CHECKATTRIBUTES = "app.update.cert.checkAttributes";
 const PREF_APP_UPDATE_CERT_ERRORS          = "app.update.cert.errors";
 const PREF_APP_UPDATE_CERT_MAXERRORS       = "app.update.cert.maxErrors";
-const PREF_APP_UPDATE_CERT_REQUIREBUILTIN  = "app.update.cert.requireBuiltIn";
 const PREF_APP_UPDATE_ENABLED              = "app.update.enabled";
 const PREF_APP_UPDATE_IDLETIME             = "app.update.idletime";
-const PREF_APP_UPDATE_INTERVAL             = "app.update.interval";
 const PREF_APP_UPDATE_LOG                  = "app.update.log";
 const PREF_APP_UPDATE_NOTIFIEDUNSUPPORTED  = "app.update.notifiedUnsupported";
 const PREF_APP_UPDATE_POSTUPDATE           = "app.update.postupdate";
@@ -57,14 +55,11 @@ const URI_UPDATE_NS             = "http://www.mozilla.org/2005/app-update";
 const URI_UPDATE_PROMPT_DIALOG  = "chrome://mozapps/content/update/updates.xul";
 const URI_UPDATES_PROPERTIES    = "chrome://mozapps/locale/update/updates.properties";
 
-const KEY_GRED            = "GreD";
 const KEY_UPDROOT         = "UpdRootD";
 const KEY_EXECUTABLE      = "XREExeF";
 // Gonk only
 const KEY_UPDATE_ARCHIVE_DIR = "UpdArchD";
 
-const DIR_UPDATED         = "updated";
-const DIR_UPDATED_APP     = "Updated.app";
 const DIR_UPDATES         = "updates";
 
 const FILE_ACTIVE_UPDATE_XML = "active-update.xml";
@@ -205,7 +200,6 @@ const APPID_TO_TOPIC = {
   "{33cb9019-c295-46dd-be21-8c4936574bee}": "xul-window-visible",
 };
 
-var gLocale = null;
 var gUpdateMutexHandle = null;
 
 // Gonk only
@@ -560,7 +554,7 @@ XPCOMUtils.defineLazyGetter(this, "gCanStageUpdatesSession",
  * @return true if updates can be staged.
  */
 function getCanStageUpdates() {
-  // If background updates are disabled, then just bail out!
+  // If staging updates are disabled, then just bail out!
   if (!getPref("getBoolPref", PREF_APP_UPDATE_STAGING_ENABLED, false)) {
     LOG("getCanStageUpdates - staging updates is disabled by preference " +
         PREF_APP_UPDATE_STAGING_ENABLED);
@@ -676,18 +670,6 @@ function binaryToHex(input) {
  */
 function getUpdateDirCreate(pathArray) {
   return FileUtils.getDir(KEY_UPDROOT, pathArray, true);
-}
-
-/**
- * Gets the specified directory at the specified hierarchy under the
- * update root directory and without creating it if it doesn't exist.
- * @param   pathArray
- *          An array of path components to locate beneath the directory
- *          specified by |key|
- * @return  nsIFile object for the location specified.
- */
-function getUpdateDirNoCreate(pathArray) {
-  return FileUtils.getDir(KEY_UPDROOT, pathArray, false);
 }
 
 /**
@@ -1274,7 +1256,9 @@ function handleUpdateFailure(update, errorCode) {
       let maxCancels = getPref("getIntPref",
                                PREF_APP_UPDATE_CANCELATIONS_OSX_MAX,
                                DEFAULT_CANCELATIONS_OSX_MAX);
-      if (osxCancelations >= DEFAULT_CANCELATIONS_OSX_MAX) {
+      // Prevent the preference from setting a value greater than 5.
+      maxCancels = Math.min(maxCancels, 5);
+      if (osxCancelations >= maxCancels) {
         cleanupActiveUpdate();
       } else {
         writeStatusFile(getUpdatesDir(),
@@ -1306,7 +1290,8 @@ function handleUpdateFailure(update, errorCode) {
     var maxFail = getPref("getIntPref",
                           PREF_APP_UPDATE_SERVICE_MAXERRORS,
                           DEFAULT_SERVICE_MAX_ERRORS);
-
+    // Prevent the preference from setting a value greater than 10.
+    maxFail = Math.min(maxFail, 10);
     // As a safety, when the service reaches maximum failures, it will
     // disable itself and fallback to using the normal update mechanism
     // without the service.
@@ -2568,8 +2553,7 @@ UpdateService.prototype = {
           }
         } else {
           let numCancels = getPref("getIntPref",
-                                   PREF_APP_UPDATE_CANCELATIONS_OSX,
-                                   0);
+                                   PREF_APP_UPDATE_CANCELATIONS_OSX, 0);
           let rejectedVersion = getPref("getCharPref",
                                         PREF_APP_UPDATE_ELEVATE_NEVER, "");
           let maxCancels = getPref("getIntPref",
@@ -3209,7 +3193,6 @@ UpdateManager.prototype = {
     if (!update) {
       return;
     }
-    var updateSucceeded = true;
     var status = readStatusFile(getUpdatesDir());
     pingStateAndStatusCodes(update, false, status);
     var parts = status.split(":");
@@ -3220,7 +3203,6 @@ UpdateManager.prototype = {
     cleanUpUpdatesDir(true);
 
     if (update.state == STATE_FAILED && parts[1]) {
-      updateSucceeded = false;
       if (!handleUpdateFailure(update, parts[1])) {
         handleFallbackToCompleteUpdate(update, true);
       }
@@ -3389,9 +3371,7 @@ Checker.prototype = {
       this._request = this._request.wrappedJSObject;
     }
     this._request.open("GET", url, true);
-    var allowNonBuiltIn = !getPref("getBoolPref",
-                                   PREF_APP_UPDATE_CERT_REQUIREBUILTIN, true);
-    this._request.channel.notificationCallbacks = new gCertUtils.BadCertHandler(allowNonBuiltIn);
+    this._request.channel.notificationCallbacks = new gCertUtils.BadCertHandler(false);
     // Prevent the request from reading from the cache.
     this._request.channel.loadFlags |= Ci.nsIRequest.LOAD_BYPASS_CACHE;
     // Prevent the request from writing to the cache.
@@ -4140,7 +4120,7 @@ Downloader.prototype = {
    * @param   status
    *          Status code containing the reason for the cessation.
    */
-  onStopRequest: function  Downloader_onStopRequest(request, context, status) {
+  onStopRequest: function Downloader_onStopRequest(request, context, status) {
     if (request instanceof Ci.nsIIncrementalDownload)
       LOG("Downloader:onStopRequest - original URI spec: " + request.URI.spec +
           ", final URI spec: " + request.finalURI.spec + ", status: " + status);
@@ -4154,8 +4134,12 @@ Downloader.prototype = {
     var deleteActiveUpdate = false;
     var retryTimeout = getPref("getIntPref", PREF_APP_UPDATE_SOCKET_RETRYTIMEOUT,
                                DEFAULT_SOCKET_RETRYTIMEOUT);
+    // Prevent the preference from setting a value greater than 10000.
+    retryTimeout = Math.min(retryTimeout, 10000);
     var maxFail = getPref("getIntPref", PREF_APP_UPDATE_SOCKET_MAXERRORS,
                           DEFAULT_SOCKET_MAX_ERRORS);
+    // Prevent the preference from setting a value greater than 20.
+    maxFail = Math.min(maxFail, 20);
     LOG("Downloader:onStopRequest - status: " + status + ", " +
         "current fail: " + this.updateService._consecutiveSocketErrors + ", " +
         "max fail: " + maxFail + ", " + "retryTimeout: " + retryTimeout);
@@ -4572,8 +4556,8 @@ UpdatePrompt.prototype = {
     if (page == "updatesavailable") {
       var idleService = Cc["@mozilla.org/widget/idleservice;1"].
                         getService(Ci.nsIIdleService);
-
-      const IDLE_TIME = getPref("getIntPref", PREF_APP_UPDATE_IDLETIME, 60);
+      // Don't allow the preference to set a value greater than 600 seconds for the idle time.
+      const IDLE_TIME = Math.min(getPref("getIntPref", PREF_APP_UPDATE_IDLETIME, 60), 600);
       if (idleService.idleTime / 1000 >= IDLE_TIME) {
         this._showUI(parent, uri, features, name, page, update);
         return;
@@ -4617,7 +4601,8 @@ UpdatePrompt.prototype = {
     var idleService = Cc["@mozilla.org/widget/idleservice;1"].
                       getService(Ci.nsIIdleService);
 
-    const IDLE_TIME = getPref("getIntPref", PREF_APP_UPDATE_IDLETIME, 60);
+    // Don't allow the preference to set a value greater than 600 seconds for the idle time.
+    const IDLE_TIME = Math.min(getPref("getIntPref", PREF_APP_UPDATE_IDLETIME, 60), 600);
     if (idleService.idleTime / 1000 >= IDLE_TIME) {
       this._showUI(parent, uri, features, name, page, update);
     } else {
