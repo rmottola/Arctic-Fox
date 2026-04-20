@@ -7,8 +7,12 @@
 'use strict';
 setup({explicit_done: true});
 SpecialPowers.pushPrefEnv(
-  { "set": [["dom.animations-api.core.enabled", true]]},
+  { "set": [
+    ["dom.animations-api.core.enabled", true],
+    ["layout.css.osx-font-smoothing.enabled", true],
+    ["layout.css.prefixes.webkit", true]
+  ] },
   function() {
-    window.open("file_set-easing.html");
+    window.open("file_discrete-animations.html");
   });
 </script>
