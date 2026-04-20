@@ -1017,56 +1017,6 @@ function isServiceInstalled() {
 }
 
 /**
- * Removes the MozUpdater directory that is created when replacing an install
- * with a staged update and leftover MozUpdater-i folders in the tmp directory.
- */
-function cleanUpMozUpdaterDirs() {
-  try {
-    // Remove the MozUpdater directory in the updates/0 directory.
-    var mozUpdaterDir = getUpdatesDir();
-    mozUpdaterDir.append("MozUpdater");
-    if (mozUpdaterDir.exists()) {
-      LOG("cleanUpMozUpdaterDirs - removing MozUpdater directory");
-      mozUpdaterDir.remove(true);
-    }
-  } catch (e) {
-    LOG("cleanUpMozUpdaterDirs - Exception: " + e);
-  }
-
-  try {
-    var tmpDir = Services.dirsvc.get("TmpD", Ci.nsIFile);
-
-    // We used to store MozUpdater-i directories in the temp directory.
-    // We need to remove these directories if we detect that they still exist.
-    // To check if they still exist, we simply check for MozUpdater-1.
-    var mozUpdaterDir1 = tmpDir.clone();
-    mozUpdaterDir1.append("MozUpdater-1");
-    // Only try to delete the left over directories in "$Temp/MozUpdater-i/*" if
-    // MozUpdater-1 exists.
-    if (mozUpdaterDir1.exists()) {
-      LOG("cleanUpMozUpdaterDirs - Removing top level tmp MozUpdater-i " +
-          "directories");
-      let i = 0;
-      let dirEntries = tmpDir.directoryEntries;
-      while (dirEntries.hasMoreElements() && i < 10) {
-        let file = dirEntries.getNext().QueryInterface(Ci.nsILocalFile);
-        if (file.leafName.startsWith("MozUpdater-") && file.leafName != "MozUpdater-1") {
-          file.remove(true);
-          i++;
-        }
-      }
-      // If you enumerate the whole temp directory and the count of deleted
-      // items is less than 10, then delete MozUpdate-1.
-      if (i < 10) {
-        mozUpdaterDir1.remove(true);
-      }
-    }
-  } catch (e) {
-    LOG("cleanUpMozUpdaterDirs - Exception: " + e);
-  }
-}
-
-/**
  * Removes the contents of the Updates Directory
  *
  * @param aBackgroundUpdate Whether the update has been performed in the
@@ -1122,7 +1072,8 @@ function cleanUpUpdatesDir(aBackgroundUpdate) {
 
       // Now, recursively remove this file.  The recursive removal is needed for
       // Mac OSX because this directory will contain a copy of updater.app,
-      // which is itself a directory.
+      // which is itself a directory and the MozUpdater directory on platforms
+      // other than Windows.
       try {
         f.remove(true);
       } catch (e) {
@@ -2139,10 +2090,6 @@ UpdateService.prototype = {
                      createInstance(Ci.nsIUpdatePrompt);
       prompter.showUpdateError(update);
     }
-
-    // Now trash the MozUpdater directory created when replacing an install with
-    // a staged update.
-    cleanUpMozUpdaterDirs();
   },
 
   /**
@@ -3287,12 +3234,12 @@ Checker.prototype = {
   /**
    * The XMLHttpRequest object that performs the connection.
    */
-  _request  : null,
+  _request: null,
 
   /**
    * The nsIUpdateCheckListener callback
    */
-  _callback : null,
+  _callback: null,
 
   /**
    * The URL of the update service XML file to connect to that contains details
@@ -3456,13 +3403,13 @@ Checker.prototype = {
       if (Services.prefs.prefHasUserValue(PREF_APP_UPDATE_CERT_ERRORS))
         Services.prefs.clearUserPref(PREF_APP_UPDATE_CERT_ERRORS);
 
-      if (Services.prefs.prefHasUserValue(PREF_APP_UPDATE_BACKGROUNDERRORS))
+      if (Services.prefs.prefHasUserValue(PREF_APP_UPDATE_BACKGROUNDERRORS)) {
         Services.prefs.clearUserPref(PREF_APP_UPDATE_BACKGROUNDERRORS);
+      }
 
       // Tell the callback about the updates
       this._callback.onCheckComplete(event.target, updates, updates.length);
-    }
-    catch (e) {
+    } catch (e) {
       LOG("Checker:onLoad - there was a problem checking for updates. " +
           "Exception: " + e);
       var request = event.target;
