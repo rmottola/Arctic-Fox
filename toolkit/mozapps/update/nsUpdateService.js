@@ -42,10 +42,8 @@ const PREF_APP_UPDATE_SILENT               = "app.update.silent";
 const PREF_APP_UPDATE_SOCKET_MAXERRORS     = "app.update.socket.maxErrors";
 const PREF_APP_UPDATE_SOCKET_RETRYTIMEOUT  = "app.update.socket.retryTimeout";
 const PREF_APP_UPDATE_STAGING_ENABLED      = "app.update.staging.enabled";
-const PREF_APP_UPDATE_NOTIFIEDUNSUPPORTED  = "app.update.notifiedUnsupported";
 const PREF_APP_UPDATE_URL                  = "app.update.url";
 const PREF_APP_UPDATE_URL_DETAILS          = "app.update.url.details";
-const PREF_APP_UPDATE_URL_OVERRIDE         = "app.update.url.override";
 
 const PREFBRANCH_APP_UPDATE_NEVER = "app.update.never.";
 
@@ -1602,12 +1600,12 @@ function Update(update) {
     }
   }
 
-  // Don't allow the background download interval to be greater than 10 minutes.
-  this.backgroundInterval = Math.min(this.backgroundInterval, 600);
-
   if (!this.displayVersion) {
     this.displayVersion = this.appVersion;
   }
+
+  // Don't allow the background download interval to be greater than 10 minutes.
+  this.backgroundInterval = Math.min(this.backgroundInterval, 600);
 
   // The Update Name is either the string provided by the <update> element, or
   // the string: "<App Name> <Update App Version>"
@@ -3121,6 +3119,9 @@ UpdateManager.prototype = {
       if (!handleUpdateFailure(update, parts[1])) {
         handleFallbackToCompleteUpdate(update, true);
       }
+    }
+    if (update.state == STATE_APPLIED && shouldUseService()) {
+      writeStatusFile(getUpdatesDir(), update.state = STATE_APPLIED_SERVICE);
     }
 
     // Send an observer notification which the update wizard uses in
