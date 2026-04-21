@@ -25,7 +25,10 @@ const PREF_APP_UPDATE_BACKGROUNDINTERVAL   = "app.update.download.backgroundInte
 const PREF_APP_UPDATE_BACKGROUNDERRORS     = "app.update.backgroundErrors";
 const PREF_APP_UPDATE_BACKGROUNDMAXERRORS  = "app.update.backgroundMaxErrors";
 const PREF_APP_UPDATE_CANCELATIONS         = "app.update.cancelations";
+const PREF_APP_UPDATE_CANCELATIONS_OSX     = "app.update.cancelations.osx";
 const PREF_APP_UPDATE_CANCELATIONS_OSX_MAX = "app.update.cancelations.osx.max";
+const PREF_APP_UPDATE_ELEVATE_NEVER        = "app.update.elevate.never";
+const PREF_APP_UPDATE_ELEVATE_VERSION      = "app.update.elevate.version";
 const PREF_APP_UPDATE_ENABLED              = "app.update.enabled";
 const PREF_APP_UPDATE_IDLETIME             = "app.update.idletime";
 const PREF_APP_UPDATE_LOG                  = "app.update.log";
@@ -502,8 +505,7 @@ function getCanApplyUpdates() {
  *
  * @return true if updates can be staged for this session.
  */
-XPCOMUtils.defineLazyGetter(this, "gCanStageUpdatesSession",
-                            function aus_gCanStageUpdatesSession() {
+XPCOMUtils.defineLazyGetter(this, "gCanStageUpdatesSession", function aus_gCSUS() {
   if (getElevationRequired()) {
     LOG("gCanStageUpdatesSession - unable to stage updates because elevation " +
         "is required.");
@@ -1029,9 +1031,9 @@ function cleanUpUpdatesDir(aBackgroundUpdate) {
   }
 
   // Preserve the last update log file for debugging purposes.
-  let file = updateDir.clone();
-  file.append(FILE_UPDATE_LOG);
-  if (file.exists()) {
+  let updateLogFile = updateDir.clone();
+  updateLogFile.append(FILE_UPDATE_LOG);
+  if (updateLogFile.exists()) {
     let dir = updateDir.parent;
     let logFile = dir.clone();
     logFile.append(FILE_LAST_UPDATE_LOG);
@@ -1045,19 +1047,19 @@ function cleanUpUpdatesDir(aBackgroundUpdate) {
     }
 
     try {
-      file.moveTo(dir, FILE_LAST_UPDATE_LOG);
+      updateLogFile.moveTo(dir, FILE_LAST_UPDATE_LOG);
     } catch (e) {
-      LOG("cleanUpUpdatesDir - failed to rename file " + file.path +
+      LOG("cleanUpUpdatesDir - failed to rename file " + updateLogFile.path +
           " to " + FILE_LAST_UPDATE_LOG);
     }
   }
 
   if (!aBackgroundUpdate) {
-    let e = updateDir.directoryEntries;
-    while (e.hasMoreElements()) {
-      let f = e.getNext().QueryInterface(Ci.nsIFile);
+    let dirEntries = updateDir.directoryEntries;
+    while (dirEntries.hasMoreElements()) {
+      let file = dirEntries.getNext().QueryInterface(Ci.nsIFile);
       if (AppConstants.platform == "gonk") {
-        if (f.leafName == FILE_UPDATE_LINK) {
+        if (file.leafName == FILE_UPDATE_LINK) {
           let linkedFile = getFileFromUpdateLink(updateDir);
           if (linkedFile && linkedFile.exists()) {
             linkedFile.remove(false);
@@ -1070,9 +1072,9 @@ function cleanUpUpdatesDir(aBackgroundUpdate) {
       // which is itself a directory and the MozUpdater directory on platforms
       // other than Windows.
       try {
-        f.remove(true);
+        file.remove(true);
       } catch (e) {
-        LOG("cleanUpUpdatesDir - failed to remove file " + f.path);
+        LOG("cleanUpUpdatesDir - failed to remove file " + file.path);
       }
     }
   }
