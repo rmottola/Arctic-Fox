@@ -445,6 +445,13 @@ MediaStreamTrack::OverrideEnded()
 
   LOG(LogLevel::Info, ("MediaStreamTrack %p ended", this));
 
+  if (!mSource) {
+    MOZ_ASSERT(false);
+    return;
+  }
+
+  mSource->UnregisterSink(this);
+
   mReadyState = MediaStreamTrackState::Ended;
 
   NotifyEnded();
