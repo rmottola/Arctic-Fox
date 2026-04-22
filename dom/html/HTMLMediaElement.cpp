@@ -5005,7 +5005,7 @@ bool HTMLMediaElement::CanActivateAutoplay()
     return false;
   }
 
-  if (!IsAllowedToPlay()) {
+  if (!IsAllowedToPlayByAudioChannel()) {
     return false;
   }
 
@@ -6065,6 +6065,12 @@ HTMLMediaElement::IsAllowedToPlay()
     return false;
   }
 
+  return IsAllowedToPlayByAudioChannel();
+}
+
+bool
+HTMLMediaElement::IsAllowedToPlayByAudioChannel()
+{
   // The media element has already been paused or blocked, so it can't start
   // playback again by script or user's intend until resuming by audio channel.
   if (mAudioChannelSuspended == nsISuspendedTypes::SUSPENDED_PAUSE ||
