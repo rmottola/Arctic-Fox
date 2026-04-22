@@ -5816,6 +5816,11 @@ HTMLMediaElement::MaybeCreateAudioChannelAgent()
 bool
 HTMLMediaElement::IsPlayingThroughTheAudioChannel() const
 {
+  // If we have an error, we are not playing.
+  if (mError) {
+    return false;
+  }
+
   // It might be resumed from remote, we should keep the audio channel agent.
   if (IsSuspendedByAudioChannel()) {
     return true;
@@ -5823,11 +5828,6 @@ HTMLMediaElement::IsPlayingThroughTheAudioChannel() const
 
   // Are we paused
   if (mPaused) {
-    return false;
-  }
-
-  // If we have an error, we are not playing.
-  if (mError) {
     return false;
   }
 
