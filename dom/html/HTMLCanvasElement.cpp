@@ -132,6 +132,9 @@ public:
     }
 
     RefPtr<DataSourceSurface> copy = CopySurface(snapshot);
+    if (!copy) {
+      return;
+    }
 
     mOwningElement->SetFrameCapture(copy.forget());
     mOwningElement->MarkContextCleanForFrameCapture();
