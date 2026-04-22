@@ -383,6 +383,10 @@ HTMLTrackElement::ReadyState() const
 void
 HTMLTrackElement::SetReadyState(uint16_t aReadyState)
 {
+  if (ReadyState() == aReadyState) {
+    return;
+  }
+
   if (mTrack) {
     switch (aReadyState) {
       case TextTrackReadyState::Loaded:
