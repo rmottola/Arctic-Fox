@@ -4218,6 +4218,9 @@ HTMLInputElement::StopNumberControlSpinnerSpin(SpinnerStopState aState)
     nsNumberControlFrame* numberControlFrame =
       do_QueryFrame(GetPrimaryFrame());
     if (numberControlFrame) {
+      MOZ_ASSERT(aState == eAllowDispatchingEvents,
+                 "Shouldn't have primary frame for the element when we're not "
+                 "allowed to dispatch events to it anymore.");
       numberControlFrame->SpinnerStateChanged();
     }
   }
@@ -4356,6 +4359,17 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
   }
 
   return NS_OK;
+}
+
+/**
+ * Return true if the input event should be ignore because of it's modifiers
+ */
+static bool
+IgnoreInputEventWithModifier(WidgetInputEvent* aEvent)
+{
+  return aEvent->IsShift() || aEvent->IsControl() || aEvent->IsAlt() ||
+         aEvent->IsMeta() || aEvent->IsAltGraph() || aEvent->IsFn() ||
+         aEvent->IsOS();
 }
 
 nsresult
@@ -4504,10 +4518,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         keyEvent && keyEvent->mMessage == eKeyPress &&
         aVisitor.mEvent->IsTrusted() &&
         (keyEvent->mKeyCode == NS_VK_UP || keyEvent->mKeyCode == NS_VK_DOWN) &&
-        !(keyEvent->IsShift() || keyEvent->IsControl() ||
-          keyEvent->IsAlt() || keyEvent->IsMeta() ||
-          keyEvent->IsAltGraph() || keyEvent->IsFn() ||
-          keyEvent->IsOS())) {
+        !IgnoreInputEventWithModifier(keyEvent)) {
       // We handle the up/down arrow keys specially for <input type=number>.
       // On some platforms the editor for the nested text control will
       // process these keys to send the cursor to the start/end of the text
@@ -4724,10 +4735,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           }
           if (mType == NS_FORM_INPUT_NUMBER && aVisitor.mEvent->IsTrusted()) {
             if (mouseEvent->button == WidgetMouseEvent::eLeftButton &&
-                !(mouseEvent->IsShift() || mouseEvent->IsControl() ||
-                  mouseEvent->IsAlt() || mouseEvent->IsMeta() ||
-                  mouseEvent->IsAltGraph() || mouseEvent->IsFn() ||
-                  mouseEvent->IsOS())) {
+                !IgnoreInputEventWithModifier(mouseEvent)) {
               nsNumberControlFrame* numberControlFrame =
                 do_QueryFrame(GetPrimaryFrame());
               if (numberControlFrame) {
@@ -4888,10 +4896,7 @@ HTMLInputElement::PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor)
         break; // don't start drag if someone else is already capturing
       }
       WidgetInputEvent* inputEvent = aVisitor.mEvent->AsInputEvent();
-      if (inputEvent->IsShift() || inputEvent->IsControl() ||
-          inputEvent->IsAlt() || inputEvent->IsMeta() ||
-          inputEvent->IsAltGraph() || inputEvent->IsFn() ||
-          inputEvent->IsOS()) {
+      if (IgnoreInputEventWithModifier(inputEvent)) {
         break; // ignore
       }
       if (aVisitor.mEvent->mMessage == eMouseDown) {
