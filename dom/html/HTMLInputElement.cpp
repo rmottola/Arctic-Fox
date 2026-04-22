@@ -3967,19 +3967,6 @@ HTMLInputElement::GetEventTargetParent(EventChainPreVisitor& aVisitor)
         // that).
         frame->InvalidateFrame();
       }
-    } else if (aVisitor.mEvent->mMessage == eKeyUp) {
-      WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
-      if ((keyEvent->mKeyCode == NS_VK_UP ||
-           keyEvent->mKeyCode == NS_VK_DOWN) &&
-          !(keyEvent->IsShift() || keyEvent->IsControl() ||
-            keyEvent->IsAlt() || keyEvent->IsMeta() ||
-            keyEvent->IsAltGraph() || keyEvent->IsFn() ||
-            keyEvent->IsOS())) {
-        // The up/down arrow key events fire 'change' events when released
-        // so that at the end of a series of up/down arrow key repeat events
-        // the value is considered to be "commited" by the user.
-        FireChangeEventIfNeeded();
-      }
     }
   }
 
@@ -4532,6 +4519,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
       // event to increase/decrease the value of the number control.
       if (!aVisitor.mEvent->DefaultPreventedByContent() && IsMutable()) {
         StepNumberControlForUserEvent(keyEvent->mKeyCode == NS_VK_UP ? 1 : -1);
+        FireChangeEventIfNeeded();
         aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
       }
     } else if (nsEventStatus_eIgnore == aVisitor.mEventStatus) {
@@ -4709,6 +4697,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
                   break;
               }
               SetValueOfRangeForUserEvent(newValue);
+              FireChangeEventIfNeeded();
               aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
             }
           }
@@ -4783,6 +4772,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
                 do_QueryFrame(GetPrimaryFrame());
               if (numberControlFrame && numberControlFrame->IsFocused()) {
                 StepNumberControlForUserEvent(wheelEvent->mDeltaY > 0 ? -1 : 1);
+                FireChangeEventIfNeeded();
                 aVisitor.mEvent->PreventDefault();
               }
             } else if (mType == NS_FORM_INPUT_RANGE &&
@@ -4796,6 +4786,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
               MOZ_ASSERT(value.isFinite() && step.isFinite());
               SetValueOfRangeForUserEvent(wheelEvent->mDeltaY < 0 ?
                                           value + step : value - step);
+              FireChangeEventIfNeeded();
               aVisitor.mEvent->PreventDefault();
             }
           }
