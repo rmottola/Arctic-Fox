@@ -1989,12 +1989,6 @@ NS_IMETHODIMP HTMLMediaElement::SetCurrentTime(double aCurrentTime)
     return NS_ERROR_FAILURE;
   }
 
-  // Detect if user has interacted with element by seeking so that
-  // play will not be blocked when initiated by a script.
-  if (EventStateManager::IsHandlingUserInput() || nsContentUtils::IsCallerChrome()) {
-  mHasUserInteraction = true;
-  }
-
   ErrorResult rv;
   SetCurrentTime(aCurrentTime, rv);
   return rv.StealNSResult();
