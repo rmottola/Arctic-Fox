@@ -2471,6 +2471,12 @@ WebGLContext::LineWidth(GLfloat width)
         return;
     }
 
+    mLineWidth = width;
+
+    if (gl->IsCoreProfile() && width > 1.0) {
+        width = 1.0;
+    }
+
     MakeContextCurrent();
     gl->fLineWidth(width);
 }
