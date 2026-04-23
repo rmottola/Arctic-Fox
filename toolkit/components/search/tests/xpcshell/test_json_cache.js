@@ -58,7 +58,6 @@ function run_test() {
     uri: "resource://search-plugins/list.json",
     loadUsingSystemPrincipal: true
   });
-  let visibleDefaultEngines = [];
   let sis = Cc["@mozilla.org/scriptableinputstream;1"].
               createInstance(Ci.nsIScriptableInputStream);
   sis.init(chan.open2());
@@ -83,7 +82,7 @@ add_test(function prepare_test_data() {
 add_test(function test_cached_engine_properties() {
   do_print("init search service");
 
-  let search = Services.search.init(function initComplete(aResult) {
+  Services.search.init(function initComplete(aResult) {
     do_print("init'd search service");
     do_check_true(Components.isSuccessCode(aResult));
 
@@ -140,7 +139,7 @@ add_test(function test_cache_write() {
     };
     Services.obs.addObserver(cacheWriteObserver, "browser-search-service", false);
 
-    Services.search.QueryInterface(Ci.nsIObserver).observe(null, "browser-search-engine-modified" , "engine-removed");
+    Services.search.QueryInterface(Ci.nsIObserver).observe(null, "browser-search-engine-modified", "engine-removed");
   });
 });
 

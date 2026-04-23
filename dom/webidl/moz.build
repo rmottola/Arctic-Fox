@@ -59,7 +59,6 @@ WEBIDL_FILES = [
     'BrowserElement.webidl',
     'BrowserElementAudioChannel.webidl',
     'BrowserElementDictionaries.webidl',
-    'BrowserElementProxy.webidl',
     'Cache.webidl',
     'CacheStorage.webidl',
     'CanvasCaptureMediaStream.webidl',
@@ -80,6 +79,7 @@ WEBIDL_FILES = [
     'Comment.webidl',
     'CompositionEvent.webidl',
     'Console.webidl',
+    'ConstantSourceNode.webidl',
     'ContainerBoxObject.webidl',
     'ConvolverNode.webidl',
     'Coordinates.webidl',
@@ -251,7 +251,6 @@ WEBIDL_FILES = [
     'HTMLVideoElement.webidl',
     'IDBCursor.webidl',
     'IDBDatabase.webidl',
-    'IDBEnvironment.webidl',
     'IDBFactory.webidl',
     'IDBFileHandle.webidl',
     'IDBFileRequest.webidl',
@@ -356,14 +355,11 @@ WEBIDL_FILES = [
     'PerformanceTiming.webidl',
     'PeriodicWave.webidl',
     'Permissions.webidl',
-    'PermissionSettings.webidl',
     'PermissionStatus.webidl',
-    'PhoneNumberService.webidl',
     'Plugin.webidl',
     'PluginArray.webidl',
     'PointerEvent.webidl',
     'PopupBoxObject.webidl',
-    'Pose.webidl',
     'Position.webidl',
     'PositionError.webidl',
     'Presentation.webidl',
@@ -385,8 +381,6 @@ WEBIDL_FILES = [
     'Range.webidl',
     'Rect.webidl',
     'Request.webidl',
-    'ResourceStats.webidl',
-    'ResourceStatsManager.webidl',
     'Response.webidl',
     'RGBColor.webidl',
     'RTCStatsReport.webidl',
@@ -518,10 +512,12 @@ WEBIDL_FILES = [
     'SVGTransformList.webidl',
     'SVGTSpanElement.webidl',
     'SVGUnitTypes.webidl',
+    'SVGUnitTypeValues.webidl',
     'SVGURIReference.webidl',
     'SVGUseElement.webidl',
     'SVGViewElement.webidl',
     'SVGZoomAndPan.webidl',
+    'SVGZoomAndPanValues.webidl',
     'SVGZoomEvent.webidl',
     'SystemUpdate.webidl',
     'TCPServerSocket.webidl',
@@ -570,7 +566,6 @@ WEBIDL_FILES = [
     'WebSocket.webidl',
     'WheelEvent.webidl',
     'WidevineCDMManifest.webidl',
-    'WifiOptions.webidl',
     'WindowOrWorkerGlobalScope.webidl',
     'WindowRoot.webidl',
     'Worker.webidl',
@@ -686,9 +681,6 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
         'MozNetworkStatsData.webidl',
         'MozNetworkStatsInterface.webidl',
         'MozNetworkStatsManager.webidl',
-        'MozWifiCapabilities.webidl',
-        'MozWifiManager.webidl',
-        'MozWifiP2pManager.webidl',
     ]
 else:
     WEBIDL_FILES += [
@@ -760,14 +752,6 @@ if CONFIG['MOZ_GAMEPAD']:
         'GamepadAxisMoveEvent.webidl',
         'GamepadButtonEvent.webidl',
         'GamepadEvent.webidl',
-    ]
-
-if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
-    GENERATED_EVENTS_WEBIDL_FILES += [
-        'MozWifiConnectionInfoEvent.webidl',
-        'MozWifiP2pStatusChangeEvent.webidl',
-        'MozWifiStationInfoEvent.webidl',
-        'MozWifiStatusChangeEvent.webidl',
     ]
 
 if CONFIG['MOZ_BUILD_APP'] in ['browser', 'xulrunner'] or CONFIG['MOZ_SUITE']:

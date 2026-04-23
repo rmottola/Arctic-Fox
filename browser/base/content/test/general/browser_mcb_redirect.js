@@ -62,7 +62,7 @@ let origBlockActive;
 let origBlockDisplay;
 var gTestBrowser = null;
 
-//------------------------ Helper Functions ---------------------
+// ------------------------ Helper Functions ---------------------
 
 registerCleanupFunction(function() {
   // Set preferences back to their original values
@@ -97,7 +97,7 @@ function waitForCondition(condition, nextTest, errorMsg, okMsg) {
   };
 }
 
-//------------------------ Test 1 ------------------------------
+// ------------------------ Test 1 ------------------------------
 
 function test1() {
   gTestBrowser.addEventListener("load", checkPopUpNotificationsForTest1, true);
@@ -118,7 +118,7 @@ function checkPopUpNotificationsForTest1() {
     "OK: Expected result in innerHTML for Test1!");
 }
 
-//------------------------ Test 2 ------------------------------
+// ------------------------ Test 2 ------------------------------
 
 function test2() {
   gTestBrowser.addEventListener("load", checkPopUpNotificationsForTest2, true);
@@ -139,7 +139,7 @@ function checkPopUpNotificationsForTest2() {
     "OK: Expected result in innerHTML for Test2!");
 }
 
-//------------------------ Test 3 ------------------------------
+// ------------------------ Test 3 ------------------------------
 // HTTPS page loading insecure image
 function test3() {
   gTestBrowser.addEventListener("load", checkLoadEventForTest3, true);
@@ -157,7 +157,7 @@ function checkLoadEventForTest3() {
     "OK: Expected result in innerHTML for Test3!");
 }
 
-//------------------------ Test 4 ------------------------------
+// ------------------------ Test 4 ------------------------------
 // HTTP page loading insecure image
 function test4() {
   gTestBrowser.addEventListener("load", checkLoadEventForTest4, true);
@@ -175,7 +175,7 @@ function checkLoadEventForTest4() {
     "OK: Expected result in innerHTML for Test4!");
 }
 
-//------------------------ Test 5 ------------------------------
+// ------------------------ Test 5 ------------------------------
 // HTTP page laoding insecure cached image
 // Assuming test 4 succeeded, the image has already been loaded once
 // and hence should be cached per the sjs cache-control header
@@ -200,7 +200,7 @@ function checkLoadEventForTest5() {
   Services.io.offline = false;
 }
 
-//------------------------ Test 6 ------------------------------
+// ------------------------ Test 6 ------------------------------
 // HTTPS page loading insecure cached image
 // Assuming test 4 succeeded, the image has already been loaded once
 // and hence should be cached per the sjs cache-control header
@@ -225,7 +225,7 @@ function checkLoadEventForTest6() {
   Services.io.offline = false;
 }
 
-//------------------------ Test 7 ------------------------------
+// ------------------------ Test 7 ------------------------------
 // HTTP page loading insecure image that went through a double redirect
 function test7() {
   gTestBrowser.addEventListener("load", checkLoadEventForTest7, true);
@@ -243,7 +243,7 @@ function checkLoadEventForTest7() {
     "OK: Expected result in innerHTML for Test7!");
 }
 
-//------------------------ Test 8 ------------------------------
+// ------------------------ Test 8 ------------------------------
 // HTTP page loading insecure cached image that went through a double redirect
 // Assuming test 7 succeeded, the image has already been loaded once
 // and hence should be cached per the sjs cache-control header
@@ -268,7 +268,7 @@ function checkLoadEventForTest8() {
   Services.io.offline = false;
 }
 
-//------------------------ Test 9 ------------------------------
+// ------------------------ Test 9 ------------------------------
 // HTTPS page loading insecure cached image that went through a double redirect
 // Assuming test 7 succeeded, the image has already been loaded once
 // and hence should be cached per the sjs cache-control header
@@ -293,7 +293,7 @@ function checkLoadEventForTest9() {
   Services.io.offline = false;
 }
 
-//------------------------ SETUP ------------------------------
+// ------------------------ SETUP ------------------------------
 
 function test() {
   // Performing async calls, e.g. 'onload', we have to wait till all of them finished

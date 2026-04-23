@@ -144,19 +144,24 @@
     <tooltip id="remoteBrowserTooltip"/>
 
     <!-- for search and content formfill/pw manager -->
-    <panel type="autocomplete" id="PopupAutoComplete" noautofocus="true" hidden="true"/>
+    <panel type="autocomplete-richlistbox" id="PopupAutoComplete" noautofocus="true" hidden="true"/>
 
     <!-- for url bar autocomplete -->
     <panel type="autocomplete-richlistbox"
            id="PopupAutoCompleteRichResult"
            noautofocus="true"
-           hidden="true"/>
+           hidden="true"
+           flip="none"/>
 
     <panel id="DateTimePickerPanel"
+           type="arrow"
            hidden="true"
+           orient="vertical"
            noautofocus="true"
            consumeoutsideclicks="false"
-           level="parent"/>
+           level="parent">
+      <iframe id="dateTimePopupFrame"/>
+    </panel>
 
     <!-- for select dropdowns. The menupopup is what shows the list of options,
          and the popuponly menulist makes things like the menuactive attributes
@@ -297,7 +302,32 @@
 #include browser-context.inc
     </menupopup>
 
-    <menupopup id="placesContext"/>
+    <menupopup id="placesContext">
+      <menuseparator id="placesContext_recentlyBookmarkedSeparator"
+                     ignoreitem="true"
+                     hidden="true"/>
+      <menuitem id="placesContext_hideRecentlyBookmarked"
+                label="&hideRecentlyBookmarked.label;"
+                accesskey="&hideRecentlyBookmarked.accesskey;"
+                oncommand="BookmarkingUI.hideRecentlyBookmarked();"
+                closemenu="single"
+                ignoreitem="true"
+                hidden="true"/>
+      <menuitem id="placesContext_showRecentlyBookmarked"
+                label="&showRecentlyBookmarked.label;"
+                accesskey="&showRecentlyBookmarked.accesskey;"
+                oncommand="BookmarkingUI.showRecentlyBookmarked();"
+                closemenu="single"
+                ignoreitem="true"
+                hidden="true"/>
+    </menupopup>
+
+    <menupopup id="hideRecentlyBookmarked">
+      <menuitem label="&hideRecentlyBookmarked.label;"
+                accesskey="&hideRecentlyBookmarked.accesskey;"
+                oncommand="BookmarkingUI.hideRecentlyBookmarked();"
+                closemenu="single"/>
+    </menupopup>
 
     <panel id="ctrlTab-panel" class="KUI-panel" hidden="true" norestorefocus="true" level="top">
       <hbox>
@@ -514,6 +544,7 @@
              fullscreentoolbar="true" mode="icons" customizable="true"
              iconsize="large"
              defaultset="unified-back-forward-button,reload-button,stop-button,home-button,urlbar-container,search-container,bookmarks-menu-button,history-menu-button,window-controls"
+              
              context="toolbar-context-menu">
 
       <toolbaritem id="unified-back-forward-button" class="chromeclass-toolbar-additional"
@@ -645,8 +676,6 @@
                          aria-label="&urlbar.addonsNotificationAnchor.label;"/>
                   <image id="indexedDB-notification-icon" class="notification-anchor-icon indexedDB-icon" role="button"
                          aria-label="&urlbar.indexedDBNotificationAnchor.label;"/>
-                  <image id="login-fill-notification-icon" class="notification-anchor-icon login-icon" role="button"
-                         aria-label="&urlbar.loginFillNotificationAnchor.label;"/>
                   <image id="password-notification-icon" class="notification-anchor-icon login-icon" role="button"
                          aria-label="&urlbar.passwordNotificationAnchor.label;"/>
                   <image id="plugins-notification-icon" class="notification-anchor-icon plugin-icon" role="button"
@@ -684,7 +713,8 @@
                 </hbox>
               </box>
               <box id="urlbar-display-box" align="center">
-                <label class="urlbar-display urlbar-display-switchtab" value="&urlbar.switchToTab.label;"/>
+                <label id="switchtab" class="urlbar-display urlbar-display-switchtab" value="&urlbar.switchToTab.label;"/>
+                <label id="extension" class="urlbar-display urlbar-display-extension" value="&urlbar.extension.label;"/>
               </box>
               <hbox id="urlbar-icons">
                 <image id="page-report-button"

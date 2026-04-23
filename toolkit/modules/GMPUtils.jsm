@@ -72,18 +72,17 @@ this.GMPUtils = {
     if (this._isPluginForceSupported(aPlugin)) {
       return true;
     }
-    if (aPlugin.id != EME_ADOBE_ID) {
-      // Only checking Adobe EME at the moment.
-      return true;
-    }
-
-    if (Services.appinfo.OS != "WINNT") {
-      // Non-Windows OSes currently unsupported.
-      return false;
-    }
-
-    if (Services.sysinfo.getPropertyAsInt32("version") < 6) {
-      // Windows versions before Vista are unsupported.
+    if (aPlugin.id == EME_ADOBE_ID) {
+      // Windows Vista and later only supported by Adobe EME.
+      return AppConstants.isPlatformAndVersionAtLeast("win", "6");
+    } else if (aPlugin.id == WIDEVINE_ID) {
+      // The Widevine plugin is available for Windows versions Vista and later,
+      // and Mac 10.7 or later, and Linux
+      if (AppConstants.isPlatformAndVersionAtLeast("win", "6") ||
+          AppConstants.isPlatformAndVersionAtLeast("macosx", "10.7")  ||
+          AppConstants.platform == "linux") {
+        return true;
+      }
       return false;
     }
 
@@ -118,31 +117,6 @@ this.GMPUtils = {
   _isPluginForceSupported: function(aPlugin) {
     return GMPPrefs.get(GMPPrefs.KEY_PLUGIN_FORCE_SUPPORTED, false, aPlugin.id);
   },
-
-  /**
-   * Report telemetry value, but only for Adobe CDM and only once per key
-   * per session.
-   */
-  maybeReportTelemetry: function(aPluginId, key, value) {
-    if (aPluginId != EME_ADOBE_ID) {
-      // Only report for Adobe CDM.
-      return;
-    }
-
-    if (!this.reportedKeys) {
-      this.reportedKeys = [];
-    }
-    if (this.reportedKeys.indexOf(key) >= 0) {
-      // Only report each key once per session.
-      return;
-    }
-    this.reportedKeys.push(key);
-
-    let hist = Services.telemetry.getHistogramById(key);
-    if (hist) {
-      hist.add(value);
-    }
-  },
 };
 
 /**
@@ -155,7 +129,6 @@ this.GMPPrefs = {
   KEY_PLUGIN_VERSION:           "media.{0}.version",
   KEY_PLUGIN_AUTOUPDATE:        "media.{0}.autoupdate",
   KEY_PLUGIN_VISIBLE:           "media.{0}.visible",
-  KEY_PLUGIN_TRIAL_CREATE:      "media.{0}.trial-create",
   KEY_PLUGIN_ABI:               "media.{0}.abi",
   KEY_PLUGIN_FORCE_SUPPORTED:   "media.{0}.forceSupported",
   KEY_URL:                      "media.gmp-manager.url",
@@ -164,6 +137,7 @@ this.GMPPrefs = {
   KEY_CERT_REQUIREBUILTIN:      "media.gmp-manager.cert.requireBuiltIn",
   KEY_UPDATE_LAST_CHECK:        "media.gmp-manager.lastCheck",
   KEY_SECONDS_BETWEEN_CHECKS:   "media.gmp-manager.secondsBetweenChecks",
+  KEY_UPDATE_ENABLED:           "media.gmp-manager.updateEnabled",
   KEY_APP_DISTRIBUTION:         "distribution.id",
   KEY_APP_DISTRIBUTION_VERSION: "distribution.version",
   KEY_BUILDID:                  "media.gmp-manager.buildID",

@@ -27,7 +27,7 @@
         is(xhr.status, expectedStatus, "xhr.status");
         is(xhr.statusText, expectedText, "xhr.statusText");
         runNextTest();
-      }
+      };
       return xhr;
     }
 
@@ -107,7 +107,6 @@
                        "user1pass", "", "");
           Services.logins.addLogin(login2);
 
-          //startWatchingForPrompts();
           sendAsyncMessage("setupDone");
         },
         QueryInterface: XPCOMUtils.generateQI([Ci.nsIProtocolProxyCallback]),

@@ -193,8 +193,16 @@ BrowserAction.prototype = {
           // be ready by the time we get a complete click.
           let tab = window.gBrowser.selectedTab;
           let popupURL = this.getProperty(tab, "popup");
+          let enabled = this.getProperty(tab, "enabled");
 
-          if (popupURL) {
+          if (popupURL && enabled) {
+            // Add permission for the active tab so it will exist for the popup.
+            // Store the tab to revoke the permission during clearPopup.
+            if (!this.pendingPopup && !this.tabManager.hasActiveTabPermission(tab)) {
+              this.tabManager.addActiveTabPermission(tab);
+              this.tabToRevokeDuringClearPopup = tab;
+            }
+
             this.pendingPopup = this.getPopup(window, popupURL);
             window.addEventListener("mouseup", this, true);
           } else {
@@ -258,6 +266,10 @@ BrowserAction.prototype = {
   clearPopup() {
     this.clearPopupTimeout();
     if (this.pendingPopup) {
+      if (this.tabToRevokeDuringClearPopup) {
+        this.tabManager.revokeActiveTabPermission(this.tabToRevokeDuringClearPopup);
+        this.tabToRevokeDuringClearPopup = null;
+      }
       this.pendingPopup.destroy();
       this.pendingPopup = null;
     }
@@ -459,12 +471,8 @@ extensions.registerSchemaAPI("browserAction", "addon_parent", context => {
       setIcon: function(details) {
         let tab = details.tabId !== null ? TabManager.getTab(details.tabId, context) : null;
 
-        // Note: the caller in the child process has already normalized
-        // `details` to not contain an `imageData` property, so the icon can
-        // safely be normalized here without errors.
         let icon = IconDetails.normalize(details, extension, context);
         BrowserAction.for(extension).setProperty(tab, "icon", icon);
-        return Promise.resolve();
       },
 
       setBadgeText: function(details) {

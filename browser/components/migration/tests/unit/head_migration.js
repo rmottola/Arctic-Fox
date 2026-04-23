@@ -1,3 +1,7 @@
+"use strict";
+
+/* exported gProfD, promiseMigration, registerFakePath */
+
 var { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
 
 Cu.importGlobalProperties([ "URL" ]);
@@ -15,7 +19,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "MigrationUtils",
 // Initialize profile.
 var gProfD = do_get_profile();
 
-Cu.import("resource://testing-common/AppInfo.jsm");
+Cu.import("resource://testing-common/AppInfo.jsm"); /* globals updateAppInfo */
 updateAppInfo();
 
 /**
@@ -26,7 +30,7 @@ function promiseMigration(migrator, resourceType, aProfile = null) {
   let availableSources = migrator.getMigrateData(aProfile, false);
   Assert.ok((availableSources & resourceType) > 0, "Resource supported by migrator");
 
-  return new Promise (resolve => {
+  return new Promise(resolve => {
     Services.obs.addObserver(function onMigrationEnded() {
       Services.obs.removeObserver(onMigrationEnded, "Migration:Ended");
       resolve();

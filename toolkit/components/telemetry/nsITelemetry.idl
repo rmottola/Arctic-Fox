@@ -62,7 +62,6 @@ interface nsITelemetry : nsISupports
    *   counts - array representing contents of the buckets in the histogram
    *   ranges -  an array with calculated bucket sizes
    *   sum - sum of the bucket contents
-   *   static - true for histograms defined in TelemetryHistograms.h, false for ones defined with newHistogram
    */
   [implicit_jscontext]
   readonly attribute jsval histogramSnapshots;
@@ -178,21 +177,6 @@ interface nsITelemetry : nsISupports
   void registeredHistograms(in uint32_t dataset,
                             out uint32_t count,
                             [retval, array, size_is(count)] out string histograms);
-
-  /**
-   * Create a histogram using the current state of an existing histogram.  The
-   * existing histogram must be registered in TelemetryHistograms.h.
-   *
-   * @param name Unique histogram name
-   * @param existing_name Existing histogram name
-   * The returned object has the following functions:
-   *   add(int) - Adds an int value to the appropriate bucket
-   *   snapshot() - Returns a snapshot of the histogram with the same data fields as in histogramSnapshots()
-   *   clear() - Zeros out the histogram's buckets and sum
-   *   dataset() - identifies what dataset this is in: DATASET_RELEASE_CHANNEL_OPTOUT or ...OPTIN
-   */
-  [implicit_jscontext]
-  jsval histogramFrom(in ACString name, in ACString existing_name);
 
   /**
    * Create and return a histogram registered in TelemetryHistograms.h.

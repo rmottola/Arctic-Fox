@@ -74,15 +74,15 @@ this.AppConstants = Object.freeze({
   false,
 #endif
 
-  MOZ_SAFE_BROWSING:
-#ifdef MOZ_SAFE_BROWSING
+  MOZ_SANDBOX:
+#ifdef MOZ_SANDBOX
   true,
 #else
   false,
 #endif
 
-  MOZ_SANDBOX:
-#ifdef MOZ_SANDBOX
+  MOZ_CONTENT_SANDBOX:
+#ifdef MOZ_CONTENT_SANDBOX
   true,
 #else
   false,

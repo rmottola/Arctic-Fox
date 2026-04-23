@@ -982,7 +982,7 @@ nsPresContext::DetachShell()
     mRestyleManager->Disconnect();
     mRestyleManager = nullptr;
   }
-  if (mRefreshDriver && mRefreshDriver->PresContext() == this) {
+  if (mRefreshDriver && mRefreshDriver->GetPresContext() == this) {
     mRefreshDriver->Disconnect();
     // Can't null out the refresh driver here.
   }
@@ -2753,6 +2753,19 @@ nsPresContext::IsRootContentDocument() const
 
   nsIFrame* f = view->GetFrame();
   return (f && f->PresContext()->IsChrome());
+}
+
+void
+nsPresContext::NotifyNonBlankPaint()
+{
+  MOZ_ASSERT(!mHadNonBlankPaint);
+  mHadNonBlankPaint = true;
+  if (IsRootContentDocument()) {
+    RefPtr<nsDOMNavigationTiming> timing = mDocument->GetNavigationTiming();
+    if (timing) {
+      timing->NotifyNonBlankPaintForRootContentDocument();
+    }
+  }
 }
 
 bool nsPresContext::GetPaintFlashing() const

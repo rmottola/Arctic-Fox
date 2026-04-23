@@ -28,10 +28,10 @@ namespace layers {
 static const uint32_t MAX_TAP_TIME = 300;
 
 /**
- * Amount of change in span needed to take us from the GESTURE_WAITING_PINCH
- * state to the GESTURE_PINCH state. This is measured as a change in distance
- * between the fingers used to compute the span ratio. Note that it is a
- * distance, not a displacement.
+ * Amount of span or focus change needed to take us from the GESTURE_WAITING_PINCH
+ * state to the GESTURE_PINCH state. This is measured as either a change in distance
+ * between the fingers used to compute the span ratio, or the a change in
+ * position of the focus point between the two fingers.
  */
 static const float PINCH_START_THRESHOLD = 35.0f;
 
@@ -66,6 +66,7 @@ GestureEventListener::GestureEventListener(AsyncPanZoomController* aAsyncPanZoom
     mState(GESTURE_NONE),
     mSpanChange(0.0f),
     mPreviousSpan(0.0f),
+    mFocusChange(0.0f),
     mLastTouchInput(MultiTouchInput::MULTITOUCH_START, 0, TimeStamp(), 0),
     mLastTapInput(MultiTouchInput::MULTITOUCH_START, 0, TimeStamp(), 0),
     mLongTapTimeoutTask(nullptr),
@@ -105,6 +106,7 @@ nsEventStatus GestureEventListener::HandleInputEvent(const MultiTouchInput& aEve
       for (size_t j = 0; j < mTouches.Length(); j++) {
         if (aEvent.mTouches[i].mIdentifier == mTouches[j].mIdentifier) {
           mTouches[j].mScreenPoint = aEvent.mTouches[i].mScreenPoint;
+          mTouches[j].mLocalScreenPoint = aEvent.mTouches[i].mLocalScreenPoint;
         }
       }
     }
@@ -269,14 +271,17 @@ nsEventStatus GestureEventListener::HandleInputTouchMove()
     }
 
     ParentLayerCoord currentSpan = GetCurrentSpan(mLastTouchInput);
+    ParentLayerPoint currentFocus = GetCurrentFocus(mLastTouchInput);
 
     mSpanChange += fabsf(currentSpan - mPreviousSpan);
-    if (mSpanChange > PINCH_START_THRESHOLD) {
+    mFocusChange += (currentFocus - mPreviousFocus).Length();
+    if (mSpanChange > PINCH_START_THRESHOLD ||
+        mFocusChange > PINCH_START_THRESHOLD) {
       SetState(GESTURE_PINCH);
       PinchGestureInput pinchEvent(PinchGestureInput::PINCHGESTURE_START,
                                    mLastTouchInput.mTime,
                                    mLastTouchInput.mTimeStamp,
-                                   GetCurrentFocus(mLastTouchInput),
+                                   currentFocus,
                                    currentSpan,
                                    currentSpan,
                                    mLastTouchInput.modifiers);
@@ -289,6 +294,7 @@ nsEventStatus GestureEventListener::HandleInputTouchMove()
     }
 
     mPreviousSpan = currentSpan;
+    mPreviousFocus = currentFocus;
     break;
   }
 
@@ -383,11 +389,11 @@ nsEventStatus GestureEventListener::HandleInputTouchEnd()
   case GESTURE_PINCH:
     if (mTouches.Length() < 2) {
       SetState(GESTURE_NONE);
-      ScreenPoint point(-1, -1);
+      ParentLayerPoint point(-1, -1);
       if (mTouches.Length() == 1) {
         // As user still keeps one finger down the event's focus point should
         // contain meaningful data.
-        point = mTouches[0].mScreenPoint;
+        point = mTouches[0].mLocalScreenPoint;
       }
       PinchGestureInput pinchEvent(PinchGestureInput::PINCHGESTURE_END,
                                    mLastTouchInput.mTime,
@@ -481,8 +487,10 @@ void GestureEventListener::SetState(GestureState aState)
   if (mState == GESTURE_NONE) {
     mSpanChange = 0.0f;
     mPreviousSpan = 0.0f;
+    mFocusChange = 0.0f;
   } else if (mState == GESTURE_MULTI_TOUCH_DOWN) {
     mPreviousSpan = GetCurrentSpan(mLastTouchInput);
+    mPreviousFocus = GetCurrentFocus(mLastTouchInput);
   }
 }
 
@@ -527,7 +535,8 @@ void GestureEventListener::CreateMaxTapTimeoutTask()
 {
   mLastTapInput = mLastTouchInput;
 
-  TouchBlockState* block = mAsyncPanZoomController->GetInputQueue()->CurrentTouchBlock();
+  TouchBlockState* block = mAsyncPanZoomController->GetInputQueue()->GetCurrentTouchBlock();
+  MOZ_ASSERT(block);
   RefPtr<CancelableRunnable> task =
     NewCancelableRunnableMethod<bool>(this,
                                       &GestureEventListener::HandleInputTimeoutMaxTap,

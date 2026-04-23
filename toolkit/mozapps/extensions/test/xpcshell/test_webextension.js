@@ -66,6 +66,7 @@ add_task(function*() {
   do_check_true(addon.isActive);
   do_check_false(addon.isSystem);
   do_check_eq(addon.type, "extension");
+  do_check_true(addon.isWebExtension);
   do_check_eq(addon.signedState, mozinfo.addon_signing ? AddonManager.SIGNEDSTATE_SIGNED : AddonManager.SIGNEDSTATE_NOT_REQUIRED);
 
   let uri = do_get_addon_root_uri(profileDir, ID);
@@ -123,7 +124,7 @@ add_task(function*() {
 
 // Writing the manifest direct to the profile should work
 add_task(function*() {
-  writeWebManifestForExtension({
+  yield promiseWriteWebManifestForExtension({
     name: "Web Extension Name",
     version: "1.0",
     manifest_version: 2,
@@ -189,7 +190,7 @@ add_task(function* test_manifest_localization() {
 
 // Missing version should cause a failure
 add_task(function*() {
-  writeWebManifestForExtension({
+  yield promiseWriteWebManifestForExtension({
     name: "Web Extension Name",
     manifest_version: 2,
     applications: {
@@ -212,7 +213,7 @@ add_task(function*() {
 
 // Incorrect manifest version should cause a failure
 add_task(function*() {
-  writeWebManifestForExtension({
+  yield promiseWriteWebManifestForExtension({
     name: "Web Extension Name",
     version: "1.0",
     manifest_version: 1,
@@ -250,7 +251,7 @@ add_task(function*() {
   do_check_true(first_addon.isActive);
   do_check_false(first_addon.isSystem);
 
-  let manifestjson_id= "last-webextension2@tests.mozilla.org";
+  let manifestjson_id = "last-webextension2@tests.mozilla.org";
   let last_addon = yield promiseAddonByID(manifestjson_id);
   do_check_eq(last_addon, null);
 
@@ -351,4 +352,53 @@ add_task(function* test_experiments_api() {
   equal(addons.pop().id, ID, "Add-on type should be aliased to extension");
 
   addon.uninstall();
+});
+
+add_task(function* developerShouldOverride() {
+  let addon = yield promiseInstallWebExtension({
+    manifest: {
+      default_locale: "en",
+      developer: {
+        name: "__MSG_name__",
+        url: "__MSG_url__"
+      },
+      author: "Will be overridden by developer",
+      homepage_url: "https://will.be.overridden",
+    },
+    files: {
+      "_locales/en/messages.json": `{
+        "name": {
+          "message": "en name"
+        },
+        "url": {
+          "message": "https://example.net/en"
+        }
+      }`
+    }
+  });
+
+  addon = yield promiseAddonByID(addon.id);
+  equal(addon.creator, "en name");
+  equal(addon.homepageURL, "https://example.net/en");
+  addon.uninstall();
+});
+
+add_task(function* developerEmpty() {
+  for (let developer of [{}, null, {name: null, url: null}]) {
+    let addon = yield promiseInstallWebExtension({
+      manifest: {
+        author: "Some author",
+        developer: developer,
+        homepage_url: "https://example.net",
+        manifest_version: 2,
+        name: "Web Extension Name",
+        version: "1.0",
+      }
+    });
+
+    addon = yield promiseAddonByID(addon.id);
+    equal(addon.creator, "Some author");
+    equal(addon.homepageURL, "https://example.net");
+    addon.uninstall();
+  }
 });

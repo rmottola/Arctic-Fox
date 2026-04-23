@@ -449,13 +449,31 @@ function mainThreadFetch(aURL, aOptions = { loadFromCache: true,
       let source = NetUtil.readInputStreamToString(stream, available);
       stream.close();
 
+      // We do our own BOM sniffing here because there's no convenient
+      // implementation of the "decode" algorithm
+      // (https://encoding.spec.whatwg.org/#decode) exposed to JS.
+      let bomCharset = null;
+      if (available >= 3 && source.codePointAt(0) == 0xef &&
+          source.codePointAt(1) == 0xbb && source.codePointAt(2) == 0xbf) {
+        bomCharset = "UTF-8";
+        source = source.slice(3);
+      } else if (available >= 2 && source.codePointAt(0) == 0xfe &&
+                 source.codePointAt(1) == 0xff) {
+        bomCharset = "UTF-16BE";
+        source = source.slice(2);
+      } else if (available >= 2 && source.codePointAt(0) == 0xff &&
+                 source.codePointAt(1) == 0xfe) {
+        bomCharset = "UTF-16LE";
+        source = source.slice(2);
+      }
+
       // If the channel or the caller has correct charset information, the
       // content will be decoded correctly. If we have to fall back to UTF-8 and
       // the guess is wrong, the conversion fails and convertToUnicode returns
       // the input unmodified. Essentially we try to decode the data as UTF-8
       // and if that fails, we use the locale specific default encoding. This is
       // the best we can do if the source does not provide charset info.
-      let charset = channel.contentCharset || aOptions.charset || "UTF-8";
+      let charset = bomCharset || channel.contentCharset || aOptions.charset || "UTF-8";
       let unicodeSource = NetworkHelper.convertToUnicode(source, charset);
 
       deferred.resolve({
@@ -612,3 +630,43 @@ function errorOnFlag(exports, name) {
 errorOnFlag(exports, "testing");
 errorOnFlag(exports, "wantLogging");
 errorOnFlag(exports, "wantVerbose");
+
+// Calls the property with the given `name` on the given `object`, where
+// `name` is a string, and `object` a Debugger.Object instance.
+///
+// This function uses only the Debugger.Object API to call the property. It
+// avoids the use of unsafeDeference. This is useful for example in workers,
+// where unsafeDereference will return an opaque security wrapper to the
+// referent.
+function callPropertyOnObject(object, name) {
+  // Find the property.
+  let descriptor;
+  let proto = object;
+  do {
+    descriptor = proto.getOwnPropertyDescriptor(name);
+    if (descriptor !== undefined) {
+      break;
+    }
+    proto = proto.proto;
+  } while (proto !== null);
+  if (descriptor === undefined) {
+    throw new Error("No such property");
+  }
+  let value = descriptor.value;
+  if (typeof value !== "object" || value === null || !("callable" in value)) {
+    throw new Error("Not a callable object.");
+  }
+
+  // Call the property.
+  let result = value.call(object);
+  if (result === null) {
+    throw new Error("Code was terminated.");
+  }
+  if ("throw" in result) {
+    throw result.throw;
+  }
+  return result.return;
+}
+
+
+exports.callPropertyOnObject = callPropertyOnObject;

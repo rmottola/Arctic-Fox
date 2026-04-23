@@ -96,11 +96,6 @@
 
           win.AppManager.update("runtime-list");
 
-          let packagedAppLocation = getTestFilePath("app");
-
-          yield winProject.projectList.importPackagedApp(packagedAppLocation);
-          yield waitForUpdate(win, "project-validated");
-
           let panelNode = docRuntime.querySelector("#runtime-panel");
           let items = panelNode.querySelectorAll(".runtime-panel-item-usb");
           is(items.length, 3, "Found 3 runtime buttons");

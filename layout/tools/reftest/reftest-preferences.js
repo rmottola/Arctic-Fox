@@ -106,9 +106,9 @@ user_pref("browser.tabs.remote.autostart.2", false);
 
 user_pref("startup.homepage_welcome_url", "");
 user_pref("startup.homepage_override_url", "");
-user_pref("browser.usedOnWindows10.introURL", "");
 
 user_pref("media.gmp-manager.url.override", "http://localhost/dummy-gmp-manager.xml");
+user_pref("media.gmp-manager.updateEnabled", false);
 
 // A fake bool pref for "@supports -moz-bool-pref" sanify test.
 user_pref("testing.supports.moz-bool-pref", true);

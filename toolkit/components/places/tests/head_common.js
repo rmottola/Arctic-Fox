@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const CURRENT_SCHEMA_VERSION = 33;
+const CURRENT_SCHEMA_VERSION = 35;
 const FIRST_UPGRADABLE_SCHEMA_VERSION = 11;
 
 const NS_APP_USER_PROFILE_50_DIR = "ProfD";
@@ -218,7 +218,7 @@ function compareArrays(aArray1, aArray2) {
   for (let i = 0; i < aArray1.length; i++) {
     if (aArray1[i] != aArray2[i]) {
       print("compareArrays: arrays differ at index " + i + ": " +
-            "(" + aArray1[i] + ") != (" + aArray2[i] +")\n");
+            "(" + aArray1[i] + ") != (" + aArray2[i] + ")\n");
       return false;
     }
   }
@@ -509,7 +509,6 @@ function check_JSON_backup(aIsAutomaticBackup) {
     let bookmarksBackupDir = gProfD.clone();
     bookmarksBackupDir.append("bookmarkbackups");
     let files = bookmarksBackupDir.directoryEntries;
-    let backup_date = PlacesBackups.toISODateString(new Date());
     while (files.hasMoreElements()) {
       let entry = files.getNext().QueryInterface(Ci.nsIFile);
       if (PlacesBackups.filenamesRegex.test(entry.leafName)) {
@@ -749,13 +748,13 @@ function do_compare_arrays(a1, a2, sorted)
 function NavBookmarkObserver() {}
 
 NavBookmarkObserver.prototype = {
-  onBeginUpdateBatch: function () {},
-  onEndUpdateBatch: function () {},
-  onItemAdded: function () {},
-  onItemRemoved: function () {},
-  onItemChanged: function () {},
-  onItemVisited: function () {},
-  onItemMoved: function () {},
+  onBeginUpdateBatch: function() {},
+  onEndUpdateBatch: function() {},
+  onItemAdded: function() {},
+  onItemRemoved: function() {},
+  onItemChanged: function() {},
+  onItemVisited: function() {},
+  onItemMoved: function() {},
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsINavBookmarkObserver,
   ])
@@ -768,14 +767,14 @@ NavBookmarkObserver.prototype = {
 function NavHistoryObserver() {}
 
 NavHistoryObserver.prototype = {
-  onBeginUpdateBatch: function () {},
-  onEndUpdateBatch: function () {},
-  onVisit: function () {},
-  onTitleChanged: function () {},
-  onDeleteURI: function () {},
-  onClearHistory: function () {},
-  onPageChanged: function () {},
-  onDeleteVisits: function () {},
+  onBeginUpdateBatch: function() {},
+  onEndUpdateBatch: function() {},
+  onVisit: function() {},
+  onTitleChanged: function() {},
+  onDeleteURI: function() {},
+  onClearHistory: function() {},
+  onPageChanged: function() {},
+  onDeleteVisits: function() {},
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsINavHistoryObserver,
   ])
@@ -789,22 +788,22 @@ NavHistoryObserver.prototype = {
 function NavHistoryResultObserver() {}
 
 NavHistoryResultObserver.prototype = {
-  batching: function () {},
-  containerStateChanged: function () {},
-  invalidateContainer: function () {},
-  nodeAnnotationChanged: function () {},
-  nodeDateAddedChanged: function () {},
-  nodeHistoryDetailsChanged: function () {},
-  nodeIconChanged: function () {},
-  nodeInserted: function () {},
-  nodeKeywordChanged: function () {},
-  nodeLastModifiedChanged: function () {},
-  nodeMoved: function () {},
-  nodeRemoved: function () {},
-  nodeTagsChanged: function () {},
-  nodeTitleChanged: function () {},
-  nodeURIChanged: function () {},
-  sortingChanged: function () {},
+  batching: function() {},
+  containerStateChanged: function() {},
+  invalidateContainer: function() {},
+  nodeAnnotationChanged: function() {},
+  nodeDateAddedChanged: function() {},
+  nodeHistoryDetailsChanged: function() {},
+  nodeIconChanged: function() {},
+  nodeInserted: function() {},
+  nodeKeywordChanged: function() {},
+  nodeLastModifiedChanged: function() {},
+  nodeMoved: function() {},
+  nodeRemoved: function() {},
+  nodeTagsChanged: function() {},
+  nodeTitleChanged: function() {},
+  nodeURIChanged: function() {},
+  sortingChanged: function() {},
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsINavHistoryResultObserver,
   ])

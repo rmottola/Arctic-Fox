@@ -299,7 +299,9 @@ FeedConverter.prototype = {
         request.cancel(Cr.NS_BINDING_ABORTED);
         return;
       }
-      let noSniff = httpChannel.getResponseHeader("X-Moz-Is-Feed");
+
+      // Note: this throws if the header is not set.
+      httpChannel.getResponseHeader("X-Moz-Is-Feed");
     }
     catch (ex) {
       this._sniffed = true;
@@ -340,7 +342,7 @@ FeedConverter.prototype = {
     if (iid.equals(Ci.nsIFeedResultListener) ||
         iid.equals(Ci.nsIStreamConverter) ||
         iid.equals(Ci.nsIStreamListener) ||
-        iid.equals(Ci.nsIRequestObserver)||
+        iid.equals(Ci.nsIRequestObserver) ||
         iid.equals(Ci.nsISupports))
       return this;
     throw Cr.NS_ERROR_NO_INTERFACE;

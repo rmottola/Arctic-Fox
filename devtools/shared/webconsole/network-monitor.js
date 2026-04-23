@@ -24,9 +24,7 @@ loader.lazyServiceGetter(this, "gActivityDistributor",
                          "nsIHttpActivityDistributor");
 const {NetworkThrottleManager} = require("devtools/shared/webconsole/throttle");
 
-// /////////////////////////////////////////////////////////////////////////////
 // Network logging
-// /////////////////////////////////////////////////////////////////////////////
 
 // The maximum uint32 value.
 const PR_UINT32_MAX = 4294967295;
@@ -86,9 +84,16 @@ function matchRequest(channel, filters) {
 
   if (filters.outerWindowID) {
     let topFrame = NetworkHelper.getTopFrameForRequest(channel);
-    if (topFrame && topFrame.outerWindowID &&
-        topFrame.outerWindowID == filters.outerWindowID) {
-      return true;
+    // topFrame is typically null for some chrome requests like favicons
+    if (topFrame) {
+      try {
+        if (topFrame.outerWindowID == filters.outerWindowID) {
+          return true;
+        }
+      } catch (e) {
+        // outerWindowID getter from browser.xml (non-remote <xul:browser>) may
+        // throw when closing a tab while resources are still loading.
+      }
     }
   }
 
@@ -272,12 +277,52 @@ function NetworkResponseListener(owner, httpActivity) {
   this.receivedData = "";
   this.httpActivity = httpActivity;
   this.bodySize = 0;
+  // Note that this is really only needed for the non-e10s case.
+  // See bug 1309523.
+  let channel = this.httpActivity.channel;
+  this._wrappedNotificationCallbacks = channel.notificationCallbacks;
+  channel.notificationCallbacks = this;
 }
 
 NetworkResponseListener.prototype = {
   QueryInterface:
     XPCOMUtils.generateQI([Ci.nsIStreamListener, Ci.nsIInputStreamCallback,
-                           Ci.nsIRequestObserver, Ci.nsISupports]),
+                           Ci.nsIRequestObserver, Ci.nsIInterfaceRequestor,
+                           Ci.nsISupports]),
+
+  // nsIInterfaceRequestor implementation
+
+  /**
+   * This object implements nsIProgressEventSink, but also needs to forward
+   * interface requests to the notification callbacks of other objects.
+   */
+  getInterface(iid) {
+    if (iid.equals(Ci.nsIProgressEventSink)) {
+      return this;
+    }
+    if (this._wrappedNotificationCallbacks) {
+      return this._wrappedNotificationCallbacks.getInterface(iid);
+    }
+    throw Cr.NS_ERROR_NO_INTERFACE;
+  },
+
+  /**
+   * Forward notifications for interfaces this object implements, in case other
+   * objects also implemented them.
+   */
+  _forwardNotification(iid, method, args) {
+    if (!this._wrappedNotificationCallbacks) {
+      return;
+    }
+    try {
+      let impl = this._wrappedNotificationCallbacks.getInterface(iid);
+      impl[method].apply(impl, args);
+    } catch (e) {
+      if (e.result != Cr.NS_ERROR_NO_INTERFACE) {
+        throw e;
+      }
+    }
+  },
 
   /**
    * This NetworkResponseListener tracks the NetworkMonitor.openResponses object
@@ -285,6 +330,12 @@ NetworkResponseListener.prototype = {
    * @private
    */
   _foundOpenResponse: false,
+
+  /**
+   * If the channel already had notificationCallbacks, hold them here internally
+   * so that we can forward getInterface requests to that object.
+   */
+  _wrappedNotificationCallbacks: null,
 
   /**
    * The response listener owner.
@@ -382,6 +433,9 @@ NetworkResponseListener.prototype = {
     this.request = request;
     this._getSecurityInfo();
     this._findOpenResponse();
+    // We need to track the offset for the onDataAvailable calls where
+    // we pass the data from our pipe to the converter.
+    this.offset = 0;
 
     // In the multi-process mode, the conversion happens on the child
     // side while we can only monitor the channel on the parent
@@ -399,7 +453,7 @@ NetworkResponseListener.prototype = {
         .getService(Ci.nsIStreamConverterService);
       let encodings = encodingHeader.split(/\s*\t*,\s*\t*/);
       let nextListener = this;
-      let acceptedEncodings = ["gzip", "deflate", "x-gzip", "x-deflate"];
+      let acceptedEncodings = ["gzip", "deflate", "br", "x-gzip", "x-deflate"];
       for (let i in encodings) {
         // There can be multiple conversions applied
         let enc = encodings[i].toLowerCase();
@@ -448,6 +502,23 @@ NetworkResponseListener.prototype = {
   onStopRequest: function () {
     this._findOpenResponse();
     this.sink.outputStream.close();
+  },
+
+  // nsIProgressEventSink implementation
+
+  /**
+   * Handle progress event as data is transferred.  This is used to record the
+   * size on the wire, which may be compressed / encoded.
+   */
+  onProgress: function (request, context, progress, progressMax) {
+    this.transferredSize = progress;
+    // Need to forward as well to keep things like Download Manager's progress
+    // bar working properly.
+    this._forwardNotification(Ci.nsIProgressEventSink, "onProgress", arguments);
+  },
+
+  onStatus: function () {
+    this._forwardNotification(Ci.nsIProgressEventSink, "onStatus", arguments);
   },
 
   /**
@@ -557,6 +628,7 @@ NetworkResponseListener.prototype = {
       this.httpActivity.discardResponseBody
     );
 
+    this._wrappedNotificationCallbacks = null;
     this.httpActivity = null;
     this.sink = null;
     this.inputStream = null;
@@ -587,23 +659,20 @@ NetworkResponseListener.prototype = {
     }
 
     if (available != -1) {
-      if (this.transferredSize === null) {
-        this.transferredSize = 0;
-      }
-
       if (available != 0) {
         if (this.converter) {
           this.converter.onDataAvailable(this.request, null, stream,
-                                         this.transferredSize, available);
+                                         this.offset, available);
         } else {
-          this.onDataAvailable(this.request, null, stream, this.transferredSize,
+          this.onDataAvailable(this.request, null, stream, this.offset,
                                available);
         }
       }
-      this.transferredSize += available;
+      this.offset += available;
       this.setAsyncListener(stream, this);
     } else {
       this.onStreamClose();
+      this.offset = 0;
     }
   },
 };
@@ -645,7 +714,7 @@ function NetworkMonitor(filters, owner) {
   this._httpModifyExaminer =
     DevToolsUtils.makeInfallible(this._httpModifyExaminer).bind(this);
   this._serviceWorkerRequest = this._serviceWorkerRequest.bind(this);
-  this.throttleData = null;
+  this._throttleData = null;
   this._throttler = null;
 }
 
@@ -721,6 +790,16 @@ NetworkMonitor.prototype = {
     // everything else only happens in the parent process
     Services.obs.addObserver(this._serviceWorkerRequest,
                              "service-worker-synthesized-response", false);
+  },
+
+  get throttleData() {
+    return this._throttleData;
+  },
+
+  set throttleData(value) {
+    this._throttleData = value;
+    // Clear out any existing throttlers
+    this._throttler = null;
   },
 
   _getThrottler: function () {

@@ -48,12 +48,16 @@ public:
   // |!key1=value1&key2=value2|. If there are no non-default attributes, this
   // returns an empty string.
   void CreateSuffix(nsACString& aStr) const;
+
+  // Don't use this method for anything else than debugging!
+  void CreateAnonymizedSuffix(nsACString& aStr) const;
+
   MOZ_MUST_USE bool PopulateFromSuffix(const nsACString& aStr);
 
   // Populates the attributes from a string like
   // |uri!key1=value1&key2=value2| and returns the uri without the suffix.
   MOZ_MUST_USE bool PopulateFromOrigin(const nsACString& aOrigin,
-                          nsACString& aOriginNoSuffix);
+                                       nsACString& aOriginNoSuffix);
 
   // Helper function to match mIsPrivateBrowsing to existing private browsing
   // flags. Once all other flags are removed, this can be removed too.
@@ -103,6 +107,8 @@ public:
 
   // Inherit OriginAttributes from Necko.
   void InheritFromNecko(const NeckoOriginAttributes& aAttrs);
+
+  void StripUserContextIdAndFirstPartyDomain();
 };
 
 // For OriginAttributes stored on docshells / loadcontexts / browsing contexts.
@@ -277,6 +283,8 @@ public:
   NS_IMETHOD GetUserContextId(uint32_t* aUserContextId) final;
   NS_IMETHOD GetPrivateBrowsingId(uint32_t* aPrivateBrowsingId) final;
 
+  bool EqualsIgnoringAddonId(nsIPrincipal *aOther);
+
   virtual bool AddonHasPermission(const nsAString& aPerm);
 
   virtual bool IsOnCSSUnprefixingWhitelist() override { return false; }
@@ -303,10 +311,14 @@ public:
 
   virtual PrincipalKind Kind() = 0;
 
+  already_AddRefed<BasePrincipal> CloneStrippingUserContextIdAndFirstPartyDomain();
+
 protected:
   virtual ~BasePrincipal();
 
   virtual nsresult GetOriginInternal(nsACString& aOrigin) = 0;
+  // Note that this does not check OriginAttributes. Callers that depend on
+  // those must call Subsumes instead.
   virtual bool SubsumesInternal(nsIPrincipal* aOther, DocumentDomainConsideration aConsider) = 0;
 
   // Internal, side-effect-free check to determine whether the concrete

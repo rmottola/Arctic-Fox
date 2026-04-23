@@ -5,7 +5,7 @@
 "use strict";
 
 // These are injected from XPIProvider.jsm
-/*globals ADDON_SIGNING, SIGNED_TYPES, BOOTSTRAP_REASONS, DB_SCHEMA,
+/* globals ADDON_SIGNING, SIGNED_TYPES, BOOTSTRAP_REASONS, DB_SCHEMA,
           AddonInternal, XPIProvider, XPIStates, syncLoadManifestFromFile,
           isUsableAddon, recordAddonTelemetry, applyBlocklistChanges,
           flushChromeCaches, canRunInSafeMode*/
@@ -18,7 +18,7 @@ var Cu = Components.utils;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/AddonManager.jsm");
-/*globals AddonManagerPrivate*/
+/* globals AddonManagerPrivate*/
 Cu.import("resource://gre/modules/Preferences.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "AddonRepository",
@@ -56,6 +56,7 @@ const PREF_EM_ENABLED_ADDONS          = "extensions.enabledAddons";
 const PREF_EM_DSS_ENABLED             = "extensions.dss.enabled";
 const PREF_EM_AUTO_DISABLED_SCOPES    = "extensions.autoDisableScopes";
 const PREF_E10S_BLOCKED_BY_ADDONS     = "extensions.e10sBlockedByAddons";
+const PREF_E10S_HAS_NONEXEMPT_ADDON   = "extensions.e10s.rollout.hasAddon";
 
 const KEY_APP_PROFILE                 = "app-profile";
 const KEY_APP_SYSTEM_ADDONS           = "app-system-addons";
@@ -86,12 +87,12 @@ const PROP_JSON_FIELDS = ["id", "syncGUID", "location", "version", "type",
                           "softDisabled", "foreignInstall", "hasBinaryComponents",
                           "strictCompatibility", "locales", "targetApplications",
                           "targetPlatforms", "multiprocessCompatible", "signedState",
-                          "seen", "dependencies"];
+                          "seen", "dependencies", "hasEmbeddedWebExtension"];
 
 // Properties that should be migrated where possible from an old database. These
 // shouldn't include properties that can be read directly from install.rdf files
 // or calculated
-const DB_MIGRATE_METADATA= ["installDate", "userDisabled", "softDisabled",
+const DB_MIGRATE_METADATA = ["installDate", "userDisabled", "softDisabled",
                             "sourceURI", "applyBackgroundUpdates",
                             "releaseNotesURI", "foreignInstall", "syncGUID"];
 
@@ -618,14 +619,11 @@ this.XPIDatabase = {
       if (fstream)
         fstream.close();
     }
-    // If an async load was also in progress, resolve that promise with our DB;
-    // otherwise create a resolved promise
+    // If an async load was also in progress, record in telemetry.
     if (this._dbPromise) {
       AddonManagerPrivate.recordSimpleMeasure("XPIDB_overlapped_load", 1);
-      this._dbPromise.resolve(this.addonDB);
     }
-    else
-      this._dbPromise = Promise.resolve(this.addonDB);
+    this._dbPromise = Promise.resolve(this.addonDB);
   },
 
   /**
@@ -769,7 +767,8 @@ this.XPIDatabase = {
         logger.debug("Async JSON file read took " + readOptions.outExecutionDuration + " MS");
         AddonManagerPrivate.recordSimpleMeasure("XPIDB_asyncRead_MS",
           readOptions.outExecutionDuration);
-        if (this._addonDB) {
+
+        if (this.addonDB) {
           logger.debug("Synchronous load completed while waiting for async load");
           return this.addonDB;
         }
@@ -781,9 +780,9 @@ this.XPIDatabase = {
         this.parseDB(data, true);
         return this.addonDB;
       })
-    .then(null,
+    .catch(
       error => {
-        if (this._addonDB) {
+        if (this.addonDB) {
           logger.debug("Synchronous load completed while waiting for async load");
           return this.addonDB;
         }
@@ -1412,6 +1411,8 @@ this.XPIDatabase = {
 
   updateAddonsBlockingE10s: function() {
     let blockE10s = false;
+
+    Preferences.set(PREF_E10S_HAS_NONEXEMPT_ADDON, false);
     for (let [, addon] of this.addonDB) {
       let active = (addon.visible && !addon.disabled && !addon.pendingUninstall);
 
@@ -1727,7 +1728,10 @@ this.XPIDatabaseReconcile = {
         logger.warn("Disabling foreign installed add-on " + aNewAddon.id + " in "
             + aInstallLocation.name);
         aNewAddon.userDisabled = true;
-        aNewAddon.seen = false;
+
+        // If we don't have an old app version then this is a new profile in
+        // which case just mark any sideloaded add-ons as already seen.
+        aNewAddon.seen = !aOldAppVersion;
       }
     }
 
@@ -2032,14 +2036,10 @@ this.XPIDatabaseReconcile = {
     let addons = currentAddons.get(KEY_APP_SYSTEM_ADDONS) || new Map();
 
     let hideLocation;
-    if (systemAddonLocation.isActive() && systemAddonLocation.isValid(addons)) {
-      // Hide the system add-on defaults
-      logger.info("Hiding the default system add-ons.");
-      hideLocation = KEY_APP_SYSTEM_DEFAULTS;
-    }
-    else {
-      // Hide the system add-on updates
-      logger.info("Hiding the updated system add-ons.");
+
+    if (!systemAddonLocation.isValid(addons)) {
+      // Hide the system add-on updates if any are invalid.
+      logger.info("One or more updated system add-ons invalid, falling back to defaults.");
       hideLocation = KEY_APP_SYSTEM_ADDONS;
     }
 
@@ -2090,6 +2090,7 @@ this.XPIDatabaseReconcile = {
             AddonManagerPrivate.addStartupChange(AddonManager.STARTUP_CHANGE_INSTALLED, id);
 
           if (currentAddon.bootstrap) {
+            AddonManagerPrivate.addStartupChange(AddonManager.STARTUP_CHANGE_INSTALLED, id);
             // Visible bootstrapped add-ons need to have their install method called
             XPIProvider.callBootstrapMethod(currentAddon, currentAddon._sourceBundle,
                                             "install", BOOTSTRAP_REASONS.ADDON_INSTALL);
@@ -2154,6 +2155,7 @@ this.XPIDatabaseReconcile = {
           multiprocessCompatible: currentAddon.multiprocessCompatible,
           runInSafeMode: canRunInSafeMode(currentAddon),
           dependencies: currentAddon.dependencies,
+          hasEmbeddedWebExtension: currentAddon.hasEmbeddedWebExtension,
         };
       }
 

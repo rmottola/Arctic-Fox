@@ -4,8 +4,7 @@
 
 "use strict";
 
-////////////////////////////////////////////////////////////////////////////////
-//// Globals
+// Globals
 
 let { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
@@ -43,8 +42,7 @@ function run_test()
   run_next_test();
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//// Global helpers
+// Global helpers
 
 // Some of these functions are already implemented in other parts of the source
 // tree, see bug 946708 about sharing more code.
@@ -80,7 +78,7 @@ function getTempFile(aLeafName)
   let file = FileUtils.getFile("TmpD", [leafName]);
   do_check_false(file.exists());
 
-  do_register_cleanup(function () {
+  do_register_cleanup(function() {
     if (file.exists()) {
       file.remove(false);
     }
@@ -113,7 +111,7 @@ function newPropertyBag(aProperties)
                     .QueryInterface(Ci.nsIWritablePropertyBag2);
 }
 
-////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////
 
 const RecipeHelpers = {
   initNewParent() {
@@ -159,7 +157,7 @@ const MockDocument = {
 
 };
 
-//// Initialization functions common to all tests
+// // Initialization functions common to all tests
 
 add_task(function* test_common_initialize()
 {

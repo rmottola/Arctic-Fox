@@ -22,8 +22,8 @@ body {
 }
 
 input {
-  font: message-box !important;
-  font-size: 16px !important;
+  font: message-box;
+  font-size: 16px;
 }
 
 input[type=button] {
@@ -122,23 +122,18 @@ input[type=button] {
   pointer-events: none;
 }
 
+/*
+ * If you change the sizes here, make sure you
+ * change the preferences:
+ * toolkit.pageThumbs.minWidth
+ * toolkit.pageThumbs.minHeight
+ */
 /* CELLS */
-.newtab-cell,
-.newtab-intro-cell,
-.newtab-intro-cell-hover {
+.newtab-cell {
   display: -moz-box;
   height: 210px;
   margin: 20px 10px 35px;
   width: 290px;
-}
-
-.newtab-intro-cell-wrapper {
-  margin-top: -12px;
-}
-
-.newtab-intro-cell,
-.newtab-intro-cell-hover {
-  margin: 0;
 }
 
 /* SITES */
@@ -213,6 +208,8 @@ input[type=button] {
 .newtab-title {
   left: 0;
   padding: 0 4px;
+  border: 1px solid #FFFFFF;
+  border-radius: 0px 0px 8px 8px;
 }
 
 .newtab-sponsored {
@@ -296,8 +293,7 @@ input[type=button] {
 }
 
 .newtab-control:-moz-focusring,
-.newtab-cell:not([ignorehover]) > .newtab-site:hover > .newtab-control,
-.newtab-intro-cell-hover .newtab-control {
+.newtab-cell:not([ignorehover]) > .newtab-site:hover > .newtab-control {
   opacity: 1;
 }
 
@@ -403,6 +399,7 @@ input[type=button] {
 
 #newtab-search-submit {
   margin-inline-start: -1px;
+  color: transparent;
   background: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go") center center no-repeat, linear-gradient(hsla(0,0%,100%,.8), hsla(0,0%,100%,.1)) padding-box;
   padding: 0;
   border: 1px solid;
@@ -411,7 +408,6 @@ input[type=button] {
   border-inline-start: 1px solid transparent;
   box-shadow: 0 0 2px hsla(0,0%,100%,.5) inset,
               0 1px 0 hsla(0,0%,100%,.2);
-  color: inherit;
   cursor: pointer;
   transition-property: background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -427,7 +423,6 @@ input[type=button] {
 #newtab-search-text + #newtab-search-submit:hover,
 #newtab-search-text[autofocus] + #newtab-search-submit {
   border-color: #59b5fc #45a3e7 #3294d5;
-  color: white;
 }
 
 #newtab-search-text:focus + #newtab-search-submit,

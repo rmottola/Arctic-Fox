@@ -14,7 +14,6 @@
 #include "prenv.h"
 
 #include "nsDocShell.h"
-#include "nsIAppsService.h"
 #include "nsIDOMHTMLIFrameElement.h"
 #include "nsIDOMHTMLFrameElement.h"
 #include "nsIDOMMozBrowserFrame.h"
@@ -75,7 +74,6 @@
 #include "Layers.h"
 #include "ClientLayerManager.h"
 
-#include "AppProcessChecker.h"
 #include "ContentParent.h"
 #include "TabParent.h"
 #include "mozilla/plugins/PPluginWidgetParent.h"
@@ -2580,7 +2578,23 @@ nsFrameLoader::TryRemoteBrowser()
   // <iframe mozbrowser> gets to skip these checks.
   if (!OwnerIsMozBrowserFrame()) {
     if (parentDocShell->ItemType() != nsIDocShellTreeItem::typeChrome) {
-      return false;
+      // Allow about:addon an exception to this rule so it can load remote
+      // extension options pages.
+      //
+      // Note that the new frame's message manager will not be a child of the
+      // chrome window message manager, and, the values of window.top and
+      // window.parent will be different than they would be for a non-remote
+      // frame.
+      nsCOMPtr<nsIWebNavigation> parentWebNav;
+      nsCOMPtr<nsIURI> aboutAddons;
+      nsCOMPtr<nsIURI> parentURI;
+      bool equals;
+      if (!((parentWebNav = do_GetInterface(parentDocShell)) &&
+            NS_SUCCEEDED(NS_NewURI(getter_AddRefs(aboutAddons), "about:addons")) &&
+            NS_SUCCEEDED(parentWebNav->GetCurrentURI(getter_AddRefs(parentURI))) &&
+            NS_SUCCEEDED(parentURI->EqualsExceptRef(aboutAddons, &equals)) && equals)) {
+        return false;
+      }
     }
 
     if (!mOwnerContent->IsXULElement()) {
@@ -2838,27 +2852,6 @@ nsFrameLoader::DoSendAsyncMessage(JSContext* aCx,
 
   // We don't have any targets to send our asynchronous message to.
   return NS_ERROR_UNEXPECTED;
-}
-
-bool
-nsFrameLoader::CheckPermission(const nsAString& aPermission)
-{
-  return AssertAppProcessPermission(GetRemoteBrowser(),
-                                    NS_ConvertUTF16toUTF8(aPermission).get());
-}
-
-bool
-nsFrameLoader::CheckManifestURL(const nsAString& aManifestURL)
-{
-  return AssertAppProcessManifestURL(GetRemoteBrowser(),
-                                     NS_ConvertUTF16toUTF8(aManifestURL).get());
-}
-
-bool
-nsFrameLoader::CheckAppHasPermission(const nsAString& aPermission)
-{
-  return AssertAppHasPermission(GetRemoteBrowser(),
-                                NS_ConvertUTF16toUTF8(aPermission).get());
 }
 
 NS_IMETHODIMP

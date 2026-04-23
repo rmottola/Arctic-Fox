@@ -16,11 +16,11 @@ XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
   return Services.strings.createBundle("chrome://browser/locale/browser.properties");
 });
 
-XPCOMUtils.defineLazyGetter(this, "gTextDecoder", function () {
+XPCOMUtils.defineLazyGetter(this, "gTextDecoder", function() {
   return new TextDecoder();
 });
 
-XPCOMUtils.defineLazyGetter(this, "gTextEncoder", function () {
+XPCOMUtils.defineLazyGetter(this, "gTextEncoder", function() {
   return new TextEncoder();
 });
 
@@ -41,32 +41,32 @@ _ContextualIdentityService.prototype = {
   _defaultIdentities: [
     { userContextId: 1,
       public: true,
-      icon: "chrome://browser/skin/usercontext/personal.svg",
-      color: "#00a7e0",
+      icon: "fingerprint",
+      color: "blue",
       l10nID: "userContextPersonal.label",
       accessKey: "userContextPersonal.accesskey",
       telemetryId: 1,
     },
     { userContextId: 2,
       public: true,
-      icon: "chrome://browser/skin/usercontext/work.svg",
-      color: "#f89c24",
+      icon: "briefcase",
+      color: "orange",
       l10nID: "userContextWork.label",
       accessKey: "userContextWork.accesskey",
       telemetryId: 2,
     },
     { userContextId: 3,
       public: true,
-      icon: "chrome://browser/skin/usercontext/banking.svg",
-      color: "#7dc14c",
+      icon: "dollar",
+      color: "green",
       l10nID: "userContextBanking.label",
       accessKey: "userContextBanking.accesskey",
       telemetryId: 3,
     },
     { userContextId: 4,
       public: true,
-      icon: "chrome://browser/skin/usercontext/shopping.svg",
-      color: "#ee5195",
+      icon: "cart",
+      color: "pink",
       l10nID: "userContextShopping.label",
       accessKey: "userContextShopping.accesskey",
       telemetryId: 4,
@@ -106,7 +106,10 @@ _ContextualIdentityService.prototype = {
 
       try {
         let data = JSON.parse(gTextDecoder.decode(bytes));
-        if (data.version != 1) {
+        if (data.version == 1) {
+          this.resetDefault();
+        }
+        if (data.version != 2) {
           dump("ERROR - ContextualIdentityService - Unknown version found in " + this._path + "\n");
           this.loadError(null);
           return;
@@ -124,6 +127,15 @@ _ContextualIdentityService.prototype = {
     });
   },
 
+  resetDefault() {
+    this._identities = this._defaultIdentities;
+    this._lastUserContextId = this._defaultIdentities.length;
+
+    this._dataReady = true;
+
+    this.saveSoon();
+  },
+
   loadError(error) {
     if (error != null &&
         !(error instanceof OS.File.Error && error.becauseNoSuchFile) &&
@@ -138,12 +150,7 @@ _ContextualIdentityService.prototype = {
       return;
     }
 
-    this._identities = this._defaultIdentities;
-    this._lastUserContextId = this._defaultIdentities.length;
-
-    this._dataReady = true;
-
-    this.saveSoon();
+    this.resetDefault();
   },
 
   saveSoon() {
@@ -152,7 +159,7 @@ _ContextualIdentityService.prototype = {
 
   save() {
    let object = {
-     version: 1,
+     version: 2,
      lastUserContextId: this._lastUserContextId,
      identities: this._identities
    };
@@ -180,7 +187,7 @@ _ContextualIdentityService.prototype = {
   update(userContextId, name, icon, color) {
     let identity = this._identities.find(identity => identity.userContextId == userContextId &&
                                          identity.public);
-    if (identity) {
+    if (identity && name) {
       identity.name = name;
       identity.color = color;
       identity.icon = icon;
@@ -221,8 +228,11 @@ _ContextualIdentityService.prototype = {
                        FileUtils.MODE_RDONLY, FileUtils.PERMS_FILE, 0);
       try {
         let json = Cc["@mozilla.org/dom/json;1"].createInstance(Ci.nsIJSON);
-        this._identities = json.decodeFromStream(inputStream,
-                                                 inputStream.available());
+        let data = json.decodeFromStream(inputStream,
+                                         inputStream.available());
+        this._identities = data.identities;
+        this._lastUserContextId = data.lastUserContextId;
+
         this._dataReady = true;
       } finally {
         inputStream.close();
@@ -251,7 +261,7 @@ _ContextualIdentityService.prototype = {
 
   getUserContextLabel(userContextId) {
     let identity = this.getIdentityFromId(userContextId);
-    if (!identity.public) {
+    if (!identity || !identity.public) {
       return "";
     }
 
@@ -264,22 +274,44 @@ _ContextualIdentityService.prototype = {
   },
 
   setTabStyle(tab) {
-    // inline style is only a temporary fix for some bad performances related
-    // to the use of CSS vars. This code will be removed in bug 1278177.
     if (!tab.hasAttribute("usercontextid")) {
-      tab.style.removeProperty("background-image");
-      tab.style.removeProperty("background-size");
-      tab.style.removeProperty("background-repeat");
       return;
     }
 
     let userContextId = tab.getAttribute("usercontextid");
     let identity = this.getIdentityFromId(userContextId);
+    tab.setAttribute("data-identity-color", identity ? identity.color : "");
+  },
 
-    let color = identity ? identity.color : DEFAULT_TAB_COLOR;
-    tab.style.backgroundImage = "linear-gradient(to right, transparent 20%, " + color + " 30%, " + color + " 70%, transparent 80%)";
-    tab.style.backgroundSize = "auto 2px";
-    tab.style.backgroundRepeat = "no-repeat";
+  countContainerTabs() {
+    let count = 0;
+    this._forEachContainerTab(function() { ++count; });
+    return count;
+  },
+
+  closeAllContainerTabs() {
+    this._forEachContainerTab(function(tab, tabbrowser) {
+      tabbrowser.removeTab(tab);
+    });
+  },
+
+  _forEachContainerTab(callback) {
+    let windowList = Services.wm.getEnumerator("navigator:browser");
+    while (windowList.hasMoreElements()) {
+      let win = windowList.getNext();
+
+      if (win.closed || !win.gBrowser) {
+	continue;
+      }
+
+      let tabbrowser = win.gBrowser;
+      for (let i = tabbrowser.tabContainer.childNodes.length - 1; i >= 0; --i) {
+        let tab = tabbrowser.tabContainer.childNodes[i];
+	if (tab.hasAttribute("usercontextid")) {
+	  callback(tab, tabbrowser);
+	}
+      }
+    }
   },
 
   telemetry(userContextId) {
@@ -290,7 +322,7 @@ _ContextualIdentityService.prototype = {
       return;
     }
 
-    if (this._openedIdentities.has(userContextId)) {
+    if (!this._openedIdentities.has(userContextId)) {
       this._openedIdentities.add(userContextId);
       Services.telemetry.getHistogramById("UNIQUE_CONTAINERS_OPENED").add(1);
     }

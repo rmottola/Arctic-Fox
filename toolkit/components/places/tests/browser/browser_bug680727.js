@@ -38,7 +38,7 @@ function test() {
   });
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 // listen to loading the neterror page. (offline mode)
 function errorListener() {
   ok(Services.io.offline, "Services.io.offline is true.");
@@ -79,7 +79,7 @@ function errorAsyncListener(aURI, aIsVisited) {
   });
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 // listen to reload of neterror.
 function reloadListener() {
   // This listener catches "DOMContentLoaded" on being called

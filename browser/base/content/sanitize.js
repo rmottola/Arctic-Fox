@@ -290,7 +290,7 @@ Sanitizer.prototype = {
           // We don't want to wait for this operation to complete...
           promiseClearPluginCookies = this.promiseClearPluginCookies(range);
 
-          //... at least, not for more than 10 seconds.
+          // ... at least, not for more than 10 seconds.
           yield Promise.race([
             promiseClearPluginCookies,
             new Promise(resolve => setTimeout(resolve, 10000 /* 10 seconds */))
@@ -795,7 +795,7 @@ Sanitizer.__defineGetter__("prefs", function()
 Sanitizer.showUI = function(aParentWindow)
 {
   let win = AppConstants.platform == "macosx" ?
-    null: // make this an app-modal window on Mac
+    null : // make this an app-modal window on Mac
     aParentWindow;
   Services.ww.openWindow(win,
                          "chrome://browser/content/sanitize.xul",

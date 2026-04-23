@@ -67,6 +67,8 @@ GPUProcessManager::GPUProcessManager()
    mProcess(nullptr),
    mGPUChild(nullptr)
 {
+  MOZ_COUNT_CTOR(GPUProcessManager);
+
   mObserver = new Observer(this);
   nsContentUtils::RegisterShutdownObserver(mObserver);
 
@@ -77,6 +79,8 @@ GPUProcessManager::GPUProcessManager()
 
 GPUProcessManager::~GPUProcessManager()
 {
+  MOZ_COUNT_DTOR(GPUProcessManager);
+
   LayerTreeOwnerTracker::Shutdown();
 
   // The GPU process should have already been shut down.
@@ -230,7 +234,7 @@ GPUProcessManager::OnProcessLaunchComplete(GPUProcessHost* aHost)
   MOZ_ASSERT(mProcess && mProcess == aHost);
 
   if (!mProcess->IsConnected()) {
-    DisableGPUProcess("Failed to launch GPU process");
+    DisableGPUProcess("Failed to connect GPU process");
     return;
   }
 
@@ -267,8 +271,8 @@ ShouldLimitDeviceResets(uint32_t count, int32_t deltaMilliseconds)
   int32_t timeLimit = gfxPrefs::DeviceResetThresholdMilliseconds();
   int32_t countLimit = gfxPrefs::DeviceResetLimitCount();
 
-  bool hasTimeLimit = timeLimit != -1;
-  bool hasCountLimit = countLimit != -1;
+  bool hasTimeLimit = timeLimit >= 0;
+  bool hasCountLimit = countLimit >= 0;
 
   bool triggeredTime = deltaMilliseconds < timeLimit;
   bool triggeredCount = count > (uint32_t)countLimit;
@@ -321,7 +325,10 @@ GPUProcessManager::OnProcessUnexpectedShutdown(GPUProcessHost* aHost)
   DestroyProcess();
 
   if (mNumProcessAttempts > uint32_t(gfxPrefs::GPUProcessDevMaxRestarts())) {
-    DisableGPUProcess("GPU processed crashed too many times");
+    char disableMessage[64];
+    SprintfLiteral(disableMessage, "GPU process disabled after %d attempts",
+                   mNumProcessAttempts);
+    DisableGPUProcess(disableMessage);
   }
 
   HandleProcessLost();
@@ -445,14 +452,8 @@ GPUProcessManager::NotifyRemoteActorDestroyed(const uint64_t& aProcessToken)
 void
 GPUProcessManager::CleanShutdown()
 {
-  if (!mProcess) {
-    return;
-  }
-
-#ifdef NS_FREE_PERMANENT_DATA
-  mVsyncBridge->Close();
-#endif
   DestroyProcess();
+  mVsyncIOThread = nullptr;
 }
 
 void

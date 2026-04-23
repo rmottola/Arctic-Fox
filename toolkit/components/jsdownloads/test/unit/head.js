@@ -9,8 +9,7 @@
 
 "use strict";
 
-////////////////////////////////////////////////////////////////////////////////
-//// Globals
+// Globals
 
 var Cc = Components.classes;
 var Ci = Components.interfaces;
@@ -73,10 +72,10 @@ const TEST_REFERRER_URL = "http://www.example.com/referrer.html";
 const TEST_DATA_SHORT = "This test string is downloaded.";
 // Generate using gzipCompressString in TelemetryController.jsm.
 const TEST_DATA_SHORT_GZIP_ENCODED_FIRST = [
- 31,139,8,0,0,0,0,0,0,3,11,201,200,44,86,40,73,45,46,81,40,46,41,202,204
+ 31, 139, 8, 0, 0, 0, 0, 0, 0, 3, 11, 201, 200, 44, 86, 40, 73, 45, 46, 81, 40, 46, 41, 202, 204
 ];
 const TEST_DATA_SHORT_GZIP_ENCODED_SECOND = [
-  75,87,0,114,83,242,203,243,114,242,19,83,82,83,244,0,151,222,109,43,31,0,0,0
+  75, 87, 0, 114, 83, 242, 203, 243, 114, 242, 19, 83, 82, 83, 244, 0, 151, 222, 109, 43, 31, 0, 0, 0
 ];
 const TEST_DATA_SHORT_GZIP_ENCODED =
   TEST_DATA_SHORT_GZIP_ENCODED_FIRST.concat(TEST_DATA_SHORT_GZIP_ENCODED_SECOND);
@@ -90,8 +89,7 @@ function run_test()
   run_next_test();
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//// Support functions
+// Support functions
 
 /**
  * HttpServer object initialized before tests start.
@@ -138,7 +136,7 @@ function getTempFile(aLeafName)
   let file = FileUtils.getFile("TmpD", [leafName]);
   do_check_false(file.exists());
 
-  do_register_cleanup(function () {
+  do_register_cleanup(function() {
     try {
       file.remove(false)
     } catch (e) {
@@ -204,20 +202,20 @@ function promiseWaitForVisit(aUrl)
 
   PlacesUtils.history.addObserver({
     QueryInterface: XPCOMUtils.generateQI([Ci.nsINavHistoryObserver]),
-    onBeginUpdateBatch: function () {},
-    onEndUpdateBatch: function () {},
-    onVisit: function (aURI, aVisitID, aTime, aSessionID, aReferringID,
-                       aTransitionType, aGUID, aHidden) {
+    onBeginUpdateBatch: function() {},
+    onEndUpdateBatch: function() {},
+    onVisit: function(aURI, aVisitID, aTime, aSessionID, aReferringID,
+                      aTransitionType, aGUID, aHidden) {
       if (aURI.equals(uri)) {
         PlacesUtils.history.removeObserver(this);
         deferred.resolve([aTime, aTransitionType]);
       }
     },
-    onTitleChanged: function () {},
-    onDeleteURI: function () {},
-    onClearHistory: function () {},
-    onPageChanged: function () {},
-    onDeleteVisits: function () {},
+    onTitleChanged: function() {},
+    onDeleteURI: function() {},
+    onClearHistory: function() {},
+    onPageChanged: function() {},
+    onDeleteVisits: function() {},
   }, false);
 
   return deferred.promise;
@@ -237,7 +235,7 @@ function promiseIsURIVisited(aUrl) {
   let deferred = Promise.defer();
 
   PlacesUtils.asyncHistory.isURIVisited(NetUtil.newURI(aUrl),
-    function (aURI, aIsVisited) {
+    function(aURI, aIsVisited) {
       deferred.resolve(aIsVisited);
     });
 
@@ -339,11 +337,11 @@ function promiseStartLegacyDownload(aSourceUrl, aOptions) {
 
   let deferred = Promise.defer();
 
-  Downloads.getList(Downloads.ALL).then(function (aList) {
+  Downloads.getList(Downloads.ALL).then(function(aList) {
     // Temporarily register a view that will get notified when the download we
     // are controlling becomes visible in the list of downloads.
     aList.addView({
-      onDownloadAdded: function (aDownload) {
+      onDownloadAdded: function(aDownload) {
         aList.removeView(this).then(null, do_report_unexpected_exception);
 
         // Remove the download to keep the list empty for the next test.  This
@@ -392,11 +390,11 @@ function promiseStartExternalHelperAppServiceDownload(aSourceUrl) {
 
   let deferred = Promise.defer();
 
-  Downloads.getList(Downloads.PUBLIC).then(function (aList) {
+  Downloads.getList(Downloads.PUBLIC).then(function(aList) {
     // Temporarily register a view that will get notified when the download we
     // are controlling becomes visible in the list of downloads.
     aList.addView({
-      onDownloadAdded: function (aDownload) {
+      onDownloadAdded: function(aDownload) {
         aList.removeView(this).then(null, do_report_unexpected_exception);
 
         // Remove the download to keep the list empty for the next test.  This
@@ -418,21 +416,21 @@ function promiseStartExternalHelperAppServiceDownload(aSourceUrl) {
     channel.asyncOpen2({
       contentListener: null,
 
-      onStartRequest: function (aRequest, aContext)
+      onStartRequest: function(aRequest, aContext)
       {
-        let channel = aRequest.QueryInterface(Ci.nsIChannel);
+        let requestChannel = aRequest.QueryInterface(Ci.nsIChannel);
         this.contentListener = gExternalHelperAppService.doContent(
-                                     channel.contentType, aRequest, null, true);
+                                     requestChannel.contentType, aRequest, null, true);
         this.contentListener.onStartRequest(aRequest, aContext);
       },
 
-      onStopRequest: function (aRequest, aContext, aStatusCode)
+      onStopRequest: function(aRequest, aContext, aStatusCode)
       {
         this.contentListener.onStopRequest(aRequest, aContext, aStatusCode);
       },
 
-      onDataAvailable: function (aRequest, aContext, aInputStream, aOffset,
-                                 aCount)
+      onDataAvailable: function(aRequest, aContext, aInputStream, aOffset,
+                                aCount)
       {
         this.contentListener.onDataAvailable(aRequest, aContext, aInputStream,
                                              aOffset, aCount);
@@ -458,7 +456,7 @@ function promiseDownloadMidway(aDownload) {
   let deferred = Promise.defer();
 
   // Wait for the download to reach half of its progress.
-  let onchange = function () {
+  let onchange = function() {
     if (!aDownload.stopped && !aDownload.canceled && aDownload.progress == 50) {
       aDownload.onchange = null;
       deferred.resolve();
@@ -578,10 +576,10 @@ function startFakeServer()
 {
   let serverSocket = new ServerSocket(-1, true, -1);
   serverSocket.asyncListen({
-    onSocketAccepted: function (aServ, aTransport) {
+    onSocketAccepted: function(aServ, aTransport) {
       aTransport.close(Cr.NS_BINDING_ABORTED);
     },
-    onStopListening: function () { },
+    onStopListening: function() { },
   });
   return serverSocket;
 }
@@ -644,7 +642,7 @@ function continueResponses()
  */
 function registerInterruptibleHandler(aPath, aFirstPartFn, aSecondPartFn)
 {
-  gHttpServer.registerPathHandler(aPath, function (aRequest, aResponse) {
+  gHttpServer.registerPathHandler(aPath, function(aRequest, aResponse) {
     do_print("Interruptible request started.");
 
     // Process the first part of the response.
@@ -676,8 +674,7 @@ function isValidDate(aDate) {
  */
 var gMostRecentFirstBytePos;
 
-////////////////////////////////////////////////////////////////////////////////
-//// Initialization functions common to all tests
+// Initialization functions common to all tests
 
 add_task(function test_common_initialize()
 {
@@ -685,12 +682,20 @@ add_task(function test_common_initialize()
   gHttpServer = new HttpServer();
   gHttpServer.registerDirectory("/", do_get_file("../data"));
   gHttpServer.start(-1);
+  do_register_cleanup(() => {
+    return new Promise(resolve => {
+      // Ensure all the pending HTTP requests have a chance to finish.
+      continueResponses();
+      // Stop the HTTP server, calling resolve when it's done.
+      gHttpServer.stop(resolve);
+    });
+  });
 
   // Cache locks might prevent concurrent requests to the same resource, and
   // this may block tests that use the interruptible handlers.
   Services.prefs.setBoolPref("browser.cache.disk.enable", false);
   Services.prefs.setBoolPref("browser.cache.memory.enable", false);
-  do_register_cleanup(function () {
+  do_register_cleanup(function() {
     Services.prefs.clearUserPref("browser.cache.disk.enable");
     Services.prefs.clearUserPref("browser.cache.memory.enable");
   });
@@ -764,7 +769,7 @@ add_task(function test_common_initialize()
     });
 
   gHttpServer.registerPathHandler("/shorter-than-content-length-http-1-1.txt",
-    function (aRequest, aResponse) {
+    function(aRequest, aResponse) {
       aResponse.processAsync();
       aResponse.setStatusLine("1.1", 200, "OK");
       aResponse.setHeader("Content-Type", "text/plain", false);
@@ -776,7 +781,7 @@ add_task(function test_common_initialize()
 
   // This URL will emulate being blocked by Windows Parental controls
   gHttpServer.registerPathHandler("/parentalblocked.zip",
-    function (aRequest, aResponse) {
+    function(aRequest, aResponse) {
       aResponse.setStatusLine(aRequest.httpVersion, 450,
                               "Blocked by Windows Parental Controls");
     });
@@ -814,11 +819,6 @@ add_task(function test_common_initialize()
       return super._getDirectory(this._allowDirectories ? name : "TmpD");
     },
   }));
-
-  // Get a reference to nsIComponentRegistrar, and ensure that is is freed
-  // before the XPCOM shutdown.
-  let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
-  do_register_cleanup(() => registrar = null);
 
   // Make sure that downloads started using nsIExternalHelperAppService are
   // saved to disk without asking for a destination interactively.

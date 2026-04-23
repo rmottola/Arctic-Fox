@@ -29,6 +29,8 @@
 #include "nsILoadContext.h"
 #include "nsIURL.h"
 #include "mozilla/Telemetry.h"
+#include "nsIProxiedChannel.h"
+#include "nsIProxyInfo.h"
 
 namespace mozilla {
 namespace net {
@@ -69,6 +71,9 @@ GetOriginAttributesSuffix(nsIChannel* aChan, nsACString &aSuffix)
 
 nsHttpChannelAuthProvider::nsHttpChannelAuthProvider()
     : mAuthChannel(nullptr)
+    , mPort(-1)
+    , mUsingSSL(false)
+    , mProxyUsingSSL(false)
     , mIsPrivate(false)
     , mProxyAuthContinuationState(nullptr)
     , mAuthContinuationState(nullptr)
@@ -110,6 +115,21 @@ nsHttpChannelAuthProvider::Init(nsIHttpAuthenticableChannel *channel)
 
     mAuthChannel->GetIsSSL(&mUsingSSL);
     if (NS_FAILED(rv)) return rv;
+
+    nsCOMPtr<nsIProxiedChannel> proxied(do_QueryInterface(channel));
+    if (proxied) {
+        nsCOMPtr<nsIProxyInfo> pi;
+        rv = proxied->GetProxyInfo(getter_AddRefs(pi));
+        if (NS_FAILED(rv)) return rv;
+
+        if (pi) {
+            nsAutoCString proxyType;
+            rv = pi->GetType(proxyType);
+            if (NS_FAILED(rv)) return rv;
+
+            mProxyUsingSSL = proxyType.EqualsLiteral("https");
+        }
+    }
 
     rv = mURI->GetAsciiHost(mHost);
     if (NS_FAILED(rv)) return rv;
@@ -817,7 +837,7 @@ nsHttpChannelAuthProvider::GetCredentialsForChallenge(const char *challenge,
 
         if (!entry && ident->IsEmpty()) {
             uint32_t level = nsIAuthPrompt2::LEVEL_NONE;
-            if (mUsingSSL)
+            if ((!proxyAuth && mUsingSSL) || (proxyAuth && mProxyUsingSSL))
                 level = nsIAuthPrompt2::LEVEL_SECURE;
             else if (authFlags & nsIHttpAuthenticator::IDENTITY_ENCRYPTED)
                 level = nsIAuthPrompt2::LEVEL_PW_ENCRYPTED;

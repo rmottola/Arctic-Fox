@@ -8,7 +8,7 @@
 
 /* global XPCNativeWrapper */
 
-var { Ci, Cu } = require("chrome");
+var { Ci, Cu, Cr } = require("chrome");
 var Services = require("Services");
 var { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
 var promise = require("promise");
@@ -484,8 +484,7 @@ BrowserTabList.prototype._handleActorClose = function (actor, browser) {
 /**
  * Make sure we are listening or not listening for activity elsewhere in
  * the browser, as appropriate. Other than setting up newly created XUL
- * windows, all listener / observer connection and disconnection should
- * happen here.
+ * windows, all listener / observer management should happen here.
  */
 BrowserTabList.prototype._checkListening = function () {
   /*
@@ -887,7 +886,7 @@ function TabActor(connection) {
   this._onWorkerActorListChanged = this._onWorkerActorListChanged.bind(this);
 }
 
-// XXX (bug 710213): TabActor attach/detach/exit/disconnect is a
+// XXX (bug 710213): TabActor attach/detach/exit/destroy is a
 // *complete* mess, needs to be rethought asap.
 
 TabActor.prototype = {
@@ -920,8 +919,6 @@ TabActor.prototype = {
   get contextActorPool() {
     return this._contextPool;
   },
-
-  _pendingNavigation: null,
 
   // A constant prefix that will be used to form the actor ID by the server.
   actorPrefix: "tab",
@@ -1139,7 +1136,7 @@ TabActor.prototype = {
   /**
    * Called when the actor is removed from the connection.
    */
-  disconnect() {
+  destroy() {
     this.exit();
   },
 
@@ -1806,10 +1803,6 @@ TabActor.prototype = {
                           .getInterface(Ci.nsIDOMWindowUtils);
     windowUtils.resumeTimeouts();
     windowUtils.suppressEventHandling(false);
-    if (this._pendingNavigation) {
-      this._pendingNavigation.resume();
-      this._pendingNavigation = null;
-    }
   },
 
   _changeTopLevelDocument(window) {
@@ -1947,12 +1940,10 @@ TabActor.prototype = {
     // TODO bug 997119: move that code to ThreadActor by listening to
     // will-navigate
     let threadActor = this.threadActor;
-    if (request && threadActor.state == "paused") {
-      request.suspend();
+    if (threadActor.state == "paused") {
       this.conn.send(
         threadActor.unsafeSynchronize(Promise.resolve(threadActor.onResume())));
       threadActor.dbg.enabled = false;
-      this._pendingNavigation = request;
     }
     threadActor.disableAllBreakpoints();
 
@@ -2503,9 +2494,27 @@ DebuggerProgressListener.prototype = {
       this._tabActor._willNavigate(window, newURI, request);
     }
     if (isWindow && isStop) {
-      // Somewhat equivalent of load event.
-      // (window.document.readyState == complete)
-      this._tabActor._navigate(window);
+      // Don't dispatch "navigate" event just yet when there is a redirect to
+      // about:neterror page.
+      if (request.status != Cr.NS_OK) {
+        // Instead, listen for DOMContentLoaded as about:neterror is loaded
+        // with LOAD_BACKGROUND flags and never dispatches load event.
+        // That may be the same reason why there is no onStateChange event
+        // for about:neterror loads.
+        let handler = getDocShellChromeEventHandler(progress);
+        let onLoad = evt => {
+          // Ignore events from iframes
+          if (evt.target == window.document) {
+            handler.removeEventListener("DOMContentLoaded", onLoad, true);
+            this._tabActor._navigate(window);
+          }
+        };
+        handler.addEventListener("DOMContentLoaded", onLoad, true);
+      } else {
+        // Somewhat equivalent of load event.
+        // (window.document.readyState == complete)
+        this._tabActor._navigate(window);
+      }
     }
   }, "DebuggerProgressListener.prototype.onStateChange")
 };

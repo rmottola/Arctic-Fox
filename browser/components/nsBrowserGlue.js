@@ -38,6 +38,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "AlertsService", "@mozilla.org/alerts-s
   ["Feeds", "resource:///modules/Feeds.jsm"],
   ["FileUtils", "resource://gre/modules/FileUtils.jsm"],
   ["FormValidationHandler", "resource:///modules/FormValidationHandler.jsm"],
+  ["Integration", "resource://gre/modules/Integration.jsm"],
   ["LightweightThemeManager", "resource://gre/modules/LightweightThemeManager.jsm"],
   ["LoginHelper", "resource://gre/modules/LoginHelper.jsm"],
   ["LoginManagerParent", "resource://gre/modules/LoginManagerParent.jsm"],
@@ -48,6 +49,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "AlertsService", "@mozilla.org/alerts-s
   ["OS", "resource://gre/modules/osfile.jsm"],
   ["PageThumbs", "resource://gre/modules/PageThumbs.jsm"],
   ["PdfJs", "resource://pdf.js/PdfJs.jsm"],
+  ["PermissionUI", "resource:///modules/PermissionUI.jsm"],
   ["PlacesBackups", "resource://gre/modules/PlacesBackups.jsm"],
   ["PlacesUtils", "resource://gre/modules/PlacesUtils.jsm"],
   ["PluralForm", "resource://gre/modules/PluralForm.jsm"],
@@ -61,7 +63,6 @@ XPCOMUtils.defineLazyServiceGetter(this, "AlertsService", "@mozilla.org/alerts-s
   ["ShellService", "resource:///modules/ShellService.jsm"],
   ["SimpleServiceDiscovery", "resource://gre/modules/SimpleServiceDiscovery.jsm"],
   ["TabCrashHandler", "resource:///modules/ContentCrashHandlers.jsm"],
-  ["TabGroupsMigrator", "resource:///modules/TabGroupsMigrator.jsm"],
   ["Task", "resource://gre/modules/Task.jsm"],
   ["UITour", "resource:///modules/UITour.jsm"],
   ["URLBarZoom", "resource:///modules/URLBarZoom.jsm"],
@@ -297,7 +298,14 @@ BrowserGlue.prototype = {
         if (!linkHandled.data) {
           let win = RecentWindow.getMostRecentBrowserWindow();
           if (win) {
-            win.openUILinkIn(data, "tab");
+            data = JSON.parse(data);
+            let where = win.whereToOpenLink(data);
+            // Preserve legacy behavior of non-modifier left-clicks
+            // opening in a new selected tab.
+            if (where == "current") {
+              where = "tab";
+            }
+            win.openUILinkIn(data.href, where);
             linkHandled.data = true;
           }
         }
@@ -406,6 +414,7 @@ BrowserGlue.prototype = {
       tag: 7,
       visiturl: 8,
       remotetab: 9,
+      extension: 10,
     };
     if (actionType in buckets) {
       Services.telemetry
@@ -460,7 +469,7 @@ BrowserGlue.prototype = {
     this._flashHangCount = 0;
     this._firstWindowReady = new Promise(resolve => this._firstWindowLoaded = resolve);
 
-    if (AppConstants.platform == "win" ||
+    if (AppConstants.isPlatformAndVersionAtMost("win", "5.2") ||
         AppConstants.platform == "macosx") {
       // Handles prompting to inform about incompatibilites when accessibility
       // and e10s are active together.
@@ -589,15 +598,6 @@ BrowserGlue.prototype = {
     this._sanitizer.onStartup();
     // check if we're in safe mode
     if (Services.appinfo.inSafeMode) {
-      // See https://bugzilla.mozilla.org/show_bug.cgi?id=1231112#c7 . We need to
-      // register the observer early if we have to migrate tab groups
-      let currentUIVersion = 0;
-      try {
-        currentUIVersion = Services.prefs.getIntPref("browser.migration.version");
-      } catch (ex) {}
-      if (currentUIVersion < 35) {
-        this._maybeMigrateTabGroups();
-      }
       Services.ww.openWindow(null, "chrome://browser/content/safeMode.xul",
                              "_blank", "chrome,centerscreen,modal,resizable=no", null);
     }
@@ -665,6 +665,31 @@ BrowserGlue.prototype = {
     }
 
     Services.obs.notifyObservers(null, "browser-ui-startup-complete", "");
+  },
+
+  _checkForOldBuildUpdates: function() {
+    // check for update if our build is old
+    if (AppConstants.MOZ_UPDATER &&
+        Services.prefs.getBoolPref("app.update.enabled") &&
+        Services.prefs.getBoolPref("app.update.checkInstallTime")) {
+
+      let buildID = Services.appinfo.appBuildID;
+      let today = new Date().getTime();
+      let buildDate = new Date(buildID.slice(0, 4),     // year
+                               buildID.slice(4, 6) - 1, // months are zero-based.
+                               buildID.slice(6, 8),     // day
+                               buildID.slice(8, 10),    // hour
+                               buildID.slice(10, 12),   // min
+                               buildID.slice(12, 14))   // ms
+      .getTime();
+
+      const millisecondsIn24Hours = 86400000;
+      let acceptableAge = Services.prefs.getIntPref("app.update.checkInstallTime.days") * millisecondsIn24Hours;
+
+      if (buildDate + acceptableAge < today) {
+        Cc["@mozilla.org/updates/update-service;1"].getService(Ci.nsIApplicationUpdateService).checkForBackgroundUpdates();
+      }
+    }
   },
 
   _setUpUserAgentOverrides: function BG__setUpUserAgentOverrides() {
@@ -765,7 +790,7 @@ BrowserGlue.prototype = {
     }
   },
 
-  _trackSlowStartup: function () {
+  _trackSlowStartup: function() {
     if (Services.startup.interrupted ||
         Services.prefs.getBoolPref("browser.slowStartup.notificationDisabled"))
       return;
@@ -808,7 +833,7 @@ BrowserGlue.prototype = {
     return (Date.now() - profileDate) / ONE_DAY;
   }),
 
-  _showSlowStartupNotification: function (profileAge) {
+  _showSlowStartupNotification: function(profileAge) {
     if (profileAge < 90) // 3 months
       return;
 
@@ -823,14 +848,14 @@ BrowserGlue.prototype = {
       {
         label:     win.gNavigatorBundle.getString("slowStartup.helpButton.label"),
         accessKey: win.gNavigatorBundle.getString("slowStartup.helpButton.accesskey"),
-        callback: function () {
+        callback: function() {
           win.openUILinkIn("https://support.mozilla.org/kb/reset-firefox-easily-fix-most-problems", "tab");
         }
       },
       {
         label:     win.gNavigatorBundle.getString("slowStartup.disableNotificationButton.label"),
         accessKey: win.gNavigatorBundle.getString("slowStartup.disableNotificationButton.accesskey"),
-        callback: function () {
+        callback: function() {
           Services.prefs.setBoolPref("browser.slowStartup.notificationDisabled", true);
         }
       }
@@ -849,7 +874,7 @@ BrowserGlue.prototype = {
    *        String of either "unused" or "uninstall", specifying the reason
    *        why a profile reset is offered.
    */
-  _resetProfileNotification: function (reason) {
+  _resetProfileNotification: function(reason) {
     let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win)
       return;
@@ -874,7 +899,7 @@ BrowserGlue.prototype = {
       {
         label:     resetBundle.formatStringFromName("refreshProfile.resetButton.label", [productName], 1),
         accessKey: resetBundle.GetStringFromName("refreshProfile.resetButton.accesskey"),
-        callback: function () {
+        callback: function() {
           ResetProfile.openConfirmationDialog(win);
         }
       },
@@ -886,7 +911,7 @@ BrowserGlue.prototype = {
                           nb.PRIORITY_INFO_LOW, buttons);
   },
 
-  _notifyUnsignedAddonsDisabled: function () {
+  _notifyUnsignedAddonsDisabled: function() {
     let win = RecentWindow.getMostRecentBrowserWindow();
     if (!win)
       return;
@@ -896,7 +921,7 @@ BrowserGlue.prototype = {
       {
         label:     win.gNavigatorBundle.getString("unsignedAddonsDisabled.learnMore.label"),
         accessKey: win.gNavigatorBundle.getString("unsignedAddonsDisabled.learnMore.accesskey"),
-        callback: function () {
+        callback: function() {
           win.BrowserOpenAddonsMgr("addons://list/extension?unsigned=true");
         }
       },
@@ -922,7 +947,9 @@ BrowserGlue.prototype = {
     }
     if (SCALING_PROBE_NAME) {
       let scaling = aWindow.devicePixelRatio * 100;
-      Services.telemetry.getHistogramById(SCALING_PROBE_NAME).add(scaling);
+      try {
+        Services.telemetry.getHistogramById(SCALING_PROBE_NAME).add(scaling);
+      } catch (ex) {}
     }
   },
 
@@ -960,12 +987,12 @@ BrowserGlue.prototype = {
     channel.listen((id, data, target) => {
       if (data.command == "request") {
         let {Troubleshoot} = Cu.import("resource://gre/modules/Troubleshoot.jsm", {});
-        Troubleshoot.snapshot(data => {
+        Troubleshoot.snapshot(snapshotData => {
           // for privacy we remove crash IDs and all preferences (but bug 1091944
           // exists to expose prefs once we are confident of privacy implications)
-          delete data.crashes;
-          delete data.modifiedPreferences;
-          channel.send(data, target);
+          delete snapshotData.crashes;
+          delete snapshotData.modifiedPreferences;
+          channel.send(snapshotData, target);
         });
       }
     });
@@ -1020,7 +1047,7 @@ BrowserGlue.prototype = {
   /**
    * Application shutdown handler.
    */
-  _onQuitApplicationGranted: function () {
+  _onQuitApplicationGranted: function() {
     // This pref must be set here because SessionStore will use its value
     // on quit-application.
     this._setPrefToSaveSession();
@@ -1049,7 +1076,7 @@ BrowserGlue.prototype = {
     }
   },
 
-  _initServiceDiscovery: function () {
+  _initServiceDiscovery: function() {
     if (!Services.prefs.getBoolPref("browser.casting.enabled")) {
       return;
     }
@@ -1208,14 +1235,6 @@ BrowserGlue.prototype = {
     }
 
     E10SAccessibilityCheck.onWindowsRestored();
-  },
-
-  _maybeMigrateTabGroups() {
-    let migrationObserver = (stateAsSupportsString, topic) => {
-      Services.obs.removeObserver(migrationObserver, "sessionstore-state-read");
-      TabGroupsMigrator.migrate(stateAsSupportsString);
-    };
-    Services.obs.addObserver(migrationObserver, "sessionstore-state-read", false);
   },
 
   _onQuitRequest: function BG__onQuitRequest(aCancelQuit, aQuitType) {
@@ -1400,7 +1419,7 @@ BrowserGlue.prototype = {
                                  stringName: "pu.notifyButton.accesskey"});
 
       let win = RecentWindow.getMostRecentBrowserWindow();
-      let notifyBox = win.gBrowser.getNotificationBox();
+      let notifyBox = win.document.getElementById("high-priority-global-notificationbox");
 
       let buttons = [
                       {
@@ -1413,10 +1432,9 @@ BrowserGlue.prototype = {
                       }
                     ];
 
-      let notification = notifyBox.appendNotification(text, "post-update-notification",
-                                                      null, notifyBox.PRIORITY_INFO_LOW,
-                                                      buttons);
-      notification.persistence = -1; // Until user closes it
+      notifyBox.appendNotification(text, "post-update-notification",
+                                   null, notifyBox.PRIORITY_INFO_LOW,
+                                   buttons);
     }
 
     if (actions.indexOf("showAlert") == -1)
@@ -1553,8 +1571,12 @@ BrowserGlue.prototype = {
       if (!importBookmarks) {
         // Now apply distribution customized bookmarks.
         // This should always run after Places initialization.
-        yield this._distributionCustomizer.applyBookmarks();
-        yield this.ensurePlacesDefaultQueriesInitialized();
+        try {
+          yield this._distributionCustomizer.applyBookmarks();
+          yield this.ensurePlacesDefaultQueriesInitialized();
+        } catch (e) {
+          Cu.reportError(e);
+        }
       }
       else {
         // An import operation is about to run.
@@ -1645,7 +1667,7 @@ BrowserGlue.prototype = {
                       .getHistogramById("PLACES_BACKUPS_DAYSFROMLAST")
                       .add(backupAge);
             } catch (ex) {
-              Cu.reportError("Unable to report telemetry.");
+              Cu.reportError(new Error("Unable to report telemetry."));
             }
 
             if (backupAge > BOOKMARKS_BACKUP_MAX_INTERVAL_DAYS)
@@ -1657,7 +1679,7 @@ BrowserGlue.prototype = {
 
     }.bind(this)).catch(ex => {
       Cu.reportError(ex);
-    }).then(result => {
+    }).then(() => {
       // NB: deliberately after the catch so that we always do this, even if
       // we threw halfway through initializing in the Task above.
       Services.obs.notifyObservers(null, "places-browser-init-complete", "");
@@ -1732,7 +1754,7 @@ BrowserGlue.prototype = {
   },
 
   _migrateUI: function BG__migrateUI() {
-    const UI_VERSION = 40;
+    const UI_VERSION = 42;
     const BROWSER_DOCURL = "chrome://browser/content/browser.xul";
 
     let currentUIVersion;
@@ -1852,20 +1874,6 @@ BrowserGlue.prototype = {
       Services.prefs.clearUserPref("permissions.default.image");
     }
 
-    if (currentUIVersion < 12) {
-      // Remove bookmarks-menu-button-container, then place
-      // bookmarks-menu-button into its position.
-      let currentset = xulStore.getValue(BROWSER_DOCURL, "nav-bar", "currentset");
-      // Need to migrate only if toolbar is customized.
-      if (currentset) {
-        if (currentset.includes("bookmarks-menu-button-container")) {
-          currentset = currentset.replace(/(^|,)bookmarks-menu-button-container($|,)/,
-                                          "$1bookmarks-menu-button$2");
-          xulStore.setValue(BROWSER_DOCURL, "nav-bar", "currentset", currentset);
-        }
-      }
-    }
-
     if (currentUIVersion < 14) {
       // DOM Storage doesn't specially handle about: pages anymore.
       let path = OS.Path.join(OS.Constants.Path.profileDir,
@@ -1886,7 +1894,10 @@ BrowserGlue.prototype = {
         if (!currentset.includes("bookmarks-menu-button")) {
           // The button isn't in the nav-bar, so let's look for an appropriate
           // place to put it.
-          if (currentset.includes("downloads-button")) {
+          if (currentset.includes("bookmarks-menu-button-container")) {
+            currentset = currentset.replace(/(^|,)bookmarks-menu-button-container($|,)/,
+                                            "$1bookmarks-menu-button$2");
+          } else if (currentset.includes("downloads-button")) {
             currentset = currentset.replace(/(^|,)downloads-button($|,)/,
                                             "$1bookmarks-menu-button,downloads-button$2");
           } else if (currentset.includes("home-button")) {
@@ -2086,10 +2097,7 @@ BrowserGlue.prototype = {
       this._notifyNotificationsUpgrade().catch(Cu.reportError);
     }
 
-    // Only do this outside of safe mode, because in safe mode we do this earlier.
-    if (currentUIVersion < 35 && !Services.appinfo.inSafeMode) {
-      this._maybeMigrateTabGroups();
-    }
+    // version 35 migrated tab groups data.
 
     if (currentUIVersion < 36) {
       xulStore.removeValue("chrome://passwordmgr/content/passwordManager.xul",
@@ -2126,6 +2134,17 @@ BrowserGlue.prototype = {
         // only in about:config
         Services.prefs.clearUserPref(kOldSafeBrowsingPref);
       }
+    }
+
+    if (currentUIVersion < 42) {
+      let backupFile = Services.dirsvc.get("ProfD", Ci.nsIFile);
+      backupFile.append("tabgroups-session-backup.json");
+      OS.File.remove(backupFile.path, {ignoreAbsent: true}).catch(ex => Cu.reportError(ex));
+    }
+
+    if (currentUIVersion < 41) {
+      const Preferences = Cu.import("resource://gre/modules/Preferences.jsm", {}).Preferences;
+      Preferences.resetBranch("loop.");
     }
 
     // Update the migration version.
@@ -2377,8 +2396,8 @@ BrowserGlue.prototype = {
         body = body.replace("#2", deviceName);
       }
 
-      const clickCallback = (subject, topic, data) => {
-        if (topic == "alertclickcallback") {
+      const clickCallback = (obsSubject, obsTopic, obsData) => {
+        if (obsTopic == "alertclickcallback") {
           win.gBrowser.selectedTab = firstTab;
         }
       }
@@ -2446,6 +2465,49 @@ BrowserGlue.prototype = {
   _xpcom_factory: BrowserGlueServiceFactory,
 }
 
+/**
+ * ContentPermissionIntegration is responsible for showing the user
+ * simple permission prompts when content requests additional
+ * capabilities.
+ *
+ * While there are some built-in permission prompts, createPermissionPrompt
+ * can also be overridden by system add-ons or tests to provide new ones.
+ *
+ * This override ability is provided by Integration.jsm. See
+ * PermissionUI.jsm for an example of how to provide a new prompt
+ * from an add-on.
+ */
+const ContentPermissionIntegration = {
+  /**
+   * Creates a PermissionPrompt for a given permission type and
+   * nsIContentPermissionRequest.
+   *
+   * @param {string} type
+   *        The type of the permission request from content. This normally
+   *        matches the "type" field of an nsIContentPermissionType, but it
+   *        can be something else if the permission does not use the
+   *        nsIContentPermissionRequest model. Note that this type might also
+   *        be different from the permission key used in the permissions
+   *        database.
+   *        Example: "geolocation"
+   * @param {nsIContentPermissionRequest} request
+   *        The request for a permission from content.
+   * @return {PermissionPrompt} (see PermissionUI.jsm),
+   *         or undefined if the type cannot be handled.
+   */
+  createPermissionPrompt(type, request) {
+    switch (type) {
+      case "geolocation": {
+        return new PermissionUI.GeolocationPermissionPrompt(request);
+      }
+      case "desktop-notification": {
+        return new PermissionUI.DesktopNotificationPermissionPrompt(request);
+      }
+    }
+    return undefined;
+  },
+};
+
 function ContentPermissionPrompt() {}
 
 ContentPermissionPrompt.prototype = {
@@ -2453,301 +2515,50 @@ ContentPermissionPrompt.prototype = {
 
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIContentPermissionPrompt]),
 
-  _getBrowserForRequest: function (aRequest) {
-    // "element" is only defined in e10s mode.
-    let browser = aRequest.element;
-    if (!browser) {
-      // Find the requesting browser.
-      browser = aRequest.window.QueryInterface(Ci.nsIInterfaceRequestor)
-                                  .getInterface(Ci.nsIWebNavigation)
-                                  .QueryInterface(Ci.nsIDocShell)
-                                  .chromeEventHandler;
-    }
-    return browser;
-  },
-
   /**
-   * Show a permission prompt.
+   * This implementation of nsIContentPermissionPrompt.prompt ensures
+   * that there's only one nsIContentPermissionType in the request,
+   * and that it's of type nsIContentPermissionType. Failing to
+   * satisfy either of these conditions will result in this method
+   * throwing NS_ERRORs. If the combined ContentPermissionIntegration
+   * cannot construct a prompt for this particular request, an
+   * NS_ERROR_FAILURE will be thrown.
    *
-   * @param aRequest               The permission request.
-   * @param aMessage               The message to display on the prompt.
-   * @param aPermission            The type of permission to prompt.
-   * @param aActions               An array of actions of the form:
-   *                               [main action, secondary actions, ...]
-   *                               Actions are of the form { stringId, action, expireType, callback }
-   *                               Permission is granted if action is null or ALLOW_ACTION.
-   * @param aNotificationId        The id of the PopupNotification.
-   * @param aAnchorId              The id for the PopupNotification anchor.
-   * @param aOptions               Options for the PopupNotification
+   * Any time an error is thrown, the nsIContentPermissionRequest is
+   * cancelled automatically.
+   *
+   * @param {nsIContentPermissionRequest} request
+   *        The request that we're to show a prompt for.
    */
-  _showPrompt: function CPP_showPrompt(aRequest, aMessage, aPermission, aActions,
-                                       aNotificationId, aAnchorId, aOptions) {
-    var browser = this._getBrowserForRequest(aRequest);
-    var chromeWin = browser.ownerGlobal;
-    var requestPrincipal = aRequest.principal;
-
-    // Transform the prompt actions into PopupNotification actions.
-    var popupNotificationActions = [];
-    for (var i = 0; i < aActions.length; i++) {
-      let promptAction = aActions[i];
-
-      // Don't offer action in PB mode if the action remembers permission for more than a session.
-      if (PrivateBrowsingUtils.isWindowPrivate(chromeWin) &&
-          promptAction.expireType != Ci.nsIPermissionManager.EXPIRE_SESSION &&
-          promptAction.action) {
-        continue;
+  prompt(request) {
+    try {
+      // Only allow exactly one permission request here.
+      let types = request.types.QueryInterface(Ci.nsIArray);
+      if (types.length != 1) {
+        throw Components.Exception(
+          "Expected an nsIContentPermissionRequest with only 1 type.",
+          Cr.NS_ERROR_UNEXPECTED);
       }
 
-      var action = {
-        label: gBrowserBundle.GetStringFromName(promptAction.stringId),
-        accessKey: gBrowserBundle.GetStringFromName(promptAction.stringId + ".accesskey"),
-        callback: function() {
-          if (promptAction.callback) {
-            promptAction.callback();
-          }
+      let type = types.queryElementAt(0, Ci.nsIContentPermissionType).type;
+      let combinedIntegration =
+        Integration.contentPermission.getCombined(ContentPermissionIntegration);
 
-          // Remember permissions.
-          if (promptAction.action) {
-            Services.perms.addFromPrincipal(requestPrincipal, aPermission,
-                                            promptAction.action, promptAction.expireType);
-          }
-
-          // Grant permission if action is null or ALLOW_ACTION.
-          if (!promptAction.action || promptAction.action == Ci.nsIPermissionManager.ALLOW_ACTION) {
-            aRequest.allow();
-          } else {
-            aRequest.cancel();
-          }
-        },
-      };
-
-      popupNotificationActions.push(action);
-    }
-
-    var mainAction = popupNotificationActions.length ?
-                       popupNotificationActions[0] : null;
-    var secondaryActions = popupNotificationActions.splice(1);
-
-    // Only allow exactly one permission request here.
-    let types = aRequest.types.QueryInterface(Ci.nsIArray);
-    if (types.length != 1) {
-      aRequest.cancel();
-      return undefined;
-    }
-
-    if (!aOptions)
-      aOptions = {};
-    aOptions.displayURI = requestPrincipal.URI;
-
-    return chromeWin.PopupNotifications.show(browser, aNotificationId, aMessage, aAnchorId,
-                                             mainAction, secondaryActions, aOptions);
-  },
-
-  _promptGeo : function(aRequest) {
-    var secHistogram = Services.telemetry.getHistogramById("SECURITY_UI");
-
-    var message;
-
-    // Share location action.
-    var actions = [{
-      stringId: "geolocation.shareLocation",
-      action: null,
-      expireType: null,
-      callback: function() {
-        secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST_SHARE_LOCATION);
-      },
-    }];
-
-    let options = {
-      learnMoreURL: Services.urlFormatter.formatURLPref("browser.geolocation.warning.infoURL"),
-    };
-
-    if (aRequest.principal.URI.schemeIs("file")) {
-      message = gBrowserBundle.GetStringFromName("geolocation.shareWithFile2");
-    } else {
-      message = gBrowserBundle.GetStringFromName("geolocation.shareWithSite2");
-      // Always share location action.
-      actions.push({
-        stringId: "geolocation.alwaysShareLocation",
-        action: Ci.nsIPermissionManager.ALLOW_ACTION,
-        expireType: null,
-        callback: function() {
-          secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST_ALWAYS_SHARE);
-        },
-      });
-
-      // Never share location action.
-      actions.push({
-        stringId: "geolocation.neverShareLocation",
-        action: Ci.nsIPermissionManager.DENY_ACTION,
-        expireType: null,
-        callback: function() {
-          secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST_NEVER_SHARE);
-        },
-      });
-    }
-
-    secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_GEOLOCATION_REQUEST);
-
-    this._showPrompt(aRequest, message, "geo", actions, "geolocation",
-                     "geo-notification-icon", options);
-  },
-
-  _promptFlyWebPublishServer : function(aRequest) {
-    var message = "Would you like to let this site start a server accessible to nearby devices and people?";
-    var actions = [
-      {
-        stringId: "flyWebPublishServer.allowPublishServer",
-        action: Ci.nsIPermissionManager.ALLOW_ACTION,
-        expireType: Ci.nsIPermissionManager.EXPIRE_SESSION
-      },
-      {
-        stringId: "flyWebPublishServer.denyPublishServer",
-        action: Ci.nsIPermissionManager.DENY_ACTION,
-        expireType: Ci.nsIPermissionManager.EXPIRE_SESSION
+      let permissionPrompt =
+        combinedIntegration.createPermissionPrompt(type, request);
+      if (!permissionPrompt) {
+        throw Components.Exception(
+          `Failed to handle permission of type ${type}`,
+          Cr.NS_ERROR_FAILURE);
       }
-    ];
 
-    let options = {
-      learnMoreURL: "https://flyweb.github.io",
-      popupIconURL: "chrome://flyweb/skin/icon-64.png"
-    };
-
-    let browser = this._getBrowserForRequest(aRequest);
-    let chromeDoc = browser.ownerDocument;
-    let iconElem = chromeDoc.getElementById("flyweb-publish-server-notification-icon");
-    if (!iconElem) {
-      let notificationPopupBox = chromeDoc.getElementById("notification-popup-box");
-      let notificationIcon = chromeDoc.createElement("image");
-      notificationIcon.setAttribute("id", "flyweb-publish-server-notification-icon");
-      notificationIcon.setAttribute("src", "chrome://flyweb/skin/icon-64.png");
-      notificationIcon.setAttribute("class", "notification-anchor-icon flyweb-publish-server-icon");
-      notificationIcon.setAttribute("style", "filter: url(chrome://browser/skin/filters.svg#fill); fill: currentColor; opacity: .4;");
-      notificationIcon.setAttribute("role", "button");
-      notificationIcon.setAttribute("aria-label", "View the publish-server request");
-      notificationPopupBox.appendChild(notificationIcon);
-    }
-
-    this._showPrompt(aRequest, message, "flyweb-publish-server", actions, "flyweb-publish-server",
-                     "flyweb-publish-server-notification-icon", options);
-  },
-
-  _promptWebNotifications : function(aRequest) {
-    var message = gBrowserBundle.GetStringFromName("webNotifications.receiveFromSite");
-
-    var actions;
-
-    var browser = this._getBrowserForRequest(aRequest);
-    // Only show "allow for session" in PB mode, we don't
-    // support "allow for session" in non-PB mode.
-    if (PrivateBrowsingUtils.isBrowserPrivate(browser)) {
-      actions = [
-        {
-          stringId: "webNotifications.receiveForSession",
-          action: Ci.nsIPermissionManager.ALLOW_ACTION,
-          expireType: Ci.nsIPermissionManager.EXPIRE_SESSION,
-          callback: function() {},
-        }
-      ];
-    } else {
-      actions = [
-        {
-          stringId: "webNotifications.alwaysReceive",
-          action: Ci.nsIPermissionManager.ALLOW_ACTION,
-          expireType: null,
-          callback: function() {},
-        },
-        {
-          stringId: "webNotifications.neverShow",
-          action: Ci.nsIPermissionManager.DENY_ACTION,
-          expireType: null,
-          callback: function() {},
-        },
-      ];
-    }
-
-    var options = {
-      learnMoreURL:
-        Services.urlFormatter.formatURLPref("app.support.baseURL") + "push",
-      eventCallback(type) {
-        if (type == "dismissed") {
-          // Bug 1259148: Hide the doorhanger icon. Unlike other permission
-          // doorhangers, the user can't restore the doorhanger using the icon
-          // in the location bar. Instead, the site will be notified that the
-          // doorhanger was dismissed.
-          this.remove();
-          aRequest.cancel();
-        }
-      },
-    };
-
-    this._showPrompt(aRequest, message, "desktop-notification", actions,
-                     "web-notifications",
-                     "web-notifications-notification-icon", options);
-  },
-
-  prompt: function CPP_prompt(request) {
-    // Only allow exactly one permission request here.
-    let types = request.types.QueryInterface(Ci.nsIArray);
-    if (types.length != 1) {
+      permissionPrompt.prompt();
+    } catch (ex) {
+      Cu.reportError(ex);
       request.cancel();
-      return;
-    }
-    let perm = types.queryElementAt(0, Ci.nsIContentPermissionType);
-
-    const kFeatureKeys = { "geolocation" : "geo",
-                           "desktop-notification" : "desktop-notification",
-                           "flyweb-publish-server": "flyweb-publish-server"
-                         };
-
-    // Make sure that we support the request.
-    if (!(perm.type in kFeatureKeys)) {
-      return;
-    }
-
-    var requestingPrincipal = request.principal;
-    var requestingURI = requestingPrincipal.URI;
-
-    // Ignore requests from non-nsIStandardURLs
-    if (!(requestingURI instanceof Ci.nsIStandardURL))
-      return;
-
-    var permissionKey = kFeatureKeys[perm.type];
-    var result = Services.perms.testExactPermissionFromPrincipal(requestingPrincipal, permissionKey);
-
-    if (result == Ci.nsIPermissionManager.DENY_ACTION) {
-      request.cancel();
-      return;
-    }
-
-    if (result == Ci.nsIPermissionManager.ALLOW_ACTION) {
-      request.allow();
-      return;
-    }
-
-    var browser = this._getBrowserForRequest(request);
-    var chromeWin = browser.ownerGlobal;
-    if (!chromeWin.PopupNotifications)
-      // Ignore requests from browsers hosted in windows that don't support
-      // PopupNotifications.
-      return;
-
-    // Show the prompt.
-    switch (perm.type) {
-    case "geolocation":
-      this._promptGeo(request);
-      break;
-    case "desktop-notification":
-      this._promptWebNotifications(request);
-      break;
-    case "flyweb-publish-server":
-      if (AppConstants.NIGHTLY_BUILD) {
-        this._promptFlyWebPublishServer(request);
-      }
-      break;
+      throw ex;
     }
   },
-
 };
 
 var DefaultBrowserCheck = {
@@ -3040,7 +2851,7 @@ var E10SAccessibilityCheck = {
     let mainAction = {
       label: win.gNavigatorBundle.getString("e10s.accessibilityNotice.acceptButton.label"),
       accessKey: win.gNavigatorBundle.getString("e10s.accessibilityNotice.acceptButton.accesskey"),
-      callback: function () {
+      callback: function() {
         // If the user invoked the button option remove the notification,
         // otherwise keep the alert icon around in the address bar.
         notification.remove();

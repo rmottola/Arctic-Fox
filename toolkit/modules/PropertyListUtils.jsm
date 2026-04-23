@@ -97,7 +97,7 @@ this.PropertyListUtils = Object.freeze({
           if (!file.exists())
             throw new Error("The file pointed by aFile does not exist");
 
-          file = new File(file);
+          file = File.createFromNsIFile(file);
         }
 
         let fileReader = new FileReader();
@@ -145,7 +145,6 @@ this.PropertyListUtils = Object.freeze({
     catch (ex) {
       throw new Error("aBuffer cannot be parsed as a DOM document: " + ex);
     }
-    return null;
   },
 
   TYPE_PRIMITIVE:    0,
@@ -238,7 +237,7 @@ this.PropertyListUtils = Object.freeze({
 function BinaryPropertyListReader(aBuffer) {
   this._dataView = new DataView(aBuffer);
 
-  const JS_MAX_INT = Math.pow(2,53);
+  const JS_MAX_INT = Math.pow(2, 53);
   this._JS_MAX_INT_SIGNED = ctypes.Int64(JS_MAX_INT);
   this._JS_MAX_INT_UNSIGNED = ctypes.UInt64(JS_MAX_INT);
   this._JS_MIN_INT = ctypes.Int64(-JS_MAX_INT);
@@ -786,7 +785,7 @@ XMLPropertyListReader.prototype = {
    * @return Returns value of "name" property of target by default. Otherwise returns
    *         updated target.
    */
-function LazyMapProxyHandler () {
+function LazyMapProxyHandler() {
   return {
     _lazyGetters: new Set(),
     get: function(target, name) {

@@ -38,22 +38,16 @@ Cu.import("resource://gre/modules/Services.jsm");
 
 var gSingleton = null;
 
-var gParentMM = null;
-
-
 function amManager() {
   Cu.import("resource://gre/modules/AddonManager.jsm");
-  /*globals AddonManagerPrivate*/
+  /* globals AddonManagerPrivate*/
 
-  let globalMM = Services.mm;
-  globalMM.loadFrameScript(CHILD_SCRIPT, true);
-  globalMM.addMessageListener(MSG_INSTALL_ADDONS, this);
-
-  gParentMM = Services.ppmm;
-  gParentMM.addMessageListener(MSG_INSTALL_ENABLED, this);
-  gParentMM.addMessageListener(MSG_PROMISE_REQUEST, this);
-  gParentMM.addMessageListener(MSG_INSTALL_CLEANUP, this);
-  gParentMM.addMessageListener(MSG_ADDON_EVENT_REQ, this);
+  Services.mm.loadFrameScript(CHILD_SCRIPT, true);
+  Services.mm.addMessageListener(MSG_INSTALL_ENABLED, this);
+  Services.mm.addMessageListener(MSG_INSTALL_ADDONS, this);
+  Services.mm.addMessageListener(MSG_PROMISE_REQUEST, this);
+  Services.mm.addMessageListener(MSG_INSTALL_CLEANUP, this);
+  Services.mm.addMessageListener(MSG_ADDON_EVENT_REQ, this);
 
   Services.obs.addObserver(this, "message-manager-close", false);
   Services.obs.addObserver(this, "message-manager-disconnect", false);
@@ -73,7 +67,7 @@ amManager.prototype = {
 
       case "message-manager-close":
       case "message-manager-disconnect":
-        AddonManager.webAPI.clearInstallsFrom(aSubject);
+        this.childClosed(aSubject);
         break;
     }
   },
@@ -164,7 +158,37 @@ amManager.prototype = {
     AddonManagerPrivate.backgroundUpdateTimerHandler();
   },
 
-  addonListener: null,
+  // Maps message manager instances for content processes to the associated
+  // AddonListener instances.
+  addonListeners: new Map(),
+
+  _addAddonListener(target) {
+    if (!this.addonListeners.has(target)) {
+      let handler = (event, id, needsRestart) => {
+        target.sendAsyncMessage(MSG_ADDON_EVENT, {event, id, needsRestart});
+      };
+      let listener = {
+        onEnabling: (addon, needsRestart) => handler("onEnabling", addon.id, needsRestart),
+        onEnabled: (addon) => handler("onEnabled", addon.id, false),
+        onDisabling: (addon, needsRestart) => handler("onDisabling", addon.id, needsRestart),
+        onDisabled: (addon) => handler("onDisabled", addon.id, false),
+        onInstalling: (addon, needsRestart) => handler("onInstalling", addon.id, needsRestart),
+        onInstalled: (addon) => handler("onInstalled", addon.id, false),
+        onUninstalling: (addon, needsRestart) => handler("onUninstalling", addon.id, needsRestart),
+        onUninstalled: (addon) => handler("onUninstalled", addon.id, false),
+        onOperationCancelled: (addon) => handler("onOperationCancelled", addon.id, false),
+      };
+      this.addonListeners.set(target, listener);
+      AddonManager.addAddonListener(listener);
+    }
+  },
+
+  _removeAddonListener(target) {
+    if (this.addonListeners.has(target)) {
+      AddonManager.removeAddonListener(this.addonListeners.get(target));
+      this.addonListeners.delete(target);
+    }
+  },
 
   /**
    * messageManager callback function.
@@ -182,9 +206,10 @@ amManager.prototype = {
       case MSG_INSTALL_ADDONS: {
         let callback = null;
         if (payload.callbackID != -1) {
+          let mm = aMessage.target.messageManager;
           callback = {
             onInstallEnded: function(url, status) {
-              gParentMM.broadcastAsyncMessage(MSG_INSTALL_CALLBACK, {
+              mm.sendAsyncMessage(MSG_INSTALL_CALLBACK, {
                 callbackID: payload.callbackID,
                 url: url,
                 status: status
@@ -199,14 +224,15 @@ amManager.prototype = {
       }
 
       case MSG_PROMISE_REQUEST: {
+        let mm = aMessage.target.messageManager;
         let resolve = (value) => {
-          aMessage.target.sendAsyncMessage(MSG_PROMISE_RESULT, {
+          mm.sendAsyncMessage(MSG_PROMISE_RESULT, {
             callbackID: payload.callbackID,
             resolve: value
           });
         }
         let reject = (value) => {
-          aMessage.target.sendAsyncMessage(MSG_PROMISE_RESULT, {
+          mm.sendAsyncMessage(MSG_PROMISE_RESULT, {
             callbackID: payload.callbackID,
             reject: value
           });
@@ -228,36 +254,24 @@ amManager.prototype = {
       }
 
       case MSG_ADDON_EVENT_REQ: {
+        let target = aMessage.target.messageManager;
         if (payload.enabled) {
-          if (!this.addonListener) {
-            let target = aMessage.target;
-            let handler = (event, id, needsRestart) => {
-              target.sendAsyncMessage(MSG_ADDON_EVENT, {event, id, needsRestart});
-            };
-            this.addonListener = {
-              onEnabling: (addon, needsRestart) => handler("onEnabling", addon.id, needsRestart),
-              onEnabled: (addon) => handler("onEnabled", addon.id, false),
-              onDisabling: (addon, needsRestart) => handler("onDisabling", addon.id, needsRestart),
-              onDisabled: (addon) => handler("onDisabled", addon.id, false),
-              onInstalling: (addon, needsRestart) => handler("onInstalling", addon.id, needsRestart),
-              onInstalled: (addon) => handler("onInstalled", addon.id, false),
-              onUninstalling: (addon, needsRestart) => handler("onUninstalling", addon.id, needsRestart),
-              onUninstalled: (addon) => handler("onUninstalled", addon.id, false),
-            };
-          }
-          AddonManager.addAddonListener(this.addonListener);
+          this._addAddonListener(target);
         } else {
-          if (this.addonListener) {
-            AddonManager.removeAddonListener(this.addonListener);
-          }
+          this._removeAddonListener(target);
         }
       }
     }
     return undefined;
   },
 
-  sendEvent(target, data) {
-    target.sendAsyncMessage(MSG_INSTALL_EVENT, data);
+  childClosed(target) {
+    AddonManager.webAPI.clearInstallsFrom(target);
+    this._removeAddonListener(target);
+  },
+
+  sendEvent(mm, data) {
+    mm.sendAsyncMessage(MSG_INSTALL_EVENT, data);
   },
 
   classID: Components.ID("{4399533d-08d1-458c-a87a-235f74451cfa}"),

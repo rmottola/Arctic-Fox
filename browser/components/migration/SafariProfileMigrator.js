@@ -10,11 +10,11 @@ var Cu = Components.utils;
 
 Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
-Cu.import("resource://gre/modules/osfile.jsm");
+Cu.import("resource://gre/modules/osfile.jsm"); /* globals OS */
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource:///modules/MigrationUtils.jsm");
+Cu.import("resource:///modules/MigrationUtils.jsm"); /* globals MigratorPrototype */
 
 XPCOMUtils.defineLazyModuleGetter(this, "Downloads",
                                   "resource://gre/modules/Downloads.jsm");
@@ -131,11 +131,11 @@ Bookmarks.prototype = {
         // Reading list items are imported as regular bookmarks.
         // They are imported under their own folder, created either under the
         // bookmarks menu (in the case of startup migration).
-        folderGuid = (yield PlacesUtils.bookmarks.insert({
-            parentGuid: PlacesUtils.bookmarks.menuGuid,
-            type: PlacesUtils.bookmarks.TYPE_FOLDER,
-            title: MigrationUtils.getLocalizedString("importedSafariReadingList"),
-          })).guid;
+        folderGuid = (yield MigrationUtils.insertBookmarkWrapper({
+          parentGuid: PlacesUtils.bookmarks.menuGuid,
+          type: PlacesUtils.bookmarks.TYPE_FOLDER,
+          title: MigrationUtils.getLocalizedString("importedSafariReadingList"),
+        })).guid;
         break;
       }
       default:
@@ -154,7 +154,7 @@ Bookmarks.prototype = {
       let type = entry.get("WebBookmarkType");
       if (type == "WebBookmarkTypeList" && entry.has("Children")) {
         let title = entry.get("Title");
-        let newFolderGuid = (yield PlacesUtils.bookmarks.insert({
+        let newFolderGuid = (yield MigrationUtils.insertBookmarkWrapper({
           parentGuid, type: PlacesUtils.bookmarks.TYPE_FOLDER, title
         })).guid;
 
@@ -168,7 +168,7 @@ Bookmarks.prototype = {
           title = entry.get("URIDictionary").get("title");
 
         try {
-          yield PlacesUtils.bookmarks.insert({
+          yield MigrationUtils.insertBookmarkWrapper({
             parentGuid, url: entry.get("URLString"), title
           });
         } catch (ex) {
@@ -225,12 +225,12 @@ History.prototype = {
             catch (ex) {
               // Safari's History file may contain malformed URIs which
               // will be ignored.
-              Cu.reportError(ex)
+              Cu.reportError(ex);
             }
           }
         }
         if (places.length > 0) {
-          PlacesUtils.asyncHistory.updatePlaces(places, {
+          MigrationUtils.insertVisitsWrapper(places, {
             _success: false,
             handleResult: function() {
               // Importing any entry is considered a successful import.
@@ -346,21 +346,8 @@ Preferences.prototype = {
         this._set("WebKitDisplayImagesKey", "permissions.default.image",
                   webkitVal => webkitVal ? 1 : 2);
 
-        if (AppConstants.platform == "win") {
-          // Cookie-accept policy.
-          // For the OS X version, see WebFoundationCookieBehavior.
-          // Setting                    Safari          Firefox
-          // Always Accept              0               0
-          // Accept from Originating    2               1
-          // Never Accept               1               2
-          this._set("WebKitCookieStorageAcceptPolicy",
-            "network.cookie.cookieBehavior",
-            webkitVal => webkitVal == 0 ? 0 : webkitVal == 1 ? 2 : 1);
-        }
-
         this._migrateFontSettings();
         yield this._migrateDownloadsFolder();
-
       }.bind(this)).then(() => aCallback(true), ex => {
         Cu.reportError(ex);
         aCallback(false);
@@ -388,7 +375,7 @@ Preferences.prototype = {
       let safariVal = this._dict.get(aSafariKey);
       let mozVal = aConvertFunction !== undefined ?
                    aConvertFunction(safariVal) : safariVal;
-      switch (typeof(mozVal)) {
+      switch (typeof mozVal) {
         case "string":
           Services.prefs.setCharPref(aMozPref, mozVal);
           break;
@@ -401,7 +388,7 @@ Preferences.prototype = {
         case "undefined":
           return false;
         default:
-          throw new Error("Unexpected value type: " + typeof(mozVal));
+          throw new Error("Unexpected value type: " + (typeof mozVal));
       }
     }
     return true;
@@ -435,7 +422,7 @@ Preferences.prototype = {
     // languages.
     if (this._dict.has("WebKitMinimumFontSize")) {
       let minimumSize = this._dict.get("WebKitMinimumFontSize");
-      if (typeof(minimumSize) == "number") {
+      if (typeof minimumSize == "number") {
         let prefs = Services.prefs.getChildList("font.minimum-size");
         for (let pref of prefs) {
           Services.prefs.setIntPref(pref, minimumSize);
@@ -489,17 +476,10 @@ Preferences.prototype = {
   },
 
   _migrateDownloadsFolder: Task.async(function* () {
-    // Windows Safari uses DownloadPath while Mac uses DownloadsPath.
-    // Check both for future compatibility.
-    let key;
-    if (this._dict.has("DownloadsPath"))
-      key = "DownloadsPath";
-    else if (this._dict.has("DownloadPath"))
-      key = "DownloadPath";
-    else
+    if (!this._dict.has("DownloadsPath"))
       return;
 
-    let downloadsFolder = FileUtils.File(this._dict.get(key));
+    let downloadsFolder = FileUtils.File(this._dict.get("DownloadsPath"));
 
     // If the download folder is set to the Desktop or to ~/Downloads, set the
     // folderList pref appropriately so that "Desktop"/Downloads is shown with
@@ -548,7 +528,6 @@ SearchStrings.prototype = {
 
 // On OS X, the cookie-accept policy preference is stored in a separate
 // property list.
-// For the Windows version, check Preferences.migrate.
 function WebFoundationCookieBehavior(aWebFoundationFile) {
   this._file = aWebFoundationFile;
 }
@@ -567,8 +546,12 @@ WebFoundationCookieBehavior.prototype = {
           // Accept from Originating    current page    1
           // Never Accept               never           2
           let acceptCookies = aDict.get("NSHTTPAcceptCookies");
-          let cookieValue = acceptCookies == "never" ? 2 :
-                            acceptCookies == "current page" ? 1 : 0;
+          let cookieValue = 0;
+          if (acceptCookies == "never") {
+            cookieValue = 2;
+          } else if (acceptCookies == "current page") {
+            cookieValue = 1;
+          }
           Services.prefs.setIntPref("network.cookie.cookieBehavior",
                                     cookieValue);
         }
@@ -582,12 +565,7 @@ function SafariProfileMigrator() {
 SafariProfileMigrator.prototype = Object.create(MigratorPrototype);
 
 SafariProfileMigrator.prototype.getResources = function SM_getResources() {
-  let profileDir;
-  if (AppConstants.platform == "macosx") {
-    profileDir = FileUtils.getDir("ULibDir", ["Safari"], false);
-  } else {
-    profileDir = FileUtils.getDir("AppData", ["Apple Computer", "Safari"], false);
-  }
+  let profileDir = FileUtils.getDir("ULibDir", ["Safari"], false);
   if (!profileDir.exists())
     return null;
 
@@ -609,40 +587,24 @@ SafariProfileMigrator.prototype.getResources = function SM_getResources() {
   // Apple may fix this at some point.
   pushProfileFileResource("ReadingList.plist", Bookmarks);
 
-  let prefsDir;
-  if (AppConstants.platform == "macosx") {
-    prefsDir = FileUtils.getDir("UsrPrfs", [], false);
-  } else {
-    prefsDir = FileUtils.getDir("AppData", ["Apple Computer", "Preferences"], false);
-  }
-
   let prefs = this.mainPreferencesPropertyList;
   if (prefs) {
     resources.push(new Preferences(prefs));
     resources.push(new SearchStrings(prefs));
   }
 
-  if (AppConstants.platform == "macosx") {
-    // On OS X, the cookie-accept policy preference is stored in a separate
-    // property list.
-    let wfFile = FileUtils.getFile("UsrPrfs", ["com.apple.WebFoundation.plist"]);
-    if (wfFile.exists())
-      resources.push(new WebFoundationCookieBehavior(wfFile));
-  }
+  let wfFile = FileUtils.getFile("UsrPrfs", ["com.apple.WebFoundation.plist"]);
+  if (wfFile.exists())
+    resources.push(new WebFoundationCookieBehavior(wfFile));
 
   return resources;
 };
 
 SafariProfileMigrator.prototype.getLastUsedDate = function SM_getLastUsedDate() {
-  let profileDir;
-  if (AppConstants.platform == "macosx") {
-    profileDir = FileUtils.getDir("ULibDir", ["Safari"], false);
-  } else {
-    profileDir = FileUtils.getDir("AppData", ["Apple Computer", "Safari"], false);
-  }
+  let profileDir = FileUtils.getDir("ULibDir", ["Safari"], false);
   let datePromises = ["Bookmarks.plist", "History.plist"].map(file => {
     let path = OS.Path.join(profileDir.path, file);
-    return OS.File.stat(path).catch(_ => null).then(info => {
+    return OS.File.stat(path).catch(() => null).then(info => {
       return info ? info.lastModificationDate : 0;
     });
   });
@@ -654,20 +616,17 @@ SafariProfileMigrator.prototype.getLastUsedDate = function SM_getLastUsedDate() 
 Object.defineProperty(SafariProfileMigrator.prototype, "mainPreferencesPropertyList", {
   get: function get_mainPreferencesPropertyList() {
     if (this._mainPreferencesPropertyList === undefined) {
-      let file;
-      if (AppConstants.platform == "macosx") {
-        file = FileUtils.getDir("UsrPrfs", [], false);
-      } else {
-        file = FileUtils.getDir("AppData", ["Apple Computer", "Preferences"], false);
-      }
+      let file = FileUtils.getDir("UsrPrfs", [], false);
       if (file.exists()) {
         file.append("com.apple.Safari.plist");
         if (file.exists()) {
-          return this._mainPreferencesPropertyList =
+          this._mainPreferencesPropertyList =
             new MainPreferencesPropertyList(file);
+          return this._mainPreferencesPropertyList;
         }
       }
-      return this._mainPreferencesPropertyList = null;
+      this._mainPreferencesPropertyList = null;
+      return this._mainPreferencesPropertyList;
     }
     return this._mainPreferencesPropertyList;
   }

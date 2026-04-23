@@ -10,18 +10,37 @@ this.EXPORTED_SYMBOLS = ["BrowserUsageTelemetry"];
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
+                                  "resource://gre/modules/PrivateBrowsingUtils.jsm");
+
+// The upper bound for the count of the visited unique domain names.
+const MAX_UNIQUE_VISITED_DOMAINS = 100;
 
 // Observed topic names.
 const WINDOWS_RESTORED_TOPIC = "sessionstore-windows-restored";
+const TAB_RESTORING_TOPIC = "SSTabRestoring";
 const TELEMETRY_SUBSESSIONSPLIT_TOPIC = "internal-telemetry-after-subsession-split";
 const DOMWINDOW_OPENED_TOPIC = "domwindowopened";
-const DOMWINDOW_CLOSED_TOPIC = "domwindowclosed";
 
 // Probe names.
 const MAX_TAB_COUNT_SCALAR_NAME = "browser.engagement.max_concurrent_tab_count";
 const MAX_WINDOW_COUNT_SCALAR_NAME = "browser.engagement.max_concurrent_window_count";
 const TAB_OPEN_EVENT_COUNT_SCALAR_NAME = "browser.engagement.tab_open_event_count";
 const WINDOW_OPEN_EVENT_COUNT_SCALAR_NAME = "browser.engagement.window_open_event_count";
+const UNIQUE_DOMAINS_COUNT_SCALAR_NAME = "browser.engagement.unique_domains_count";
+const TOTAL_URI_COUNT_SCALAR_NAME = "browser.engagement.total_uri_count";
+const UNFILTERED_URI_COUNT_SCALAR_NAME = "browser.engagement.unfiltered_uri_count";
+
+// A list of known search origins.
+const KNOWN_SEARCH_SOURCES = [
+  "abouthome",
+  "contextmenu",
+  "newtab",
+  "searchbar",
+  "urlbar",
+];
 
 function getOpenTabsAndWinsCounts() {
   let tabCount = 0;
@@ -36,6 +55,131 @@ function getOpenTabsAndWinsCounts() {
 
   return { tabCount, winCount };
 }
+
+function getSearchEngineId(engine) {
+  if (engine) {
+    if (engine.identifier) {
+      return engine.identifier;
+    }
+    // Due to bug 1222070, we can't directly check Services.telemetry.canRecordExtended
+    // here.
+    const extendedTelemetry = Services.prefs.getBoolPref("toolkit.telemetry.enabled");
+    if (engine.name && extendedTelemetry) {
+      // If it's a custom search engine only report the engine name
+      // if extended Telemetry is enabled.
+      return "other-" + engine.name;
+    }
+  }
+  return "other";
+}
+
+let URICountListener = {
+  // A set containing the visited domains, see bug 1271310.
+  _domainSet: new Set(),
+  // A map to keep track of the URIs loaded from the restored tabs.
+  _restoredURIsMap: new WeakMap(),
+
+  isHttpURI(uri) {
+    // Only consider http(s) schemas.
+    return uri.schemeIs("http") || uri.schemeIs("https");
+  },
+
+  addRestoredURI(browser, uri) {
+    if (!this.isHttpURI(uri)) {
+      return;
+    }
+
+    this._restoredURIsMap.set(browser, uri.spec);
+  },
+
+  onLocationChange(browser, webProgress, request, uri, flags) {
+    // Don't count this URI if it's an error page.
+    if (flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_ERROR_PAGE) {
+      return;
+    }
+
+    // We only care about top level loads.
+    if (!webProgress.isTopLevel) {
+      return;
+    }
+
+    // The SessionStore sets the URI of a tab first, firing onLocationChange the
+    // first time, then manages content loading using its scheduler. Once content
+    // loads, we will hit onLocationChange again.
+    // We can catch the first case by checking for null requests: be advised that
+    // this can also happen when navigating page fragments, so account for it.
+    if (!request &&
+        !(flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT)) {
+      return;
+    }
+
+    // Track URI loads, even if they're not http(s).
+    let uriSpec = null;
+    try {
+      uriSpec = uri.spec;
+    } catch (e) {
+      // If we have troubles parsing the spec, still count this as
+      // an unfiltered URI.
+      Services.telemetry.scalarAdd(UNFILTERED_URI_COUNT_SCALAR_NAME, 1);
+      return;
+    }
+
+
+    // Don't count about:blank and similar pages, as they would artificially
+    // inflate the counts.
+    if (browser.ownerDocument.defaultView.gInitialPages.includes(uriSpec)) {
+      return;
+    }
+
+    // If the URI we're loading is in the _restoredURIsMap, then it comes from a
+    // restored tab. If so, let's skip it and remove it from the map as we want to
+    // count page refreshes.
+    if (this._restoredURIsMap.get(browser) === uriSpec) {
+      this._restoredURIsMap.delete(browser);
+      return;
+    }
+
+    // The URI wasn't from a restored tab. Count it among the unfiltered URIs.
+    // If this is an http(s) URI, this also gets counted by the "total_uri_count"
+    // probe.
+    Services.telemetry.scalarAdd(UNFILTERED_URI_COUNT_SCALAR_NAME, 1);
+
+    if (!this.isHttpURI(uri)) {
+      return;
+    }
+
+    // Update the URI counts.
+    Services.telemetry.scalarAdd(TOTAL_URI_COUNT_SCALAR_NAME, 1);
+
+    // We only want to count the unique domains up to MAX_UNIQUE_VISITED_DOMAINS.
+    if (this._domainSet.size == MAX_UNIQUE_VISITED_DOMAINS) {
+      return;
+    }
+
+    // Unique domains should be aggregated by (eTLD + 1): x.test.com and y.test.com
+    // are counted once as test.com.
+    try {
+      // Even if only considering http(s) URIs, |getBaseDomain| could still throw
+      // due to the URI containing invalid characters or the domain actually being
+      // an ipv4 or ipv6 address.
+      this._domainSet.add(Services.eTLD.getBaseDomain(uri));
+    } catch (e) {
+      return;
+    }
+
+    Services.telemetry.scalarSet(UNIQUE_DOMAINS_COUNT_SCALAR_NAME, this._domainSet.size);
+  },
+
+  /**
+   * Reset the counts. This should be called when breaking a session in Telemetry.
+   */
+  reset() {
+    this._domainSet.clear();
+  },
+
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener,
+                                         Ci.nsISupportsWeakReference]),
+};
 
 let BrowserUsageTelemetry = {
   init() {
@@ -52,11 +196,13 @@ let BrowserUsageTelemetry = {
     const counts = getOpenTabsAndWinsCounts();
     Services.telemetry.scalarSetMaximum(MAX_TAB_COUNT_SCALAR_NAME, counts.tabCount);
     Services.telemetry.scalarSetMaximum(MAX_WINDOW_COUNT_SCALAR_NAME, counts.winCount);
+
+    // Reset the URI counter.
+    URICountListener.reset();
   },
 
   uninit() {
     Services.obs.removeObserver(this, DOMWINDOW_OPENED_TOPIC, false);
-    Services.obs.removeObserver(this, DOMWINDOW_CLOSED_TOPIC, false);
     Services.obs.removeObserver(this, TELEMETRY_SUBSESSIONSPLIT_TOPIC, false);
     Services.obs.removeObserver(this, WINDOWS_RESTORED_TOPIC, false);
   },
@@ -69,9 +215,6 @@ let BrowserUsageTelemetry = {
       case DOMWINDOW_OPENED_TOPIC:
         this._onWindowOpen(subject);
         break;
-      case DOMWINDOW_CLOSED_TOPIC:
-        this._unregisterWindow(subject);
-        break;
       case TELEMETRY_SUBSESSIONSPLIT_TOPIC:
         this.afterSubsessionSplit();
         break;
@@ -83,7 +226,40 @@ let BrowserUsageTelemetry = {
       case "TabOpen":
         this._onTabOpen();
         break;
+      case "unload":
+        this._unregisterWindow(event.target);
+        break;
+      case TAB_RESTORING_TOPIC:
+        // We're restoring a new tab from a previous or crashed session.
+        // We don't want to track the URIs from these tabs, so let
+        // |URICountListener| know about them.
+        let browser = event.target.linkedBrowser;
+        URICountListener.addRestoredURI(browser, browser.currentURI);
+        break;
     }
+  },
+
+  /**
+   * The main entry point for recording search related Telemetry. This includes
+   * search counts and engagement measurements.
+   *
+   * Telemetry records only search counts per engine and action origin, but
+   * nothing pertaining to the search contents themselves.
+   *
+   * @param engine
+   *        (nsISearchEngine) The engine handling the search.
+   * @param source
+   *        (string) Where the search originated from. See
+   *        KNOWN_SEARCH_SOURCES for allowed values.
+   * @throws if source is not in the known sources list.
+   */
+  recordSearch(engine, source) {
+    if (!KNOWN_SEARCH_SOURCES.includes(source)) {
+      throw new Error("Unknown source for search: " + source);
+    }
+
+    let countId = getSearchEngineId(engine) + "." + source;
+    Services.telemetry.getKeyedHistogramById("SEARCH_COUNTS").add(countId);
   },
 
   /**
@@ -94,7 +270,6 @@ let BrowserUsageTelemetry = {
   _setupAfterRestore() {
     // Make sure to catch new chrome windows and subsession splits.
     Services.obs.addObserver(this, DOMWINDOW_OPENED_TOPIC, false);
-    Services.obs.addObserver(this, DOMWINDOW_CLOSED_TOPIC, false);
     Services.obs.addObserver(this, TELEMETRY_SUBSESSIONSPLIT_TOPIC, false);
 
     // Attach the tabopen handlers to the existing Windows.
@@ -113,20 +288,30 @@ let BrowserUsageTelemetry = {
    * Adds listeners to a single chrome window.
    */
   _registerWindow(win) {
+    win.addEventListener("unload", this);
     win.addEventListener("TabOpen", this, true);
+
+    // Don't include URI and domain counts when in private mode.
+    if (PrivateBrowsingUtils.isWindowPrivate(win)) {
+      return;
+    }
+    win.gBrowser.tabContainer.addEventListener(TAB_RESTORING_TOPIC, this);
+    win.gBrowser.addTabsProgressListener(URICountListener);
   },
 
   /**
    * Removes listeners from a single chrome window.
    */
   _unregisterWindow(win) {
-    // Ignore non-browser windows.
-    if (!(win instanceof Ci.nsIDOMWindow) ||
-        win.document.documentElement.getAttribute("windowtype") != "navigator:browser") {
+    win.removeEventListener("unload", this);
+    win.removeEventListener("TabOpen", this, true);
+
+    // Don't include URI and domain counts when in private mode.
+    if (PrivateBrowsingUtils.isWindowPrivate(win.defaultView)) {
       return;
     }
-
-    win.removeEventListener("TabOpen", this, true);
+    win.defaultView.gBrowser.tabContainer.removeEventListener(TAB_RESTORING_TOPIC, this);
+    win.defaultView.gBrowser.removeTabsProgressListener(URICountListener);
   },
 
   /**

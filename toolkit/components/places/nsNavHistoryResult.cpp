@@ -2351,13 +2351,25 @@ nsNavHistoryQueryResultNode::RecursiveSort(
   }
 }
 
+NS_IMETHODIMP
+nsNavHistoryQueryResultNode::GetSkipTags(bool *aSkipTags)
+{
+  *aSkipTags = false;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsNavHistoryQueryResultNode::GetSkipDescendantsOnItemRemoval(bool *aSkipDescendantsOnItemRemoval)
+{
+  *aSkipDescendantsOnItemRemoval = false;
+  return NS_OK;
+}
 
 NS_IMETHODIMP
 nsNavHistoryQueryResultNode::OnBeginUpdateBatch()
 {
   return NS_OK;
 }
-
 
 NS_IMETHODIMP
 nsNavHistoryQueryResultNode::OnEndUpdateBatch()
@@ -3520,6 +3532,19 @@ nsNavHistoryFolderResultNode::FindChildById(int64_t aItemId,
     return NS_OK; \
   }
 
+NS_IMETHODIMP
+nsNavHistoryFolderResultNode::GetSkipTags(bool *aSkipTags)
+{
+  *aSkipTags = false;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsNavHistoryFolderResultNode::GetSkipDescendantsOnItemRemoval(bool *aSkipDescendantsOnItemRemoval)
+{
+  *aSkipDescendantsOnItemRemoval = false;
+  return NS_OK;
+}
 
 NS_IMETHODIMP
 nsNavHistoryFolderResultNode::OnBeginUpdateBatch()
@@ -3966,12 +3991,12 @@ nsNavHistoryFolderResultNode::OnItemMoved(int64_t aItemId,
     }
     if (aOldParent == mTargetFolderItemId) {
       OnItemRemoved(aItemId, aOldParent, aOldIndex, aItemType, itemURI,
-                    aGUID, aOldParentGUID, nsINavBookmarksService::SOURCE_DEFAULT);
+                    aGUID, aOldParentGUID, aSource);
     }
     if (aNewParent == mTargetFolderItemId) {
       OnItemAdded(aItemId, aNewParent, aNewIndex, aItemType, itemURI, itemTitle,
                   RoundedPRNow(), // This is a dummy dateAdded, not the real value.
-                  aGUID, aNewParentGUID, nsINavBookmarksService::SOURCE_DEFAULT);
+                  aGUID, aNewParentGUID, aSource);
     }
   }
   return NS_OK;
@@ -4399,6 +4424,20 @@ nsNavHistoryResult::requestRefresh(nsNavHistoryContainerResultNode* aContainer)
   ENUMERATE_LIST_OBSERVERS(ContainerObserverList, Refresh(), mRefreshParticipants, IsContainer()); \
   mRefreshParticipants.Clear(); \
   PR_END_MACRO
+
+NS_IMETHODIMP
+nsNavHistoryResult::GetSkipTags(bool *aSkipTags)
+{
+  *aSkipTags = false;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsNavHistoryResult::GetSkipDescendantsOnItemRemoval(bool *aSkipDescendantsOnItemRemoval)
+{
+  *aSkipDescendantsOnItemRemoval = false;
+  return NS_OK;
+}
 
 NS_IMETHODIMP
 nsNavHistoryResult::OnBeginUpdateBatch()

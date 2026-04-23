@@ -39,6 +39,7 @@
 #include "nsTArray.h"
 #include "pixelflinger/format.h"
 #include "nsIDisplayInfo.h"
+#include "base/task.h"
 
 #if ANDROID_VERSION >= 17
 #include "libdisplay/DisplaySurface.h"
@@ -153,8 +154,9 @@ nsScreenGonk::nsScreenGonk(uint32_t aId,
 }
 
 static void
-ReleaseGLContextSync(mozilla::gl::GLContext* aGLContext) {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+ReleaseGLContextSync(mozilla::gl::GLContext* aGLContext)
+{
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     aGLContext->Release();
 }
 
@@ -423,7 +425,7 @@ NeedsRBSwap(int aHalFormat)
 already_AddRefed<DrawTarget>
 nsScreenGonk::StartRemoteDrawing()
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     MOZ_ASSERT(!mFramebuffer);
     MOZ_ASSERT(!mMappedBuffer);
 
@@ -461,7 +463,7 @@ nsScreenGonk::StartRemoteDrawing()
 void
 nsScreenGonk::EndRemoteDrawing()
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
 
     if (mFramebufferTarget && mFramebuffer) {
         IntSize size = mFramebufferTarget->GetSize();
@@ -528,7 +530,7 @@ nsScreenGonk::QueueBuffer(ANativeWindowBuffer* buf)
 nsresult
 nsScreenGonk::MakeSnapshot(ANativeWindowBuffer* aBuffer)
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     MOZ_ASSERT(aBuffer);
 
     layers::CompositorBridgeParent* compositorParent = mCompositorBridgeParent;
@@ -610,7 +612,7 @@ nsScreenGonk::SetEGLInfo(hwc_display_t aDisplay,
                          hwc_surface_t aSurface,
                          gl::GLContext* aGLContext)
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     mEGLDisplay = aDisplay;
     mEGLSurface = aSurface;
     mGLContext = aGLContext;
@@ -619,21 +621,21 @@ nsScreenGonk::SetEGLInfo(hwc_display_t aDisplay,
 hwc_display_t
 nsScreenGonk::GetEGLDisplay()
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     return mEGLDisplay;
 }
 
 hwc_surface_t
 nsScreenGonk::GetEGLSurface()
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     return mEGLSurface;
 }
 
 already_AddRefed<mozilla::gl::GLContext>
 nsScreenGonk::GetGLContext()
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     RefPtr<mozilla::gl::GLContext>glContext = mGLContext;
     return glContext.forget();
 }
@@ -641,7 +643,7 @@ nsScreenGonk::GetGLContext()
 static void
 UpdateMirroringWidgetSync(nsMainThreadPtrHandle<nsScreenGonk>&& aScreen, nsWindow* aWindow)
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     already_AddRefed<nsWindow> window(aWindow);
     aScreen->UpdateMirroringWidget(window);
 }
@@ -662,7 +664,8 @@ nsScreenGonk::EnableMirroring()
     nsWidgetInitData initData;
     initData.mScreenId = mId;
     RefPtr<nsWindow> window = new nsWindow();
-    window->Create(nullptr, nullptr, mNaturalBounds, &initData);
+    nsresult rv = window->Create(nullptr, nullptr, mNaturalBounds, &initData);
+    NS_ENSURE_SUCCESS(rv, false);
     MOZ_ASSERT(static_cast<nsWindow*>(window)->GetScreen() == this);
 
     // Update mMirroringWidget on compositor thread
@@ -729,7 +732,7 @@ nsScreenGonk::ClearMirroringScreen(nsScreenGonk* aScreen)
 void
 nsScreenGonk::UpdateMirroringWidget(already_AddRefed<nsWindow>& aWindow)
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     MOZ_ASSERT(IsPrimaryScreen());
 
     if (mMirroringWidget) {
@@ -742,7 +745,7 @@ nsScreenGonk::UpdateMirroringWidget(already_AddRefed<nsWindow>& aWindow)
 nsWindow*
 nsScreenGonk::GetMirroringWidget()
 {
-    MOZ_ASSERT(CompositorBridgeParent::IsInCompositorThread());
+    MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
     MOZ_ASSERT(IsPrimaryScreen());
 
     return mMirroringWidget;

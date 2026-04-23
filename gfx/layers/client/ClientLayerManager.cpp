@@ -282,16 +282,6 @@ ClientLayerManager::EndTransactionInternal(DrawPaintedLayerCallback aCallback,
   PROFILER_LABEL("ClientLayerManager", "EndTransactionInternal",
     js::ProfileEntry::Category::GRAPHICS);
 
-  if (!mForwarder || !mForwarder->IPCOpen()) {
-    gfxCriticalError() << "LayerManager::EndTransaction while IPC is dead.";
-    // Pointless to try to render since the content cannot be sent to the
-    // compositor. We should not get here in the first place but I suspect
-    // This is happening during shutdown, tab-switch or some other scenario
-    // where we already started tearing the resources down but something
-    // triggered painting anyway.
-    return false;
-  }
-
 #ifdef MOZ_LAYERS_HAVE_LOG
   MOZ_LAYERS_LOG(("  ----- (beginning paint)"));
   Log();
@@ -314,12 +304,17 @@ ClientLayerManager::EndTransactionInternal(DrawPaintedLayerCallback aCallback,
 
   GetRoot()->ComputeEffectiveTransforms(Matrix4x4());
 
-  if (gfxPrefs::AlwaysPaint() && XRE_IsContentProcess()) {
-    TimeStamp start = TimeStamp::Now();
-    root->RenderLayer();
-    mLastPaintTime = TimeStamp::Now() - start;
+  // Skip the painting if the device is in device-reset status.
+  if (!gfxPlatform::GetPlatform()->DidRenderingDeviceReset()) {
+    if (gfxPrefs::AlwaysPaint() && XRE_IsContentProcess()) {
+      TimeStamp start = TimeStamp::Now();
+      root->RenderLayer();
+      mLastPaintTime = TimeStamp::Now() - start;
+    } else {
+      root->RenderLayer();
+    }
   } else {
-    root->RenderLayer();
+    gfxCriticalNote << "LayerManager::EndTransaction skip RenderLayer().";
   }
 
   if (!mRepeatTransaction && !GetRoot()->GetInvalidRegion().IsEmpty()) {
@@ -361,6 +356,11 @@ ClientLayerManager::EndTransaction(DrawPaintedLayerCallback aCallback,
                                    void* aCallbackData,
                                    EndTransactionFlags aFlags)
 {
+  if (!mForwarder->IPCOpen()) {
+    mInTransaction = false;
+    return;
+  }
+
   if (mWidget) {
     mWidget->PrepareWindowEffects();
   }
@@ -387,9 +387,10 @@ ClientLayerManager::EndEmptyTransaction(EndTransactionFlags aFlags)
 {
   mInTransaction = false;
 
-  if (!mRoot) {
+  if (!mRoot || !mForwarder->IPCOpen()) {
     return false;
   }
+
   if (!EndTransactionInternal(nullptr, nullptr, aFlags)) {
     // Return without calling ForwardTransaction. This leaves the
     // ShadowLayerForwarder transaction open; the following
@@ -637,8 +638,12 @@ ClientLayerManager::ForwardTransaction(bool aScheduleComposite)
 {
   TimeStamp start = TimeStamp::Now();
 
-  if (mForwarder->GetSyncObject()) {
-    mForwarder->GetSyncObject()->FinalizeFrame();
+  // Skip the synchronization for buffer since we also skip the painting during
+  // device-reset status.
+  if (!gfxPlatform::GetPlatform()->DidRenderingDeviceReset()) {
+    if (mForwarder->GetSyncObject()) {
+      mForwarder->GetSyncObject()->FinalizeFrame();
+    }
   }
 
   mPhase = PHASE_FORWARD;

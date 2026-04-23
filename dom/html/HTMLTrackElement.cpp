@@ -50,10 +50,6 @@ nsGenericHTMLElement*
 NS_NewHTMLTrackElement(already_AddRefed<mozilla::dom::NodeInfo>&& aNodeInfo,
                        mozilla::dom::FromParser aFromParser)
 {
-  if (!mozilla::dom::HTMLTrackElement::IsWebVTTEnabled()) {
-    return new mozilla::dom::HTMLUnknownElement(aNodeInfo);
-  }
-
   return new mozilla::dom::HTMLTrackElement(aNodeInfo);
 }
 
@@ -132,6 +128,12 @@ HTMLTrackElement::HTMLTrackElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
   , mLoadResourceDispatched(false)
   , mWindowDestroyObserver(nullptr)
 {
+  nsISupports* parentObject = OwnerDoc()->GetParentObject();
+  NS_ENSURE_TRUE_VOID(parentObject);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(parentObject);
+  if (window) {
+    mWindowDestroyObserver = new WindowDestroyObserver(this, window->WindowID());
+  }
 }
 
 HTMLTrackElement::~HTMLTrackElement()
@@ -172,13 +174,6 @@ JSObject*
 HTMLTrackElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return HTMLTrackElementBinding::Wrap(aCx, this, aGivenProto);
-}
-
-bool
-HTMLTrackElement::IsWebVTTEnabled()
-{
-  // Our callee does not use its arguments.
-  return HTMLTrackElementBinding::ConstructorEnabled(nullptr, nullptr);
 }
 
 TextTrack*
@@ -321,10 +316,6 @@ HTMLTrackElement::LoadResource()
   NS_ENSURE_TRUE_VOID(NS_SUCCEEDED(rv));
 
   mChannel = channel;
-  nsISupports* parentObject = OwnerDoc()->GetParentObject();
-  NS_ENSURE_TRUE_VOID(parentObject);
-  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(parentObject);
-  mWindowDestroyObserver = new WindowDestroyObserver(this, window->WindowID());
 }
 
 nsresult
@@ -392,6 +383,10 @@ HTMLTrackElement::ReadyState() const
 void
 HTMLTrackElement::SetReadyState(uint16_t aReadyState)
 {
+  if (ReadyState() == aReadyState) {
+    return;
+  }
+
   if (mTrack) {
     switch (aReadyState) {
       case TextTrackReadyState::Loaded:

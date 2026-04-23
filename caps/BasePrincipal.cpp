@@ -23,6 +23,7 @@
 #include "nsScriptSecurityManager.h"
 #include "nsServiceManagerUtils.h"
 
+#include "mozilla/dom/ChromeUtils.h"
 #include "mozilla/dom/CSPDictionariesBinding.h"
 #include "mozilla/dom/quota/QuotaManager.h"
 #include "mozilla/dom/ToJSValue.h"
@@ -57,6 +58,13 @@ PrincipalOriginAttributes::InheritFromNecko(const NeckoOriginAttributes& aAttrs)
 
   mPrivateBrowsingId = aAttrs.mPrivateBrowsingId;
   mFirstPartyDomain = aAttrs.mFirstPartyDomain;
+}
+
+void
+PrincipalOriginAttributes::StripUserContextIdAndFirstPartyDomain()
+{
+  mUserContextId = nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID;
+  mFirstPartyDomain.Truncate();
 }
 
 void
@@ -182,6 +190,18 @@ OriginAttributes::CreateSuffix(nsACString& aStr) const
   str.Assign(aStr);
   MOZ_ASSERT(str.FindCharInSet(dom::quota::QuotaManager::kReplaceChars) == kNotFound);
 #endif
+}
+
+void
+OriginAttributes::CreateAnonymizedSuffix(nsACString& aStr) const
+{
+  OriginAttributes attrs = *this;
+
+  if (!attrs.mFirstPartyDomain.IsEmpty()) {
+    attrs.mFirstPartyDomain.AssignLiteral("_anonymizedFirstPartyDomain_");
+  }
+
+  attrs.CreateSuffix(aStr);
 }
 
 namespace {
@@ -359,6 +379,16 @@ bool
 BasePrincipal::Subsumes(nsIPrincipal* aOther, DocumentDomainConsideration aConsideration)
 {
   MOZ_ASSERT(aOther);
+
+  // Expanded principals handle origin attributes for each of their
+  // sub-principals individually, null principals do only simple checks for
+  // pointer equality, and system principals are immune to origin attributes
+  // checks, so only do this check for codebase principals.
+  if (Kind() == eCodebasePrincipal &&
+      OriginAttributesRef() != Cast(aOther)->OriginAttributesRef()) {
+    return false;
+  }
+
   return SubsumesInternal(aOther, aConsideration);
 }
 
@@ -378,6 +408,22 @@ BasePrincipal::EqualsConsideringDomain(nsIPrincipal *aOther, bool *aResult)
   *aResult = Subsumes(aOther, ConsiderDocumentDomain) &&
              Cast(aOther)->Subsumes(this, ConsiderDocumentDomain);
   return NS_OK;
+}
+
+bool
+BasePrincipal::EqualsIgnoringAddonId(nsIPrincipal *aOther)
+{
+  MOZ_ASSERT(aOther);
+
+  // Note that this will not work for expanded principals, nor is it intended
+  // to.
+  if (!dom::ChromeUtils::IsOriginAttributesEqualIgnoringAddonId(
+          OriginAttributesRef(), Cast(aOther)->OriginAttributesRef())) {
+    return false;
+  }
+
+  return SubsumesInternal(aOther, DontConsiderDocumentDomain) &&
+         Cast(aOther)->SubsumesInternal(this, DontConsiderDocumentDomain);
 }
 
 NS_IMETHODIMP
@@ -554,13 +600,8 @@ BasePrincipal::GetOriginSuffix(nsACString& aOriginAttributes)
 NS_IMETHODIMP
 BasePrincipal::GetAppStatus(uint16_t* aAppStatus)
 {
-  if (AppId() == nsIScriptSecurityManager::UNKNOWN_APP_ID) {
-    NS_WARNING("Asking for app status on a principal with an unknown app id");
-    *aAppStatus = nsIPrincipal::APP_STATUS_NOT_INSTALLED;
-    return NS_OK;
-  }
-
-  *aAppStatus = nsScriptSecurityManager::AppStatusForPrincipal(this);
+  // TODO: Remove GetAppStatus.
+  *aAppStatus = nsIPrincipal::APP_STATUS_NOT_INSTALLED;
   return NS_OK;
 }
 
@@ -676,6 +717,23 @@ BasePrincipal::CreateCodebasePrincipal(const nsACString& aOrigin)
 
   nsCOMPtr<nsIURI> uri;
   nsresult rv = NS_NewURI(getter_AddRefs(uri), originNoSuffix);
+  NS_ENSURE_SUCCESS(rv, nullptr);
+
+  return BasePrincipal::CreateCodebasePrincipal(uri, attrs);
+}
+
+already_AddRefed<BasePrincipal>
+BasePrincipal::CloneStrippingUserContextIdAndFirstPartyDomain()
+{
+  PrincipalOriginAttributes attrs = OriginAttributesRef();
+  attrs.StripUserContextIdAndFirstPartyDomain();
+
+  nsAutoCString originNoSuffix;
+  nsresult rv = GetOriginNoSuffix(originNoSuffix);
+  NS_ENSURE_SUCCESS(rv, nullptr);
+
+  nsCOMPtr<nsIURI> uri;
+  rv = NS_NewURI(getter_AddRefs(uri), originNoSuffix);
   NS_ENSURE_SUCCESS(rv, nullptr);
 
   return BasePrincipal::CreateCodebasePrincipal(uri, attrs);

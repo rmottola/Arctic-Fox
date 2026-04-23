@@ -1434,6 +1434,34 @@ IDBObjectStore::AddOrPut(JSContext* aCx,
     return nullptr;
   }
 
+  // Check the size limit of the serialized message which mainly consists of
+  // a StructuredCloneBuffer, an encoded object key, and the encoded index keys.
+  // kMaxIDBMsgOverhead covers the minor stuff not included in this calculation
+  // because the precise calculation would slow down this AddOrPut operation.
+  static const size_t kMaxIDBMsgOverhead = 1024 * 1024; // 1MB
+  const uint32_t maximalSizeFromPref =
+    IndexedDatabaseManager::MaxSerializedMsgSize();
+  MOZ_ASSERT(maximalSizeFromPref > kMaxIDBMsgOverhead);
+  const size_t kMaxMessageSize = maximalSizeFromPref - kMaxIDBMsgOverhead;
+
+  size_t indexUpdateInfoSize = 0;
+  for (size_t i = 0; i < updateInfo.Length(); i++) {
+    indexUpdateInfoSize += updateInfo[i].value().GetBuffer().Length();
+    indexUpdateInfoSize += updateInfo[i].localizedValue().GetBuffer().Length();
+  }
+
+  size_t messageSize = cloneWriteInfo.mCloneBuffer.data().Size() +
+    key.GetBuffer().Length() + indexUpdateInfoSize;
+
+  if (messageSize > kMaxMessageSize) {
+    IDB_REPORT_INTERNAL_ERR();
+    aRv.ThrowDOMException(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR,
+      nsPrintfCString("The serialized value is too large"
+                      " (size=%zu bytes, max=%zu bytes).",
+                      messageSize, kMaxMessageSize));
+    return nullptr;
+  }
+
   ObjectStoreAddPutParams commonParams;
   commonParams.objectStoreId() = Id();
   commonParams.cloneInfo().data().data = Move(cloneWriteInfo.mCloneBuffer.data());
@@ -1752,7 +1780,8 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_END
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(IDBObjectStore)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTransaction)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIndexes);
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIndexes)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDeletedIndexes)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(IDBObjectStore)
@@ -1760,7 +1789,8 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(IDBObjectStore)
 
   // Don't unlink mTransaction!
 
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mIndexes);
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mIndexes)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mDeletedIndexes)
 
   tmp->mCachedKeyPath.setUndefined();
 
@@ -1970,12 +2000,10 @@ IDBObjectStore::CreateIndex(const nsAString& aName,
   }
 
   IDBTransaction* transaction = IDBTransaction::GetCurrent();
-  if (!transaction || transaction != mTransaction) {
+  if (!transaction || transaction != mTransaction || !transaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return nullptr;
   }
-
-  MOZ_ASSERT(transaction->IsOpen());
 
   auto& indexes = const_cast<nsTArray<IndexMetadata>&>(mSpec->indexes());
   for (uint32_t count = indexes.Length(), index = 0;
@@ -2084,12 +2112,10 @@ IDBObjectStore::DeleteIndex(const nsAString& aName, ErrorResult& aRv)
   }
 
   IDBTransaction* transaction = IDBTransaction::GetCurrent();
-  if (!transaction || transaction != mTransaction) {
+  if (!transaction || transaction != mTransaction || !transaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return;
   }
-
-  MOZ_ASSERT(transaction->IsOpen());
 
   auto& metadataArray = const_cast<nsTArray<IndexMetadata>&>(mSpec->indexes());
 
@@ -2112,6 +2138,11 @@ IDBObjectStore::DeleteIndex(const nsAString& aName, ErrorResult& aRv)
 
         if (index->Id() == foundId) {
           index->NoteDeletion();
+
+          RefPtr<IDBIndex>* deletedIndex =
+            mDeletedIndexes.AppendElement();
+          deletedIndex->swap(mIndexes[indexIndex]);
+
           mIndexes.RemoveElementAt(indexIndex);
           break;
         }
@@ -2326,6 +2357,12 @@ IDBObjectStore::RefreshSpec(bool aMayDelete)
         mIndexes[idxIndex]->RefreshMetadata(aMayDelete);
       }
 
+      for (uint32_t idxCount = mDeletedIndexes.Length(), idxIndex = 0;
+           idxIndex < idxCount;
+           idxIndex++) {
+        mDeletedIndexes[idxIndex]->RefreshMetadata(false);
+      }
+
       found = true;
       break;
     }
@@ -2398,12 +2435,10 @@ IDBObjectStore::SetName(const nsAString& aName, ErrorResult& aRv)
   }
 
   IDBTransaction* transaction = IDBTransaction::GetCurrent();
-  if (!transaction || transaction != mTransaction) {
+  if (!transaction || transaction != mTransaction || !transaction->IsOpen()) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_TRANSACTION_INACTIVE_ERR);
     return;
   }
-
-  MOZ_ASSERT(transaction->IsOpen());
 
   if (aName == mSpec->metadata().name()) {
     return;

@@ -115,9 +115,7 @@
       ]]></handler>
 
       <handler event="focus"><![CDATA[
-        let { AppConstants } =
-            Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
-        if (AppConstants.platform == "macosx") {
+        if (/Mac/.test(navigator.platform)) {
           let findbar = this.findbar;
           findbar._onFindFieldFocus();
         }
@@ -164,29 +162,21 @@
     <content hidden="true">
     <xul:hbox anonid="findbar-container" class="findbar-container" flex="1" align="center">
       <xul:hbox anonid="findbar-textbox-wrapper" align="stretch">
-        <xul:toolbarbutton anonid="find-closebutton"
-                           class="findbar-closebutton close-icon"
-                           tooltiptext="&findCloseButton.tooltip;"
-                           oncommand="close();"/>
         <xul:textbox anonid="findbar-textbox"
                      class="findbar-textbox findbar-find-fast"
                      xbl:inherits="flash"/>
-        <xul:toolbarbutton anonid="find-next"
-                           class="findbar-find-next tabbable"
-                           label="&next.label;"
-                           accesskey="&next.accesskey;"
-                           tooltiptext="&next.tooltip;"
-                           oncommand="onFindAgainCommand(false);"
-                           disabled="true"
-                           xbl:inherits="accesskey=findnextaccesskey"/>
         <xul:toolbarbutton anonid="find-previous"
                            class="findbar-find-previous tabbable"
-                           label="&previous.label;"
-                           accesskey="&previous.accesskey;"
                            tooltiptext="&previous.tooltip;"
                            oncommand="onFindAgainCommand(true);"
                            disabled="true"
                            xbl:inherits="accesskey=findpreviousaccesskey"/>
+        <xul:toolbarbutton anonid="find-next"
+                           class="findbar-find-next tabbable"
+                           tooltiptext="&next.tooltip;"
+                           oncommand="onFindAgainCommand(false);"
+                           disabled="true"
+                           xbl:inherits="accesskey=findnextaccesskey"/>
       </xul:hbox>
       <xul:toolbarbutton anonid="highlight"
                          class="findbar-highlight findbar-button tabbable"
@@ -196,8 +186,8 @@
                          oncommand="toggleHighlight(this.checked);"
                          type="checkbox"
                          xbl:inherits="accesskey=highlightaccesskey"/>
-      <xul:checkbox anonid="find-case-sensitive"
-                         class="findbar-case-sensitive tabbable"
+      <xul:toolbarbutton anonid="find-case-sensitive"
+                         class="findbar-case-sensitive findbar-button tabbable"
                          label="&caseSensitive.label;"
                          accesskey="&caseSensitive.accesskey;"
                          tooltiptext="&caseSensitive.tooltiptext;"
@@ -222,6 +212,10 @@
       <!-- Do not use value, first child is used because it provides a11y with text change events -->
       </xul:description>
     </xul:hbox>
+    <xul:toolbarbutton anonid="find-closebutton"
+                       class="findbar-closebutton close-icon"
+                       tooltiptext="&findCloseButton.tooltip;"
+                       oncommand="close();"/>
     </content>
 
     <implementation implements="nsIMessageListener, nsIEditActionListener">
@@ -372,16 +366,12 @@
         this._findStatusIcon = this.getElement("find-status-icon");
         this._findStatusDesc = this.getElement("find-status");
 
-        this._foundURL = null;
-
         let prefsvc = this._prefsvc;
 
         this._quickFindTimeoutLength =
           prefsvc.getIntPref("accessibility.typeaheadfind.timeout");
         this._flashFindBar =
           prefsvc.getIntPref("accessibility.typeaheadfind.flashBar");
-        this._matchesCountLimit =
-          prefsvc.getIntPref("accessibility.typeaheadfind.matchesCountLimit");
         this._useModalHighlight = prefsvc.getBoolPref("findbar.modalHighlight");
 
         prefsvc.addObserver("accessibility.typeaheadfind",
@@ -403,17 +393,17 @@
         this._entireWord = prefsvc.getBoolPref("findbar.entireword");
         this._highlightAll = prefsvc.getBoolPref("findbar.highlightAll");
 
-        // Convenience
+        // Convenience.
         this.nsITypeAheadFind = Components.interfaces.nsITypeAheadFind;
-        this.nsISelectionController = Components.interfaces.nsISelectionController;
-        this._findSelection = this.nsISelectionController.SELECTION_FIND;
 
         this._findResetTimeout = -1;
 
         // Make sure the FAYT keypress listener is attached by initializing the
-        // browser property
+        // browser property.
         if (this.getAttribute("browserid"))
-          setTimeout(function(aSelf) { aSelf.browser = aSelf.browser; }, 0, this);
+          setTimeout(() => this.browser = this.browser, 0);
+
+        this._enableFindButtons(false);
       ]]></constructor>
 
       <destructor><![CDATA[
@@ -790,7 +780,7 @@
           if (!aTarget)
             return;
 
-          let event = document.createEvent("KeyEvents");
+          let event = document.createEvent("KeyboardEvent");
           event.initKeyEvent(aEvent.type, aEvent.bubbles, aEvent.cancelable,
                              aEvent.view, aEvent.ctrlKey, aEvent.altKey,
                              aEvent.shiftKey, aEvent.metaKey, aEvent.keyCode,
@@ -1022,7 +1012,6 @@
               this._startFindDeferred = null;
             }
 
-            this._enableFindButtons(val);
             this._updateCaseSensitivity(val);
             this._setEntireWord();
 
@@ -1128,7 +1117,6 @@
           return this.dispatchEvent(event);
         ]]></body>
       </method>
-
 
       <!--
         - Opens the findbar, focuses the findfield and selects its contents.
@@ -1295,7 +1283,7 @@
             this._findFailedString = null;
           }
 
-          this._updateStatusUI(aData.result, aData.findBackwards);
+          this.updateControlState(aData.result, aData.findBackwards);
           this._updateStatusUIBar(aData.linkURL);
 
           if (this._findMode != this.FIND_NORMAL)
@@ -1315,9 +1303,9 @@
           if (aResult.total !== 0) {
             if (aResult.total == -1) {
               this._foundMatches.value = this.pluralForm.get(
-                this._matchesCountLimit,
+                aResult.limit,
                 this.strBundle.GetStringFromName("FoundMatchesCountLimit")
-              ).replace("#1", this._matchesCountLimit);
+              ).replace("#1", aResult.limit);
             } else {
               this._foundMatches.value = this.pluralForm.get(
                 aResult.total,
@@ -1349,9 +1337,7 @@
           if (aIsInitialSelection && !this._startFindDeferred)
             return;
 
-          let { AppConstants } =
-              Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
-          if (AppConstants.platform == "macosx" && aIsInitialSelection && !aSelectionString) {
+          if (/Mac/.test(navigator.platform) && aIsInitialSelection && !aSelectionString) {
             let clipboardSearchString = this.browser.finder.clipboardSearchString;
             if (clipboardSearchString)
               aSelectionString = clipboardSearchString;
@@ -1361,7 +1347,6 @@
             this._findField.value = aSelectionString;
 
           if (aIsInitialSelection) {
-            this._enableFindButtons(!!this._findField.value);
             this._findField.select();
             this._findField.focus();
 

@@ -459,10 +459,7 @@ void
 MediaDecoder::Shutdown()
 {
   MOZ_ASSERT(NS_IsMainThread());
-
-  if (IsShutdown()) {
-    return;
-  }
+  MOZ_ASSERT(!IsShutdown());
 
   // Unwatch all watch targets to prevent further notifications.
   mWatchManager.Shutdown();
@@ -1069,9 +1066,7 @@ void
 MediaDecoder::NotifyBytesDownloaded()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (IsShutdown()) {
-    return;
-  }
+  MOZ_ASSERT(!IsShutdown());
   UpdatePlaybackRate();
   mOwner->DownloadProgressed();
 }
@@ -1303,6 +1298,12 @@ media::TimeIntervals
 MediaDecoder::GetSeekable()
 {
   MOZ_ASSERT(NS_IsMainThread());
+
+  if (IsNaN(GetDuration())) {
+    // We do not have a duration yet, we can't determine the seekable range.
+    return TimeIntervals();
+  }
+
   // We can seek in buffered range if the media is seekable. Also, we can seek
   // in unbuffered ranges if the transport level is seekable (local file or the
   // server supports range requests, etc.) or in cue-less WebMs
@@ -1486,12 +1487,7 @@ void MediaDecoder::AddSizeOfResources(ResourceSizes* aSizes) {
 void
 MediaDecoder::NotifyDataArrived() {
   MOZ_ASSERT(NS_IsMainThread());
-
-  // Don't publish events since task queues might be shutting down.
-  if (IsShutdown()) {
-    return;
-  }
-
+  MOZ_ASSERT(!IsShutdown());
   mDataArrivedEvent.Notify();
 }
 

@@ -674,7 +674,7 @@ nsPIDOMWindow<T>::nsPIDOMWindow(nsPIDOMWindowOuter *aOuterWindow)
   mMediaSuspend(Preferences::GetBool("media.block-autoplay-until-in-foreground", true) ?
     nsISuspendedTypes::SUSPENDED_BLOCK : nsISuspendedTypes::NONE_SUSPENDED),
   mAudioMuted(false), mAudioVolume(1.0), mAudioCaptured(false),
-  mDesktopModeViewport(false), mInnerWindow(nullptr),
+  mDesktopModeViewport(false), mIsRootOuterWindow(false), mInnerWindow(nullptr),
   mOuterWindow(aOuterWindow),
   // Make sure no actual window ends up with mWindowID == 0
   mWindowID(NextWindowID()), mHasNotifiedGlobalCreated(false),
@@ -1818,6 +1818,8 @@ nsGlobalWindow::FreeInnerObjects(bool aForDocumentOpen)
   }
 
   mIndexedDB = nullptr;
+
+  UnlinkHostObjectURIs();
 
   NotifyWindowIDDestroyed("inner-window-destroyed");
 
@@ -3136,6 +3138,7 @@ nsGlobalWindow::SetDocShell(nsIDocShell* aDocShell)
     }
     else {
       mChromeEventHandler = NS_NewWindowRoot(AsOuter());
+      mIsRootOuterWindow = true;
     }
   }
 
@@ -3314,9 +3317,10 @@ nsGlobalWindow::WillHandleEvent(EventChainPostVisitor& aVisitor)
 }
 
 nsresult
-nsGlobalWindow::PreHandleEvent(EventChainPreVisitor& aVisitor)
+nsGlobalWindow::GetEventTargetParent(EventChainPreVisitor& aVisitor)
 {
-  NS_PRECONDITION(IsInnerWindow(), "PreHandleEvent is used on outer window!?");
+  NS_PRECONDITION(IsInnerWindow(),
+                  "GetEventTargetParent is used on outer window!?");
   EventMessage msg = aVisitor.mEvent->mMessage;
 
   aVisitor.mCanHandle = true;
@@ -3549,7 +3553,7 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
   } else if (aVisitor.mEvent->mMessage == eLoad &&
              aVisitor.mEvent->IsTrusted()) {
     // This is page load event since load events don't propagate to |window|.
-    // @see nsDocument::PreHandleEvent.
+    // @see nsDocument::GetEventTargetParent.
     mIsDocumentLoaded = true;
 
     nsCOMPtr<Element> element = GetOuterWindow()->GetFrameElementInternal();
@@ -6277,12 +6281,16 @@ nsGlobalWindow::SetFullScreen(bool aFullScreen)
   return SetFullscreenInternal(FullscreenReason::ForFullscreenMode, aFullScreen);
 }
 
-void
+static void
 FinishDOMFullscreenChange(nsIDocument* aDoc, bool aInDOMFullscreen)
 {
   if (aInDOMFullscreen) {
     // Ask the document to handle any pending DOM fullscreen change.
-    nsIDocument::HandlePendingFullscreenRequests(aDoc);
+    if (!nsIDocument::HandlePendingFullscreenRequests(aDoc)) {
+      // If we don't end up having anything in fullscreen,
+      // async request exiting fullscreen.
+      nsIDocument::AsyncExitFullscreen(aDoc);
+    }
   } else {
     // If the window is leaving fullscreen state, also ask the document
     // to exit from DOM Fullscreen.
@@ -11846,7 +11854,20 @@ void
 nsGlobalWindow::Suspend()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(IsInnerWindow());
+  MOZ_DIAGNOSTIC_ASSERT(IsInnerWindow());
+
+  // We can only safely suspend windows that are the current inner window.  If
+  // its not the current inner, then we are in one of two different cases.
+  // Either we are in the bfcache or we are doomed window that is going away.
+  // When a window becomes inactive we purposely avoid placing already suspended
+  // windows into the bfcache.  It only expects windows suspended due to the
+  // Freeze() method which occurs while the window is still the current inner.
+  // So we must not call Suspend() on bfcache windows at this point or this
+  // invariant will be broken.  If the window is doomed there is no point in
+  // suspending it since it will soon be gone.
+  if (!AsInner()->IsCurrentInnerWindow()) {
+    return;
+  }
 
   // All children are also suspended.  This ensure mSuspendDepth is
   // set properly and the timers are properly canceled for each child.
@@ -11894,7 +11915,17 @@ void
 nsGlobalWindow::Resume()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(IsInnerWindow());
+  MOZ_DIAGNOSTIC_ASSERT(IsInnerWindow());
+
+  // We can only safely resume a window if its the current inner window.  If
+  // its not the current inner, then we are in one of two different cases.
+  // Either we are in the bfcache or we are doomed window that is going away.
+  // If a window is suspended when it becomes inactive we purposely do not
+  // put it in the bfcache, so Resume should never be needed in that case.
+  // If the window is doomed then there is no point in resuming it.
+  if (!AsInner()->IsCurrentInnerWindow()) {
+    return;
+  }
 
   // Resume all children.  This restores timers recursively canceled
   // in Suspend() and ensures all children have the correct mSuspendDepth.
@@ -11991,7 +12022,6 @@ void
 nsGlobalWindow::Freeze()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(IsInnerWindow());
   Suspend();
   FreezeInternal();
 }
@@ -12000,7 +12030,9 @@ void
 nsGlobalWindow::FreezeInternal()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(IsSuspended());
+  MOZ_DIAGNOSTIC_ASSERT(IsInnerWindow());
+  MOZ_DIAGNOSTIC_ASSERT(AsInner()->IsCurrentInnerWindow());
+  MOZ_DIAGNOSTIC_ASSERT(IsSuspended());
 
   CallOnChildren(&nsGlobalWindow::FreezeInternal);
 
@@ -12036,7 +12068,6 @@ void
 nsGlobalWindow::Thaw()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(IsInnerWindow());
   ThawInternal();
   Resume();
 }
@@ -12045,7 +12076,9 @@ void
 nsGlobalWindow::ThawInternal()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(IsSuspended());
+  MOZ_DIAGNOSTIC_ASSERT(IsInnerWindow());
+  MOZ_DIAGNOSTIC_ASSERT(AsInner()->IsCurrentInnerWindow());
+  MOZ_DIAGNOSTIC_ASSERT(IsSuspended());
 
   CallOnChildren(&nsGlobalWindow::ThawInternal);
 
@@ -12102,6 +12135,7 @@ nsGlobalWindow::SyncStateFromParentWindow()
   // This method should only be called on an inner window that has been
   // assigned to an outer window already.
   MOZ_ASSERT(IsInnerWindow());
+  MOZ_ASSERT(AsInner()->IsCurrentInnerWindow());
   nsPIDOMWindowOuter* outer = GetOuterWindow();
   MOZ_ASSERT(outer);
 
@@ -12145,6 +12179,8 @@ void
 nsGlobalWindow::CallOnChildren(Method aMethod)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(IsInnerWindow());
+  MOZ_ASSERT(AsInner()->IsCurrentInnerWindow());
 
   nsCOMPtr<nsIDocShell> docShell = GetDocShell();
   if (!docShell) {
@@ -12314,14 +12350,6 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
 
   NS_ASSERTION(mDocShell, "Must have docshell here");
 
-  // Popups from apps are never blocked.
-  bool isApp = false;
-  if (mDoc) {
-    isApp = mDoc->NodePrincipal()->GetAppStatus() >=
-              nsIPrincipal::APP_STATUS_INSTALLED;
-  }
-
-  
   bool forceNoOpener = aForceNoOpener;
   if (!forceNoOpener) {
     // Unlike other window flags, "noopener" comes from splitting on commas with
@@ -12341,7 +12369,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
   // But note that if you change this to GetEntryGlobal(), say, then
   // OnLinkClickEvent::Run will need a full-blown AutoEntryScript.
   const bool checkForPopup = !nsContentUtils::LegacyIsCallerChromeOrNativeCode() &&
-    !isApp && !aDialog && !WindowExists(aName, forceNoOpener, !aCalledNoScript);
+    !aDialog && !WindowExists(aName, forceNoOpener, !aCalledNoScript);
 
   // Note: it's very important that this be an nsXPIDLCString, since we want
   // .get() on it to return nullptr until we write stuff to it.  The window
@@ -14846,7 +14874,7 @@ nsGlobalWindow::TabGroupOuter()
   if (!mIsValidatingTabGroup) {
     mIsValidatingTabGroup = true;
     // We only need to do this check if we aren't in the chrome tab group
-    if (GetDocShell()->ItemType() == nsIDocShellTreeItem::typeChrome) {
+    if (mIsChrome) {
       MOZ_ASSERT(mTabGroup == TabGroup::GetChromeTabGroup());
     } else {
       // Sanity check that our tabgroup matches our opener or parent.
@@ -14916,6 +14944,29 @@ nsPIDOMWindow<T>::GetDocGroup()
     return doc->GetDocGroup();
   }
   return nullptr;
+}
+
+nsresult
+nsGlobalWindow::Dispatch(const char* aName,
+                         TaskCategory aCategory,
+                         already_AddRefed<nsIRunnable>&& aRunnable)
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  if (GetDocGroup()) {
+    return GetDocGroup()->Dispatch(aName, aCategory, Move(aRunnable));
+  }
+  return DispatcherTrait::Dispatch(aName, aCategory, Move(aRunnable));
+}
+
+already_AddRefed<nsIEventTarget>
+nsGlobalWindow::CreateEventTarget(const char* aName,
+                                  TaskCategory aCategory)
+{
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  if (GetDocGroup()) {
+    return GetDocGroup()->CreateEventTarget(aName, aCategory);
+  }
+  return DispatcherTrait::CreateEventTarget(aName, aCategory);
 }
 
 nsGlobalWindow::TemporarilyDisableDialogs::TemporarilyDisableDialogs(

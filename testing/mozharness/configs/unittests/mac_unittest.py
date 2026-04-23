@@ -222,9 +222,8 @@ config = {
                 # when configs are consolidated this python path will only show
                 # for windows.
                 "python", "../scripts/external_tools/mouse_and_screen_resolution.py",
-                "--configuration-url",
-                "https://hg.mozilla.org/%(branch)s/raw-file/%(revision)s/" +
-                    "testing/machine-configuration.json"],
+                "--configuration-file",
+                "../scripts/external_tools/machine-configuration.json"],
             "architectures": ["32bit"],
             "halt_on_failure": True,
             "enabled": ADJUST_MOUSE_AND_SCREEN
@@ -236,6 +235,7 @@ config = {
     "default_blob_upload_servers": [
         "https://blobupload.elasticbeanstalk.com",
     ],
+    "structured_suites": ["reftest"],
     "blob_uploader_auth_file": os.path.join(os.getcwd(), "oauth.txt"),
     "download_minidump_stackwalk": True,
     "minidump_stackwalk_path": "macosx64-minidump_stackwalk",

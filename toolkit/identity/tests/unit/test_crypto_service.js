@@ -47,7 +47,7 @@ function test_base64_roundtrip() {
 }
 
 function test_dsa() {
-  idService.generateKeyPair(ALG_DSA, function (rv, keyPair) {
+  idService.generateKeyPair(ALG_DSA, function(rv, keyPair) {
     log("DSA generateKeyPair finished ", rv);
     do_check_true(Components.isSuccessCode(rv));
     do_check_eq(typeof keyPair.sign, "function");
@@ -70,7 +70,7 @@ function test_dsa() {
 }
 
 function test_rsa() {
-  idService.generateKeyPair(ALG_RSA, function (rv, keyPair) {
+  idService.generateKeyPair(ALG_RSA, function(rv, keyPair) {
     log("RSA generateKeyPair finished ", rv);
     do_check_true(Components.isSuccessCode(rv));
     do_check_eq(typeof keyPair.sign, "function");

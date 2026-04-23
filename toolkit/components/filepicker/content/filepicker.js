@@ -238,7 +238,7 @@ function selectOnOK()
     try {
       file.normalize();
     } catch (e) {
-      //promptService.alert(window, "Problem", "normalize failed, continuing");
+      // promptService.alert(window, "Problem", "normalize failed, continuing");
     }
 
     var fileExists = file.exists();
@@ -661,9 +661,7 @@ function newDir() {
 
     var parent = file.parent;
     if (!(parent.exists() && parent.isDirectory() && parent.isWritable())) {
-      var oldParent = parent;
       while (!parent.exists()) {
-        oldParent = parent;
         parent = parent.parent;
       }
       if (parent.isFile()) {
@@ -681,7 +679,7 @@ function newDir() {
     }
 
     try {
-      file.create(nsIFile.DIRECTORY_TYPE, 0755);
+      file.create(nsIFile.DIRECTORY_TYPE, 0o755);
     } catch (e) {
       showErrorDialog("errorCreateNewDirTitle",
                       "errorCreateNewDirMessage",
@@ -791,7 +789,7 @@ function processPathEntry(path, fileArray)
   try {
     file = sfile.clone().QueryInterface(nsILocalFile);
   } catch (e) {
-    dump("Couldn't clone\n"+e);
+    dump("Couldn't clone\n" + e);
     return false;
   }
 
@@ -811,13 +809,13 @@ function processPathEntry(path, fileArray)
     file.initWithPath(filePath);
   else if ((filePath.indexOf("/../") > 0) ||
            (filePath.substr(-3) == "/..") ||
-           (filePath.substr(0,3) == "../") ||
+           (filePath.substr(0, 3) == "../") ||
            (filePath == "..")) {
     /* appendRelativePath doesn't allow .. */
     try {
       file.initWithPath(file.path + "/" + filePath);
     } catch (e) {
-      dump("Couldn't init path\n"+e);
+      dump("Couldn't init path\n" + e);
       return false;
     }
   }
@@ -825,7 +823,7 @@ function processPathEntry(path, fileArray)
     try {
       file.appendRelativePath(filePath);
     } catch (e) {
-      dump("Couldn't append path\n"+e);
+      dump("Couldn't append path\n" + e);
       return false;
     }
   }

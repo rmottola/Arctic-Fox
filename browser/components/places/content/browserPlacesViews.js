@@ -1393,7 +1393,6 @@ PlacesToolbar.prototype = {
    * - folderElt: the folder to drop into, if applicable.
    */
   _getDropPoint: function PT__getDropPoint(aEvent) {
-    let result = this.result;
     if (!PlacesUtils.nodeIsFolder(this._resultNode))
       return null;
 
@@ -1561,7 +1560,7 @@ PlacesToolbar.prototype = {
       // of dragging.
       let translateY = this._cachedMouseMoveEvent.clientY - aEvent.clientY;
       let translateX = this._cachedMouseMoveEvent.clientX - aEvent.clientX;
-      if ((translateY) >= Math.abs(translateX/2)) {
+      if ((translateY) >= Math.abs(translateX / 2)) {
         // Don't start the drag.
         aEvent.preventDefault();
         // Open the menu.

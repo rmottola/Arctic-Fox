@@ -123,11 +123,13 @@ class BasePopup {
     this.destroyed = true;
     this.browserLoadedDeferred.reject(new Error("Popup destroyed"));
     return this.browserReady.then(() => {
-      this.destroyBrowser(this.browser);
+      this.destroyBrowser(this.browser, true);
       this.browser.remove();
 
-      this.viewNode.removeEventListener(this.DESTROY_EVENT, this);
-      this.viewNode.style.maxHeight = "";
+      if (this.viewNode) {
+        this.viewNode.removeEventListener(this.DESTROY_EVENT, this);
+        this.viewNode.style.maxHeight = "";
+      }
 
       if (this.panel) {
         this.panel.style.removeProperty("--panel-arrowcontent-background");
@@ -141,16 +143,19 @@ class BasePopup {
     });
   }
 
-  destroyBrowser(browser) {
+  destroyBrowser(browser, finalize = false) {
     let mm = browser.messageManager;
     // If the browser has already been removed from the document, because the
-    // popup was closed externally, there will be no message manager here.
+    // popup was closed externally, there will be no message manager here, so
+    // just replace our receiveMessage method with a stub.
     if (mm) {
       mm.removeMessageListener("DOMTitleChanged", this);
       mm.removeMessageListener("Extension:BrowserBackgroundChanged", this);
       mm.removeMessageListener("Extension:BrowserContentLoaded", this);
       mm.removeMessageListener("Extension:BrowserResized", this);
       mm.removeMessageListener("Extension:DOMWindowClose", this);
+    } else if (finalize) {
+      this.receiveMessage = () => {};
     }
   }
 
@@ -217,60 +222,73 @@ class BasePopup {
   handleEvent(event) {
     switch (event.type) {
       case this.DESTROY_EVENT:
-        this.destroy();
+        if (!this.destroyed) {
+          this.destroy();
+        }
         break;
     }
   }
 
   createBrowser(viewNode, popupURL = null) {
     let document = viewNode.ownerDocument;
-    this.browser = document.createElementNS(XUL_NS, "browser");
-    this.browser.setAttribute("type", "content");
-    this.browser.setAttribute("disableglobalhistory", "true");
-    this.browser.setAttribute("transparent", "true");
-    this.browser.setAttribute("class", "webextension-popup-browser");
-    this.browser.setAttribute("tooltip", "aHTMLTooltip");
+    let browser = document.createElementNS(XUL_NS, "browser");
+    browser.setAttribute("type", "content");
+    browser.setAttribute("disableglobalhistory", "true");
+    browser.setAttribute("transparent", "true");
+    browser.setAttribute("class", "webextension-popup-browser");
+    browser.setAttribute("webextension-view-type", "popup");
+    browser.setAttribute("tooltip", "aHTMLTooltip");
+
+    if (this.extension.remote) {
+      browser.setAttribute("remote", "true");
+    }
 
     // We only need flex sizing for the sake of the slide-in sub-views of the
     // main menu panel, so that the browser occupies the full width of the view,
     // and also takes up any extra height that's available to it.
-    this.browser.setAttribute("flex", "1");
+    browser.setAttribute("flex", "1");
 
     // Note: When using noautohide panels, the popup manager will add width and
     // height attributes to the panel, breaking our resize code, if the browser
     // starts out smaller than 30px by 10px. This isn't an issue now, but it
     // will be if and when we popup debugging.
 
-    viewNode.appendChild(this.browser);
+    this.browser = browser;
 
-    extensions.emit("extension-browser-inserted", this.browser);
-    let windowId = WindowManager.getId(this.browser.ownerGlobal);
-    this.browser.messageManager.sendAsyncMessage("Extension:InitExtensionView", {
-      viewType: "popup",
-      windowId,
-    });
-    // TODO(robwu): Rework this to use the Extension:ExtensionViewLoaded message
-    // to detect loads and so on. And definitely move this content logic inside
-    // a file in the child process.
+    let readyPromise;
+    if (this.extension.remote) {
+      readyPromise = promiseEvent(browser, "XULFrameLoaderCreated");
+    } else {
+      readyPromise = promiseEvent(browser, "load");
+    }
 
-    let initBrowser = browser => {
+    viewNode.appendChild(browser);
+
+    extensions.emit("extension-browser-inserted", browser);
+
+    let setupBrowser = browser => {
       let mm = browser.messageManager;
       mm.addMessageListener("DOMTitleChanged", this);
       mm.addMessageListener("Extension:BrowserBackgroundChanged", this);
       mm.addMessageListener("Extension:BrowserContentLoaded", this);
       mm.addMessageListener("Extension:BrowserResized", this);
       mm.addMessageListener("Extension:DOMWindowClose", this, true);
+      return browser;
     };
 
     if (!popupURL) {
-      initBrowser(this.browser);
-      return this.browser;
+      // For remote browsers, we can't do any setup until the frame loader is
+      // created. Non-remote browsers get a message manager immediately, so
+      // there's no need to wait for the load event.
+      if (this.extension.remote) {
+        return readyPromise.then(() => setupBrowser(browser));
+      }
+      return setupBrowser(browser);
     }
 
-    return promiseEvent(this.browser, "load").then(() => {
-      initBrowser(this.browser);
-
-      let mm = this.browser.messageManager;
+    return readyPromise.then(() => {
+      setupBrowser(browser);
+      let mm = browser.messageManager;
 
       mm.loadFrameScript(
         "chrome://extensions/content/ext-browser-content.js", false);
@@ -283,7 +301,7 @@ class BasePopup {
         stylesheets: this.STYLESHEETS,
       });
 
-      this.browser.setAttribute("src", popupURL);
+      browser.loadURI(popupURL);
     });
   }
 
@@ -374,12 +392,13 @@ class PanelPopup extends BasePopup {
   destroy() {
     super.destroy();
     this.viewNode.remove();
+    this.viewNode = null;
   }
 
   closePopup() {
     promisePopupShown(this.viewNode).then(() => {
-      // Make sure we're not already destroyed.
-      if (this.viewNode) {
+      // Make sure we're not already destroyed, or removed from the DOM.
+      if (this.viewNode && this.viewNode.hidePopup) {
         this.viewNode.hidePopup();
       }
     });
@@ -402,6 +421,7 @@ class ViewPopup extends BasePopup {
     this.ignoreResizes = true;
 
     this.attached = false;
+    this.shown = false;
     this.tempPanel = panel;
 
     this.browser.classList.add("webextension-preload-browser");
@@ -443,10 +463,12 @@ class ViewPopup extends BasePopup {
       }
 
       if (this.destroyed) {
+        CustomizableUI.hidePanelForNode(viewNode);
         return false;
       }
 
       this.attached = true;
+
 
       // Store the initial height of the view, so that we never resize menu panel
       // sub-views smaller than the initial height of the menu.
@@ -468,7 +490,7 @@ class ViewPopup extends BasePopup {
 
       // Create a new browser in the real popup.
       let browser = this.browser;
-      this.createBrowser(this.viewNode);
+      yield this.createBrowser(this.viewNode);
 
       this.browser.swapDocShells(browser);
       this.destroyBrowser(browser);
@@ -480,6 +502,14 @@ class ViewPopup extends BasePopup {
 
       this.tempPanel.remove();
       this.tempPanel = null;
+
+      this.shown = true;
+
+      if (this.destroyed) {
+        this.closePopup();
+        this.destroy();
+        return false;
+      }
 
       let event = new this.window.CustomEvent("WebExtPopupLoaded", {
         bubbles: true,
@@ -505,8 +535,10 @@ class ViewPopup extends BasePopup {
   }
 
   closePopup() {
-    if (this.attached) {
+    if (this.shown) {
       CustomizableUI.hidePanelForNode(this.viewNode);
+    } else if (this.attached) {
+      this.destroyed = true;
     } else {
       this.destroy();
     }
@@ -602,6 +634,10 @@ ExtensionTabManager.prototype = {
     }
   },
 
+  revokeActiveTabPermission(tab = TabManager.activeTab) {
+    this.hasTabPermissionFor.delete(tab);
+  },
+
   // Returns true if the extension has the "activeTab" permission for this tab.
   // This is somewhat more permissive than the generic "tabs" permission, as
   // checked by |hasTabPermission|, in that it also allows programmatic script
@@ -665,26 +701,70 @@ ExtensionTabManager.prototype = {
     return result;
   },
 
+  // Converts tabs returned from SessionStore.getClosedTabData and
+  // SessionStore.getClosedWindowData into API tab objects
+  convertFromSessionStoreClosedData(tab, window) {
+    let result = {
+      sessionId: String(tab.closedId),
+      index: tab.pos ? tab.pos : 0,
+      windowId: WindowManager.getId(window),
+      selected: false,
+      highlighted: false,
+      active: false,
+      pinned: false,
+      incognito: Boolean(tab.state && tab.state.isPrivate),
+    };
+
+    return result;
+  },
+
   getTabs(window) {
-    return Array.from(window.gBrowser.tabs, tab => this.convert(tab));
+    return Array.from(window.gBrowser.tabs)
+                .filter(tab => !tab.closing)
+                .map(tab => this.convert(tab));
   },
 };
+
+function getBrowserInfo(browser) {
+  if (!browser.ownerGlobal.gBrowser) {
+    // When we're loaded into a <browser> inside about:addons, we need to go up
+    // one more level.
+    browser = browser.ownerGlobal.QueryInterface(Ci.nsIInterfaceRequestor)
+                     .getInterface(Ci.nsIDocShell)
+                     .chromeEventHandler;
+
+    if (!browser) {
+      return {};
+    }
+  }
+
+  let result = {};
+
+  let window = browser.ownerGlobal;
+  if (window.gBrowser) {
+    let tab = window.gBrowser.getTabForBrowser(browser);
+    if (tab) {
+      result.tabId = TabManager.getId(tab);
+    }
+
+    result.windowId = WindowManager.getId(window);
+  }
+
+  return result;
+}
+global.getBrowserInfo = getBrowserInfo;
 
 // Sends the tab and windowId upon request. This is primarily used to support
 // the synchronous `browser.extension.getViews` API.
 let onGetTabAndWindowId = {
   receiveMessage({name, target, sync}) {
-    let {gBrowser} = target.ownerGlobal;
-    let tab = gBrowser && gBrowser.getTabForBrowser(target);
-    if (tab) {
-      let reply = {
-        tabId: TabManager.getId(tab),
-        windowId: WindowManager.getId(tab.ownerGlobal),
-      };
+    let result = getBrowserInfo(target);
+
+    if (result.tabId) {
       if (sync) {
-        return reply;
+        return result;
       }
-      target.messageManager.sendAsyncMessage("Extension:SetTabAndWindowId", reply);
+      target.messageManager.sendAsyncMessage("Extension:SetTabAndWindowId", result);
     }
   },
 };
@@ -910,6 +990,19 @@ global.WindowManager = {
     return null;
   },
 
+  getState(window) {
+    const STATES = {
+      [window.STATE_MAXIMIZED]: "maximized",
+      [window.STATE_MINIMIZED]: "minimized",
+      [window.STATE_NORMAL]: "normal",
+    };
+    let state = STATES[window.windowState];
+    if (window.fullScreen) {
+      state = "fullscreen";
+    }
+    return state;
+  },
+
   setState(window, state) {
     if (state != "fullscreen" && window.fullScreen) {
       window.fullScreen = false;
@@ -950,16 +1043,6 @@ global.WindowManager = {
   },
 
   convert(extension, window, getInfo) {
-    const STATES = {
-      [window.STATE_MAXIMIZED]: "maximized",
-      [window.STATE_MINIMIZED]: "minimized",
-      [window.STATE_NORMAL]: "normal",
-    };
-    let state = STATES[window.windowState];
-    if (window.fullScreen) {
-      state = "fullscreen";
-    }
-
     let xulWindow = window.QueryInterface(Ci.nsIInterfaceRequestor)
                           .getInterface(Ci.nsIDocShell)
                           .treeOwner.QueryInterface(Ci.nsIInterfaceRequestor)
@@ -974,12 +1057,34 @@ global.WindowManager = {
       height: window.outerHeight,
       incognito: PrivateBrowsingUtils.isWindowPrivate(window),
       type: this.windowType(window),
-      state,
+      state: this.getState(window),
       alwaysOnTop: xulWindow.zLevel >= Ci.nsIXULWindow.raisedZ,
     };
 
     if (getInfo && getInfo.populate) {
       result.tabs = TabManager.for(extension).getTabs(window);
+    }
+
+    return result;
+  },
+
+  // Converts windows returned from SessionStore.getClosedWindowData
+  // into API window objects
+  convertFromSessionStoreClosedData(window, extension) {
+    let result = {
+      sessionId: String(window.closedId),
+      focused: false,
+      incognito: false,
+      type: "normal", // this is always "normal" for a closed window
+      state: this.getState(window),
+      alwaysOnTop: false,
+    };
+
+    if (window.tabs.length) {
+      result.tabs = [];
+      window.tabs.forEach((tab, index) => {
+        result.tabs.push(TabManager.for(extension).convertFromSessionStoreClosedData(tab, window, index));
+      });
     }
 
     return result;

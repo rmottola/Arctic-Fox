@@ -127,7 +127,6 @@ var gViewSourceUtils = {
                                                       message.data.baseURI);
       }
       else {
-        let docUrl = null;
         window.openDialog("chrome://global/content/viewPartialSource.xul",
                           "_blank", "all,dialog=no",
                           {
@@ -491,10 +490,10 @@ var gViewSourceUtils = {
       }
     },
 
-    onLocationChange: function() {return 0;},
-    onProgressChange: function() {return 0;},
-    onStatusChange: function() {return 0;},
-    onSecurityChange: function() {return 0;},
+    onLocationChange: function() { return 0; },
+    onProgressChange: function() { return 0; },
+    onStatusChange: function() { return 0; },
+    onSecurityChange: function() { return 0; },
 
     webShell: null,
     editor: null,

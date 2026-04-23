@@ -5,37 +5,42 @@
 "use strict";
 
 Cu.import("resource://gre/modules/Promise.jsm");
-let {AddonTestUtils} = Cu.import("resource://testing-common/AddonManagerTesting.jsm", {});
-let GMPScope = Cu.import("resource://gre/modules/addons/GMPProvider.jsm");
+Cu.import("resource://gre/modules/AppConstants.jsm");
+var {AddonTestUtils} = Cu.import("resource://testing-common/AddonManagerTesting.jsm", {});
+var GMPScope = Cu.import("resource://gre/modules/addons/GMPProvider.jsm");
 
 const TEST_DATE = new Date(2013, 0, 1, 12);
 
-let gManagerWindow;
-let gCategoryUtilities;
-let gIsEnUsLocale;
+var gManagerWindow;
+var gCategoryUtilities;
+var gIsEnUsLocale;
 
-let gMockAddons = [];
+var gMockAddons = [];
 
 for (let plugin of GMPScope.GMP_PLUGINS) {
   let mockAddon = Object.freeze({
       id: plugin.id,
       isValid: true,
       isInstalled: false,
-      isEME: plugin.id.indexOf("gmp-eme-") == 0 ? true : false,
+      isEME: (plugin.id == "gmp-widevinecdm" ||
+              plugin.id.indexOf("gmp-eme-") == 0) ? true : false,
   });
   gMockAddons.push(mockAddon);
 }
 
-let gInstalledAddonId = "";
-let gInstallDeferred = null;
-let gPrefs = Services.prefs;
-let getKey = GMPScope.GMPPrefs.getPrefKey;
+var gInstalledAddonId = "";
+var gInstallDeferred = null;
+var gPrefs = Services.prefs;
+var getKey = GMPScope.GMPPrefs.getPrefKey;
 
 function MockGMPInstallManager() {
 }
 
 MockGMPInstallManager.prototype = {
-  checkForAddons: () => Promise.resolve(gMockAddons),
+  checkForAddons: () => Promise.resolve({
+    usedFallback: true,
+    gmpAddons: gMockAddons
+  }),
 
   installAddon: addon => {
     gInstalledAddonId = addon.id;
@@ -44,7 +49,7 @@ MockGMPInstallManager.prototype = {
   },
 };
 
-let gOptionsObserver = {
+var gOptionsObserver = {
   lastDisplayed: null,
   observe: function(aSubject, aTopic, aData) {
     if (aTopic == AddonManager.OPTIONS_NOTIFICATION_DISPLAYED) {

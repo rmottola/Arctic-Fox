@@ -26,6 +26,10 @@ Cu.importGlobalProperties(["TextEncoder"]);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
+/* globals processCount */
+
+XPCOMUtils.defineLazyPreferenceGetter(this, "processCount", "dom.ipc.processCount");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
@@ -34,8 +38,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "ExtensionAPIs",
                                   "resource://gre/modules/ExtensionAPI.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ExtensionStorage",
                                   "resource://gre/modules/ExtensionStorage.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
-                                  "resource://gre/modules/FileUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ExtensionTestCommon",
+                                  "resource://testing-common/ExtensionTestCommon.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Locale",
                                   "resource://gre/modules/Locale.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Log",
@@ -63,32 +67,26 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
 
 Cu.import("resource://gre/modules/ExtensionContent.jsm");
 Cu.import("resource://gre/modules/ExtensionManagement.jsm");
+Cu.import("resource://gre/modules/ExtensionParent.jsm");
+Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "uuidGen",
                                    "@mozilla.org/uuid-generator;1",
                                    "nsIUUIDGenerator");
 
-const BASE_SCHEMA = "chrome://extensions/content/schemas/manifest.json";
-const CATEGORY_EXTENSION_SCHEMAS = "webextension-schemas";
-const CATEGORY_EXTENSION_SCRIPTS = "webextension-scripts";
-
-let schemaURLs = new Set();
-
-if (!AppConstants.RELEASE_OR_BETA) {
-  schemaURLs.add("chrome://extensions/content/schemas/experiments.json");
-}
-
-Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
-  BaseContext,
-  defineLazyGetter,
+  GlobalManager,
+  ParentAPIManager,
+  apiManager: Management,
+} = ExtensionParent;
+
+const {
   EventEmitter,
-  SchemaAPIManager,
   LocaleData,
-  instanceOf,
-  LocalAPIImplementation,
-  flushJarCache,
+  getUniqueId,
 } = ExtensionUtils;
+
+XPCOMUtils.defineLazyGetter(this, "console", ExtensionUtils.getConsole);
 
 const LOGGER_ID_BASE = "addons.webextension.";
 const UUID_MAP_PREF = "extensions.webextensions.uuids";
@@ -106,462 +104,6 @@ const COMMENT_REGEXP = new RegExp(String.raw`
 
     //.*
   `.replace(/\s+/g, ""), "gm");
-
-var GlobalManager;
-
-// This object loads the ext-*.js scripts that define the extension API.
-var Management = new class extends SchemaAPIManager {
-  constructor() {
-    super("main");
-    this.initialized = null;
-  }
-
-  // Loads all the ext-*.js scripts currently registered.
-  lazyInit() {
-    if (this.initialized) {
-      return this.initialized;
-    }
-
-    // Load order matters here. The base manifest defines types which are
-    // extended by other schemas, so needs to be loaded first.
-    let promise = Schemas.load(BASE_SCHEMA).then(() => {
-      let promises = [];
-      for (let [/* name */, url] of XPCOMUtils.enumerateCategoryEntries(CATEGORY_EXTENSION_SCHEMAS)) {
-        promises.push(Schemas.load(url));
-      }
-      for (let url of schemaURLs) {
-        promises.push(Schemas.load(url));
-      }
-      return Promise.all(promises);
-    });
-
-    for (let [/* name */, value] of XPCOMUtils.enumerateCategoryEntries(CATEGORY_EXTENSION_SCRIPTS)) {
-      this.loadScript(value);
-    }
-
-    this.initialized = promise;
-    return this.initialized;
-  }
-
-  registerSchemaAPI(namespace, envType, getAPI) {
-    if (envType == "addon_parent" || envType == "content_parent") {
-      super.registerSchemaAPI(namespace, envType, getAPI);
-    }
-  }
-}();
-
-// Subscribes to messages related to the extension messaging API and forwards it
-// to the relevant message manager. The "sender" field for the `onMessage` and
-// `onConnect` events are updated if needed.
-let ProxyMessenger = {
-  _initialized: false,
-  init() {
-    if (this._initialized) {
-      return;
-    }
-    this._initialized = true;
-
-    // TODO(robwu): When addons move to a separate process, we should use the
-    // parent process manager(s) of the addon process(es) instead of the
-    // in-process one.
-    let pipmm = Services.ppmm.getChildAt(0);
-    // Listen on the global frame message manager because content scripts send
-    // and receive extension messages via their frame.
-    // Listen on the parent process message manager because `runtime.connect`
-    // and `runtime.sendMessage` requests must be delivered to all frames in an
-    // addon process (by the API contract).
-    // And legacy addons are not associated with a frame, so that is another
-    // reason for having a parent process manager here.
-    let messageManagers = [Services.mm, pipmm];
-
-    MessageChannel.addListener(messageManagers, "Extension:Connect", this);
-    MessageChannel.addListener(messageManagers, "Extension:Message", this);
-    MessageChannel.addListener(messageManagers, "Extension:Port:Disconnect", this);
-    MessageChannel.addListener(messageManagers, "Extension:Port:PostMessage", this);
-  },
-
-  receiveMessage({target, messageName, channelId, sender, recipient, data, responseType}) {
-    let extension = GlobalManager.extensionMap.get(sender.extensionId);
-    let receiverMM = this._getMessageManagerForRecipient(recipient);
-    if (!extension || !receiverMM) {
-      return Promise.reject({
-        result: MessageChannel.RESULT_NO_HANDLER,
-        message: "No matching message handler for the given recipient.",
-      });
-    }
-
-    if ((messageName == "Extension:Message" ||
-         messageName == "Extension:Connect") &&
-        Management.global.tabGetSender) {
-      // From ext-tabs.js, undefined on Android.
-      Management.global.tabGetSender(extension, target, sender);
-    }
-    return MessageChannel.sendMessage(receiverMM, messageName, data, {
-      sender,
-      recipient,
-      responseType,
-    });
-  },
-
-  /**
-   * @param {object} recipient An object that was passed to
-   *     `MessageChannel.sendMessage`.
-   * @returns {object|null} The message manager matching the recipient if found.
-   */
-  _getMessageManagerForRecipient(recipient) {
-    let {extensionId, tabId} = recipient;
-    // tabs.sendMessage / tabs.connect
-    if (tabId) {
-      // `tabId` being set implies that the tabs API is supported, so we don't
-      // need to check whether `TabManager` exists.
-      let tab = Management.global.TabManager.getTab(tabId, null, null);
-      return tab && tab.linkedBrowser.messageManager;
-    }
-
-    // runtime.sendMessage / runtime.connect
-    if (extensionId) {
-      // TODO(robwu): map the extensionId to the addon parent process's message
-      // manager when they run in a separate process.
-      let pipmm = Services.ppmm.getChildAt(0);
-      return pipmm;
-    }
-
-    // Note: No special handling for sendNativeMessage / connectNative because
-    // native messaging runs in the chrome process, so it never needs a proxy.
-    return null;
-  },
-};
-
-class BrowserDocshellFollower {
-  /**
-   * Follows the <browser> belonging to the `xulBrowser`'s current docshell.
-   *
-   * @param {XULElement} xulBrowser A <browser> tag.
-   * @param {function} onBrowserChange Called when the <browser> changes.
-   */
-  constructor(xulBrowser, onBrowserChange) {
-    this.xulBrowser = xulBrowser;
-    this.onBrowserChange = onBrowserChange;
-
-    xulBrowser.addEventListener("SwapDocShells", this);
-  }
-
-  destroy() {
-    this.xulBrowser.removeEventListener("SwapDocShells", this);
-    this.xulBrowser = null;
-  }
-
-  handleEvent({detail: otherBrowser}) {
-    this.xulBrowser.removeEventListener("SwapDocShells", this);
-    this.xulBrowser = otherBrowser;
-    this.xulBrowser.addEventListener("SwapDocShells", this);
-    this.onBrowserChange(otherBrowser);
-  }
-}
-
-class ProxyContext extends BaseContext {
-  constructor(envType, extension, params, xulBrowser, principal) {
-    super(envType, extension);
-
-    this.uri = NetUtil.newURI(params.url);
-
-    // This message manager is used by ParentAPIManager to send messages and to
-    // close the ProxyContext if the underlying message manager closes. This
-    // message manager object may change when `xulBrowser` swaps docshells, e.g.
-    // when a tab is moved to a different window.
-    this.currentMessageManager = xulBrowser.messageManager;
-    this._docShellTracker = new BrowserDocshellFollower(xulBrowser,
-        this.onBrowserChange.bind(this));
-
-    Object.defineProperty(this, "principal", {
-      value: principal, enumerable: true, configurable: true,
-    });
-
-    this.listenerProxies = new Map();
-
-    Management.emit("proxy-context-load", this);
-  }
-
-  get cloneScope() {
-    return this.sandbox;
-  }
-
-  onBrowserChange(browser) {
-    // Make sure that the message manager is set. Otherwise the ProxyContext may
-    // never be destroyed because the ParentAPIManager would fail to detect that
-    // the message manager is closed.
-    if (!browser.messageManager) {
-      throw new Error("BrowserDocshellFollower: The new browser has no message manager");
-    }
-
-    this.currentMessageManager = browser.messageManager;
-  }
-
-  shutdown() {
-    this.unload();
-  }
-
-  unload() {
-    if (this.unloaded) {
-      return;
-    }
-    this._docShellTracker.destroy();
-    super.unload();
-    Management.emit("proxy-context-unload", this);
-  }
-}
-
-defineLazyGetter(ProxyContext.prototype, "apiObj", function() {
-  let obj = {};
-  GlobalManager.injectInObject(this, false, obj);
-  return obj;
-});
-
-defineLazyGetter(ProxyContext.prototype, "sandbox", function() {
-  return Cu.Sandbox(this.principal);
-});
-
-// The parent ProxyContext of an ExtensionContext in ExtensionChild.jsm.
-class ExtensionChildProxyContext extends ProxyContext {
-  constructor(envType, extension, params, xulBrowser) {
-    super(envType, extension, params, xulBrowser, extension.principal);
-
-    this.viewType = params.viewType;
-    // WARNING: The xulBrowser may change when docShells are swapped, e.g. when
-    // the tab moves to a different window.
-    this.xulBrowser = xulBrowser;
-  }
-
-  // The window that contains this context. This may change due to moving tabs.
-  get xulWindow() {
-    return this.xulBrowser.ownerGlobal;
-  }
-
-  get windowId() {
-    if (!Management.global.WindowManager || this.viewType == "background") {
-      return;
-    }
-    // viewType popup or tab:
-    return Management.global.WindowManager.getId(this.xulWindow);
-  }
-
-  get tabId() {
-    if (!Management.global.TabManager) {
-      return;  // Not yet supported on Android.
-    }
-    let {gBrowser} = this.xulBrowser.ownerGlobal;
-    let tab = gBrowser && gBrowser.getTabForBrowser(this.xulBrowser);
-    return tab && Management.global.TabManager.getId(tab);
-  }
-
-  onBrowserChange(browser) {
-    super.onBrowserChange(browser);
-    this.xulBrowser = browser;
-  }
-
-  shutdown() {
-    Management.emit("page-shutdown", this);
-    super.shutdown();
-  }
-}
-
-function findPathInObject(obj, path, printErrors = true) {
-  for (let elt of path.split(".")) {
-    // If we get a null object before reaching the requested path
-    // (e.g. the API object is returned only on particular kind of contexts instead
-    // of based on WebExtensions permissions, like it happens for the devtools APIs),
-    // stop searching and return undefined.
-    // TODO(robwu): This should never be reached. If an API is not available for
-    // a context, it should be declared as such in the schema and enforced by
-    // `shouldInject`, for instance using the same logic that is used to opt-in
-    // to APIs in content scripts.
-    // If this check is kept, then there is a discrepancy between APIs depending
-    // on whether it is generated locally or remotely: Non-existing local APIs
-    // are excluded in `shouldInject` by this check, but remote APIs do not have
-    // this information and will therefore cause the schema API generator to
-    // create an API that proxies to a non-existing API implementation.
-    if (!obj || !(elt in obj)) {
-      if (printErrors) {
-        Cu.reportError(`WebExtension API ${path} not found (it may be unimplemented by Firefox).`);
-      }
-      return null;
-    }
-
-    obj = obj[elt];
-  }
-
-  return obj;
-}
-
-var ParentAPIManager = {
-  proxyContexts: new Map(),
-
-  init() {
-    Services.obs.addObserver(this, "message-manager-close", false);
-
-    Services.mm.addMessageListener("API:CreateProxyContext", this);
-    Services.mm.addMessageListener("API:CloseProxyContext", this, true);
-    Services.mm.addMessageListener("API:Call", this);
-    Services.mm.addMessageListener("API:AddListener", this);
-    Services.mm.addMessageListener("API:RemoveListener", this);
-  },
-
-  // "message-manager-close" observer.
-  observe(subject, topic, data) {
-    let mm = subject;
-    for (let [childId, context] of this.proxyContexts) {
-      if (context.currentMessageManager == mm) {
-        this.closeProxyContext(childId);
-      }
-    }
-  },
-
-  shutdownExtension(extensionId) {
-    for (let [childId, context] of this.proxyContexts) {
-      if (context.extension.id == extensionId) {
-        context.shutdown();
-        this.proxyContexts.delete(childId);
-      }
-    }
-  },
-
-  receiveMessage({name, data, target}) {
-    switch (name) {
-      case "API:CreateProxyContext":
-        this.createProxyContext(data, target);
-        break;
-
-      case "API:CloseProxyContext":
-        this.closeProxyContext(data.childId);
-        break;
-
-      case "API:Call":
-        this.call(data, target);
-        break;
-
-      case "API:AddListener":
-        this.addListener(data, target);
-        break;
-
-      case "API:RemoveListener":
-        this.removeListener(data);
-        break;
-    }
-  },
-
-  createProxyContext(data, target) {
-    let {envType, extensionId, childId, principal} = data;
-    if (this.proxyContexts.has(childId)) {
-      Cu.reportError("A WebExtension context with the given ID already exists!");
-      return;
-    }
-    let extension = GlobalManager.getExtension(extensionId);
-    if (!extension) {
-      Cu.reportError(`No WebExtension found with ID ${extensionId}`);
-      return;
-    }
-
-    let context;
-    if (envType == "addon_parent") {
-      // Privileged addon contexts can only be loaded in documents whose main
-      // frame is also the same addon.
-      if (principal.URI.prePath != extension.baseURI.prePath ||
-          !target.contentPrincipal.subsumes(principal)) {
-        Cu.reportError(`Refused to create privileged WebExtension context for ${principal.URI.spec}`);
-        return;
-      }
-      context = new ExtensionChildProxyContext(envType, extension, data, target);
-    } else if (envType == "content_parent") {
-      context = new ProxyContext(envType, extension, data, target, principal);
-    } else {
-      Cu.reportError(`Invalid WebExtension context envType: ${envType}`);
-      return;
-    }
-    this.proxyContexts.set(childId, context);
-  },
-
-  closeProxyContext(childId) {
-    let context = this.proxyContexts.get(childId);
-    if (!context) {
-      return;
-    }
-    context.unload();
-    this.proxyContexts.delete(childId);
-  },
-
-  call(data, target) {
-    let context = this.proxyContexts.get(data.childId);
-    if (!context) {
-      Cu.reportError("WebExtension context not found!");
-      return;
-    }
-    if (context.currentMessageManager !== target.messageManager) {
-      Cu.reportError("WebExtension warning: Message manager unexpectedly changed");
-    }
-
-    function callback(...cbArgs) {
-      let lastError = context.lastError;
-
-      context.currentMessageManager.sendAsyncMessage("API:CallResult", {
-        childId: data.childId,
-        callId: data.callId,
-        args: cbArgs,
-        lastError: lastError ? lastError.message : null,
-      });
-    }
-
-    let args = data.args;
-    args = Cu.cloneInto(args, context.sandbox);
-    if (data.callId) {
-      args = args.concat(callback);
-    }
-    try {
-      findPathInObject(context.apiObj, data.path)(...args);
-    } catch (e) {
-      let msg = e.message || "API failed";
-      context.currentMessageManager.sendAsyncMessage("API:CallResult", {
-        childId: data.childId,
-        callId: data.callId,
-        lastError: msg,
-      });
-    }
-  },
-
-  addListener(data, target) {
-    let context = this.proxyContexts.get(data.childId);
-    if (!context) {
-      Cu.reportError("WebExtension context not found!");
-      return;
-    }
-    if (context.currentMessageManager !== target.messageManager) {
-      Cu.reportError("WebExtension warning: Message manager unexpectedly changed");
-    }
-
-    function listener(...listenerArgs) {
-      context.currentMessageManager.sendAsyncMessage("API:RunListener", {
-        childId: data.childId,
-        path: data.path,
-        args: listenerArgs,
-      });
-    }
-
-    context.listenerProxies.set(data.path, listener);
-
-    let args = Cu.cloneInto(data.args, context.sandbox);
-    findPathInObject(context.apiObj, data.path).addListener(listener, ...args);
-  },
-
-  removeListener(data) {
-    let context = this.proxyContexts.get(data.childId);
-    if (!context) {
-      Cu.reportError("WebExtension context not found!");
-    }
-    let listener = context.listenerProxies.get(data.path);
-    findPathInObject(context.apiObj, data.path).removeListener(listener);
-  },
-};
-
-ParentAPIManager.init();
 
 // All moz-extension URIs use a machine-specific UUID rather than the
 // extension's own ID in the host component. This makes it more
@@ -668,91 +210,7 @@ var UninstallObserver = {
   },
 };
 
-// Responsible for loading extension APIs into the right globals.
-GlobalManager = {
-  // Map[extension ID -> Extension]. Determines which extension is
-  // responsible for content under a particular extension ID.
-  extensionMap: new Map(),
-  initialized: false,
-
-  init(extension) {
-    if (this.extensionMap.size == 0) {
-      UninstallObserver.init();
-      ProxyMessenger.init();
-      Management.on("extension-browser-inserted", this._onExtensionBrowser);
-      this.initialized = true;
-    }
-
-    this.extensionMap.set(extension.id, extension);
-  },
-
-  uninit(extension) {
-    this.extensionMap.delete(extension.id);
-
-    if (this.extensionMap.size == 0 && this.initialized) {
-      Management.off("extension-browser-inserted", this._onExtensionBrowser);
-      this.initialized = false;
-    }
-  },
-
-  _onExtensionBrowser(type, browser) {
-    // TODO(robwu): Move this logic inside a frame script.
-    let global = browser.docShell
-      .QueryInterface(Ci.nsIInterfaceRequestor)
-      .getInterface(Ci.nsIContentFrameMessageManager);
-    ExtensionContent.init(global);
-    /* eslint-disable mozilla/balanced-listeners */
-    global.addEventListener("unload", function() {
-      ExtensionContent.uninit(this);
-    });
-    /* eslint-enable mozilla/balanced-listeners */
-  },
-
-  getExtension(extensionId) {
-    return this.extensionMap.get(extensionId);
-  },
-
-  injectInObject(context, isChromeCompat, dest) {
-    let apis = {
-      extensionTypes: {},
-    };
-    Management.generateAPIs(context, apis);
-    SchemaAPIManager.generateAPIs(context, context.extension.apis, apis);
-
-    // For testing only.
-    context._unwrappedAPIs = apis;
-
-    let schemaWrapper = {
-      isChromeCompat,
-
-      get principal() {
-        return context.principal;
-      },
-
-      get cloneScope() {
-        return context.cloneScope;
-      },
-
-      hasPermission(permission) {
-        return context.extension.hasPermission(permission);
-      },
-
-      shouldInject(namespace, name, allowedContexts) {
-        // Do not generate content script APIs, unless explicitly allowed.
-        if (context.envType === "content_parent" && !allowedContexts.includes("content")) {
-          return false;
-        }
-        return findPathInObject(apis, namespace, false) !== null;
-      },
-
-      getImplementation(namespace, name) {
-        let pathObj = findPathInObject(apis, namespace);
-        return new LocalAPIImplementation(pathObj, name, context);
-      },
-    };
-    Schemas.inject(dest, schemaWrapper);
-  },
-};
+UninstallObserver.init();
 
 // Represents the data contained in an extension, contained either
 // in a directory or a zip file, which may or may not be installed.
@@ -843,15 +301,16 @@ this.ExtensionData = class {
 
       // FIXME: We need a way to do this without main thread IO.
 
-      this.rootURI.QueryInterface(Ci.nsIJARURI);
+      let uri = this.rootURI.QueryInterface(Ci.nsIJARURI);
 
-      let file = this.rootURI.JARFile.QueryInterface(Ci.nsIFileURL).file;
+      let file = uri.JARFile.QueryInterface(Ci.nsIFileURL).file;
       let zipReader = Cc["@mozilla.org/libjar/zip-reader;1"].createInstance(Ci.nsIZipReader);
       zipReader.open(file);
       try {
         let results = [];
 
         // Normalize the directory path.
+        path = `${uri.JAREntry}/${path}`;
         path = path.replace(/\/\/+/g, "/").replace(/^\/|\/$/g, "") + "/";
 
         // Escape pattern metacharacters.
@@ -889,7 +348,9 @@ this.ExtensionData = class {
 
       NetUtil.asyncFetch({uri, loadUsingSystemPrincipal: true}, (inputStream, status) => {
         if (!Components.isSuccessCode(status)) {
-          reject(new Error(status));
+          // Convert status code to a string
+          let e = Components.Exception("", status);
+          reject(new Error(`Error while loading '${uri}' (${e.name})`));
           return;
         }
         try {
@@ -904,6 +365,22 @@ this.ExtensionData = class {
         }
       });
     });
+  }
+
+  // This method should return a structured representation of any
+  // capabilities this extension has access to, as derived from the
+  // manifest.  The current implementation just returns the contents
+  // of the permissions attribute, if we add things like url_overrides,
+  // they should also be added here.
+  userPermissions() {
+    let result = {
+      hosts: this.whiteListedHosts.pat,
+      apis: [...this.apiNames],
+    };
+    const EXP_PATTERN = /^experiments\.\w+/;
+    result.permissions = [...this.permissions]
+      .filter(p => !result.hosts.includes(p) && !EXP_PATTERN.test(p));
+    return result;
   }
 
   // Reads the extension's |manifest.json| file, and stores its
@@ -1106,102 +583,21 @@ this.ExtensionData = class {
   }
 };
 
+let _browserUpdated = false;
 
-/**
- * A skeleton Extension-like object, used for testing, which installs an
- * add-on via the add-on manager when startup() is called, and
- * uninstalles it on shutdown().
- *
- * @param {string} id
- * @param {nsIFile} file
- * @param {nsIURI} rootURI
- * @param {string} installType
- */
-class MockExtension {
-  constructor(file, rootURI, installType) {
-    this.id = null;
-    this.file = file;
-    this.rootURI = rootURI;
-    this.installType = installType;
-    this.addon = null;
-
-    let promiseEvent = eventName => new Promise(resolve => {
-      let onstartup = (msg, extension) => {
-        if (this.addon && extension.id == this.addon.id) {
-          Management.off(eventName, onstartup);
-
-          this.id = extension.id;
-          this._extension = extension;
-          resolve(extension);
-        }
-      };
-      Management.on(eventName, onstartup);
-    });
-
-    this._extension = null;
-    this._extensionPromise = promiseEvent("startup");
-    this._readyPromise = promiseEvent("ready");
-  }
-
-  testMessage(...args) {
-    return this._extension.testMessage(...args);
-  }
-
-  on(...args) {
-    this._extensionPromise.then(extension => {
-      extension.on(...args);
-    });
-  }
-
-  off(...args) {
-    this._extensionPromise.then(extension => {
-      extension.off(...args);
-    });
-  }
-
-  startup() {
-    if (this.installType == "temporary") {
-      return AddonManager.installTemporaryAddon(this.file).then(addon => {
-        this.addon = addon;
-        return this._readyPromise;
-      });
-    } else if (this.installType == "permanent") {
-      return new Promise((resolve, reject) => {
-        AddonManager.getInstallForFile(this.file, install => {
-          let listener = {
-            onInstallFailed: reject,
-            onInstallEnded: (install, newAddon) => {
-              this.addon = newAddon;
-              resolve(this._readyPromise);
-            },
-          };
-
-          install.addListener(listener);
-          install.install();
-        });
-      });
-    }
-    throw new Error("installType must be one of: temporary, permanent");
-  }
-
-  shutdown() {
-    this.addon.uninstall();
-    return this.cleanupGeneratedFile();
-  }
-
-  cleanupGeneratedFile() {
-    flushJarCache(this.file);
-    return OS.File.remove(this.file.path);
-  }
-}
+const PROXIED_EVENTS = new Set(["test-harness-message"]);
 
 // We create one instance of this class per extension. |addonData|
 // comes directly from bootstrap.js when initializing.
 this.Extension = class extends ExtensionData {
-  constructor(addonData) {
+  constructor(addonData, startupReason) {
     super(addonData.resourceURI);
 
     this.uuid = UUIDMap.get(addonData.id);
+    this.instanceId = getUniqueId();
+
+    this.MESSAGE_EMIT_EVENT = `Extension:EmitEvent:${this.instanceId}`;
+    Services.ppmm.addMessageListener(this.MESSAGE_EMIT_EVENT, this);
 
     if (addonData.cleanupFile) {
       Services.obs.addObserver(this, "xpcom-shutdown", false);
@@ -1210,6 +606,14 @@ this.Extension = class extends ExtensionData {
     }
 
     this.addonData = addonData;
+    this.startupReason = startupReason;
+
+    this.remote = ExtensionManagement.useRemoteWebExtensions;
+
+    if (this.remote && processCount !== 1) {
+      throw new Error("Out-of-process WebExtensions are not supported with multiple child processes");
+    }
+
     this.id = addonData.id;
     this.baseURI = NetUtil.newURI(this.getURL("")).QueryInterface(Ci.nsIURL);
     this.principal = this.createPrincipal();
@@ -1228,161 +632,35 @@ this.Extension = class extends ExtensionData {
     this.emitter = new EventEmitter();
   }
 
-  /**
-   * This code is designed to make it easy to test a WebExtension
-   * without creating a bunch of files. Everything is contained in a
-   * single JSON blob.
-   *
-   * Properties:
-   *   "background": "<JS code>"
-   *     A script to be loaded as the background script.
-   *     The "background" section of the "manifest" property is overwritten
-   *     if this is provided.
-   *   "manifest": {...}
-   *     Contents of manifest.json
-   *   "files": {"filename1": "contents1", ...}
-   *     Data to be included as files. Can be referenced from the manifest.
-   *     If a manifest file is provided here, it takes precedence over
-   *     a generated one. Always use "/" as a directory separator.
-   *     Directories should appear here only implicitly (as a prefix
-   *     to file names)
-   *
-   * To make things easier, the value of "background" and "files"[] can
-   * be a function, which is converted to source that is run.
-   *
-   * The generated extension is stored in the system temporary directory,
-   * and an nsIFile object pointing to it is returned.
-   *
-   * @param {object} data
-   * @returns {nsIFile}
-   */
+  get parentMessageManager() {
+    if (this.remote) {
+      // We currently run extensions in the normal web content process. Since
+      // we currently only support remote extensions in single-child e10s,
+      // child 0 is always the current process, and child 1 is always the
+      // remote extension process.
+      return Services.ppmm.getChildAt(1);
+    }
+    return Services.ppmm.getChildAt(0);
+  }
+
+  static set browserUpdated(updated) {
+    _browserUpdated = updated;
+  }
+
+  static get browserUpdated() {
+    return _browserUpdated;
+  }
+
   static generateXPI(data) {
-    let manifest = data.manifest;
-    if (!manifest) {
-      manifest = {};
-    }
-
-    let files = data.files;
-    if (!files) {
-      files = {};
-    }
-
-    function provide(obj, keys, value, override = false) {
-      if (keys.length == 1) {
-        if (!(keys[0] in obj) || override) {
-          obj[keys[0]] = value;
-        }
-      } else {
-        if (!(keys[0] in obj)) {
-          obj[keys[0]] = {};
-        }
-        provide(obj[keys[0]], keys.slice(1), value, override);
-      }
-    }
-
-    provide(manifest, ["name"], "Generated extension");
-    provide(manifest, ["manifest_version"], 2);
-    provide(manifest, ["version"], "1.0");
-
-    if (data.background) {
-      let bgScript = uuidGen.generateUUID().number + ".js";
-
-      provide(manifest, ["background", "scripts"], [bgScript], true);
-      files[bgScript] = data.background;
-    }
-
-    provide(files, ["manifest.json"], manifest);
-
-    return this.generateZipFile(files);
+    return ExtensionTestCommon.generateXPI(data);
   }
 
   static generateZipFile(files, baseName = "generated-extension.xpi") {
-    let ZipWriter = Components.Constructor("@mozilla.org/zipwriter;1", "nsIZipWriter");
-    let zipW = new ZipWriter();
-
-    let file = FileUtils.getFile("TmpD", [baseName]);
-    file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, FileUtils.PERMS_FILE);
-
-    const MODE_WRONLY = 0x02;
-    const MODE_TRUNCATE = 0x20;
-    zipW.open(file, MODE_WRONLY | MODE_TRUNCATE);
-
-    // Needs to be in microseconds for some reason.
-    let time = Date.now() * 1000;
-
-    function generateFile(filename) {
-      let components = filename.split("/");
-      let path = "";
-      for (let component of components.slice(0, -1)) {
-        path += component + "/";
-        if (!zipW.hasEntry(path)) {
-          zipW.addEntryDirectory(path, time, false);
-        }
-      }
-    }
-
-    for (let filename in files) {
-      let script = files[filename];
-      if (typeof(script) == "function") {
-        script = "(" + script.toString() + ")()";
-      } else if (instanceOf(script, "Object") || instanceOf(script, "Array")) {
-        script = JSON.stringify(script);
-      }
-
-      if (!instanceOf(script, "ArrayBuffer")) {
-        script = new TextEncoder("utf-8").encode(script).buffer;
-      }
-
-      let stream = Cc["@mozilla.org/io/arraybuffer-input-stream;1"].createInstance(Ci.nsIArrayBufferInputStream);
-      stream.setData(script, 0, script.byteLength);
-
-      generateFile(filename);
-      zipW.addEntryStream(filename, time, 0, stream, false);
-    }
-
-    zipW.close();
-
-    return file;
+    return ExtensionTestCommon.generateZipFile(files, baseName);
   }
 
-  /**
-   * Generates a new extension using |Extension.generateXPI|, and initializes a
-   * new |Extension| instance which will execute it.
-   *
-   * @param {object} data
-   * @returns {Extension}
-   */
   static generate(data) {
-    let file = this.generateXPI(data);
-
-    flushJarCache(file);
-    Services.ppmm.broadcastAsyncMessage("Extension:FlushJarCache", {path: file.path});
-
-    let fileURI = Services.io.newFileURI(file);
-    let jarURI = Services.io.newURI("jar:" + fileURI.spec + "!/", null, null);
-
-    // This may be "temporary" or "permanent".
-    if (data.useAddonManager) {
-      return new MockExtension(file, jarURI, data.useAddonManager);
-    }
-
-    let id;
-    if (data.manifest) {
-      if (data.manifest.applications && data.manifest.applications.gecko) {
-        id = data.manifest.applications.gecko.id;
-      } else if (data.manifest.browser_specific_settings && data.manifest.browser_specific_settings.gecko) {
-        id = data.manifest.browser_specific_settings.gecko.id;
-      }
-    }
-    if (!id) {
-      id = uuidGen.generateUUID().number;
-    }
-
-    return new Extension({
-      id,
-      resourceURI: jarURI,
-      cleanupFile: file,
-    });
+    return ExtensionTestCommon.generate(data);
   }
 
   on(hook, f) {
@@ -1393,12 +671,22 @@ this.Extension = class extends ExtensionData {
     return this.emitter.off(hook, f);
   }
 
-  emit(...args) {
-    return this.emitter.emit(...args);
+  emit(event, ...args) {
+    if (PROXIED_EVENTS.has(event)) {
+      Services.ppmm.broadcastAsyncMessage(this.MESSAGE_EMIT_EVENT, {event, args});
+    }
+
+    return this.emitter.emit(event, ...args);
+  }
+
+  receiveMessage({name, data}) {
+    if (name === this.MESSAGE_EMIT_EVENT) {
+      this.emitter.emit(data.event, ...data.args);
+    }
   }
 
   testMessage(...args) {
-    Management.emit("test-message", this, ...args);
+    this.emit("test-harness-message", ...args);
   }
 
   createPrincipal(uri = this.baseURI) {
@@ -1440,6 +728,7 @@ this.Extension = class extends ExtensionData {
     return {
       id: this.id,
       uuid: this.uuid,
+      instanceId: this.instanceId,
       manifest: this.manifest,
       resourceURL: this.addonData.resourceURI.spec,
       baseURL: this.baseURI.spec,
@@ -1454,15 +743,35 @@ this.Extension = class extends ExtensionData {
 
   broadcast(msg, data) {
     return new Promise(resolve => {
-      let count = Services.ppmm.childCount;
-      Services.ppmm.addMessageListener(msg + "Complete", function listener() {
-        count--;
-        if (count == 0) {
-          Services.ppmm.removeMessageListener(msg + "Complete", listener);
+      let {ppmm} = Services;
+      let children = new Set();
+      for (let i = 0; i < ppmm.childCount; i++) {
+        children.add(ppmm.getChildAt(i));
+      }
+
+      let maybeResolve;
+      function listener(data) {
+        children.delete(data.target);
+        maybeResolve();
+      }
+      function observer(subject, topic, data) {
+        children.delete(subject);
+        maybeResolve();
+      }
+
+      maybeResolve = () => {
+        if (children.size === 0) {
+          ppmm.removeMessageListener(msg + "Complete", listener);
+          Services.obs.removeObserver(observer, "message-manager-close");
+          Services.obs.removeObserver(observer, "message-manager-disconnect");
           resolve();
         }
-      });
-      Services.ppmm.broadcastAsyncMessage(msg, data);
+      };
+      ppmm.addMessageListener(msg + "Complete", listener);
+      Services.obs.addObserver(observer, "message-manager-close", false);
+      Services.obs.addObserver(observer, "message-manager-disconnect", false);
+
+      ppmm.broadcastAsyncMessage(msg, data);
     });
   }
 
@@ -1596,6 +905,9 @@ this.Extension = class extends ExtensionData {
 
   shutdown() {
     this.hasShutdown = true;
+
+    Services.ppmm.removeMessageListener(this.MESSAGE_EMIT_EVENT, this);
+
     if (!this.manifest) {
       ExtensionManagement.shutdownExtension(this.uuid);
 

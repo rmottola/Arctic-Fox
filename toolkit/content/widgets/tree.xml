@@ -88,11 +88,7 @@
                 onget="return this.view; /*.QueryInterface(Components.interfaces.nsIXULTreeBuilder)*/"
                 readonly="true"/>
       <field name="pageUpOrDownMovesSelection">
-        {
-          let { AppConstants } =
-              Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
-          AppConstants.platform != "macosx";
-        }
+        !/Mac/.test(navigator.platform)
       </field>
       <property name="keepCurrentInView"
                 onget="return (this.getAttribute('keepcurrentinview') == 'true');"
@@ -147,13 +143,13 @@
             for (var col = this.columns.getFirstColumn(); col; col = col.getNext())
               cols.push(col.element);
             for (i = 0; i < cols.length; ++i)
-              cols[i].setAttribute("ordinal", (i*2)+1);
+              cols[i].setAttribute("ordinal", (i * 2) + 1);
 
             // update the ordinal positions of splitters to even numbers, so that
             // they are in between columns
             var splitters = this.getElementsByTagName("splitter");
             for (i = 0; i < splitters.length; ++i)
-              splitters[i].setAttribute("ordinal", (i+1)*2);
+              splitters[i].setAttribute("ordinal", (i + 1) * 2);
           }
           this._columnsDirty = false;
         ]]></body>
@@ -669,9 +665,7 @@
             return true;
           }
 
-          let { AppConstants } =
-              Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
-          if (AppConstants.platform == "macosx") {
+          if (/Mac/.test(navigator.platform)) {
             // See if we can edit the cell.
             var row = this.currentIndex;
             if (this._cellSelType) {
@@ -844,7 +838,7 @@
               // If already opened, select the first child.
               // The getParentIndex test above ensures that the children
               // are already populated and ready.
-              if (cellSelType && !this.view.isSelectable(c , currentColumn)) {
+              if (cellSelType && !this.view.isSelectable(c, currentColumn)) {
                 let col = this._getNextColumn(c, false);
                 if (col) {
                   this.view.selection.currentColumn = col;
@@ -993,7 +987,7 @@
       <constructor><![CDATA[
         // Set resizeafter="farthest" on the splitters if nothing else has been
         // specified.
-        Array.forEach(this.getElementsByTagName("splitter"), function (splitter) {
+        Array.forEach(this.getElementsByTagName("splitter"), function(splitter) {
           if (!splitter.hasAttribute("resizeafter"))
             splitter.setAttribute("resizeafter", "farthest");
         });
@@ -1143,7 +1137,7 @@
           return;
         }
 
-        if (! view.selection.single) {
+        if (!view.selection.single) {
           var augment = this._isAccelPressed(event);
           if (event.shiftKey) {
             view.selection.rangedSelect(-1, cell.row, augment);
@@ -1413,11 +1407,9 @@
           if (event.target != event.originalTarget)
             return;
 
-          let { AppConstants } =
-              Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
           // On Windows multiple clicking on tree columns only cycles one time
           // every 2 clicks.
-          if (AppConstants.platform == "win" && event.detail % 2 == 0)
+          if (/Win/.test(navigator.platform) && event.detail % 2 == 0)
             return;
 
           var tree = this.parentNode.parentNode;

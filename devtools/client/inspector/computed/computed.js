@@ -4,8 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* globals StopIteration */
-
 "use strict";
 
 const ToolDefinitions = require("devtools/client/definitions").Tools;
@@ -19,14 +17,19 @@ const {PrefObserver, PREF_ORIG_SOURCES} = require("devtools/client/styleeditor/u
 const {createChild} = require("devtools/client/inspector/shared/utils");
 const {gDevTools} = require("devtools/client/framework/devtools");
 const {getCssProperties} = require("devtools/shared/fronts/css-properties");
-
-const overlays = require("devtools/client/inspector/shared/style-inspector-overlays");
+const {
+  VIEW_NODE_SELECTOR_TYPE,
+  VIEW_NODE_PROPERTY_TYPE,
+  VIEW_NODE_VALUE_TYPE,
+  VIEW_NODE_IMAGE_URL_TYPE,
+} = require("devtools/client/inspector/shared/node-types");
 const StyleInspectorMenu = require("devtools/client/inspector/shared/style-inspector-menu");
+const TooltipsOverlay = require("devtools/client/inspector/shared/tooltips-overlay");
 const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
-const {LayoutView} = require("devtools/client/inspector/layout/layout");
+const {BoxModelView} = require("devtools/client/inspector/components/box-model");
 const clipboardHelper = require("devtools/shared/platform/clipboard");
 
-const STYLE_INSPECTOR_PROPERTIES = "devtools-shared/locale/styleinspector.properties";
+const STYLE_INSPECTOR_PROPERTIES = "devtools/shared/locales/styleinspector.properties";
 const {LocalizationHelper} = require("devtools/shared/l10n");
 const STYLE_INSPECTOR_L10N = new LocalizationHelper(STYLE_INSPECTOR_PROPERTIES);
 
@@ -39,8 +42,8 @@ const HTML_NS = "http://www.w3.org/1999/xhtml";
  *
  * @param {Window} win
  *        Timeouts will be set on this window when appropriate.
- * @param {Generator} generator
- *        Will iterate this generator.
+ * @param {Array} array
+ *        The array of items to process.
  * @param {Object} options
  *        Options for the update process:
  *          onItem {function} Will be called with the value of each iteration.
@@ -50,9 +53,11 @@ const HTML_NS = "http://www.w3.org/1999/xhtml";
  *          onCancel {function} Will be called if the process is canceled.
  *          threshold {int} How long to process before yielding, in ms.
  */
-function UpdateProcess(win, generator, options) {
+function UpdateProcess(win, array, options) {
   this.win = win;
-  this.iter = _Iterator(generator);
+  this.index = 0;
+  this.array = array;
+
   this.onItem = options.onItem || function () {};
   this.onBatch = options.onBatch || function () {};
   this.onDone = options.onDone || function () {};
@@ -63,6 +68,11 @@ function UpdateProcess(win, generator, options) {
 }
 
 UpdateProcess.prototype = {
+  /**
+   * Error thrown when the array of items to process is empty.
+   */
+  ERROR_ITERATION_DONE: new Error("UpdateProcess iteration done"),
+
   /**
    * Schedule a new batch on the main loop.
    */
@@ -92,7 +102,7 @@ UpdateProcess.prototype = {
       this._runBatch();
       this.schedule();
     } catch (e) {
-      if (e instanceof StopIteration) {
+      if (e === this.ERROR_ITERATION_DONE) {
         this.onBatch();
         this.onDone();
         return;
@@ -105,15 +115,25 @@ UpdateProcess.prototype = {
   _runBatch: function () {
     let time = Date.now();
     while (!this.canceled) {
-      // Continue until iter.next() throws...
-      let next = this.iter.next();
-      this.onItem(next[1]);
+      let next = this._next();
+      this.onItem(next);
       if ((Date.now() - time) > this.threshold) {
         this.onBatch();
         return;
       }
     }
-  }
+  },
+
+  /**
+   * Returns the item at the current index and increases the index.
+   * If all items have already been processed, will throw ERROR_ITERATION_DONE.
+   */
+  _next: function () {
+    if (this.index < this.array.length) {
+      return this.array[this.index++];
+    }
+    throw this.ERROR_ITERATION_DONE;
+  },
 };
 
 /**
@@ -131,6 +151,7 @@ UpdateProcess.prototype = {
  */
 function CssComputedView(inspector, document, pageStyle) {
   this.inspector = inspector;
+  this.highlighters = inspector.highlighters;
   this.styleDocument = document;
   this.styleWindow = this.styleDocument.defaultView;
   this.pageStyle = pageStyle;
@@ -138,7 +159,7 @@ function CssComputedView(inspector, document, pageStyle) {
   this.propertyViews = [];
 
   let cssProperties = getCssProperties(inspector.toolbox);
-  this._outputParser = new OutputParser(document, cssProperties.supportsType);
+  this._outputParser = new OutputParser(document, cssProperties);
 
   // Create bound methods.
   this.focusWindow = this.focusWindow.bind(this);
@@ -148,8 +169,6 @@ function CssComputedView(inspector, document, pageStyle) {
   this._onFilterStyles = this._onFilterStyles.bind(this);
   this._onClearSearch = this._onClearSearch.bind(this);
   this._onIncludeBrowserStyles = this._onIncludeBrowserStyles.bind(this);
-  this._onFilterTextboxContextMenu =
-    this._onFilterTextboxContextMenu.bind(this);
 
   let doc = this.styleDocument;
   this.element = doc.getElementById("propertyContainer");
@@ -167,8 +186,7 @@ function CssComputedView(inspector, document, pageStyle) {
   this.element.addEventListener("copy", this._onCopy);
   this.element.addEventListener("contextmenu", this._onContextMenu);
   this.searchField.addEventListener("input", this._onFilterStyles);
-  this.searchField.addEventListener("contextmenu",
-                                    this._onFilterTextboxContextMenu);
+  this.searchField.addEventListener("contextmenu", this.inspector.onTextBoxContextMenu);
   this.searchClearButton.addEventListener("click", this._onClearSearch);
   this.includeBrowserStylesCheckbox.addEventListener("input",
     this._onIncludeBrowserStyles);
@@ -195,11 +213,10 @@ function CssComputedView(inspector, document, pageStyle) {
   this._contextmenu = new StyleInspectorMenu(this, { isRuleView: false });
 
   // Add the tooltips and highlightersoverlay
-  this.tooltips = new overlays.TooltipsOverlay(this);
+  this.tooltips = new TooltipsOverlay(this);
   this.tooltips.addToView();
 
-  this.highlighters = new overlays.HighlightersOverlay(this);
-  this.highlighters.addToView();
+  this.highlighters.addToView(this);
 }
 
 /**
@@ -289,7 +306,7 @@ CssComputedView.prototype = {
    *        The node which we want information about
    * @return {Object} The type information object contains the following props:
    * - type {String} One of the VIEW_NODE_XXX_TYPE const in
-   *   style-inspector-overlays
+   *   client/inspector/shared/node-types
    * - value {Object} Depends on the type of the node
    * returns null if the node isn't anything we care about
    */
@@ -312,7 +329,7 @@ CssComputedView.prototype = {
         }
       }
       return {
-        type: overlays.VIEW_NODE_SELECTOR_TYPE,
+        type: VIEW_NODE_SELECTOR_TYPE,
         value: selectorText.trim()
       };
     }
@@ -359,12 +376,12 @@ CssComputedView.prototype = {
 
     // Get the type
     if (classes.contains("property-name")) {
-      type = overlays.VIEW_NODE_PROPERTY_TYPE;
+      type = VIEW_NODE_PROPERTY_TYPE;
     } else if (classes.contains("property-value") ||
                classes.contains("other-property-value")) {
-      type = overlays.VIEW_NODE_VALUE_TYPE;
+      type = VIEW_NODE_VALUE_TYPE;
     } else if (isHref) {
-      type = overlays.VIEW_NODE_IMAGE_URL_TYPE;
+      type = VIEW_NODE_IMAGE_URL_TYPE;
       value.url = node.href;
     } else {
       return null;
@@ -547,19 +564,6 @@ CssComputedView.prototype = {
   },
 
   /**
-   * Context menu handler for filter style search box.
-   */
-  _onFilterTextboxContextMenu: function (event) {
-    try {
-      this.styleDocument.defaultView.focus();
-      let contextmenu = this.inspector.toolbox.textboxContextMenuPopup;
-      contextmenu.openPopupAtScreen(event.screenX, event.screenY, true);
-    } catch (e) {
-      console.error(e);
-    }
-  },
-
-  /**
    * Called when the user clicks on the clear button in the filter style search
    * box. Returns true if the search box is cleared and false otherwise.
    */
@@ -654,8 +658,7 @@ CssComputedView.prototype = {
    * Focus the window on mousedown.
    */
   focusWindow: function () {
-    let win = this.styleDocument.defaultView;
-    win.focus();
+    this.styleWindow.focus();
   },
 
   /**
@@ -692,7 +695,7 @@ CssComputedView.prototype = {
    */
   copySelection: function () {
     try {
-      let win = this.styleDocument.defaultView;
+      let win = this.styleWindow;
       let text = win.getSelection().toString().trim();
 
       // Tidy up block headings by moving CSS property names and their
@@ -749,7 +752,7 @@ CssComputedView.prototype = {
     }
 
     this.tooltips.destroy();
-    this.highlighters.destroy();
+    this.highlighters.removeFromView(this);
 
     // Remove bound listeners
     this.styleDocument.removeEventListener("mousedown", this.focusWindow);
@@ -758,7 +761,7 @@ CssComputedView.prototype = {
     this.element.removeEventListener("contextmenu", this._onContextMenu);
     this.searchField.removeEventListener("input", this._onFilterStyles);
     this.searchField.removeEventListener("contextmenu",
-                                         this._onFilterTextboxContextMenu);
+      this.inspector.onTextBoxContextMenu);
     this.searchClearButton.removeEventListener("click", this._onClearSearch);
     this.includeBrowserStylesCheckbox.removeEventListener("input",
       this._onIncludeBrowserStyles);
@@ -777,6 +780,7 @@ CssComputedView.prototype = {
     this.propertyViews = null;
 
     this.inspector = null;
+    this.highlighters = null;
     this.styleDocument = null;
     this.styleWindow = null;
 
@@ -941,6 +945,9 @@ PropertyView.prototype = {
     });
     this.shortcuts.on("F1", (name, event) => {
       this.mdnLinkClick(event);
+      // Prevent opening the options panel
+      event.preventDefault();
+      event.stopPropagation();
     });
     this.shortcuts.on("Return", (name, event) => this.onMatchedToggle(event));
     this.shortcuts.on("Space", (name, event) => this.onMatchedToggle(event));
@@ -961,6 +968,9 @@ PropertyView.prototype = {
     // Reset its tabindex attribute otherwise, if an ellipsis is applied
     // it will be reachable via TABing
     this.nameNode.setAttribute("tabindex", "");
+    // Avoid english text (css properties) from being altered
+    // by RTL mode
+    this.nameNode.setAttribute("dir", "ltr");
     this.nameNode.textContent = this.nameNode.title = this.name;
     // Make it hand over the focus to the container
     this.onFocus = () => this.element.focus();
@@ -1169,8 +1179,6 @@ PropertyView.prototype = {
       let browserWin = inspector.target.tab.ownerDocument.defaultView;
       browserWin.openUILinkIn(this.link, "tab");
     }
-    event.preventDefault();
-    event.stopPropagation();
   },
 
   /**
@@ -1394,7 +1402,7 @@ function ComputedViewTool(inspector, window) {
 
   this.computedView = new CssComputedView(this.inspector, this.document,
     this.inspector.pageStyle);
-  this.layoutView = new LayoutView(this.inspector, this.document);
+  this.boxModelView = new BoxModelView(this.inspector, this.document);
 
   this.onSelected = this.onSelected.bind(this);
   this.refresh = this.refresh.bind(this);
@@ -1503,9 +1511,9 @@ ComputedViewTool.prototype = {
     }
 
     this.computedView.destroy();
-    this.layoutView.destroy();
+    this.boxModelView.destroy();
 
-    this.computedView = this.layoutView = this.document = this.inspector = null;
+    this.computedView = this.boxModelView = this.document = this.inspector = null;
   }
 };
 

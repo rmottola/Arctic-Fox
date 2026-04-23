@@ -374,7 +374,7 @@ var BookmarkPropertiesPanel = {
       case "resize":
         for (let [id, oldHeight] of elementsHeight) {
           let newHeight = document.getElementById(id).boxObject.height;
-          this._height += - oldHeight + newHeight;
+          this._height += -oldHeight + newHeight;
           elementsHeight.set(id, newHeight);
         }
         break;
@@ -538,7 +538,7 @@ var BookmarkPropertiesPanel = {
       childTransactions.push(setLoadTxn);
     }
 
-    //XXX TODO: this should be in a transaction!
+    // XXX TODO: this should be in a transaction!
     if (this._charSet && !PrivateBrowsingUtils.isWindowPrivate(window))
       PlacesUtils.setCharsetForURI(this._uri, this._charSet);
 
@@ -637,12 +637,6 @@ var BookmarkPropertiesPanel = {
   _promiseNewItem: Task.async(function* () {
     if (!PlacesUIUtils.useAsyncTransactions)
       return this._createNewItem();
-
-    let txnFunc =
-      { [BOOKMARK_FOLDER]: PlacesTransactions.NewFolder,
-        [LIVEMARK_CONTAINER]: PlacesTransactions.NewLivemark,
-        [BOOKMARK_ITEM]: PlacesTransactions.NewBookmark
-      }[this._itemType];
 
     let [containerId, index] = this._getInsertionPointDetails();
     let parentGuid = yield PlacesUtils.promiseItemGuid(containerId);

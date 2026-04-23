@@ -270,7 +270,10 @@ nsTimerEvent::DeleteAllocatorIfNeeded()
 NS_IMETHODIMP
 nsTimerEvent::Run()
 {
-  MOZ_ASSERT(mTimer);
+  if (!mTimer) {
+    MOZ_ASSERT(false);
+    return NS_OK;
+  }
 
   if (mGeneration != mTimer->GetGeneration()) {
     return NS_OK;
@@ -698,7 +701,7 @@ TimerThread::PostTimerEvent(already_AddRefed<nsTimerImpl> aTimerRef)
   (timer->GetTracedTask()).SetTLSTraceInfo();
 #endif
 
-  nsIEventTarget* target = timer->mEventTarget;
+  nsCOMPtr<nsIEventTarget> target = timer->mEventTarget;
   event->SetTimer(timer.forget());
 
   nsresult rv;

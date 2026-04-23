@@ -8,10 +8,6 @@
                   name="browser.search.hiddenOneOffs"
                   type="unichar"/>
 
-      <preference id="browser.search.redirectWindowsSearch"
-                  name="browser.search.redirectWindowsSearch"
-                  type="bool"/>
-
     </preferences>
 
     <script type="application/javascript"
@@ -37,10 +33,6 @@
                 label="&provideSearchSuggestions.label;"
                 accesskey="&provideSearchSuggestions.accesskey;"
                 preference="browser.search.suggest.enabled"/>
-      <checkbox id="redirectSearchCheckbox"
-                label="&redirectWindowsSearch.label;"
-                accesskey="&redirectWindowsSearch.accesskey;"
-                preference="browser.search.redirectWindowsSearch"/>
     </groupbox>
 
     <groupbox id="oneClickSearchProvidersGroup" data-category="paneSearch">

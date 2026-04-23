@@ -3271,8 +3271,6 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleContent
     mResets[aIndex].mValue = aValue;
   }
 
-  nsStyleCoord  mMarkerOffset;  // [reset] coord, auto
-
 protected:
   nsTArray<nsStyleContentData> mContents;
   nsTArray<nsStyleCounterData> mIncrements;

@@ -36,6 +36,7 @@ EXTRA_JS_MODULES += [
     'openLocationLastURL.jsm',
     'PageMenu.jsm',
     'PanelFrame.jsm',
+    'PermissionUI.jsm',
     'PluginContent.jsm',
     'ProcessHangMonitor.jsm',
     'ReaderParent.jsm',
@@ -43,7 +44,6 @@ EXTRA_JS_MODULES += [
     'RemotePrompt.jsm',
     'Sanitizer.jsm',
     'SitePermissions.jsm',
-    'TabGroupsMigrator.jsm',
     'TransientPrefs.jsm',
     'webrtcUI.jsm',
 ]

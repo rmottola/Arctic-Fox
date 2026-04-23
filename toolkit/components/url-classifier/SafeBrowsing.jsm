@@ -27,8 +27,6 @@ function log(...stuff) {
   dump(Services.urlFormatter.trimSensitiveURLs(msg) + "\n");
 }
 
-// Skip all the ones containining "test", because we never need to ask for
-// updates for them.
 function getLists(prefName) {
   log("getLists: " + prefName);
   let pref = null;
@@ -42,7 +40,6 @@ function getLists(prefName) {
     return [];
   }
   return pref.split(",")
-    .filter(function(value) { return value.indexOf("test-") == -1; })
     .map(function(value) { return value.trim(); });
 }
 
@@ -64,9 +61,9 @@ this.SafeBrowsing = {
       return;
     }
 
-    Services.prefs.addObserver("browser.safebrowsing", this.readPrefs.bind(this), false);
-    Services.prefs.addObserver("privacy.trackingprotection", this.readPrefs.bind(this), false);
-    Services.prefs.addObserver("urlclassifier", this.readPrefs.bind(this), false);
+    Services.prefs.addObserver("browser.safebrowsing", this, false);
+    Services.prefs.addObserver("privacy.trackingprotection", this, false);
+    Services.prefs.addObserver("urlclassifier", this, false);
 
     this.readPrefs();
     this.addMozEntries();
@@ -168,6 +165,13 @@ this.SafeBrowsing = {
     return reportUrl;
   },
 
+  observe: function(aSubject, aTopic, aData) {
+    // skip nextupdatetime and lastupdatetime
+    if (aData.indexOf("lastupdatetime") >= 0 || aData.indexOf("nextupdatetime") >= 0) {
+      return;
+    }
+    this.readPrefs();
+  },
 
   readPrefs: function() {
     log("reading prefs");

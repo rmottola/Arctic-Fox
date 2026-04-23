@@ -374,6 +374,7 @@ ImageTestCase CorruptTestCase();
 ImageTestCase CorruptBMPWithTruncatedHeader();
 ImageTestCase CorruptICOWithBadBMPWidthTestCase();
 ImageTestCase CorruptICOWithBadBMPHeightTestCase();
+ImageTestCase CorruptICOWithBadBppTestCase();
 
 ImageTestCase TransparentPNGTestCase();
 ImageTestCase TransparentGIFTestCase();
@@ -392,6 +393,8 @@ ImageTestCase DownscaledBMPTestCase();
 ImageTestCase DownscaledICOTestCase();
 ImageTestCase DownscaledIconTestCase();
 ImageTestCase DownscaledTransparentICOWithANDMaskTestCase();
+
+ImageTestCase TruncatedSmallGIFTestCase();
 
 } // namespace image
 } // namespace mozilla

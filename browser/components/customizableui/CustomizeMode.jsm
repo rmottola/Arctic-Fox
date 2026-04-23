@@ -42,7 +42,6 @@ let gDebug;
 XPCOMUtils.defineLazyGetter(this, "log", () => {
   let scope = {};
   Cu.import("resource://gre/modules/Console.jsm", scope);
-  let ConsoleAPI = scope.ConsoleAPI;
   try {
     gDebug = Services.prefs.getBoolPref(kPrefCustomizationDebug);
   } catch (ex) {}
@@ -243,7 +242,6 @@ CustomizeMode.prototype = {
 
       let toolbarVisibilityBtn = document.getElementById(kToolbarVisibilityBtn);
       let togglableToolbars = window.getTogglableToolbars();
-      let bookmarksToolbar = document.getElementById("PersonalToolbar");
       if (togglableToolbars.length == 0) {
         toolbarVisibilityBtn.setAttribute("hidden", "true");
       } else {
@@ -424,7 +422,6 @@ CustomizeMode.prototype = {
 
     let window = this.window;
     let document = this.document;
-    let documentElement = document.documentElement;
 
     // Hide the palette before starting the transition for increased perf.
     this.visiblePalette.hidden = true;
@@ -801,7 +798,7 @@ CustomizeMode.prototype = {
     }
   },
 
-  //XXXunf Maybe this should use -moz-element instead of wrapping the node?
+  // XXXunf Maybe this should use -moz-element instead of wrapping the node?
   //       Would ensure no weird interactions/event handling from original node,
   //       and makes it possible to put this in a lazy-loaded iframe/real tab
   //       while still getting rid of the need for overlays.
@@ -834,12 +831,12 @@ CustomizeMode.prototype = {
             yield this.deferredUnwrapToolbarItem(paletteChild);
           this._stowedPalette.appendChild(unwrappedPaletteItem);
         } else if (provider == CustomizableUI.PROVIDER_API) {
-          //XXXunf Currently this doesn't destroy the (now unused) node. It would
+          // XXXunf Currently this doesn't destroy the (now unused) node. It would
           //       be good to do so, but we need to keep strong refs to it in
           //       CustomizableUI (can't iterate of WeakMaps), and there's the
           //       question of what behavior wrappers should have if consumers
           //       keep hold of them.
-          //widget.destroyInstance(widgetNode);
+          // widget.destroyInstance(widgetNode);
         } else if (provider == CustomizableUI.PROVIDER_SPECIAL) {
           this.visiblePalette.removeChild(paletteChild);
         }
@@ -1022,7 +1019,7 @@ CustomizeMode.prototype = {
       let commandID = aWrapper.getAttribute("itemcommand");
       toolbarItem.setAttribute("command", commandID);
 
-      //XXX Bug 309953 - toolbarbuttons aren't in sync with their commands after customizing
+      // XXX Bug 309953 - toolbarbuttons aren't in sync with their commands after customizing
       let command = this.document.getElementById(commandID);
       if (command && command.hasAttribute("disabled")) {
         toolbarItem.setAttribute("disabled", command.getAttribute("disabled"));
@@ -1397,7 +1394,6 @@ CustomizeMode.prototype = {
 
       let footer = doc.getElementById("customization-lwtheme-menu-footer");
       let panel = footer.parentNode;
-      let themesInMyThemesSection = 0;
       let recommendedLabel = doc.getElementById("customization-lwtheme-menu-recommended");
       for (let theme of themes) {
         let tbb = buildToolbarButton(theme);
@@ -1409,7 +1405,6 @@ CustomizeMode.prototype = {
           this.parentNode.hidePopup();
         });
         panel.insertBefore(tbb, recommendedLabel);
-        themesInMyThemesSection++;
       }
 
       let lwthemePrefs = Services.prefs.getBranch("lightweightThemes.");
@@ -2267,7 +2262,7 @@ CustomizeMode.prototype = {
       while (placeholders-- > currentPlaceholderCount) {
         let placeholder = doc.createElement("toolbarpaletteitem");
         placeholder.classList.add(kPlaceholderClass);
-        //XXXjaws The toolbarbutton child here is only necessary to get
+        // XXXjaws The toolbarbutton child here is only necessary to get
         //  the styling right here.
         let placeholderChild = doc.createElement("toolbarbutton");
         placeholderChild.classList.add(kPlaceholderClass + "-child");

@@ -65,10 +65,12 @@ class TPSTestRunner(object):
         # Allow installing extensions dropped into the profile folder
         'extensions.autoDisableScopes': 10,
         'extensions.getAddons.get.url': 'http://127.0.0.1:4567/addons/api/%IDS%.xml',
+        # Our pretend addons server doesn't support metadata...
+        'extensions.getAddons.cache.enabled': False,
+        'extensions.install.requireSecureOrigin': False,
         'extensions.update.enabled': False,
         # Don't open a dialog to show available add-on updates
         'extensions.update.notifyUser': False,
-        'services.sync.addons.ignoreRepositoryChecking': True,
         'services.sync.firstSync': 'notReady',
         'services.sync.lastversion': '1.0',
         'toolkit.startup.max_resumed_crashes': -1,
@@ -201,6 +203,25 @@ class TPSTestRunner(object):
             for f in files:
                 zip.write(os.path.join(root, f), os.path.join(dir, f))
 
+    def handle_phase_failure(self, profiles):
+        for profile in profiles:
+            self.log('\nDumping sync log for profile %s\n' %  profiles[profile].profile)
+            for root, dirs, files in os.walk(os.path.join(profiles[profile].profile, 'weave', 'logs')):
+                for f in files:
+                    weavelog = os.path.join(profiles[profile].profile, 'weave', 'logs', f)
+                    if os.access(weavelog, os.F_OK):
+                        with open(weavelog, 'r') as fh:
+                            for line in fh:
+                                possible_time = line[0:13]
+                                if len(possible_time) == 13 and possible_time.isdigit():
+                                    time_ms = int(possible_time)
+                                    formatted = time.strftime('%Y-%m-%d %H:%M:%S',
+                                            time.localtime(time_ms / 1000))
+                                    self.log('%s.%03d %s' % (
+                                        formatted, time_ms % 1000, line[14:] ))
+                                else:
+                                    self.log(line)
+
     def run_single_test(self, testdir, testname):
         testpath = os.path.join(testdir, testname)
         self.log("Running test %s\n" % testname, True)
@@ -215,12 +236,7 @@ class TPSTestRunner(object):
         except:
             test = json.loads(testcontent[testcontent.find('{'):testcontent.find('}') + 1])
 
-        testcontent += 'var config = %s;\n' % json.dumps(self.config, indent=2)
-        testcontent += 'var seconds_since_epoch = %d;\n' % int(time.time())
-
-        tmpfile = TempFile(prefix='tps_test_')
-        tmpfile.write(testcontent)
-        tmpfile.close()
+        self.preferences['tps.seconds_since_epoch'] = int(time.time())
 
         # generate the profiles defined in the test, and a list of test phases
         profiles = {}
@@ -238,7 +254,7 @@ class TPSTestRunner(object):
                 phase,
                 profiles[profilename],
                 testname,
-                tmpfile.filename,
+                testpath,
                 self.logfile,
                 self.env,
                 self.firefoxRunner,
@@ -249,29 +265,30 @@ class TPSTestRunner(object):
         phaselist = sorted(phaselist, key=lambda phase: phase.phase)
 
         # run each phase in sequence, aborting at the first failure
+        failed = False
         for phase in phaselist:
             phase.run()
-
-            # if a failure occurred, dump the entire sync log into the test log
             if phase.status != 'PASS':
-                for profile in profiles:
-                    self.log('\nDumping sync log for profile %s\n' %  profiles[profile].profile)
-                    for root, dirs, files in os.walk(os.path.join(profiles[profile].profile, 'weave', 'logs')):
-                        for f in files:
-                            weavelog = os.path.join(profiles[profile].profile, 'weave', 'logs', f)
-                            if os.access(weavelog, os.F_OK):
-                                with open(weavelog, 'r') as fh:
-                                    for line in fh:
-                                        possible_time = line[0:13]
-                                        if len(possible_time) == 13 and possible_time.isdigit():
-                                            time_ms = int(possible_time)
-                                            formatted = time.strftime('%Y-%m-%d %H:%M:%S',
-                                                    time.localtime(time_ms / 1000))
-                                            self.log('%s.%03d %s' % (
-                                                formatted, time_ms % 1000, line[14:] ))
-                                        else:
-                                            self.log(line)
+                failed = True
                 break;
+
+        for profilename in profiles:
+            cleanup_phase = TPSTestPhase(
+                'cleanup-' + profilename,
+                profiles[profilename], testname,
+                testpath,
+                self.logfile,
+                self.env,
+                self.firefoxRunner,
+                self.log)
+
+            cleanup_phase.run()
+            if cleanup_phase.status != 'PASS':
+                failed = True
+                # Keep going to run the remaining cleanup phases.
+
+        if failed:
+            self.handle_phase_failure(profiles)
 
         # grep the log for FF and sync versions
         f = open(self.logfile)
@@ -329,8 +346,6 @@ class TPSTestRunner(object):
         self.log(logstr, True)
         for phase in phaselist:
             print "\t%s: %s" % (phase.phase, phase.status)
-            if phase.status == 'FAIL':
-                break
 
         return resultdata
 
@@ -348,6 +363,11 @@ class TPSTestRunner(object):
 
         if self.debug:
             self.preferences.update(self.debug_preferences)
+
+        if 'preferences' in self.config:
+            self.preferences.update(self.config['preferences'])
+
+        self.preferences['tps.config'] = json.dumps(self.config)
 
     def run_tests(self):
         # delete the logfile if it already exists

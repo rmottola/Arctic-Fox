@@ -90,6 +90,7 @@
     <command id="cmd_gestureRotateEnd" oncommand="gGestureSupport.rotateEnd()"/>
     <command id="Browser:OpenLocation" oncommand="openLocation();"/>
     <command id="Browser:RestoreLastSession" oncommand="restoreLastSession();" disabled="true"/>
+    <command id="Browser:OpenAboutContainers" oncommand="openPreferences('paneContainers');"/>
 
     <command id="Tools:Search" oncommand="BrowserSearch.webSearch();"/>
     <command id="Tools:Downloads" oncommand="BrowserDownloadsUI();"/>

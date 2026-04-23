@@ -535,7 +535,6 @@ this.PlacesUIUtils = {
 
         // Otherwise move the item.
         return new PlacesMoveItemTransaction(data.id, container, index);
-        break;
       case PlacesUtils.TYPE_X_MOZ_PLACE:
         if (copy || data.id == -1) { // Id is -1 if the place is not bookmarked.
           return this._getURIItemCopyTransaction(data, container, index);
@@ -543,7 +542,6 @@ this.PlacesUIUtils = {
 
         // Otherwise move the item.
         return new PlacesMoveItemTransaction(data.id, container, index);
-        break;
       case PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR:
         if (copy) {
           // There is no data in a separator, so copying it just amounts to
@@ -553,7 +551,6 @@ this.PlacesUIUtils = {
 
         // Otherwise move the item.
         return new PlacesMoveItemTransaction(data.id, container, index);
-        break;
       default:
         if (type == PlacesUtils.TYPE_X_MOZ_URL ||
             type == PlacesUtils.TYPE_UNICODE ||
@@ -593,7 +590,7 @@ this.PlacesUIUtils = {
 
     if ("itemGuid" in aData) {
       if (!this.PLACES_FLAVORS.includes(aData.type))
-        throw new Error (`itemGuid unexpectedly set on ${aData.type} data`);
+        throw new Error(`itemGuid unexpectedly set on ${aData.type} data`);
 
       let info = { guid: aData.itemGuid
                  , newParentGuid: aNewParentGuid
@@ -958,9 +955,9 @@ this.PlacesUIUtils = {
     if (where == "window") {
       // There is no browser window open, thus open a new one.
       var uriList = PlacesUtils.toISupportsString(urls.join("|"));
-      var args = Cc["@mozilla.org/supports-array;1"].
-                  createInstance(Ci.nsISupportsArray);
-      args.AppendElement(uriList);
+      var args = Cc["@mozilla.org/array;1"].
+                  createInstance(Ci.nsIMutableArray);
+      args.appendElement(uriList, /* weak =*/ false);
       browserWindow = Services.ww.openWindow(aWindow,
                                              "chrome://browser/content/browser.xul",
                                              null, "chrome,dialog=no,all", args);
@@ -1007,7 +1004,7 @@ this.PlacesUIUtils = {
     let window = aView.ownerWindow;
 
     let urlsToOpen = [];
-    for (var i=0; i < aNodes.length; i++) {
+    for (var i = 0; i < aNodes.length; i++) {
       // Skip over separators and folders.
       if (PlacesUtils.nodeIsURI(aNodes[i]))
         urlsToOpen.push({uri: aNodes[i].uri, isBookmark: PlacesUtils.nodeIsBookmark(aNodes[i])});
@@ -1043,7 +1040,7 @@ this.PlacesUIUtils = {
     this._openNodeIn(aNode, aWhere, window, aPrivate);
   },
 
-  _openNodeIn: function PUIU_openNodeIn(aNode, aWhere, aWindow, aPrivate=false) {
+  _openNodeIn: function PUIU_openNodeIn(aNode, aWhere, aWindow, aPrivate = false) {
     if (aNode && PlacesUtils.nodeIsURI(aNode) &&
         this.checkURLSecurity(aNode, aWindow)) {
       let isBookmark = PlacesUtils.nodeIsBookmark(aNode);
@@ -1728,8 +1725,7 @@ XPCOMUtils.defineLazyGetter(PlacesUIUtils, "ptm", function() {
       return new PlacesSetItemAnnotationTransaction(aItemId, annoObj);
     },
 
-    ////////////////////////////////////////////////////////////////////////////
-    //// nsITransactionManager forwarders.
+    // nsITransactionManager forwarders.
 
     beginBatch: () =>
       PlacesUtils.transactionManager.beginBatch(null),

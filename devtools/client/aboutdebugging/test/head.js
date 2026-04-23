@@ -3,7 +3,7 @@
 
 /* eslint-env browser */
 /* exported openAboutDebugging, changeAboutDebuggingHash, closeAboutDebugging,
-   installAddon, uninstallAddon, waitForMutation, assertHasTarget,
+   installAddon, uninstallAddon, waitForMutation, waitForContentMutation, assertHasTarget,
    getServiceWorkerList, getTabList, openPanel, waitForInitialAddonList,
    waitForServiceWorkerRegistered, unregisterServiceWorker,
    waitForDelayedStartupFinished, setupTestAboutDebuggingWebExtension,
@@ -32,7 +32,7 @@ function* openAboutDebugging(page, win) {
     url += "#" + page;
   }
 
-  let tab = yield addTab(url, win);
+  let tab = yield addTab(url, { window: win });
   let browser = tab.linkedBrowser;
   let document = browser.contentDocument;
 
@@ -64,49 +64,9 @@ function openPanel(document, panelId) {
     document.querySelector(".main-content"), {childList: true});
 }
 
-function closeAboutDebugging(tab, win) {
+function closeAboutDebugging(tab) {
   info("Closing about:debugging");
-  return removeTab(tab, win);
-}
-
-function addTab(url, win, backgroundTab = false) {
-  info("Adding tab: " + url);
-
-  return new Promise(done => {
-    let targetWindow = win || window;
-    let targetBrowser = targetWindow.gBrowser;
-
-    targetWindow.focus();
-    let tab = targetBrowser.addTab(url);
-    if (!backgroundTab) {
-      targetBrowser.selectedTab = tab;
-    }
-    let linkedBrowser = tab.linkedBrowser;
-
-    linkedBrowser.addEventListener("load", function onLoad() {
-      linkedBrowser.removeEventListener("load", onLoad, true);
-      info("Tab added and finished loading: " + url);
-      done(tab);
-    }, true);
-  });
-}
-
-function removeTab(tab, win) {
-  info("Removing tab.");
-
-  return new Promise(done => {
-    let targetWindow = win || window;
-    let targetBrowser = targetWindow.gBrowser;
-    let tabContainer = targetBrowser.tabContainer;
-
-    tabContainer.addEventListener("TabClose", function onClose() {
-      tabContainer.removeEventListener("TabClose", onClose, false);
-      info("Tab removed and finished closing.");
-      done();
-    }, false);
-
-    targetBrowser.removeTab(tab);
-  });
+  return removeTab(tab);
 }
 
 function getSupportsFile(path) {
@@ -266,6 +226,22 @@ function waitForMutation(target, mutationOptions) {
       resolve();
     });
     observer.observe(target, mutationOptions);
+  });
+}
+
+/**
+ * Returns a promise that will resolve after receiving a mutation in the subtree of the
+ * provided target. Depending on the current React implementation, a text change might be
+ * observable as a childList mutation or a characterData mutation.
+ *
+ * @param {Node} target
+ * @return {Promise}
+ */
+function waitForContentMutation(target) {
+  return waitForMutation(target, {
+    characterData: true,
+    childList: true,
+    subtree: true
   });
 }
 

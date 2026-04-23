@@ -5,6 +5,7 @@ Cu.import("resource://services-sync/service.js");
 Cu.import("resource://services-sync/util.js");
 
 function run_test() {
+  validate_all_future_pings();
   let debug = [];
   let info  = [];
 
@@ -30,7 +31,7 @@ function run_test() {
   Service.sync();
   Service._locked = false;
 
-  do_check_true(debug[debug.length - 2].startsWith("Exception: Could not acquire lock. Label: \"service.js: login\"."));
+  do_check_true(debug[debug.length - 2].startsWith("Exception calling WrappedLock: Could not acquire lock. Label: \"service.js: login\"."));
   do_check_eq(info[info.length - 1], "Cannot start sync: already syncing?");
 }
 

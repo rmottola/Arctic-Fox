@@ -398,7 +398,7 @@ COMPILER ERROR
 
     MakeHashKey(mHashKey, mHttps ? NS_LITERAL_CSTRING("https") : NS_LITERAL_CSTRING("http"),
                 mOriginHost, mOriginPort, mPrivate);
-  } while (0);
+  } while (false);
 }
 
 // This is the asynchronous null transaction used to validate
@@ -542,6 +542,7 @@ public:
                                                   nullptr, nullptr,
                                                   nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                                                   nsIContentPolicy::TYPE_OTHER);
+    loadInfo->SetOriginAttributes(mCI->GetOriginAttributes());
 
     RefPtr<nsHttpChannel> chan = new nsHttpChannel();
     nsresult rv;

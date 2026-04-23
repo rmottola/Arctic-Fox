@@ -38,7 +38,6 @@ define(function (require, exports, module) {
           delim = (i == array.length - 1 ? "" : ", ");
 
           items.push(ItemRep({
-            key: i,
             object: value,
             // Hardcode tiny mode to avoid recursive handling.
             mode: "tiny",
@@ -46,7 +45,6 @@ define(function (require, exports, module) {
           }));
         } catch (exc) {
           items.push(ItemRep({
-            key: i,
             object: exc,
             mode: "tiny",
             delim: delim
@@ -57,7 +55,6 @@ define(function (require, exports, module) {
       if (array.length > max) {
         let objectLink = this.props.objectLink || DOM.span;
         items.push(Caption({
-          key: "more",
           object: objectLink({
             object: this.props.object
           }, (array.length - max) + " more…")
@@ -124,7 +121,7 @@ define(function (require, exports, module) {
 
       if (mode == "tiny") {
         let isEmpty = object.length === 0;
-        items = DOM.span({className: "length"}, isEmpty ? "" : object.length);
+        items = [DOM.span({className: "length"}, isEmpty ? "" : object.length)];
         brackets = needSpace(false);
       } else {
         let max = (mode == "short") ? 3 : 300;
@@ -139,13 +136,11 @@ define(function (require, exports, module) {
           className: "objectBox objectBox-array"},
           objectLink({
             className: "arrayLeftBracket",
-            role: "presentation",
             object: object
           }, brackets.left),
-          items,
+          ...items,
           objectLink({
             className: "arrayRightBracket",
-            role: "presentation",
             object: object
           }, brackets.right),
           DOM.span({

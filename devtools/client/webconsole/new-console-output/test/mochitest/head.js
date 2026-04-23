@@ -12,6 +12,10 @@ Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/devtools/client/framework/test/shared-head.js",
   this);
 
+var {Utils: WebConsoleUtils} = require("devtools/client/webconsole/utils");
+const WEBCONSOLE_STRINGS_URI = "devtools/client/locales/webconsole.properties";
+var WCUL10n = new WebConsoleUtils.L10n(WEBCONSOLE_STRINGS_URI);
+
 Services.prefs.setBoolPref("devtools.webconsole.new-frontend-enabled", true);
 registerCleanupFunction(function* () {
   Services.prefs.clearUserPref("devtools.webconsole.new-frontend-enabled");
@@ -52,16 +56,19 @@ var openNewTabAndConsole = Task.async(function* (url) {
 function waitForMessages({ hud, messages }) {
   return new Promise(resolve => {
     let numMatched = 0;
-    let receivedLog = hud.ui.on("new-messages", function messagesReceieved(e, newMessage) {
+    let receivedLog = hud.ui.on("new-messages", function messagesReceieved(e, newMessages) {
       for (let message of messages) {
         if (message.matched) {
           continue;
         }
 
-        if (newMessage.node.querySelector(".message-body").textContent == message.text) {
-          numMatched++;
-          message.matched = true;
-          info("Matched a message with text: " + message.text + ", still waiting for " + (messages.length - numMatched) + " messages");
+        for (let newMessage of newMessages) {
+          if (newMessage.node.querySelector(".message-body").textContent == message.text) {
+            numMatched++;
+            message.matched = true;
+            info("Matched a message with text: " + message.text + ", still waiting for " + (messages.length - numMatched) + " messages");
+            break;
+          }
         }
 
         if (numMatched === messages.length) {
@@ -91,7 +98,7 @@ function waitForMessages({ hud, messages }) {
 function* waitFor(condition, message = "waitFor", interval = 100, maxTries = 50) {
   return new Promise(resolve => {
     BrowserTestUtils.waitForCondition(condition, message, interval, maxTries)
-      .then(resolve(condition()));
+      .then(() => resolve(condition()));
   });
 }
 
@@ -106,9 +113,25 @@ function* waitFor(condition, message = "waitFor", interval = 100, maxTries = 50)
  *        The selector to use in finding the message.
  */
 function findMessage(hud, text, selector = ".message") {
+  const elements = findMessages(hud, text, selector);
+  return elements.pop();
+}
+
+/**
+ * Find multiple messages in the output.
+ *
+ * @param object hud
+ *        The web console.
+ * @param string text
+ *        A substring that can be found in the message.
+ * @param selector [optional]
+ *        The selector to use in finding the message.
+ */
+function findMessages(hud, text, selector = ".message") {
+  const messages = hud.ui.experimentalOutputNode.querySelectorAll(selector);
   const elements = Array.prototype.filter.call(
-    hud.ui.experimentalOutputNode.querySelectorAll(selector),
+    messages,
     (el) => el.textContent.includes(text)
   );
-  return elements.pop();
+  return elements;
 }

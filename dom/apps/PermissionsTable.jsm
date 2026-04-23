@@ -131,11 +131,6 @@ this.PermissionsTable =  { geolocation: {
                              privileged: ALLOW_ACTION,
                              certified: ALLOW_ACTION
                            },
-                           "browser:embedded-system-app": {
-                             app: DENY_ACTION,
-                             privileged: DENY_ACTION,
-                             certified: ALLOW_ACTION
-                           },
                            mobilenetwork: {
                              app: DENY_ACTION,
                              privileged: ALLOW_ACTION,
@@ -170,16 +165,6 @@ this.PermissionsTable =  { geolocation: {
                            permissions: {
                              app: DENY_ACTION,
                              privileged: DENY_ACTION,
-                             certified: ALLOW_ACTION
-                           },
-                           phonenumberservice: {
-                             app: DENY_ACTION,
-                             privileged: DENY_ACTION,
-                             certified: ALLOW_ACTION
-                           },
-                           fmradio: {
-                             app: DENY_ACTION,
-                             privileged: ALLOW_ACTION,
                              certified: ALLOW_ACTION
                            },
                            attention: {
@@ -219,11 +204,6 @@ this.PermissionsTable =  { geolocation: {
                              certified: ALLOW_ACTION
                            },
                            "networkstats-manage": {
-                             app: DENY_ACTION,
-                             privileged: DENY_ACTION,
-                             certified: ALLOW_ACTION
-                           },
-                           "resourcestats-manage": {
                              app: DENY_ACTION,
                              privileged: DENY_ACTION,
                              certified: ALLOW_ACTION

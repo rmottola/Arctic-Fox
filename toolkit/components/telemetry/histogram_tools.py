@@ -3,6 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import collections
+import itertools
 import json
 import math
 import os
@@ -257,17 +258,23 @@ associated with the histogram.  Returns None if no guarding is necessary."""
                 raise ValueError, "Histogram name '%s' doesn't confirm to '%s'" % (name, pattern)
 
     def check_expiration(self, name, definition):
-        expiration = definition.get('expires_in_version')
+        field = 'expires_in_version'
+        expiration = definition.get(field)
 
         if not expiration:
             return
+
+        # We forbid new probes from using "expires_in_version" : "default" field/value pair.
+        # Old ones that use this are added to the whitelist.
+        if expiration == "default" and name not in whitelists['expiry_default']:
+            raise ValueError, 'New histogram "%s" cannot have "default" %s value.' % (name, field)
 
         if re.match(r'^[1-9][0-9]*$', expiration):
             expiration = expiration + ".0a1"
         elif re.match(r'^[1-9][0-9]*\.0$', expiration):
             expiration = expiration + "a1"
 
-        definition['expires_in_version'] = expiration
+        definition[field] = expiration
 
     def check_label_values(self, name, definition):
         labels = definition.get('labels')
@@ -295,7 +302,8 @@ associated with the histogram.  Returns None if no guarding is necessary."""
     def check_whitelistable_fields(self, name, definition):
         # Use counters don't have any mechanism to add the fields checked here,
         # so skip the check for them.
-        if self._is_use_counter:
+        # We also don't need to run any of these checks on the server.
+        if self._is_use_counter or not self._strict_type_checks:
             return
 
         # In the pipeline we don't have whitelists available.
@@ -305,6 +313,9 @@ associated with the histogram.  Returns None if no guarding is necessary."""
         for field in ['alert_emails', 'bug_numbers']:
             if field not in definition and name not in whitelists[field]:
                 raise KeyError, 'New histogram "%s" must have a %s field.' % (name, field)
+            if field in definition and name in whitelists[field]:
+                msg = 'Should remove histogram "%s" from the whitelist for "%s" in histogram-whitelists.json'
+                raise KeyError, msg % (name, field)
 
     def check_field_types(self, name, definition):
         # Define expected types for the histogram properties.
@@ -489,6 +500,14 @@ the histograms defined in filenames.
         n_counters = upper_bound - lower_bound + 1
         if n_counters != len(use_counter_indices):
             raise DefinitionException, "use counter histograms must be defined in a contiguous block"
+
+    # Check that histograms that were removed from Histograms.json etc. are also removed from the whitelists.
+    if whitelists is not None:
+        all_whitelist_entries = itertools.chain.from_iterable(whitelists.itervalues())
+        orphaned = set(all_whitelist_entries) - set(all_histograms.keys())
+        if len(orphaned) > 0:
+            msg = 'The following entries are orphaned and should be removed from histogram-whitelists.json: %s'
+            raise BaseException, msg % (', '.join(sorted(orphaned)))
 
     for (name, definition) in all_histograms.iteritems():
         yield Histogram(name, definition, strict_type_checks=True)

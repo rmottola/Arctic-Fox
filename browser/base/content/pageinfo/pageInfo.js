@@ -5,7 +5,7 @@
 Components.utils.import("resource://gre/modules/LoadContextInfo.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 
-//******** define a js object to implement nsITreeView
+// define a js object to implement nsITreeView
 function pageInfoTreeView(treeid, copycol)
 {
   // copycol is the index number for the column that we want to add to
@@ -636,14 +636,14 @@ function addImage(imageViewRow)
   }
 }
 
-//******** Link Stuff
+// Link Stuff
 function openURL(target)
 {
   var url = target.parentNode.childNodes[2].value;
   window.open(url, "_blank", "chrome");
 }
 
-function onBeginLinkDrag(event,urlField,descField)
+function onBeginLinkDrag(event, urlField, descField)
 {
   if (event.originalTarget.localName != "treechildren")
     return;
@@ -668,7 +668,7 @@ function onBeginLinkDrag(event,urlField,descField)
   dt.setData("text/plain", url);
 }
 
-//******** Image Stuff
+// Image Stuff
 function getSelectedRows(tree)
 {
   var start = { };
@@ -1053,18 +1053,16 @@ function formatNumber(number)
 
 function formatDate(datestr, unknown)
 {
-  // scriptable date formatter, for pretty printing dates
-  var dateService = Components.classes["@mozilla.org/intl/scriptabledateformat;1"]
-                              .getService(Components.interfaces.nsIScriptableDateFormat);
-
   var date = new Date(datestr);
   if (!date.valueOf())
     return unknown;
 
-  return dateService.FormatDateTime("", dateService.dateFormatLong,
-                                    dateService.timeFormatSeconds,
-                                    date.getFullYear(), date.getMonth()+1, date.getDate(),
-                                    date.getHours(), date.getMinutes(), date.getSeconds());
+  const locale = Components.classes["@mozilla.org/chrome/chrome-registry;1"]
+                 .getService(Components.interfaces.nsIXULChromeRegistry)
+                 .getSelectedLocale("global", true);
+  const dtOptions = { year: 'numeric', month: 'long', day: 'numeric',
+                      hour: 'numeric', minute: 'numeric', second: 'numeric' };
+  return date.toLocaleString(locale, dtOptions);
 }
 
 function doCopy()

@@ -37,6 +37,8 @@ NS_IMPL_ISUPPORTS(HttpServer,
                   nsILocalCertGetCallback)
 
 HttpServer::HttpServer()
+  : mPort()
+  , mHttps()
 {
 }
 
@@ -303,6 +305,8 @@ HttpServer::Connection::Connection(nsISocketTransport* aTransport,
   : mServer(aServer)
   , mTransport(aTransport)
   , mState(eRequestLine)
+  , mPendingReqVersion()
+  , mRemainingBodySize()
   , mCloseAfterRequest(false)
 {
   nsCOMPtr<nsIInputStream> input;
@@ -581,16 +585,13 @@ HttpServer::Connection::ConsumeLine(const char* aBuffer,
     NS_ENSURE_TRUE(tokens.hasMoreTokens(), NS_ERROR_UNEXPECTED);
     nsDependentCSubstring method = tokens.nextToken();
     NS_ENSURE_TRUE(NS_IsValidHTTPToken(method), NS_ERROR_UNEXPECTED);
-
     NS_ENSURE_TRUE(tokens.hasMoreTokens(), NS_ERROR_UNEXPECTED);
     nsDependentCSubstring url = tokens.nextToken();
     // Seems like it's also allowed to pass full urls with scheme+host+port.
     // May need to support that.
     NS_ENSURE_TRUE(url.First() == '/', NS_ERROR_UNEXPECTED);
-
-    mPendingReq = new InternalRequest(url);
+    mPendingReq = new InternalRequest(url, /* aURLFragment */ EmptyCString());
     mPendingReq->SetMethod(method);
-
     NS_ENSURE_TRUE(tokens.hasMoreTokens(), NS_ERROR_UNEXPECTED);
     nsDependentCSubstring version = tokens.nextToken();
     NS_ENSURE_TRUE(StringBeginsWith(version, NS_LITERAL_CSTRING("HTTP/1.")),
@@ -1048,7 +1049,7 @@ StreamCopier::FillOutputBuffer(char* aBuffer,
                                uint32_t aCount,
                                uint32_t* aCountRead)
 {
-  nsresult rv;
+  nsresult rv = NS_OK;
   while (mChunked && mSeparator.IsEmpty() && !mChunkRemaining &&
          !mAddedFinalSeparator) {
     uint64_t avail;

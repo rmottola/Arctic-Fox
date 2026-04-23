@@ -15,8 +15,7 @@ this.EXPORTED_SYMBOLS = [
   "LoginImport",
 ];
 
-////////////////////////////////////////////////////////////////////////////////
-//// Globals
+// Globals
 
 const Cc = Components.classes;
 const Ci = Components.interfaces;
@@ -33,8 +32,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Sqlite",
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
                                   "resource://gre/modules/NetUtil.jsm");
 
-////////////////////////////////////////////////////////////////////////////////
-//// LoginImport
+// LoginImport
 
 /**
  * Provides an object that has a method to import login-related data from the
@@ -45,11 +43,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
  * @param aPath
  *        String containing the file path of the SQLite login database.
  */
-this.LoginImport = function (aStore, aPath)
-{
+this.LoginImport = function(aStore, aPath) {
   this.store = aStore;
   this.path = aPath;
-}
+};
 
 this.LoginImport.prototype = {
   /**
@@ -162,7 +159,6 @@ this.LoginImport.prototype = {
       rows = yield connection.execute("SELECT * FROM moz_disabledHosts");
       for (let row of rows) {
         try {
-          let id = row.getResultByName("id");
           let hostname = row.getResultByName("hostname");
 
           this.store.data.disabledHosts.push(hostname);

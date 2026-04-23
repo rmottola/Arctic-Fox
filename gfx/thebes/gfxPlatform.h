@@ -62,6 +62,9 @@ BackendTypeBit(BackendType b)
 }
 
 } // namespace gfx
+namespace dom {
+class FontFamilyListEntry;
+}
 } // namespace mozilla
 
 #define MOZ_PERFORMANCE_WARNING(module, ...) \
@@ -183,6 +186,8 @@ public:
      */
     static void InitNullMetadata();
 
+    static void InitMoz2DLogging();
+
     /**
      * Create an offscreen surface of the given dimensions
      * and image format.
@@ -199,7 +204,7 @@ public:
      * support the DrawTarget we get back.
      * See SupportsAzureContentForDrawTarget.
      */
-    virtual already_AddRefed<DrawTarget>
+    static already_AddRefed<DrawTarget>
       CreateDrawTargetForSurface(gfxASurface *aSurface, const mozilla::gfx::IntSize& aSize);
 
     /*
@@ -319,6 +324,15 @@ public:
     virtual nsresult GetFontList(nsIAtom *aLangGroup,
                                  const nsACString& aGenericFamily,
                                  nsTArray<nsString>& aListOfFonts);
+
+    /**
+     * Fill aFontFamilies with a list of FontFamilyListEntry records for the
+     * available fonts on the platform; used to pass the list from chrome to
+     * content process. Currently implemented only on MacOSX.
+     */
+    virtual void GetSystemFontFamilyList(
+      InfallibleTArray<mozilla::dom::FontFamilyListEntry>* aFontFamilies)
+    { }
 
     /**
      * Rebuilds the any cached system font lists
@@ -456,7 +470,7 @@ public:
 
     static bool OffMainThreadCompositingEnabled();
 
-    void UpdateCanUseHardareVideoDecoding();
+    void UpdateCanUseHardwareVideoDecoding();
 
     // Returns a prioritized list of all available compositor backends.
     void GetCompositorBackends(bool useAcceleration, nsTArray<mozilla::layers::LayersBackend>& aBackends);
@@ -770,7 +784,7 @@ protected:
     // max number of entries in word cache
     int32_t mWordCacheMaxEntries;
 
-    uint32_t mTotalSystemMemory;
+    uint64_t mTotalSystemMemory;
 
     // Hardware vsync source. Only valid on parent process
     RefPtr<mozilla::gfx::VsyncSource> mVsyncSource;
@@ -806,6 +820,8 @@ private:
 
     void InitCompositorAccelerationPrefs();
     void InitGPUProcessPrefs();
+
+    static bool IsDXInterop2Blocked();
 
     RefPtr<gfxASurface> mScreenReferenceSurface;
     nsCOMPtr<nsIObserver> mSRGBOverrideObserver;

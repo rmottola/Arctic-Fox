@@ -4,17 +4,21 @@
 
 "use strict";
 
-const { LocalizationHelper } = require("devtools/shared/l10n");
-const STRINGS_URI = "global/locale/layout_errors.properties";
-const L10N = new LocalizationHelper(STRINGS_URI);
+const LAYOUT_ERRORS_L10N =
+  new LocalizationHelper("toolkit/locales/layout_errors.properties");
 
 // Test that when an animation is selected, its list of animated properties is
 // displayed below it.
 
 const EXPECTED_PROPERTIES = [
+  "background-attachment",
+  "background-clip",
   "background-color",
+  "background-image",
+  "background-origin",
   "background-position-x",
   "background-position-y",
+  "background-repeat",
   "background-size",
   "border-bottom-left-radius",
   "border-bottom-right-radius",
@@ -79,7 +83,7 @@ function hasExpectedWarnings(containerEl) {
   for (let warning of warnings) {
     let warningID =
       "CompositorAnimationWarningTransformWithGeometricProperties";
-    if (warning.getAttribute("title") == L10N.getStr(warningID)) {
+    if (warning.getAttribute("title") == LAYOUT_ERRORS_L10N.getStr(warningID)) {
       return true;
     }
   }

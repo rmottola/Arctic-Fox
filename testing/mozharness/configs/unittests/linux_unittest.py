@@ -95,27 +95,6 @@ config = {
             "run_filename": "jit_test.py",
             "testsdir": "jit-test/jit-test"
         },
-        "luciddream-emulator": {
-            "options": [
-                "--startup-timeout=300",
-                "--log-raw=%(raw_log_file)s",
-                "--log-errorsummary=%(error_summary_file)s",
-                "--browser-path=%(browser_path)s",
-                "--b2gpath=%(emulator_path)s",
-                "%(test_manifest)s"
-            ],
-        },
-        "luciddream-b2gdt": {
-            "options": [
-                "--startup-timeout=300",
-                "--log-raw=%(raw_log_file)s",
-                "--log-errorsummary=%(error_summary_file)s",
-                "--browser-path=%(browser_path)s",
-                "--b2g-desktop-path=%(fxos_desktop_path)s",
-                "--gaia-profile=%(gaia_profile)s",
-                "%(test_manifest)s"
-            ],
-        },
         "mochitest": {
             "options": [
                 "--appname=%(binary_path)s",
@@ -288,9 +267,8 @@ config = {
                 # when configs are consolidated this python path will only show
                 # for windows.
                 "python", "../scripts/external_tools/mouse_and_screen_resolution.py",
-                "--configuration-url",
-                "https://hg.mozilla.org/%(branch)s/raw-file/%(revision)s/" +
-                    "testing/machine-configuration.json"],
+                "--configuration-file",
+                "../scripts/external_tools/machine-configuration.json"],
             "architectures": ["32bit"],
             "halt_on_failure": True,
             "enabled": ADJUST_MOUSE_AND_SCREEN
@@ -302,6 +280,7 @@ config = {
     "default_blob_upload_servers": [
         "https://blobupload.elasticbeanstalk.com",
     ],
+    "structured_suites": ["reftest"],
     "blob_uploader_auth_file": os.path.join(os.getcwd(), "oauth.txt"),
     "download_minidump_stackwalk": True,
     "minidump_stackwalk_path": MINIDUMP_STACKWALK_PATH,

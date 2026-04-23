@@ -3,20 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
-                                  "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
                                   "resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 
 const ENGINE_FLAVOR = "text/x-moz-search-engine";
-
-document.addEventListener("Initialized", () => {
-  if (!AppConstants.isPlatformAndVersionAtLeast("win", "10")) {
-    document.getElementById("redirectSearchCheckbox").hidden = true;
-  }
-});
 
 var gEngineView = null;
 
@@ -35,6 +27,11 @@ var gSearchPane = {
     gEngineView = new EngineView(new EngineStore());
     document.getElementById("engineList").view = gEngineView;
     this.buildDefaultEngineDropDown();
+
+    let addEnginesLink = document.getElementById("addEngines");
+    let searchEnginesURL = Services.wm.getMostRecentWindow('navigator:browser')
+                                      .BrowserSearch.searchEnginesURL;
+    addEnginesLink.setAttribute("href", searchEnginesURL);
 
     window.addEventListener("click", this, false);
     window.addEventListener("command", this, false);
@@ -265,7 +262,7 @@ var gSearchPane = {
       }
     }
 
-    gEngineView._engineStore.changeEngine(aEngine, "alias", aNewKeyword);
+    gEngineView._engineStore.changeEngine(aEngine, "alias", keyword);
     gEngineView.invalidate();
     return true;
   }),
@@ -334,7 +331,7 @@ EngineStore.prototype = {
   },
 
   _cloneEngine: function ES_cloneEngine(aEngine) {
-    var clonedObj={};
+    var clonedObj = {};
     for (var i in aEngine)
       clonedObj[i] = aEngine[i];
     clonedObj.originalEngine = aEngine;

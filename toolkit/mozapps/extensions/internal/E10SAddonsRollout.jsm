@@ -118,6 +118,11 @@ const RolloutPolicy = {
   "49limiteda": { addons: set49PaneOnly, webextensions: true },
   "49limitedb": { addons: set49PaneOnly, webextensions: false },
 
+  // Beta testing on 50
+  "50allmpc": { addons: [], webextensions: true, mpc: true },
+
+  "51alladdons": { addons: [], webextensions: true, alladdons: true },
+
   "xpcshell-test": { addons: [ADDONS.test1, ADDONS.test2], webextensions: false },
 };
 
@@ -139,7 +144,19 @@ Object.defineProperty(this, "isAddonPartOfE10SRollout", {
 
     let policy = RolloutPolicy[policyId];
 
+    if (policy.alladdons) {
+      if (aAddon.multiprocessCompatible === false) {
+        return false;
+      }
+
+      return true;
+    }
+
     if (policy.webextensions && aAddon.type == "webextension") {
+      return true;
+    }
+
+    if (policy.mpc && aAddon.multiprocessCompatible) {
       return true;
     }
 

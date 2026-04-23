@@ -256,9 +256,14 @@ const BOOKMARK_VALIDATORS = Object.freeze({
 });
 
 // Sync bookmark records can contain additional properties.
-const SYNC_BOOKMARK_VALIDATORS = Object.freeze(Object.assign({
-  // Sync uses kinds instead of types, which distinguish between livemarks
-  // and smart bookmarks.
+const SYNC_BOOKMARK_VALIDATORS = Object.freeze({
+  // Sync uses Places GUIDs for all records except roots.
+  syncId: simpleValidateFunc(v => typeof v == "string" && (
+                                  (PlacesSyncUtils.bookmarks.ROOTS.includes(v) ||
+                                   PlacesUtils.isValidGuid(v)))),
+  parentSyncId: v => SYNC_BOOKMARK_VALIDATORS.syncId(v),
+  // Sync uses kinds instead of types, which distinguish between livemarks,
+  // queries, and smart bookmarks.
   kind: simpleValidateFunc(v => typeof v == "string" &&
                                 Object.values(PlacesSyncUtils.bookmarks.KINDS).includes(v)),
   query: simpleValidateFunc(v => v === null || (typeof v == "string" && v)),
@@ -282,9 +287,11 @@ const SYNC_BOOKMARK_VALIDATORS = Object.freeze(Object.assign({
   keyword: simpleValidateFunc(v => v === null || typeof v == "string"),
   description: simpleValidateFunc(v => v === null || typeof v == "string"),
   loadInSidebar: simpleValidateFunc(v => v === true || v === false),
-  feed: BOOKMARK_VALIDATORS.url,
+  feed: v => v === null ? v : BOOKMARK_VALIDATORS.url(v),
   site: v => v === null ? v : BOOKMARK_VALIDATORS.url(v),
-}, BOOKMARK_VALIDATORS));
+  title: BOOKMARK_VALIDATORS.title,
+  url: BOOKMARK_VALIDATORS.url,
+});
 
 this.PlacesUtils = {
   // Place entries that are containers, e.g. bookmark folders or queries.
@@ -308,6 +315,7 @@ this.PlacesUtils = {
   POST_DATA_ANNO: "bookmarkProperties/POSTData",
   READ_ONLY_ANNO: "placesInternal/READ_ONLY",
   CHARSET_ANNO: "URIProperties/characterSet",
+  MOBILE_ROOT_ANNO: "mobile/bookmarksRoot",
 
   TOPIC_SHUTDOWN: "places-shutdown",
   TOPIC_INIT_COMPLETE: "places-init-complete",
@@ -403,6 +411,28 @@ this.PlacesUtils = {
   },
 
   /**
+   * Makes a moz-action URI for the given action and set of parameters.
+   *
+   * @param   type
+   *          The action type.
+   * @param   params
+   *          A JS object of action params.
+   * @returns A moz-action URI as a string.
+   */
+  mozActionURI(type, params) {
+    let encodedParams = {};
+    for (let key in params) {
+      // Strip null or undefined.
+      // Regardless, don't encode them or they would be converted to a string.
+      if (params[key] === null || params[key] === undefined) {
+        continue;
+      }
+      encodedParams[key] = encodeURIComponent(params[key]);
+    }
+    return "moz-action:" + type + "," + JSON.stringify(encodedParams);
+  },
+
+  /**
    * Determines whether or not a ResultNode is a Bookmark folder.
    * @param   aNode
    *          A result node
@@ -489,7 +519,7 @@ this.PlacesUtils = {
    * @throws if the object contains invalid data.
    * @note any unknown properties are pass-through.
    */
-  validateItemProperties(validators, props, behavior={}) {
+  validateItemProperties(validators, props, behavior = {}) {
     if (!props)
       throw new Error("Input should be a valid object");
     // Make a shallow copy of `props` to avoid mutating the original object
@@ -551,8 +581,7 @@ this.PlacesUtils = {
     this._shutdownFunctions.push(aFunc);
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  //// nsIObserver
+  // nsIObserver
   observe: function PU_observe(aSubject, aTopic, aData)
   {
     switch (aTopic) {
@@ -585,8 +614,7 @@ this.PlacesUtils = {
   onPageAnnotationRemoved: function() {},
 
 
-  //////////////////////////////////////////////////////////////////////////////
-  //// nsITransactionListener
+  // nsITransactionListener
 
   didDo: function PU_didDo(aManager, aTransaction, aDoResult)
   {
@@ -895,11 +923,11 @@ this.PlacesUtils = {
         // but drag and drop of files from the shell has parts.length = 1
         if (parts.length != 1 && parts.length % 2)
           break;
-        for (let i = 0; i < parts.length; i=i+2) {
+        for (let i = 0; i < parts.length; i = i + 2) {
           let uriString = parts[i];
           let titleString = "";
-          if (parts.length > i+1)
-            titleString = parts[i+1];
+          if (parts.length > i + 1)
+            titleString = parts[i + 1];
           else {
             // for drag and drop of files, try to use the leafName as title
             try {
@@ -911,7 +939,7 @@ this.PlacesUtils = {
           // note:  this._uri() will throw if uriString is not a valid URI
           if (this._uri(uriString)) {
             nodes.push({ uri: uriString,
-                         title: titleString ? titleString : uriString ,
+                         title: titleString ? titleString : uriString,
                          type: this.TYPE_X_MOZ_URL });
           }
         }
@@ -1093,6 +1121,11 @@ this.PlacesUtils = {
     return this.unfiledBookmarksFolderId = this.bookmarks.unfiledBookmarksFolder;
   },
 
+  get mobileFolderId() {
+    delete this.mobileFolderId;
+    return this.mobileFolderId = this.bookmarks.mobileFolder;
+  },
+
   /**
    * Checks if aItemId is a root.
    *
@@ -1105,7 +1138,8 @@ this.PlacesUtils = {
            aItemId == PlacesUtils.toolbarFolderId ||
            aItemId == PlacesUtils.unfiledBookmarksFolderId ||
            aItemId == PlacesUtils.tagsFolderId ||
-           aItemId == PlacesUtils.placesRootId;
+           aItemId == PlacesUtils.placesRootId ||
+           aItemId == PlacesUtils.mobileFolderId;
   },
 
   /**
@@ -1144,7 +1178,7 @@ this.PlacesUtils = {
 
       // Fetch keywords for this href.
       let cache = yield gKeywordsCachePromise;
-      for (let [ keyword, entry ] of cache) {
+      for (let [ , entry ] of cache) {
         // Set the POST data on keywords not having it.
         if (entry.url.href == bm.url.href && !entry.postData) {
           entry.postData = aPostData;
@@ -1374,207 +1408,6 @@ this.PlacesUtils = {
   },
 
   /**
-   * Serializes the given node (and all its descendents) as JSON
-   * and writes the serialization to the given output stream.
-   *
-   * @param   aNode
-   *          An nsINavHistoryResultNode
-   * @param   aStream
-   *          An nsIOutputStream. NOTE: it only uses the write(str, len)
-   *          method of nsIOutputStream. The caller is responsible for
-   *          closing the stream.
-   */
-  _serializeNodeAsJSONToOutputStream: function (aNode, aStream) {
-    function addGenericProperties(aPlacesNode, aJSNode) {
-      aJSNode.title = aPlacesNode.title;
-      aJSNode.id = aPlacesNode.itemId;
-      let guid = aPlacesNode.bookmarkGuid;
-      if (guid) {
-        aJSNode.itemGuid = guid;
-        var parent = aPlacesNode.parent;
-        if (parent)
-          aJSNode.parent = parent.itemId;
-
-        var dateAdded = aPlacesNode.dateAdded;
-        if (dateAdded)
-          aJSNode.dateAdded = dateAdded;
-        var lastModified = aPlacesNode.lastModified;
-        if (lastModified)
-          aJSNode.lastModified = lastModified;
-
-        // XXX need a hasAnnos api
-        var annos = [];
-        try {
-          annos = PlacesUtils.getAnnotationsForItem(aJSNode.id).filter(function(anno) {
-            // XXX should whitelist this instead, w/ a pref for
-            // backup/restore of non-whitelisted annos
-            // XXX causes JSON encoding errors, so utf-8 encode
-            //anno.value = unescape(encodeURIComponent(anno.value));
-            if (anno.name == PlacesUtils.LMANNO_FEEDURI)
-              aJSNode.livemark = 1;
-            return true;
-          });
-        } catch(ex) {}
-        if (annos.length != 0)
-          aJSNode.annos = annos;
-      }
-      // XXXdietrich - store annos for non-bookmark items
-    }
-
-    function addURIProperties(aPlacesNode, aJSNode) {
-      aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE;
-      aJSNode.uri = aPlacesNode.uri;
-      if (aJSNode.id && aJSNode.id != -1) {
-        // harvest bookmark-specific properties
-        var keyword = PlacesUtils.bookmarks.getKeywordForBookmark(aJSNode.id);
-        if (keyword)
-          aJSNode.keyword = keyword;
-      }
-
-      if (aPlacesNode.tags)
-        aJSNode.tags = aPlacesNode.tags;
-
-      // last character-set
-      var uri = PlacesUtils._uri(aPlacesNode.uri);
-      try {
-        var lastCharset = PlacesUtils.annotations.getPageAnnotation(
-                            uri, PlacesUtils.CHARSET_ANNO);
-        aJSNode.charset = lastCharset;
-      } catch (e) {}
-    }
-
-    function addSeparatorProperties(aPlacesNode, aJSNode) {
-      aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR;
-    }
-
-    function addContainerProperties(aPlacesNode, aJSNode) {
-      var concreteId = PlacesUtils.getConcreteItemId(aPlacesNode);
-      if (concreteId != -1) {
-        // This is a bookmark or a tag container.
-        if (PlacesUtils.nodeIsQuery(aPlacesNode) ||
-            concreteId != aPlacesNode.itemId) {
-          aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE;
-          aJSNode.uri = aPlacesNode.uri;
-          // folder shortcut
-          aJSNode.concreteId = concreteId;
-        }
-        else { // Bookmark folder or a shortcut we should convert to folder.
-          aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER;
-
-          // Mark root folders.
-          if (aJSNode.id == PlacesUtils.placesRootId)
-            aJSNode.root = "placesRoot";
-          else if (aJSNode.id == PlacesUtils.bookmarksMenuFolderId)
-            aJSNode.root = "bookmarksMenuFolder";
-          else if (aJSNode.id == PlacesUtils.tagsFolderId)
-            aJSNode.root = "tagsFolder";
-          else if (aJSNode.id == PlacesUtils.unfiledBookmarksFolderId)
-            aJSNode.root = "unfiledBookmarksFolder";
-          else if (aJSNode.id == PlacesUtils.toolbarFolderId)
-            aJSNode.root = "toolbarFolder";
-        }
-      }
-      else {
-        // This is a grouped container query, generated on the fly.
-        aJSNode.type = PlacesUtils.TYPE_X_MOZ_PLACE;
-        aJSNode.uri = aPlacesNode.uri;
-      }
-    }
-
-    function appendConvertedComplexNode(aNode, aSourceNode, aArray) {
-      var repr = {};
-
-      for (let [name, value] in Iterator(aNode))
-        repr[name] = value;
-
-      // write child nodes
-      var children = repr.children = [];
-      if (!aNode.livemark) {
-        asContainer(aSourceNode);
-        var wasOpen = aSourceNode.containerOpen;
-        if (!wasOpen)
-          aSourceNode.containerOpen = true;
-        var cc = aSourceNode.childCount;
-        for (var i = 0; i < cc; ++i) {
-          var childNode = aSourceNode.getChild(i);
-          appendConvertedNode(aSourceNode.getChild(i), i, children);
-        }
-        if (!wasOpen)
-          aSourceNode.containerOpen = false;
-      }
-
-      aArray.push(repr);
-      return true;
-    }
-
-    function appendConvertedNode(bNode, aIndex, aArray) {
-      var node = {};
-
-      // set index in order received
-      // XXX handy shortcut, but are there cases where we don't want
-      // to export using the sorting provided by the query?
-      if (aIndex)
-        node.index = aIndex;
-
-      addGenericProperties(bNode, node);
-
-      var parent = bNode.parent;
-      var grandParent = parent ? parent.parent : null;
-      if (grandParent)
-        node.grandParentId = grandParent.itemId;
-
-      if (PlacesUtils.nodeIsURI(bNode)) {
-        // Tag root accept only folder nodes
-        if (parent && parent.itemId == PlacesUtils.tagsFolderId)
-          return false;
-
-        // Check for url validity, since we can't halt while writing a backup.
-        // This will throw if we try to serialize an invalid url and it does
-        // not make sense saving a wrong or corrupt uri node.
-        try {
-          PlacesUtils._uri(bNode.uri);
-        } catch (ex) {
-          return false;
-        }
-
-        addURIProperties(bNode, node);
-      }
-      else if (PlacesUtils.nodeIsContainer(bNode)) {
-        // Tag containers accept only uri nodes
-        if (grandParent && grandParent.itemId == PlacesUtils.tagsFolderId)
-          return false;
-
-        addContainerProperties(bNode, node);
-      }
-      else if (PlacesUtils.nodeIsSeparator(bNode)) {
-        // Tag root accept only folder nodes
-        // Tag containers accept only uri nodes
-        if ((parent && parent.itemId == PlacesUtils.tagsFolderId) ||
-            (grandParent && grandParent.itemId == PlacesUtils.tagsFolderId))
-          return false;
-
-        addSeparatorProperties(bNode, node);
-      }
-
-      if (!node.feedURI && node.type == PlacesUtils.TYPE_X_MOZ_PLACE_CONTAINER)
-        return appendConvertedComplexNode(node, bNode, aArray);
-
-      aArray.push(node);
-      return true;
-    }
-
-    // serialize to stream
-    var array = [];
-    if (appendConvertedNode(aNode, null, array)) {
-      var json = JSON.stringify(array[0]);
-      aStream.write(json, json.length);
-    }
-    else {
-      throw Cr.NS_ERROR_UNEXPECTED;
-    }
-  },
-
-  /**
    * Gets a shared Sqlite.jsm readonly connection to the Places database,
    * usable only for SELECT queries.
    *
@@ -1796,10 +1629,10 @@ this.PlacesUtils = {
    *           properties: { uri, dataLen, data, mimeType }
    * @rejects JavaScript exception if the given url has no associated favicon.
    */
-  promiseFaviconData: function (aPageUrl) {
+  promiseFaviconData: function(aPageUrl) {
     let deferred = Promise.defer();
     PlacesUtils.favicons.getFaviconDataForPage(NetUtil.newURI(aPageUrl),
-      function (aURI, aDataLen, aData, aMimeType) {
+      function(aURI, aDataLen, aData, aMimeType) {
         if (aURI) {
           deferred.resolve({ uri: aURI,
                              dataLen: aDataLen,
@@ -1819,7 +1652,7 @@ this.PlacesUtils = {
    * @resolves to the nsIURL of the favicon link
    * @rejects if the given url has no associated favicon.
    */
-  promiseFaviconLinkUrl: function (aPageUrl) {
+  promiseFaviconLinkUrl: function(aPageUrl) {
     let deferred = Promise.defer();
     if (!(aPageUrl instanceof Ci.nsIURI))
       aPageUrl = NetUtil.newURI(aPageUrl);
@@ -1999,6 +1832,8 @@ this.PlacesUtils = {
             item.root = "unfiledBookmarksFolder";
           else if (itemId == PlacesUtils.toolbarFolderId)
             item.root = "toolbarFolder";
+          else if (itemId == PlacesUtils.mobileFolderId)
+            item.root = "mobileFolder";
           break;
         case Ci.nsINavBookmarksService.TYPE_SEPARATOR:
           item.type = PlacesUtils.TYPE_X_MOZ_PLACE_SEPARATOR;
@@ -2011,7 +1846,8 @@ this.PlacesUtils = {
     }.bind(this);
 
     const QUERY_STR =
-      `WITH RECURSIVE
+      `/* do not warn (bug no): cannot use an index */
+       WITH RECURSIVE
        descendants(fk, level, type, id, guid, parent, parentGuid, position,
                    title, dateAdded, lastModified) AS (
          SELECT b1.fk, 0, b1.type, b1.id, b1.guid, b1.parent,
@@ -2183,7 +2019,7 @@ XPCOMUtils.defineLazyGetter(PlacesUtils, "transactionManager", function() {
   let tm = Cc["@mozilla.org/transactionmanager;1"].
            createInstance(Ci.nsITransactionManager);
   tm.AddListener(PlacesUtils);
-  this.registerShutdownFunction(function () {
+  this.registerShutdownFunction(function() {
     // Clear all references to local transactions in the transaction manager,
     // this prevents from leaking it.
     this.transactionManager.RemoveListener(this);
@@ -2309,7 +2145,7 @@ var Keywords = {
    * @resolves to an object in the form: { keyword, url, postData },
    *           or null if a keyword entry was not found.
    */
-  fetch(keywordOrEntry, onResult=null) {
+  fetch(keywordOrEntry, onResult = null) {
     if (typeof(keywordOrEntry) == "string")
       keywordOrEntry = { keyword: keywordOrEntry };
 
@@ -2540,29 +2376,54 @@ XPCOMUtils.defineLazyGetter(this, "gKeywordsCachePromise", () =>
           }).catch(Cu.reportError);
         },
 
-        onItemChanged(id, prop, isAnno, val, lastMod, itemType, parentId, guid) {
-          if (gIgnoreKeywordNotifications ||
-              prop != "keyword")
+        onItemChanged(id, prop, isAnno, val, lastMod, itemType, parentId, guid,
+                      parentGuid, oldVal) {
+          if (gIgnoreKeywordNotifications) {
             return;
+          }
 
-          Task.spawn(function* () {
-            let bookmark = yield PlacesUtils.bookmarks.fetch(guid);
-            // By this time the bookmark could have gone, there's nothing we can do.
-            if (!bookmark)
-              return;
+          if (prop == "keyword") {
+            this._onKeywordChanged(guid, val).catch(Cu.reportError);
+          } else if (prop == "uri") {
+            this._onUrlChanged(guid, val, oldVal).catch(Cu.reportError);
+          }
+        },
 
-            if (val.length == 0) {
-              // We are removing a keyword.
-              let keywords = keywordsForHref(bookmark.url.href)
-              for (let keyword of keywords) {
-                cache.delete(keyword);
-              }
-            } else {
-              // We are adding a new keyword.
-              cache.set(val, { keyword: val, url: bookmark.url });
+        _onKeywordChanged: Task.async(function* (guid, keyword) {
+          let bookmark = yield PlacesUtils.bookmarks.fetch(guid);
+          // Due to mixed sync/async operations, by this time the bookmark could
+          // have disappeared and we already handle removals in onItemRemoved.
+          if (!bookmark) {
+            return;
+          }
+
+          if (keyword.length == 0) {
+            // We are removing a keyword.
+            let keywords = keywordsForHref(bookmark.url.href)
+            for (let kw of keywords) {
+              cache.delete(kw);
             }
-          }).catch(Cu.reportError);
-        }
+          } else {
+            // We are adding a new keyword.
+            cache.set(keyword, { keyword, url: bookmark.url });
+          }
+        }),
+
+        _onUrlChanged: Task.async(function* (guid, url, oldUrl) {
+          // Check if the old url is associated with keywords.
+          let entries = [];
+          yield PlacesUtils.keywords.fetch({ url: oldUrl }, e => entries.push(e));
+          if (entries.length == 0) {
+            return;
+          }
+
+          // Move the keywords to the new url.
+          for (let entry of entries) {
+            yield PlacesUtils.keywords.remove(entry.keyword);
+            entry.url = new URL(url);
+            yield PlacesUtils.keywords.insert(entry);
+          }
+        }),
       };
 
       PlacesUtils.bookmarks.addObserver(observer, false);
@@ -2655,7 +2516,7 @@ var GuidHelper = {
     this.idsForGuids.delete(guid);
   },
 
-  ensureObservingRemovedItems: function () {
+  ensureObservingRemovedItems: function() {
     if (!("observer" in this)) {
       /**
        * This observers serves two purposes:
@@ -2693,8 +2554,7 @@ var GuidHelper = {
   }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-//// Transactions handlers.
+// Transactions handlers.
 
 /**
  * Updates commands in the undo group of the active window commands.
@@ -3607,14 +3467,18 @@ PlacesSetPageAnnotationTransaction.prototype = {
  *        new keyword for the bookmark
  * @param aNewPostData [optional]
  *        new keyword's POST data, if available
+ * @param aOldKeyword [optional]
+ *        old keyword of the bookmark
  *
  * @return nsITransaction object
  */
 this.PlacesEditBookmarkKeywordTransaction =
- function PlacesEditBookmarkKeywordTransaction(aItemId, aNewKeyword, aNewPostData)
-{
+  function PlacesEditBookmarkKeywordTransaction(aItemId, aNewKeyword,
+                                                aNewPostData, aOldKeyword) {
   this.item = new TransactionItemCache();
   this.item.id = aItemId;
+  this.item.keyword = aOldKeyword;
+  this.item.href = (PlacesUtils.bookmarks.getBookmarkURI(aItemId)).spec;
   this.new = new TransactionItemCache();
   this.new.keyword = aNewKeyword;
   this.new.postData = aNewPostData
@@ -3625,22 +3489,55 @@ PlacesEditBookmarkKeywordTransaction.prototype = {
 
   doTransaction: function EBKTXN_doTransaction()
   {
-    // Store the current values.
-    this.item.keyword = PlacesUtils.bookmarks.getKeywordForBookmark(this.item.id);
-    if (this.item.keyword)
-      this.item.postData = PlacesUtils.getPostDataForBookmark(this.item.id);
+    let done = false;
+    Task.spawn(function* () {
+      if (this.item.keyword) {
+        let oldEntry = yield PlacesUtils.keywords.fetch(this.item.keyword);
+        this.item.postData = oldEntry.postData;
+        yield PlacesUtils.keywords.remove(this.item.keyword);
+      }
 
-    // Update the keyword.
-    PlacesUtils.bookmarks.setKeywordForBookmark(this.item.id, this.new.keyword);
-    if (this.new.keyword && this.new.postData)
-      PlacesUtils.setPostDataForBookmark(this.item.id, this.new.postData);
+      if (this.new.keyword) {
+        yield PlacesUtils.keywords.insert({
+          url: this.item.href,
+          keyword: this.new.keyword,
+          postData: this.new.postData || this.item.postData
+        });
+      }
+    }.bind(this)).catch(Cu.reportError)
+                 .then(() => done = true);
+    // TODO: Until we can move to PlacesTransactions.jsm, we must spin the
+    // events loop :(
+    let thread = Services.tm.currentThread;
+    while (!done) {
+      thread.processNextEvent(true);
+    }
   },
 
   undoTransaction: function EBKTXN_undoTransaction()
   {
-    PlacesUtils.bookmarks.setKeywordForBookmark(this.item.id, this.item.keyword);
-    if (this.item.postData)
-      PlacesUtils.setPostDataForBookmark(this.item.id, this.item.postData);
+
+    let done = false;
+    Task.spawn(function* () {
+      if (this.new.keyword) {
+        yield PlacesUtils.keywords.remove(this.new.keyword);
+      }
+
+      if (this.item.keyword) {
+        yield PlacesUtils.keywords.insert({
+          url: this.item.href,
+          keyword: this.item.keyword,
+          postData: this.item.postData
+        });
+      }
+    }.bind(this)).catch(Cu.reportError)
+                 .then(() => done = true);
+    // TODO: Until we can move to PlacesTransactions.jsm, we must spin the
+    // events loop :(
+    let thread = Services.tm.currentThread;
+    while (!done) {
+      thread.processNextEvent(true);
+    }
   }
 };
 
@@ -3796,7 +3693,7 @@ PlacesSortFolderByNameTransaction.prototype = {
     let newOrder = [];
     let preSep = []; // temporary array for sorting each group of items
     let sortingMethod =
-      function (a, b) {
+      function(a, b) {
         if (PlacesUtils.nodeIsContainer(a) && !PlacesUtils.nodeIsContainer(b))
           return -1;
         if (!PlacesUtils.nodeIsContainer(a) && PlacesUtils.nodeIsContainer(b))
@@ -3937,7 +3834,7 @@ PlacesUntagURITransaction.prototype = {
     // Filter tags existing on the bookmark, otherwise on undo we may try to
     // set nonexistent tags.
     let tags = PlacesUtils.tagging.getTagsForURI(this.item.uri);
-    this.item.tags = this.item.tags.filter(function (aTag) {
+    this.item.tags = this.item.tags.filter(function(aTag) {
       return tags.includes(aTag);
     });
     PlacesUtils.tagging.untagURI(this.item.uri, this.item.tags);

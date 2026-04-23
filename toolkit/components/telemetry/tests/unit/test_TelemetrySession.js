@@ -110,7 +110,6 @@ function fakeIdleNotification(topic) {
 
 function setupTestData() {
 
-  Telemetry.histogramFrom(IGNORE_CLONED_HISTOGRAM, IGNORE_HISTOGRAM_TO_CLONE);
   Services.startup.interrupted = true;
   Telemetry.registerAddonHistogram(ADDON_NAME, ADDON_HISTOGRAM,
                                    Telemetry.HISTOGRAM_LINEAR,
@@ -133,7 +132,7 @@ function getSavedPingFile(basename) {
   if (pingFile.exists()) {
     pingFile.remove(true);
   }
-  do_register_cleanup(function () {
+  do_register_cleanup(function() {
     try {
       pingFile.remove(true);
     } catch (e) {
@@ -237,8 +236,8 @@ function checkPayloadInfo(data) {
 
   Assert.ok(Date.parse(data.subsessionStartDate) >= Date.parse(data.sessionStartDate));
   Assert.ok(data.profileSubsessionCounter >= data.subsessionCounter);
-  Assert.ok(data.timezoneOffset >= -12*60, "The timezone must be in a valid range.");
-  Assert.ok(data.timezoneOffset <= 12*60, "The timezone must be in a valid range.");
+  Assert.ok(data.timezoneOffset >= -12 * 60, "The timezone must be in a valid range.");
+  Assert.ok(data.timezoneOffset <= 12 * 60, "The timezone must be in a valid range.");
 }
 
 function checkScalars(processes) {
@@ -333,14 +332,6 @@ function checkPayload(payload, reason, successfulPings, savedPings) {
   }
   Assert.ok(TELEMETRY_TEST_FLAG in payload.histograms);
   Assert.ok(TELEMETRY_TEST_COUNT in payload.histograms);
-
-  let rh = Telemetry.registeredHistograms(Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTIN, []);
-  for (let name of rh) {
-    if (/SQLITE/.test(name) && name in payload.histograms) {
-      let histogramName = ("STARTUP_" + name);
-      Assert.ok(histogramName in payload.histograms, histogramName + " must be available.");
-    }
-  }
 
   Assert.ok(!(IGNORE_CLONED_HISTOGRAM in payload.histograms));
 
@@ -1113,9 +1104,6 @@ add_task(function* test_environmentChange() {
     return;
   }
 
-  let timerCallback = null;
-  let timerDelay = null;
-
   yield TelemetryStorage.testClearPendingPings();
   PingServer.clearRequests();
 
@@ -1254,8 +1242,8 @@ add_task(function* test_savedSessionData() {
 
   // Watch a test preference, trigger and environment change and wait for it to propagate.
   // _watchPreferences triggers a subsession notification
-  let now = fakeNow(new Date(2050, 1, 1, 12, 0, 0));
   gMonotonicNow = fakeMonotonicNow(gMonotonicNow + 10 * MILLISECONDS_PER_MINUTE);
+  fakeNow(new Date(2050, 1, 1, 12, 0, 0));
   TelemetryEnvironment.testWatchPreferences(PREFS_TO_WATCH);
   let changePromise = new Promise(resolve =>
     TelemetryEnvironment.registerChangeListener("test_fake_change", resolve));
@@ -1477,7 +1465,7 @@ add_task(function* test_abortedSession_Shutdown() {
             "Telemetry must create the aborted session directory when starting.");
 
   // Fake now again so that the scheduled aborted-session save takes place.
-  now = fakeNow(futureDate(now, ABORTED_SESSION_UPDATE_INTERVAL_MS));
+  fakeNow(futureDate(now, ABORTED_SESSION_UPDATE_INTERVAL_MS));
   // The first aborted session checkpoint must take place right after the initialisation.
   Assert.ok(!!schedulerTickCallback);
   // Execute one scheduler tick.
@@ -1628,7 +1616,7 @@ add_task(function* test_schedulerEnvironmentReschedules() {
   TelemetryEnvironment.testWatchPreferences(PREFS_TO_WATCH);
 
   // Set the current time at midnight.
-  let future = fakeNow(futureDate(nowDate, MS_IN_ONE_DAY));
+  fakeNow(futureDate(nowDate, MS_IN_ONE_DAY));
   gMonotonicNow = fakeMonotonicNow(gMonotonicNow + 10 * MILLISECONDS_PER_MINUTE);
 
   // Trigger the environment change.
@@ -1915,7 +1903,7 @@ add_task(function* test_changeThrottling() {
   Assert.equal(getSubsessionCount(), 1);
 
   // We should get a change notification after the 5min throttling interval.
-  now = fakeNow(futureDate(now, 5 * MILLISECONDS_PER_MINUTE + 1));
+  fakeNow(futureDate(now, 5 * MILLISECONDS_PER_MINUTE + 1));
   gMonotonicNow = fakeMonotonicNow(gMonotonicNow + 5 * MILLISECONDS_PER_MINUTE + 1);
   Preferences.set(PREF_TEST, 2);
   Assert.equal(getSubsessionCount(), 2);

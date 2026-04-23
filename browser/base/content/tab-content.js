@@ -430,14 +430,14 @@ var ContentSearchMediator = {
     return this.whitelist.has(content.document.documentURI);
   },
 
-  _sendMsg: function (type, data=null) {
+  _sendMsg: function (type, data = null) {
     sendAsyncMessage("ContentSearch", {
       type: type,
       data: data,
     });
   },
 
-  _fireEvent: function (type, data=null) {
+  _fireEvent: function (type, data = null) {
     let event = Cu.cloneInto({
       detail: {
         type: type,
@@ -927,6 +927,12 @@ ExtensionContent.init(this);
 addEventListener("unload", () => {
   ExtensionContent.uninit(this);
   RefreshBlocker.uninit();
+});
+
+addMessageListener("AllowScriptsToClose", () => {
+  content.QueryInterface(Ci.nsIInterfaceRequestor)
+         .getInterface(Ci.nsIDOMWindowUtils)
+         .allowScriptsToClose();
 });
 
 addEventListener("MozAfterPaint", function onFirstPaint() {

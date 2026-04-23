@@ -85,11 +85,6 @@ AutoCompleteResultBase.prototype = {
 
   defaultIndex: -1,
 
-  _typeAheadResult: false,
-  get typeAheadResult() {
-    return this._typeAheadResult;
-  },
-
   get matchCount() {
     return this._values.length;
   },
@@ -118,7 +113,7 @@ AutoCompleteResultBase.prototype = {
     return this._finalCompleteValues[aIndex] || this._values[aIndex];
   },
 
-  removeValueAt: function (aRowIndex, aRemoveFromDb) {},
+  removeValueAt: function(aRowIndex, aRemoveFromDb) {},
 
   // nsISupports implementation
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIAutoCompleteResult])
@@ -161,6 +156,25 @@ AutoCompleteSearchBase.prototype = {
     return this.QueryInterface(iid);
   }
 }
+
+function AutocompletePopupBase(input) {
+  this.input = input;
+}
+AutocompletePopupBase.prototype = {
+  selectedIndex: 0,
+  invalidate() {},
+  selectBy(reverse, page) {
+    let numRows = this.input.controller.matchCount;
+    if (numRows > 0) {
+      let delta = reverse ? -1 : 1;
+      this.selectedIndex = (this.selectedIndex + delta) % numRows;
+      if (this.selectedIndex < 0) {
+        this.selectedIndex = numRows - 1;
+      }
+    }
+  },
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIAutoCompletePopup]),
+};
 
 /**
  * Helper to register an AutoCompleteSearch with the given name.

@@ -999,7 +999,7 @@ protected:
   bool mInEnsureScriptEnv;
 #endif
 
-  uint64_t mHistoryID;
+  nsID mHistoryID;
   uint32_t mDefaultLoadFlags;
 
   static nsIURIFixup* sURIFixup;

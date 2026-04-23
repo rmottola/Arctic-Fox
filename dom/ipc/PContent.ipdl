@@ -105,6 +105,8 @@ union ChromeRegistryItem
 namespace mozilla {
 namespace dom {
 
+// Used on Android/B2G to pass the list of fonts on the device
+// to the child process
 struct FontListEntry {
     nsString  familyName;
     nsString  faceName;
@@ -114,6 +116,15 @@ struct FontListEntry {
     uint8_t   italic;
     uint8_t   index;
     bool      isHidden;
+};
+
+// Used on Mac OS X to pass the list of font families (not faces)
+// from chrome to content processes.
+// The entryType field distinguishes several types of font family
+// record; see gfxMacPlatformFontList.h for values and meaning.
+struct FontFamilyListEntry {
+    nsString familyName;
+    uint8_t  entryType;
 };
 
 struct DeviceStorageFreeSpaceParams
@@ -475,6 +486,7 @@ child:
 
     async SetOffline(bool offline);
     async SetConnectivity(bool connectivity);
+    async SetCaptivePortalState(int32_t aState);
 
     async NotifyVisited(URIParams uri);
 
@@ -518,7 +530,6 @@ child:
 
     async AppInfo(nsCString version, nsCString buildID, nsCString name, nsCString UAName,
                   nsCString ID, nsCString vendor);
-    async AppInit();
 
     /**
      * Send ServiceWorkerRegistrationData to child process.
@@ -677,11 +688,13 @@ parent:
     sync GetProcessAttributes()
         returns (ContentParentId cpId, bool isForBrowser);
     sync GetXPCOMProcessAttributes()
-        returns (bool isOffline, bool isConnected, bool isLangRTL,
+        returns (bool isOffline, bool isConnected, int32_t captivePortalState,
+                 bool isLangRTL,
                  bool haveBidiKeyboards, nsString[] dictionaries,
                  ClipboardCapabilities clipboardCaps,
                  DomainPolicyClone domainPolicy,
-                 StructuredCloneData initialData);
+                 StructuredCloneData initialData,
+                 FontFamilyListEntry[] fontFamilies /* used on MacOSX only */);
 
     sync CreateChildProcess(IPCTabContext context,
                             ProcessPriority priority,
@@ -901,9 +914,6 @@ parent:
 
     // Notify the parent of the presence or absence of private docshells
     async PrivateDocShellsExist(bool aExist);
-
-    // Tell the parent that the child has gone idle for the first time
-    async FirstIdle();
 
     async AudioChannelServiceStatus(bool aActiveTelephonyChannel,
                                     bool aContentOrNormalChannel,

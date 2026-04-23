@@ -10,6 +10,7 @@
 #include "mozilla/Attributes.h"
 #include "nsIDOMHTMLTextAreaElement.h"
 #include "nsITextControlElement.h"
+#include "nsIControllers.h"
 #include "nsIDOMNSEditableElement.h"
 #include "nsCOMPtr.h"
 #include "nsGenericHTMLElement.h"
@@ -124,7 +125,9 @@ public:
                                               int32_t aModType) const override;
   NS_IMETHOD_(bool) IsAttributeMapped(const nsIAtom* aAttribute) const override;
 
-  virtual nsresult PreHandleEvent(EventChainPreVisitor& aVisitor) override;
+  virtual nsresult GetEventTargetParent(
+                     EventChainPreVisitor& aVisitor) override;
+  virtual nsresult PreHandleEvent(EventChainVisitor& aVisitor) override;
   virtual nsresult PostHandleEvent(
                      EventChainPostVisitor& aVisitor) override;
 

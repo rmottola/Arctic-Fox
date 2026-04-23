@@ -176,6 +176,10 @@ DrawTargetD2D1::DrawSurface(SourceSurface *aSurface,
   } else {
     // This has issues ignoring the alpha channel on windows 7 with images marked opaque.
     MOZ_ASSERT(aSurface->GetFormat() != SurfaceFormat::B8G8R8X8);
+
+    // Bug 1275478 - D2D1 cannot draw A8 surface correctly.
+    MOZ_ASSERT(aSurface->GetFormat() != SurfaceFormat::A8);
+
     mDC->CreateImageBrush(image,
                           D2D1::ImageBrushProperties(samplingBounds,
                                                      D2D1_EXTEND_MODE_CLAMP,
@@ -1420,6 +1424,7 @@ DrawTargetD2D1::GetDeviceSpaceClipRect(D2D1_RECT_F& aClipRect, bool& aIsPixelAli
     return false;
   }
 
+  aIsPixelAligned = true;
   aClipRect = D2D1::RectF(0, 0, mSize.width, mSize.height);
   for (auto iter = CurrentLayer().mPushedClips.begin();iter != CurrentLayer().mPushedClips.end(); iter++) {
     if (iter->mGeometry) {
@@ -1436,6 +1441,8 @@ DrawTargetD2D1::GetDeviceSpaceClipRect(D2D1_RECT_F& aClipRect, bool& aIsPixelAli
 already_AddRefed<ID2D1Image>
 DrawTargetD2D1::GetImageForLayerContent(bool aShouldPreserveContent)
 {
+  PopAllClips();
+
   if (!CurrentLayer().mCurrentList) {
     RefPtr<ID2D1Bitmap> tmpBitmap;
     HRESULT hr = mDC->CreateBitmap(D2DIntSize(mSize), D2D1::BitmapProperties(D2DPixelFormat(mFormat)), getter_AddRefs(tmpBitmap));
@@ -1450,8 +1457,6 @@ DrawTargetD2D1::GetImageForLayerContent(bool aShouldPreserveContent)
     tmpBitmap->CopyFromBitmap(nullptr, mBitmap, nullptr);
     return tmpBitmap.forget();
   } else {
-    PopAllClips();
-
     RefPtr<ID2D1CommandList> list = CurrentLayer().mCurrentList;
     mDC->CreateCommandList(getter_AddRefs(CurrentLayer().mCurrentList));
     mDC->SetTarget(CurrentTarget());

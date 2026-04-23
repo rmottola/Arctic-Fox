@@ -1071,6 +1071,20 @@ ProcessXCTO(nsIURI* aURI, nsHttpResponseHead* aResponseHead, nsILoadInfo* aLoadI
 
     if (aLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_IMAGE) {
         if (StringBeginsWith(contentType, NS_LITERAL_CSTRING("image/"))) {
+            Accumulate(Telemetry::XCTO_NOSNIFF_BLOCK_IMAGE, 0);
+            return NS_OK;
+        }
+        Accumulate(Telemetry::XCTO_NOSNIFF_BLOCK_IMAGE, 1);
+        // Instead of consulting Preferences::GetBool() all the time we
+        // can cache the result to speed things up.
+        static bool sXCTONosniffBlockImages = false;
+        static bool sIsInited = false;
+        if (!sIsInited) {
+            sIsInited = true;
+            Preferences::AddBoolVarCache(&sXCTONosniffBlockImages,
+            "security.xcto_nosniff_block_images");
+        }
+        if (!sXCTONosniffBlockImages) {
             return NS_OK;
         }
         ReportTypeBlocking(aURI, aLoadInfo, "MimeTypeMismatch");
@@ -1794,7 +1808,7 @@ nsHttpChannel::ProcessSSLInformation()
     nsCOMPtr<nsIX509Cert> cert;
     sslstat->GetServerCert(getter_AddRefs(cert));
     if (cert) {
-        ScopedCERTCertificate nssCert(cert->GetCert());
+        UniqueCERTCertificate nssCert(cert->GetCert());
         if (nssCert) {
             SECOidTag tag = SECOID_GetAlgorithmTag(&nssCert->signature);
             LOG(("Checking certificate signature: The OID tag is %i [this=%p]\n", tag, this));
@@ -3117,6 +3131,9 @@ nsHttpChannel::OnDoneReadingPartialCacheEntry(bool *streamDone)
     // we're now completing the cached content, so we can clear this flag.
     // this puts us in the state of a regular download.
     mCachedContentIsPartial = false;
+    // The cache input stream pump is finished, we do not need it any more.
+    // (see bug 1313923)
+    mCachePump = nullptr;
 
     // resume the transaction if it exists, otherwise the pipe contained the
     // remaining part of the document and we've now streamed all of the data.
@@ -4536,9 +4553,13 @@ nsHttpChannel::OpenCacheInputStream(nsICacheEntry* cacheEntry, bool startBufferi
         if (NS_SUCCEEDED(rv)) {
             // We have succeeded.
             mAvailableCachedAltDataType = mPreferredCachedAltDataType;
-            // The alternative data may have a different length than the original
-            // content, so we clear the Content-Length header
+            // Clear the header.
             mCachedResponseHead->SetContentLength(-1);
+            // Set the correct data size on the channel.
+            int64_t altDataSize;
+            if (NS_SUCCEEDED(cacheEntry->GetAltDataSize(&altDataSize))) {
+                mCachedResponseHead->SetContentLength(altDataSize);
+            }
         }
     }
 
@@ -5667,6 +5688,11 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
 
     AddCookiesToRequest();
 
+    // Set user agent override, do so before OnOpeningRequest notification
+    // since we want to allow consumers of that notification change or remove
+    // the User-Agent request header.
+    HttpBaseChannel::SetDocshellUserAgentOverride();
+
     // After we notify any observers (on-opening-request, loadGroup, etc) we
     // must return NS_OK and return any errors asynchronously via
     // OnStart/OnStopRequest.  Observers may add a reference to the channel
@@ -5677,9 +5703,6 @@ nsHttpChannel::AsyncOpen(nsIStreamListener *listener, nsISupports *context)
     if (!(mLoadFlags & LOAD_REPLACE)) {
         gHttpHandler->OnOpeningRequest(this);
     }
-
-    // Set user agent override
-    HttpBaseChannel::SetDocshellUserAgentOverride();
 
     mIsPending = true;
     mWasOpened = true;
@@ -6570,18 +6593,28 @@ nsHttpChannel::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult st
         // keep the connection around after the transaction is finished.
         //
         RefPtr<nsAHttpConnection> conn;
-        if (authRetry && (mCaps & NS_HTTP_STICKY_CONNECTION)) {
+        LOG(("  authRetry=%d, sticky conn cap=%d", authRetry, mCaps & NS_HTTP_STICKY_CONNECTION));
+        // We must check caps for stickinness also on the transaction because it
+        // might have been updated by the transaction itself during inspection of
+        // the reposnse headers yet on the socket thread (found connection based
+        // auth schema).
+        if (authRetry && (mCaps & NS_HTTP_STICKY_CONNECTION ||
+                          mTransaction->Caps() & NS_HTTP_STICKY_CONNECTION)) {
             conn = mTransaction->GetConnectionReference();
+            LOG(("  transaction %p provides connection %p", mTransaction.get(), conn.get()));
             // This is so far a workaround to fix leak when reusing unpersistent
             // connection for authentication retry. See bug 459620 comment 4
             // for details.
-            if (conn && !conn->IsPersistent())
+            if (conn && !conn->IsPersistent()) {
+                LOG(("  connection is not persistent, not reusing it"));
                 conn = nullptr;
+            }
         }
 
         RefPtr<nsAHttpConnection> stickyConn;
-        if (mCaps & NS_HTTP_STICKY_CONNECTION)
+        if (mCaps & NS_HTTP_STICKY_CONNECTION) {
             stickyConn = mTransaction->GetConnectionReference();
+        }
 
         mTransferSize = mTransaction->GetTransferSize();
 
@@ -7956,19 +7989,24 @@ nsHttpChannel::OnHSTSPrimingFailed(nsresult aError, bool aCached)
 
     LOG(("HSTS Priming Failed [this=%p], %s the load", this,
                 (wouldBlock) ? "blocking" : "allowing"));
-    if (aCached) {
+    if (aError == NS_ERROR_HSTS_PRIMING_TIMEOUT) {
+        // A priming request was sent, but timed out
+        Telemetry::Accumulate(Telemetry::MIXED_CONTENT_HSTS_PRIMING_RESULT,
+                (wouldBlock) ?  HSTSPrimingResult::eHSTS_PRIMING_TIMEOUT_BLOCK :
+                HSTSPrimingResult::eHSTS_PRIMING_TIMEOUT_ACCEPT);
+    } else if (aCached) {
         // Between the time we marked for priming and started the priming request,
         // the host was found to not allow the upgrade, probably from another
         // priming request.
         Telemetry::Accumulate(Telemetry::MIXED_CONTENT_HSTS_PRIMING_RESULT,
                 (wouldBlock) ?  HSTSPrimingResult::eHSTS_PRIMING_CACHED_BLOCK :
-                                HSTSPrimingResult::eHSTS_PRIMING_CACHED_NO_UPGRADE);
+                HSTSPrimingResult::eHSTS_PRIMING_CACHED_NO_UPGRADE);
     } else {
         // A priming request was sent, and no HSTS header was found that allows
         // the upgrade.
         Telemetry::Accumulate(Telemetry::MIXED_CONTENT_HSTS_PRIMING_RESULT,
                 (wouldBlock) ?  HSTSPrimingResult::eHSTS_PRIMING_FAILED_BLOCK :
-                                HSTSPrimingResult::eHSTS_PRIMING_FAILED_ACCEPT);
+                HSTSPrimingResult::eHSTS_PRIMING_FAILED_ACCEPT);
     }
 
     // Don't visit again for at least
@@ -8226,26 +8264,24 @@ nsHttpChannel::ReportNetVSCacheTelemetry()
         Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_NOTIMG, onStopDiff);
     }
 
-    if (mCacheQueueSizeWhenOpen < 10) {
-        if (mCacheOpenWithPriority) {
+    if (mCacheOpenWithPriority) {
+        if (mCacheQueueSizeWhenOpen < 5) {
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QSMALL_HIGHPRI, onStartDiff);
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QSMALL_HIGHPRI, onStopDiff);
-        } else {
-            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QSMALL_NORMALPRI, onStartDiff);
-            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QSMALL_NORMALPRI, onStopDiff);
-        }
-    } else if (mCacheQueueSizeWhenOpen < 50) {
-        if (mCacheOpenWithPriority) {
+        } else if (mCacheQueueSizeWhenOpen < 10) {
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QMED_HIGHPRI, onStartDiff);
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QMED_HIGHPRI, onStopDiff);
         } else {
-            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QMED_NORMALPRI, onStartDiff);
-            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QMED_NORMALPRI, onStopDiff);
-        }
-    } else {
-        if (mCacheOpenWithPriority) {
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QBIG_HIGHPRI, onStartDiff);
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QBIG_HIGHPRI, onStopDiff);
+        }
+    } else { // The limits are higher for normal priority cache queues
+        if (mCacheQueueSizeWhenOpen < 10) {
+            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QSMALL_NORMALPRI, onStartDiff);
+            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QSMALL_NORMALPRI, onStopDiff);
+        } else if (mCacheQueueSizeWhenOpen < 50) {
+            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QMED_NORMALPRI, onStartDiff);
+            Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QMED_NORMALPRI, onStopDiff);
         } else {
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTART_QBIG_NORMALPRI, onStartDiff);
             Telemetry::Accumulate(Telemetry::HTTP_NET_VS_CACHE_ONSTOP_QBIG_NORMALPRI, onStopDiff);

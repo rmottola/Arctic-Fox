@@ -77,7 +77,7 @@ function test() {
         }
 
         function cleanUp() {
-            Services.ww.registerNotification(function (aSubject, aTopic, aData) {
+            Services.ww.registerNotification(function(aSubject, aTopic, aData) {
                 Services.ww.unregisterNotification(arguments.callee);
                 Services.logins.removeAllLogins();
                 doc.getElementById("passwordCol").hidden = true;

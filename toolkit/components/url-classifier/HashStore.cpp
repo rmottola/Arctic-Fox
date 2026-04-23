@@ -168,7 +168,27 @@ TableUpdateV4::NewPrefixes(int32_t aSize, std::string& aPrefixes)
   NS_ENSURE_TRUE_VOID(aPrefixes.size() % aSize == 0);
   NS_ENSURE_TRUE_VOID(!mPrefixesMap.Get(aSize));
 
-  PrefixString* prefix = new PrefixString(aPrefixes);
+  if (LOG_ENABLED() && 4 == aSize) {
+    int numOfPrefixes = aPrefixes.size() / 4;
+    uint32_t* p = (uint32_t*)aPrefixes.c_str();
+
+    // Dump the first/last 10 fixed-length prefixes for debugging.
+    LOG(("* The first 10 (maximum) fixed-length prefixes: "));
+    for (int i = 0; i < std::min(10, numOfPrefixes); i++) {
+      uint8_t* c = (uint8_t*)&p[i];
+      LOG(("%.2X%.2X%.2X%.2X", c[0], c[1], c[2], c[3]));
+    }
+
+    LOG(("* The last 10 (maximum) fixed-length prefixes: "));
+    for (int i = std::max(0, numOfPrefixes - 10); i < numOfPrefixes; i++) {
+      uint8_t* c = (uint8_t*)&p[i];
+      LOG(("%.2X%.2X%.2X%.2X", c[0], c[1], c[2], c[3]));
+    }
+
+    LOG(("---- %d fixed-length prefixes in total.", aPrefixes.size() / aSize));
+  }
+
+  PrefixStdString* prefix = new PrefixStdString(aPrefixes);
   mPrefixesMap.Put(aSize, prefix);
 }
 
@@ -180,13 +200,22 @@ TableUpdateV4::NewRemovalIndices(const uint32_t* aIndices, size_t aNumOfIndices)
   }
 }
 
-HashStore::HashStore(const nsACString& aTableName, nsIFile* aRootStoreDir)
+void
+TableUpdateV4::NewChecksum(const std::string& aChecksum)
+{
+  mChecksum.Assign(aChecksum.data(), aChecksum.size());
+}
+
+HashStore::HashStore(const nsACString& aTableName,
+                     const nsACString& aProvider,
+                     nsIFile* aRootStoreDir)
   : mTableName(aTableName)
   , mInUpdate(false)
   , mFileSize(0)
 {
   nsresult rv = Classifier::GetPrivateStoreDirectory(aRootStoreDir,
                                                      aTableName,
+                                                     aProvider,
                                                      getter_AddRefs(mStoreDirectory));
   if (NS_FAILED(rv)) {
     LOG(("Failed to get private store directory for %s", mTableName.get()));
@@ -558,7 +587,9 @@ Merge(ChunkSet* aStoreChunks,
   // to make the chunkranges continuous.
   aStoreChunks->Merge(aUpdateChunks);
 
-  aStorePrefixes->AppendElements(adds, fallible);
+  if (!aStorePrefixes->AppendElements(adds, fallible))
+    return NS_ERROR_OUT_OF_MEMORY;
+
   EntrySort(*aStorePrefixes);
 
   return NS_OK;
@@ -737,33 +768,46 @@ nsresult InflateReadTArray(nsIInputStream* aStream, FallibleTArray<T>* aOut,
 static nsresult
 ByteSliceWrite(nsIOutputStream* aOut, nsTArray<uint32_t>& aData)
 {
-  nsTArray<uint8_t> slice1;
-  nsTArray<uint8_t> slice2;
-  nsTArray<uint8_t> slice3;
-  nsTArray<uint8_t> slice4;
+  nsTArray<uint8_t> slice;
   uint32_t count = aData.Length();
 
-  slice1.SetCapacity(count);
-  slice2.SetCapacity(count);
-  slice3.SetCapacity(count);
-  slice4.SetCapacity(count);
-
-  for (uint32_t i = 0; i < count; i++) {
-    slice1.AppendElement( aData[i] >> 24);
-    slice2.AppendElement((aData[i] >> 16) & 0xFF);
-    slice3.AppendElement((aData[i] >>  8) & 0xFF);
-    slice4.AppendElement( aData[i]        & 0xFF);
+  // Only process one slice at a time to avoid using too much memory.
+  if (!slice.SetLength(count, fallible)) {
+    return NS_ERROR_OUT_OF_MEMORY;
   }
 
-  nsresult rv = DeflateWriteTArray(aOut, slice1);
+  // Process slice 1.
+  for (uint32_t i = 0; i < count; i++) {
+    slice[i] = (aData[i] >> 24);
+  }
+
+  nsresult rv = DeflateWriteTArray(aOut, slice);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = DeflateWriteTArray(aOut, slice2);
+
+  // Process slice 2.
+  for (uint32_t i = 0; i < count; i++) {
+    slice[i] = ((aData[i] >> 16) & 0xFF);
+  }
+
+  rv = DeflateWriteTArray(aOut, slice);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = DeflateWriteTArray(aOut, slice3);
+
+  // Process slice 3.
+  for (uint32_t i = 0; i < count; i++) {
+    slice[i] = ((aData[i] >> 8) & 0xFF);
+  }
+
+  rv = DeflateWriteTArray(aOut, slice);
   NS_ENSURE_SUCCESS(rv, rv);
+
+  // Process slice 4.
+  for (uint32_t i = 0; i < count; i++) {
+    slice[i] = (aData[i] & 0xFF);
+  }
+
   // The LSB slice is generally uncompressible, don't bother
   // compressing it.
-  rv = WriteTArray(aOut, slice4);
+  rv = WriteTArray(aOut, slice);
   NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;

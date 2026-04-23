@@ -96,58 +96,6 @@ LayerManager::GetRootScrollableLayerId()
       FrameMetrics::NULL_SCROLL_ID;
 }
 
-void
-LayerManager::GetRootScrollableLayers(nsTArray<Layer*>& aArray)
-{
-  if (!mRoot) {
-    return;
-  }
-
-  FrameMetrics::ViewID rootScrollableId = GetRootScrollableLayerId();
-  if (rootScrollableId == FrameMetrics::NULL_SCROLL_ID) {
-    aArray.AppendElement(mRoot);
-    return;
-  }
-
-  nsTArray<Layer*> queue = { mRoot };
-  while (queue.Length()) {
-    Layer* layer = queue[0];
-    queue.RemoveElementAt(0);
-
-    if (LayerMetricsWrapper::TopmostScrollableMetrics(layer).GetScrollId() == rootScrollableId) {
-      aArray.AppendElement(layer);
-      continue;
-    }
-
-    for (Layer* child = layer->GetFirstChild(); child; child = child->GetNextSibling()) {
-      queue.AppendElement(child);
-    }
-  }
-}
-
-void
-LayerManager::GetScrollableLayers(nsTArray<Layer*>& aArray)
-{
-  if (!mRoot) {
-    return;
-  }
-
-  nsTArray<Layer*> queue = { mRoot };
-  while (!queue.IsEmpty()) {
-    Layer* layer = queue.LastElement();
-    queue.RemoveElementAt(queue.Length() - 1);
-
-    if (layer->HasScrollableFrameMetrics()) {
-      aArray.AppendElement(layer);
-      continue;
-    }
-
-    for (Layer* child = layer->GetFirstChild(); child; child = child->GetNextSibling()) {
-      queue.AppendElement(child);
-    }
-  }
-}
-
 LayerMetricsWrapper
 LayerManager::GetRootContentLayer()
 {
@@ -656,14 +604,13 @@ Layer::SnapTransformTranslation(const Matrix4x4& aTransform,
   }
 
   Matrix matrix2D;
-  Matrix4x4 result;
   if (aTransform.CanDraw2D(&matrix2D) &&
       !matrix2D.HasNonTranslation() &&
       matrix2D.HasNonIntegerTranslation()) {
     auto snappedTranslation = IntPoint::Round(matrix2D.GetTranslation());
     Matrix snappedMatrix = Matrix::Translation(snappedTranslation.x,
                                                snappedTranslation.y);
-    result = Matrix4x4::From2D(snappedMatrix);
+    Matrix4x4 result = Matrix4x4::From2D(snappedMatrix);
     if (aResidualTransform) {
       // set aResidualTransform so that aResidual * snappedMatrix == matrix2D.
       // (I.e., appying snappedMatrix after aResidualTransform gives the
@@ -675,6 +622,13 @@ Layer::SnapTransformTranslation(const Matrix4x4& aTransform,
     return result;
   }
 
+  return SnapTransformTranslation3D(aTransform, aResidualTransform);
+}
+
+Matrix4x4
+Layer::SnapTransformTranslation3D(const Matrix4x4& aTransform,
+                                  Matrix* aResidualTransform)
+{
   if(aTransform.IsSingular() ||
      aTransform.HasPerspectiveComponent() ||
      aTransform.HasNonTranslation() ||
@@ -724,7 +678,7 @@ Layer::SnapTransformTranslation(const Matrix4x4& aTransform,
   // Translate transformed origin to transformed snap since the
   // residual transform would trnslate the snap to the origin.
   Point3D transformedShift = transformedSnap - transformedOrigin;
-  result = aTransform;
+  Matrix4x4 result = aTransform;
   result.PostTranslate(transformedShift.x,
                        transformedShift.y,
                        transformedShift.z);

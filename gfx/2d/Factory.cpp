@@ -27,6 +27,7 @@
 
 #ifdef XP_DARWIN
 #include "ScaledFontMac.h"
+#include "NativeFontResourceMac.h"
 #endif
 
 #ifdef MOZ_WIDGET_GTK
@@ -552,6 +553,9 @@ Factory::CreateNativeFontResource(uint8_t *aData, uint32_t aSize,
     }
 #endif
   case FontType::CAIRO:
+#ifdef USE_SKIA
+  case FontType::SKIA:
+#endif
     {
 #ifdef WIN32
       if (GetDirect3D11Device()) {
@@ -561,6 +565,8 @@ Factory::CreateNativeFontResource(uint8_t *aData, uint32_t aSize,
         return NativeFontResourceGDI::Create(aData, aSize,
                                              /* aNeedsCairo = */ true);
       }
+#elif XP_DARWIN
+      return NativeFontResourceMac::Create(aData, aSize);
 #else
       gfxWarning() << "Unable to create cairo scaled font from truetype data";
       return nullptr;

@@ -72,10 +72,6 @@ browser[remote="true"] {
   margin: 0;
 }
 
-browser[frameType="social"][remote="true"] {
-  -moz-binding: url("chrome://global/content/bindings/remote-browser.xml#remote-browser");
-}
-
 tabbrowser {
   -moz-binding: url("chrome://browser/content/tabbrowser.xml#tabbrowser");
 }
@@ -214,6 +210,7 @@ toolbar[printpreview="true"] {
 .titlebar-placeholder[type="fullscreen-button"]:-moz-locale-dir(rtl) {
   -moz-box-ordinal-group: 0;
 }
+
 %else
 /* On non-OSX, these should be start-aligned */
 #titlebar-buttonbox-container {
@@ -430,28 +427,40 @@ splitmenu {
   -moz-binding: url(chrome://browser/content/urlbarBindings.xml#urlbar);
 }
 
+/* Always show URLs LTR. */
 .ac-url-text:-moz-locale-dir(rtl),
-.ac-title:-moz-locale-dir(rtl) > description {
+.ac-title-text[lookslikeurl]:-moz-locale-dir(rtl) {
   direction: ltr !important;
 }
 
-/* For results that are actions, their description text is shown instead of
-   the URL - this needs to follow the locale's direction, unlike URLs. */
-panel:not([noactions]) > richlistbox > richlistitem[type~="action"]:-moz-locale-dir(rtl) > .ac-url-box {
-  direction: rtl;
-}
-
-panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .ac-url > .ac-action-text,
-panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .ac-action-icon {
+/* For non-action items, hide the action text; for action items, hide the URL
+   text. */
+.ac-url[actiontype],
+.ac-action:not([actiontype]) {
   visibility: collapse;
 }
 
-panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .ac-url > .ac-url-text {
-  visibility: visible;
+/* For action items in a noactions popup, show the URL text and hide the action
+   text and type icon. */
+#PopupAutoCompleteRichResult[noactions] > richlistbox > richlistitem.overridable-action > .ac-url {
+  display: -moz-box;
+}
+#PopupAutoCompleteRichResult[noactions] > richlistbox > richlistitem.overridable-action > .ac-action {
+  display: none;
+}
+#PopupAutoCompleteRichResult[noactions] > richlistbox > richlistitem.overridable-action > .ac-type-icon {
+  list-style-image: none;
 }
 
-#urlbar:not([actiontype]) > #urlbar-display-box,
-#urlbar:not([actiontype="switchtab"]) > #urlbar-display-box > .urlbar-display-switchtab {
+#urlbar:not([actiontype="switchtab"]):not([actiontype="extension"]) > #urlbar-display-box {
+  display: none;
+}
+
+#urlbar:not([actiontype="switchtab"]) > #urlbar-display-box > #switchtab {
+  display: none;
+}
+
+#urlbar:not([actiontype="extension"]) > #urlbar-display-box > #extension {
   display: none;
 }
 
@@ -460,8 +469,16 @@ panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .a
   cursor: -moz-grab;
 }
 
-#PopupAutoComplete {
-  -moz-binding: url("chrome://browser/content/urlbarBindings.xml#browser-autocomplete-result-popup");
+#PopupAutoComplete > richlistbox > richlistitem > .ac-type-icon,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-site-icon,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-tags,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-separator,
+#PopupAutoComplete > richlistbox > richlistitem > .ac-url {
+  display: none;
+}
+
+#PopupSearchAutoComplete {
+  -moz-binding: url("chrome://browser/content/search/search.xml#browser-search-autocomplete-result-popup");
 }
 
 /* Overlay a badge on top of the icon of additional open search providers

@@ -24,7 +24,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "ContentLinkHandler",
   "resource:///modules/ContentLinkHandler.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerContent",
   "resource://gre/modules/LoginManagerContent.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "FormLikeFactory",
+XPCOMUtils.defineLazyModuleGetter(this, "LoginFormFactory",
   "resource://gre/modules/LoginManagerContent.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "InsecurePasswordUtils",
   "resource://gre/modules/InsecurePasswordUtils.jsm");
@@ -65,12 +65,12 @@ addMessageListener("RemoteLogins:fillForm", function(message) {
 });
 addEventListener("DOMFormHasPassword", function(event) {
   LoginManagerContent.onDOMFormHasPassword(event, content);
-  let formLike = FormLikeFactory.createFromForm(event.target);
+  let formLike = LoginFormFactory.createFromForm(event.target);
   InsecurePasswordUtils.checkForInsecurePasswords(formLike);
 });
 addEventListener("DOMInputPasswordAdded", function(event) {
   LoginManagerContent.onDOMInputPasswordAdded(event, content);
-  let formLike = FormLikeFactory.createFromField(event.target);
+  let formLike = LoginFormFactory.createFromField(event.target);
   InsecurePasswordUtils.checkForInsecurePasswords(formLike);
 });
 addEventListener("pageshow", function(event) {
@@ -162,6 +162,9 @@ var handleContentContextMenu = function (event) {
 
   let selectionInfo = BrowserUtils.getSelectionDetails(content);
 
+  let loadContext = docShell.QueryInterface(Ci.nsILoadContext);
+  let userContextId = loadContext.originAttributes.userContextId;
+
   if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
     let editFlags = SpellCheckHelper.isEditable(event.target, content);
     let spellInfo;
@@ -185,7 +188,7 @@ var handleContentContextMenu = function (event) {
                      principal, docLocation, charSet, baseURI, referrer,
                      referrerPolicy, contentType, contentDisposition,
                      frameOuterWindowID, selectionInfo, disableSetDesktopBg,
-                     loginFillInfo, parentAllowsMixedContent },
+                     loginFillInfo, parentAllowsMixedContent, userContextId },
                    { event, popupNode: event.target });
   }
   else {
@@ -209,6 +212,7 @@ var handleContentContextMenu = function (event) {
       disableSetDesktopBackground: disableSetDesktopBg,
       loginFillInfo,
       parentAllowsMixedContent,
+      userContextId,
     };
   }
 }
@@ -465,7 +469,8 @@ var ClickEventHandler = {
                  ctrlKey: event.ctrlKey, metaKey: event.metaKey,
                  altKey: event.altKey, href: null, title: null,
                  bookmark: false, referrerPolicy: referrerPolicy,
-                 originAttributes: principal ? principal.originAttributes : {} };
+                 originAttributes: principal ? principal.originAttributes : {},
+                 isContentWindowPrivate: PrivateBrowsingUtils.isContentWindowPrivate(ownerDoc.defaultView)};
 
     if (href) {
       try {
@@ -502,6 +507,7 @@ var ClickEventHandler = {
           json.allowMixedContent = true;
         } catch (e) {}
       }
+      json.originPrincipal = ownerDoc.nodePrincipal;
 
       sendAsyncMessage("Content:Click", json);
       return;
@@ -798,7 +804,7 @@ addMessageListener("ContextMenu:SearchFieldBookmarkData", (message) => {
         ((type == "checkbox" || type == "radio") && el.checked)) {
       formData.push(escapeNameValuePair(el.name, el.value, isURLEncoded));
     } else if (el instanceof content.HTMLSelectElement && el.selectedIndex >= 0) {
-      for (let j=0; j < el.options.length; j++) {
+      for (let j = 0; j < el.options.length; j++) {
         if (el.options[j].selected)
           formData.push(escapeNameValuePair(el.name, el.options[j].value,
                                             isURLEncoded));
@@ -1133,7 +1139,7 @@ var PageInfoListener = {
           // TODO: Reimplement once bug 714757 is fixed.
           let strVal = val.getStringValue();
           if (strVal.search(/^.*url\(\"?/) > -1) {
-            let url = strVal.replace(/^.*url\(\"?/,"").replace(/\"?\).*$/,"");
+            let url = strVal.replace(/^.*url\(\"?/, "").replace(/\"?\).*$/, "");
             addImage(url, label, strings.notSet, elem, true);
           }
         }
@@ -1274,7 +1280,7 @@ var PageInfoListener = {
     return result;
   },
 
-  //******** Other Misc Stuff
+  // Other Misc Stuff
   // Modified from the Links Panel v2.3, http://segment7.net/mozilla/links/links.html
   // parse a node to extract the contents of the node
   getValueText: function(node)

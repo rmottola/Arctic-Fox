@@ -113,8 +113,6 @@ WAVTrackDemuxer::Init()
     uint32_t aChunkName = mHeaderParser.GiveHeader().ChunkName();
     uint32_t aChunkSize = mHeaderParser.GiveHeader().ChunkSize();
 
-    aChunkSize += aChunkSize % 2;
-
     if (aChunkName == FRMT_CODE) {
       if (!FmtChunkParserInit()) {
         return false;
@@ -136,6 +134,10 @@ WAVTrackDemuxer::Init()
       break;
     } else {
       mOffset += aChunkSize; // Skip other irrelevant chunks.
+    }
+    if (mOffset & 1) {
+      // Wave files are 2-byte aligned so we need to round up
+      mOffset += 1;
     }
     mHeaderParser.Reset();
   }

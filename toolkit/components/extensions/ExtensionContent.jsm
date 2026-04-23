@@ -45,20 +45,28 @@ XPCOMUtils.defineLazyModuleGetter(this, "WebNavigationFrames",
                                   "resource://gre/modules/WebNavigationFrames.jsm");
 
 Cu.import("resource://gre/modules/ExtensionChild.jsm");
-
+Cu.import("resource://gre/modules/ExtensionCommon.jsm");
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
-var {
-  runSafeSyncWithoutClone,
-  defineLazyGetter,
-  BaseContext,
+
+const {
+  EventEmitter,
   LocaleData,
-  Messenger,
+  defineLazyGetter,
   flushJarCache,
   getInnerWindowID,
   promiseDocumentReady,
-  ChildAPIManager,
-  SchemaAPIManager,
+  runSafeSyncWithoutClone,
 } = ExtensionUtils;
+
+const {
+  BaseContext,
+  SchemaAPIManager,
+} = ExtensionCommon;
+
+const {
+  ChildAPIManager,
+  Messenger,
+} = ExtensionChild;
 
 XPCOMUtils.defineLazyGetter(this, "console", ExtensionUtils.getConsole);
 
@@ -284,10 +292,13 @@ function getWindowMessageManager(contentWindow) {
 var DocumentManager;
 var ExtensionManager;
 
-// Scope in which extension content script code can run. It uses
-// Cu.Sandbox to run the code. There is a separate scope for each
-// frame.
-class ExtensionContext extends BaseContext {
+/**
+ * An execution context for semi-privileged extension content scripts.
+ *
+ * This is the child side of the ContentScriptContextParent class
+ * defined in ExtensionParent.jsm.
+ */
+class ContentScriptContextChild extends BaseContext {
   constructor(extension, contentWindow, contextOptions = {}) {
     super("content_child", extension);
 
@@ -437,7 +448,7 @@ class ExtensionContext extends BaseContext {
   }
 }
 
-defineLazyGetter(ExtensionContext.prototype, "messenger", function() {
+defineLazyGetter(ContentScriptContextChild.prototype, "messenger", function() {
   // The |sender| parameter is passed directly to the extension.
   let sender = {id: this.extension.uuid, frameId: this.frameId, url: this.url};
   let filter = {extensionId: this.extension.id};
@@ -446,7 +457,7 @@ defineLazyGetter(ExtensionContext.prototype, "messenger", function() {
   return new Messenger(this, [this.messageManager], sender, filter, optionalFilter);
 });
 
-defineLazyGetter(ExtensionContext.prototype, "childManager", function() {
+defineLazyGetter(ContentScriptContextChild.prototype, "childManager", function() {
   let localApis = {};
   apiManager.generateAPIs(this, localApis);
 
@@ -465,10 +476,10 @@ defineLazyGetter(ExtensionContext.prototype, "childManager", function() {
 DocumentManager = {
   extensionCount: 0,
 
-  // Map[windowId -> Map[extensionId -> ExtensionContext]]
+  // Map[windowId -> Map[extensionId -> ContentScriptContextChild]]
   contentScriptWindows: new Map(),
 
-  // Map[windowId -> ExtensionContext]
+  // Map[windowId -> ContentScriptContextChild]
   extensionPageWindows: new Map(),
 
   init() {
@@ -667,7 +678,7 @@ DocumentManager = {
 
     let extensions = this.contentScriptWindows.get(winId);
     if (!extensions.has(extension.id)) {
-      let context = new ExtensionContext(extension, window);
+      let context = new ContentScriptContextChild(extension, window);
       extensions.set(extension.id, context);
     }
 
@@ -679,7 +690,7 @@ DocumentManager = {
 
     let context = this.extensionPageWindows.get(winId);
     if (!context) {
-      let context = new ExtensionContext(extension, window, {isExtensionPage: true});
+      let context = new ContentScriptContextChild(extension, window, {isExtensionPage: true});
       this.extensionPageWindows.set(winId, context);
     }
 
@@ -756,46 +767,70 @@ DocumentManager = {
 };
 
 // Represents a browser extension in the content process.
-function BrowserExtensionContent(data) {
-  this.id = data.id;
-  this.uuid = data.uuid;
-  this.data = data;
-  this.scripts = data.content_scripts.map(scriptData => new Script(this, scriptData));
-  this.webAccessibleResources = new MatchGlobs(data.webAccessibleResources);
-  this.whiteListedHosts = new MatchPattern(data.whiteListedHosts);
-  this.permissions = data.permissions;
-  this.principal = data.principal;
+class BrowserExtensionContent extends EventEmitter {
+  constructor(data) {
+    super();
 
-  this.localeData = new LocaleData(data.localeData);
+    this.id = data.id;
+    this.uuid = data.uuid;
+    this.data = data;
+    this.instanceId = data.instanceId;
 
-  this.manifest = data.manifest;
-  this.baseURI = Services.io.newURI(data.baseURL, null, null);
+    this.MESSAGE_EMIT_EVENT = `Extension:EmitEvent:${this.instanceId}`;
+    Services.cpmm.addMessageListener(this.MESSAGE_EMIT_EVENT, this);
 
-  // Only used in addon processes.
-  this.views = new Set();
+    this.scripts = data.content_scripts.map(scriptData => new Script(this, scriptData));
+    this.webAccessibleResources = new MatchGlobs(data.webAccessibleResources);
+    this.whiteListedHosts = new MatchPattern(data.whiteListedHosts);
+    this.permissions = data.permissions;
+    this.principal = data.principal;
 
-  let uri = Services.io.newURI(data.resourceURL, null, null);
+    this.localeData = new LocaleData(data.localeData);
 
-  if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
-    // Extension.jsm takes care of this in the parent.
-    ExtensionManagement.startupExtension(this.uuid, uri, this);
+    this.manifest = data.manifest;
+    this.baseURI = Services.io.newURI(data.baseURL, null, null);
+
+    // Only used in addon processes.
+    this.views = new Set();
+
+    // Only used for devtools views.
+    this.devtoolsViews = new Set();
+
+    let uri = Services.io.newURI(data.resourceURL, null, null);
+
+    if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
+      // Extension.jsm takes care of this in the parent.
+      ExtensionManagement.startupExtension(this.uuid, uri, this);
+    }
   }
-}
 
-BrowserExtensionContent.prototype = {
   shutdown() {
+    Services.cpmm.removeMessageListener(this.MESSAGE_EMIT_EVENT, this);
+
     if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
       ExtensionManagement.shutdownExtension(this.uuid);
     }
-  },
+  }
+
+  emit(event, ...args) {
+    Services.cpmm.sendAsyncMessage(this.MESSAGE_EMIT_EVENT, {event, args});
+
+    super.emit(event, ...args);
+  }
+
+  receiveMessage({name, data}) {
+    if (name === this.MESSAGE_EMIT_EVENT) {
+      super.emit(data.event, ...data.args);
+    }
+  }
 
   localizeMessage(...args) {
     return this.localeData.localizeMessage(...args);
-  },
+  }
 
   localize(...args) {
     return this.localeData.localize(...args);
-  },
+  }
 
   hasPermission(perm) {
     let match = /^manifest:(.*)/.exec(perm);
@@ -803,8 +838,8 @@ BrowserExtensionContent.prototype = {
       return this.manifest[match[1]] != null;
     }
     return this.permissions.has(perm);
-  },
-};
+  }
+}
 
 ExtensionManager = {
   // Map[extensionId, BrowserExtensionContent]
@@ -836,8 +871,11 @@ ExtensionManager = {
     switch (name) {
       case "Extension:Startup": {
         extension = new BrowserExtensionContent(data);
+
         this.extensions.set(data.id, extension);
+
         DocumentManager.startupExtension(data.id);
+
         Services.cpmm.sendAsyncMessage("Extension:StartupComplete");
         break;
       }
@@ -845,7 +883,9 @@ ExtensionManager = {
       case "Extension:Shutdown": {
         extension = this.extensions.get(data.id);
         extension.shutdown();
+
         DocumentManager.shutdownExtension(data.id);
+
         this.extensions.delete(data.id);
         break;
       }
@@ -984,11 +1024,15 @@ this.ExtensionContent = {
 
   init(global) {
     this.globals.set(global, new ExtensionGlobal(global));
-    ExtensionChild.init(global);
+    if (ExtensionManagement.isExtensionProcess) {
+      ExtensionChild.init(global);
+    }
   },
 
   uninit(global) {
-    ExtensionChild.uninit(global);
+    if (ExtensionManagement.isExtensionProcess) {
+      ExtensionChild.uninit(global);
+    }
     this.globals.get(global).uninit();
     this.globals.delete(global);
   },

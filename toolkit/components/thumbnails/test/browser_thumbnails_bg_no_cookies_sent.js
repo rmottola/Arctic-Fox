@@ -27,7 +27,7 @@ function* runTests() {
   yield bgCapture(url);
   ok(thumbnailExists(url), "Thumbnail file should exist after capture.");
 
-  retrieveImageDataForURL(url, function ([r, g, b]) {
+  retrieveImageDataForURL(url, function([r, g, b]) {
     isnot([r, g, b].toString(), [0, 255, 0].toString(),
           "The captured page should not be green.");
     gBrowser.removeTab(tab);

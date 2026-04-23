@@ -19,7 +19,7 @@ loader.lazyRequireGetter(this, "ObjectClient", "devtools/shared/client/main", tr
 const { extend } = require("sdk/core/heritage");
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
-const STRINGS_URI = "devtools/locale/webconsole.properties";
+const STRINGS_URI = "devtools/client/locales/webconsole.properties";
 
 const WebConsoleUtils = require("devtools/client/webconsole/utils").Utils;
 const { getSourceNames } = require("devtools/client/shared/source-utils");
@@ -935,8 +935,6 @@ Messages.Simple.prototype = extend(Messages.BaseMessage.prototype, {
 
     this.element.appendChild(body);
 
-    this.element.appendChild(this.document.createTextNode("\n"));
-
     this.element.clipboardText = this.element.textContent;
 
     if (this.private) {
@@ -993,11 +991,15 @@ Messages.Simple.prototype = extend(Messages.BaseMessage.prototype, {
     let location = this._renderLocation();
 
     if (repeatNode) {
+      bodyFlex.appendChild(this.document.createTextNode(" "));
       bodyFlex.appendChild(repeatNode);
     }
     if (location) {
+      bodyFlex.appendChild(this.document.createTextNode(" "));
       bodyFlex.appendChild(location);
     }
+
+    bodyFlex.appendChild(this.document.createTextNode("\n"));
 
     if (this.stack) {
       this._attachment = new Widgets.Stacktrace(this, this.stack).render().element;

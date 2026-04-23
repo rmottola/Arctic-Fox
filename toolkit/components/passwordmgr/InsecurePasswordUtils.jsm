@@ -71,7 +71,7 @@ this.InsecurePasswordUtils = {
    * or on insecure web pages. If insecure password fields are present,
    * a log message is sent to the web console to warn developers.
    *
-   * @param {FormLike} aForm A form-like object. @See {FormLikeFactory}
+   * @param {FormLike} aForm A form-like object. @See {LoginFormFactory}
    */
   checkForInsecurePasswords(aForm) {
     if (this._formRootsWarned.has(aForm.rootElement) ||
@@ -101,7 +101,6 @@ this.InsecurePasswordUtils = {
       let uri = Services.io.newURI(aForm.rootElement.action || aForm.rootElement.baseURI,
                                    null, null);
       let principal = gScriptSecurityManager.getCodebasePrincipal(uri);
-      let host = uri.host;
 
       if (uri.schemeIs("http")) {
         isFormSubmitHTTP = true;

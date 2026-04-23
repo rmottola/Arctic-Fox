@@ -288,7 +288,7 @@ Experiments.Policy.prototype = {
   },
 };
 
-function AlreadyShutdownError(message="already shut down") {
+function AlreadyShutdownError(message = "already shut down") {
   Error.call(this, message);
   let error = new Error();
   this.name = "AlreadyShutdownError";
@@ -298,7 +298,7 @@ function AlreadyShutdownError(message="already shut down") {
 AlreadyShutdownError.prototype = Object.create(Error.prototype);
 AlreadyShutdownError.prototype.constructor = AlreadyShutdownError;
 
-function CacheWriteError(message="Error writing cache file") {
+function CacheWriteError(message = "Error writing cache file") {
   Error.call(this, message);
   let error = new Error();
   this.name = "CacheWriteError";
@@ -312,7 +312,7 @@ CacheWriteError.prototype.constructor = CacheWriteError;
  * Manages the experiments and provides an interface to control them.
  */
 
-Experiments.Experiments = function (policy=new Experiments.Policy()) {
+Experiments.Experiments = function (policy = new Experiments.Policy()) {
   let log = Log.repository.getLoggerWithMessagePrefix(
       "Browser.Experiments.Experiments",
       "Experiments #" + gExperimentsCounter++ + "::");
@@ -488,7 +488,7 @@ Experiments.Experiments.prototype = {
       latestLogs: this._forensicsLogs,
       experiments: this._experiments ? [...this._experiments.keys()] : null,
       terminateReason: this._terminateReason,
-      activeExperiment: !!activeExperiment ? activeExperiment.id : null,
+      activeExperiment: activeExperiment ? activeExperiment.id : null,
     };
     if (this._latestError) {
       if (typeof this._latestError == "object") {
@@ -704,7 +704,7 @@ Experiments.Experiments.prototype = {
    * @throws Error if the specified experiment ID is unknown, or if there is no
    *         current experiment.
    */
-  getExperimentBranch: Task.async(function*(id=null) {
+  getExperimentBranch: Task.async(function*(id = null) {
     yield this._loadTask;
     let e;
     if (id) {
@@ -1359,7 +1359,7 @@ Experiments.Experiments.prototype = {
       return;
     }
 
-    this._log.trace("scheduleExperimentEvaluation() - scheduling for "+time+", now: "+now);
+    this._log.trace("scheduleExperimentEvaluation() - scheduling for " + time + ", now: " + now);
     this._policy.oneshotTimer(this.notify, time - now, this, "_timer");
   },
 };
@@ -1567,7 +1567,7 @@ Experiments.ExperimentEntry.prototype = {
 
     // In order for the experiment's data expiration mechanism to work, use the experiment's
     // |_endData| as the |_lastChangedDate| (if available).
-    this._lastChangedDate = !!this._endDate ? this._endDate : this._policy.now();
+    this._lastChangedDate = this._endDate ? this._endDate : this._policy.now();
 
     return true;
   },
@@ -1980,7 +1980,7 @@ Experiments.ExperimentEntry.prototype = {
     }
 
     // Experiment addons should not require a restart.
-    if (!!(addon.operationsRequiringRestart & AddonManager.OP_NEEDS_RESTART_ENABLE)) {
+    if (addon.operationsRequiringRestart & AddonManager.OP_NEEDS_RESTART_ENABLE) {
       throw new Error("Experiment addon requires a restart: " + addon.id);
     }
 

@@ -13,13 +13,25 @@ add_task(function* testWindowCreate() {
       });
     };
 
-    let windowId;
+    let promiseTabUpdated = (expected) => {
+      return new Promise(resolve => {
+        browser.tabs.onUpdated.addListener(function listener(tabId, changeInfo, tab) {
+          if (changeInfo.url === expected) {
+            browser.tabs.onUpdated.removeListener(listener);
+            resolve();
+          }
+        });
+      });
+    };
+
+    let windowId, tabId;
     browser.windows.getCurrent().then(window => {
       windowId = window.id;
 
       browser.test.log("Create additional tab in window 1");
       return browser.tabs.create({windowId, url: "about:blank"});
     }).then(tab => {
+      tabId = tab.id;
       browser.test.log("Create a new window, adopting the new tab");
 
       // Note that we want to check against actual boolean values for
@@ -28,10 +40,11 @@ add_task(function* testWindowCreate() {
 
       return Promise.all([
         promiseTabAttached(),
-        browser.windows.create({tabId: tab.id}),
+        browser.windows.create({tabId: tabId}),
       ]);
     }).then(([, window]) => {
       browser.test.assertEq(false, window.incognito, "New window is not private");
+      browser.test.assertEq(tabId, window.tabs[0].id, "tabs property populated correctly");
 
       browser.test.log("Close the new window");
       return browser.windows.remove(window.id);
@@ -86,6 +99,39 @@ add_task(function* testWindowCreate() {
                                     "Create call failed as expected");
           });
     }).then(() => {
+      browser.test.log("Try to create a window with an invalid tabId");
+
+      return browser.windows.create({tabId: 0}).then(
+        window => {
+          browser.test.fail("Create call should have failed");
+        },
+        error => {
+          browser.test.assertTrue(/Invalid tab ID: 0/.test(error.message),
+                                  "Create call failed as expected");
+        }
+      );
+    }).then(() => {
+      browser.test.log("Try to create a window with two URLs");
+
+      return browser.windows.create({url: ["http://example.com/", "http://example.org/"]});
+    }).then(window => {
+      browser.test.assertEq(2, window.tabs.length, "2 tabs were opened in new window");
+      browser.test.assertEq("about:blank", window.tabs[0].url, "about:blank, page not loaded yet");
+      browser.test.assertEq("about:blank", window.tabs[1].url, "about:blank, page not loaded yet");
+
+      return Promise.all([
+        promiseTabUpdated("http://example.com/"),
+        promiseTabUpdated("http://example.org/"),
+        Promise.resolve(window),
+      ]);
+    }).then(([, , window]) => {
+      return browser.windows.get(window.id, {populate: true});
+    }).then(window => {
+      browser.test.assertEq(2, window.tabs.length, "2 tabs were opened in new window");
+      browser.test.assertEq("http://example.com/", window.tabs[0].url, "Correct URL was loaded in tab 1");
+      browser.test.assertEq("http://example.org/", window.tabs[1].url, "Correct URL was loaded in tab 2");
+      return browser.windows.remove(window.id);
+    }).then(() => {
       browser.test.notifyPass("window-create");
     }).catch(e => {
       browser.test.fail(`${e} :: ${e.stack}`);
@@ -105,4 +151,3 @@ add_task(function* testWindowCreate() {
   yield extension.awaitFinish("window-create");
   yield extension.unload();
 });
-

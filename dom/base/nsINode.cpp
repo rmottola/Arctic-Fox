@@ -1242,7 +1242,7 @@ nsINode::RemoveEventListener(const nsAString& aType,
 NS_IMPL_REMOVE_SYSTEM_EVENT_LISTENER(nsINode)
 
 nsresult
-nsINode::PreHandleEvent(EventChainPreVisitor& aVisitor)
+nsINode::GetEventTargetParent(EventChainPreVisitor& aVisitor)
 {
   // This is only here so that we can use the NS_DECL_NSIDOMTARGET macro
   NS_ABORT();
@@ -2716,7 +2716,10 @@ nsINode::ParseSelectorList(const nsAString& aSelectorString,
   if (haveCachedList) {
     if (!selectorList) {
       // Invalid selector.
-      aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+      aRv.ThrowDOMException(NS_ERROR_DOM_SYNTAX_ERR,
+        NS_LITERAL_CSTRING("'") + NS_ConvertUTF16toUTF8(aSelectorString) +
+        NS_LITERAL_CSTRING("' is not a valid selector")
+      );
     }
     return selectorList;
   }
@@ -2733,6 +2736,13 @@ nsINode::ParseSelectorList(const nsAString& aSelectorString,
     // of selectors, but it sees if we can parse them first.)
     MOZ_ASSERT(aRv.ErrorCodeIs(NS_ERROR_DOM_SYNTAX_ERR),
                "Unexpected error, so cached version won't return it");
+
+    // Change the error message to match above.
+    aRv.ThrowDOMException(NS_ERROR_DOM_SYNTAX_ERR,
+      NS_LITERAL_CSTRING("'") + NS_ConvertUTF16toUTF8(aSelectorString) +
+      NS_LITERAL_CSTRING("' is not a valid selector")
+    );
+
     cache.CacheList(aSelectorString, nullptr);
     return nullptr;
   }

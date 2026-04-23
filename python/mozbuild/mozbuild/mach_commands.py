@@ -424,7 +424,8 @@ class Build(MachCommandBase):
                 try:
                     config = self.config_environment
                 except Exception:
-                    config_rc = self.configure()
+                    config_rc = self.configure(buildstatus_messages=True,
+                                               line_handler=output.on_line)
                     if config_rc != 0:
                         return config_rc
 
@@ -550,16 +551,23 @@ class Build(MachCommandBase):
         description='Configure the tree (run configure and config.status).')
     @CommandArgument('options', default=None, nargs=argparse.REMAINDER,
                      help='Configure options')
-    def configure(self, options=None):
+    def configure(self, options=None, buildstatus_messages=False, line_handler=None):
         def on_line(line):
             self.log(logging.INFO, 'build_output', {'line': line}, '{line}')
 
+        line_handler = line_handler or on_line
+
         options = ' '.join(shell_quote(o) for o in options or ())
+        append_env = {b'CONFIGURE_ARGS': options.encode('utf-8')}
+
+        # Only print build status messages when we have an active
+        # monitor.
+        if not buildstatus_messages:
+            append_env[b'NO_BUILDSTATUS_MESSAGES'] =  b'1'
         status = self._run_make(srcdir=True, filename='client.mk',
-            target='configure', line_handler=on_line, log=False,
+            target='configure', line_handler=line_handler, log=False,
             print_directory=False, allow_parallel=False, ensure_exit_code=False,
-            append_env={b'CONFIGURE_ARGS': options.encode('utf-8'),
-                        b'NO_BUILDSTATUS_MESSAGES': b'1',})
+            append_env=append_env)
 
         if not status:
             print('Configure complete!')
@@ -1073,10 +1081,12 @@ class Install(MachCommandBase):
 
     @Command('install', category='post-build',
         description='Install the package on the machine, or on a device.')
-    def install(self):
+    @CommandArgument('--verbose', '-v', action='store_true',
+        help='Print verbose output when installing to an Android emulator.')
+    def install(self, verbose=False):
         if conditions.is_android(self):
             from mozrunner.devices.android_device import verify_android_device
-            verify_android_device(self)
+            verify_android_device(self, verbose=verbose)
         ret = self._run_make(directory=".", target='install', ensure_exit_code=False)
         if ret == 0:
             self.notify('Install complete')
@@ -1571,3 +1581,23 @@ class PackageFrontend(MachCommandBase):
         artifacts = self._make_artifacts(tree=tree, job=job)
         artifacts.clear_cache()
         return 0
+
+@CommandProvider
+class Vendor(MachCommandBase):
+    """Vendor third-party dependencies into the source repository."""
+
+    @Command('vendor', category='misc',
+             description='Vendor third-party dependencies into the source repository.')
+    def vendor(self):
+        self.parser.print_usage()
+        sys.exit(1)
+
+    @SubCommand('vendor', 'rust',
+                description='Vendor rust crates from crates.io into third_party/rust')
+    @CommandArgument('--ignore-modified', action='store_true',
+        help='Ignore modified files in current checkout',
+        default=False)
+    def vendor_rust(self, **kwargs):
+        from mozbuild.vendor_rust import VendorRust
+        vendor_command = self._spawn(VendorRust)
+        vendor_command.vendor(**kwargs)

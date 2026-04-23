@@ -225,7 +225,6 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY urlbar.geolocationNotificationAnchor.label     "View the location request">
 <!ENTITY urlbar.addonsNotificationAnchor.label          "View the add-on install message">
 <!ENTITY urlbar.indexedDBNotificationAnchor.label       "View the app-offline storage message">
-<!ENTITY urlbar.loginFillNotificationAnchor.label       "Manage your login information">
 <!ENTITY urlbar.passwordNotificationAnchor.label        "Check if you want to save your password">
 <!ENTITY urlbar.pluginsNotificationAnchor.label         "Manage plugin usage on this page">
 <!ENTITY urlbar.webNotsNotificationAnchor3.label        "Change whether you can receive notifications from the site">
@@ -242,6 +241,8 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY urlbar.translateNotificationAnchor.label       "Translate this page">
 <!ENTITY urlbar.translatedNotificationAnchor.label      "Manage page translation">
 <!ENTITY urlbar.emeNotificationAnchor.label             "Manage use of DRM software">
+
+<!ENTITY urlbar.openHistoryPopup.tooltip                "Show history">
 
 <!ENTITY backForwardItem.title        "Back/Forward">
 <!ENTITY locationItem.title           "Location">
@@ -480,6 +481,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY openCmd.commandkey           "l">
 <!ENTITY urlbar.placeholder2          "Search or enter address">
 <!ENTITY urlbar.accesskey             "d">
+<!ENTITY urlbar.extension.label       "Extension:">
 <!ENTITY urlbar.switchToTab.label     "Switch to tab:">
 
 <!ENTITY urlbar.searchSuggestionsNotification.question "Would you like to improve your search experience with suggestions?">
@@ -511,11 +513,11 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY searchFocus.commandkey2      "e">
 <!ENTITY searchFocusUnix.commandkey   "j">
 
-<!-- LOCALIZATION NOTE (contentSearchInput.label, contentSearchSubmit.label):
-     These are set as the aria-label attribute for the search input box and
-     submit button in the in-content search UI, to be used by screen readers. -->
+<!-- LOCALIZATION NOTE (contentSearchInput.label):
+     This is set as the aria-label attribute for the search input box in the
+     in-content search UI, to be used by screen readers. -->
 <!ENTITY contentSearchInput.label     "Search query">
-<!ENTITY contentSearchSubmit.label    "Submit search">
+<!ENTITY contentSearchSubmit.tooltip  "Submit search">
 
 <!-- LOCALIZATION NOTE (searchFor.label, searchWith.label):
      These two strings are used to build the header above the list of one-click
@@ -553,7 +555,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY openLinkCmd.accesskey        "W">
 <!ENTITY openLinkInPrivateWindowCmd.label "Open Link in New Private Window">
 <!ENTITY openLinkInPrivateWindowCmd.accesskey "P">
-<!ENTITY openLinkCmdInCurrent.label     "Open Link in Current Tab">
+<!ENTITY openLinkCmdInCurrent.label     "Open Link">
 <!ENTITY openLinkCmdInCurrent.accesskey "O">
 <!ENTITY openFrameCmdInTab.label      "Open Frame in New Tab">
 <!ENTITY openFrameCmdInTab.accesskey  "T">

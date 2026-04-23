@@ -15,7 +15,7 @@ const {promiseWarn} = require("devtools/client/inspector/shared/utils");
 const {parseDeclarations} = require("devtools/shared/css/parsing-utils");
 const Services = require("Services");
 
-const STYLE_INSPECTOR_PROPERTIES = "devtools-shared/locale/styleinspector.properties";
+const STYLE_INSPECTOR_PROPERTIES = "devtools/shared/locales/styleinspector.properties";
 const {LocalizationHelper} = require("devtools/shared/l10n");
 const STYLE_INSPECTOR_L10N = new LocalizationHelper(STYLE_INSPECTOR_PROPERTIES);
 
@@ -189,7 +189,7 @@ Rule.prototype = {
     }
 
     this.applyProperties((modifications) => {
-      modifications.createProperty(ind, name, value, priority);
+      modifications.createProperty(ind, name, value, priority, enabled);
       // Now that the rule has been updated, the server might have given us data
       // that changes the state of the property. Update it now.
       prop.updateEditor();

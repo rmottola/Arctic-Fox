@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-@import url("splitters.css");
+
+@import url("resource://devtools/client/themes/splitters.css");
+@namespace html url("http://www.w3.org/1999/xhtml");
 
 :root {
   font: message-box;
@@ -33,6 +35,10 @@
   font-size: 80%;
 }
 
+/* Override wrong system font from forms.css */
+html|button, html|select {
+  font: message-box;
+}
 
 /* Autocomplete Popup */
 
@@ -366,10 +372,11 @@ checkbox:-moz-focusring {
   opacity: 0.8;
 }
 
-.devtools-button:hover:empty::before,
+.devtools-button:hover:empty:not(:disabled):before,
+.devtools-button.checked:empty::before,
 .devtools-button[checked]:empty::before,
 .devtools-button[open]:empty::before,
-.devtools-toolbarbutton:not([label]):hover > image,
+.devtools-toolbarbutton:not([label]):not([disabled=true]):hover > image,
 .devtools-toolbarbutton:not([label])[checked=true] > image,
 .devtools-toolbarbutton:not([label])[open=true] > image {
   opacity: 1;
@@ -378,6 +385,7 @@ checkbox:-moz-focusring {
 .devtools-button:disabled,
 .devtools-button[disabled],
 .devtools-toolbarbutton[disabled] {
+  pointer-events: none;
   opacity: 0.5 !important;
 }
 
@@ -389,6 +397,15 @@ checkbox:-moz-focusring {
   filter: var(--checked-icon-filter);
 }
 
+/* Checked/opened icon button background */
+.theme-firebug .devtools-button[checked]:empty,
+.theme-firebug .devtools-button[open]:empty,
+.theme-firebug .devtools-button.checked,
+.theme-firebug .devtools-toolbarbutton:not([label])[checked=true],
+.theme-firebug .devtools-toolbarbutton:not([label])[open=true] {
+  background-color: #C8D8E7;
+}
+
 /* Icon-and-text buttons */
 .devtools-toolbarbutton.icon-and-text .toolbarbutton-text {
   margin-inline-start: .5em !important;
@@ -397,29 +414,31 @@ checkbox:-moz-focusring {
 
 /* Text-only buttons */
 .theme-light .devtools-toolbarbutton[label]:not([text-as-image]):not([type=menu-button]),
-.theme-light .devtools-toolbarbutton[data-text-only] {
+.theme-light .devtools-toolbarbutton[data-text-only],
+.theme-light .devtools-button:not(:empty) {
   background-color: var(--toolbar-tab-hover);
 }
 .theme-dark .devtools-toolbarbutton[label]:not([text-as-image]):not([type=menu-button]),
-.theme-dark .devtools-toolbarbutton[data-text-only] {
+.theme-dark .devtools-toolbarbutton[data-text-only],
+.theme-dark .devtools-button:not(:empty) {
   background-color: rgba(0, 0, 0, .2); /* Splitter */
 }
 
 /* Text-only button states */
-.theme-dark .devtools-button:not(:empty):not([disabled]):hover,
+.theme-dark .devtools-button:not(:empty):not(:disabled):hover,
 .theme-dark .devtools-toolbarbutton:not(:-moz-any([checked=true],[disabled],[text-as-image]))[label]:hover {
   background: rgba(0, 0, 0, .3); /* Splitters */
 }
-.theme-light .devtools-button:not(:empty):not([disabled]):hover,
+.theme-light .devtools-button:not(:empty):not(:disabled):hover,
 .theme-light .devtools-toolbarbutton:not(:-moz-any([checked=true],[disabled],[text-as-image]))[label]:hover {
   background: rgba(170, 170, 170, .3); /* Splitters */
 }
 
-.theme-dark .devtools-button:not(:empty):not([disabled]):hover:active,
+.theme-dark .devtools-button:not(:empty):not(:disabled):hover:active,
 .theme-dark .devtools-toolbarbutton:not(:-moz-any([checked=true],[disabled],[text-as-image]))[label]:hover:active {
   background: rgba(0, 0, 0, .4); /* Splitters */
 }
-.theme-light .devtools-button:not(:empty):not([disabled]):hover:active,
+.theme-light .devtools-button:not(:empty):not(:disabled):hover:active,
 .theme-light .devtools-toolbarbutton:not(:-moz-any([checked=true],[disabled],[text-as-image]))[label]:hover:active {
   background: var(--toolbar-tab-hover-active);
 }
@@ -527,12 +546,21 @@ checkbox:-moz-focusring {
   font-size: inherit;
 }
 
+/*
+ * @TODO : has-clear-btn class was added for bug 1296187 and we should remove it
+ *  once we have a standardized search and filter input across the toolboxes.
+ */
+.has-clear-btn > .devtools-searchinput,
+.has-clear-btn > .devtools-filterinput {
+  padding-inline-end: 23px;
+}
+
 .devtools-searchinput {
   background-image: var(--magnifying-glass-image);
 }
 
 .devtools-filterinput {
-  background-image: url(images/filter.svg#filterinput);
+  background-image: url(chrome://devtools/skin/images/filter.svg#filterinput);
 }
 
 .devtools-searchinput:-moz-locale-dir(rtl),
@@ -563,7 +591,7 @@ checkbox:-moz-focusring {
 
 /* Searchbox is a div container element for a search input element */
 .devtools-searchbox {
-  display: flex;
+  display: inline-flex;
   flex: 1;
   height: 23px;
   position: relative;
@@ -576,11 +604,12 @@ checkbox:-moz-focusring {
 .devtools-searchbox > .devtools-filterinput {
   margin-left: 0;
   margin-right: 0;
+  width: 100%;
 }
 
-.devtools-searchbox > .devtools-textinput:-moz-focusring,
-.devtools-searchbox > .devtools-searchinput:-moz-focusring,
-.devtools-searchbox > .devtools-filterinput:-moz-focusring {
+.devtools-textinput:focus,
+.devtools-searchinput:focus,
+.devtools-filterinput:focus {
   border-color: var(--theme-focus-border-color-textbox);
   box-shadow: var(--theme-focus-box-shadow-textbox);
   transition: all 0.2s ease-in-out;
@@ -611,10 +640,9 @@ checkbox:-moz-focusring {
   width: 100%;
 }
 
-.devtools-rule-searchbox[filled] {
+.devtools-filterinput:-moz-any([filled],.filled) {
   background-color: var(--searchbox-background-color);
   border-color: var(--searchbox-border-color);
-  padding-inline-end: 23px;
 }
 
 .devtools-style-searchbox-no-match {
@@ -676,6 +704,74 @@ checkbox:-moz-focusring {
 .devtools-searchinput > .textbox-input-box > .textbox-search-icons > .textbox-search-clear:hover,
 .devtools-filterinput > .textbox-input-box > .textbox-search-icons > .textbox-search-clear:hover {
   -moz-image-region: rect(0, 32px, 16px, 16px);
+}
+
+/* Twisty and checkbox controls */
+.theme-twisty, .theme-checkbox {
+  width: 14px;
+  height: 14px;
+  background-repeat: no-repeat;
+  background-image: url("chrome://devtools/skin/images/controls.png");
+  background-size: 56px 28px;
+}
+
+.theme-twisty {
+  cursor: pointer;
+  background-position: 0 -14px;
+}
+
+.theme-selected ~ .theme-twisty,
+.theme-dark .theme-twisty {
+  background-position: -28px -14px;
+}
+
+.theme-twisty:-moz-focusring {
+  outline-style: none;
+}
+
+.theme-twisty[open], .theme-twisty.open {
+  background-position: -14px -14px;
+}
+
+.theme-selected ~ .theme-twisty[open],
+.theme-dark .theme-twisty[open], .theme-dark .theme-twisty.open  {
+  background-position: -42px -14px;
+}
+
+.theme-twisty[invisible] {
+  visibility: hidden;
+}
+
+/* Mirror the twisty for rtl direction */
+.theme-twisty:dir(rtl),
+.theme-twisty:-moz-locale-dir(rtl) {
+  transform: scaleX(-1);
+}
+
+.theme-checkbox {
+  display: inline-block;
+  border: 0;
+  padding: 0;
+  outline: none;
+  background-position: 0 0;
+}
+
+.theme-dark .theme-checkbox {
+  background-position: -28px 0;
+}
+
+.theme-checkbox[checked] {
+  background-position: -14px 0;
+}
+
+.theme-dark .theme-checkbox[checked] {
+  background-position: -42px 0;
+}
+
+@media (min-resolution: 1.1dppx) {
+  .theme-twisty, .theme-checkbox {
+    background-image: url("chrome://devtools/skin/images/controls@2x.png");
+  }
 }
 
 /* Throbbers */

@@ -4,9 +4,12 @@
 
 "use strict";
 
-const { createClass, DOM: dom } =
+const { createClass, DOM: dom, PropTypes } =
   require("devtools/client/shared/vendor/react");
 const Services = require("Services");
+
+loader.lazyRequireGetter(this, "DebuggerClient",
+  "devtools/shared/client/main", true);
 
 const Strings = Services.strings.createBundle(
   "chrome://devtools/locale/aboutdebugging.properties");
@@ -18,14 +21,24 @@ const LocaleCompare = (a, b) => {
 module.exports = createClass({
   displayName: "TargetList",
 
+  propTypes: {
+    client: PropTypes.instanceOf(DebuggerClient).isRequired,
+    debugDisabled: PropTypes.bool,
+    error: PropTypes.node,
+    id: PropTypes.string.isRequired,
+    name: PropTypes.string,
+    sort: PropTypes.bool,
+    targetClass: PropTypes.func.isRequired,
+    targets: PropTypes.arrayOf(PropTypes.object).isRequired
+  },
+
   render() {
     let { client, debugDisabled, error, targetClass, targets, sort } = this.props;
     if (sort) {
       targets = targets.sort(LocaleCompare);
     }
     targets = targets.map(target => {
-      let key = target.name || target.url || target.title;
-      return targetClass({ client, key, target, debugDisabled });
+      return targetClass({ client, target, debugDisabled });
     });
 
     let content = "";

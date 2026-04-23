@@ -1,4 +1,4 @@
-/*!
+/* !
 	update.js
 
 	run $ npm install
@@ -30,15 +30,15 @@ var path			= require('path'),
 
 
 var repo = 'glennjones/microformat-shiv',
-	tempDir = path.resolve(__dirname,'temp-repo'),
+	tempDir = path.resolve(__dirname, 'temp-repo'),
 	deployDirResolved = path.resolve(__dirname, deployDir),
 	pathList = [
-		['/modern/microformat-shiv-modern.js','/microformat-shiv.js'],
-		['/lib','/test/lib'],
-		['/test/interface-tests','/test/interface-tests'],
-		['/test/module-tests','/test/module-tests'],
-		['/test/standards-tests','/test/standards-tests'],
-		['/test/static','/test/static']
+		['/modern/microformat-shiv-modern.js', '/microformat-shiv.js'],
+		['/lib', '/test/lib'],
+		['/test/interface-tests', '/test/interface-tests'],
+		['/test/module-tests', '/test/module-tests'],
+		['/test/standards-tests', '/test/standards-tests'],
+		['/test/static', '/test/static']
 		];
 
 
@@ -131,7 +131,7 @@ function addNewFiles( pathList, deployDirResolved ) {
  * @return {String}
  */
 function getRepoVersion() {
-	var pack = fs.readFileSync(path.resolve(tempDir,'package.json'), {encoding: 'utf8'});
+	var pack = fs.readFileSync(path.resolve(tempDir, 'package.json'), {encoding: 'utf8'});
 	if (pack) {
 		pack = JSON.parse(pack)
 		if (pack && pack.version) {
@@ -157,7 +157,7 @@ function getLastCommitDate( repo, callback ) {
 	  }
 	};
 
-	request(options, function (error, response, body) {
+	request(options, function(error, response, body) {
 	  if (!error && response.statusCode == 200) {
 		var date = null,
 			json = JSON.parse(body);
@@ -189,7 +189,7 @@ function getLastBuildState( repo, callback ) {
 	  }
 	};
 
-	request(options, function (error, response, body) {
+	request(options, function(error, response, body) {
 	  if (!error && response.statusCode == 200) {
 		var buildState = null,
 			json = JSON.parse(body);

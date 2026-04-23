@@ -72,7 +72,7 @@ SetACookie(nsICookieService *aCookieService, const char *aSpec1, const char *aSp
     if (aSpec2)
         NS_NewURI(getter_AddRefs(uri2), aSpec2);
 
-    sBuffer = PR_sprintf_append(sBuffer, "    for host \"%s\": SET ", aSpec1);
+    sBuffer = PR_sprintf_append(sBuffer, R"(    for host "%s": SET )", aSpec1);
     nsresult rv = aCookieService->SetCookieStringFromHttp(uri1, uri2, nullptr, (char *)aCookieString, aServerTime, nullptr);
     // the following code is useless. the cookieservice blindly returns NS_OK
     // from SetCookieString. we have to call GetCookie to see if the cookie was
@@ -91,7 +91,7 @@ SetACookieNoHttp(nsICookieService *aCookieService, const char *aSpec, const char
     nsCOMPtr<nsIURI> uri;
     NS_NewURI(getter_AddRefs(uri), aSpec);
 
-    sBuffer = PR_sprintf_append(sBuffer, "    for host \"%s\": SET ", aSpec);
+    sBuffer = PR_sprintf_append(sBuffer, R"(    for host "%s": SET )", aSpec);
     nsresult rv = aCookieService->SetCookieString(uri, nullptr, (char *)aCookieString, nullptr);
     // the following code is useless. the cookieservice blindly returns NS_OK
     // from SetCookieString. we have to call GetCookie to see if the cookie was
@@ -114,7 +114,7 @@ GetACookie(nsICookieService *aCookieService, const char *aSpec1, const char *aSp
     if (aSpec2)
         NS_NewURI(getter_AddRefs(uri2), aSpec2);
 
-    sBuffer = PR_sprintf_append(sBuffer, "             \"%s\": GOT ", aSpec1);
+    sBuffer = PR_sprintf_append(sBuffer, R"(             "%s": GOT )", aSpec1);
     nsresult rv = aCookieService->GetCookieStringFromHttp(uri1, uri2, nullptr, aCookie);
     if (NS_FAILED(rv)) {
       sBuffer = PR_sprintf_append(sBuffer, "XXX GetCookieString() failed!\n");
@@ -135,7 +135,7 @@ GetACookieNoHttp(nsICookieService *aCookieService, const char *aSpec, char **aCo
     nsCOMPtr<nsIURI> uri;
     NS_NewURI(getter_AddRefs(uri), aSpec);
 
-    sBuffer = PR_sprintf_append(sBuffer, "             \"%s\": GOT ", aSpec);
+    sBuffer = PR_sprintf_append(sBuffer, R"(             "%s": GOT )", aSpec);
     nsresult rv = aCookieService->GetCookieString(uri, nullptr, aCookie);
     if (NS_FAILED(rv)) {
       sBuffer = PR_sprintf_append(sBuffer, "XXX GetCookieString() failed!\n");
@@ -357,7 +357,7 @@ main(int32_t argc, char *argv[])
       GetACookie(cookieService, "http://foo.domain.com", nullptr, getter_Copies(cookie));
       rv[13] = CheckResult(cookie.get(), MUST_BE_NULL);
 
-      SetACookie(cookieService, "http://path.net/path/file", nullptr, "test=taco; path=\"/bogus\"", nullptr);
+      SetACookie(cookieService, "http://path.net/path/file", nullptr, R"(test=taco; path="/bogus")", nullptr);
       GetACookie(cookieService, "http://path.net/path/file", nullptr, getter_Copies(cookie));
       rv[14] = CheckResult(cookie.get(), MUST_EQUAL, "test=taco");
       SetACookie(cookieService, "http://path.net/path/file", nullptr, "test=taco; max-age=-1", nullptr);
@@ -457,10 +457,10 @@ main(int32_t argc, char *argv[])
       SetACookie(cookieService, "http://expireme.org/", nullptr, "test=expiry; expires=Thu, 10 Apr 1980 16:33:12 GMT", nullptr);
       GetACookie(cookieService, "http://expireme.org/", nullptr, getter_Copies(cookie));
       rv[3] = CheckResult(cookie.get(), MUST_BE_NULL);
-      SetACookie(cookieService, "http://expireme.org/", nullptr, "test=expiry; expires=\"Thu, 10 Apr 1980 16:33:12 GMT", nullptr);
+      SetACookie(cookieService, "http://expireme.org/", nullptr, R"(test=expiry; expires="Thu, 10 Apr 1980 16:33:12 GMT)", nullptr);
       GetACookie(cookieService, "http://expireme.org/", nullptr, getter_Copies(cookie));
       rv[4] = CheckResult(cookie.get(), MUST_BE_NULL);
-      SetACookie(cookieService, "http://expireme.org/", nullptr, "test=expiry; expires=\"Thu, 10 Apr 1980 16:33:12 GMT\"", nullptr);
+      SetACookie(cookieService, "http://expireme.org/", nullptr, R"(test=expiry; expires="Thu, 10 Apr 1980 16:33:12 GMT")", nullptr);
       GetACookie(cookieService, "http://expireme.org/", nullptr, getter_Copies(cookie));
       rv[5] = CheckResult(cookie.get(), MUST_BE_NULL);
 
@@ -557,7 +557,7 @@ main(int32_t argc, char *argv[])
       rv[1] = CheckResult(cookie.get(), MUST_BE_NULL);
       SetACookie(cookieService, "http://parser.test/", nullptr, "test=\"fubar! = foo;bar\\\";\" parser; domain=.parser.test; max-age=6\nfive; max-age=2.63,", nullptr);
       GetACookie(cookieService, "http://parser.test/", nullptr, getter_Copies(cookie));
-      rv[2] = CheckResult(cookie.get(), MUST_CONTAIN, "test=\"fubar! = foo");
+      rv[2] = CheckResult(cookie.get(), MUST_CONTAIN, R"(test="fubar! = foo)");
       rv[3] = CheckResult(cookie.get(), MUST_CONTAIN, "five");
       SetACookie(cookieService, "http://parser.test/", nullptr, "test=kill; domain=.parser.test; max-age=0 \n five; max-age=0", nullptr);
       GetACookie(cookieService, "http://parser.test/", nullptr, getter_Copies(cookie));
@@ -802,9 +802,9 @@ main(int32_t argc, char *argv[])
       uint32_t hostCookies = 0;
       rv[8] = NS_SUCCEEDED(cookieMgr2->CountCookiesFromHost(NS_LITERAL_CSTRING("cookiemgr.test"), &hostCookies)) &&
               hostCookies == 2;
-      // check CookieExists() using the third cookie
+      // check CookieExistsNative() using the third cookie
       bool found;
-      rv[9] = NS_SUCCEEDED(cookieMgr2->CookieExists(newDomainCookie, &found)) && found;
+      rv[9] = NS_SUCCEEDED(cookieMgr2->CookieExistsNative(newDomainCookie, &attrs,  &found)) && found;
 
 
       // remove the cookie, block it, and ensure it can't be added again
@@ -813,7 +813,7 @@ main(int32_t argc, char *argv[])
                                                     NS_LITERAL_CSTRING("/rabbit"),    // path
                                                     true,                             // is blocked
                                                     &attrs));                         // originAttributes
-      rv[11] = NS_SUCCEEDED(cookieMgr2->CookieExists(newDomainCookie, &found)) && !found;
+      rv[11] = NS_SUCCEEDED(cookieMgr2->CookieExistsNative(newDomainCookie, &attrs, &found)) && !found;
       rv[12] = NS_SUCCEEDED(cookieMgr2->AddNative(NS_LITERAL_CSTRING("new.domain"),     // domain
                                             NS_LITERAL_CSTRING("/rabbit"),        // path
                                             NS_LITERAL_CSTRING("test3"),          // name
@@ -823,14 +823,14 @@ main(int32_t argc, char *argv[])
                                             true,                              // is session
                                             INT64_MIN,                            // expiry time
                                             &attrs));                         // originAttributes
-      rv[13] = NS_SUCCEEDED(cookieMgr2->CookieExists(newDomainCookie, &found)) && !found;
+      rv[13] = NS_SUCCEEDED(cookieMgr2->CookieExistsNative(newDomainCookie, &attrs, &found)) && !found;
       // sleep four seconds, to make sure the second cookie has expired
       PR_Sleep(4 * PR_TicksPerSecond());
-      // check that both CountCookiesFromHost() and CookieExists() count the
+      // check that both CountCookiesFromHost() and CookieExistsNative() count the
       // expired cookie
       rv[14] = NS_SUCCEEDED(cookieMgr2->CountCookiesFromHost(NS_LITERAL_CSTRING("cookiemgr.test"), &hostCookies)) &&
               hostCookies == 2;
-      rv[15] = NS_SUCCEEDED(cookieMgr2->CookieExists(expiredCookie, &found)) && found;
+      rv[15] = NS_SUCCEEDED(cookieMgr2->CookieExistsNative(expiredCookie, &attrs, &found)) && found;
       // double-check RemoveAll() using the enumerator
       rv[16] = NS_SUCCEEDED(cookieMgr->RemoveAll());
       rv[17] = NS_SUCCEEDED(cookieMgr->GetEnumerator(getter_AddRefs(enumerator))) &&

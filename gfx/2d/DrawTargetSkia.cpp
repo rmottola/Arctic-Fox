@@ -183,28 +183,28 @@ VerifyRGBXCorners(uint8_t* aData, const IntSize &aSize, const int32_t aStride, S
   const int strideDiff = aStride - (width * pixelSize);
   MOZ_ASSERT(width * pixelSize <= aStride);
 
-  const int topLeft = kARGBAlphaOffset;
-  const int topRight = width * pixelSize + kARGBAlphaOffset - pixelSize;
-  const int bottomRight = aStride * height - strideDiff + kARGBAlphaOffset - pixelSize;
-  const int bottomLeft = aStride * height - aStride + kARGBAlphaOffset;
+  const int topLeft = 0;
+  const int topRight = width * pixelSize - pixelSize;
+  const int bottomRight = aStride * height - strideDiff - pixelSize;
+  const int bottomLeft = aStride * height - aStride;
 
   // Lastly the center pixel
   int middleRowHeight = height / 2;
   int middleRowWidth = (width / 2) * pixelSize;
-  const int middle = aStride * middleRowHeight + middleRowWidth + kARGBAlphaOffset;
+  const int middle = aStride * middleRowHeight + middleRowWidth;
 
   const int offsets[] = { topLeft, topRight, bottomRight, bottomLeft, middle };
   for (size_t i = 0; i < MOZ_ARRAY_LENGTH(offsets); i++) {
     int offset = offsets[i];
-    if (aData[offset] != 0xFF) {
+    if (aData[offset + kARGBAlphaOffset] != 0xFF) {
         int row = offset / aStride;
         int column = (offset % aStride) / pixelSize;
         gfxCriticalError() << "RGBX corner pixel at (" << column << "," << row << ") in "
                            << width << "x" << height << " surface is not opaque: "
-                           << int(aData[column]) << ","
-                           << int(aData[column+1]) << ","
-                           << int(aData[column+2]) << ","
-                           << int(aData[column+3]);
+                           << int(aData[offset]) << ","
+                           << int(aData[offset+1]) << ","
+                           << int(aData[offset+2]) << ","
+                           << int(aData[offset+3]);
     }
   }
 
@@ -1586,10 +1586,17 @@ DrawTargetSkia::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFor
     // Otherwise, just fall back to a software draw target.
   }
 #endif
+
+#ifdef DEBUG
   // Check that our SkCanvas isn't backed by vector storage such as PDF.  If it
-  // is then we want similar storage to avoid losing fidelity.
-  MOZ_ASSERT(mCanvas->imageInfo().colorType() != kUnknown_SkColorType,
-             "Not backed by pixels - we need to handle PDF backed SkCanvas");
+  // is then we want similar storage to avoid losing fidelity (if and when this
+  // DrawTarget is Snapshot()'ed, drawning a raster back into this DrawTarget
+  // will lose fidelity).
+  if (mCanvas->imageInfo().colorType() == kUnknown_SkColorType) {
+    NS_WARNING("Not backed by pixels - we need to handle PDF backed SkCanvas");
+  }
+#endif
+
   if (!target->Init(aSize, aFormat)) {
     return nullptr;
   }

@@ -51,7 +51,7 @@ function expectNotifications() {
             if (arg && arg instanceof Ci.nsIURI)
               return new URL(arg.spec);
             if (arg && typeof(arg) == "number" && arg >= Date.now() * 1000)
-              return new Date(parseInt(arg/1000));
+              return new Date(parseInt(arg / 1000));
             return arg;
           });
           notifications.push({ name: name, arguments: args });
@@ -275,7 +275,6 @@ add_task(function* test_unsetKeyword() {
 });
 
 add_task(function* test_addRemoveBookmark() {
-  let fc = yield foreign_count(URI3);
   let observer = expectNotifications();
 
   let itemId =

@@ -102,6 +102,18 @@
   border-bottom: none;
 }
 
+.search-setting-button-compact {
+  border-bottom: none !important;
+}
+
+.search-panel-one-offs:not([compact=true]) > .searchbar-engine-one-off-item.last-of-row,
+.search-panel-one-offs[compact=true] > .searchbar-engine-one-off-item.last-of-row:not(.dummy),
+.search-panel-one-offs[compact=true] > .searchbar-engine-one-off-item.dummy:not(.last-of-row),
+.search-panel-one-offs[compact=true] > .searchbar-engine-one-off-item.last-engine,
+.search-setting-button-compact {
+  background-image: none;
+}
+
 .search-panel-tree {
   border-top: 1px solid #ccc !important;
 }
@@ -126,4 +138,19 @@
 
 .search-panel-tree > .autocomplete-treebody::-moz-tree-image(fromhistory, selected) {
   list-style-image: url("chrome://browser/skin/search-history-icon.svg#search-history-icon-active");
+}
+
+.search-setting-button {
+  -moz-appearance: none;
+  min-height: 32px;
+}
+
+.search-setting-button[selected] {
+  background-color: var(--arrowpanel-dimmed-further);
+}
+
+.search-setting-button-compact > .button-box > .button-icon {
+  list-style-image: url("chrome://browser/skin/gear.svg");
+  filter: url(chrome://browser/skin/filters.svg#fill);
+  fill: currentColor;
 }

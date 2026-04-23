@@ -20,9 +20,7 @@
 
 #include "nsDebug.h"
 #include "nsXPCOM.h"
-#ifndef XPCOM_GLUE
 #include "mozilla/Atomics.h"
-#endif
 #include "mozilla/Attributes.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Compiler.h"
@@ -175,6 +173,9 @@ public:
   {
   }
 
+  nsCycleCollectingAutoRefCnt(const nsCycleCollectingAutoRefCnt&) = delete;
+  void operator=(const nsCycleCollectingAutoRefCnt&) = delete;
+
   MOZ_ALWAYS_INLINE uintptr_t incr(nsISupports* aOwner)
   {
     return incr(aOwner, nullptr);
@@ -269,6 +270,9 @@ public:
   nsAutoRefCnt() : mValue(0) {}
   explicit nsAutoRefCnt(nsrefcnt aValue) : mValue(aValue) {}
 
+  nsAutoRefCnt(const nsAutoRefCnt&) = delete;
+  void operator=(const nsAutoRefCnt&) = delete;
+
   // only support prefix increment/decrement
   nsrefcnt operator++() { return ++mValue; }
   nsrefcnt operator--() { return --mValue; }
@@ -284,13 +288,15 @@ private:
   nsrefcnt mValue;
 };
 
-#ifndef XPCOM_GLUE
 namespace mozilla {
 class ThreadSafeAutoRefCnt
 {
 public:
   ThreadSafeAutoRefCnt() : mValue(0) {}
   explicit ThreadSafeAutoRefCnt(nsrefcnt aValue) : mValue(aValue) {}
+
+  ThreadSafeAutoRefCnt(const ThreadSafeAutoRefCnt&) = delete;
+  void operator=(const ThreadSafeAutoRefCnt&) = delete;
 
   // only support prefix increment/decrement
   MOZ_ALWAYS_INLINE nsrefcnt operator++() { return ++mValue; }
@@ -313,7 +319,6 @@ private:
   Atomic<nsrefcnt> mValue;
 };
 } // namespace mozilla
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -81,12 +81,17 @@ private:
   // Decrement the decoder limit and resolve a promise if available.
   void ResolvePromise(ReentrantMonitorAutoEnter& aProofOfLock);
 
+  // Protect access to Instance().
+  static StaticMutex sMutex;
+
   ReentrantMonitor mMonitor;
   // The number of decoders available for creation.
   int mDecoderLimit;
   // Requests to acquire tokens.
   std::queue<RefPtr<PromisePrivate>> mPromises;
 };
+
+StaticMutex DecoderAllocPolicy::sMutex;
 
 class DecoderAllocPolicy::AutoDeallocToken : public Token
 {
@@ -115,8 +120,7 @@ DecoderAllocPolicy::~DecoderAllocPolicy()
 DecoderAllocPolicy&
 DecoderAllocPolicy::Instance()
 {
-  // Note: Function-static initialization is not thread-safe in VS 2013.
-  // Don't uplift this code to 45esr.
+  StaticMutexAutoLock lock(sMutex);
   static auto sPolicy = new DecoderAllocPolicy();
   return *sPolicy;
 }
@@ -196,6 +200,7 @@ private:
       mTokenPromise.DisconnectIfExists();
       mInitPromise.DisconnectIfExists();
       if (mDecoder) {
+        mDecoder->Flush();
         mDecoder->Shutdown();
       }
     }
@@ -1524,6 +1529,8 @@ MediaFormatReader::Update(TrackType aTrack)
       }
       SkipVideoDemuxToNextKeyFrame(decoder.mLastSampleTime.refOr(TimeInterval()).Length());
       return;
+    } else if (aTrack == TrackType::kAudioTrack) {
+      decoder.Flush();
     }
   }
 
@@ -2184,11 +2191,6 @@ MediaFormatReader::UpdateBufferedWithPromise() {
 
 void MediaFormatReader::ReleaseResources()
 {
-  // Before freeing a video codec, all video buffers needed to be released
-  // even from graphics pipeline.
-  if (mVideoFrameContainer) {
-    mVideoFrameContainer->ClearCurrentFrame();
-  }
   mVideo.ShutdownDecoder();
   mAudio.ShutdownDecoder();
 }

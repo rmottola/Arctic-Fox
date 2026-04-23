@@ -144,7 +144,7 @@ CommonDialog.prototype = {
         // set the icon
         let icon = this.ui.infoIcon;
         if (icon)
-            this.iconClass.forEach((el,idx,arr) => icon.classList.add(el));
+            this.iconClass.forEach((el, idx, arr) => icon.classList.add(el));
 
         // set default result to cancelled
         this.args.ok = false;
@@ -218,7 +218,7 @@ CommonDialog.prototype = {
     },
 
 
-    initTextbox : function (aName, aValue) {
+    initTextbox : function(aName, aValue) {
         this.ui[aName + "Container"].hidden = false;
         this.ui[aName + "Textbox"].setAttribute("value",
                                                 aValue !== null ? aValue : "");

@@ -5,8 +5,7 @@
 
 "use strict";
 
-var Cu = Components.utils;
-const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
+const {require} = Components.utils.import("resource://devtools/shared/Loader.jsm", {});
 const {parseDeclarations, _parseCommentDeclarations} = require("devtools/shared/css/parsing-utils");
 const {isCssPropertyKnown} = require("devtools/server/actors/css-properties");
 
@@ -239,12 +238,13 @@ const TEST_DATA = [
     }]
   },
   {
-    input: "content: \"a not s\\\
-          o very long title\"",
-    expected: [
-      {name: "content", value: '"a not s\\\
-          o very long title"', priority: "", offsets: [0, 46]}
-    ]
+    input: "content: \"a not s\\          o very long title\"",
+    expected: [{
+      name: "content",
+      value: '"a not s\\          o very long title"',
+      priority: "",
+      offsets: [0, 46]
+    }]
   },
   // Test calc with nested parentheses
   {
@@ -352,6 +352,13 @@ const TEST_DATA = [
   {
     input: "color: blue \\9 no\\_need",
     expected: [{name: "color", value: "blue \\9 no_need", priority: "", offsets: [0, 23]}]
+  },
+
+  // Regression test for bug 1297890 - don't paste tokens.
+  {
+    parseComments: true,
+    input: "stroke-dasharray: 1/*ThisIsAComment*/2;",
+    expected: [{name: "stroke-dasharray", value: "1 2", priority: "", offsets: [0, 39]}]
   },
 ];
 

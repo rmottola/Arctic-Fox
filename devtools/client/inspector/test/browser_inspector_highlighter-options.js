@@ -24,7 +24,7 @@ const TEST_DATA = [
     options: {},
     checkHighlighter: function* (testActor) {
       let hidden = yield testActor.getHighlighterNodeAttribute(
-        "box-model-nodeinfobar-container", "hidden");
+        "box-model-infobar-container", "hidden");
       ok(!hidden, "Node infobar is visible");
 
       hidden = yield testActor.getHighlighterNodeAttribute(
@@ -64,8 +64,8 @@ const TEST_DATA = [
     options: {hideInfoBar: true},
     checkHighlighter: function* (testActor) {
       let hidden = yield testActor.getHighlighterNodeAttribute(
-        "box-model-nodeinfobar-container", "hidden");
-      is(hidden, "true", "nodeinfobar has been hidden");
+        "box-model-infobar-container", "hidden");
+      is(hidden, "true", "infobar has been hidden");
     }
   },
   {
@@ -185,7 +185,7 @@ const TEST_DATA = [
 ];
 
 add_task(function* () {
-  let {inspector, toolbox, testActor} = yield openInspectorForURL(
+  let {inspector, testActor} = yield openInspectorForURL(
     "data:text/html;charset=utf-8," + encodeURI(TEST_URL));
 
   let divFront = yield getNodeFront("div", inspector);
@@ -194,11 +194,11 @@ add_task(function* () {
     info("Running test: " + desc);
 
     info("Show the box-model highlighter with options " + options);
-    yield toolbox.highlighter.showBoxModel(divFront, options);
+    yield inspector.highlighter.showBoxModel(divFront, options);
 
     yield checkHighlighter(testActor);
 
     info("Hide the box-model highlighter");
-    yield toolbox.highlighter.hideBoxModel();
+    yield inspector.highlighter.hideBoxModel();
   }
 });

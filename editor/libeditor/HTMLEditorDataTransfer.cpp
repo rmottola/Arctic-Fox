@@ -990,7 +990,9 @@ ImgFromData(const nsACString& aType, const nsACString& aData, nsString& aOutput)
   aOutput.AssignLiteral("<IMG src=\"data:");
   AppendUTF8toUTF16(aType, aOutput);
   aOutput.AppendLiteral(";base64,");
-  AppendUTF8toUTF16(data64, aOutput);
+  if (!AppendASCIItoUTF16(data64, aOutput, fallible_t())) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
   aOutput.AppendLiteral("\" alt=\"\" >");
   return NS_OK;
 }
@@ -1272,7 +1274,8 @@ HTMLEditor::InsertFromDataTransfer(DataTransfer* aDataTransfer,
                                    bool aDoDeleteSelection)
 {
   ErrorResult rv;
-  RefPtr<DOMStringList> types = aDataTransfer->MozTypesAt(aIndex, rv);
+  RefPtr<DOMStringList> types =
+    aDataTransfer->MozTypesAt(aIndex, CallerType::System, rv);
   if (rv.Failed()) {
     return rv.StealNSResult();
   }

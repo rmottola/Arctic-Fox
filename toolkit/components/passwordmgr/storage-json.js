@@ -27,7 +27,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gUUIDGenerator",
                                    "@mozilla.org/uuid-generator;1",
                                    "nsIUUIDGenerator");
 
-this.LoginManagerStorage_json = function () {};
+this.LoginManagerStorage_json = function() {};
 
 this.LoginManagerStorage_json.prototype = {
   classID: Components.ID("{c00c432d-a0c9-46d7-bef6-9c45b4d07341}"),
@@ -97,7 +97,7 @@ this.LoginManagerStorage_json.prototype = {
    */
   terminate() {
     this._store._saver.disarm();
-    return this._store.save();
+    return this._store._save();
   },
 
   addLogin(login) {
@@ -180,8 +180,7 @@ this.LoginManagerStorage_json.prototype = {
 
     // Check if the new GUID is duplicate.
     if (newLogin.guid != oldStoredLogin.guid &&
-        !this._isGuidUnique(newLogin.guid))
-    {
+        !this._isGuidUnique(newLogin.guid)) {
       throw new Error("specified GUID already exists");
     }
 
@@ -283,8 +282,6 @@ this.LoginManagerStorage_json.prototype = {
     schemeUpgrades: false,
   }) {
     this._store.ensureDataReady();
-
-    let conditions = [];
 
     function match(aLogin) {
       for (let field in matchData) {
@@ -398,7 +395,6 @@ this.LoginManagerStorage_json.prototype = {
   },
 
   countLogins(hostname, formSubmitURL, httpRealm) {
-    let count = {};
     let loginData = {
       hostname: hostname,
       formSubmitURL: formSubmitURL,

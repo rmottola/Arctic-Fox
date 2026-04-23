@@ -47,6 +47,7 @@ var publicProperties = [
   "getSignedInUserProfile",
   "loadAndPoll",
   "localtimeOffsetMsec",
+  "notifyDevices",
   "now",
   "promiseAccountsForceSigninURI",
   "promiseAccountsChangeProfileURI",
@@ -375,6 +376,29 @@ FxAccountsInternal.prototype = {
     let storage = new FxAccountsStorageManager();
     storage.initialize(credentials);
     return new AccountState(storage);
+  },
+
+  /**
+   * Send a message to a set of devices in the same account
+   *
+   * @return Promise
+   */
+  notifyDevices: function(deviceIds, payload, TTL) {
+    if (!Array.isArray(deviceIds)) {
+      deviceIds = [deviceIds];
+    }
+    return this.currentAccountState.getUserAccountData()
+      .then(data => {
+        if (!data) {
+          throw this._error(ERROR_NO_ACCOUNT);
+        }
+        if (!data.sessionToken) {
+          throw this._error(ERROR_AUTH_ERROR,
+            "notifyDevices called without a session token");
+        }
+        return this.fxAccountsClient.notifyDevices(data.sessionToken, deviceIds,
+          payload, TTL);
+    });
   },
 
   /**

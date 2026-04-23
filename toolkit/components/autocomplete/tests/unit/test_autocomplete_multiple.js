@@ -114,7 +114,7 @@ AutoCompleteResult.prototype = {
     return this.getValueAt(aIndex);
   },
 
-  removeValueAt: function (aRowIndex, aRemoveFromDb) {},
+  removeValueAt: function(aRowIndex, aRemoveFromDb) {},
 
   // nsISupports implementation
   QueryInterface: function(iid) {
@@ -228,8 +228,8 @@ function unregisterAutoCompleteSearch(aSearch) {
  * Test AutoComplete with multiple AutoCompleteSearch sources.
  */
 function run_test() {
-  var expected1 = ["1","2","3"];
-  var expected2 = ["a","b","c"];
+  var expected1 = ["1", "2", "3"];
+  var expected2 = ["a", "b", "c"];
   var search1 = new AutoCompleteSearch("search1",
                              new AutoCompleteResult(expected1, [], []));
   var search2 = new AutoCompleteSearch("search2",

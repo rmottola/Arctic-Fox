@@ -22,7 +22,9 @@ EXTRA_PP_COMPONENTS += [
 EXTRA_JS_MODULES['services-sync'] += [
     'modules/addonsreconciler.js',
     'modules/addonutils.js',
+    'modules/bookmark_validator.js',
     'modules/browserid_identity.js',
+    'modules/collection_validator.js',
     'modules/engines.js',
     'modules/FxaMigrator.jsm',
     'modules/healthreport.jsm',
@@ -38,6 +40,7 @@ EXTRA_JS_MODULES['services-sync'] += [
     'modules/service.js',
     'modules/status.js',
     'modules/SyncedTabs.jsm',
+    'modules/telemetry.js',
     'modules/userapi.js',
     'modules/util.js',
 ]
@@ -54,6 +57,7 @@ EXTRA_JS_MODULES['services-sync'].engines += [
     'modules/engines/addons.js',
     'modules/engines/bookmarks.js',
     'modules/engines/clients.js',
+    'modules/engines/extension-storage.js',
     'modules/engines/forms.js',
     'modules/engines/history.js',
     'modules/engines/passwords.js',

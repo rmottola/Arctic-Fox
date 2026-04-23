@@ -639,7 +639,7 @@ IDBTransaction::AbortInternal(nsresult aAbortCode,
 
   const bool isVersionChange = mMode == VERSION_CHANGE;
   const bool isInvalidated = mDatabase->IsInvalidated();
-  bool needToSendAbort = mReadyState == INITIAL && !isInvalidated;
+  bool needToSendAbort = mReadyState == INITIAL;
 
   mAbortCode = aAbortCode;
   mReadyState = DONE;
@@ -652,6 +652,12 @@ IDBTransaction::AbortInternal(nsresult aAbortCode,
     if (!isInvalidated) {
       mDatabase->RevertToPreviousState();
     }
+
+    // We do the reversion only for the mObjectStores/mDeletedObjectStores but
+    // not for the mIndexes/mDeletedIndexes of each IDBObjectStore because it's
+    // time-consuming(O(m*n)) and mIndexes/mDeletedIndexes won't be used anymore
+    // in IDBObjectStore::(Create|Delete)Index() and IDBObjectStore::Index() in
+    // which all the executions are returned earlier by !transaction->IsOpen().
 
     const nsTArray<ObjectStoreSpec>& specArray =
       mDatabase->Spec()->objectStores();
@@ -990,7 +996,7 @@ IDBTransaction::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 }
 
 nsresult
-IDBTransaction::PreHandleEvent(EventChainPreVisitor& aVisitor)
+IDBTransaction::GetEventTargetParent(EventChainPreVisitor& aVisitor)
 {
   AssertIsOnOwningThread();
 

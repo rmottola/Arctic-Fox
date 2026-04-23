@@ -49,6 +49,7 @@ DevToolsModules(
     'process.js',
     'profiler.js',
     'promises.js',
+    'reflow.js',
     'root.js',
     'script.js',
     'settings.js',

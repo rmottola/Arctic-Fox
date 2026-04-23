@@ -24,7 +24,6 @@ LOCAL_INCLUDES += [
     '/toolkit/mozapps/update/common',
 ]
 
-
 if CONFIG['OS_ARCH'] == 'WINNT':
     USE_LIBS += [
         'updatecommon-standalone',
@@ -44,6 +43,9 @@ for var in ('MOZ_APP_NAME', 'MOZ_APP_BASENAME', 'MOZ_APP_DISPLAYNAME',
     DEFINES[var] = CONFIG[var]
 
 DEFINES['NS_NO_XPCOM'] = True
+
+if CONFIG['MOZ_MAINTENANCE_SERVICE']:
+    DEFINES['MOZ_MAINTENANCE_SERVICE'] = CONFIG['MOZ_MAINTENANCE_SERVICE']
 
 # For debugging purposes only
 #DEFINES['DISABLE_UPDATER_AUTHENTICODE_CHECK'] = True

@@ -86,12 +86,16 @@ static mozilla::LazyLogModule sRefreshDriverLog("nsRefreshDriver");
 
 // The number of seconds spent skipping frames because we are waiting for the compositor
 // before logging.
-#ifdef MOZ_VALGRIND
-#define REFRESH_WAIT_WARNING 10
-#elif defined(DEBUG) || defined(MOZ_ASAN)
-#define REFRESH_WAIT_WARNING 5
+#if defined(MOZ_ASAN)
+# define REFRESH_WAIT_WARNING 5
+#elif defined(DEBUG) && !defined(MOZ_VALGRIND)
+# define REFRESH_WAIT_WARNING 5
+#elif defined(DEBUG) && defined(MOZ_VALGRIND)
+# define REFRESH_WAIT_WARNING (RUNNING_ON_VALGRIND ? 20 : 5)
+#elif defined(MOZ_VALGRIND)
+# define REFRESH_WAIT_WARNING (RUNNING_ON_VALGRIND ? 10 : 1)
 #else
-#define REFRESH_WAIT_WARNING 1
+# define REFRESH_WAIT_WARNING 1
 #endif
 
 namespace {
@@ -171,7 +175,8 @@ public:
       NS_ASSERTION(mRootRefreshDrivers.Contains(aDriver), "RemoveRefreshDriver for a refresh driver that's not in the root refresh list!");
       mRootRefreshDrivers.RemoveElement(aDriver);
     } else {
-      nsPresContext* rootContext = aDriver->PresContext()->GetRootPresContext();
+      nsPresContext* pc = aDriver->GetPresContext();
+      nsPresContext* rootContext = pc ? pc->GetRootPresContext() : nullptr;
       // During PresContext shutdown, we can't accurately detect
       // if a root refresh driver exists or not. Therefore, we have to
       // search and find out which list this driver exists in.
@@ -254,7 +259,8 @@ protected:
 
   bool IsRootRefreshDriver(nsRefreshDriver* aDriver)
   {
-    nsPresContext* rootContext = aDriver->PresContext()->GetRootPresContext();
+    nsPresContext* pc = aDriver->GetPresContext();
+    nsPresContext* rootContext = pc ? pc->GetRootPresContext() : nullptr;
     if (!rootContext) {
       return false;
     }
@@ -357,7 +363,7 @@ public:
     mTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
   }
 
-  virtual ~SimpleTimerBasedRefreshDriverTimer()
+  ~SimpleTimerBasedRefreshDriverTimer() override
   {
     StopTimer();
   }
@@ -374,14 +380,14 @@ public:
     return mRateMilliseconds;
   }
 
-  virtual TimeDuration GetTimerRate() override
+  TimeDuration GetTimerRate() override
   {
     return mRateDuration;
   }
 
 protected:
 
-  virtual void StartTimer() override
+  void StartTimer() override
   {
     // pretend we just fired, and we schedule the next tick normally
     mLastFireEpoch = JS_Now();
@@ -393,7 +399,7 @@ protected:
     mTimer->InitWithFuncCallback(TimerTick, this, delay, nsITimer::TYPE_ONE_SHOT);
   }
 
-  virtual void StopTimer() override
+  void StopTimer() override
   {
     mTimer->Cancel();
   }
@@ -434,14 +440,20 @@ public:
     mVsyncRate = mVsyncChild->GetVsyncRate();
   }
 
-  virtual TimeDuration GetTimerRate() override
+  TimeDuration GetTimerRate() override
   {
     if (mVsyncRate != TimeDuration::Forever()) {
       return mVsyncRate;
     }
 
     if (mVsyncChild) {
-      mVsyncRate = mVsyncChild->GetVsyncRate();
+      // VsyncChild::VsyncRate() is a simple getter for the cached
+      // hardware vsync rate. We depend on that
+      // VsyncChild::GetVsyncRate() being called in the constructor
+      // will result in a response with the actual vsync rate sooner
+      // or later. Until that happens VsyncChild::VsyncRate() returns
+      // TimeDuration::Forever() and we have to guess below.
+      mVsyncRate = mVsyncChild->VsyncRate();
     }
 
     // If hardware queries fail / are unsupported, we have to just guess.
@@ -470,7 +482,7 @@ private:
       MOZ_ASSERT(NS_IsMainThread());
     }
 
-    virtual bool NotifyVsync(TimeStamp aVsyncTimestamp) override
+    bool NotifyVsync(TimeStamp aVsyncTimestamp) override
     {
       // IMPORTANT: All paths through this method MUST hold a strong ref on
       // |this| for the duration of the TickRefreshDriver callback.
@@ -515,7 +527,7 @@ private:
       }
     }
   private:
-    virtual ~RefreshDriverVsyncObserver() {}
+    ~RefreshDriverVsyncObserver() = default;
 
     void RecordTelemetryProbes(TimeStamp aVsyncTimestamp)
     {
@@ -593,7 +605,7 @@ private:
     bool mProcessedVsync;
   }; // RefreshDriverVsyncObserver
 
-  virtual ~VsyncRefreshDriverTimer()
+  ~VsyncRefreshDriverTimer() override
   {
     if (XRE_IsParentProcess()) {
       mVsyncDispatcher->SetParentRefreshTimer(nullptr);
@@ -614,7 +626,7 @@ private:
     mVsyncObserver = nullptr;
   }
 
-  virtual void StartTimer() override
+  void StartTimer() override
   {
     // Protect updates to `sActiveVsyncTimers`.
     MOZ_ASSERT(NS_IsMainThread());
@@ -632,7 +644,7 @@ private:
     ++sActiveVsyncTimers;
   }
 
-  virtual void StopTimer() override
+  void StopTimer() override
   {
     // Protect updates to `sActiveVsyncTimers`.
     MOZ_ASSERT(NS_IsMainThread());
@@ -647,7 +659,7 @@ private:
     --sActiveVsyncTimers;
   }
 
-  virtual void ScheduleNextTick(TimeStamp aNowTime) override
+  void ScheduleNextTick(TimeStamp aNowTime) override
   {
     // Do nothing since we just wait for the next vsync from
     // RefreshDriverVsyncObserver.
@@ -689,7 +701,7 @@ public:
   }
 
 protected:
-  virtual void ScheduleNextTick(TimeStamp aNowTime)
+  void ScheduleNextTick(TimeStamp aNowTime) override
   {
     // Since this is only used for startup, it isn't super critical
     // that we tick at consistent intervals.
@@ -733,7 +745,7 @@ public:
   {
   }
 
-  virtual void AddRefreshDriver(nsRefreshDriver* aDriver) override
+  void AddRefreshDriver(nsRefreshDriver* aDriver) override
   {
     RefreshDriverTimer::AddRefreshDriver(aDriver);
 
@@ -751,7 +763,7 @@ public:
     StartTimer();
   }
 
-  virtual TimeDuration GetTimerRate() override
+  TimeDuration GetTimerRate() override
   {
     return TimeDuration::FromMilliseconds(mNextTickDuration);
   }
@@ -762,7 +774,7 @@ protected:
     return mContentRefreshDrivers.Length() + mRootRefreshDrivers.Length();
   }
 
-  virtual void StartTimer() override
+  void StartTimer() override
   {
     mLastFireEpoch = JS_Now();
     mLastFireTime = TimeStamp::Now();
@@ -773,12 +785,12 @@ protected:
     mTimer->InitWithFuncCallback(TimerTickOne, this, delay, nsITimer::TYPE_ONE_SHOT);
   }
 
-  virtual void StopTimer() override
+  void StopTimer() override
   {
     mTimer->Cancel();
   }
 
-  virtual void ScheduleNextTick(TimeStamp aNowTime) override
+  void ScheduleNextTick(TimeStamp aNowTime) override
   {
     if (mDisableAfterMilliseconds > 0.0 &&
         mNextTickDuration > mDisableAfterMilliseconds)
@@ -864,16 +876,16 @@ public:
   }
 
 private:
-  virtual ~VsyncChildCreateCallback() {}
+  virtual ~VsyncChildCreateCallback() = default;
 
-  virtual void ActorCreated(PBackgroundChild* aPBackgroundChild) override
+  void ActorCreated(PBackgroundChild* aPBackgroundChild) override
   {
     MOZ_ASSERT(NS_IsMainThread());
     MOZ_ASSERT(aPBackgroundChild);
     CreateVsyncActor(aPBackgroundChild);
   }
 
-  virtual void ActorFailed() override
+  void ActorFailed() override
   {
     MOZ_ASSERT(NS_IsMainThread());
     MOZ_CRASH("Failed To Create VsyncChild Actor");
@@ -2197,7 +2209,8 @@ nsRefreshDriver::IsWaitingForPaint(mozilla::TimeStamp aTime)
 
   // Try find the 'root' refresh driver for the current window and check
   // if that is waiting for a paint.
-  nsPresContext *rootContext = PresContext()->GetRootPresContext();
+  nsPresContext* pc = GetPresContext();
+  nsPresContext* rootContext = pc ? pc->GetRootPresContext() : nullptr;
   if (rootContext) {
     nsRefreshDriver *rootRefresh = rootContext->RefreshDriver();
     if (rootRefresh && rootRefresh != this) {
@@ -2235,8 +2248,8 @@ nsRefreshDriver::PVsyncActorCreated(VsyncChild* aVsyncChild)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!XRE_IsParentProcess());
-  VsyncRefreshDriverTimer* vsyncRefreshDriverTimer =
-                           new VsyncRefreshDriverTimer(aVsyncChild);
+  auto* vsyncRefreshDriverTimer =
+      new VsyncRefreshDriverTimer(aVsyncChild);
 
   // If we are using software timer, swap current timer to
   // VsyncRefreshDriverTimer.

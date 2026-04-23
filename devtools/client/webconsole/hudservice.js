@@ -22,7 +22,7 @@ loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", 
 loader.lazyRequireGetter(this, "showDoorhanger", "devtools/client/shared/doorhanger", true);
 loader.lazyRequireGetter(this, "viewSource", "devtools/client/shared/view-source");
 
-const STRINGS_URI = "devtools/locale/webconsole.properties";
+const STRINGS_URI = "devtools/client/locales/webconsole.properties";
 var l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 
 const BROWSER_CONSOLE_WINDOW_FEATURES = "chrome,titlebar,toolbar,centerscreen,resizable,dialog=no";
@@ -521,18 +521,12 @@ WebConsole.prototype = {
       return null;
     }
     let panel = toolbox.getPanel("jsdebugger");
+
     if (!panel) {
       return null;
     }
-    let framesController = panel.panelWin.DebuggerController.StackFrames;
-    let thread = framesController.activeThread;
-    if (thread && thread.paused) {
-      return {
-        frames: thread.cachedFrames,
-        selected: framesController.currentFrameDepth,
-      };
-    }
-    return null;
+
+    return panel.getFrames();
   },
 
   /**

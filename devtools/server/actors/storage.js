@@ -161,6 +161,9 @@ StorageActors.defaults = function (typeName, observationTopic) {
       events.off(this.storageActor, "window-destroyed", this.onWindowDestroyed);
 
       this.hostVsStores.clear();
+
+      protocol.Actor.prototype.destroy.call(this);
+
       this.storageActor = null;
     },
 
@@ -415,7 +418,11 @@ StorageActors.createActor({
     events.off(this.storageActor, "window-ready", this.onWindowReady);
     events.off(this.storageActor, "window-destroyed", this.onWindowDestroyed);
 
-    this._pendingResponse = this.storageActor = null;
+    this._pendingResponse = null;
+
+    protocol.Actor.prototype.destroy.call(this);
+
+    this.storageActor = null;
   },
 
   /**
@@ -1250,6 +1257,61 @@ StorageActors.createActor({
   toStoreObject(item) {
     return item;
   },
+
+  removeItem: Task.async(function* (host, name) {
+    const cacheMap = this.hostVsStores.get(host);
+    if (!cacheMap) {
+      return;
+    }
+
+    const parsedName = JSON.parse(name);
+
+    if (parsedName.length == 1) {
+      // Delete the whole Cache object
+      const [ cacheName ] = parsedName;
+      cacheMap.delete(cacheName);
+      const cacheStorage = yield this.getCachesForHost(host);
+      yield cacheStorage.delete(cacheName);
+      this.onItemUpdated("deleted", host, [ cacheName ]);
+    } else if (parsedName.length == 2) {
+      // Delete one cached request
+      const [ cacheName, url ] = parsedName;
+      const cache = cacheMap.get(cacheName);
+      if (cache) {
+        yield cache.delete(url);
+        this.onItemUpdated("deleted", host, [ cacheName, url ]);
+      }
+    }
+  }),
+
+  removeAll: Task.async(function* (host, name) {
+    const cacheMap = this.hostVsStores.get(host);
+    if (!cacheMap) {
+      return;
+    }
+
+    const parsedName = JSON.parse(name);
+
+    // Only a Cache object is a valid object to clear
+    if (parsedName.length == 1) {
+      const [ cacheName ] = parsedName;
+      const cache = cacheMap.get(cacheName);
+      if (cache) {
+        let keys = yield cache.keys();
+        yield promise.all(keys.map(key => cache.delete(key)));
+        this.onItemUpdated("cleared", host, [ cacheName ]);
+      }
+    }
+  }),
+
+  /**
+   * CacheStorage API doesn't support any notifications, we must fake them
+   */
+  onItemUpdated(action, host, path) {
+    this.storageActor.update(action, "Cache", {
+      [host]: [ JSON.stringify(path) ]
+    });
+  },
 });
 
 /**
@@ -1389,6 +1451,10 @@ StorageActors.createActor({
 
     events.off(this.storageActor, "window-ready", this.onWindowReady);
     events.off(this.storageActor, "window-destroyed", this.onWindowDestroyed);
+
+    protocol.Actor.prototype.destroy.call(this);
+
+    this.storageActor = null;
   },
 
   /**
@@ -2178,9 +2244,8 @@ let StorageActor = protocol.ActorClassWithSpec(specs.storageSpec, {
   },
 
   initialize(conn, tabActor) {
-    protocol.Actor.prototype.initialize.call(this, null);
+    protocol.Actor.prototype.initialize.call(this, conn);
 
-    this.conn = conn;
     this.parentActor = tabActor;
 
     this.childActorPool = new Map();
@@ -2216,10 +2281,8 @@ let StorageActor = protocol.ActorClassWithSpec(specs.storageSpec, {
     Services.obs.removeObserver(this, "inner-window-destroyed", false);
     this.destroyed = true;
     if (this.parentActor.browser) {
-      this.parentActor.browser.removeEventListener(
-        "pageshow", this.onPageChange, true);
-      this.parentActor.browser.removeEventListener(
-        "pagehide", this.onPageChange, true);
+      this.parentActor.browser.removeEventListener("pageshow", this.onPageChange, true);
+      this.parentActor.browser.removeEventListener("pagehide", this.onPageChange, true);
     }
     // Destroy the registered store types
     for (let actor of this.childActorPool.values()) {
@@ -2227,9 +2290,15 @@ let StorageActor = protocol.ActorClassWithSpec(specs.storageSpec, {
     }
     this.childActorPool.clear();
     this.childWindowPool.clear();
-    this.childWindowPool = this.childActorPool = this.__poolMap = this.conn =
-      this.parentActor = this.boundUpdate = this.registeredPool =
-      this._pendingResponse = null;
+
+    this.childActorPool = null;
+    this.childWindowPool = null;
+    this.parentActor = null;
+    this.boundUpdate = null;
+    this.registeredPool = null;
+    this._pendingResponse = null;
+
+    protocol.Actor.prototype.destroy.call(this);
   },
 
   /**

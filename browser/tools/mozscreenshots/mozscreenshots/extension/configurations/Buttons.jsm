@@ -20,15 +20,13 @@ this.Buttons = {
 
   configurations: {
     navBarButtons: {
-      applyConfig: Task.async(() =>{
-        let browserWindow = Services.wm.getMostRecentWindow("navigator:browser");
+      applyConfig: Task.async(() => {
         CustomizableUI.addWidgetToArea("screenshot-widget", CustomizableUI.AREA_NAVBAR);
       }),
     },
 
     tabsToolbarButtons: {
       applyConfig: Task.async(() => {
-        let browserWindow = Services.wm.getMostRecentWindow("navigator:browser");
         CustomizableUI.addWidgetToArea("screenshot-widget", CustomizableUI.AREA_TABSTRIP);
       }),
     },

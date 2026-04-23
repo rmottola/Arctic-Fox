@@ -6,23 +6,19 @@
 /* import-globals-from shared-head.js */
 "use strict";
 
+const TEST_URL = "data:text/html;charset=utf8,test for dynamically " +
+                 "registering and unregistering tools";
 var doc = null, toolbox = null, panelWin = null, modifiedPrefs = [];
 
 function test() {
-  gBrowser.selectedTab = gBrowser.addTab();
-  let target = TargetFactory.forTab(gBrowser.selectedTab);
-
-  gBrowser.selectedBrowser.addEventListener("load", function onLoad(evt) {
-    gBrowser.selectedBrowser.removeEventListener(evt.type, onLoad, true);
+  addTab(TEST_URL).then(tab => {
+    let target = TargetFactory.forTab(tab);
     gDevTools.showToolbox(target)
       .then(testSelectTool)
       .then(testToggleToolboxButtons)
       .then(testPrefsAreRespectedWhenReopeningToolbox)
       .then(cleanup, errorHandler);
-  }, true);
-
-  content.location = "data:text/html;charset=utf8,test for dynamically " +
-                     "registering and unregistering tools";
+  });
 }
 
 function testPrefsAreRespectedWhenReopeningToolbox() {
@@ -91,11 +87,12 @@ function testToggleToolboxButtons() {
   let toolboxButtonNodes = [...doc.querySelectorAll(".command-button")];
   let toggleableTools = toolbox.toolboxButtons;
 
-  // The noautohide button is only displayed in the browser toolbox
+  // The noautohide button is only displayed in the browser toolbox, and the element
+  // picker button is not toggleable.
   toggleableTools = toggleableTools.filter(
-    tool => tool.id != "command-button-noautohide");
+    tool => tool.id != "command-button-noautohide" && tool.id != "command-button-pick");
   toolboxButtonNodes = toolboxButtonNodes.filter(
-    btn => btn.id != "command-button-noautohide");
+    btn => btn.id != "command-button-noautohide" && btn.id != "command-button-pick");
 
   is(checkNodes.length, toggleableTools.length,
     "All of the buttons are toggleable.");

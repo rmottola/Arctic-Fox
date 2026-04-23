@@ -3086,28 +3086,28 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderBottomLeftRadius()
 {
   return GetEllipseRadii(StyleBorder()->mBorderRadius,
-                         NS_CORNER_BOTTOM_LEFT, true);
+                         NS_CORNER_BOTTOM_LEFT);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderBottomRightRadius()
 {
   return GetEllipseRadii(StyleBorder()->mBorderRadius,
-                         NS_CORNER_BOTTOM_RIGHT, true);
+                         NS_CORNER_BOTTOM_RIGHT);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderTopLeftRadius()
 {
   return GetEllipseRadii(StyleBorder()->mBorderRadius,
-                         NS_CORNER_TOP_LEFT, true);
+                         NS_CORNER_TOP_LEFT);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderTopRightRadius()
 {
   return GetEllipseRadii(StyleBorder()->mBorderRadius,
-                         NS_CORNER_TOP_RIGHT, true);
+                         NS_CORNER_TOP_RIGHT);
 }
 
 already_AddRefed<CSSValue>
@@ -3180,14 +3180,6 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarginRightWidth()
 {
   return GetMarginWidthFor(NS_SIDE_RIGHT);
-}
-
-already_AddRefed<CSSValue>
-nsComputedDOMStyle::DoGetMarkerOffset()
-{
-  RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  SetValueToCoord(val, StyleContent()->mMarkerOffset, false);
-  return val.forget();
 }
 
 already_AddRefed<CSSValue>
@@ -3345,28 +3337,28 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetOutlineRadiusBottomLeft()
 {
   return GetEllipseRadii(StyleOutline()->mOutlineRadius,
-                         NS_CORNER_BOTTOM_LEFT, false);
+                         NS_CORNER_BOTTOM_LEFT);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetOutlineRadiusBottomRight()
 {
   return GetEllipseRadii(StyleOutline()->mOutlineRadius,
-                         NS_CORNER_BOTTOM_RIGHT, false);
+                         NS_CORNER_BOTTOM_RIGHT);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetOutlineRadiusTopLeft()
 {
   return GetEllipseRadii(StyleOutline()->mOutlineRadius,
-                         NS_CORNER_TOP_LEFT, false);
+                         NS_CORNER_TOP_LEFT);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetOutlineRadiusTopRight()
 {
   return GetEllipseRadii(StyleOutline()->mOutlineRadius,
-                         NS_CORNER_TOP_RIGHT, false);
+                         NS_CORNER_TOP_RIGHT);
 }
 
 already_AddRefed<CSSValue>
@@ -3379,42 +3371,15 @@ nsComputedDOMStyle::DoGetOutlineColor()
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::GetEllipseRadii(const nsStyleCorners& aRadius,
-                                    uint8_t aFullCorner,
-                                    bool aIsBorder) // else outline
+                                    uint8_t aFullCorner)
 {
-  nsStyleCoord radiusX, radiusY;
-  if (mInnerFrame && aIsBorder) {
-    nscoord radii[8];
-    mInnerFrame->GetBorderRadii(radii);
-    radiusX.SetCoordValue(radii[NS_FULL_TO_HALF_CORNER(aFullCorner, false)]);
-    radiusY.SetCoordValue(radii[NS_FULL_TO_HALF_CORNER(aFullCorner, true)]);
-  } else {
-    radiusX = aRadius.Get(NS_FULL_TO_HALF_CORNER(aFullCorner, false));
-    radiusY = aRadius.Get(NS_FULL_TO_HALF_CORNER(aFullCorner, true));
-
-    if (mInnerFrame) {
-      // We need to convert to absolute coordinates before doing the
-      // equality check below.
-      nscoord v;
-
-      v = StyleCoordToNSCoord(radiusX,
-                              &nsComputedDOMStyle::GetFrameBorderRectWidth,
-                              0, true);
-      radiusX.SetCoordValue(v);
-
-      v = StyleCoordToNSCoord(radiusY,
-                              &nsComputedDOMStyle::GetFrameBorderRectHeight,
-                              0, true);
-      radiusY.SetCoordValue(v);
-    }
-  }
+  nsStyleCoord radiusX = aRadius.Get(NS_FULL_TO_HALF_CORNER(aFullCorner, false));
+  nsStyleCoord radiusY = aRadius.Get(NS_FULL_TO_HALF_CORNER(aFullCorner, true));
 
   // for compatibility, return a single value if X and Y are equal
   if (radiusX == radiusY) {
     RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-
     SetValueToCoord(val, radiusX, true);
-
     return val.forget();
   }
 
@@ -3695,8 +3660,7 @@ nsComputedDOMStyle::DoGetVerticalAlign()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   SetValueToCoord(val, StyleDisplay()->mVerticalAlign, false,
-                  &nsComputedDOMStyle::GetLineHeightCoord,
-                  nsCSSProps::kVerticalAlignKTable);
+                  nullptr, nsCSSProps::kVerticalAlignKTable);
   return val.forget();
 }
 
@@ -3900,8 +3864,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetTextIndent()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  SetValueToCoord(val, StyleText()->mTextIndent, false,
-                  &nsComputedDOMStyle::GetCBContentWidth);
+  SetValueToCoord(val, StyleText()->mTextIndent, false);
   return val.forget();
 }
 
@@ -4904,8 +4867,7 @@ nsComputedDOMStyle::DoGetMaxHeight()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   SetValueToCoord(val, StylePosition()->mMaxHeight, true,
-                  &nsComputedDOMStyle::GetCBContentHeight,
-                  nsCSSProps::kWidthKTable);
+                  nullptr, nsCSSProps::kWidthKTable);
   return val.forget();
 }
 
@@ -4914,8 +4876,7 @@ nsComputedDOMStyle::DoGetMaxWidth()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   SetValueToCoord(val, StylePosition()->mMaxWidth, true,
-                  &nsComputedDOMStyle::GetCBContentWidth,
-                  nsCSSProps::kWidthKTable);
+                  nullptr, nsCSSProps::kWidthKTable);
   return val.forget();
 }
 
@@ -4933,9 +4894,7 @@ nsComputedDOMStyle::DoGetMinHeight()
     minHeight.SetCoordValue(0);
   }
 
-  SetValueToCoord(val, minHeight, true,
-                  &nsComputedDOMStyle::GetCBContentHeight,
-                  nsCSSProps::kWidthKTable);
+  SetValueToCoord(val, minHeight, true, nullptr, nsCSSProps::kWidthKTable);
   return val.forget();
 }
 
@@ -4961,9 +4920,8 @@ nsComputedDOMStyle::DoGetMinWidth()
       }
     }
   }
-  SetValueToCoord(val, minWidth, true,
-                  &nsComputedDOMStyle::GetCBContentWidth,
-                  nsCSSProps::kWidthKTable);
+
+  SetValueToCoord(val, minWidth, true, nullptr, nsCSSProps::kWidthKTable);
   return val.forget();
 }
 

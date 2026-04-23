@@ -9,8 +9,7 @@
 
 "use strict";
 
-////////////////////////////////////////////////////////////////////////////////
-//// Tests
+// Tests
 
 /**
  * Tests that the createDownload function exists and can be called.  More
@@ -193,9 +192,3 @@ add_task(function* test_getTemporaryDownloadsDirectory()
   let downloadDir = yield Downloads.getTemporaryDownloadsDirectory();
   do_check_neq(downloadDir, "");
 });
-
-////////////////////////////////////////////////////////////////////////////////
-//// Termination
-
-let tailFile = do_get_file("tail.js");
-Services.scriptloader.loadSubScript(NetUtil.newURI(tailFile).spec);

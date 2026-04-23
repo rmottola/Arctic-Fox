@@ -570,7 +570,7 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
     newTransform = aTransform.As2D();
   } else {
     // Create a temporary surface for the transform.
-    dest = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(RoundedOut(aRect).Size(), SurfaceFormat::B8G8R8A8);
+    dest = Factory::CreateDrawTarget(gfxVars::ContentBackend(), RoundedOut(aRect).Size(), SurfaceFormat::B8G8R8A8);
     if (!dest) {
       return;
     }
@@ -644,6 +644,9 @@ BasicCompositor::DrawQuad(const gfx::Rect& aRect,
                                         newTransform, aRect, transformedClipRect,
                                         dest, buffer)) {
           // we succeeded in convert and scaling
+        } else if (source->mFromYCBCR &&
+                   !source->GetSurface(dest)) {
+          gfxWarning() << "Failed to get YCbCr to rgb surface.";
         } else if (source->mFromYCBCR &&
             AttemptVideoScale(source, sourceMask, aOpacity, blendMode,
                               texturedEffect,

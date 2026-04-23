@@ -19,18 +19,15 @@ add_task(function*() {
 
 var checkViewSource = Task.async(function* (aWindow) {
   is(aWindow.gBrowser.contentDocument.body.textContent, content, "Correct content loaded");
-  let selection = aWindow.gBrowser.contentWindow.getSelection();
   let statusPanel = aWindow.document.getElementById("statusbar-line-col");
   is(statusPanel.getAttribute("label"), "", "Correct status bar text");
 
   for (let i = 1; i <= 3; i++) {
     aWindow.viewSourceChrome.goToLine(i);
-    let result = yield ContentTask.spawn(aWindow.gBrowser, i, function*(i) {
+    yield ContentTask.spawn(aWindow.gBrowser, i, function*(i) {
       let selection = content.getSelection();
-      return (selection.toString() == "line " + i);
+      Assert.equal(selection.toString(), "line " + i, "Correct text selected");
     });
-
-    ok(result, "Correct text selected");
 
     yield ContentTaskUtils.waitForCondition(() => {
       return (statusPanel.getAttribute("label") == "Line " + i + ", Col 1");

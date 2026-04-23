@@ -15,6 +15,10 @@ Cu.import("resource://gre/modules/FileUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AttributionCode",
                                   "resource:///modules/AttributionCode.jsm");
 
+// AttributionCode is only needed for Firefox
+XPCOMUtils.defineLazyModuleGetter(this, "AttributionCode",
+                                  "resource:///modules/AttributionCode.jsm");
+
 // Lazy load |LightweightThemeManager|, we won't be using it on Gonk.
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
@@ -211,7 +215,7 @@ function createMockAddonProvider(aName) {
       AddonManagerPrivate.callAddonListeners("onInstalled", new MockAddonWrapper(aAddon));
     },
 
-    getAddonsByTypes: function (aTypes, aCallback) {
+    getAddonsByTypes: function(aTypes, aCallback) {
       aCallback(this._addons.map(a => new MockAddonWrapper(a)));
     },
 
@@ -570,12 +574,12 @@ function checkSystemSection(data) {
   Assert.ok("DWriteEnabled" in gfxData);
   // DWriteVersion is disabled due to main thread jank and will be enabled
   // again as part of bug 1154500.
-  //Assert.ok("DWriteVersion" in gfxData);
+  // Assert.ok("DWriteVersion" in gfxData);
   if (gIsWindows) {
     Assert.equal(typeof gfxData.D2DEnabled, "boolean");
     Assert.equal(typeof gfxData.DWriteEnabled, "boolean");
     // As above, will be enabled again as part of bug 1154500.
-    //Assert.ok(checkString(gfxData.DWriteVersion));
+    // Assert.ok(checkString(gfxData.DWriteVersion));
   }
 
   Assert.ok("adapters" in gfxData);
@@ -922,7 +926,6 @@ add_task(function* test_addonsWatch_InterestingChange() {
   // We only expect a single notification for each install, uninstall, enable, disable.
   const EXPECTED_NOTIFICATIONS = 4;
 
-  let deferred = PromiseUtils.defer();
   let receivedNotifications = 0;
 
   let registerCheckpointPromise = (aExpected) => {
@@ -1244,7 +1247,6 @@ add_task(function* test_collectionWithbrokenAddonData() {
                                          AddonManager.SIGNEDSTATE_NOT_REQUIRED,
   };
 
-  let deferred = PromiseUtils.defer();
   let receivedNotifications = 0;
 
   let registerCheckpointPromise = (aExpected) => {

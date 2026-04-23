@@ -558,6 +558,15 @@ ImageTestCase CorruptICOWithBadBMPHeightTestCase()
                        IntSize(100, 100), TEST_CASE_HAS_ERROR);
 }
 
+ImageTestCase CorruptICOWithBadBppTestCase()
+{
+  // This test case is an ICO with a BPP (15) in the ICO header which differs
+  // from that in the BMP header itself (1). It should ignore the ICO BPP when
+  // the BMP BPP is available and thus correctly decode the image.
+  return ImageTestCase("corrupt-with-bad-ico-bpp.ico", "image/x-icon",
+                       IntSize(100, 100), TEST_CASE_IS_TRANSPARENT);
+}
+
 ImageTestCase TransparentPNGTestCase()
 {
   return ImageTestCase("transparent.png", "image/png", IntSize(32, 32),
@@ -662,6 +671,11 @@ ImageTestCase DownscaledTransparentICOWithANDMaskTestCase()
   return ImageTestCase("transparent-ico-with-and-mask.ico", "image/x-icon",
                        IntSize(32, 32), IntSize(20, 20),
                        TEST_CASE_IS_TRANSPARENT | TEST_CASE_IGNORE_OUTPUT);
+}
+
+ImageTestCase TruncatedSmallGIFTestCase()
+{
+  return ImageTestCase("green-1x1-truncated.gif", "image/gif", IntSize(1, 1));
 }
 
 } // namespace image

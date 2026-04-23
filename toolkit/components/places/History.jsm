@@ -127,7 +127,7 @@ this.History = Object.freeze({
    *      If `guidOrURI` does not have the expected type or if it is a string
    *      that may be parsed neither as a valid URL nor as a valid GUID.
    */
-  fetch: function (guidOrURI) {
+  fetch: function(guidOrURI) {
     throw new Error("Method not implemented");
   },
 
@@ -172,7 +172,7 @@ this.History = Object.freeze({
    * @throws (Error)
    *      If an element of `visits` has an invalid `transition`.
    */
-  insert: function (pageInfo) {
+  insert: function(pageInfo) {
     if (typeof pageInfo != "object" || !pageInfo) {
       throw new TypeError("pageInfo must be an object");
     }
@@ -228,7 +228,7 @@ this.History = Object.freeze({
    * @throws (Error)
    *      If an element of `visits` has an invalid `transition`.
    */
-  insertMany: function (pageInfos, onResult, onError) {
+  insertMany: function(pageInfos, onResult, onError) {
     let infos = [];
 
     if (!Array.isArray(pageInfos)) {
@@ -278,7 +278,7 @@ this.History = Object.freeze({
    *       is neither a valid GUID nor a valid URI or if `pages`
    *       is an empty array.
    */
-  remove: function (pages, onResult = null) {
+  remove: function(pages, onResult = null) {
     // Normalize and type-check arguments
     if (Array.isArray(pages)) {
       if (pages.length == 0) {
@@ -728,7 +728,7 @@ var notifyCleanup = Task.async(function*(db, pages) {
       // We have removed all visits, but the page is still alive, e.g.
       // because of a bookmark.
       notify(observers, "onDeleteVisits",
-        [uri, /*last visit*/0, guid, reason, -1]);
+        [uri, /* last visit*/0, guid, reason, -1]);
     } else {
       // The page has been entirely removed.
       notify(observers, "onDeleteURI",
@@ -872,13 +872,10 @@ var remove = Task.async(function*(db, {guids, urls}, onResult = null) {
 
   let onResultData = onResult ? [] : null;
   let pages = [];
-  let hasPagesToKeep = false;
   let hasPagesToRemove = false;
   yield db.execute(query, null, Task.async(function*(row) {
     let hasForeign = row.getResultByName("foreign_count") != 0;
-    if (hasForeign) {
-      hasPagesToKeep = true;
-    } else {
+    if (!hasForeign) {
       hasPagesToRemove = true;
     }
     let id = row.getResultByName("id");
@@ -943,7 +940,7 @@ var remove = Task.async(function*(db, {guids, urls}, onResult = null) {
  * @return (PageInfo)
  *      A PageInfo object populated with data from updateInfo.
  */
-function mergeUpdateInfoIntoPageInfo(updateInfo, pageInfo={}) {
+function mergeUpdateInfoIntoPageInfo(updateInfo, pageInfo = {}) {
   pageInfo.guid = updateInfo.guid;
   if (!pageInfo.url) {
     pageInfo.url = new URL(updateInfo.uri.spec);

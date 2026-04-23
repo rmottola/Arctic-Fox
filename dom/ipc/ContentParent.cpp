@@ -24,7 +24,6 @@
 #include "chrome/common/process_watcher.h"
 
 #include "mozilla/a11y/PDocAccessible.h"
-#include "AppProcessChecker.h"
 #include "AudioChannelService.h"
 #include "BlobParent.h"
 #include "CrashReporterParent.h"
@@ -91,6 +90,7 @@
 #ifdef MOZ_ENABLE_PROFILER_SPS
 #include "mozilla/ProfileGatherer.h"
 #endif
+#include "mozilla/ScopeExit.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Telemetry.h"
@@ -109,7 +109,6 @@
 #include "nsFrameMessageManager.h"
 #include "nsHashPropertyBag.h"
 #include "nsIAlertsService.h"
-#include "nsIAppsService.h"
 #include "nsIClipboard.h"
 #include "nsContentPermissionHelper.h"
 #include "nsICycleCollectorListener.h"
@@ -156,7 +155,6 @@
 #include "nsThreadUtils.h"
 #include "nsToolkitCompsCID.h"
 #include "nsWidgetsCID.h"
-#include "PreallocatedProcessManager.h"
 #include "ProcessPriorityManager.h"
 #include "SandboxHal.h"
 #include "ScreenManagerParent.h"
@@ -180,6 +178,7 @@
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
 #include "nsHostObjectProtocolHandler.h"
+#include "nsICaptivePortalService.h"
 
 #include "nsIBidiKeyboard.h"
 
@@ -519,6 +518,7 @@ static const char* sObserverTopics[] = {
   "profile-before-change",
   NS_IPC_IOSERVICE_SET_OFFLINE_TOPIC,
   NS_IPC_IOSERVICE_SET_CONNECTIVITY_TOPIC,
+  NS_IPC_CAPTIVE_PORTAL_SET_STATE,
   "memory-pressure",
   "child-gc-request",
   "child-cc-request",
@@ -543,25 +543,6 @@ static const char* sObserverTopics[] = {
 #endif
   "cacheservice:empty-cache",
 };
-
-// PreallocateAppProcess is called by the PreallocatedProcessManager.
-// ContentParent then takes this process back within
-// GetNewOrPreallocatedAppProcess.
-/*static*/ already_AddRefed<ContentParent>
-ContentParent::PreallocateAppProcess()
-{
-  RefPtr<ContentParent> process =
-    new ContentParent(/* aOpener = */ nullptr,
-                      /* isForBrowserElement = */ false,
-                      /* isForPreallocated = */ true);
-
-  if (!process->LaunchSubprocess(PROCESS_PRIORITY_PREALLOC)) {
-    return nullptr;
-  }
-
-  process->Init();
-  return process.forget();
-}
 
 /*static*/ void
 ContentParent::StartUp()
@@ -595,9 +576,6 @@ ContentParent::StartUp()
   BlobParent::Startup(BlobParent::FriendKey());
 
   BackgroundChild::Startup();
-
-  // Try to preallocate a process that we can transform into an app later.
-  PreallocatedProcessManager::AllocateAfterDelay();
 
   sDisableUnsafeCPOWWarnings = PR_GetEnv("DISABLE_UNSAFE_CPOW_WARNINGS");
 
@@ -711,22 +689,14 @@ ContentParent::GetNewOrUsedBrowserProcess(bool aForBrowserElement,
     } while (currIdx != startIdx);
   }
 
-  // Try to take and transform the preallocated process into browser.
-  RefPtr<ContentParent> p = PreallocatedProcessManager::Take();
-  if (p) {
-    p->TransformPreallocatedIntoBrowser(aOpener);
-  } else {
-    // Failed in using the preallocated process: fork from the chrome process.
-    p = new ContentParent(aOpener,
-                          aForBrowserElement,
-                          /* isForPreallocated = */ false);
+  RefPtr<ContentParent> p = new ContentParent(aOpener,
+                                              aForBrowserElement);
 
-    if (!p->LaunchSubprocess(aPriority)) {
-      return nullptr;
-    }
-
-    p->Init();
+  if (!p->LaunchSubprocess(aPriority)) {
+    return nullptr;
   }
+
+  p->Init();
 
   p->mLargeAllocationProcess = aLargeAllocationProcess;
 
@@ -777,16 +747,10 @@ ContentParent::SendAsyncUpdate(nsIWidget* aWidget)
   ContentParent* cp = reinterpret_cast<ContentParent*>(
     ::GetPropW(hwnd, kPluginWidgetContentParentProperty));
   if (cp && !cp->IsDestroyed()) {
-    cp->SendUpdateWindow((uintptr_t)hwnd);
+    Unused << cp->SendUpdateWindow((uintptr_t)hwnd);
   }
 }
 #endif // defined(XP_WIN)
-
-bool
-ContentParent::PreallocatedProcessReady()
-{
-  return true;
-}
 
 mozilla::ipc::IPCResult
 ContentParent::RecvCreateChildProcess(const IPCTabContext& aContext,
@@ -1255,15 +1219,6 @@ ContentParent::SetPriorityAndCheckIsAlive(ProcessPriority aPriority)
 }
 
 void
-ContentParent::TransformPreallocatedIntoBrowser(ContentParent* aOpener)
-{
-  // Reset mIsForBrowser and mOSPrivileges for browser.
-  mMetamorphosed = true;
-  mOpener = aOpener;
-  mIsForBrowser = true;
-}
-
-void
 ContentParent::ShutDownProcess(ShutDownMethod aMethod)
 {
   // Shutting down by sending a shutdown message works differently than the
@@ -1437,14 +1392,15 @@ ContentParent::AllocateLayerTreeId(ContentParent* aContent,
   GPUProcessManager* gpu = GPUProcessManager::Get();
 
   *aId = gpu->AllocateLayerTreeId();
+
+  if (!aContent || !aTopLevel) {
+    return false;
+  }
+
   gpu->MapLayerTreeId(*aId, aContent->OtherPid());
 
   if (!gfxPlatform::AsyncPanZoomEnabled()) {
     return true;
-  }
-
-  if (!aContent || !aTopLevel) {
-    return false;
   }
 
   return aContent->SendNotifyLayerAllocated(aTabId, *aId);
@@ -1833,19 +1789,13 @@ ContentParent::LaunchSubprocess(ProcessPriority aInitialPriority /* = PROCESS_PR
 }
 
 ContentParent::ContentParent(ContentParent* aOpener,
-                             bool aIsForBrowser,
-                             bool aIsForPreallocated)
+                             bool aIsForBrowser)
   : nsIContentParent()
   , mOpener(aOpener)
   , mIsForBrowser(aIsForBrowser)
-  , mIsPreallocated(aIsForPreallocated)
   , mLargeAllocationProcess(false)
 {
   InitializeMembers();  // Perform common initialization.
-
-  // No more than one of aIsForBrowser and aIsForPreallocated should be
-  // true.
-  MOZ_ASSERT(aIsForBrowser + aIsForPreallocated <= 1);
 
   mMetamorphosed = true;
 
@@ -1957,11 +1907,6 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
 
       gpm->AddListener(this);
     }
-  }
-
-  if (gAppData) {
-    // Sending all information to content process.
-    Unused << SendAppInit();
   }
 
   nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
@@ -2324,17 +2269,6 @@ ContentParent::RecvGetShowPasswordSetting(bool* showPassword)
 }
 
 mozilla::ipc::IPCResult
-ContentParent::RecvFirstIdle()
-{
-  // When the ContentChild goes idle, it sends us a FirstIdle message
-  // which we use as a good time to prelaunch another process. If we
-  // prelaunch any sooner than this, then we'll be competing with the
-  // child process and slowing it down.
-  PreallocatedProcessManager::AllocateAfterDelay();
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
 ContentParent::RecvAudioChannelChangeDefVolChannel(const int32_t& aChannel,
                                                    const bool& aHidden)
 {
@@ -2442,6 +2376,17 @@ ContentParent::Observe(nsISupports* aSubject,
   }
   else if (!strcmp(aTopic, NS_IPC_IOSERVICE_SET_CONNECTIVITY_TOPIC)) {
     if (!SendSetConnectivity(NS_LITERAL_STRING("true").Equals(aData))) {
+      return NS_ERROR_NOT_AVAILABLE;
+    }
+  } else if (!strcmp(aTopic, NS_IPC_CAPTIVE_PORTAL_SET_STATE)) {
+    nsCOMPtr<nsICaptivePortalService> cps = do_QueryInterface(aSubject);
+    MOZ_ASSERT(cps, "Should QI to a captive portal service");
+    if (!cps) {
+      return NS_ERROR_FAILURE;
+    }
+    int32_t state;
+    cps->GetState(&state);
+    if (!SendSetCaptivePortalState(state)) {
       return NS_ERROR_NOT_AVAILABLE;
     }
   }
@@ -2594,12 +2539,14 @@ ContentParent::RecvGetProcessAttributes(ContentParentId* aCpId,
 mozilla::ipc::IPCResult
 ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
                                              bool* aIsConnected,
+                                             int32_t* aCaptivePortalState,
                                              bool* aIsLangRTL,
                                              bool* aHaveBidiKeyboards,
                                              InfallibleTArray<nsString>* dictionaries,
                                              ClipboardCapabilities* clipboardCaps,
                                              DomainPolicyClone* domainPolicy,
-                                             StructuredCloneData* aInitialData)
+                                             StructuredCloneData* aInitialData,
+                                             InfallibleTArray<FontFamilyListEntry>* fontFamilies)
 {
   nsCOMPtr<nsIIOService> io(do_GetIOService());
   MOZ_ASSERT(io, "No IO service?");
@@ -2608,6 +2555,12 @@ ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
 
   rv = io->GetConnectivity(aIsConnected);
   MOZ_ASSERT(NS_SUCCEEDED(rv), "Failed getting connectivity?");
+
+  *aCaptivePortalState = nsICaptivePortalService::UNKNOWN;
+  nsCOMPtr<nsICaptivePortalService> cps = do_GetService(NS_CAPTIVEPORTAL_CONTRACTID);
+  if (cps) {
+    cps->GetState(aCaptivePortalState);
+  }
 
   nsIBidiKeyboard* bidi = nsContentUtils::GetBidiKeyboard();
 
@@ -2656,6 +2609,9 @@ ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
     }
   }
 
+  // This is only implemented (returns a non-empty list) by MacOSX at present.
+  gfxPlatform::GetPlatform()->GetSystemFontFamilyList(fontFamilies);
+
   return IPC_OK();
 }
 
@@ -2696,9 +2652,6 @@ PDeviceStorageRequestParent*
 ContentParent::AllocPDeviceStorageRequestParent(const DeviceStorageParams& aParams)
 {
   RefPtr<DeviceStorageRequestParent> result = new DeviceStorageRequestParent(aParams);
-  if (!result->EnsureRequiredPermissions(this)) {
-    return nullptr;
-  }
   result->Dispatch();
   return result.forget().take();
 }
@@ -2829,19 +2782,11 @@ ContentParent::KillHard(const char* aReason)
                         otherProcessHandle, /*force=*/true));
 }
 
-bool
-ContentParent::IsPreallocated() const
-{
-  return mIsPreallocated;
-}
-
 void
 ContentParent::FriendlyName(nsAString& aName, bool aAnonymize)
 {
   aName.Truncate();
-  if (IsPreallocated()) {
-    aName.AssignLiteral("(Preallocated)");
-  } else if (mIsForBrowser) {
+  if (mIsForBrowser) {
     aName.AssignLiteral("Browser");
   } else if (aAnonymize) {
     aName.AssignLiteral("<anonymized-name>");
@@ -3556,12 +3501,12 @@ AddGeolocationListener(nsIDOMGeoPositionCallback* watcher,
     return -1;
   }
 
-  PositionOptions* options = new PositionOptions();
+  UniquePtr<PositionOptions> options = MakeUnique<PositionOptions>();
   options->mTimeout = 0;
   options->mMaximumAge = 0;
   options->mEnableHighAccuracy = highAccuracy;
   int32_t retval = 1;
-  geo->WatchPosition(watcher, errorCallBack, options, &retval);
+  geo->WatchPosition(watcher, errorCallBack, Move(options), &retval);
   return retval;
 }
 
@@ -3727,37 +3672,6 @@ ContentParent::DoSendAsyncMessage(JSContext* aCx,
     return NS_ERROR_UNEXPECTED;
   }
   return NS_OK;
-}
-
-bool
-ContentParent::CheckPermission(const nsAString& aPermission)
-{
-  return AssertAppProcessPermission(this, NS_ConvertUTF16toUTF8(aPermission).get());
-}
-
-bool
-ContentParent::CheckManifestURL(const nsAString& aManifestURL)
-{
-  return AssertAppProcessManifestURL(this, NS_ConvertUTF16toUTF8(aManifestURL).get());
-}
-
-bool
-ContentParent::CheckAppHasPermission(const nsAString& aPermission)
-{
-  return AssertAppHasPermission(this, NS_ConvertUTF16toUTF8(aPermission).get());
-}
-
-bool
-ContentParent::CheckAppHasStatus(unsigned short aStatus)
-{
-  return AssertAppHasStatus(this, aStatus);
-}
-
-bool
-ContentParent::KillChild()
-{
-  KillHard("KillChild");
-  return true;
 }
 
 PBlobParent*
@@ -4363,6 +4277,7 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
 {
   // We always expect to open a new window here. If we don't, it's an error.
   *aWindowIsNew = true;
+  *aResult = NS_OK;
 
   // The content process should never be in charge of computing whether or
   // not a window should be private or remote - the parent will do that.
@@ -4386,6 +4301,14 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
 
   TabParent* newTab = TabParent::GetFrom(aNewTab);
   MOZ_ASSERT(newTab);
+
+  auto destroyNewTabOnError = MakeScopeExit([&] {
+    if (!*aWindowIsNew || NS_FAILED(*aResult)) {
+      if (newTab) {
+        newTab->Destroy();
+      }
+    }
+  });
 
   // Content has requested that we open this new content window, so
   // we must have an opener.

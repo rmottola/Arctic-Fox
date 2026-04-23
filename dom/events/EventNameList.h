@@ -172,6 +172,10 @@ EVENT(contextmenu,
       eContextMenu,
       EventNameType_HTMLXUL,
       eMouseEventClass)
+NON_IDL_EVENT(mouselongtap,
+      eMouseLongTap,
+      EventNameType_HTMLXUL,
+      eMouseEventClass)
 // Not supported yet
 // EVENT(cuechange)
 EVENT(dblclick,
@@ -786,6 +790,10 @@ NON_IDL_EVENT(popupshowing,
               eBasicEventClass)
 NON_IDL_EVENT(popupshown,
               eXULPopupShown,
+              EventNameType_XUL,
+              eBasicEventClass)
+NON_IDL_EVENT(popuppositioned,
+              eXULPopupPositioned,
               EventNameType_XUL,
               eBasicEventClass)
 NON_IDL_EVENT(popuphiding,

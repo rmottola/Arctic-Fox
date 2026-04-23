@@ -97,10 +97,9 @@ LoginRecipesParent.prototype = {
 
       try {
         this.initializationPromise = new Promise(function(resolve) {
-          NetUtil.asyncFetch(channel, function (stream, result) {
+          NetUtil.asyncFetch(channel, function(stream, result) {
             if (!Components.isSuccessCode(result)) {
               throw new Error("Error fetching recipe file:" + result);
-              return;
             }
             let count = stream.available();
             let data = NetUtil.readInputStreamToString(stream, count, { charset: "UTF-8" });
@@ -191,7 +190,6 @@ var LoginRecipesContent = {
    */
   _filterRecipesForForm(aRecipes, aForm) {
     let formDocURL = aForm.ownerDocument.location;
-    let host = formDocURL.host;
     let hostRecipes = aRecipes;
     let recipes = new Set();
     log.debug("_filterRecipesForForm", aRecipes);

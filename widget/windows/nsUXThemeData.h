@@ -61,7 +61,16 @@ enum WindowsTheme {
   WINTHEME_UNRECOGNIZED = 0,
   WINTHEME_CLASSIC      = 1, // no theme
   WINTHEME_AERO         = 2,
-  WINTHEME_AERO_LITE    = 3
+  WINTHEME_LUNA         = 3,
+  WINTHEME_ROYALE       = 4,
+  WINTHEME_ZUNE         = 5,
+  WINTHEME_AERO_LITE    = 6
+};
+enum WindowsThemeColor {
+  WINTHEMECOLOR_UNRECOGNIZED = 0,
+  WINTHEMECOLOR_NORMAL       = 1,
+  WINTHEMECOLOR_HOMESTEAD    = 2,
+  WINTHEMECOLOR_METALLIC     = 3
 };
 
 #define CMDBUTTONIDX_MINIMIZE    0

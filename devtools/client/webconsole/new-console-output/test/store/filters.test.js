@@ -13,13 +13,14 @@ const { getAllFilters } = require("devtools/client/webconsole/new-console-output
 const { setupStore } = require("devtools/client/webconsole/new-console-output/test/helpers");
 const { MESSAGE_LEVEL } = require("devtools/client/webconsole/new-console-output/constants");
 const { stubPackets } = require("devtools/client/webconsole/new-console-output/test/fixtures/stubs/index");
+const { stubPreparedMessages } = require("devtools/client/webconsole/new-console-output/test/fixtures/stubs/index");
 
 describe("Filtering", () => {
   let store;
   let numMessages;
   // Number of messages in prepareBaseStore which are not filtered out, i.e. Evaluation
-  // Results and console commands .
-  const numUnfilterableMessages = 2;
+  // Results, console commands and console.groups .
+  const numUnfilterableMessages = 3;
 
   beforeEach(() => {
     store = prepareBaseStore();
@@ -57,6 +58,44 @@ describe("Filtering", () => {
 
       let messages = getAllMessages(store.getState());
       expect(messages.size).toEqual(numMessages - 1);
+    });
+
+    it("filters css messages", () => {
+      let message = stubPreparedMessages.get(
+        "Unknown property ‘such-unknown-property’.  Declaration dropped."
+      );
+      store.dispatch(messageAdd(message));
+
+      let messages = getAllMessages(store.getState());
+      expect(messages.size).toEqual(numMessages);
+
+      store.dispatch(actions.filterToggle("css"));
+      messages = getAllMessages(store.getState());
+      expect(messages.size).toEqual(numMessages + 1);
+    });
+
+    it("filters xhr messages", () => {
+      let message = stubPreparedMessages.get("XHR GET request");
+      store.dispatch(messageAdd(message));
+
+      let messages = getAllMessages(store.getState());
+      expect(messages.size).toEqual(numMessages);
+
+      store.dispatch(actions.filterToggle("netxhr"));
+      messages = getAllMessages(store.getState());
+      expect(messages.size).toEqual(numMessages + 1);
+    });
+
+    it("filters network messages", () => {
+      let message = stubPreparedMessages.get("GET request");
+      store.dispatch(messageAdd(message));
+
+      let messages = getAllMessages(store.getState());
+      expect(messages.size).toEqual(numMessages);
+
+      store.dispatch(actions.filterToggle("net"));
+      messages = getAllMessages(store.getState());
+      expect(messages.size).toEqual(numMessages + 1);
     });
   });
 
@@ -137,13 +176,18 @@ describe("Clear filters", () => {
 
     // Setup test case
     store.dispatch(actions.filterToggle(MESSAGE_LEVEL.ERROR));
+    store.dispatch(actions.filterToggle("netxhr"));
     store.dispatch(actions.filterTextSet("foobar"));
+
     let filters = getAllFilters(store.getState());
     expect(filters.toJS()).toEqual({
+      "css": true,
       "debug": true,
       "error": false,
       "info": true,
       "log": true,
+      "net": false,
+      "netxhr": true,
       "warn": true,
       "text": "foobar"
     });
@@ -152,10 +196,13 @@ describe("Clear filters", () => {
 
     filters = getAllFilters(store.getState());
     expect(filters.toJS()).toEqual({
+      "css": false,
       "debug": true,
       "error": true,
       "info": true,
       "log": true,
+      "net": false,
+      "netxhr": false,
       "warn": true,
       "text": ""
     });
@@ -173,7 +220,8 @@ function prepareBaseStore() {
     // Evaluation Result - never filtered
     "new Date(0)",
     // PageError
-    "ReferenceError: asdf is not defined"
+    "ReferenceError: asdf is not defined",
+    "console.group('bar')"
   ]);
 
   // Console Command - never filtered

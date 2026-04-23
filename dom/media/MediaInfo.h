@@ -261,7 +261,8 @@ public:
   // container.
   nsIntRect ScaledImageRect(int64_t aWidth, int64_t aHeight) const
   {
-    if (aWidth == mImage.width && aHeight == mImage.height) {
+    if ((aWidth == mImage.width && aHeight == mImage.height) ||
+        !mImage.width || !mImage.height) {
       return ImageRect();
     }
     nsIntRect imageRect = ImageRect();
@@ -463,7 +464,8 @@ public:
 
   bool IsEncrypted() const
   {
-    return mCrypto.IsEncrypted();
+    return (HasAudio() && mAudio.mCrypto.mValid) ||
+           (HasVideo() && mVideo.mCrypto.mValid);
   }
 
   bool HasValidMedia() const

@@ -3,3 +3,9 @@
 % file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 %include ../shared/devedition.inc.css
+
+.ac-type-icon {
+  /* Left-align the type icon in awesomebar popup results with the icon in the
+     urlbar. */
+  -moz-margin-start: 11px;
+}

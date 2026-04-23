@@ -147,7 +147,7 @@ DoesBinaryMatchAllowedCertificates(LPCWSTR basePathForUpdate, LPCWSTR filePath,
     // Raise the roof, we found a match!
     return TRUE; 
   }
-
+  
   RegCloseKey(baseKey);
   // No certificates match, :'(
   return FALSE;

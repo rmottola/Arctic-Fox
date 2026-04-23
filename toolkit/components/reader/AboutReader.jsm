@@ -178,7 +178,7 @@ AboutReader.prototype = {
     return _viewId;
   },
 
-  receiveMessage: function (message) {
+  receiveMessage: function(message) {
     switch (message.name) {
       // Triggered by Android user pressing BACK while the banner font-dropdown is open.
       case "Reader:CloseDropdown": {
@@ -241,7 +241,7 @@ AboutReader.prototype = {
         }
         break;
       case "scroll":
-        this._closeDropdowns();
+        this._closeDropdowns(true);
         let isScrollingUp = this._scrollOffset > aEvent.pageY;
         this._setSystemUIVisibility(isScrollingUp);
         this._scrollOffset = aEvent.pageY;
@@ -520,7 +520,7 @@ AboutReader.prototype = {
       return;
     }
     // Holds the average of the lux values collected in this._luxValues.
-    let averageLuxValue = this._totalLux/luxValuesSize;
+    let averageLuxValue = this._totalLux / luxValuesSize;
 
     this._updateColorScheme(averageLuxValue);
     // Pop the oldest value off the array.
@@ -687,7 +687,7 @@ AboutReader.prototype = {
       }
 
       // If the image is at least half as wide as the body, center it on desktop.
-      if (img.naturalWidth >= bodyWidth/2) {
+      if (img.naturalWidth >= bodyWidth / 2) {
         img.setAttribute("moz-reader-center", true);
       } else {
         img.removeAttribute("moz-reader-center");
@@ -712,7 +712,7 @@ AboutReader.prototype = {
     if (!article.dir)
       return;
 
-    //Set "dir" attribute on content
+    // Set "dir" attribute on content
     this._contentElement.setAttribute("dir", article.dir);
     this._headerElement.setAttribute("dir", article.dir);
   },
@@ -940,10 +940,17 @@ AboutReader.prototype = {
   },
 
   /*
-   * If the ReaderView has open dropdowns, close them.
+   * If the ReaderView has open dropdowns, close them. If we are closing the
+   * dropdowns because the page is scrolling, allow popups to stay open with
+   * the keep-open class.
    */
-  _closeDropdowns: function() {
-    let openDropdowns = this._doc.querySelectorAll(".dropdown.open:not(.keep-open)");
+  _closeDropdowns: function(scrolling) {
+    let selector = ".dropdown.open";
+    if (scrolling) {
+      selector += ":not(.keep-open)";
+    }
+
+    let openDropdowns = this._doc.querySelectorAll(selector);
     for (let dropdown of openDropdowns) {
       dropdown.classList.remove("open");
     }

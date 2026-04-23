@@ -180,6 +180,9 @@ pref("dom.performance.enable_user_timing_logging", false);
 // Enable notification of performance timing
 pref("dom.performance.enable_notify_performance_timing", false);
 
+// Enable Permission API's .revoke() method
+pref("dom.permissions.revoke.enable", false);
+
 // Enable Performance Observer API
 #ifdef NIGHTLY_BUILD
 pref("dom.enable_performance_observer", true);
@@ -422,6 +425,7 @@ pref("media.suspend-bkgnd-video.delay-ms", 10000);
 pref("media.navigator.enabled", true);
 pref("media.navigator.video.enabled", true);
 pref("media.navigator.load_adapt", true);
+pref("media.navigator.load_adapt.encoder_only", true);
 pref("media.navigator.load_adapt.measure_interval",1000);
 pref("media.navigator.load_adapt.avg_seconds",3);
 pref("media.navigator.load_adapt.high_load","0.90");
@@ -562,8 +566,7 @@ pref("media.getusermedia.screensharing.allow_on_old_platforms", false);
 
 pref("media.getusermedia.audiocapture.enabled", false);
 
-// TextTrack support
-pref("media.webvtt.enabled", true);
+// TextTrack WebVTT Region extension support.
 pref("media.webvtt.regions.enabled", false);
 
 // AudioTrack and VideoTrack support
@@ -812,6 +815,8 @@ pref("gfx.content.azure.backends", "cairo");
 #ifdef ANDROID
 pref("gfx.content.azure.backends", "cairo");
 #endif
+
+pref("gfx.canvas.skiagl.dynamic-cache", true);
 
 pref("gfx.text.disable-aa", false);
 
@@ -1401,7 +1406,7 @@ pref("print.print_edge_right", 0);
 pref("print.print_edge_bottom", 0);
 
 // Print via the parent process. This is only used when e10s is enabled.
-#if defined(XP_WIN)
+#if defined(XP_WIN) || defined(XP_MACOSX)
 pref("print.print_via_parent", true);
 #else
 pref("print.print_via_parent", false);
@@ -1851,6 +1856,7 @@ pref("network.http.spdy.allow-push", true);
 pref("network.http.spdy.push-allowance", 131072);   // 128KB
 pref("network.http.spdy.pull-allowance", 12582912); // 12MB
 pref("network.http.spdy.default-concurrent", 100);
+pref("network.http.spdy.default-hpack-buffer", 65536); // 64k
 
 // alt-svc allows separation of transport routing from
 // the origin host without using a proxy.
@@ -2248,6 +2254,18 @@ pref("network.generic-ntlm-auth.workstation", "WORKSTATION");
 //   2 - allow the cross-origin authentication as well.
 pref("network.auth.subresource-http-auth-allow", 2);
 
+// This preference controls whether to allow sending default credentials (SSO) to
+// NTLM/Negotiate servers allowed in the "trusted uri" list when navigating them
+// in a Private Browsing window.
+// If set to false, Private Browsing windows will not use default credentials and ask
+// for credentials from the user explicitly.
+// If set to true, and a server URL conforms other conditions for sending default
+// credentials, those will be sent automatically in Private Browsing windows.
+//
+// This preference has no effect when the browser is set to "Never Remember History",
+// in that case default credentials will always be used.
+pref("network.auth.private-browsing-sso", false);
+
 pref("permissions.default.image",           1); // 1-Accept, 2-Deny, 3-dontAcceptForeign
 
 pref("network.proxy.type",                  5);
@@ -2435,6 +2453,9 @@ pref("security.sri.enable", false);
 // Block scripts with wrong MIME type such as image/ or video/.
 pref("security.block_script_with_wrong_mime", true);
 
+// Block images of wrong MIME for XCTO: nosniff.
+pref("security.xcto_nosniff_block_images", false);
+
 // OCSP must-staple
 pref("security.ssl.enable_ocsp_must_staple", true);
 
@@ -2445,9 +2466,45 @@ pref("security.cert_pinning.enforcement_level", 2);
 // for tests.
 pref("security.cert_pinning.process_headers_from_non_builtin_roots", false);
 
+// If set to true, allow view-source URIs to be opened from URIs that share
+// their protocol with the inner URI of the view-source URI
+pref("security.view-source.reachable-from-inner-protocol", false);
+
+// Services security settings
+pref("services.settings.server", "https://firefox.settings.services.mozilla.com/v1");
+
+// Blocklist preferences
+pref("extensions.blocklist.enabled", true);
+// OneCRL freshness checking depends on this value, so if you change it,
+// please also update security.onecrl.maximum_staleness_in_seconds.
+pref("extensions.blocklist.interval", 86400);
+// Required blocklist freshness for OneCRL OCSP bypass
+// (default is 1.25x extensions.blocklist.interval, or 30 hours)
+pref("security.onecrl.maximum_staleness_in_seconds", 108000);
+pref("extensions.blocklist.url", "https://blocklist.addons.mozilla.org/blocklist/3/%APP_ID%/%APP_VERSION%/%PRODUCT%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/%PING_COUNT%/%TOTAL_PING_COUNT%/%DAYS_SINCE_LAST_PING%/");
+pref("extensions.blocklist.detailsURL", "https://www.mozilla.com/%LOCALE%/blocklist/");
+pref("extensions.blocklist.itemURL", "https://blocklist.addons.mozilla.org/%LOCALE%/%APP%/blocked/%blockID%");
+// Controls what level the blocklist switches from warning about items to forcibly
+// blocking them.
+pref("extensions.blocklist.level", 2);
+// Blocklist via settings server (Kinto)
+pref("services.blocklist.changes.path", "/buckets/monitor/collections/changes/records");
+pref("services.blocklist.bucket", "blocklists");
+pref("services.blocklist.onecrl.collection", "certificates");
+pref("services.blocklist.onecrl.checked", 0);
+pref("services.blocklist.addons.collection", "addons");
+pref("services.blocklist.addons.checked", 0);
+pref("services.blocklist.plugins.collection", "plugins");
+pref("services.blocklist.plugins.checked", 0);
+pref("services.blocklist.gfx.collection", "gfx");
+pref("services.blocklist.gfx.checked", 0);
+
 // Controls whether signing should be enforced on signature-capable blocklist
 // collections.
 pref("services.blocklist.signing.enforced", false);
+
+// Enable blocklists via the services settings mechanism
+pref("services.blocklist.update_enabled", true);
 
 #ifdef RELEASE_OR_BETA
 pref("security.onecrl.via.amo", true);
@@ -2789,7 +2846,7 @@ pref("layout.css.prefixes.font-features", true);
 pref("layout.css.prefixes.gradients", true);
 
 // Are webkit-prefixed properties & property-values supported?
-pref("layout.css.prefixes.webkit", false);
+pref("layout.css.prefixes.webkit", true);
 
 // Are "-webkit-{min|max}-device-pixel-ratio" media queries supported?
 // (Note: this pref has no effect if the master 'layout.css.prefixes.webkit'
@@ -3060,7 +3117,7 @@ pref("dom.ipc.plugins.timeoutSecs", 45);
 pref("dom.ipc.plugins.parentTimeoutSecs", 0);
 // How long a plugin in e10s is allowed to process a synchronous IPC
 // message before we notify the chrome process of a hang.
-pref("dom.ipc.plugins.contentTimeoutSecs", 45);
+pref("dom.ipc.plugins.contentTimeoutSecs", 10);
 // How long a plugin launch is allowed to take before
 // we consider it failed.
 pref("dom.ipc.plugins.processLaunchTimeoutSecs", 45);
@@ -3097,19 +3154,18 @@ pref("dom.ipc.plugins.java.enabled", false);
 pref("dom.ipc.plugins.flash.disable-protected-mode", false);
 
 // How long we wait before unloading an idle plugin process.
-// Defaults to 1 minute.
-pref("dom.ipc.plugins.unloadTimeoutSecs", 60);
+// Defaults to 30 seconds.
+pref("dom.ipc.plugins.unloadTimeoutSecs", 30);
 
-// Asynchronous plugin initialization should only be enabled on non-e10s
-// channels until some remaining bugs are resolved.
-#ifdef E10S_TESTING_ONLY
+// Asynchronous plugin initialization is on hold.
 pref("dom.ipc.plugins.asyncInit.enabled", false);
-#else
-pref("dom.ipc.plugins.asyncInit.enabled", true);
-#endif
 
-// Allow the AsyncDrawing mode to be used for plugins.
+#ifdef RELEASE_OR_BETA
+pref("dom.ipc.plugins.asyncdrawing.enabled", false);
+#else
+// Allow the AsyncDrawing mode to be used for plugins in dev channels.
 pref("dom.ipc.plugins.asyncdrawing.enabled", true);
+#endif
 
 pref("dom.ipc.processCount", 1);
 
@@ -4419,7 +4475,6 @@ pref("gfx.font_rendering.fontconfig.max_generic_substitutions", 3);
 #endif
 #endif
 #endif
-pref("gl.ignore-dx-interop2-blacklist", false);
 
 #if defined(ANDROID) || defined(MOZ_B2G)
 
@@ -4526,14 +4581,15 @@ pref("font.name.serif.ja", "Charis SIL Compact");
 pref("font.name.sans-serif.ja", "Clear Sans");
 pref("font.name.monospace.ja", "MotoyaLMaru");
 pref("font.name-list.serif.ja", "Noto Serif, Droid Serif");
-pref("font.name-list.sans-serif.ja", "Clear Sans, Roboto, Droid Sans, MotoyaLMaru, MotoyaLCedar, Noto Sans JP, Droid Sans Japanese");
-pref("font.name-list.monospace.ja", "MotoyaLMaru, MotoyaLCedar, Droid Sans Mono");
+pref("font.name-list.sans-serif.ja", "Clear Sans, Roboto, Droid Sans, MotoyaLMaru, MotoyaLCedar, Noto Sans JP, Noto Sans CJK JP, Droid Sans Japanese");
+pref("font.name-list.monospace.ja", "MotoyaLMaru, MotoyaLCedar, Droid Sans Mono CJK JP, Droid Sans Mono");
 
 pref("font.name.serif.ko", "Charis SIL Compact");
 pref("font.name.sans-serif.ko", "Clear Sans");
 pref("font.name.monospace.ko", "Droid Sans Mono");
 pref("font.name-list.serif.ko", "Noto Serif, Droid Serif, HYSerif");
-pref("font.name-list.sans-serif.ko", "SmartGothic, NanumGothic, Noto Sans KR, DroidSansFallback, Droid Sans Fallback");
+pref("font.name-list.sans-serif.ko", "SmartGothic, NanumGothic, Noto Sans KR, Noto Sans CJK KR, DroidSansFallback, Droid Sans Fallback");
+pref("font.name-list.monospace.ko", "Noto Sans Mono CJK KR");
 
 pref("font.name.serif.th", "Charis SIL Compact");
 pref("font.name.sans-serif.th", "Clear Sans");
@@ -4563,22 +4619,22 @@ pref("font.name.serif.zh-CN", "Charis SIL Compact");
 pref("font.name.sans-serif.zh-CN", "Clear Sans");
 pref("font.name.monospace.zh-CN", "Droid Sans Mono");
 pref("font.name-list.serif.zh-CN", "Noto Serif, Droid Serif, Droid Sans Fallback");
-pref("font.name-list.sans-serif.zh-CN", "Roboto, Droid Sans, Noto Sans SC, Droid Sans Fallback");
-pref("font.name-list.monospace.zh-CN", "Droid Sans Fallback");
+pref("font.name-list.sans-serif.zh-CN", "Roboto, Droid Sans, Noto Sans SC, Noto Sans CJK SC, Droid Sans Fallback");
+pref("font.name-list.monospace.zh-CN", "Noto Sans Mono CJK SC, Droid Sans Fallback");
 
 pref("font.name.serif.zh-HK", "Charis SIL Compact");
 pref("font.name.sans-serif.zh-HK", "Clear Sans");
 pref("font.name.monospace.zh-HK", "Droid Sans Mono");
 pref("font.name-list.serif.zh-HK", "Noto Serif, Droid Serif, Droid Sans Fallback");
-pref("font.name-list.sans-serif.zh-HK", "Roboto, Droid Sans, Noto Sans TC, Noto Sans SC, Droid Sans Fallback");
-pref("font.name-list.monospace.zh-HK", "Droid Sans Fallback");
+pref("font.name-list.sans-serif.zh-HK", "Roboto, Droid Sans, Noto Sans TC, Noto Sans SC, Noto Sans CJK TC, Droid Sans Fallback");
+pref("font.name-list.monospace.zh-HK", "Noto Sans Mono CJK TC, Droid Sans Fallback");
 
 pref("font.name.serif.zh-TW", "Charis SIL Compact");
 pref("font.name.sans-serif.zh-TW", "Clear Sans");
 pref("font.name.monospace.zh-TW", "Droid Sans Mono");
 pref("font.name-list.serif.zh-TW", "Noto Serif, Droid Serif, Droid Sans Fallback");
-pref("font.name-list.sans-serif.zh-TW", "Roboto, Droid Sans, Noto Sans TC, Noto Sans SC, Droid Sans Fallback");
-pref("font.name-list.monospace.zh-TW", "Droid Sans Fallback");
+pref("font.name-list.sans-serif.zh-TW", "Roboto, Droid Sans, Noto Sans TC, Noto Sans SC, Noto Sans CJK TC, Droid Sans Fallback");
+pref("font.name-list.monospace.zh-TW", "Noto Sans Mono CJK TC, Droid Sans Fallback");
 
 pref("font.name.serif.x-math", "Latin Modern Math");
 pref("font.name-list.serif.x-math", "Latin Modern Math, XITS Math, Cambria Math, Libertinus Math, DejaVu Math TeX Gyre, TeX Gyre Bonum Math, TeX Gyre Pagella Math, TeX Gyre Schola, TeX Gyre Termes Math, STIX Math, Asana Math, STIXGeneral, DejaVu Serif, DejaVu Sans, Charis SIL Compact");
@@ -4614,7 +4670,6 @@ pref("signon.autofillForms",                false);
 pref("signon.autologin.proxy",              false);
 pref("signon.formlessCapture.enabled",      true);
 pref("signon.storeWhenAutocompleteOff",     true);
-pref("signon.ui.experimental",              false);
 pref("signon.debug",                        false);
 pref("signon.recipes.path",                 "chrome://passwordmgr/content/recipes.json");
 pref("signon.schemeUpgrades",               false);
@@ -4749,6 +4804,7 @@ pref("gl.require-hardware", false);
 #ifdef XP_MACOSX
 pref("gl.multithreaded", false);
 #endif
+pref("gl.ignore-dx-interop2-blacklist", false);
 
 pref("webgl.force-enabled", false);
 pref("webgl.disabled", false);
@@ -4829,7 +4885,7 @@ pref("network.tcp.keepalive.retry_interval", 1); // seconds
 #endif
 // Default maximum probe retransmissions.
 // Linux only; not configurable on Win and Mac; fixed at 10 and 8 respectively.
-#ifdef XP_UNIX && !defined(XP_MACOSX)
+#if defined(XP_UNIX) && !defined(XP_MACOSX)
 pref("network.tcp.keepalive.probe_count", 4);
 #endif
 
@@ -5005,6 +5061,9 @@ pref("extensions.webExtensionsMinPlatformVersion", "42.0a1");
 // Other webextensions prefs
 pref("extensions.webextensions.keepStorageOnUninstall", false);
 pref("extensions.webextensions.keepUuidOnUninstall", false);
+// Redirect basedomain used by identity api
+pref("extensions.webextensions.identity.redirectDomain", "extensions.allizom.org");
+pref("extensions.webextensions.remote", false);
 
 pref("network.buffer.cache.count", 24);
 pref("network.buffer.cache.size",  32768);
@@ -5117,7 +5176,6 @@ pref("dom.mozNetworkStats.enabled", false);
 
 // WebSettings
 pref("dom.mozSettings.enabled", false);
-pref("dom.mozPermissionSettings.enabled", false);
 
 // W3C touch events
 // 0 - disabled, 1 - enabled, 2 - autodetect
@@ -5166,17 +5224,17 @@ pref("dom.netinfo.enabled", false);
 #ifdef XP_WIN
 // On 32-bit Windows, fire a low-memory notification if we have less than this
 // many mb of virtual address space available.
-pref("memory.low_virtual_memory_threshold_mb", 128);
+pref("memory.low_virtual_memory_threshold_mb", 256);
 
-// On Windows 32- or 64-bit, fire a low-memory notification if we have less
+// On Windows 32-bit, fire a low-memory notification if we have less
 // than this many mb of commit space (physical memory plus page file) left.
-pref("memory.low_commit_space_threshold_mb", 128);
+pref("memory.low_commit_space_threshold_mb", 256);
 
-// On Windows 32- or 64-bit, fire a low-memory notification if we have less
+// On Windows 32-bit, fire a low-memory notification if we have less
 // than this many mb of physical memory available on the whole machine.
 pref("memory.low_physical_memory_threshold_mb", 0);
 
-// On Windows 32- or 64-bit, don't fire a low-memory notification because of
+// On Windows 32-bit, don't fire a low-memory notification because of
 // low available physical memory or low commit space more than once every
 // low_memory_notification_interval_ms.
 pref("memory.low_memory_notification_interval_ms", 10000);
@@ -5349,6 +5407,9 @@ pref("urlclassifier.phishTable", "goog-phish-shavar,test-phish-simple");
 pref("urlclassifier.phishTable", "googpub-phish-shavar,test-phish-simple");
 #endif
 
+// Tables for application reputation.
+pref("urlclassifier.downloadBlockTable", "goog-badbinurl-shavar");
+
 #ifdef XP_WIN
  // Only download the whitelist on Windows, since the whitelist is
  // only useful for suppressing remote lookups for signed binaries which we can
@@ -5365,8 +5426,26 @@ pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simpl
 pref("urlclassifier.trackingTable", "test-track-simple,mozpub-track-digest256");
 pref("urlclassifier.trackingWhitelistTable", "test-trackwhite-simple,mozpub-trackwhite-digest256");
 
+// The number of random entries to send with a gethash request.
+pref("urlclassifier.gethashnoise", 4);
+
+// Gethash timeout for Safebrowsing.
+pref("urlclassifier.gethash.timeout_ms", 5000);
+
+// If an urlclassifier table has not been updated in this number of seconds,
+// a gethash request will be forced to check that the result is still in
+// the database.
+pref("urlclassifier.max-complete-age", 2700);
+
+// Name of the about: page contributed by safebrowsing to handle display of error
+// pages on phishing/malware hits.  (bug 399233)
+pref("urlclassifier.alternate_error_page", "blocked");
+
 // Enable phishing protection
-pref("browser.safebrowsing.phishing.enabled", true);
+pref("browser.safebrowsing.phishing.enabled", false);
+
+// Enable malware protection
+pref("browser.safebrowsing.malware.enabled", false);
 
 pref("browser.safebrowsing.downloads.enabled", false);
 pref("browser.safebrowsing.downloads.remote.enabled", false);
@@ -5378,7 +5457,9 @@ pref("browser.safebrowsing.downloads.remote.block_potentially_unwanted", true);
 pref("browser.safebrowsing.downloads.remote.block_uncommon",             true);
 pref("browser.safebrowsing.debug", false);
 
-pref("browser.safebrowsing.provider.google.lists", "goog-badbinurl-shavar,goog-downloadwhite-digest256,goog-phish-shavar,goog-malware-shavar,goog-unwanted-shavar");
+// The protocol version we communicate with google server.
+pref("browser.safebrowsing.provider.google.pver", "2.2");
+pref("browser.safebrowsing.provider.google.lists", "goog-badbinurl-shavar,goog-downloadwhite-digest256,goog-phish-shavar,googpub-phish-shavar,goog-malware-shavar,goog-unwanted-shavar");
 pref("browser.safebrowsing.provider.google.updateURL", "https://safebrowsing.google.com/safebrowsing/downloads?client=SAFEBROWSING_ID&appver=%MAJOR_VERSION%&pver=2.2&key=%GOOGLE_API_KEY%");
 pref("browser.safebrowsing.provider.google.gethashURL", "https://safebrowsing.google.com/safebrowsing/gethash?client=SAFEBROWSING_ID&appver=%MAJOR_VERSION%&pver=2.2");
 pref("browser.safebrowsing.provider.google.reportURL", "https://safebrowsing.google.com/safebrowsing/diagnostic?client=%NAME%&hl=%LOCALE%&site=");
@@ -5403,6 +5484,17 @@ pref("browser.safebrowsing.provider.mozilla.pver", "2.2");
 pref("browser.safebrowsing.provider.mozilla.lists", "mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,mozplugin-block-digest256,mozplugin2-block-digest256");
 pref("browser.safebrowsing.provider.mozilla.updateURL", "https://shavar.services.mozilla.com/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
 pref("browser.safebrowsing.provider.mozilla.gethashURL", "https://shavar.services.mozilla.com/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
+
+// Allow users to ignore Safe Browsing warnings.
+pref("browser.safebrowsing.allowOverride", true);
+
+#ifdef MOZILLA_OFFICIAL
+// Normally the "client ID" sent in updates is appinfo.name, but for
+// official Firefox releases from Mozilla we use a special identifier.
+pref("browser.safebrowsing.id", "navclient-auto-ffox");
+#else
+pref("browser.safebrowsing.id", "Firefox");
+#endif
 
 // Turn off Spatial navigation by default.
 pref("snav.enabled", false);
@@ -5438,7 +5530,7 @@ pref("layout.accessiblecaret.timeout_ms", 3000);
 
 // Simulate long tap to select words on the platforms where APZ is not enabled
 // or long tap events does not fired by APZ.
-pref("layout.accessiblecaret.use_long_tap_injector", true);
+pref("layout.accessiblecaret.use_long_tap_injector", false);
 
 // By default, carets become tilt only when they are overlapping.
 pref("layout.accessiblecaret.always_tilt", false);
@@ -5466,9 +5558,6 @@ pref("dom.wakelock.enabled", false);
 
 // The URL of the Firefox Accounts auth server backend
 pref("identity.fxaccounts.auth.uri", "https://api.accounts.firefox.com/v1");
-
-// disable mozsample size for now
-pref("image.mozsamplesize.enabled", false);
 
 // Enable navigator.sendBeacon on all platforms except b2g because it doesn't
 // play nicely with Firefox OS apps yet.
@@ -5668,7 +5757,9 @@ pref("narrate.enabled", false);
 
 pref("narrate.test", false);
 pref("narrate.rate", 0);
-pref("narrate.voice", "automatic");
+pref("narrate.voice", " { \"default\": \"automatic\" }");
+// Only make voices that match content language available.
+pref("narrate.filter-voices", true);
 
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
 // Whether to allow, on a Linux system that doesn't support the necessary sandboxing
@@ -5677,9 +5768,6 @@ pref("media.gmp.insecure.allow", false);
 #endif
 
 pref("dom.audiochannel.mutedByDefault", false);
-
-// Enable <details> and <summary> tags.
-pref("dom.details_element.enabled", false);
 
 // Secure Element API
 #ifdef MOZ_SECUREELEMENT
@@ -5718,6 +5806,14 @@ pref("webextensions.tests", false);
 // 16MB default non-parseable upload limit for requestBody.raw.bytes
 pref("webextensions.webRequest.requestBodyMaxRawBytes", 16777216);
 
+// This functionality is still experimental
+pref("webextensions.storage.sync.enabled", false);
+#ifdef RELEASE_OR_BETA
+pref("webextensions.storage.sync.serverURL", "https://webextensions.settings.services.mozilla.com/v1");
+#else
+pref("webextensions.storage.sync.serverURL", "https://webextensions.dev.mozaws.net/v1");
+#endif
+
 // Allow customization of the fallback directory for file uploads
 pref("dom.input.fallbackUploadDir", "");
 
@@ -5755,6 +5851,11 @@ pref("dom.maxHardwareConcurrency", 16);
 pref("osfile.reset_worker_delay", 30000);
 #endif
 
+#if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID)
+pref("dom.webkitBlink.dirPicker.enabled", true);
+pref("dom.webkitBlink.filesystem.enabled", true);
+#endif
+
 pref("media.block-autoplay-until-in-foreground", true);
 #ifdef MOZ_STYLO
 // Is the Servo-backed style system enabled?
@@ -5774,5 +5875,15 @@ pref("security.mixed_content.use_hsts", false);
 // mixed-content blocking
 pref("security.mixed_content.use_hsts", true);
 #endif
-// Approximately 1 week default cache for HSTS priming failures
+// Approximately 1 week default cache for HSTS priming failures, in seconds
 pref ("security.mixed_content.hsts_priming_cache_timeout", 10080);
+// Force the channel to timeout in 3 seconds if we have not received
+// expects a time in milliseconds
+pref ("security.mixed_content.hsts_priming_request_timeout", 3000);
+
+// Disable Storage api in release builds.
+#ifdef NIGHTLY_BUILD
+pref("dom.storageManager.enabled", true);
+#else
+pref("dom.storageManager.enabled", false);
+#endif

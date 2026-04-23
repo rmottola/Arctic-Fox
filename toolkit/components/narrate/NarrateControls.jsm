@@ -10,6 +10,7 @@ Cu.import("resource://gre/modules/narrate/VoiceSelect.jsm");
 Cu.import("resource://gre/modules/narrate/Narrator.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/AsyncPrefs.jsm");
+Cu.import("resource://gre/modules/TelemetryStopwatch.jsm");
 
 this.EXPORTED_SYMBOLS = ["NarrateControls"];
 
@@ -18,6 +19,8 @@ var gStrings = Services.strings.createBundle("chrome://global/locale/narrate.pro
 function NarrateControls(mm, win) {
   this._mm = mm;
   this._winRef = Cu.getWeakReference(win);
+
+  win.addEventListener("unload", this);
 
   // Append content style sheet in document head
   let style = win.document.createElement("link");
@@ -36,13 +39,60 @@ function NarrateControls(mm, win) {
   let dropdown = win.document.createElement("ul");
   dropdown.className = "dropdown";
   dropdown.id = "narrate-dropdown";
+  // We need inline svg here for the animation to work (bug 908634 & 1190881).
+  // The style animation can't be scoped (bug 830056).
   dropdown.innerHTML =
     localize`<style scoped>
       @import url("chrome://global/skin/narrateControls.css");
     </style>
     <li>
-       <button class="dropdown-toggle button"
-               id="narrate-toggle" title="${"narrate"}"></button>
+       <button class="dropdown-toggle button" id="narrate-toggle"
+               title="${"narrate"}" hidden>
+         <svg xmlns="http://www.w3.org/2000/svg"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              width="24" height="24" viewBox="0 0 24 24">
+          <style>
+            @keyframes grow {
+              0%   { transform: scaleY(1);   }
+              15%  { transform: scaleY(1.5); }
+              15%  { transform: scaleY(1.5); }
+              30%  { transform: scaleY(1);   }
+              100% { transform: scaleY(1);   }
+            }
+
+            #waveform > rect {
+              fill: #808080;
+            }
+
+            .speaking #waveform > rect {
+              fill: #58bf43;
+              transform-box: fill-box;
+              transform-origin: 50% 50%;
+              animation-name: grow;
+              animation-duration: 1750ms;
+              animation-iteration-count: infinite;
+              animation-timing-function: linear;
+            }
+
+            #waveform > rect:nth-child(2) { animation-delay: 250ms; }
+            #waveform > rect:nth-child(3) { animation-delay: 500ms; }
+            #waveform > rect:nth-child(4) { animation-delay: 750ms; }
+            #waveform > rect:nth-child(5) { animation-delay: 1000ms; }
+            #waveform > rect:nth-child(6) { animation-delay: 1250ms; }
+            #waveform > rect:nth-child(7) { animation-delay: 1500ms; }
+
+          </style>
+          <g id="waveform">
+            <rect x="1"  y="8" width="2" height="8"  rx=".5" ry=".5" />
+            <rect x="4"  y="5" width="2" height="14" rx=".5" ry=".5" />
+            <rect x="7"  y="8" width="2" height="8"  rx=".5" ry=".5" />
+            <rect x="10" y="4" width="2" height="16" rx=".5" ry=".5" />
+            <rect x="13" y="2" width="2" height="20" rx=".5" ry=".5" />
+            <rect x="16" y="4" width="2" height="16" rx=".5" ry=".5" />
+            <rect x="19" y="7" width="2" height="10" rx=".5" ry=".5" />
+          </g>
+         </svg>
+        </button>
     </li>
     <li class="dropdown-popup">
       <div id="narrate-control" class="narrate-row">
@@ -54,7 +104,7 @@ function NarrateControls(mm, win) {
       </div>
       <div id="narrate-rate" class="narrate-row">
         <input id="narrate-rate-input" value="0" title="${"speed"}"
-               step="25" max="400" min="-400" type="range">
+               step="5" max="100" min="-100" type="range">
       </div>
       <div id="narrate-voices" class="narrate-row"></div>
       <div class="dropdown-arrow"></div>
@@ -65,8 +115,6 @@ function NarrateControls(mm, win) {
   let branch = Services.prefs.getBranch("narrate.");
   let selectLabel = gStrings.GetStringFromName("selectvoicelabel");
   this.voiceSelect = new VoiceSelect(win, selectLabel);
-  this.voiceSelect.addOptions(this._getVoiceOptions(),
-    branch.getCharPref("voice"));
   this.voiceSelect.element.addEventListener("change", this);
   this.voiceSelect.element.id = "voice-select";
   win.speechSynthesis.addEventListener("voiceschanged", this);
@@ -76,12 +124,12 @@ function NarrateControls(mm, win) {
   dropdown.addEventListener("click", this, true);
 
   let rateRange = dropdown.querySelector("#narrate-rate > input");
-  rateRange.addEventListener("input", this);
-  rateRange.addEventListener("mousedown", this);
-  rateRange.addEventListener("mouseup", this);
+  rateRange.addEventListener("change", this);
 
   // The rate is stored as an integer.
   rateRange.value = branch.getIntPref("rate");
+
+  this._setupVoices();
 
   let tb = win.document.getElementById("reader-toolbar");
   tb.appendChild(dropdown);
@@ -90,58 +138,102 @@ function NarrateControls(mm, win) {
 NarrateControls.prototype = {
   handleEvent: function(evt) {
     switch (evt.type) {
-      case "mousedown":
-        this._rateMousedown = true;
-        break;
-      case "mouseup":
-        this._rateMousedown = false;
-        break;
-      case "input":
-        this._onRateInput(evt);
-        break;
       case "change":
-        this._onVoiceChange();
+        if (evt.target.id == "narrate-rate-input") {
+          this._onRateInput(evt);
+        } else {
+          this._onVoiceChange();
+        }
         break;
       case "click":
         this._onButtonClick(evt);
         break;
       case "voiceschanged":
-        this.voiceSelect.clear();
-        this.voiceSelect.addOptions(this._getVoiceOptions(),
-          Services.prefs.getCharPref("narrate.voice"));
+        this._setupVoices();
+        break;
+      case "unload":
+        if (this.narrator.speaking) {
+          TelemetryStopwatch.finish("NARRATE_CONTENT_SPEAKTIME_MS", this);
+        }
         break;
     }
   },
 
-  _getVoiceOptions: function() {
-    let win = this._win;
-    let comparer = win.Intl ?
-      (new Intl.Collator()).compare : (a, b) => a.localeCompare(b);
-    let options = win.speechSynthesis.getVoices().map(v => {
-      return {
-        label: this._createVoiceLabel(v),
-        value: v.voiceURI
-      };
-    }).sort((a, b) => comparer(a.label, b.label));
-    options.unshift({
-      label: gStrings.GetStringFromName("defaultvoice"),
-      value: "automatic"
-    });
+  /**
+   * Returns true if synth voices are available.
+   */
+  _setupVoices: function() {
+    return this.narrator.languagePromise.then(language => {
+      this.voiceSelect.clear();
+      let win = this._win;
+      let voicePrefs = this._getVoicePref();
+      let selectedVoice = voicePrefs[language || "default"];
+      let comparer = win.Intl ?
+        (new Intl.Collator()).compare : (a, b) => a.localeCompare(b);
+      let filter = !Services.prefs.getBoolPref("narrate.filter-voices");
+      let options = win.speechSynthesis.getVoices().filter(v => {
+        return filter || !language || v.lang.split("-")[0] == language;
+      }).map(v => {
+        return {
+          label: this._createVoiceLabel(v),
+          value: v.voiceURI,
+          selected: selectedVoice == v.voiceURI
+        };
+      }).sort((a, b) => comparer(a.label, b.label));
 
-    return options;
+      if (options.length) {
+        options.unshift({
+          label: gStrings.GetStringFromName("defaultvoice"),
+          value: "automatic",
+          selected: selectedVoice == "automatic"
+        });
+        this.voiceSelect.addOptions(options);
+      }
+
+      let narrateToggle = win.document.getElementById("narrate-toggle");
+      let histogram =
+        Services.telemetry.getKeyedHistogramById("NARRATE_CONTENT_BY_LANGUAGE");
+      let initial = !!this._voicesInitialized;
+      this._voicesInitialized = true;
+
+      if (initial) {
+        histogram.add(language, 0);
+      }
+
+      if (options.length && narrateToggle.hidden) {
+        // About to show for the first time..
+        histogram.add(language, 1);
+      }
+
+      // We disable this entire feature if there are no available voices.
+      narrateToggle.hidden = !options.length;
+    });
+  },
+
+  _getVoicePref: function() {
+    let voicePref = Services.prefs.getCharPref("narrate.voice");
+    try {
+      return JSON.parse(voicePref);
+    } catch (e) {
+      return { default: voicePref };
+    }
   },
 
   _onRateInput: function(evt) {
-    if (!this._rateMousedown) {
-      AsyncPrefs.set("narrate.rate", parseInt(evt.target.value, 10));
-      this.narrator.setRate(this._convertRate(evt.target.value));
-    }
+    AsyncPrefs.set("narrate.rate", parseInt(evt.target.value, 10));
+    this.narrator.setRate(this._convertRate(evt.target.value));
   },
 
   _onVoiceChange: function() {
     let voice = this.voice;
-    AsyncPrefs.set("narrate.voice", voice);
     this.narrator.setVoice(voice);
+    this.narrator.languagePromise.then(language => {
+      if (language) {
+        let voicePref = this._getVoicePref();
+        voicePref[language || "default"] = voice;
+        AsyncPrefs.set("narrate.voice", JSON.stringify(voicePref));
+      }
+    });
   },
 
   _onButtonClick: function(evt) {
@@ -166,34 +258,26 @@ NarrateControls.prototype = {
           });
         }
         break;
-      case "narrate-toggle":
-        let dropdown = this._doc.getElementById("narrate-dropdown");
-        if (dropdown.classList.contains("open")) {
-          if (this.narrator.speaking) {
-            this.narrator.stop();
-          }
-
-          // We need to remove "keep-open" class here so that AboutReader
-          // closes this dropdown properly. This class is eventually removed in
-          // _updateSpeechControls which gets called after narration stops,
-          // but that happend asynchronously and is too late.
-          dropdown.classList.remove("keep-open");
-        }
-        break;
     }
   },
 
   _updateSpeechControls: function(speaking) {
     let dropdown = this._doc.getElementById("narrate-dropdown");
     dropdown.classList.toggle("keep-open", speaking);
+    dropdown.classList.toggle("speaking", speaking);
 
     let startStopButton = this._doc.getElementById("narrate-start-stop");
-    startStopButton.classList.toggle("speaking", speaking);
     startStopButton.title =
-      gStrings.GetStringFromName(speaking ? "start" : "stop");
+      gStrings.GetStringFromName(speaking ? "stop" : "start");
 
     this._doc.getElementById("narrate-skip-previous").disabled = !speaking;
     this._doc.getElementById("narrate-skip-next").disabled = !speaking;
+
+    if (speaking) {
+      TelemetryStopwatch.start("NARRATE_CONTENT_SPEAKTIME_MS", this);
+    } else {
+      TelemetryStopwatch.finish("NARRATE_CONTENT_SPEAKTIME_MS", this);
+    }
   },
 
   _createVoiceLabel: function(voice) {

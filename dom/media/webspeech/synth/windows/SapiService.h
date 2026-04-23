@@ -42,11 +42,11 @@ public:
 private:
   virtual ~SapiService();
 
+  already_AddRefed<ISpVoice> InitSapiInstance();
   bool RegisterVoices();
 
   nsRefPtrHashtable<nsStringHashKey, ISpObjectToken> mVoices;
   nsTArray<RefPtr<SapiCallback>> mCallbacks;
-  RefPtr<ISpVoice> mSapiClient;
 
   bool mInitialized;
 

@@ -448,11 +448,6 @@ pref("dom.mozNetworkStats.enabled", true);
 pref("dom.webapps.firstRunWithSIM", true);
 #endif
 
-// ResourceStats
-#ifdef MOZ_WIDGET_GONK
-pref("dom.resource_stats.enabled", true);
-#endif
-
 #ifdef MOZ_B2G_RIL
 // SingleVariant
 pref("dom.mozApps.single_variant_sourcedir", "/persist/svoperapps");
@@ -460,7 +455,6 @@ pref("dom.mozApps.single_variant_sourcedir", "/persist/svoperapps");
 
 // WebSettings
 pref("dom.mozSettings.enabled", true);
-pref("dom.mozPermissionSettings.enabled", true);
 
 // controls if we want camera support
 pref("device.camera.enabled", true);
@@ -657,9 +651,6 @@ pref("hal.processPriorityManager.gonk.MASTER.OomScoreAdjust", 0);
 pref("hal.processPriorityManager.gonk.MASTER.KillUnderKB", 4096);
 pref("hal.processPriorityManager.gonk.MASTER.cgroup", "");
 
-pref("hal.processPriorityManager.gonk.PREALLOC.OomScoreAdjust", 67);
-pref("hal.processPriorityManager.gonk.PREALLOC.cgroup", "apps/bg_non_interactive");
-
 pref("hal.processPriorityManager.gonk.FOREGROUND_HIGH.OomScoreAdjust", 67);
 pref("hal.processPriorityManager.gonk.FOREGROUND_HIGH.KillUnderKB", 5120);
 pref("hal.processPriorityManager.gonk.FOREGROUND_HIGH.cgroup", "apps/critical");
@@ -736,12 +727,6 @@ pref("gonk.notifySoftLowMemUnderKB", 43008);
 // memory pressure event.  (When we're not under memory pressure, we sit
 // blocked on a poll(), and this pref has no effect.)
 pref("gonk.systemMemoryPressureRecoveryPollMS", 5000);
-
-// Enable pre-launching content processes for improved startup time
-// (hiding latency).
-pref("dom.ipc.processPrelaunch.enabled", true);
-// Wait this long before pre-launching a new subprocess.
-pref("dom.ipc.processPrelaunch.delayMs", 5000);
 
 pref("dom.ipc.reuse_parent_app", false);
 
@@ -977,11 +962,6 @@ pref("dom.apps.reviewer_paths", "/reviewers/,/extension/reviewers/");
 
 // New implementation to unify touch-caret and selection-carets.
 pref("layout.accessiblecaret.enabled", true);
-
-// APZ on real devices supports long tap events.
-#ifdef MOZ_WIDGET_GONK
-pref("layout.accessiblecaret.use_long_tap_injector", false);
-#endif
 
 // The active caret is disallow to be dragged across the other (inactive) caret.
 pref("layout.accessiblecaret.allow_dragging_across_other_caret", false);

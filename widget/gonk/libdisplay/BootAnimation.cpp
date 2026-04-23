@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <endian.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -253,8 +254,17 @@ struct AnimationFrame {
 struct AnimationPart {
     int32_t count;
     int32_t pause;
+    // If you alter the size of the path, change ReadFromString() as well.
     char path[256];
     vector<AnimationFrame> frames;
+
+    bool
+    ReadFromString(const char* aLine)
+    {
+        MOZ_ASSERT(aLine);
+        // this 255 value must be in sync with AnimationPart::path.
+        return sscanf(aLine, "p %d %d %255s", &count, &pause, path) == 3;
+    }
 };
 
 struct RawReadState {
@@ -279,7 +289,7 @@ TransformTo565(png_structp png_ptr, png_row_infop row_info, png_bytep data)
 {
     uint16_t *outbuf = (uint16_t *)data;
     uint8_t *inbuf = (uint8_t *)data;
-    for (int i = 0; i < row_info->rowbytes; i += 3) {
+    for (uint32_t i = 0; i < row_info->rowbytes; i += 3) {
         *outbuf++ = ((inbuf[i]     & 0xF8) << 8) |
                     ((inbuf[i + 1] & 0xFC) << 3) |
                     ((inbuf[i + 2]       ) >> 3);
@@ -411,7 +421,7 @@ AnimationFrame::ReadPngFrame(int outputFormat)
 
     vector<char *> rows(height + 1);
     uint32_t stride = width * bytepp;
-    for (int i = 0; i < height; i++) {
+    for (uint32_t i = 0; i < height; i++) {
         rows[i] = buf + (stride * i);
     }
     rows[height] = nullptr;
@@ -575,8 +585,7 @@ AnimationThread(void *)
         if (headerRead &&
             sscanf(line, "%d %d %d", &width, &height, &fps) == 3) {
             headerRead = false;
-        } else if (sscanf(line, "p %d %d %s",
-                          &part.count, &part.pause, part.path)) {
+        } else if (part.ReadFromString(line)) {
             parts.push_back(part);
         }
     } while (end && *(line = end + 1));
@@ -593,7 +602,7 @@ AnimationThread(void *)
                 name.length() >= 256)
                 continue;
 
-            part.frames.push_back();
+            part.frames.resize(part.frames.size() + 1);
             AnimationFrame &frame = part.frames.back();
             strcpy(frame.path, name.c_str());
             frame.file = reader.GetLocalEntry(entry);
@@ -602,12 +611,12 @@ AnimationThread(void *)
         sort(part.frames.begin(), part.frames.end());
     }
 
-    uint32_t frameDelayUs = 1000000 / fps;
+    long int frameDelayUs = 1000000 / fps;
 
     for (uint32_t i = 0; i < parts.size(); i++) {
         AnimationPart &part = parts[i];
 
-        uint32_t j = 0;
+        int32_t j = 0;
         while (sRunAnimation && (!part.count || j++ < part.count)) {
             for (uint32_t k = 0; k < part.frames.size(); k++) {
                 struct timeval tv1, tv2;
@@ -640,11 +649,11 @@ AnimationThread(void *)
                             (buf->height * buf->stride * frame.bytepp) / sizeof(wchar_t));
                 }
 
-                if (buf->height == frame.height && buf->stride == frame.width) {
+                if ((uint32_t)buf->height == frame.height && (uint32_t)buf->stride == frame.width) {
                     memcpy(vaddr, frame.buf,
                            frame.width * frame.height * frame.bytepp);
-                } else if (buf->height >= frame.height &&
-                           buf->width >= frame.width) {
+                } else if ((uint32_t)buf->height >= frame.height &&
+                           (uint32_t)buf->width >= frame.width) {
                     int startx = (buf->width - frame.width) / 2;
                     int starty = (buf->height - frame.height) / 2;
 
@@ -654,7 +663,7 @@ AnimationThread(void *)
                     char *src = frame.buf;
                     char *dst = (char *) vaddr + starty * dst_stride + startx * frame.bytepp;
 
-                    for (int i = 0; i < frame.height; i++) {
+                    for (uint32_t i = 0; i < frame.height; i++) {
                         memcpy(dst, src, src_stride);
                         src += src_stride;
                         dst += dst_stride;
@@ -669,7 +678,7 @@ AnimationThread(void *)
                 if (tv2.tv_usec < frameDelayUs) {
                     usleep(frameDelayUs - tv2.tv_usec);
                 } else {
-                    LOGW("Frame delay is %d us but decoding took %d us",
+                    LOGW("Frame delay is %ld us but decoding took %ld us",
                          frameDelayUs, tv2.tv_usec);
                 }
 

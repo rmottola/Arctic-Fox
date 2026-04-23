@@ -24,11 +24,11 @@ function run_test() {
       var prefValue = Math.floor(Math.random() * 100);
 
       if (shouldThrow) {
-        do_check_thrown(function () { cps.getPref(aGroup, prefName); });
-        do_check_thrown(function () { cps.setPref(aGroup, prefName, prefValue); });
-        do_check_thrown(function () { cps.hasPref(aGroup, prefName); });
-        do_check_thrown(function () { cps.removePref(aGroup, prefName); });
-        do_check_thrown(function () { cps.getPrefs(aGroup); });
+        do_check_thrown(function() { cps.getPref(aGroup, prefName); });
+        do_check_thrown(function() { cps.setPref(aGroup, prefName, prefValue); });
+        do_check_thrown(function() { cps.hasPref(aGroup, prefName); });
+        do_check_thrown(function() { cps.removePref(aGroup, prefName); });
+        do_check_thrown(function() { cps.getPrefs(aGroup); });
       } else {
         do_check_eq(cps.setPref(aGroup, prefName, prefValue), undefined);
         do_check_true(cps.hasPref(aGroup, prefName));
@@ -79,26 +79,26 @@ function run_test() {
     do_check_eq(cps.setPref(stringURI, "test.2", 2), undefined);
     do_check_eq(cps.setPref(uri, "test.1", 1), undefined);
 
-    enumerateAndCheck(cps.getPrefs(uri), 8, ["test.1","test.2","test.5"]);
-    enumerateAndCheck(cps.getPrefs(stringURI), 8, ["test.1","test.2","test.5"]);
-    enumerateAndCheck(cps.getPrefs(stringObjectURI), 8, ["test.1","test.2","test.5"]);
+    enumerateAndCheck(cps.getPrefs(uri), 8, ["test.1", "test.2", "test.5"]);
+    enumerateAndCheck(cps.getPrefs(stringURI), 8, ["test.1", "test.2", "test.5"]);
+    enumerateAndCheck(cps.getPrefs(stringObjectURI), 8, ["test.1", "test.2", "test.5"]);
 
     do_check_eq(cps.setPref(uri, "test.4", 4), undefined);
     do_check_eq(cps.setPref(stringObjectURI, "test.0", 0), undefined);
 
-    enumerateAndCheck(cps.getPrefs(uri), 12, ["test.0","test.1","test.2","test.4","test.5"]);
-    enumerateAndCheck(cps.getPrefs(stringURI), 12, ["test.0","test.1","test.2","test.4","test.5"]);
-    enumerateAndCheck(cps.getPrefs(stringObjectURI), 12, ["test.0","test.1","test.2","test.4","test.5"]);
+    enumerateAndCheck(cps.getPrefs(uri), 12, ["test.0", "test.1", "test.2", "test.4", "test.5"]);
+    enumerateAndCheck(cps.getPrefs(stringURI), 12, ["test.0", "test.1", "test.2", "test.4", "test.5"]);
+    enumerateAndCheck(cps.getPrefs(stringObjectURI), 12, ["test.0", "test.1", "test.2", "test.4", "test.5"]);
 
     do_check_eq(cps.setPref(stringURI, "test.3", 3), undefined);
 
-    enumerateAndCheck(cps.getPrefs(uri), 15, ["test.0","test.1","test.2","test.3","test.4","test.5"]);
-    enumerateAndCheck(cps.getPrefs(stringURI), 15, ["test.0","test.1","test.2","test.3","test.4","test.5"]);
-    enumerateAndCheck(cps.getPrefs(stringObjectURI), 15, ["test.0","test.1","test.2","test.3","test.4","test.5"]);
+    enumerateAndCheck(cps.getPrefs(uri), 15, ["test.0", "test.1", "test.2", "test.3", "test.4", "test.5"]);
+    enumerateAndCheck(cps.getPrefs(stringURI), 15, ["test.0", "test.1", "test.2", "test.3", "test.4", "test.5"]);
+    enumerateAndCheck(cps.getPrefs(stringObjectURI), 15, ["test.0", "test.1", "test.2", "test.3", "test.4", "test.5"]);
   }
 }
 
-function do_check_thrown (aCallback) {
+function do_check_thrown(aCallback) {
   var exThrown = false;
   try {
     aCallback();

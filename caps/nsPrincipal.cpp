@@ -30,8 +30,6 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/HashFunctions.h"
 
-#include "nsIAppsService.h"
-
 using namespace mozilla;
 
 static bool gIsWhitelistingTestDomains = false;
@@ -195,10 +193,6 @@ nsPrincipal::SubsumesInternal(nsIPrincipal* aOther,
   // For nsPrincipal, Subsumes is equivalent to Equals.
   if (aOther == this) {
     return true;
-  }
-
-  if (OriginAttributesRef() != Cast(aOther)->OriginAttributesRef()) {
-    return false;
   }
 
   // If either the subject or the object has changed its principal by
@@ -731,6 +725,9 @@ nsExpandedPrincipal::SubsumesInternal(nsIPrincipal* aOther,
     nsTArray< nsCOMPtr<nsIPrincipal> >* otherList;
     expanded->GetWhiteList(&otherList);
     for (uint32_t i = 0; i < otherList->Length(); ++i){
+      // Use SubsumesInternal rather than Subsumes here, since OriginAttribute
+      // checks are only done between non-expanded sub-principals, and we don't
+      // need to incur the extra virtual call overhead.
       if (!SubsumesInternal((*otherList)[i], aConsideration)) {
         return false;
       }

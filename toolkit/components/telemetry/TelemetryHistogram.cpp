@@ -203,9 +203,6 @@ mozilla::Atomic<bool, mozilla::Relaxed> gIPCTimerArming(false);
 StaticAutoPtr<nsTArray<Accumulation>> gAccumulations;
 StaticAutoPtr<nsTArray<KeyedAccumulation>> gKeyedAccumulations;
 
-// Has XPCOM started shutting down?
-mozilla::Atomic<bool, mozilla::Relaxed>  gShuttingDown(false);
-
 } // namespace
 
 
@@ -343,26 +340,17 @@ HistogramInfo::label_id(const char* label, uint32_t* labelId) const
   return NS_ERROR_FAILURE;
 }
 
-struct TelemetryShutdownObserver : public nsIObserver
+void internal_DispatchToMainThread(already_AddRefed<nsIRunnable>&& aEvent)
 {
-  NS_DECL_ISUPPORTS
-
-  NS_IMETHOD Observe(nsISupports*, const char* aTopic, const char16_t*) override
-  {
-    if (strcmp(aTopic, NS_XPCOM_SHUTDOWN_OBSERVER_ID) != 0) {
-      return NS_OK;
-    }
-    nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
-    if (obs) {
-      obs->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID);
-    }
-    gShuttingDown = true;
-    return NS_OK;
+  nsCOMPtr<nsIRunnable> event(aEvent);
+  nsCOMPtr<nsIThread> thread;
+  nsresult rv = NS_GetMainThread(getter_AddRefs(thread));
+  if (NS_FAILED(rv)) {
+    NS_WARNING("NS_FAILED DispatchToMainThread. Maybe we're shutting down?");
+    return;
   }
-private:
-  virtual ~TelemetryShutdownObserver() { }
-};
-NS_IMPL_ISUPPORTS(TelemetryShutdownObserver, nsIObserver)
+  thread->Dispatch(event, 0);
+}
 
 } // namespace
 
@@ -594,6 +582,9 @@ internal_GetHistogramByName(const nsACString &name, Histogram **ret)
   return NS_OK;
 }
 
+
+#if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID)
+
 /**
  * This clones a histogram |existing| with the id |existingId| to a
  * new histogram with the name |newName|.
@@ -623,26 +614,6 @@ internal_CloneHistogram(const nsACString& newName,
 
   return clone;
 }
-
-/**
- * This clones a histogram with the id |existingId| to a new histogram
- * with the name |newName|.
- * For simplicity this is limited to registered histograms.
- */
-Histogram*
-internal_CloneHistogram(const nsACString& newName,
-                        mozilla::Telemetry::ID existingId)
-{
-  Histogram *existing = nullptr;
-  nsresult rv = internal_GetHistogramByEnumId(existingId, &existing, GeckoProcessType_Default);
-  if (NS_FAILED(rv)) {
-    return nullptr;
-  }
-
-  return internal_CloneHistogram(newName, existingId, *existing);
-}
-
-#if !defined(MOZ_WIDGET_GONK) && !defined(MOZ_WIDGET_ANDROID)
 
 GeckoProcessType
 GetProcessFromName(const std::string& aString)
@@ -1385,8 +1356,8 @@ void internal_armIPCTimer()
   gIPCTimerArming = true;
   if (NS_IsMainThread()) {
     internal_armIPCTimerMainThread();
-  } else if (!gShuttingDown) {
-    NS_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
+  } else {
+    internal_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
       StaticMutexAutoLock locker(gTelemetryHistogramMutex);
       internal_armIPCTimerMainThread();
     }));
@@ -1399,11 +1370,16 @@ internal_RemoteAccumulate(mozilla::Telemetry::ID aId, uint32_t aSample)
   if (XRE_IsParentProcess()) {
     return false;
   }
+  Histogram *h;
+  nsresult rv = internal_GetHistogramByEnumId(aId, &h, GeckoProcessType_Default);
+  if (NS_SUCCEEDED(rv) && !h->IsRecordingEnabled()) {
+    return true;
+  }
   if (!gAccumulations) {
     gAccumulations = new nsTArray<Accumulation>();
   }
   if (gAccumulations->Length() == kAccumulationsArrayHighWaterMark) {
-    NS_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
+    internal_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
       TelemetryHistogram::IPCTimerFired(nullptr, nullptr);
     }));
   }
@@ -1419,11 +1395,18 @@ internal_RemoteAccumulate(mozilla::Telemetry::ID aId,
   if (XRE_IsParentProcess()) {
     return false;
   }
+  const HistogramInfo& th = gHistograms[aId];
+  KeyedHistogram* keyed
+     = internal_GetKeyedHistogramById(nsDependentCString(th.id()));
+  MOZ_ASSERT(keyed);
+  if (!keyed->IsRecordingEnabled()) {
+    return false;
+  }
   if (!gKeyedAccumulations) {
     gKeyedAccumulations = new nsTArray<KeyedAccumulation>();
   }
   if (gKeyedAccumulations->Length() == kAccumulationsArrayHighWaterMark) {
-    NS_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
+    internal_DispatchToMainThread(NS_NewRunnableFunction([]() -> void {
       TelemetryHistogram::IPCTimerFired(nullptr, nullptr);
     }));
   }
@@ -2127,10 +2110,6 @@ void TelemetryHistogram::InitializeGlobalState(bool canRecordBase,
       " the n_values for the following in Histograms.json:"
       " STARTUP_MEASUREMENT_ERRORS");
 
-  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
-  MOZ_ASSERT(obs);
-  obs->AddObserver(new TelemetryShutdownObserver, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
-
   gInitDone = true;
 }
 
@@ -2363,33 +2342,6 @@ TelemetryHistogram::GetHistogramName(mozilla::Telemetry::ID id)
   StaticMutexAutoLock locker(gTelemetryHistogramMutex);
   const HistogramInfo& h = gHistograms[id];
   return h.id();
-}
-
-nsresult
-TelemetryHistogram::HistogramFrom(const nsACString &name,
-                                  const nsACString &existing_name,
-                                  JSContext *cx,
-                                  JS::MutableHandle<JS::Value> ret)
-{
-  Histogram* clone = nullptr;
-  {
-    StaticMutexAutoLock locker(gTelemetryHistogramMutex);
-    mozilla::Telemetry::ID id;
-    nsresult rv
-      = internal_GetHistogramEnumId(PromiseFlatCString(existing_name).get(),
-                                    &id);
-    if (NS_FAILED(rv)) {
-      return rv;
-    }
-
-    clone = internal_CloneHistogram(name, id);
-    if (!clone) {
-      return NS_ERROR_FAILURE;
-    }
-  }
-
-  // Runs without protection from |gTelemetryHistogramMutex|
-  return internal_WrapAndReturnHistogram(clone, cx, ret);
 }
 
 nsresult

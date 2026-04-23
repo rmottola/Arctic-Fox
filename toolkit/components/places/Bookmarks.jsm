@@ -118,6 +118,7 @@ var Bookmarks = Object.freeze({
    menuGuid:    "menu________",
    toolbarGuid: "toolbar_____",
    unfiledGuid: "unfiled_____",
+   mobileGuid:  "mobile______",
 
    // With bug 424160, tags will stop being bookmarks, thus this root will
    // be removed.  Do not rely on this, rather use the tagging service API.
@@ -188,13 +189,17 @@ var Bookmarks = Object.freeze({
       // complete we may stop using it.
       let uri = item.hasOwnProperty("url") ? PlacesUtils.toURI(item.url) : null;
       let itemId = yield PlacesUtils.promiseItemId(item.guid);
+
+      // Pass tagging information for the observers to skip over these notifications when needed.
+      let isTagging = parent._parentId == PlacesUtils.tagsFolderId;
+      let isTagsFolder = parent._id == PlacesUtils.tagsFolderId;
       notify(observers, "onItemAdded", [ itemId, parent._id, item.index,
                                          item.type, uri, item.title || null,
                                          PlacesUtils.toPRTime(item.dateAdded), item.guid,
-                                         item.parentGuid, item.source ]);
+                                         item.parentGuid, item.source ],
+                                       { isTagging: isTagging || isTagsFolder });
 
       // If it's a tag, notify OnItemChanged to all bookmarks for this URL.
-      let isTagging = parent._parentId == PlacesUtils.tagsFolderId;
       if (isTagging) {
         for (let entry of (yield fetchBookmarksByURL(item))) {
           notify(observers, "onItemChanged", [ entry._id, "tags", false, "",
@@ -264,7 +269,6 @@ var Bookmarks = Object.freeze({
         return Object.assign({}, item);
       }
 
-      let time = (updateInfo && updateInfo.dateAdded) || new Date();
       updateInfo = validateBookmarkObject(updateInfo,
         { url: { validIf: () => item.type == this.TYPE_BOOKMARK }
         , title: { validIf: () => [ this.TYPE_BOOKMARK
@@ -401,7 +405,7 @@ var Bookmarks = Object.freeze({
    * @rejects if the provided guid doesn't match any existing bookmark.
    * @throws if the arguments are invalid.
    */
-  remove(guidOrInfo, options={}) {
+  remove(guidOrInfo, options = {}) {
     let info = guidOrInfo;
     if (!info)
       throw new Error("Input should be a valid object");
@@ -410,7 +414,7 @@ var Bookmarks = Object.freeze({
 
     // Disallow removing the root folders.
     if ([this.rootGuid, this.menuGuid, this.toolbarGuid, this.unfiledGuid,
-         this.tagsGuid].includes(info.guid)) {
+         this.tagsGuid, this.mobileGuid].includes(info.guid)) {
       throw new Error("It's not possible to remove Places root folders.");
     }
 
@@ -426,21 +430,23 @@ var Bookmarks = Object.freeze({
       item = yield removeBookmark(item, options);
 
       // Notify onItemRemoved to listeners.
+      let { source = Bookmarks.SOURCES.DEFAULT } = options;
       let observers = PlacesUtils.bookmarks.getObservers();
       let uri = item.hasOwnProperty("url") ? PlacesUtils.toURI(item.url) : null;
+      let isUntagging = item._grandParentId == PlacesUtils.tagsFolderId;
       notify(observers, "onItemRemoved", [ item._id, item._parentId, item.index,
                                            item.type, uri, item.guid,
                                            item.parentGuid,
-                                           removeInfo.source ]);
+                                           source ],
+                                         { isTagging: isUntagging });
 
-      let isUntagging = item._grandParentId == PlacesUtils.tagsFolderId;
       if (isUntagging) {
         for (let entry of (yield fetchBookmarksByURL(item))) {
           notify(observers, "onItemChanged", [ entry._id, "tags", false, "",
                                                PlacesUtils.toPRTime(entry.lastModified),
                                                entry.type, entry._parentId,
                                                entry.guid, entry.parentGuid,
-                                               "", removeInfo.source ]);
+                                               "", source ]);
         }
       }
 
@@ -462,10 +468,11 @@ var Bookmarks = Object.freeze({
    * @return {Promise} resolved when the removal is complete.
    * @resolves once the removal is complete.
    */
-  eraseEverything: function(options={}) {
+  eraseEverything: function(options = {}) {
     return PlacesUtils.withConnectionWrapper("Bookmarks.jsm: eraseEverything",
       db => db.executeTransaction(function* () {
-        const folderGuids = [this.toolbarGuid, this.menuGuid, this.unfiledGuid];
+        const folderGuids = [this.toolbarGuid, this.menuGuid, this.unfiledGuid,
+                             this.mobileGuid];
         yield removeFoldersContents(db, folderGuids, options);
         const time = PlacesUtils.toPRTime(new Date());
         for (let folderGuid of folderGuids) {
@@ -539,7 +546,7 @@ var Bookmarks = Object.freeze({
    * @note Any unknown property in the info object is ignored.  Known properties
    *       may be overwritten.
    */
-  fetch(guidOrInfo, onResult=null) {
+  fetch(guidOrInfo, onResult = null) {
     if (onResult && typeof onResult != "function")
       throw new Error("onResult callback must be a valid function");
     let info = guidOrInfo;
@@ -553,7 +560,7 @@ var Bookmarks = Object.freeze({
       v => v.hasOwnProperty("guid"),
       v => v.hasOwnProperty("parentGuid") && v.hasOwnProperty("index"),
       v => v.hasOwnProperty("url")
-    ].reduce((old, fn) => old + fn(info)|0, 0);
+    ].reduce((old, fn) => old + fn(info) | 0, 0);
     if (conditionsCount != 1)
       throw new Error(`Unexpected number of conditions provided: ${conditionsCount}`);
 
@@ -684,7 +691,7 @@ var Bookmarks = Object.freeze({
    * @rejects if an error happens while reordering.
    * @throws if the arguments are invalid.
    */
-  reorder(parentGuid, orderedChildrenGuids, options={}) {
+  reorder(parentGuid, orderedChildrenGuids, options = {}) {
     let info = { guid: parentGuid, source: this.SOURCES.DEFAULT };
     info = validateBookmarkObject(info, { guid: { required: true } });
 
@@ -776,7 +783,6 @@ var Bookmarks = Object.freeze({
   },
 });
 
-////////////////////////////////////////////////////////////////////////////////
 // Globals.
 
 /**
@@ -788,16 +794,26 @@ var Bookmarks = Object.freeze({
  *        the notification name.
  * @param args
  *        array of arguments to pass to the notification.
+ * @param information
+ *        Information about the notification, so we can filter based
+ *        based on the observer's preferences.
  */
-function notify(observers, notification, args) {
+function notify(observers, notification, args, information = {}) {
   for (let observer of observers) {
+    if (information.isTagging && observer.skipTags) {
+      continue;
+    }
+
+    if (information.isDescendantRemoval && observer.skipDescendantsOnItemRemoval) {
+      continue;
+    }
+
     try {
       observer[notification](...args);
     } catch (ex) {}
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Update implementation.
 
 function updateBookmark(info, item, newParent) {
@@ -882,7 +898,6 @@ function updateBookmark(info, item, newParent) {
   }));
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Insert implementation.
 
 function insertBookmark(item, parent) {
@@ -937,7 +952,6 @@ function insertBookmark(item, parent) {
   }));
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Query implementation.
 
 function queryBookmarks(info) {
@@ -987,7 +1001,6 @@ function queryBookmarks(info) {
 }
 
 
-////////////////////////////////////////////////////////////////////////////////
 // Fetch implementation.
 
 function fetchBookmark(info) {
@@ -1099,7 +1112,6 @@ function fetchBookmarksByParent(info) {
   }));
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Remove implementation.
 
 function removeBookmark(item, options) {
@@ -1148,7 +1160,6 @@ function removeBookmark(item, options) {
   }));
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Reorder implementation.
 
 function reorderChildren(parent, orderedChildrenGuids) {
@@ -1159,15 +1170,28 @@ function reorderChildren(parent, orderedChildrenGuids) {
       if (!children.length)
         return undefined;
 
+      // Build a map of GUIDs to indices for fast lookups in the comparator
+      // function.
+      let guidIndices = new Map();
+      for (let i = 0; i < orderedChildrenGuids.length; ++i) {
+        let guid = orderedChildrenGuids[i];
+        guidIndices.set(guid, i);
+      }
+
       // Reorder the children array according to the specified order, provided
       // GUIDs come first, others are appended in somehow random order.
       children.sort((a, b) => {
-        let i = orderedChildrenGuids.indexOf(a.guid);
-        let j = orderedChildrenGuids.indexOf(b.guid);
         // This works provided fetchBookmarksByParent returns sorted children.
-        if (i == -1 && j == -1)
+        if (!guidIndices.has(a.guid) && !guidIndices.has(b.guid)) {
           return 0;
-        return (i != -1 && j != -1 && i < j) || (i != -1 && j == -1) ? -1 : 1;
+        }
+        if (!guidIndices.has(a.guid)) {
+          return 1;
+        }
+        if (!guidIndices.has(b.guid)) {
+          return -1;
+        }
+        return guidIndices.get(a.guid) < guidIndices.get(b.guid) ? -1 : 1;
        });
 
       // Update the bookmarks position now.  If any unknown guid have been
@@ -1183,14 +1207,15 @@ function reorderChildren(parent, orderedChildrenGuids) {
            VALUES ${valuesTable}
          )
          UPDATE moz_bookmarks SET position = (
-           SELECT CASE count(a.g) WHEN 0 THEN -position
-                                  ELSE count(a.g) - 1
+           SELECT CASE count(*) WHEN 0 THEN -position
+                                       ELSE count(*) - 1
                   END
            FROM sorting a
            JOIN sorting b ON b.p <= a.p
            WHERE a.g = guid
-             AND parent = :parentId
-        )`, { parentId: parent._id});
+         )
+         WHERE parent = :parentId
+        `, { parentId: parent._id});
 
       // Update position of items that could have been inserted in the meanwhile.
       // Since this can happen rarely and it's only done for schema coherence
@@ -1220,7 +1245,6 @@ function reorderChildren(parent, orderedChildrenGuids) {
   );
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Helpers.
 
 /**
@@ -1434,10 +1458,10 @@ Task.async(function* (db, folderGuids, options) {
               b.type, url, b.guid, p.guid AS parentGuid, b.dateAdded,
               b.lastModified, b.title, p.parent AS _grandParentId,
               NULL AS _childCount
-       FROM moz_bookmarks b
+       FROM descendants
+       JOIN moz_bookmarks b ON did = b.id
        JOIN moz_bookmarks p ON p.id = b.parent
-       LEFT JOIN moz_places h ON b.fk = h.id
-       WHERE b.id IN descendants`, { folderGuid });
+       LEFT JOIN moz_places h ON b.fk = h.id`, { folderGuid });
 
     itemsRemoved = itemsRemoved.concat(rowsToItemsArray(rows));
 
@@ -1475,7 +1499,10 @@ Task.async(function* (db, folderGuids, options) {
     notify(observers, "onItemRemoved", [ item._id, item._parentId,
                                          item.index, item.type, uri,
                                          item.guid, item.parentGuid,
-                                         source ]);
+                                         source ],
+                                       // Notify observers that this item is being
+                                       // removed as a descendent.
+                                       { isDescendantRemoval: true });
 
     let isUntagging = item._grandParentId == PlacesUtils.tagsFolderId;
     if (isUntagging) {

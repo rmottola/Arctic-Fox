@@ -48,7 +48,7 @@ var gIoService = null;
 const XMLNS = "http://www.w3.org/XML/1998/namespace";
 const RSS090NS = "http://my.netscape.com/rdf/simple/0.9/";
 
-/***** Some general utils *****/
+/** *** Some general utils *****/
 function strToURI(link, base) {
   base = base || null;
   if (!gIoService)
@@ -93,7 +93,7 @@ function isIFeedContainer(a) {
 }
 
 function stripTags(someHTML) {
-  return someHTML.replace(/<[^>]+>/g,"");
+  return someHTML.replace(/<[^>]+>/g, "");
 }
 
 /**
@@ -228,16 +228,16 @@ function Feed() {
 Feed.prototype = {
   searchLists: {
     title: ["title", "rss1:title", "atom03:title", "atom:title"],
-    subtitle: ["description","dc:description","rss1:description",
-               "atom03:tagline","atom:subtitle"],
-    items: ["items","atom03_entries","entries"],
-    id: ["atom:id","rdf:about"],
+    subtitle: ["description", "dc:description", "rss1:description",
+               "atom03:tagline", "atom:subtitle"],
+    items: ["items", "atom03_entries", "entries"],
+    id: ["atom:id", "rdf:about"],
     generator: ["generator"],
     authors : ["authors"],
     contributors: ["contributors"],
-    link:  [["link",strToURI],["rss1:link",strToURI]],
+    link:  [["link", strToURI], ["rss1:link", strToURI]],
     categories: ["categories", "dc:subject"],
-    rights: ["atom03:rights","atom:rights"],
+    rights: ["atom03:rights", "atom:rights"],
     cloud: ["cloud"],
     image: ["image", "rss1:image", "atom:logo"],
     textInput: ["textInput", "rss1:textinput"],
@@ -368,8 +368,8 @@ Feed.prototype = {
 
   // reset the bag to raw contents, not text constructs
   _resetBagMembersToRawText: function Feed_resetBagMembers(fieldLists) {
-    for (var i=0; i<fieldLists.length; i++) {
-      for (var j=0; j<fieldLists[i].length; j++) {
+    for (var i = 0; i < fieldLists.length; i++) {
+      for (var j = 0; j < fieldLists[i].length; j++) {
         if (bagHasKey(this.fields, fieldLists[i][j])) {
           var textConstruct = this.fields.getProperty(fieldLists[i][j]);
           this.fields.setPropertyAsAString(fieldLists[i][j],
@@ -406,15 +406,15 @@ Entry.prototype = {
 
   searchLists: {
     title: ["title", "rss1:title", "atom03:title", "atom:title"],
-    link: [["link",strToURI],["rss1:link",strToURI]],
+    link: [["link", strToURI], ["rss1:link", strToURI]],
     id: [["guid", makePropGetter("guid")], "rdf:about",
          "atom03:id", "atom:id"],
     authors : ["authors"],
     contributors: ["contributors"],
     summary: ["description", "rss1:description", "dc:description",
               "atom03:summary", "atom:summary"],
-    content: ["content:encoded","atom03:content","atom:content"],
-    rights: ["atom03:rights","atom:rights"],
+    content: ["content:encoded", "atom03:content", "atom:content"],
+    rights: ["atom03:rights", "atom:rights"],
     published: ["pubDate", "atom03:issued", "dcterms:issued", "atom:published"],
     updated: ["pubDate", "atom03:modified", "dc:date", "dcterms:modified",
               "atom:updated"]
@@ -659,13 +659,13 @@ Generator.prototype = {
 
   set attributes(value) {
     this._attributes = value;
-    this.version = this._attributes.getValueFromName("","version");
-    var uriAttribute = this._attributes.getValueFromName("","uri") ||
-                       this._attributes.getValueFromName("","url");
+    this.version = this._attributes.getValueFromName("", "version");
+    var uriAttribute = this._attributes.getValueFromName("", "uri") ||
+                       this._attributes.getValueFromName("", "url");
     this.uri = strToURI(uriAttribute, this.baseURI);
 
     // RSS1
-    uriAttribute = this._attributes.getValueFromName(RDF_NS,"resource");
+    uriAttribute = this._attributes.getValueFromName(RDF_NS, "resource");
     if (uriAttribute) {
       this.agent = uriAttribute;
       this.uri = strToURI(uriAttribute, this.baseURI);
@@ -706,10 +706,10 @@ Person.prototype = {
  *               transformation function (like parseInt).
  */
 function fieldsToObj(container, fields) {
-  var props,prop,field,searchList;
+  var props, prop, field, searchList;
   for (var key in fields) {
     searchList = fields[key];
-    for (var i=0; i < searchList.length; ++i) {
+    for (var i = 0; i < searchList.length; ++i) {
       props = searchList[i];
       prop = null;
       field = isArray(props) ? props[0] : props;
@@ -775,7 +775,7 @@ function rssGuid(s, guid) {
 // We want to split this up and assign it to corresponding Atom
 // fields.
 //
-function rssAuthor(s,author) {
+function rssAuthor(s, author) {
   author.QueryInterface(Ci.nsIFeedPerson);
   // check for RSS2 string format
   var chars = s.trim();
@@ -884,7 +884,7 @@ XHTMLHandler.prototype = {
     if (namespace == XHTML_NS) {
       this._buf += "<" + localName;
       var uri;
-      for (var i=0; i < attributes.length; ++i) {
+      for (var i = 0; i < attributes.length; ++i) {
         uri = attributes.getURI(i);
         // XHTML attributes aren't in a namespace
         if (uri == "") {
@@ -970,8 +970,6 @@ ExtensionHandler.prototype = {
   },
   startElement: function EH_startElement(uri, localName, qName, attrs) {
     ++this._depth;
-    var prefix = gNamespaces[uri] ? gNamespaces[uri] + ":" : "";
-    var key =  prefix + localName;
 
     if (this._depth == 1) {
       this._uri = uri;
@@ -1038,7 +1036,7 @@ function WrapperElementInfo(fieldName) {
   this.fieldName = fieldName;
 }
 
-/***** The Processor *****/
+/** *** The Processor *****/
 function FeedProcessor() {
   this._reader = Cc[SAX_CONTRACTID].createInstance(Ci.nsISAXXMLReader);
   this._buf =  "";
@@ -1076,7 +1074,7 @@ function FeedProcessor() {
 
   this._trans = {
     "START": {
-      //If we hit a root RSS element, treat as RSS2.
+      // If we hit a root RSS element, treat as RSS2.
       "rss": new FeedElementInfo("RSS2", "rss2"),
 
       // If we hit an RDF element, if could be RSS1, but we can't
@@ -1090,7 +1088,7 @@ function FeedProcessor() {
       "atom03:feed": new FeedElementInfo("Atom03", "atom03"),
     },
 
-    /********* RSS2 **********/
+    /** ******* RSS2 **********/
     "IN_RSS2": {
       "channel": new WrapperElementInfo("channel")
     },
@@ -1145,7 +1143,7 @@ function FeedProcessor() {
       "media:thumbnail": new ElementInfo("mediathumbnail", null, null, true)
     },
 
-    /********* RSS1 **********/
+    /** ******* RSS1 **********/
     "IN_RDF": {
       // If we hit a rss1:channel, we can verify that we have RSS1
       "rss1:channel": new FeedElementInfo("rdf_channel", "rss1"),
@@ -1166,7 +1164,7 @@ function FeedProcessor() {
                                          rssAuthor, true),
     },
 
-    /********* ATOM 1.0 **********/
+    /** ******* ATOM 1.0 **********/
     "IN_ATOM": {
       "atom:author": new ElementInfo("authors", Cc[PERSON_CONTRACTID],
                                      null, true),
@@ -1188,7 +1186,7 @@ function FeedProcessor() {
       "atom:link": new ElementInfo("links", null, null, true),
     },
 
-    /********* ATOM 0.3 **********/
+    /** ******* ATOM 0.3 **********/
     "IN_ATOM03": {
       "atom03:author": new ElementInfo("authors", Cc[PERSON_CONTRACTID],
                                        null, true),
@@ -1316,7 +1314,7 @@ FeedProcessor.prototype = {
   // through.
   fatalError: function FP_reportError() {
     this._result.bozo = true;
-    //XXX need to QI to FeedProgressListener
+    // XXX need to QI to FeedProgressListener
     if (!this._haveSentResult)
       this._sendResult();
   },
@@ -1324,7 +1322,7 @@ FeedProcessor.prototype = {
   // nsISAXContentHandler
 
   startDocument: function FP_startDocument() {
-    //LOG("----------");
+    // LOG("----------");
   },
 
   endDocument: function FP_endDocument() {
@@ -1364,7 +1362,7 @@ FeedProcessor.prototype = {
     ++this._depth;
     var elementInfo;
 
-    //LOG("<" + localName + ">");
+    // LOG("<" + localName + ">");
 
     // Check for xml:base
     var base = attributes.getValueFromName(XMLNS, "base");
@@ -1400,7 +1398,7 @@ FeedProcessor.prototype = {
     //
     if ((this._result.version == "atom" || this._result.version == "atom03") &&
         this._textConstructs[key] != null) {
-      var type = attributes.getValueFromName("","type");
+      var type = attributes.getValueFromName("", "type");
       if (type != null && type.indexOf("xhtml") >= 0) {
         this._xhtmlHandler =
           new XHTMLHandler(this, (this._result.version == "atom"));
@@ -1455,7 +1453,7 @@ FeedProcessor.prototype = {
   // to distinguish endElement events from startElement events.
   endElement:  function FP_endElement(uri, localName, qName) {
     var elementInfo = this._handlerStack[this._depth];
-    //LOG("</" + localName + ">");
+    // LOG("</" + localName + ">");
     if (elementInfo && !elementInfo.isWrapper)
       this._closeComplexElement(elementInfo);
 
@@ -1498,7 +1496,7 @@ FeedProcessor.prototype = {
   // attributes and child elements.
   _processComplexElement:
   function FP__processComplexElement(elementInfo, attributes) {
-    var obj, key, prefix;
+    var obj;
 
     // If the container is an entry/item, it'll need to have its
     // more esoteric properties put in the 'fields' property bag.
@@ -1545,7 +1543,7 @@ FeedProcessor.prototype = {
       // off the handle in the browser, and loses track of the interface
       // on large files. Bug 335638.
       newProp.QueryInterface(Ci.nsIMutableArray);
-      newProp.appendElement(obj,false);
+      newProp.appendElement(obj, false);
 
       // If new object is an nsIFeedContainer, we want to deal with
       // its member nsIPropertyBag instead.
@@ -1556,7 +1554,7 @@ FeedProcessor.prototype = {
     else {
       // If it doesn't, set it.
       if (!prop) {
-        container.setPropertyAsInterface(elementInfo.fieldName,obj);
+        container.setPropertyAsInterface(elementInfo.fieldName, obj);
       }
       newProp = container.getProperty(elementInfo.fieldName);
     }
@@ -1629,7 +1627,7 @@ FeedProcessor.prototype = {
                      "0.94":"rss094" }
     if (versions[versionAttr])
       return versions[versionAttr];
-    if (versionAttr.substr(0,2) != "2.")
+    if (versionAttr.substr(0, 2) != "2.")
       return "rssUnknown";
     return "rss2";
   },
@@ -1712,7 +1710,7 @@ FeedProcessor.prototype = {
       newProp.text = chars;
       // Look up the default type in our table
       var type = this._textConstructs[propName];
-      var typeAttribute = attributes.getValueFromName("","type");
+      var typeAttribute = attributes.getValueFromName("", "type");
       if (this._result.version == "atom" && typeAttribute != null) {
         type = typeAttribute;
       }

@@ -219,6 +219,8 @@ public:
    */
   void FlushAllImages(ImageClient* aClient, ImageContainer* aContainer);
 
+  virtual bool IPCOpen() const override { return mCanSend; }
+
 private:
 
   /**

@@ -397,7 +397,7 @@ var TelemetryScheduler = {
    *                 that the reason field of this payload will be changed.
    * @return {Promise} A promise resolved when the ping is saved.
    */
-  _saveAbortedPing: function(now, competingPayload=null) {
+  _saveAbortedPing: function(now, competingPayload = null) {
     this._lastSessionCheckpointTime = now;
     return Impl._saveAbortedSessionPing(competingPayload)
                 .catch(e => this._log.error("_saveAbortedPing - Failed", e));
@@ -413,19 +413,16 @@ var TelemetryScheduler = {
         // If the user is idle, increase the tick interval.
         this._isUserIdle = true;
         return this._onSchedulerTick();
-        break;
       case "active":
         // User is back to work, restore the original tick interval.
         this._isUserIdle = false;
         return this._onSchedulerTick();
-        break;
       case "wake_notification":
         // The machine woke up from sleep, trigger a tick to avoid sessions
         // spanning more than a day.
         // This is needed because sleep time does not count towards timeouts
         // on Mac & Linux - see bug 1262386, bug 1204823 et al.
         return this._onSchedulerTick();
-        break;
     }
     return undefined;
   },
@@ -648,7 +645,7 @@ this.TelemetrySession = Object.freeze({
   /**
    * Send a notification.
    */
-  observe: function (aSubject, aTopic, aData) {
+  observe: function(aSubject, aTopic, aData) {
     return Impl.observe(aSubject, aTopic, aData);
   },
 });
@@ -658,9 +655,6 @@ var Impl = {
   _initialized: false,
   _logger: null,
   _prevValues: {},
-  // Regex that matches histograms we care about during startup.
-  // Keep this in sync with gen-histogram-bucket-ranges.py.
-  _startupHistogramRegex: /SQLITE|HTTP|SPDY|CACHE|DNS/,
   _slowSQLStartup: {},
   _hasWindowRestoredObserver: false,
   _hasXulWindowVisibleObserver: false,
@@ -987,7 +981,7 @@ var Impl = {
    * @param {keyed} Take a snapshot of keyed or non keyed scalars.
    * @return {Object} The scalar data as a Javascript object.
    */
-  getScalars: function (subsession, clearSubsession, keyed) {
+  getScalars: function(subsession, clearSubsession, keyed) {
     this._log.trace("getScalars - subsession: " + subsession + ", clearSubsession: " +
                     clearSubsession + ", keyed: " + keyed);
 
@@ -1155,7 +1149,7 @@ var Impl = {
     }
     let b = (id, n) => h(id, Ci.nsIMemoryReporter.UNITS_BYTES, n);
     let c = (id, n) => h(id, Ci.nsIMemoryReporter.UNITS_COUNT, n);
-    let cc= (id, n) => h(id, Ci.nsIMemoryReporter.UNITS_COUNT_CUMULATIVE, n);
+    let cc = (id, n) => h(id, Ci.nsIMemoryReporter.UNITS_COUNT_CUMULATIVE, n);
     let p = (id, n) => h(id, Ci.nsIMemoryReporter.UNITS_PERCENTAGE, n);
 
     b("MEMORY_VSIZE", "vsize");
@@ -1188,9 +1182,16 @@ var Impl = {
           TOTAL_MEMORY_COLLECTOR_TIMEOUT);
         this._childrenToHearFrom = new Set();
         for (let i = 1; i < ppmm.childCount; i++) {
-          ppmm.getChildAt(i).sendAsyncMessage(MESSAGE_TELEMETRY_GET_CHILD_USS, {id: this._nextTotalMemoryId});
-          this._childrenToHearFrom.add(this._nextTotalMemoryId);
-          this._nextTotalMemoryId++;
+          let child = ppmm.getChildAt(i);
+          try {
+            child.sendAsyncMessage(MESSAGE_TELEMETRY_GET_CHILD_USS, {id: this._nextTotalMemoryId});
+            this._childrenToHearFrom.add(this._nextTotalMemoryId);
+            this._nextTotalMemoryId++;
+          } catch (ex) {
+            // If a content process has just crashed, then attempting to send it
+            // an async message will throw an exception.
+            Cu.reportError(ex);
+          }
         }
       } else {
         boundHandleMemoryReport(
@@ -1243,33 +1244,8 @@ var Impl = {
     h.add(val);
   },
 
-  /**
-   * Return true if we're interested in having a STARTUP_* histogram for
-   * the given histogram name.
-   */
-  isInterestingStartupHistogram: function isInterestingStartupHistogram(name) {
-    return this._startupHistogramRegex.test(name);
-  },
-
   getChildPayloads: function getChildPayloads() {
     return this._childTelemetry.map(child => child.payload);
-  },
-
-  /**
-   * Make a copy of interesting histograms at startup.
-   */
-  gatherStartupHistograms: function gatherStartupHistograms() {
-    this._log.trace("gatherStartupHistograms");
-
-    let info =
-      Telemetry.registeredHistograms(this.getDatasetType(), []);
-    let snapshots = Telemetry.histogramSnapshots;
-    for (let name of info) {
-      // Only duplicate histograms with actual data.
-      if (this.isInterestingStartupHistogram(name) && name in snapshots) {
-        Telemetry.histogramFrom("STARTUP_" + name, name);
-      }
-    }
   },
 
   /**
@@ -1382,7 +1358,7 @@ var Impl = {
   /**
    * Start a new subsession.
    */
-  startNewSubsession: function () {
+  startNewSubsession: function() {
     this._subsessionStartDate = Policy.now();
     this._subsessionStartTimeMonotonic = Policy.monotonicNow();
     this._previousSubsessionId = this._subsessionId;
@@ -1545,7 +1521,7 @@ var Impl = {
           GCTelemetry.init();
         }
 
-        Telemetry.asyncFetchTelemetryData(function () {});
+        Telemetry.asyncFetchTelemetryData(function() {});
 
         if (IS_UNIFIED_TELEMETRY) {
           // Check for a previously written aborted session ping.
@@ -1594,8 +1570,6 @@ var Impl = {
     Services.obs.addObserver(this, "content-child-shutdown", false);
     cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS, this);
     cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_USS, this);
-
-    this.gatherStartupHistograms();
 
     let delayedTask = new DeferredTask(function* () {
       this._initialized = true;
@@ -1774,7 +1748,7 @@ var Impl = {
         addEnvironment: true,
       };
       p.push(TelemetryController.submitExternalPing(getPingType(payload), payload, options)
-                                .catch (e => this._log.error("saveShutdownPings - failed to submit saved-session ping", e)));
+                                .catch(e => this._log.error("saveShutdownPings - failed to submit saved-session ping", e)));
     }
 
     // Wait on pings to be saved.
@@ -1818,7 +1792,6 @@ var Impl = {
     // This function returns the current Telemetry payload to the caller.
     // We only gather startup info once.
     if (Object.keys(this._slowSQLStartup).length == 0) {
-      this.gatherStartupHistograms();
       this._slowSQLStartup = Telemetry.slowSQL;
     }
     this.gatherMemory();
@@ -1876,7 +1849,6 @@ var Impl = {
       [this._startupIO.startupSessionRestoreReadBytes,
         this._startupIO.startupSessionRestoreWriteBytes] = counters;
     }
-    this.gatherStartupHistograms();
     this._slowSQLStartup = Telemetry.slowSQL;
   },
 
@@ -1891,7 +1863,7 @@ var Impl = {
   /**
    * This observer drives telemetry.
    */
-  observe: function (aSubject, aTopic, aData) {
+  observe: function(aSubject, aTopic, aData) {
     // Prevent the cycle collector begin topic from cluttering the log.
     if (aTopic != TOPIC_CYCLE_COLLECTOR_BEGIN) {
       this._log.trace("observe - " + aTopic + " notified.");

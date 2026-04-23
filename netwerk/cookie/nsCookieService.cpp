@@ -50,8 +50,6 @@
 #include "mozilla/AutoRestore.h"
 #include "mozilla/FileUtils.h"
 #include "mozilla/Telemetry.h"
-#include "nsIAppsService.h"
-#include "mozIApplicationClearPrivateDataParams.h"
 #include "nsIConsoleService.h"
 #include "nsVariant.h"
 
@@ -92,6 +90,8 @@ static nsCookieService *gCookieService;
 #define IDX_HTTPONLY 8
 #define IDX_BASE_DOMAIN 9
 #define IDX_ORIGIN_ATTRIBUTES 10
+
+#define TOPIC_CLEAR_ORIGIN_DATA "clear-origin-attributes-data"
 
 static const int64_t kCookiePurgeAge =
   int64_t(30 * 24 * 60 * 60) * PR_USEC_PER_SEC; // 30 days in microseconds
@@ -154,9 +154,7 @@ struct nsCookieAttributes
 struct nsListIter
 {
   // default (non-initializing) constructor.
-  nsListIter()
-  {
-  }
+  nsListIter() = default;
 
   // explicit constructor to a given iterator state with entryclass 'aEntry'
   // and index 'aIndex'.
@@ -377,9 +375,9 @@ public:
 class InsertCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "INSERT"; }
+  const char *GetOpType() override { return "INSERT"; }
 
-  ~InsertCookieDBListener() {}
+  ~InsertCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -413,9 +411,9 @@ NS_IMPL_ISUPPORTS(InsertCookieDBListener, mozIStorageStatementCallback)
 class UpdateCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "UPDATE"; }
+  const char *GetOpType() override { return "UPDATE"; }
 
-  ~UpdateCookieDBListener() {}
+  ~UpdateCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -441,9 +439,9 @@ NS_IMPL_ISUPPORTS(UpdateCookieDBListener, mozIStorageStatementCallback)
 class RemoveCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "REMOVE"; }
+  const char *GetOpType() override { return "REMOVE"; }
 
-  ~RemoveCookieDBListener() {}
+  ~RemoveCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -469,10 +467,10 @@ NS_IMPL_ISUPPORTS(RemoveCookieDBListener, mozIStorageStatementCallback)
 class ReadCookieDBListener final : public DBListenerErrorHandler
 {
 private:
-  virtual const char *GetOpType() override { return "READ"; }
+  const char *GetOpType() override { return "READ"; }
   bool mCanceled;
 
-  ~ReadCookieDBListener() {}
+  ~ReadCookieDBListener() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -489,7 +487,7 @@ public:
   {
     nsCOMPtr<mozIStorageRow> row;
 
-    while (1) {
+    while (true) {
       DebugOnly<nsresult> rv = aResult->GetNextRow(getter_AddRefs(row));
       NS_ASSERT_SUCCESS(rv);
 
@@ -555,7 +553,7 @@ NS_IMPL_ISUPPORTS(ReadCookieDBListener, mozIStorageStatementCallback)
  ******************************************************************************/
 class CloseCookieDBListener final :  public mozIStorageCompletionCallback
 {
-  ~CloseCookieDBListener() {}
+  ~CloseCookieDBListener() = default;
 
 public:
   explicit CloseCookieDBListener(DBState* dbState) : mDBState(dbState) { }
@@ -575,7 +573,7 @@ namespace {
 
 class AppClearDataObserver final : public nsIObserver {
 
-  ~AppClearDataObserver() {}
+  ~AppClearDataObserver() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -823,7 +821,7 @@ namespace {
 
 class ConvertAppIdToOriginAttrsSQLFunction final : public mozIStorageFunction
 {
-  ~ConvertAppIdToOriginAttrsSQLFunction() {}
+  ~ConvertAppIdToOriginAttrsSQLFunction() = default;
 
   NS_DECL_ISUPPORTS
   NS_DECL_MOZISTORAGEFUNCTION
@@ -859,7 +857,7 @@ ConvertAppIdToOriginAttrsSQLFunction::OnFunctionCall(
 
 class SetAppIdFromOriginAttributesSQLFunction final : public mozIStorageFunction
 {
-  ~SetAppIdFromOriginAttributesSQLFunction() {}
+  ~SetAppIdFromOriginAttributesSQLFunction() = default;
 
   NS_DECL_ISUPPORTS
   NS_DECL_MOZISTORAGEFUNCTION
@@ -891,7 +889,7 @@ SetAppIdFromOriginAttributesSQLFunction::OnFunctionCall(
 class SetInBrowserFromOriginAttributesSQLFunction final :
   public mozIStorageFunction
 {
-  ~SetInBrowserFromOriginAttributesSQLFunction() {}
+  ~SetInBrowserFromOriginAttributesSQLFunction() = default;
 
   NS_DECL_ISUPPORTS
   NS_DECL_MOZISTORAGEFUNCTION
@@ -1036,7 +1034,7 @@ nsCookieService::TryInitDB(bool aRecreateDB)
 
         nsCString baseDomain, host;
         bool hasResult;
-        while (1) {
+        while (true) {
           rv = select->ExecuteStep(&hasResult);
           NS_ENSURE_SUCCESS(rv, RESULT_RETRY);
 
@@ -1113,7 +1111,7 @@ nsCookieService::TryInitDB(bool aRecreateDB)
           select->GetUTF8String(SCHEMA3_IDX_PATH, path1);
 
           nsCString name2, host2, path2;
-          while (1) {
+          while (true) {
             // Read the second row.
             rv = select->ExecuteStep(&hasResult);
             NS_ENSURE_SUCCESS(rv, RESULT_RETRY);
@@ -2146,7 +2144,7 @@ nsCookieService::NotifyThirdParty(nsIURI *aHostURI, bool aIsAccepted, nsIChannel
     nsAutoString referringHostUTF16 = NS_ConvertUTF8toUTF16(referringHost);
     os->NotifyObservers(aHostURI, topic, referringHostUTF16.get());
     return;
-  } while (0);
+  } while (false);
 
   // This can fail for a number of reasons, in which kind we fallback to "?"
   os->NotifyObservers(aHostURI, topic, u"?");
@@ -2492,6 +2490,25 @@ nsCookieService::RemoveNative(const nsACString &aHost,
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsCookieService::UsePrivateMode(bool aIsPrivate,
+                                nsIPrivateModeCallback* aCallback)
+{
+  if (!aCallback) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  if (!mDBState) {
+    NS_WARNING("No DBState! Profile already closed?");
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  AutoRestore<DBState*> savePrevDBState(mDBState);
+  mDBState = aIsPrivate ? mPrivateDBState : mDefaultDBState;
+
+  return aCallback->Callback();
+}
+
 /******************************************************************************
  * nsCookieService impl:
  * private file I/O functions
@@ -2719,7 +2736,7 @@ nsCookieService::EnsureReadDomain(const nsCookieKey &aKey)
   bool hasResult;
   nsCString name, value, host, path;
   AutoTArray<RefPtr<nsCookie>, kMaxCookiesPerHost> array;
-  while (1) {
+  while (true) {
     rv = mDefaultDBState->stmtReadDomain->ExecuteStep(&hasResult);
     if (NS_FAILED(rv)) {
       // Recreate the database.
@@ -2796,7 +2813,7 @@ nsCookieService::EnsureReadComplete()
   nsCString baseDomain, name, value, host, path;
   bool hasResult;
   nsTArray<CookieDomainTuple> array(kMaxNumberOfCookies);
-  while (1) {
+  while (true) {
     rv = stmt->ExecuteStep(&hasResult);
     if (NS_FAILED(rv)) {
       // Recreate the database.
@@ -4436,10 +4453,37 @@ nsCookieService::PurgeCookies(int64_t aCurrentTimeInUsec)
 // find whether a given cookie has been previously set. this is provided by the
 // nsICookieManager2 interface.
 NS_IMETHODIMP
-nsCookieService::CookieExists(nsICookie2 *aCookie,
-                              bool       *aFoundCookie)
+nsCookieService::CookieExists(nsICookie2* aCookie,
+                              JS::HandleValue aOriginAttributes,
+                              JSContext* aCx,
+                              uint8_t aArgc,
+                              bool* aFoundCookie)
 {
   NS_ENSURE_ARG_POINTER(aCookie);
+  NS_ENSURE_ARG_POINTER(aCx);
+  NS_ENSURE_ARG_POINTER(aFoundCookie);
+  MOZ_ASSERT(aArgc == 0 || aArgc == 1);
+
+  NeckoOriginAttributes attrs;
+  nsresult rv = InitializeOriginAttributes(&attrs,
+                                           aOriginAttributes,
+                                           aCx,
+                                           aArgc,
+                                           u"nsICookieManager2.cookieExists()",
+                                           u"2");
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return CookieExistsNative(aCookie, &attrs, aFoundCookie);
+}
+
+NS_IMETHODIMP_(nsresult)
+nsCookieService::CookieExistsNative(nsICookie2* aCookie,
+                                    NeckoOriginAttributes* aOriginAttributes,
+                                    bool* aFoundCookie)
+{
+  NS_ENSURE_ARG_POINTER(aCookie);
+  NS_ENSURE_ARG_POINTER(aOriginAttributes);
+  NS_ENSURE_ARG_POINTER(aFoundCookie);
 
   if (!mDBState) {
     NS_WARNING("No DBState! Profile already closed?");
@@ -4459,7 +4503,8 @@ nsCookieService::CookieExists(nsICookie2 *aCookie,
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsListIter iter;
-  *aFoundCookie = FindCookie(DEFAULT_APP_KEY(baseDomain), host, name, path, iter);
+  *aFoundCookie = FindCookie(nsCookieKey(baseDomain, *aOriginAttributes),
+                             host, name, path, iter);
   return NS_OK;
 }
 

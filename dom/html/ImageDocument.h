@@ -56,10 +56,6 @@ public:
   virtual JSObject* WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
     override;
 
-  bool ImageResizingEnabled() const
-  {
-    return true;
-  }
   bool ImageIsOverflowing() const
   {
     return mImageIsOverflowingHorizontally || mImageIsOverflowingVertically;
@@ -116,9 +112,6 @@ protected:
   float                         mVisibleHeight;
   int32_t                       mImageWidth;
   int32_t                       mImageHeight;
-
-  // Holds the custom background color for stand-alone images
-  nsAutoString                  mBackgroundColor;
 
   bool                          mResizeImageByDefault;
   bool                          mClickResizingEnabled;

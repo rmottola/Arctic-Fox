@@ -1167,6 +1167,7 @@ nsresult nsWebBrowserPersist::SendErrorStatusChange(
     nsCOMPtr<nsIFile> file;
     GetLocalFileFromURI(aURI, getter_AddRefs(file));
     nsAutoString path;
+    nsresult rv;
     if (file)
     {
         file->GetPath(path);
@@ -1174,7 +1175,8 @@ nsresult nsWebBrowserPersist::SendErrorStatusChange(
     else
     {
         nsAutoCString fileurl;
-        aURI->GetSpec(fileurl);
+        rv = aURI->GetSpec(fileurl);
+        NS_ENSURE_SUCCESS(rv, rv);
         AppendUTF8toUTF16(fileurl, path);
     }
 
@@ -1214,7 +1216,6 @@ nsresult nsWebBrowserPersist::SendErrorStatusChange(
         break;
     }
     // Get properties file bundle and extract status string.
-    nsresult rv;
     nsCOMPtr<nsIStringBundleService> s = do_GetService(NS_STRINGBUNDLE_CONTRACTID, &rv);
     NS_ENSURE_TRUE(NS_SUCCEEDED(rv) && s, NS_ERROR_FAILURE);
 

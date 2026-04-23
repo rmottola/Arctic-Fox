@@ -3941,7 +3941,7 @@ nsCSSFrameConstructor::ConstructFrameFromItemInternal(FrameConstructionItem& aIt
       if (outerDisplay->IsAbsPosContainingBlock(outerFrame)) {
         maybeAbsoluteContainingBlockDisplay = outerDisplay;
         maybeAbsoluteContainingBlock = outerFrame;
-	maybeAbsoluteContainingBlockStyleFrame = outerFrame;
+        maybeAbsoluteContainingBlockStyleFrame = outerFrame;
         innerFrame->AddStateBits(NS_FRAME_CAN_HAVE_ABSPOS_CHILDREN);
       }
 
@@ -5770,7 +5770,7 @@ nsCSSFrameConstructor::AddFrameConstructionItemsInternal(nsFrameConstructorState
   // ::before and ::after); we always want to create "internal" anonymous
   // content.
   auto* details = HTMLDetailsElement::FromContentOrNull(parent);
-  if (details && details->IsDetailsEnabled() && !details->Open() &&
+  if (details && !details->Open() &&
       (!aContent->IsRootOfNativeAnonymousSubtree() ||
        aContent->IsGeneratedContentContainerForBefore() ||
        aContent->IsGeneratedContentContainerForAfter())) {
@@ -10635,7 +10635,8 @@ nsCSSFrameConstructor::AddFCItemsForAnonymousContent(
       // If we don't have an explicit style context, that means we need the
       // ordinary computed values. Make sure we eagerly cascaded them when the
       // anonymous nodes were created.
-      MOZ_ASSERT_IF(content->IsStyledByServo(), content->HasServoData());
+      MOZ_ASSERT_IF(content->IsStyledByServo() && content->IsElement(),
+                    content->HasServoData());
       styleContext = ResolveStyleContext(aFrame, content, &aState);
     }
 

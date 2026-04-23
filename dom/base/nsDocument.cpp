@@ -2888,6 +2888,27 @@ nsIDocument::GetDocGroup()
   return mDocGroup;
 }
 
+nsresult
+nsIDocument::Dispatch(const char* aName,
+                      TaskCategory aCategory,
+                      already_AddRefed<nsIRunnable>&& aRunnable)
+{
+  // Note that this method may be called off the main thread.
+  if (mDocGroup) {
+    return mDocGroup->Dispatch(aName, aCategory, Move(aRunnable));
+  }
+  return DispatcherTrait::Dispatch(aName, aCategory, Move(aRunnable));
+}
+
+already_AddRefed<nsIEventTarget>
+nsIDocument::CreateEventTarget(const char* aName, TaskCategory aCategory)
+{
+  if (mDocGroup) {
+    return mDocGroup->CreateEventTarget(aName, aCategory);
+  }
+  return DispatcherTrait::CreateEventTarget(aName, aCategory);
+}
+
 NS_IMETHODIMP
 nsDocument::GetApplicationCache(nsIApplicationCache **aApplicationCache)
 {
@@ -5937,30 +5958,6 @@ nsDocument::GetElementsByTagNameNS(const nsAString& aNamespaceURI,
 }
 
 NS_IMETHODIMP
-nsDocument::GetAsync(bool *aAsync)
-{
-  NS_ERROR("nsDocument::GetAsync() should be overriden by subclass!");
-
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
-nsDocument::SetAsync(bool aAsync)
-{
-  NS_ERROR("nsDocument::SetAsync() should be overriden by subclass!");
-
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
-nsDocument::Load(const nsAString& aUrl, bool *aReturn)
-{
-  NS_ERROR("nsDocument::Load() should be overriden by subclass!");
-
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
 nsDocument::GetStyleSheets(nsIDOMStyleSheetList** aStyleSheets)
 {
   NS_ADDREF(*aStyleSheets = StyleSheets());
@@ -7618,7 +7615,7 @@ nsDocument::GetExistingListenerManager() const
 }
 
 nsresult
-nsDocument::PreHandleEvent(EventChainPreVisitor& aVisitor)
+nsDocument::GetEventTargetParent(EventChainPreVisitor& aVisitor)
 {
   aVisitor.mCanHandle = true;
    // FIXME! This is a hack to make middle mouse paste working also in Editor.

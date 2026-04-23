@@ -204,10 +204,16 @@ const CustomizableWidgets = [
 
       PlacesUtils.history.QueryInterface(Ci.nsPIPlacesDatabase)
                          .asyncExecuteLegacyQueries([query], 1, options, {
-        handleResult: function (aResultSet) {
-          let onItemCommand = function (aEvent) {
-            let item = aEvent.target;
-            win.openUILink(item.getAttribute("targetURI"), aEvent);
+        handleResult: function(aResultSet) {
+          let onItemCommand = function(aItemCommandEvent) {
+            // Only handle the click event for middle clicks, we're using the command
+            // event otherwise.
+            if (aItemCommandEvent.type == "click" &&
+                aItemCommandEvent.button != 1) {
+              return;
+            }
+            let item = aItemCommandEvent.target;
+            win.openUILink(item.getAttribute("targetURI"), aItemCommandEvent);
             CustomizableUI.hidePanelForNode(item);
           };
           let fragment = doc.createDocumentFragment();
@@ -222,6 +228,7 @@ const CustomizableWidgets = [
             item.setAttribute("targetURI", uri);
             item.setAttribute("class", "subviewbutton");
             item.addEventListener("command", onItemCommand);
+            item.addEventListener("click", onItemCommand);
             if (icon) {
               let iconURL = "moz-anno:favicon:" + icon;
               item.setAttribute("image", iconURL);
@@ -230,10 +237,10 @@ const CustomizableWidgets = [
           }
           items.appendChild(fragment);
         },
-        handleError: function (aError) {
+        handleError: function(aError) {
           log.debug("History view tried to show but had an error: " + aError);
         },
-        handleCompletion: function (aReason) {
+        handleCompletion: function(aReason) {
           log.debug("History view is being shown!");
         },
       });
@@ -262,7 +269,9 @@ const CustomizableWidgets = [
       let elementCount = tabsFragment.childElementCount;
       separator.hidden = !elementCount;
       while (--elementCount >= 0) {
-        tabsFragment.children[elementCount].classList.add("subviewbutton", "cui-withicon");
+        let element = tabsFragment.children[elementCount];
+        CustomizableUI.addShortcut(element);
+        element.classList.add("subviewbutton", "cui-withicon");
       }
       recentlyClosedTabs.appendChild(tabsFragment);
 
@@ -272,7 +281,9 @@ const CustomizableWidgets = [
       elementCount = windowsFragment.childElementCount;
       separator.hidden = !elementCount;
       while (--elementCount >= 0) {
-        windowsFragment.children[elementCount].classList.add("subviewbutton", "cui-withicon");
+        let element = windowsFragment.children[elementCount];
+        CustomizableUI.addShortcut(element);
+        element.classList.add("subviewbutton", "cui-withicon");
       }
       recentlyClosedWindows.appendChild(windowsFragment);
     },
@@ -467,6 +478,9 @@ const CustomizableWidgets = [
       // Create the element for the remote client.
       let clientItem = doc.createElementNS(kNSXUL, "label");
       clientItem.setAttribute("itemtype", "client");
+      let window = doc.defaultView;
+      clientItem.setAttribute("tooltiptext",
+        window.gSyncUI.formatLastSyncDate(new Date(client.lastModified)));
       clientItem.textContent = client.name;
 
       attachFragment.appendChild(clientItem);
@@ -482,7 +496,6 @@ const CustomizableWidgets = [
       }
     },
     _createTabElement(doc, tabInfo) {
-      let win = doc.defaultView;
       let item = doc.createElementNS(kNSXUL, "toolbarbutton");
       let tooltipText = (tabInfo.title ? tabInfo.title + "\n" : "") + tabInfo.url;
       item.setAttribute("itemtype", "tab");
@@ -505,10 +518,8 @@ const CustomizableWidgets = [
     shortcutId: "key_privatebrowsing",
     defaultArea: CustomizableUI.AREA_PANEL,
     onCommand: function(e) {
-      let win = e.target && e.target.ownerGlobal;
-      if (win && typeof win.OpenBrowserWindow == "function") {
-        win.OpenBrowserWindow({private: true});
-      }
+      let win = e.target.ownerGlobal;
+      win.OpenBrowserWindow({private: true});
     }
   }, {
     id: "save-page-button",
@@ -516,11 +527,8 @@ const CustomizableWidgets = [
     tooltiptext: "save-page-button.tooltiptext3",
     defaultArea: CustomizableUI.AREA_PANEL,
     onCommand: function(aEvent) {
-      let win = aEvent.target &&
-                aEvent.target.ownerGlobal;
-      if (win && typeof win.saveBrowser == "function") {
-        win.saveBrowser(win.gBrowser.selectedBrowser);
-      }
+      let win = aEvent.target.ownerGlobal;
+      win.saveBrowser(win.gBrowser.selectedBrowser);
     }
   }, {
     id: "find-button",
@@ -528,9 +536,8 @@ const CustomizableWidgets = [
     tooltiptext: "find-button.tooltiptext3",
     defaultArea: CustomizableUI.AREA_PANEL,
     onCommand: function(aEvent) {
-      let win = aEvent.target &&
-                aEvent.target.ownerGlobal;
-      if (win && win.gFindBar) {
+      let win = aEvent.target.ownerGlobal;
+      if (win.gFindBar) {
         win.gFindBar.onFindCommand();
       }
     }
@@ -540,11 +547,8 @@ const CustomizableWidgets = [
     tooltiptext: "open-file-button.tooltiptext3",
     defaultArea: CustomizableUI.AREA_PANEL,
     onCommand: function(aEvent) {
-      let win = aEvent.target
-                && aEvent.target.ownerGlobal;
-      if (win && typeof win.BrowserOpenFileWindow == "function") {
-        win.BrowserOpenFileWindow();
-      }
+      let win = aEvent.target.ownerGlobal;
+      win.BrowserOpenFileWindow();
     }
   }, {
     id: "sidebar-button",
@@ -556,7 +560,6 @@ const CustomizableWidgets = [
       // sidebar menu. We skip menu elements, because the menu panel has no way
       // of dealing with those right now.
       let doc = aEvent.target.ownerDocument;
-      let win = doc.defaultView;
       let menu = doc.getElementById("viewSidebarMenu");
 
       // First clear any existing menuitems then populate. Social sidebar
@@ -681,7 +684,7 @@ const CustomizableWidgets = [
         if (aDocument.documentElement.hasAttribute("customizing")) {
           updateDisplay = false;
         }
-        //XXXgijs in some tests we get called very early, and there's no docShell on the
+        // XXXgijs in some tests we get called very early, and there's no docShell on the
         // tabbrowser. This breaks the zoom toolkit code (see bug 897410). Don't let that happen:
         let zoomFactor = 100;
         try {
@@ -1118,8 +1121,10 @@ const CustomizableWidgets = [
 
       let onItemCommand = function (aEvent) {
         let item = aEvent.target;
-        let userContextId = parseInt(item.getAttribute("usercontextid"));
-        win.openUILinkIn(win.BROWSER_NEW_TAB_URL, "tab", {userContextId});
+        if (item.hasAttribute("usercontextid")) {
+          let userContextId = parseInt(item.getAttribute("usercontextid"));
+          win.openUILinkIn(win.BROWSER_NEW_TAB_URL, "tab", {userContextId});
+        }
       };
       items.addEventListener("command", onItemCommand);
 
@@ -1144,18 +1149,28 @@ const CustomizableWidgets = [
       }
 
       let fragment = doc.createDocumentFragment();
+      let bundle = doc.getElementById("bundle_browser");
 
       ContextualIdentityService.getIdentities().forEach(identity => {
-        let bundle = doc.getElementById("bundle_browser");
         let label = ContextualIdentityService.getUserContextLabel(identity.userContextId);
 
         let item = doc.createElementNS(kNSXUL, "toolbarbutton");
         item.setAttribute("label", label);
         item.setAttribute("usercontextid", identity.userContextId);
         item.setAttribute("class", "subviewbutton");
+        item.setAttribute("data-identity-color", identity.color);
+        item.setAttribute("data-identity-icon", identity.icon);
 
         fragment.appendChild(item);
       });
+
+      fragment.appendChild(doc.createElementNS(kNSXUL, "menuseparator"));
+
+      let item = doc.createElementNS(kNSXUL, "toolbarbutton");
+      item.setAttribute("label", bundle.getString("userContext.aboutPage.label"));
+      item.setAttribute("command", "Browser:OpenAboutContainers");
+      item.setAttribute("class", "subviewbutton");
+      fragment.appendChild(item);
 
       items.appendChild(fragment);
     },

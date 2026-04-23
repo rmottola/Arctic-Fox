@@ -473,7 +473,23 @@ toolbarbutton.bookmark-item > menupopup {
   height: 16px;
 }
 
-/* ::::: primary toolbar buttons ::::: */
+/* ----- PRIMARY TOOLBAR BUTTONS ----- */
+
+.findbar-button,
+toolbar .toolbarbutton-1:not(:-moz-any([type="menu-button"],#back-button,#forward-button)),
+toolbar .toolbarbutton-1 > .toolbarbutton-menubutton-button,
+toolbar .toolbarbutton-1 > .toolbarbutton-menubutton-dropmarker {
+  border: 1px solid transparent;
+  border-radius: @toolbarbuttonCornerRadius@;
+  transition-property: background, border-color;
+  transition-duration: 250ms;
+}
+
+.findbar-button {
+  background: none;
+  box-shadow: none;
+}
+
 
 .toolbarbutton-1 {
     list-style-image: url("chrome://browser/skin/Toolbar.png");
@@ -1217,45 +1233,47 @@ html|*.urlbar-input:-moz-lwtheme::placeholder,
 
 /* ----- AUTOCOMPLETE ----- */
 
+%include ../shared/autocomplete.inc.css
+
 #treecolAutoCompleteImage {
-    max-width: 36px;
+  max-width: 36px;
 }
 
-.ac-result-type-bookmark,
-.autocomplete-treebody::-moz-tree-image(bookmark, treecolAutoCompleteImage) {
-    list-style-image: url("chrome://browser/skin/places/bookmark.png");
-    -moz-image-region: rect(0px 48px 16px 32px);
-    width: 16px;
-    height: 16px;
+.autocomplete-richlistbox {
+  padding: 4px;
 }
 
-.ac-result-type-keyword,
-.autocomplete-treebody::-moz-tree-image(keyword, treecolAutoCompleteImage) {
-    list-style-image: url(chrome://global/skin/icons/search-textbox.png);
-    margin: 2px;
-    width: 12px;
-    height: 12px;
+.autocomplete-richlistitem {
+  height: 30px;
+  min-height: 30px;
+  font: message-box;
+  border-radius: 2px;
+  border: 1px solid transparent;
 }
 
-.ac-result-type-tag,
-.autocomplete-treebody::-moz-tree-image(tag, treecolAutoCompleteImage) {
-    list-style-image: url("chrome://browser/skin/places/tag.png");
-    width: 16px;
-    height: 16px;
+.autocomplete-richlistitem[selected] {
+  background-color: hsl(210, 80%, 52%);
 }
 
-.ac-comment {
-    font-size: 1.06em;
+.ac-title {
+  font-size: 14px;
+  color: hsl(0, 0%, 0%);
 }
 
-.ac-extra > .ac-comment {
-    font-size: 1em;
+html|span.ac-emphasize-text-title {
+  color: hsl(0, 0%, 50%);
 }
 
-.ac-url-text,
-.ac-action-text {
-    font-size: 1em;
-    color: -moz-nativehyperlinktext;
+.ac-tags {
+  font-size: 12px;
+}
+
+html|span.ac-tag {
+  background-color: hsl(216, 0%, 88%);
+  color: hsl(0, 0%, 0%);
+  border-radius: 2px;
+  border: 1px solid transparent;
+  padding: 0 1px;
 }
 
 @media (-moz-mac-lion-theme) {
@@ -1265,20 +1283,97 @@ html|*.urlbar-input:-moz-lwtheme::placeholder,
     }
 }
 
-richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon {
-    list-style-image: url("chrome://browser/skin/actionicon-tab.png");
-    -moz-image-region: rect(0, 16px, 11px, 0);
-    padding: 0 3px;
+html|span.ac-emphasize-text-tag {
+  color: hsl(0, 0%, 50%);
 }
 
-richlistitem[type~="action"][actiontype$="tab"][selected="true"] > .ac-url-box > .ac-action-icon {
-    -moz-image-region: rect(11px, 16px, 22px, 0);
+.ac-url {
+  font-size: 12px;
+  color: hsl(210, 77%, 47%);
+}
+
+html|span.ac-emphasize-text-url {
+  color: hsl(210, 86%, 64%);
+}
+
+.ac-action {
+  font-size: 12px;
+  color: hsl(178, 100%, 28%);
 }
 
 .ac-comment[selected="true"],
 .ac-url-text[selected="true"],
 .ac-action-text[selected="true"] {
     color: inherit !important;
+}
+
+html|span.ac-title-urlaction-separator {
+  color: hsl(0, 0%, 50%);
+}
+
+.ac-title[selected],
+.ac-url[selected],
+.ac-action[selected],
+.ac-title-text[selected] > html|span.ac-emphasize-text,
+.ac-url-text[selected] > html|span.ac-emphasize-text,
+.ac-action-text[selected] > html|span.ac-emphasize-text,
+.ac-url-text[selected] > html|span.ac-title-urlaction-separator,
+.ac-action-text[selected] > html|span.ac-title-urlaction-separator {
+  color: hsl(0, 0%, 100%);
+}
+
+.ac-tags-text[selected] > html|span.ac-tag {
+  background-color: hsl(0, 0%, 100%);
+  color: hsl(210, 80%, 40%);
+}
+
+.ac-tags-text[selected] > html|span.ac-tag > html|span.ac-emphasize-text-tag {
+  color: hsl(210, 80%, 52%);
+}
+
+.ac-type-icon[type=bookmark] {
+  list-style-image: url("chrome://browser/skin/urlbar-star.svg#star");
+}
+
+.autocomplete-treebody::-moz-tree-image(bookmark, treecolAutoCompleteImage) {
+  list-style-image: url("chrome://browser/skin/places/autocomplete-star.png");
+  -moz-image-region: rect(0, 16px, 16px, 0);
+}
+
+.autocomplete-treebody::-moz-tree-image(selected, current, bookmark, treecolAutoCompleteImage) {
+  -moz-image-region: rect(0, 32px, 16px, 16px);
+}
+
+.ac-type-icon[type=bookmark][selected][current] {
+  list-style-image: url("chrome://browser/skin/urlbar-star.svg#star-inverted");
+}
+
+.ac-type-icon[type=keyword],
+.ac-site-icon[type=searchengine],
+.autocomplete-treebody::-moz-tree-image(keyword, treecolAutoCompleteImage) {
+  list-style-image: url(chrome://global/skin/icons/autocomplete-search.svg#search-icon);
+}
+
+.ac-type-icon[type=keyword][selected],
+.ac-site-icon[type=searchengine][selected],
+.autocomplete-treebody::-moz-tree-image(keyword, treecolAutoCompleteImage, selected) {
+  list-style-image: url(chrome://global/skin/icons/autocomplete-search.svg#search-icon-inverted);
+}
+
+.autocomplete-treebody::-moz-tree-image(tag, treecolAutoCompleteImage) {
+  list-style-image: url("chrome://browser/skin/places/tag.png");
+}
+
+.ac-type-icon[type=switchtab] {
+  list-style-image: url("chrome://browser/skin/urlbar-tab.svg#tab");
+}
+
+.ac-type-icon[type=switchtab][selected] {
+  list-style-image: url("chrome://browser/skin/urlbar-tab.svg#tab-inverted");
+}
+
+.autocomplete-treebody::-moz-tree-cell-text(treecolAutoCompleteComment) {
+  color: GrayText;
 }
 
 richlistitem[type~="action"][actiontype="searchengine"] > .ac-title-box > .ac-site-icon {
@@ -1288,18 +1383,18 @@ richlistitem[type~="action"][actiontype="searchengine"][selected="true"] > .ac-t
   list-style-image: url("chrome://global/skin/icons/autocomplete-search.svg#search-icon-inverted");
 }
 .autocomplete-treebody::-moz-tree-cell-text(treecolAutoCompleteComment) {
-    color: GrayText;
+  color: GrayText;
 }
 
 .autocomplete-treebody::-moz-tree-cell-text(suggesthint, treecolAutoCompleteComment),
 .autocomplete-treebody::-moz-tree-cell-text(suggestfirst, treecolAutoCompleteComment)
 {
-    color: GrayText;
-    font-size: smaller;
+  color: GrayText;
+  font-size: smaller;
 }
 
 .autocomplete-treebody::-moz-tree-cell(suggesthint) {
-    border-top: 1px solid GrayText;
+  border-top: 1px solid GrayText;
 }
 
 
@@ -1867,11 +1962,6 @@ toolbar[brighttext] #alltabs-button[type="menu"] {
   }
 }
 
-.alltabs-item[tabIsVisible] {
-    /* box-shadow instead of background-color to work around native styling */
-    box-shadow: inset -5px 0 ThreeDShadow;
-}
-
 toolbar[brighttext] .tabs-closebutton {
     list-style-image: url("chrome://global/skin/icons/close-inverted.png");
 }
@@ -1966,15 +2056,6 @@ toolbar[brighttext] .tabs-closebutton {
 #ub-feed-button[open="true"],
 #ub-feed-button:hover:active {
     -moz-image-region: rect(0px 48px 16px 32px);
-}
-
-
-.alltabs-endimage[muted] {
-  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-muted);
-}
-
-.alltabs-endimage[soundplaying] {
-  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
 }
 
 /* Bookmarks toolbar */

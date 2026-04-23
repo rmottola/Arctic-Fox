@@ -7,11 +7,10 @@ function test() {
   // Initialization
   waitForExplicitFinish();
   let windowsToClose = [];
-  let testURI = "https://www.mozilla.org/en-US/";
   let favIconLocation =
     "http://example.org/tests/toolkit/components/places/tests/browser/favicon-normal32.png";
   let favIconURI = NetUtil.newURI(favIconLocation);
-  let favIconMimeType= "image/png";
+  let favIconMimeType = "image/png";
   let pageURI;
   let favIconData;
 
@@ -66,7 +65,7 @@ function test() {
     );
 
     addVisits({uri: pageURI, transition: TRANSITION_TYPED}, aWindow,
-      function () {
+      function() {
         aWindow.PlacesUtils.favicons.setAndFetchFaviconForPage(pageURI, favIconURI,
           true, aWindow.PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE, null,
           Services.scriptSecurityManager.getSystemPrincipal());

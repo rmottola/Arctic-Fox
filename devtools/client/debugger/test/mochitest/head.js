@@ -31,7 +31,11 @@ const FRAME_SCRIPT_URL = getRootDirectory(gTestPath) + "code_frame-script.js";
 const CHROME_URL = "chrome://mochitests/content/browser/devtools/client/debugger/test/mochitest/";
 const CHROME_URI = Services.io.newURI(CHROME_URL, null, null);
 
+Services.prefs.setBoolPref("devtools.debugger.new-debugger-frontend", false);
+
 registerCleanupFunction(function* () {
+  Services.prefs.clearUserPref("devtools.debugger.new-debugger-frontend");
+
   info("finish() was called, cleaning up...");
   Services.prefs.setBoolPref("devtools.debugger.log", gEnableLogging);
 
@@ -87,11 +91,11 @@ this.addTab = function addTab(aUrl, aWindow) {
   info("Loading frame script with url " + FRAME_SCRIPT_URL + ".");
   linkedBrowser.messageManager.loadFrameScript(FRAME_SCRIPT_URL, false);
 
-  linkedBrowser.addEventListener("load", function onLoad() {
-    linkedBrowser.removeEventListener("load", onLoad, true);
-    info("Tab added and finished loading: " + aUrl);
-    deferred.resolve(tab);
-  }, true);
+  BrowserTestUtils.browserLoaded(linkedBrowser)
+    .then(function () {
+      info("Tab added and finished loading: " + aUrl);
+      deferred.resolve(tab);
+    });
 
   return deferred.promise;
 };
@@ -747,6 +751,9 @@ AddonDebugger.prototype = {
   }),
 
   _onMessage: function (event) {
+    if (typeof(event.data) !== "string") {
+      return;
+    }
     let json = JSON.parse(event.data);
     switch (json.name) {
       case "toolbox-title":

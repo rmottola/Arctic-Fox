@@ -42,7 +42,7 @@ function timeDaysAgo(numDays) {
 }
 
 // utility function to make a visit for insetion into places db
-function makeVisit(index, daysAgo, isTyped, domain=TEST_URL) {
+function makeVisit(index, daysAgo, isTyped, domain = TEST_URL) {
   let {
     TRANSITION_TYPED,
     TRANSITION_LINK
@@ -70,7 +70,7 @@ add_task(function test_LinkChecker_securityCheck() {
   ];
   for (let {url, expected} of urls) {
     let observed = PlacesProvider.LinkChecker.checkLoadURI(url);
-    equal(observed , expected, `can load "${url}"?`);
+    equal(observed, expected, `can load "${url}"?`);
   }
 });
 

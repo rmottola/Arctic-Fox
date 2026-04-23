@@ -402,6 +402,8 @@ add_task(function* mixup_frecency() {
         style: [ "bookmark" ] },
       { uri: NetUtil.newURI("http://example.com/lo4"),
         title: "low frecency 4" },
+      { uri: NetUtil.newURI("http://example.com/lo3"),
+        title: "low frecency 3" },
       {
         uri: makeActionURI(("searchengine"), {
           engineName: ENGINE_NAME,
@@ -424,8 +426,6 @@ add_task(function* mixup_frecency() {
         style: ["action", "searchengine"],
         icon: "",
       },
-      { uri: NetUtil.newURI("http://example.com/lo3"),
-        title: "low frecency 3" },
       { uri: NetUtil.newURI("http://example.com/lo2"),
         title: "low frecency 2" },
       { uri: NetUtil.newURI("http://example.com/lo1"),
@@ -479,8 +479,99 @@ add_task(function* prohibit_suggestions() {
     searchParam: "enable-actions",
     matches: [
       makeVisitMatch("localhost", "http://localhost/", { heuristic: true }),
+      makeSearchMatch("localhost", { engineName: ENGINE_NAME, heuristic: false })
     ],
   });
+
+  // When using multiple words, we should still get suggestions:
+  yield check_autocomplete({
+    search: "localhost other",
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("localhost other", { engineName: ENGINE_NAME, heuristic: true }),
+      {
+        uri: makeActionURI(("searchengine"), {
+          engineName: ENGINE_NAME,
+          input: "localhost other foo",
+          searchQuery: "localhost other",
+          searchSuggestion: "localhost other foo",
+        }),
+        title: ENGINE_NAME,
+        style: ["action", "searchengine"],
+        icon: "",
+      },
+      {
+        uri: makeActionURI(("searchengine"), {
+          engineName: ENGINE_NAME,
+          input: "localhost other bar",
+          searchQuery: "localhost other",
+          searchSuggestion: "localhost other bar",
+        }),
+        title: ENGINE_NAME,
+        style: ["action", "searchengine"],
+        icon: "",
+      },
+    ],
+  });
+
+  // Clear the whitelist for localhost, and try preferring DNS for any single
+  // word instead:
+  Services.prefs.clearUserPref("browser.fixup.domainwhitelist.localhost");
+  Services.prefs.setBoolPref("browser.fixup.dns_first_for_single_words", true);
+  do_register_cleanup(() => {
+    Services.prefs.clearUserPref("browser.fixup.dns_first_for_single_words");
+  });
+
+  yield check_autocomplete({
+    search: "localhost",
+    searchParam: "enable-actions",
+    matches: [
+      makeVisitMatch("localhost", "http://localhost/", { heuristic: true }),
+      makeSearchMatch("localhost", { engineName: ENGINE_NAME, heuristic: false })
+    ],
+  });
+
+  yield check_autocomplete({
+    search: "somethingelse",
+    searchParam: "enable-actions",
+    matches: [
+      makeVisitMatch("somethingelse", "http://somethingelse/", { heuristic: true }),
+      makeSearchMatch("somethingelse", { engineName: ENGINE_NAME, heuristic: false })
+    ],
+  });
+
+  // When using multiple words, we should still get suggestions:
+  yield check_autocomplete({
+    search: "localhost other",
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("localhost other", { engineName: ENGINE_NAME, heuristic: true }),
+      {
+        uri: makeActionURI(("searchengine"), {
+          engineName: ENGINE_NAME,
+          input: "localhost other foo",
+          searchQuery: "localhost other",
+          searchSuggestion: "localhost other foo",
+        }),
+        title: ENGINE_NAME,
+        style: ["action", "searchengine"],
+        icon: "",
+      },
+      {
+        uri: makeActionURI(("searchengine"), {
+          engineName: ENGINE_NAME,
+          input: "localhost other bar",
+          searchQuery: "localhost other",
+          searchSuggestion: "localhost other bar",
+        }),
+        title: ENGINE_NAME,
+        style: ["action", "searchengine"],
+        icon: "",
+      },
+    ],
+  });
+
+  Services.prefs.clearUserPref("browser.fixup.dns_first_for_single_words");
 
   yield check_autocomplete({
     search: "1.2.3.4",
@@ -500,14 +591,14 @@ add_task(function* prohibit_suggestions() {
     search: "user:pass@test",
     searchParam: "enable-actions",
     matches: [
-      makeSearchMatch("user:pass@test", { engineName: ENGINE_NAME, heuristic: true }),
+      makeVisitMatch("user:pass@test", "http://user:pass@test/", { heuristic: true }),
     ],
   });
   yield check_autocomplete({
     search: "test/test",
     searchParam: "enable-actions",
     matches: [
-      makeSearchMatch("test/test", { engineName: ENGINE_NAME, heuristic: true }),
+      makeVisitMatch("test/test", "http://test/test", { heuristic: true }),
     ],
   });
   yield check_autocomplete({

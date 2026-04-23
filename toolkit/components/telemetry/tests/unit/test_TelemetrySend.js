@@ -46,7 +46,7 @@ function fakePingId(type, number) {
   const HEAD = "93bd0011-2c8f-4e1c-bee0-";
   const TAIL = "000000000000";
   const N = String(number);
-  const id = HEAD + type + TAIL.slice(type.length, - N.length) + N;
+  const id = HEAD + type + TAIL.slice(type.length, -N.length) + N;
   fakeGeneratePingId(() => id);
   return id;
 }
@@ -176,7 +176,7 @@ add_task(function* test_sendPendingPings() {
 });
 
 add_task(function* test_sendDateHeader() {
-  let now = fakeNow(new Date(Date.UTC(2011, 1, 1, 11, 0, 0)));
+  fakeNow(new Date(Date.UTC(2011, 1, 1, 11, 0, 0)));
   yield TelemetrySend.reset();
 
   let pingId = yield TelemetryController.submitExternalPing("test-send-date-header", {});
@@ -254,7 +254,7 @@ add_task(function* test_discardBigPings() {
   const TEST_PING_TYPE = "test-ping-type";
 
   // Generate a 2MB string and create an oversized payload.
-  const OVERSIZED_PAYLOAD = generateRandomString(2 * 1024 * 1024);
+  const OVERSIZED_PAYLOAD = {"data": generateRandomString(2 * 1024 * 1024)};
 
   // Reset the histograms.
   Telemetry.getHistogramById("TELEMETRY_PING_SIZE_EXCEEDED_SEND").clear();
@@ -323,7 +323,7 @@ add_task(function* test_persistCurrentPingsOnShutdown() {
 
   // Submit new pings that shouldn't be persisted yet.
   let ids = [];
-  for (let i=0; i<5; ++i) {
+  for (let i = 0; i < 5; ++i) {
     ids.push(fakePingId("f", i));
     TelemetryController.submitExternalPing(TEST_TYPE, {});
   }

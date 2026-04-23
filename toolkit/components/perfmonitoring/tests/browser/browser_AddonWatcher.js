@@ -20,29 +20,26 @@ add_task(function* init() {
   if (installer.error) {
     throw installer.error;
   }
-  let ready = new Promise((resolve, reject) => installer.addListener({
+  let installed = new Promise((resolve, reject) => installer.addListener({
     onInstallEnded: (_, addon) => resolve(addon),
     onInstallFailed: reject,
     onDownloadFailed: reject
   }));
+
+  // We also need to wait for the add-on to report that it's ready
+  // to be used in the test.
+  let ready = TestUtils.topicObserved("test-addonwatcher-ready");
   installer.install();
 
   info("Waiting for installation to terminate");
-  let addon = yield ready;
+  let addon = yield installed;
+
+  yield ready;
 
   registerCleanupFunction(() => {
     info("Uninstalling test add-on");
     addon.uninstall()
   });
-
-
-  let freezeThreshold = Preferences.get("browser.addon-watch.freeze-threshold-micros", /* 5 seconds */ 5000000);
-  let jankThreshold = Preferences.get("browser.addon-watch.jank-threshold-micros", /* 256 ms == 8 frames*/ 256000);
-  let occurrencesBetweenAlerts = Preferences.get("browser.addon-watch.occurrences-between-alerts", 3);
-  let delayBetweenAlerts = Preferences.get("browser.addon-watch.delay-between-alerts-ms", 6 * 3600 * 1000 /* 6h */);
-  let delayBetweenFreezeAlerts = Preferences.get("browser.addon-watch.delay-between-freeze-alerts-ms", 2 * 60 * 1000 /* 2 min */);
-  let prescriptionDelay = Preferences.get("browser.addon-watch.prescription-delay", 5 * 60 * 1000 /* 5 minutes */);
-  let highestNumberOfAddonsToReport = Preferences.get("browser.addon-watch.max-simultaneous-reports", 1);
 
   Preferences.set("browser.addon-watch.warmup-ms", 0);
   Preferences.set("browser.addon-watch.freeze-threshold-micros", 0);
@@ -71,7 +68,7 @@ add_task(function* init() {
   Services.telemetry.canRecordExtended = true;
   AddonWatcher.init();
 
-  registerCleanupFunction(function () {
+  registerCleanupFunction(function() {
     AddonWatcher.paused = true;
     Services.telemetry.canRecordExtended = oldCanRecord;
   });
@@ -106,7 +103,7 @@ let burn_rubber = Task.async(function*({histogramName, topic, expectedMinSum}) {
       let snap2 = histogram.snapshot(ADDON_ID);
       histogramUpdated = snap2.sum > 0;
       info(`For the moment, histogram ${histogramName} shows ${snap2.sum} => ${histogramUpdated}`);
-      info(`For the moment, we have ${detected?"":"NOT "}detected the slow add-on`);
+      info(`For the moment, we have ${detected ? "" : "NOT "}detected the slow add-on`);
     } while (!histogramUpdated || !detected);
 
     let snap3 = histogram.snapshot(ADDON_ID);

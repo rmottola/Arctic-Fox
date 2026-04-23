@@ -456,6 +456,7 @@ MP3TrackDemuxer::FindNextFrame() {
 
   uint8_t buffer[BUFFER_SIZE];
   int32_t read = 0;
+
   bool foundFrame = false;
   int64_t frameHeaderOffset = 0;
 
@@ -464,9 +465,11 @@ MP3TrackDemuxer::FindNextFrame() {
     if ((!mParser.FirstFrame().Length() &&
          mOffset - mParser.ID3Header().Size() > MAX_SKIPPED_BYTES) ||
         (read = Read(buffer, mOffset, BUFFER_SIZE)) == 0) {
+      MP3LOG("FindNext() EOS or exceeded MAX_SKIPPED_BYTES without a frame");
       // This is not a valid MPEG audio stream or we've reached EOS, give up.
       break;
     }
+
     ByteReader reader(buffer, read);
     uint32_t bytesToSkip = 0;
     foundFrame = mParser.Parse(&reader, &bytesToSkip);
@@ -520,7 +523,8 @@ MP3TrackDemuxer::SkipNextFrame(const MediaByteRange& aRange) {
 
 already_AddRefed<MediaRawData>
 MP3TrackDemuxer::GetNextFrame(const MediaByteRange& aRange) {
-  MP3LOG("GetNext() Begin({mStart=%" PRId64 " Length()=%" PRId64 "})");
+  MP3LOG("GetNext() Begin({mStart=%" PRId64 " Length()=%" PRId64 "})",
+         aRange.mStart, aRange.Length());
   if (!aRange.Length()) {
     return nullptr;
   }
@@ -771,9 +775,9 @@ FrameParser::Parse(ByteReader* aReader, uint32_t* aBytesToSkip) {
       if (skipSize > aReader->Remaining()) {
         // Skipping across the ID3v2 tag would take us past the end of the buffer, therefore we
         // return immediately and let the calling function handle skipping the rest of the tag.
-        MP3LOGV("ID3v2 tag detected, size=%d, "
-                "needing to skip %d bytes past the current buffer",
-                tagSize, tagSize - aReader->Remaining());
+        MP3LOGV("ID3v2 tag detected, size=%d,"
+                " needing to skip %d bytes past the current buffer",
+                tagSize, skipSize - aReader->Remaining());
         *aBytesToSkip = skipSize - aReader->Remaining();
         return false;
       }

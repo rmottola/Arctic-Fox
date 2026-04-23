@@ -221,7 +221,7 @@ TransactionsHistory.__proto__ = {
    * @return the proxified transaction object.
    * @see getRawTransaction for retrieving the raw transaction.
    */
-  proxifyTransaction: function (aRawTransaction) {
+  proxifyTransaction: function(aRawTransaction) {
     let proxy = Object.freeze({
       transact() {
         return TransactionsManager.transact(this);
@@ -313,7 +313,6 @@ var PlacesTransactions = {
    * @see Batches in the module documentation.
    */
   batch(aToBatch) {
-    let batchFunc;
     if (Array.isArray(aToBatch)) {
       if (aToBatch.length == 0)
         throw new Error("aToBatch must not be an empty array");
@@ -668,7 +667,7 @@ function DefineTransaction(aRequiredProps = [], aOptionalProps = []) {
       throw new Error("Property '" + prop + "' is not defined");
   }
 
-  let ctor = function (aInput) {
+  let ctor = function(aInput) {
     // We want to support both syntaxes:
     // let t = new PlacesTransactions.NewBookmark(),
     // let t = PlacesTransactions.NewBookmark()
@@ -710,7 +709,7 @@ function isPrimitive(v) {
   return v === null || (typeof(v) != "object" && typeof(v) != "function");
 }
 
-DefineTransaction.annotationObjectValidate = function (obj) {
+DefineTransaction.annotationObjectValidate = function(obj) {
   let checkProperty = (aPropName, aRequired, aCheckFunc) => {
     if (aPropName in obj)
       return aCheckFunc(obj[aPropName]);
@@ -742,12 +741,12 @@ DefineTransaction.urlValidate = function(url) {
 
 DefineTransaction.inputProps = new Map();
 DefineTransaction.defineInputProps =
-function (aNames, aValidationFunction, aDefaultValue) {
+function(aNames, aValidationFunction, aDefaultValue) {
   for (let name of aNames) {
     // Workaround bug 449811.
     let propName = name;
     this.inputProps.set(propName, {
-      validateValue: function (aValue) {
+      validateValue: function(aValue) {
         if (aValue === undefined)
           return aDefaultValue;
         try {
@@ -758,7 +757,7 @@ function (aNames, aValidationFunction, aDefaultValue) {
         }
       },
 
-      validateInput: function (aInput, aRequired) {
+      validateInput: function(aInput, aRequired) {
         if (aRequired && !(propName in aInput))
           throw new Error(`Required input property is missing: ${propName}`);
         return this.validateValue(aInput[propName]);
@@ -770,13 +769,13 @@ function (aNames, aValidationFunction, aDefaultValue) {
 };
 
 DefineTransaction.defineArrayInputProp =
-function (aName, aBasePropertyName) {
+function(aName, aBasePropertyName) {
   let baseProp = this.inputProps.get(aBasePropertyName);
   if (!baseProp)
     throw new Error(`Unknown input property: ${aBasePropertyName}`);
 
   this.inputProps.set(aName, {
-    validateValue: function (aValue) {
+    validateValue: function(aValue) {
       if (aValue == undefined)
         return [];
 
@@ -791,7 +790,7 @@ function (aName, aBasePropertyName) {
     // We allow setting either the array property itself (e.g. urls), or a
     // single element of it (url, in that example), that is then transformed
     // into a single-element array.
-    validateInput: function (aInput, aRequired) {
+    validateInput: function(aInput, aRequired) {
       if (aName in aInput) {
         // It's not allowed to set both though.
         if (aBasePropertyName in aInput) {
@@ -821,12 +820,12 @@ function (aName, aBasePropertyName) {
 };
 
 DefineTransaction.validatePropertyValue =
-function (aProp, aInput, aRequired) {
+function(aProp, aInput, aRequired) {
   return this.inputProps.get(aProp).validateInput(aInput, aRequired);
 };
 
 DefineTransaction.getInputObjectForSingleValue =
-function (aInput, aRequiredProps, aOptionalProps) {
+function(aInput, aRequiredProps, aOptionalProps) {
   // The following input forms may be deduced from a single value:
   // * a single required property with or without optional properties (the given
   //   value is set to the required property).
@@ -845,7 +844,7 @@ function (aInput, aRequiredProps, aOptionalProps) {
 };
 
 DefineTransaction.verifyInput =
-function (aInput, aRequiredProps = [], aOptionalProps = []) {
+function(aInput, aRequiredProps = [], aOptionalProps = []) {
   if (aRequiredProps.length == 0 && aOptionalProps.length == 0)
     return {};
 
@@ -885,7 +884,7 @@ DefineTransaction.defineInputProps(["guid", "parentGuid", "newParentGuid"],
                                    DefineTransaction.guidValidate);
 DefineTransaction.defineInputProps(["title"],
                                    DefineTransaction.strOrNullValidate, null);
-DefineTransaction.defineInputProps(["keyword", "postData", "tag",
+DefineTransaction.defineInputProps(["keyword", "oldKeyword", "postData", "tag",
                                     "excludingAnnotation"],
                                    DefineTransaction.strValidate, "");
 DefineTransaction.defineInputProps(["index", "newIndex"],
@@ -1000,8 +999,12 @@ function* createItemsFromBookmarksTree(aBookmarksTree, aRestoring = false,
         let uri = NetUtil.newURI(aItem.uri);
         itemId = PlacesUtils.bookmarks.insertBookmark(
           parentId, uri, aIndex, aItem.title, guid);
-        if ("keyword" in aItem)
-          PlacesUtils.bookmarks.setKeywordForBookmark(itemId, aItem.keyword);
+        if ("keyword" in aItem) {
+          yield PlacesUtils.keywords.insert({
+            keyword: aItem.keyword,
+            url: uri.spec
+          });
+        }
         if ("tags" in aItem) {
           PlacesUtils.tagging.tagURI(uri, aItem.tags.split(","));
         }
@@ -1060,7 +1063,7 @@ function* createItemsFromBookmarksTree(aBookmarksTree, aRestoring = false,
                           aBookmarksTree.index);
 }
 
-/*****************************************************************************
+/** ***************************************************************************
  * The Standard Places Transactions.
  *
  * See the documentation at the top of this file. The valid values for input
@@ -1081,18 +1084,23 @@ PT.NewBookmark = DefineTransaction(["parentGuid", "url"],
                                    ["index", "title", "keyword", "postData",
                                     "annotations", "tags"]);
 PT.NewBookmark.prototype = Object.seal({
-  execute: function (aParentGuid, aURI, aIndex, aTitle,
-                     aKeyword, aPostData, aAnnos, aTags) {
+  execute: function(aParentGuid, aURI, aIndex, aTitle,
+                    aKeyword, aPostData, aAnnos, aTags) {
     return ExecuteCreateItem(this, aParentGuid,
-      function (parentId, guidToRestore = "") {
+      function* (parentId, guidToRestore = "") {
         let itemId = PlacesUtils.bookmarks.insertBookmark(
           parentId, aURI, aIndex, aTitle, guidToRestore);
-        if (aKeyword)
-          PlacesUtils.bookmarks.setKeywordForBookmark(itemId, aKeyword);
-        if (aPostData)
-          PlacesUtils.setPostDataForBookmark(itemId, aPostData);
-        if (aAnnos.length)
+
+        if (aKeyword) {
+          yield PlacesUtils.keywords.insert({
+            url: aURI.spec,
+            keyword: aKeyword,
+            postData: aPostData
+          });
+        }
+        if (aAnnos.length) {
           PlacesUtils.setAnnotationsForItem(itemId, aAnnos);
+        }
         if (aTags.length > 0) {
           let currentTags = PlacesUtils.tagging.getTagsForURI(aURI);
           aTags = aTags.filter(t => !currentTags.includes(t));
@@ -1102,8 +1110,9 @@ PT.NewBookmark.prototype = Object.seal({
         return itemId;
       },
       function _additionalOnUndo() {
-        if (aTags.length > 0)
+        if (aTags.length > 0) {
           PlacesUtils.tagging.untagURI(aURI, aTags);
+        }
       });
   }
 });
@@ -1119,9 +1128,9 @@ PT.NewBookmark.prototype = Object.seal({
 PT.NewFolder = DefineTransaction(["parentGuid", "title"],
                                  ["index", "annotations"]);
 PT.NewFolder.prototype = Object.seal({
-  execute: function (aParentGuid, aTitle, aIndex, aAnnos) {
+  execute: function(aParentGuid, aTitle, aIndex, aAnnos) {
     return ExecuteCreateItem(this,  aParentGuid,
-      function(parentId, guidToRestore = "") {
+      function* (parentId, guidToRestore = "") {
         let itemId = PlacesUtils.bookmarks.createFolder(
           parentId, aTitle, aIndex, guidToRestore);
         if (aAnnos.length > 0)
@@ -1142,9 +1151,9 @@ PT.NewFolder.prototype = Object.seal({
  */
 PT.NewSeparator = DefineTransaction(["parentGuid"], ["index"]);
 PT.NewSeparator.prototype = Object.seal({
-  execute: function (aParentGuid, aIndex) {
+  execute: function(aParentGuid, aIndex) {
     return ExecuteCreateItem(this, aParentGuid,
-      function (parentId, guidToRestore = "") {
+      function* (parentId, guidToRestore = "") {
         let itemId = PlacesUtils.bookmarks.insertSeparator(
           parentId, aIndex, guidToRestore);
         return itemId;
@@ -1304,7 +1313,7 @@ PT.Annotate.prototype = {
       let undoAnnos = [];
       for (let newAnno of aNewAnnos) {
         let currentAnno = currentAnnos.find(a => a.name == newAnno.name);
-        if (!!currentAnno) {
+        if (currentAnno) {
           undoAnnos.push(currentAnno);
         }
         else {
@@ -1336,14 +1345,36 @@ PT.Annotate.prototype = {
  *
  * Required Input Properties: guid, keyword.
  */
-PT.EditKeyword = DefineTransaction(["guid", "keyword"]);
+PT.EditKeyword = DefineTransaction(["guid", "keyword"],
+                                   ["postData", "oldKeyword"]);
 PT.EditKeyword.prototype = Object.seal({
-  execute: function* (aGuid, aKeyword) {
-    let itemId = yield PlacesUtils.promiseItemId(aGuid),
-        oldKeyword = PlacesUtils.bookmarks.getKeywordForBookmark(itemId);
-    PlacesUtils.bookmarks.setKeywordForBookmark(itemId, aKeyword);
-    this.undo = () => {
-      PlacesUtils.bookmarks.setKeywordForBookmark(itemId, oldKeyword);
+  execute: function* (aGuid, aKeyword, aPostData, aOldKeyword) {
+    let url;
+    let oldKeywordEntry;
+    if (aOldKeyword) {
+      oldKeywordEntry = yield PlacesUtils.keywords.fetch(aOldKeyword);
+      url = oldKeywordEntry.url;
+      yield PlacesUtils.keywords.remove(aOldKeyword);
+    }
+
+    if (aKeyword) {
+      if (!url) {
+        url = (yield PlacesUtils.bookmarks.fetch(aGuid)).url;
+      }
+      yield PlacesUtils.keywords.insert({
+        url: url,
+        keyword: aKeyword,
+        postData: aPostData || (oldKeywordEntry ? oldKeywordEntry.postData : "")
+      });
+    }
+
+    this.undo = function* () {
+      if (aKeyword) {
+        yield PlacesUtils.keywords.remove(aKeyword);
+      }
+      if (oldKeywordEntry) {
+        yield PlacesUtils.keywords.insert(oldKeywordEntry);
+      }
     };
   }
 });

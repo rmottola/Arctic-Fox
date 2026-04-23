@@ -9,10 +9,13 @@ const Immutable = require("devtools/client/shared/vendor/immutable");
 const constants = require("devtools/client/webconsole/new-console-output/constants");
 
 const FilterState = Immutable.Record({
+  css: false,
   debug: true,
   error: true,
   info: true,
   log: true,
+  net: false,
+  netxhr: false,
   text: "",
   warn: true,
 });

@@ -96,6 +96,7 @@ registerCleanupFunction(() => {
   Services.prefs.clearUserPref("devtools.dump.emit");
   Services.prefs.clearUserPref("devtools.toolbox.host");
   Services.prefs.clearUserPref("devtools.toolbox.previousHost");
+  Services.prefs.clearUserPref("devtools.toolbox.splitconsoleEnabled");
 });
 
 registerCleanupFunction(function* cleanup() {
@@ -107,13 +108,22 @@ registerCleanupFunction(function* cleanup() {
 /**
  * Add a new test tab in the browser and load the given url.
  * @param {String} url The url to be loaded in the new tab
+ * @param {Object} options Object with various optional fields:
+ *   - {Boolean} background If true, open the tab in background
+ *   - {ChromeWindow} window Firefox top level window we should use to open the tab
  * @return a promise that resolves to the tab object when the url is loaded
  */
-var addTab = Task.async(function* (url) {
+var addTab = Task.async(function* (url, options = { background: false, window: window }) {
   info("Adding a new tab with URL: " + url);
 
-  let tab = gBrowser.selectedTab = gBrowser.addTab(url);
-  yield once(gBrowser.selectedBrowser, "load", true);
+  let { background } = options;
+  let { gBrowser } = options.window ? options.window : window;
+
+  let tab = gBrowser.addTab(url);
+  if (!background) {
+    gBrowser.selectedTab = tab;
+  }
+  yield BrowserTestUtils.browserLoaded(tab.linkedBrowser);
 
   info("Tab added and finished loading");
 
@@ -128,6 +138,7 @@ var addTab = Task.async(function* (url) {
 var removeTab = Task.async(function* (tab) {
   info("Removing tab.");
 
+  let { gBrowser } = tab.ownerDocument.defaultView;
   let onClose = once(gBrowser.tabContainer, "TabClose");
   gBrowser.removeTab(tab);
   yield onClose;
@@ -142,7 +153,7 @@ var removeTab = Task.async(function* (tab) {
  */
 var refreshTab = Task.async(function*(tab) {
   info("Refreshing tab.");
-  const finished = once(gBrowser.selectedBrowser, "load", true);
+  const finished = BrowserTestUtils.browserLoaded(gBrowser.selectedBrowser);
   gBrowser.reloadTab(gBrowser.selectedTab);
   yield finished;
   info("Tab finished refreshing.");
@@ -191,15 +202,18 @@ function synthesizeKeyShortcut(key, target) {
   // parseElectronKey requires any window, just to access `KeyboardEvent`
   let window = Services.appShell.hiddenDOMWindow;
   let shortcut = KeyShortcuts.parseElectronKey(window, key);
-
-  info("Synthesizing key shortcut: " + key);
-  EventUtils.synthesizeKey(shortcut.key || "", {
-    keyCode: shortcut.keyCode,
+  let keyEvent = {
     altKey: shortcut.alt,
     ctrlKey: shortcut.ctrl,
     metaKey: shortcut.meta,
     shiftKey: shortcut.shift
-  }, target);
+  };
+  if (shortcut.keyCode) {
+    keyEvent.keyCode = shortcut.keyCode;
+  }
+
+  info("Synthesizing key shortcut: " + key);
+  EventUtils.synthesizeKey(shortcut.key || "", keyEvent, target);
 }
 
 /**
@@ -291,9 +305,7 @@ function waitForTick() {
  * @return A promise that resolves when the time is passed
  */
 function wait(ms) {
-  let def = defer();
-  content.setTimeout(def.resolve, ms);
-  return def.promise;
+  return new promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -504,3 +516,81 @@ var closeToolbox = Task.async(function* () {
   let target = TargetFactory.forTab(gBrowser.selectedTab);
   yield gDevTools.closeToolbox(target);
 });
+
+/**
+ * Load the Telemetry utils, then stub Telemetry.prototype.log and
+ * Telemetry.prototype.logKeyed in order to record everything that's logged in
+ * it.
+ * Store all recordings in Telemetry.telemetryInfo.
+ * @return {Telemetry}
+ */
+function loadTelemetryAndRecordLogs() {
+  info("Mock the Telemetry log function to record logged information");
+
+  let Telemetry = require("devtools/client/shared/telemetry");
+  Telemetry.prototype.telemetryInfo = {};
+  Telemetry.prototype._oldlog = Telemetry.prototype.log;
+  Telemetry.prototype.log = function (histogramId, value) {
+    if (!this.telemetryInfo) {
+      // Telemetry instance still in use after stopRecordingTelemetryLogs
+      return;
+    }
+    if (histogramId) {
+      if (!this.telemetryInfo[histogramId]) {
+        this.telemetryInfo[histogramId] = [];
+      }
+      this.telemetryInfo[histogramId].push(value);
+    }
+  };
+  Telemetry.prototype._oldlogKeyed = Telemetry.prototype.logKeyed;
+  Telemetry.prototype.logKeyed = function (histogramId, key, value) {
+    this.log(`${histogramId}|${key}`, value);
+  };
+
+  return Telemetry;
+}
+
+/**
+ * Stop recording the Telemetry logs and put back the utils as it was before.
+ * @param {Telemetry} Required Telemetry
+ *        Telemetry object that needs to be stopped.
+ */
+function stopRecordingTelemetryLogs(Telemetry) {
+  info("Stopping Telemetry");
+  Telemetry.prototype.log = Telemetry.prototype._oldlog;
+  Telemetry.prototype.logKeyed = Telemetry.prototype._oldlogKeyed;
+  delete Telemetry.prototype._oldlog;
+  delete Telemetry.prototype._oldlogKeyed;
+  delete Telemetry.prototype.telemetryInfo;
+}
+
+/**
+ * Clean the logical clipboard content. This method only clears the OS clipboard on
+ * Windows (see Bug 666254).
+ */
+function emptyClipboard() {
+  let clipboard = Cc["@mozilla.org/widget/clipboard;1"]
+    .getService(SpecialPowers.Ci.nsIClipboard);
+  clipboard.emptyClipboard(clipboard.kGlobalClipboard);
+}
+
+/**
+ * Check if the current operating system is Windows.
+ */
+function isWindows() {
+  return Services.appinfo.OS === "WINNT";
+}
+
+/**
+ * Wait for a given toolbox to get its title updated.
+ */
+function waitForTitleChange(toolbox) {
+  let deferred = defer();
+  toolbox.win.parent.addEventListener("message", function onmessage(event) {
+    if (event.data.name == "set-host-title") {
+      toolbox.win.parent.removeEventListener("message", onmessage);
+      deferred.resolve();
+    }
+  });
+  return deferred.promise;
+}

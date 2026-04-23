@@ -560,12 +560,20 @@ SpecialPowersObserverAPI.prototype = {
         // they're run on a bare archive rather than a running instance,
         // as the add-on manager runs them.
         let extensionData = new ExtensionData(extension.rootURI);
-        extensionData.readManifest().then(() => {
-          return extensionData.initAllLocales();
-        }).then(() => {
-          if (extensionData.errors.length) {
-            return Promise.reject("Extension contains packaging errors");
+        extensionData.readManifest().then(
+          () => {
+            return extensionData.initAllLocales().then(() => {
+              if (extensionData.errors.length) {
+                return Promise.reject("Extension contains packaging errors");
+              }
+            });
+          },
+          () => {
+            // readManifest() will throw if we're loading an embedded
+            // extension, so don't worry about locale errors in that
+            // case.
           }
+        ).then(() => {
           return extension.startup();
         }).then(() => {
           this._sendReply(aMessage, "SPExtensionMessage", {id, type: "extensionStarted", args: []});
@@ -590,28 +598,6 @@ SpecialPowersObserverAPI.prototype = {
         this._extensions.delete(id);
         extension.shutdown();
         this._sendReply(aMessage, "SPExtensionMessage", {id, type: "extensionUnloaded", args: []});
-        return undefined;
-      }
-
-      case "SPClearAppPrivateData": {
-        let appId = aMessage.data.appId;
-        let browserOnly = aMessage.data.browserOnly;
-
-        let attributes = { appId: appId };
-        if (browserOnly) {
-          attributes.inIsolatedMozBrowser = true;
-        }
-        this._notifyCategoryAndObservers(null,
-                                         "clear-origin-attributes-data",
-                                         JSON.stringify(attributes));
-
-        let subject = {
-          appId: appId,
-          browserOnly: browserOnly,
-          QueryInterface: XPCOMUtils.generateQI([Ci.mozIApplicationClearPrivateDataParams])
-        };
-        this._notifyCategoryAndObservers(subject, "webapps-clear-data", null);
-
         return undefined;
       }
 

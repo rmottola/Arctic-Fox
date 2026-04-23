@@ -15,6 +15,7 @@
 #include "nsICryptoHash.h"
 #include "nsNetUtil.h"
 #include "nsIOutputStream.h"
+#include "nsClassHashtable.h"
 
 #if DEBUG
 #include "plbase64.h"
@@ -30,6 +31,8 @@ namespace safebrowsing {
 template <uint32_t S, class Comparator>
 struct SafebrowsingHash
 {
+  static_assert(S >= 4, "The SafebrowsingHash should be at least 4 bytes.");
+
   static const uint32_t sHashSize = S;
   typedef SafebrowsingHash<S, Comparator> self_type;
   uint8_t buf[S];
@@ -104,18 +107,24 @@ struct SafebrowsingHash
   }
 
   uint32_t ToUint32() const {
-      return *((uint32_t*)buf);
+    uint32_t n;
+    memcpy(&n, buf, sizeof(n));
+    return n;
   }
   void FromUint32(uint32_t aHash) {
-      *((uint32_t*)buf) = aHash;
+    memcpy(buf, &aHash, sizeof(aHash));
   }
 };
 
 class PrefixComparator {
 public:
   static int Compare(const uint8_t* a, const uint8_t* b) {
-      uint32_t first = *((uint32_t*)a);
-      uint32_t second = *((uint32_t*)b);
+      uint32_t first;
+      memcpy(&first, a, sizeof(uint32_t));
+
+      uint32_t second;
+      memcpy(&second, b, sizeof(uint32_t));
+
       if (first > second) {
           return 1;
       } else if (first == second) {
@@ -304,6 +313,8 @@ WriteTArray(nsIOutputStream* aStream, nsTArray_Impl<T, Alloc>& aArray)
                         aArray.Length() * sizeof(T),
                         &written);
 }
+
+typedef nsClassHashtable<nsUint32HashKey, nsCString> PrefixStringMap;
 
 } // namespace safebrowsing
 } // namespace mozilla

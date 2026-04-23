@@ -27,6 +27,8 @@ user_pref("browser.safebrowsing.phishing.enabled", false);
 user_pref("browser.safebrowsing.malware.enabled", false);
 user_pref("browser.safebrowsing.forbiddenURIs.enabled", false);
 user_pref("browser.safebrowsing.blockedURIs.enabled", false);
+user_pref("privacy.trackingprotection.enabled", false);
+user_pref("privacy.trackingprotection.pbmode.enabled", false);
 user_pref("browser.snippets.enabled", false);
 user_pref("browser.snippets.syncPromo.enabled", false);
 user_pref("browser.snippets.firstrunHomepage.enabled", false);

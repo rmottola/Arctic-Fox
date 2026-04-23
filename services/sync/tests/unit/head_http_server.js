@@ -294,8 +294,16 @@ ServerCollection.prototype = {
           data.push(wbo.get());
         }
       }
+      let start = options.offset || 0;
       if (options.limit) {
-        data = data.slice(0, options.limit);
+        let numItemsPastOffset = data.length - start;
+        data = data.slice(start, start + options.limit);
+        // use options as a backchannel to set x-weave-next-offset
+        if (numItemsPastOffset > options.limit) {
+          options.nextOffset = start + options.limit;
+        }
+      } else if (start) {
+        data = data.slice(start);
       }
       // Our implementation of application/newlines.
       result = data.join("\n") + "\n";
@@ -309,8 +317,12 @@ ServerCollection.prototype = {
           data.push(id);
         }
       }
+      let start = options.offset || 0;
       if (options.limit) {
-        data = data.slice(0, options.limit);
+        data = data.slice(start, start + options.limit);
+        options.nextOffset = start + options.limit;
+      } else if (start) {
+        data = data.slice(start);
       }
       result = JSON.stringify(data);
       options.recordCount = data.length;
@@ -391,29 +403,36 @@ ServerCollection.prototype = {
       if (options.limit) {
         options.limit = parseInt(options.limit, 10);
       }
+      if (options.offset) {
+        options.offset = parseInt(options.offset, 10);
+      }
 
       switch(request.method) {
         case "GET":
-          body = self.get(options);
-          // "If supported by the db, this header will return the number of
-          // records total in the request body of any multiple-record GET
-          // request."
-          let records = options.recordCount;
-          self._log.info("Records: " + records);
+          body = self.get(options, request);
+          // see http://moz-services-docs.readthedocs.io/en/latest/storage/apis-1.5.html
+          // for description of these headers.
+          let { recordCount: records, nextOffset } = options;
+
+          self._log.info("Records: " + records + ", nextOffset: " + nextOffset);
           if (records != null) {
             response.setHeader("X-Weave-Records", "" + records);
           }
+          if (nextOffset) {
+            response.setHeader("X-Weave-Next-Offset", "" + nextOffset);
+          }
+          response.setHeader("X-Last-Modified", "" + this.timestamp);
           break;
 
         case "POST":
-          let res = self.post(readBytesFromInputStream(request.bodyInputStream));
+          let res = self.post(readBytesFromInputStream(request.bodyInputStream), request);
           body = JSON.stringify(res);
           response.newModified = res.modified;
           break;
 
         case "DELETE":
           self._log.debug("Invoking ServerCollection.DELETE.");
-          let deleted = self.delete(options);
+          let deleted = self.delete(options, request);
           let ts = new_timestamp();
           body = JSON.stringify(ts);
           response.newModified = ts;

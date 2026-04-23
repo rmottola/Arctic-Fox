@@ -85,6 +85,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "Promise",
                                   "resource://gre/modules/Promise.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AddonRepository",
                                   "resource://gre/modules/addons/AddonRepository.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Extension",
+                                  "resource://gre/modules/Extension.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
                                   "resource://gre/modules/FileUtils.jsm");
 
@@ -335,6 +337,7 @@ function webAPIForAddon(addon) {
 
   // A few properties are computed for a nicer API
   result.isEnabled = !addon.userDisabled;
+  result.canUninstall = Boolean(addon.permissions & AddonManager.PERM_CAN_UNINSTALL);
 
   return result;
 }
@@ -848,6 +851,8 @@ var AddonManagerInternal = {
         appChanged = Services.appinfo.version != oldAppVersion;
       }
       catch (e) { }
+
+      Extension.browserUpdated = appChanged;
 
       let oldPlatformVersion = null;
       try {
@@ -1866,13 +1871,12 @@ var AddonManagerInternal = {
    *         Optional placeholder icons while the add-on is being downloaded
    * @param  aVersion
    *         An optional placeholder version while the add-on is being downloaded
-   * @param  aLoadGroup
-   *         An optional nsILoadGroup to associate any network requests with
+   * @param  aBrowser
+   *         An optional <browser> element for download permissions prompts.
    * @throws if the aUrl, aCallback or aMimetype arguments are not specified
    */
-  getInstallForURL: function(aUrl, aCallback, aMimetype,
-                                                  aHash, aName, aIcons,
-                                                  aVersion, aBrowser) {
+  getInstallForURL: function(aUrl, aCallback, aMimetype, aHash, aName,
+                             aIcons, aVersion, aBrowser) {
     if (!gStarted)
       throw Components.Exception("AddonManager is not initialized",
                                  Cr.NS_ERROR_NOT_INITIALIZED);
@@ -2330,6 +2334,19 @@ var AddonManagerInternal = {
                                .installTemporaryAddon(aFile);
   },
 
+  installAddonFromSources: function(aFile) {
+    if (!gStarted)
+      throw Components.Exception("AddonManager is not initialized",
+                                 Cr.NS_ERROR_NOT_INITIALIZED);
+
+    if (!(aFile instanceof Ci.nsIFile))
+      throw Components.Exception("aFile must be a nsIFile",
+                                 Cr.NS_ERROR_INVALID_ARG);
+
+    return AddonManagerInternal._getProviderByName("XPIProvider")
+                               .installAddonFromSources(aFile);
+  },
+
   /**
    * Returns an Addon corresponding to an instance ID.
    * @param aInstanceID
@@ -2601,11 +2618,9 @@ var AddonManagerInternal = {
     let addons = [];
 
     new AsyncObjectCaller(this.providers, "getAddonsWithOperationsByTypes", {
-      nextObject: function getAddonsWithOperationsByTypes_nextObject
-                           (aCaller, aProvider) {
+      nextObject: function(aCaller, aProvider) {
         callProviderAsync(aProvider, "getAddonsWithOperationsByTypes", aTypes,
-                          function getAddonsWithOperationsByTypes_concatAddons
-                                   (aProviderAddons) {
+                          function(aProviderAddons) {
           if (aProviderAddons) {
             addons = addons.concat(aProviderAddons);
           }
@@ -2871,7 +2886,7 @@ var AddonManagerInternal = {
       obj.maxProgress = install.maxProgress;
     },
 
-    makeListener(id, target) {
+    makeListener(id, mm) {
       const events = [
         "onDownloadStarted",
         "onDownloadProgress",
@@ -2889,7 +2904,7 @@ var AddonManagerInternal = {
         listener[event] = (install) => {
           let data = {event, id};
           AddonManager.webAPI.copyProps(install, data);
-          this.sendEvent(target, data);
+          this.sendEvent(mm, data);
         }
       });
       return listener;
@@ -2930,7 +2945,7 @@ var AddonManagerInternal = {
 
         let newInstall = install => {
           let id = this.nextInstall++;
-          let listener = this.makeListener(id, target);
+          let listener = this.makeListener(id, target.messageManager);
           install.addListener(listener);
 
           this.installs.set(id, {install, target, listener});
@@ -2939,7 +2954,7 @@ var AddonManagerInternal = {
           this.copyProps(install, result);
           resolve(result);
         };
-        AddonManager.getInstallForURL(options.url, newInstall, "application/x-xpinstall");
+        AddonManager.getInstallForURL(options.url, newInstall, "application/x-xpinstall", options.hash);
       });
     },
 
@@ -2997,7 +3012,7 @@ var AddonManagerInternal = {
 
     clearInstallsFrom(mm) {
       for (let [id, info] of this.installs) {
-        if (info.target == mm) {
+        if (info.target.messageManager == mm) {
           this.forgetInstall(id);
         }
       }
@@ -3182,16 +3197,22 @@ this.AddonManager = {
     ["STATE_DOWNLOADED", 3],
     // The download failed.
     ["STATE_DOWNLOAD_FAILED", 4],
+    // The install may not proceed until the user accepts permissions
+    ["STATE_AWAITING_PERMISSIONS", 5],
+    // Any permission prompts are done
+    ["STATE_PERMISSION_GRANTED", 6],
     // The install has been postponed.
-    ["STATE_POSTPONED", 5],
+    ["STATE_POSTPONED", 7],
+    // The install is ready to be applied.
+    ["STATE_READY", 8],
     // The add-on is being installed.
-    ["STATE_INSTALLING", 6],
+    ["STATE_INSTALLING", 9],
     // The add-on has been installed.
-    ["STATE_INSTALLED", 7],
+    ["STATE_INSTALLED", 10],
     // The install failed.
-    ["STATE_INSTALL_FAILED", 8],
+    ["STATE_INSTALL_FAILED", 11],
     // The install has been cancelled.
-    ["STATE_CANCELLED", 9],
+    ["STATE_CANCELLED", 12],
   ]),
 
   // Constants representing different types of errors while downloading an
@@ -3210,6 +3231,8 @@ this.AddonManager = {
     ["ERROR_SIGNEDSTATE_REQUIRED", -5],
     // The downloaded add-on had a different type than expected.
     ["ERROR_UNEXPECTED_ADDON_TYPE", -6],
+    // The addon did not have the expected ID
+    ["ERROR_INCORRECT_ID", -7],
   ]),
 
   // These must be kept in sync with AddonUpdateChecker.
@@ -3502,6 +3525,10 @@ this.AddonManager = {
 
   installTemporaryAddon: function(aDirectory) {
     return AddonManagerInternal.installTemporaryAddon(aDirectory);
+  },
+
+  installAddonFromSources: function(aDirectory) {
+    return AddonManagerInternal.installAddonFromSources(aDirectory);
   },
 
   getAddonByInstanceID: function(aInstanceID) {

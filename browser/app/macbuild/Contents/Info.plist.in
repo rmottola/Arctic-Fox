@@ -205,22 +205,15 @@
 	<true/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
-    <key>LSEnvironment</key>
-    <dict>
-        <key>MallocNanoZone</key>
-        <string>0</string>
-    </dict>
+	<key>LSFileQuarantineEnabled</key>
+	<true/>
+        <key>LSEnvironment</key>
+        <dict>
+          <key>MallocNanoZone</key>
+          <string>0</string>
+        </dict>
 	<key>LSMinimumSystemVersion</key>
-	<string>10.5</string>
-	<key>LSMinimumSystemVersionByArchitecture</key>
-	<dict>
-		<key>i386</key>
-		<string>10.5.0</string>
-		<key>x86_64</key>
-		<string>10.5.0</string>
-		<key>ppc</key>
-		<string>10.5.0</string>
-	</dict>
+	<string>10.5.0</string>
   <key>NSSupportsAutomaticGraphicsSwitching</key>
   <true/>
   <key>NSPrincipalClass</key>

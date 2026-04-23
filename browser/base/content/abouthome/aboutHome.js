@@ -27,7 +27,7 @@ var searchText;
 
 // This global tracks if the page has been set up before, to prevent double inits
 var gInitialized = false;
-var gObserver = new MutationObserver(function (mutations) {
+var gObserver = new MutationObserver(function(mutations) {
   for (let mutation of mutations) {
     // The addition of the restore session button changes our width:
     if (mutation.attributeName == "session") {
@@ -43,7 +43,7 @@ var gObserver = new MutationObserver(function (mutations) {
   }
 });
 
-window.addEventListener("pageshow", function () {
+window.addEventListener("pageshow", function() {
   // Delay search engine setup, cause browser.js::BrowserOnAboutPageLoad runs
   // later and may use asynchronous getters.
   window.gObserver.observe(document.documentElement, { attributes: true });
@@ -118,7 +118,7 @@ function ensureSnippetsMapThen(aCallback)
     return;
   }
 
-  let invokeCallbacks = function () {
+  let invokeCallbacks = function() {
     if (!gSnippetsMap) {
       gSnippetsMap = Object.freeze(new Map());
     }
@@ -132,21 +132,21 @@ function ensureSnippetsMapThen(aCallback)
   let openRequest = indexedDB.open(DATABASE_NAME, {version: DATABASE_VERSION,
                                                    storage: DATABASE_STORAGE});
 
-  openRequest.onerror = function (event) {
+  openRequest.onerror = function(event) {
     // Try to delete the old database so that we can start this process over
     // next time.
     indexedDB.deleteDatabase(DATABASE_NAME);
     invokeCallbacks();
   };
 
-  openRequest.onupgradeneeded = function (event) {
+  openRequest.onupgradeneeded = function(event) {
     let db = event.target.result;
     if (!db.objectStoreNames.contains(SNIPPETS_OBJECTSTORE_NAME)) {
       db.createObjectStore(SNIPPETS_OBJECTSTORE_NAME);
     }
   }
 
-  openRequest.onsuccess = function (event) {
+  openRequest.onsuccess = function(event) {
     let db = event.target.result;
 
     db.onerror = function (event) {
@@ -186,18 +186,18 @@ function ensureSnippetsMapThen(aCallback)
       // The cache has been filled up, create the snippets map.
       gSnippetsMap = Object.freeze({
         get: (aKey) => cache.get(aKey),
-        set: function (aKey, aValue) {
+        set: function(aKey, aValue) {
           db.transaction(SNIPPETS_OBJECTSTORE_NAME, "readwrite")
             .objectStore(SNIPPETS_OBJECTSTORE_NAME).put(aValue, aKey);
           return cache.set(aKey, aValue);
         },
         has: (aKey) => cache.has(aKey),
-        delete: function (aKey) {
+        delete: function(aKey) {
           db.transaction(SNIPPETS_OBJECTSTORE_NAME, "readwrite")
             .objectStore(SNIPPETS_OBJECTSTORE_NAME).delete(aKey);
           return cache.delete(aKey);
         },
-        clear: function () {
+        clear: function() {
           db.transaction(SNIPPETS_OBJECTSTORE_NAME, "readwrite")
             .objectStore(SNIPPETS_OBJECTSTORE_NAME).clear();
           return cache.clear();
@@ -220,6 +220,11 @@ var gContentSearchController;
 
 function setupSearch()
 {
+  // Set submit button label for when CSS background are disabled (e.g.
+  // high contrast mode).
+  document.getElementById("searchSubmit").value =
+    document.body.getAttribute("dir") == "ltr" ? "\u25B6" : "\u25C0";
+
   // The "autofocus" attribute doesn't focus the form element
   // immediately when the element is first drawn, so the
   // attribute is also used for styling when the page first loads.

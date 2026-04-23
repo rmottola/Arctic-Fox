@@ -4,7 +4,7 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -17,20 +17,20 @@ const MSG_INSTALL_CLEANUP  = "WebAPICleanup";
 const MSG_ADDON_EVENT_REQ  = "WebAPIAddonEventRequest";
 const MSG_ADDON_EVENT      = "WebAPIAddonEvent";
 
-const APIBroker = {
-  _nextID: 0,
+class APIBroker {
+  constructor(mm) {
+    this.mm = mm;
 
-  init() {
     this._promises = new Map();
 
     // _installMap maps integer ids to DOM AddonInstall instances
     this._installMap = new Map();
 
-    Services.cpmm.addMessageListener(MSG_PROMISE_RESULT, this);
-    Services.cpmm.addMessageListener(MSG_INSTALL_EVENT, this);
+    this.mm.addMessageListener(MSG_PROMISE_RESULT, this);
+    this.mm.addMessageListener(MSG_INSTALL_EVENT, this);
 
     this._eventListener = null;
-  },
+  }
 
   receiveMessage(message) {
     let payload = message.data;
@@ -41,13 +41,9 @@ const APIBroker = {
           return;
         }
 
-        let { resolve, reject } = this._promises.get(payload.callbackID);
+        let resolve = this._promises.get(payload.callbackID);
         this._promises.delete(payload.callbackID);
-
-        if ("resolve" in payload)
-          resolve(payload.resolve);
-        else
-          reject(payload.reject);
+        resolve(payload);
         break;
       }
 
@@ -68,108 +64,118 @@ const APIBroker = {
         }
       }
     }
-  },
+  }
 
-  sendRequest: function(type, ...args) {
-    return new Promise((resolve, reject) => {
-      let callbackID = this._nextID++;
+  sendRequest(type, ...args) {
+    return new Promise(resolve => {
+      let callbackID = APIBroker._nextID++;
 
-      this._promises.set(callbackID, { resolve, reject });
-      Services.cpmm.sendAsyncMessage(MSG_PROMISE_REQUEST, { type, callbackID, args });
+      this._promises.set(callbackID, resolve);
+      this.mm.sendAsyncMessage(MSG_PROMISE_REQUEST, { type, callbackID, args });
     });
-  },
+  }
 
   setAddonListener(callback) {
     this._eventListener = callback;
     if (callback) {
-      Services.cpmm.addMessageListener(MSG_ADDON_EVENT, this);
-      Services.cpmm.sendAsyncMessage(MSG_ADDON_EVENT_REQ, {enabled: true});
+      this.mm.addMessageListener(MSG_ADDON_EVENT, this);
+      this.mm.sendAsyncMessage(MSG_ADDON_EVENT_REQ, {enabled: true});
     } else {
-      Services.cpmm.removeMessageListener(MSG_ADDON_EVENT, this);
-      Services.cpmm.sendAsyncMessage(MSG_ADDON_EVENT_REQ, {enabled: false});
+      this.mm.removeMessageListener(MSG_ADDON_EVENT, this);
+      this.mm.sendAsyncMessage(MSG_ADDON_EVENT_REQ, {enabled: false});
     }
-  },
+  }
 
-  sendCleanup: function(ids) {
+  sendCleanup(ids) {
     this.setAddonListener(null);
-    Services.cpmm.sendAsyncMessage(MSG_INSTALL_CLEANUP, { ids });
-  },
-};
-
-APIBroker.init();
-
-function Addon(window, properties) {
-  this.window = window;
-
-  // We trust the webidl binding to broker access to our properties.
-  for (let key of Object.keys(properties)) {
-    this[key] = properties[key];
+    this.mm.sendAsyncMessage(MSG_INSTALL_CLEANUP, { ids });
   }
 }
 
-function AddonInstall(window, properties) {
-  let id = properties.id;
-  APIBroker._installMap.set(id, this);
+APIBroker._nextID = 0;
 
-  this.window = window;
-  this.handlers = new Map();
+// Base class for building classes to back content-exposed interfaces.
+class APIObject {
+  init(window, broker, properties) {
+    this.window = window;
+    this.broker = broker;
 
-  for (let key of Object.keys(properties)) {
-    this[key] = properties[key];
-  }
-}
-
-/**
- * API methods should return promises from the page, this is a simple wrapper
- * to make sure of that. It also automatically wraps objects when necessary.
- */
-function WebAPITask(generator) {
-  return function(...args) {
-    let task = Task.async(generator.bind(this));
-
-    let win = this.window;
-
-    let wrapForContent = (obj) => {
-      if (obj instanceof Addon) {
-        return win.Addon._create(win, obj);
-      }
-      if (obj instanceof AddonInstall) {
-        return win.AddonInstall._create(win, obj);
-      }
-
-      return obj;
+    // Copy any provided properties onto this object, webidl bindings
+    // will only expose to content what should be exposed.
+    for (let key of Object.keys(properties)) {
+      this[key] = properties[key];
     }
+  }
 
+  /**
+   * Helper to implement an asychronous method visible to content, where
+   * the method is implemented by sending a message to the parent process
+   * and then wrapping the returned object or error in an appropriate object.
+   * This helper method ensures that:
+   *  - Returned Promise objects are from the content window
+   *  - Rejected Promises have Error objects from the content window
+   *  - Only non-internal errors are exposed to the caller
+   *
+   * @param {string} apiRequest The command to invoke in the parent process.
+   * @param {array<cloneable>} apiArgs The arguments to include with the
+   *                                   request to the parent process.
+   * @param {function} resultConvert If provided, a function called with the
+   *                                 result from the parent process as an
+   *                                 argument.  Used to convert the result
+   *                                 into something appropriate for content.
+   * @returns {Promise<any>} A Promise suitable for passing directly to content.
+   */
+  _apiTask(apiRequest, apiArgs, resultConverter) {
+    let win = this.window;
+    let broker = this.broker;
     return new win.Promise((resolve, reject) => {
-      task(...args).then(wrapForContent)
-                   .then(resolve, reject);
+      Task.spawn(function*() {
+        let result = yield broker.sendRequest(apiRequest, ...apiArgs);
+        if ("reject" in result) {
+          let err = new win.Error(result.reject.message);
+          // We don't currently put any other properties onto Errors
+          // generated by mozAddonManager.  If/when we do, they will
+          // need to get copied here.
+          reject(err);
+          return;
+        }
+
+        let obj = result.resolve;
+        if (resultConverter) {
+          obj = resultConverter(obj);
+        }
+        resolve(obj);
+      }).catch(err => {
+        Cu.reportError(err);
+        reject(new win.Error("Unexpected internal error"));
+      });
     });
   }
 }
 
-Addon.prototype = {
-  uninstall: WebAPITask(function*() {
-    return yield APIBroker.sendRequest("addonUninstall", this.id);
-  }),
+class Addon extends APIObject {
+  constructor(...args) {
+    super();
+    this.init(...args);
+  }
 
-  setEnabled: WebAPITask(function* (value) {
-    return yield APIBroker.sendRequest("addonSetEnabled", this.id, value);
-  }),
-};
+  uninstall() {
+    return this._apiTask("addonUninstall", [this.id]);
+  }
 
-const INSTALL_EVENTS = [
-  "onDownloadStarted",
-  "onDownloadProgress",
-  "onDownloadEnded",
-  "onDownloadCancelled",
-  "onDownloadFailed",
-  "onInstallStarted",
-  "onInstallEnded",
-  "onInstallCancelled",
-  "onInstallFailed",
-];
+  setEnabled(value) {
+    return this._apiTask("addonSetEnabled", [this.id, value]);
+  }
+}
 
-AddonInstall.prototype = {
+class AddonInstall extends APIObject {
+  constructor(window, broker, properties) {
+    super();
+    this.init(window, broker, properties);
+
+    broker._installMap.set(properties.id, this);
+  }
+
   _dispatch(data) {
     // The message for the event includes updated copies of all install
     // properties.  Use the usual "let webidl filter visible properties" trick.
@@ -179,66 +185,85 @@ AddonInstall.prototype = {
 
     let event = new this.window.Event(data.event);
     this.__DOM_IMPL__.dispatchEvent(event);
-  },
+  }
 
-  install: WebAPITask(function*() {
-    yield APIBroker.sendRequest("addonInstallDoInstall", this.id);
-  }),
+  install() {
+    return this._apiTask("addonInstallDoInstall", [this.id]);
+  }
 
-  cancel: WebAPITask(function*() {
-    yield APIBroker.sendRequest("addonInstallCancel", this.id);
-  }),
-};
-
-function WebAPI() {
+  cancel() {
+    return this._apiTask("addonInstallCancel", [this.id]);
+  }
 }
 
-WebAPI.prototype = {
-  init(window) {
-    this.window = window;
+class WebAPI extends APIObject {
+  constructor() {
+    super();
     this.allInstalls = [];
     this.listenerCount = 0;
+  }
+
+  init(window) {
+    let mm = window
+        .QueryInterface(Ci.nsIInterfaceRequestor)
+        .getInterface(Ci.nsIDocShell)
+        .QueryInterface(Ci.nsIInterfaceRequestor)
+        .getInterface(Ci.nsIContentFrameMessageManager);
+    let broker = new APIBroker(mm);
+
+    super.init(window, broker, {});
 
     window.addEventListener("unload", event => {
-      APIBroker.sendCleanup(this.allInstalls);
+      this.broker.sendCleanup(this.allInstalls);
     });
-  },
+  }
 
-  getAddonByID: WebAPITask(function*(id) {
-    let addonInfo = yield APIBroker.sendRequest("getAddonByID", id);
-    return addonInfo ? new Addon(this.window, addonInfo) : null;
-  }),
+  getAddonByID(id) {
+    return this._apiTask("getAddonByID", [id], addonInfo => {
+      if (!addonInfo) {
+        return null;
+      }
+      let addon = new Addon(this.window, this.broker, addonInfo);
+      return this.window.Addon._create(this.window, addon);
+    });
+  }
 
-  createInstall: WebAPITask(function*(options) {
-    let installInfo = yield APIBroker.sendRequest("createInstall", options);
-    if (!installInfo) {
-      return null;
-    }
-    let install = new AddonInstall(this.window, installInfo);
-    this.allInstalls.push(installInfo.id);
-    return install;
-  }),
+  createInstall(options) {
+    return this._apiTask("createInstall", [options], installInfo => {
+      if (!installInfo) {
+        return null;
+      }
+      let install = new AddonInstall(this.window, this.broker, installInfo);
+      this.allInstalls.push(installInfo.id);
+      return this.window.AddonInstall._create(this.window, install);
+    });
+  }
 
   eventListenerWasAdded(type) {
     if (this.listenerCount == 0) {
-      APIBroker.setAddonListener(data => {
+      this.broker.setAddonListener(data => {
         let event = new this.window.AddonEvent(data.event, data);
         this.__DOM_IMPL__.dispatchEvent(event);
       });
     }
     this.listenerCount++;
-  },
+  }
 
   eventListenerWasRemoved(type) {
     this.listenerCount--;
     if (this.listenerCount == 0) {
-      APIBroker.setAddonListener(null);
+      this.broker.setAddonListener(null);
     }
-  },
+  }
 
-  classID: Components.ID("{8866d8e3-4ea5-48b7-a891-13ba0ac15235}"),
-  contractID: "@mozilla.org/addon-web-api/manager;1",
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsISupports, Ci.nsIDOMGlobalPropertyInitializer])
-};
+  QueryInterface(iid) {
+    if (iid.equals(WebAPI.classID) || iid.equals(Ci.nsISupports)
+        || iid.equals(Ci.nsIDOMGlobalPropertyInitializer)) {
+      return this;
+    }
+    return Cr.NS_ERROR_NO_INTERFACE;
+  }
+}
 
+WebAPI.prototype.classID = Components.ID("{8866d8e3-4ea5-48b7-a891-13ba0ac15235}");
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory([WebAPI]);

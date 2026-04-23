@@ -6,6 +6,7 @@
 #include "CompositionTransaction.h"
 
 #include "mozilla/EditorBase.h"         // mEditorBase
+#include "mozilla/SelectionState.h"     // RangeUpdater
 #include "mozilla/dom/Selection.h"      // local var
 #include "mozilla/dom/Text.h"           // mTextNode
 #include "nsAString.h"                  // params
@@ -25,15 +26,18 @@ CompositionTransaction::CompositionTransaction(
                           uint32_t aReplaceLength,
                           TextRangeArray* aTextRangeArray,
                           const nsAString& aStringToInsert,
-                          EditorBase& aEditorBase)
+                          EditorBase& aEditorBase,
+                          RangeUpdater* aRangeUpdater)
   : mTextNode(&aTextNode)
   , mOffset(aOffset)
   , mReplaceLength(aReplaceLength)
   , mRanges(aTextRangeArray)
   , mStringToInsert(aStringToInsert)
   , mEditorBase(aEditorBase)
+  , mRangeUpdater(aRangeUpdater)
   , mFixed(false)
 {
+  MOZ_ASSERT(mTextNode->TextLength() >= mOffset);
 }
 
 CompositionTransaction::~CompositionTransaction()
@@ -67,11 +71,31 @@ CompositionTransaction::DoTransaction()
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
+    mRangeUpdater->SelAdjInsertText(*mTextNode, mOffset, mStringToInsert);
   } else {
+    uint32_t replaceableLength = mTextNode->TextLength() - mOffset;
     nsresult rv =
       mTextNode->ReplaceData(mOffset, mReplaceLength, mStringToInsert);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
+    }
+    mRangeUpdater->SelAdjDeleteText(mTextNode, mOffset, mReplaceLength);
+    mRangeUpdater->SelAdjInsertText(*mTextNode, mOffset, mStringToInsert);
+
+    // If IME text node is multiple node, ReplaceData doesn't remove all IME
+    // text.  So we need remove remained text into other text node.
+    if (replaceableLength < mReplaceLength) {
+      int32_t remainLength = mReplaceLength - replaceableLength;
+      nsCOMPtr<nsINode> node = mTextNode->GetNextSibling();
+      while (node && node->IsNodeOfType(nsINode::eTEXT) &&
+             remainLength > 0) {
+        Text* text = static_cast<Text*>(node.get());
+        uint32_t textLength = text->TextLength();
+        text->DeleteData(0, remainLength);
+        mRangeUpdater->SelAdjDeleteText(text, 0, remainLength);
+        remainLength -= textLength;
+        node = node->GetNextSibling();
+      }
     }
   }
 
@@ -293,7 +317,10 @@ CompositionTransaction::SetIMESelection(EditorBase& aEditorBase,
 
     // If caret range isn't specified explicitly, we should hide the caret.
     // Hiding the caret benefits a Windows build (see bug 555642 comment #6).
-    aEditorBase.HideCaret(true);
+    // However, when there is no range, we should keep showing caret.
+    if (countOfRanges) {
+      aEditorBase.HideCaret(true);
+    }
   }
 
   rv = selection->EndBatchChangesInternal();

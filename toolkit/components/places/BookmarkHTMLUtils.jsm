@@ -520,8 +520,6 @@ BookmarkImporter.prototype = {
     let keyword = this._safeTrim(aElt.getAttribute("shortcuturl"));
     let postData = this._safeTrim(aElt.getAttribute("post_data"));
     let webPanel = this._safeTrim(aElt.getAttribute("web_panel"));
-    let micsumGenURI = this._safeTrim(aElt.getAttribute("micsum_gen_uri"));
-    let generatedTitle = this._safeTrim(aElt.getAttribute("generated_title"));
     let dateAdded = this._safeTrim(aElt.getAttribute("add_date"));
     let lastModified = this._safeTrim(aElt.getAttribute("last_modified"));
     let tags = this._safeTrim(aElt.getAttribute("tags"));
@@ -1040,15 +1038,15 @@ BookmarkExporter.prototype = {
 
   _converterOut: null,
 
-  _write: function (aText) {
+  _write: function(aText) {
     this._converterOut.writeString(aText || "");
   },
 
-  _writeAttribute: function (aName, aValue) {
+  _writeAttribute: function(aName, aValue) {
     this._write(' ' +  aName + '="' + aValue + '"');
   },
 
-  _writeLine: function (aText) {
+  _writeLine: function(aText) {
     if (Services.sysinfo.getProperty("name") == "Windows_NT") {
       // Write CRLF line endings on Windows
       this._write(aText + "\r\n");
@@ -1057,7 +1055,7 @@ BookmarkExporter.prototype = {
     }
   },
 
-  _writeHeader: function () {
+  _writeHeader: function() {
     this._writeLine("<!DOCTYPE NETSCAPE-Bookmark-file-1>");
     this._writeLine("<!-- This is an automatically generated file.");
     this._writeLine("     It will be read and overwritten.");
@@ -1110,7 +1108,7 @@ BookmarkExporter.prototype = {
     }
   },
 
-  _writeSeparator: function (aItem, aIndent) {
+  _writeSeparator: function(aItem, aIndent) {
     this._write(aIndent + "<HR");
     // We keep exporting separator titles, but don't support them anymore.
     if (aItem.title)
@@ -1118,7 +1116,7 @@ BookmarkExporter.prototype = {
     this._write(">");
   },
 
-  _writeLivemark: function (aItem, aIndent) {
+  _writeLivemark: function(aItem, aIndent) {
     this._write(aIndent + "<DT><A");
     let feedSpec = aItem.annos.find(anno => anno.name == PlacesUtils.LMANNO_FEEDURI).value;
     this._writeAttribute("FEEDURL", escapeUrl(feedSpec));
@@ -1130,9 +1128,8 @@ BookmarkExporter.prototype = {
   },
 
   *_writeItem(aItem, aIndent) {
-    let uri = null;
     try {
-      uri = NetUtil.newURI(aItem.uri);
+      NetUtil.newURI(aItem.uri);
     } catch (ex) {
       // If the item URI is invalid, skip the item instead of failing later.
       return;
@@ -1159,7 +1156,7 @@ BookmarkExporter.prototype = {
     this._writeDescription(aItem, aIndent);
   },
 
-  _writeDateAttributes: function (aItem) {
+  _writeDateAttributes: function(aItem) {
     if (aItem.dateAdded)
       this._writeAttribute("ADD_DATE",
                            Math.floor(aItem.dateAdded / MICROSEC_PER_SEC));
@@ -1188,7 +1185,7 @@ BookmarkExporter.prototype = {
     }
   },
 
-  _writeDescription: function (aItem, aIndent) {
+  _writeDescription: function(aItem, aIndent) {
     let descriptionAnno = aItem.annos &&
                           aItem.annos.find(anno => anno.name == DESCRIPTION_ANNO);
     if (descriptionAnno)

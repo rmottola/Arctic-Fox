@@ -65,11 +65,6 @@ typedef CONTEXT tickcontext_t;
 typedef ucontext_t tickcontext_t;
 #endif
 
-#if defined(LINUX) || defined(XP_MACOSX)
-#include <sys/types.h>
-pid_t gettid();
-#endif
-
 #if defined(__arm__) && defined(ANDROID)
  // Should also work on ARM Linux, but not tested there yet.
  #define USE_EHABI_STACKWALK
@@ -192,7 +187,8 @@ GeckoSampler::GeckoSampler(double aInterval, int aEntrySize,
   mUseStackWalk = hasFeature(aFeatures, aFeatureCount, "stackwalk");
 
   mProfileJS = hasFeature(aFeatures, aFeatureCount, "js");
-  mProfileJava = hasFeature(aFeatures, aFeatureCount, "java");
+  mProfileJava = mozilla::jni::IsFennec() &&
+      hasFeature(aFeatures, aFeatureCount, "java");
   mProfileGPU = hasFeature(aFeatures, aFeatureCount, "gpu");
   mProfilePower = hasFeature(aFeatures, aFeatureCount, "power");
   // Users sometimes ask to filter by a list of threads but forget to request
@@ -285,6 +281,12 @@ GeckoSampler::~GeckoSampler()
   // Cancel any in-flight async profile gatherering
   // requests
   mGatherer->Cancel();
+
+#ifdef MOZ_TASK_TRACER
+  if (mTaskTracer) {
+    mozilla::tasktracer::StopLogging();
+  }
+#endif
 }
 
 void GeckoSampler::HandleSaveRequest()

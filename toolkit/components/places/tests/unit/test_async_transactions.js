@@ -18,7 +18,7 @@ var observer = {
 
   tagRelatedGuids: new Set(),
 
-  reset: function () {
+  reset: function() {
     this.itemsAdded = new Map();
     this.itemsRemoved = new Map();
     this.itemsChanged = new Map();
@@ -27,17 +27,17 @@ var observer = {
     this.endUpdateBatch = false;
   },
 
-  onBeginUpdateBatch: function () {
+  onBeginUpdateBatch: function() {
     this.beginUpdateBatch = true;
   },
 
-  onEndUpdateBatch: function () {
+  onEndUpdateBatch: function() {
     this.endUpdateBatch = true;
   },
 
   onItemAdded:
-  function (aItemId, aParentId, aIndex, aItemType, aURI, aTitle, aDateAdded,
-            aGuid, aParentGuid) {
+  function(aItemId, aParentId, aIndex, aItemType, aURI, aTitle, aDateAdded,
+           aGuid, aParentGuid) {
     // Ignore tag items.
     if (aParentId == PlacesUtils.tagsFolderId ||
         (aParentId != PlacesUtils.placesRootId &&
@@ -55,7 +55,7 @@ var observer = {
   },
 
   onItemRemoved:
-  function (aItemId, aParentId, aIndex, aItemType, aURI, aGuid, aParentGuid) {
+  function(aItemId, aParentId, aIndex, aItemType, aURI, aGuid, aParentGuid) {
     if (this.tagRelatedGuids.has(aGuid))
       return;
 
@@ -65,8 +65,8 @@ var observer = {
   },
 
   onItemChanged:
-  function (aItemId, aProperty, aIsAnnoProperty, aNewValue, aLastModified,
-            aItemType, aParentId, aGuid, aParentGuid) {
+  function(aItemId, aProperty, aIsAnnoProperty, aNewValue, aLastModified,
+           aItemType, aParentId, aGuid, aParentGuid) {
     if (this.tagRelatedGuids.has(aGuid))
       return;
 
@@ -93,8 +93,8 @@ var observer = {
   onItemVisited: () => {},
 
   onItemMoved:
-  function (aItemId, aOldParent, aOldIndex, aNewParent, aNewIndex, aItemType,
-            aGuid, aOldParentGuid, aNewParentGuid) {
+  function(aItemId, aOldParent, aOldIndex, aNewParent, aNewIndex, aItemType,
+           aGuid, aOldParentGuid, aNewParentGuid) {
     this.itemsMoved.set(aGuid, { oldParentGuid: aOldParentGuid
                                , oldIndex:      aOldIndex
                                , newParentGuid: aNewParentGuid
@@ -109,7 +109,7 @@ var bmStartIndex = 0;
 
 function run_test() {
   bmsvc.addObserver(observer, false);
-  do_register_cleanup(function () {
+  do_register_cleanup(function() {
     bmsvc.removeObserver(observer);
   });
 
@@ -681,11 +681,12 @@ add_task(function* test_remove_folder() {
 });
 
 add_task(function* test_add_and_remove_bookmarks_with_additional_info() {
-  const testURI = NetUtil.newURI("http://add.remove.tag")
-      , TAG_1 = "TestTag1", TAG_2 = "TestTag2"
-      , KEYWORD = "test_keyword"
-      , POST_DATA = "post_data"
-      , ANNO = { name: "TestAnno", value: "TestAnnoValue" };
+  const testURI = NetUtil.newURI("http://add.remove.tag");
+  const TAG_1 = "TestTag1";
+  const TAG_2 = "TestTag2";
+  const KEYWORD = "test_keyword";
+  const POST_DATA = "post_data";
+  const ANNO = { name: "TestAnno", value: "TestAnnoValue" };
 
   let folder_info = createTestFolderInfo();
   folder_info.guid = yield PT.NewFolder(folder_info).transact();
@@ -749,9 +750,14 @@ add_task(function* test_add_and_remove_bookmarks_with_additional_info() {
   ensureTags([TAG_1]);
 
   // Check if Remove correctly restores keywords, tags and annotations.
+  // Since both bookmarks share the same uri, they also share the keyword that
+  // is not removed along with one of the bookmarks.
   observer.reset();
   yield PT.redo();
-  ensureItemsChanged(...b2_post_creation_changes);
+  ensureItemsChanged({ guid: b2_info.guid
+                     , isAnnoProperty: true
+                     , property: ANNO.name
+                     , newValue: ANNO.value });
   ensureTags([TAG_1, TAG_2]);
 
   // Test Remove for multiple items.
@@ -761,6 +767,10 @@ add_task(function* test_add_and_remove_bookmarks_with_additional_info() {
   yield PT.Remove(folder_info.guid).transact();
   yield ensureItemsRemoved(b1_info, b2_info, folder_info);
   ensureTags([]);
+  // There is no keyword removal notification cause all bookmarks are removed
+  // before the keyword itself, so there's no one to notify.
+  let entry = yield PlacesUtils.keywords.fetch(KEYWORD);
+  Assert.equal(entry, null, "keyword has been removed");
 
   observer.reset();
   yield PT.undo();
@@ -1021,21 +1031,91 @@ add_task(function* test_edit_keyword() {
   bm_info.guid = yield PT.NewBookmark(bm_info).transact();
 
   observer.reset();
-  yield PT.EditKeyword({ guid: bm_info.guid, keyword: KEYWORD }).transact();
+  yield PT.EditKeyword({ guid: bm_info.guid, keyword: KEYWORD, postData: "postData" }).transact();
   ensureKeywordChange(KEYWORD);
+  let entry = yield PlacesUtils.keywords.fetch(KEYWORD);
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData");
 
   observer.reset();
   yield PT.undo();
   ensureKeywordChange();
+  entry = yield PlacesUtils.keywords.fetch(KEYWORD);
+  Assert.equal(entry, null);
 
   observer.reset();
   yield PT.redo();
   ensureKeywordChange(KEYWORD);
+  entry = yield PlacesUtils.keywords.fetch(KEYWORD);
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData");
 
   // Cleanup
   observer.reset();
   yield PT.undo();
   ensureKeywordChange();
+  yield PT.undo();
+  ensureItemsRemoved(bm_info);
+
+  yield PT.clearTransactionsHistory();
+  ensureUndoState();
+});
+
+add_task(function* test_edit_specific_keyword() {
+  let bm_info = { parentGuid: rootGuid
+                , url: NetUtil.newURI("http://test.edit.keyword") };
+  bm_info.guid = yield PT.NewBookmark(bm_info).transact();
+  function ensureKeywordChange(aCurrentKeyword = "", aPreviousKeyword = "") {
+    ensureItemsChanged({ guid: bm_info.guid
+                       , property: "keyword"
+                       , newValue: aCurrentKeyword
+                       });
+  }
+
+  yield PlacesUtils.keywords.insert({ keyword: "kw1", url: bm_info.url.spec, postData: "postData1" });
+  yield PlacesUtils.keywords.insert({ keyword: "kw2", url: bm_info.url.spec, postData: "postData2" });
+  bm_info.guid = yield PT.NewBookmark(bm_info).transact();
+
+  observer.reset();
+  yield PT.EditKeyword({ guid: bm_info.guid, keyword: "keyword", oldKeyword: "kw2" }).transact();
+  ensureKeywordChange("keyword", "kw2");
+  let entry = yield PlacesUtils.keywords.fetch("kw1");
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData1");
+  entry = yield PlacesUtils.keywords.fetch("keyword");
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData2");
+  entry = yield PlacesUtils.keywords.fetch("kw2");
+  Assert.equal(entry, null);
+
+  observer.reset();
+  yield PT.undo();
+  ensureKeywordChange("kw2", "keyword");
+  entry = yield PlacesUtils.keywords.fetch("kw1");
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData1");
+  entry = yield PlacesUtils.keywords.fetch("kw2");
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData2");
+  entry = yield PlacesUtils.keywords.fetch("keyword");
+  Assert.equal(entry, null);
+
+  observer.reset();
+  yield PT.redo();
+  ensureKeywordChange("keyword", "kw2");
+  entry = yield PlacesUtils.keywords.fetch("kw1");
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData1");
+  entry = yield PlacesUtils.keywords.fetch("keyword");
+  Assert.equal(entry.url.href, bm_info.url.spec);
+  Assert.equal(entry.postData, "postData2");
+  entry = yield PlacesUtils.keywords.fetch("kw2");
+  Assert.equal(entry, null);
+
+  // Cleanup
+  observer.reset();
+  yield PT.undo();
+  ensureKeywordChange("kw2");
   yield PT.undo();
   ensureItemsRemoved(bm_info);
 
@@ -1134,7 +1214,7 @@ add_task(function* test_untag_uri() {
   });
 
   function* doTest(aInfo) {
-    let urls, tagsToRemove;
+    let urls, tagsRemoved;
     if (aInfo instanceof Ci.nsIURI) {
       urls = [aInfo];
       tagsRemoved = [];
@@ -1298,9 +1378,9 @@ add_task(function* test_sort_folder_by_name() {
   let folder_info = createTestFolderInfo();
 
   let url = NetUtil.newURI("http://sort.by.name/");
-  let preSep =  ["3","2","1"].map(i => ({ title: i, url }));
+  let preSep =  ["3", "2", "1"].map(i => ({ title: i, url }));
   let sep = {};
-  let postSep = ["c","b","a"].map(l => ({ title: l, url }));
+  let postSep = ["c", "b", "a"].map(l => ({ title: l, url }));
   let originalOrder = [...preSep, sep, ...postSep];
   let sortedOrder = [...preSep.slice(0).reverse(),
                      sep,
@@ -1421,9 +1501,9 @@ add_task(function* test_copy() {
   }
 
   // Test duplicating leafs (bookmark, separator, empty folder)
-  let bmTxn = PT.NewBookmark({ url: new URL("http://test.item.duplicate")
-                             , parentGuid: rootGuid
-                             , annos: [{ name: "Anno", value: "AnnoValue"}] });
+  PT.NewBookmark({ url: new URL("http://test.item.duplicate")
+                 , parentGuid: rootGuid
+                 , annos: [{ name: "Anno", value: "AnnoValue"}] });
   let sepTxn = PT.NewSeparator({ parentGuid: rootGuid, index: 1 });
   let livemarkTxn = PT.NewLivemark(
     { feedUrl: new URL("http://test.feed.uri")
@@ -1584,7 +1664,7 @@ add_task(function* test_remove_multiple() {
     let nestedFolderGuid =
       yield PT.NewFolder({ title: "Nested Test Folder"
                          , parentGuid: folderGuid }).transact();
-    let nestedSepGuid = yield PT.NewSeparator(nestedFolderGuid).transact();
+    yield PT.NewSeparator(nestedFolderGuid).transact();
 
     guids.push(folderGuid);
 

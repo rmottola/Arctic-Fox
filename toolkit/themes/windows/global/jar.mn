@@ -5,7 +5,7 @@
 #include ../../shared/non-mac.jar.inc.mn
 
 toolkit.jar:
-* skin/classic/global/autocomplete.css
+  skin/classic/global/autocomplete.css
   skin/classic/global/button.css
   skin/classic/global/checkbox.css
   skin/classic/global/colorpicker.css

@@ -116,8 +116,6 @@ public:
 
     static int32_t AppleWeightToCSSWeight(int32_t aAppleWeight);
 
-    gfxFontFamily* GetDefaultFont(const gfxFontStyle* aStyle) override;
-
     bool GetStandardFamilyName(const nsAString& aFontName, nsAString& aFamilyName) override;
 
     gfxFontEntry* LookupLocalFont(const nsAString& aFontName,
@@ -144,6 +142,21 @@ public:
                           gfxFontStyle &aFontStyle,
                           float aDevPixPerCSSPixel);
 
+    // Values for the entryType field in FontFamilyListEntry records passed
+    // from chrome to content process.
+    enum FontFamilyEntryType {
+        kStandardFontFamily = 0, // a standard installed font family
+        kHiddenSystemFontFamily = 1, // hidden system family, not exposed to UI
+        kTextSizeSystemFontFamily = 2, // name of 'system' font at text sizes
+        kDisplaySizeSystemFontFamily = 3 // 'system' font at display sizes
+    };
+    void GetSystemFontFamilyList(
+        InfallibleTArray<mozilla::dom::FontFamilyListEntry>* aList);
+
+protected:
+    virtual gfxFontFamily*
+    GetDefaultFontForPlatform(const gfxFontStyle* aStyle) override;
+
 private:
     friend class gfxPlatformMac;
 
@@ -151,7 +164,7 @@ private:
     virtual ~gfxMacPlatformFontList();
 
     // initialize font lists
-    nsresult InitFontList() override;
+    virtual nsresult InitFontListForPlatform() override;
 
     // special case font faces treated as font families (set via prefs)
     void InitSingleFaceList();
@@ -195,6 +208,8 @@ private:
     // But CFStringRef and NSString* are the same thing anyway (they're
     // toll-free bridged).
     void AddFamily(CFStringRef aFamily);
+
+    void AddFamily(const nsAString& aFamilyName, bool aSystemFont);
 
 #ifdef MOZ_BUNDLED_FONTS
     void ActivateBundledFonts();

@@ -14,6 +14,8 @@ const { PerformanceStats } = Cu.import("resource://gre/modules/PerformanceStats.
 const { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
 const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
 const { ObjectUtils } = Cu.import("resource://gre/modules/ObjectUtils.jsm", {});
+const { Memory } = Cu.import("resource://gre/modules/Memory.jsm");
+const { DownloadUtils } = Cu.import("resource://gre/modules/DownloadUtils.jsm");
 
 // about:performance observes notifications on this topic.
 // if a notification is sent, this causes the page to be updated immediately,
@@ -130,12 +132,12 @@ let tabFinder = {
 function wait(ms = 0) {
   try {
     let resolve;
-    let p = new Promise(resolve_ => {resolve = resolve_});
+    let p = new Promise(resolve_ => { resolve = resolve_ });
     setTimeout(resolve, ms);
     return p;
   } catch (e) {
     dump("WARNING: wait aborted because of an invalid Window state in aboutPerformance.js.\n");
-    return;
+    return undefined;
   }
 }
 
@@ -567,7 +569,7 @@ var View = {
     }
 
     // Grab everything from the DOM before cleaning up
-    let eltContainer = this._setupStructure(id);
+    this._setupStructure(id);
 
     // An array of `cachedElements` that need to be added
     let toAdd = [];
@@ -579,9 +581,9 @@ var View = {
       toAdd.push(cachedElements);
       cachedElements.eltTitle.textContent = delta.readableName;
       cachedElements.eltName.textContent = `Full name: ${delta.fullName}.`;
-      cachedElements.eltLoaded.textContent = `Measure start: ${Math.round(delta.age/1000)} seconds ago.`
+      cachedElements.eltLoaded.textContent = `Measure start: ${Math.round(delta.age / 1000)} seconds ago.`
 
-      let processes = delta.diff.processes.map(proc => `${proc.processId} (${proc.isChildProcess?"child":"parent"})`);
+      let processes = delta.diff.processes.map(proc => `${proc.processId} (${proc.isChildProcess ? "child" : "parent"})`);
       cachedElements.eltProcess.textContent = `Processes: ${processes.join(", ")}`;
       let jankSuffix = "";
       if (watcherAlerts) {
@@ -605,9 +607,9 @@ var View = {
         }
 
         cachedElements.eltFPS.textContent = `Impact on framerate: ${delta.diff.jank.longestDuration + 1}/${delta.diff.jank.durations.length}${jankSuffix}.`;
-        cachedElements.eltCPU.textContent = `CPU usage: ${Math.ceil(delta.diff.jank.totalCPUTime/delta.diff.deltaT)}%.`;
-        cachedElements.eltSystem.textContent = `System usage: ${Math.ceil(delta.diff.jank.totalSystemTime/delta.diff.deltaT)}%.`;
-        cachedElements.eltCPOW.textContent = `Blocking process calls: ${Math.ceil(delta.diff.cpow.totalCPOWTime/delta.diff.deltaT)}%.`;
+        cachedElements.eltCPU.textContent = `CPU usage: ${Math.ceil(delta.diff.jank.totalCPUTime / delta.diff.deltaT / 10)}%.`;
+        cachedElements.eltSystem.textContent = `System usage: ${Math.ceil(delta.diff.jank.totalSystemTime / delta.diff.deltaT / 10)}%.`;
+        cachedElements.eltCPOW.textContent = `Blocking process calls: ${Math.ceil(delta.diff.cpow.totalCPOWTime / delta.diff.deltaT / 10)}%.`;
       } else {
         if (delta.alerts.length == 0) {
           eltImpact.textContent = " has performed well so far.";
@@ -647,10 +649,9 @@ var View = {
           cachedElements.eltRoot.setAttribute("impact", Math.round(impact));
         }
 
-        let result = delta.diff.jank.totalCPUTime/delta.diff.deltaT;
-        cachedElements.eltCPU.textContent = `CPU usage: ${Math.ceil(delta.diff.jank.totalCPUTime/delta.diff.deltaT)}% (total ${delta.diff.jank.totalUserTime}ms).`;
-        cachedElements.eltSystem.textContent = `System usage: ${Math.ceil(delta.diff.jank.totalSystemTime/delta.diff.deltaT)}% (total ${delta.diff.jank.totalSystemTime}ms).`;
-        cachedElements.eltCPOW.textContent = `Blocking process calls: ${Math.ceil(delta.diff.cpow.totalCPOWTime/delta.diff.deltaT)}% (total ${delta.diff.cpow.totalCPOWTime}ms).`;
+        cachedElements.eltCPU.textContent = `CPU usage: ${Math.ceil(delta.diff.jank.totalCPUTime / delta.diff.deltaT / 10)}% (total ${delta.diff.jank.totalUserTime}ms).`;
+        cachedElements.eltSystem.textContent = `System usage: ${Math.ceil(delta.diff.jank.totalSystemTime / delta.diff.deltaT / 10)}% (total ${delta.diff.jank.totalSystemTime}ms).`;
+        cachedElements.eltCPOW.textContent = `Blocking process calls: ${Math.ceil(delta.diff.cpow.totalCPOWTime / delta.diff.deltaT / 10)}% (total ${delta.diff.cpow.totalCPOWTime}ms).`;
       }
     }
     this._insertElements(toAdd, id);
@@ -867,8 +868,8 @@ var Control = {
       yield State.update();
     }
     yield wait(0);
-    let state = yield (mode == MODE_GLOBAL?
-      State.promiseDeltaSinceStartOfTime():
+    let state = yield (mode == MODE_GLOBAL ?
+      State.promiseDeltaSinceStartOfTime() :
       State.promiseDeltaSinceStartOfBuffer());
 
     for (let category of ["webpages", "addons"]) {
@@ -934,7 +935,7 @@ var Control = {
     let eltCheckRecent = document.getElementById("check-display-recent");
     let eltLabelRecent = document.getElementById("label-display-recent");
     eltCheckRecent.addEventListener("click", () => onModeChange(true));
-    eltLabelRecent.textContent = `Display only the latest ${Math.round(BUFFER_DURATION_MS/1000)}s`;
+    eltLabelRecent.textContent = `Display only the latest ${Math.round(BUFFER_DURATION_MS / 1000)}s`;
 
     onModeChange(false);
   },
@@ -942,7 +943,123 @@ var Control = {
   _displayMode: MODE_GLOBAL,
 };
 
+/**
+ * This functionality gets memory related information of sub-processes and
+ * updates the performance table regularly.
+ * If the page goes hidden, it also handles visibility change by not
+ * querying the content processes unnecessarily.
+ */
+var SubprocessMonitor = {
+  _timeout: null,
+
+  /**
+   * Init will start the process of updating the table if the page is not hidden,
+   * and set up an event listener for handling visibility changes.
+   */
+  init: function() {
+    if (!document.hidden) {
+      SubprocessMonitor.updateTable();
+    }
+    document.addEventListener("visibilitychange", SubprocessMonitor.handleVisibilityChange);
+  },
+
+  /**
+   * This function updates the table after an interval if the page is visible
+   * and clears the interval otherwise.
+   */
+  handleVisibilityChange: function() {
+    if (!document.hidden) {
+      SubprocessMonitor.queueUpdate();
+    } else {
+      clearTimeout(this._timeout);
+      this._timeout = null;
+    }
+  },
+
+  /**
+   * This function queues a timer to request the next summary using updateTable
+   * after some delay.
+   */
+  queueUpdate: function() {
+    this._timeout = setTimeout(() => this.updateTable(), UPDATE_INTERVAL_MS);
+  },
+
+  /**
+   * This is a helper function for updateTable, which updates a particular row.
+   * @param {<tr> node} row The row to be updated.
+   * @param {object} summaries The object with the updated RSS and USS values.
+   * @param {string} pid The pid represented by the row for which we update.
+   */
+  updateRow: function(row, summaries, pid) {
+    row.cells[0].textContent = pid;
+    let RSSval = DownloadUtils.convertByteUnits(summaries[pid].rss);
+    row.cells[1].textContent = RSSval.join(" ");
+    let USSval = DownloadUtils.convertByteUnits(summaries[pid].uss);
+    row.cells[2].textContent = USSval.join(" ");
+  },
+
+  /**
+   * This function adds a row to the subprocess-performance table for every new pid
+   * and populates and regularly updates it with RSS/USS measurements.
+   */
+  updateTable: function() {
+    if (!document.hidden) {
+      Memory.summary().then((summaries) => {
+        if (!(Object.keys(summaries).length)) {
+          // The summaries list was empty, which means we timed out getting
+          // the memory reports. We'll try again later.
+          SubprocessMonitor.queueUpdate();
+          return;
+        }
+        let resultTable = document.getElementById("subprocess-reports");
+        let recycle = [];
+        // We first iterate the table to check if summaries exist for rowPids,
+        // if yes, update them and delete the pid's summary or else hide the row
+        // for recycling it. Start at row 1 instead of 0 (to skip the header row).
+        for (let i = 1, row; row = resultTable.rows[i]; i++) {
+          let rowPid = row.dataset.pid;
+          let summary = summaries[rowPid];
+          if (summary) {
+            // Now we update the values in the row, which is hardcoded for now,
+            // but we might want to make this more adaptable in the future.
+            SubprocessMonitor.updateRow(row, summaries, rowPid);
+            delete summaries[rowPid];
+          } else {
+            // Take this unnecessary row, hide it and stash it for potential re-use.
+            row.hidden = true;
+            recycle.push(row);
+          }
+        }
+        // For the remaining pids in summaries, we choose from the recyclable
+        // (hidden) nodes, and if they get exhausted, append a row to the table.
+        for (let pid in summaries) {
+          let row = recycle.pop();
+          if (row) {
+            row.hidden = false;
+          } else {
+            // We create a new row here, and set it to row
+            row = document.createElement("tr");
+            // Insert cell for pid
+            row.insertCell();
+            // Insert a cell for USS.
+            row.insertCell();
+            // Insert another cell for RSS.
+            row.insertCell();
+          }
+          row.dataset.pid = pid;
+          // Update the row and put it at the bottom
+          SubprocessMonitor.updateRow(row, summaries, pid);
+          resultTable.appendChild(row);
+        }
+      });
+      SubprocessMonitor.queueUpdate();
+    }
+  },
+};
+
 var go = Task.async(function*() {
+
+  SubprocessMonitor.init();
   Control.init();
 
   // Setup a hook to allow tests to configure and control this page

@@ -67,8 +67,7 @@ nsStreamConverterService::nsStreamConverterService()
 {
 }
 
-nsStreamConverterService::~nsStreamConverterService() {
-}
+nsStreamConverterService::~nsStreamConverterService() = default;
 
 // Builds the graph represented as an adjacency list (and built up in
 // memory using an nsObjectHashtable and nsCOMArray combination).
@@ -194,7 +193,7 @@ typedef nsClassHashtable<nsCStringHashKey, BFSTableData> BFSHashTable;
 
 class CStreamConvDeallocator : public nsDequeFunctor {
 public:
-    virtual void* operator()(void* anObject) {
+    void* operator()(void* anObject) override {
         nsCString *string = (nsCString*)anObject;
         delete string;
         return 0;

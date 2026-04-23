@@ -50,6 +50,7 @@
 #include "mozilla/Hal.h"
 #include "nsISiteSpecificUserAgent.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/SSE.h"
 #include "mozilla/StaticPtr.h"
 #include "Connection.h"
 #include "mozilla/dom/Event.h" // for nsIDOMEvent::InternalDOMEvent()
@@ -66,7 +67,6 @@
 #include "TimeManager.h"
 #include "DeviceStorage.h"
 #include "nsStreamUtils.h"
-#include "nsIAppsService.h"
 #include "WidgetUtils.h"
 #include "nsIPresentationService.h"
 
@@ -747,6 +747,12 @@ Navigator::HardwareConcurrency()
   return rts->ClampedHardwareConcurrency();
 }
 
+bool
+Navigator::CpuHasSSE2()
+{
+  return mozilla::supports_sse2();
+}
+
 void
 Navigator::RefreshMIMEArray()
 {
@@ -1252,15 +1258,15 @@ Navigator::SendBeacon(const nsAString& aUrl,
                   doc,
                   doc->GetDocBaseURI());
   if (NS_FAILED(rv)) {
-    aRv.Throw(NS_ERROR_DOM_URL_MISMATCH_ERR);
+    aRv.ThrowTypeError<MSG_INVALID_URL>(aUrl);
     return false;
   }
 
-  // Explicitly disallow loading data: URIs
-  bool isDataScheme = false;
-  rv = uri->SchemeIs("data", &isDataScheme);
-  if (NS_FAILED(rv) || isDataScheme) {
-    aRv.Throw(NS_ERROR_CONTENT_BLOCKED);
+  // Spec disallows any schemes save for HTTP/HTTPs
+  bool isValidScheme;
+  if (!(NS_SUCCEEDED(uri->SchemeIs("http", &isValidScheme)) && isValidScheme) &&
+      !(NS_SUCCEEDED(uri->SchemeIs("https", &isValidScheme)) && isValidScheme)) {
+    aRv.ThrowTypeError<MSG_INVALID_URL_SCHEME>( NS_LITERAL_STRING("Beacon"), aUrl);
     return false;
   }
 

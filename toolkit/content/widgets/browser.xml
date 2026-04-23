@@ -713,8 +713,14 @@
         <body>
           <![CDATA[
             let event = document.createEvent("Events");
-            event.initEvent("DOMAudioPlaybackStarted", true, true);
+            event.initEvent("DOMAudioPlaybackStarted", true, false);
             this.dispatchEvent(event);
+            if (this._audioBlocked) {
+              this._audioBlocked = false;
+              event = document.createEvent("Events");
+              event.initEvent("DOMAudioPlaybackBlockStopped", true, false);
+              this.dispatchEvent(event);
+            }
           ]]>
         </body>
       </method>
@@ -723,7 +729,18 @@
         <body>
           <![CDATA[
             let event = document.createEvent("Events");
-            event.initEvent("DOMAudioPlaybackStopped", true, true);
+            event.initEvent("DOMAudioPlaybackStopped", true, false);
+            this.dispatchEvent(event);
+          ]]>
+        </body>
+      </method>
+
+      <method name="audioPlaybackBlocked">
+        <body>
+          <![CDATA[
+            this._audioBlocked = true;
+            let event = document.createEvent("Events");
+            event.initEvent("DOMAudioPlaybackBlockStarted", true, false);
             this.dispatchEvent(event);
           ]]>
         </body>
@@ -732,6 +749,12 @@
       <field name="_audioMuted">false</field>
       <property name="audioMuted"
                 onget="return this._audioMuted;"
+                readonly="true"/>
+
+
+      <field name="_audioBlocked">false</field>
+      <property name="audioBlocked"
+                onget="return this._audioBlocked;"
                 readonly="true"/>
 
       <method name="mute">
@@ -783,6 +806,7 @@
       <method name="blockMedia">
         <body>
           <![CDATA[
+            this._audioBlocked = true;
             this.messageManager.sendAsyncMessage("AudioPlayback",
                                                  {type: "blockInactivePageMedia"});
           ]]>
@@ -792,8 +816,12 @@
       <method name="resumeMedia">
         <body>
           <![CDATA[
+            this._audioBlocked = false;
             this.messageManager.sendAsyncMessage("AudioPlayback",
                                                  {type: "resumeMedia"});
+            let  event = document.createEvent("Events");
+            event.initEvent("DOMAudioPlaybackBlockStopped", true, false);
+            this.dispatchEvent(event);
           ]]>
         </body>
       </method>
@@ -947,6 +975,7 @@
             this.messageManager.addMessageListener("Autoscroll:Cancel", this);
             this.messageManager.addMessageListener("AudioPlayback:Start", this);
             this.messageManager.addMessageListener("AudioPlayback:Stop", this);
+            this.messageManager.addMessageListener("AudioPlayback:Block", this);
           }
         ]]>
       </constructor>
@@ -1033,6 +1062,9 @@
             case "AudioPlayback:Stop":
               this.audioPlaybackStopped();
               break;
+            case "AudioPlayback:Block":
+              this.audioPlaybackBlocked();
+              break;
           }
           return undefined;
         ]]></body>
@@ -1063,6 +1095,16 @@
         <body>
           <![CDATA[
             this.messageManager.sendAsyncMessage("Browser:PurgeSessionHistory");
+          ]]>
+        </body>
+      </method>
+
+      <method name="createAboutBlankContentViewer">
+        <parameter name="aPrincipal"/>
+        <body>
+          <![CDATA[
+            let principal = BrowserUtils.principalWithMatchingOA(aPrincipal, this.contentPrincipal);
+            this.docShell.createAboutBlankContentViewer(principal);
           ]]>
         </body>
       </method>

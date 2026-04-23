@@ -19,7 +19,7 @@ try {
   // process. We're used in the child process (for now), so guard against
   // this.
   Components.utils.import("resource://gre/modules/AddonManager.jsm");
-  /*globals AddonManagerPrivate*/
+  /* globals AddonManagerPrivate*/
 } catch (e) {
 }
 
@@ -284,26 +284,6 @@ function parseRegExp(aStr) {
   let pattern = aStr.slice(1, lastSlash);
   let flags = aStr.slice(lastSlash + 1);
   return new RegExp(pattern, flags);
-}
-
-/**
- * Helper function to test if the blockEntry matches with the plugin.
- *
- * @param   blockEntry
- *          The plugin blocklist entries to compare against.
- * @param   plugin
- *          The nsIPluginTag to get the blocklist state for.
- * @returns True if the blockEntry matches the plugin, false otherwise.
- */
-function hasMatchingPluginName(blockEntry, plugin) {
-  for (let name in blockEntry.matches) {
-    if ((name in plugin) &&
-        typeof(plugin[name]) == "string" &&
-        blockEntry.matches[name].test(plugin[name])) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**
@@ -1129,7 +1109,7 @@ Blocklist.prototype = {
   //   <manufacturer>foo</manufacturer>
   //   <hardware>foo</hardware>
   // </gfxBlacklistEntry>
-  _handleGfxBlacklistNode: function (blocklistElement, result) {
+  _handleGfxBlacklistNode: function(blocklistElement, result) {
     const blockEntry = {};
 
     // The blockID attribute is always present in the actual data produced on server
@@ -1320,7 +1300,7 @@ Blocklist.prototype = {
     return blockEntry.infoURL;
   },
 
-  _notifyObserversBlocklistGFX: function () {
+  _notifyObserversBlocklistGFX: function() {
     // Notify `GfxInfoBase`, by passing a string serialization.
     // This way we avoid spreading XML structure logics there.
     const payload = this._gfxEntries.map((r) => {
@@ -1394,8 +1374,15 @@ Blocklist.prototype = {
 
         // If the add-on is already disabled for some reason then don't warn
         // about it
-        if (!addon.isActive)
+        if (!addon.isActive) {
+          // But mark it as softblocked if necessary. Note that we avoid setting
+          // softDisabled at the same time as userDisabled to make it clear
+          // which was the original cause of the add-on becoming disabled in a
+          // way that the user can change.
+          if (state == Ci.nsIBlocklistService.STATE_SOFTBLOCKED && !addon.userDisabled)
+            addon.softDisabled = true;
           continue;
+        }
 
         addonList.push({
           name: addon.name,

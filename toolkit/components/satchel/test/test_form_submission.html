@@ -295,7 +295,7 @@ var ccNumbers = {
 
 function checkInitialState() {
   countEntries(null, null,
-    function (num) {
+    function(num) {
       ok(!num, "checking for initially empty storage");
       startTest();
     });
@@ -402,12 +402,11 @@ function checkSubmit(formNum) {
     case 23:
     case 24:
       countEntries(null, null,
-        function (num) {
+        function(num) {
           ok(!num, "checking for empty storage");
           submitForm(formNum);
         });
         return false;
-        break;
     case 100:
         checkForSave("subtest2", "subtestValue", "checking saved subtest value");
         break;

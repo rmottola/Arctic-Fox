@@ -13,6 +13,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/Unused.h"
 
 #include "mozilla/Logging.h"
 #include "mozilla/Services.h"
@@ -95,8 +96,6 @@
 #include "TexturePoolOGL.h"
 #endif
 
-#include "mozilla/Hal.h"
-
 #ifdef USE_SKIA
 # ifdef __GNUC__
 #  pragma GCC diagnostic push
@@ -139,6 +138,7 @@ class mozilla::gl::SkiaGLGlue : public GenericAtomicRefCounted {
 #include "gfxVR.h"
 #include "VRManagerChild.h"
 #include "mozilla/gfx/GPUParent.h"
+#include "prsystem.h"
 
 namespace mozilla {
 namespace layers {
@@ -273,14 +273,25 @@ CrashStatsLogForwarder::UpdateStringsVector(const std::string& aString)
 void CrashStatsLogForwarder::UpdateCrashReport()
 {
   std::stringstream message;
-  if (XRE_IsParentProcess()) {
-    for(LoggingRecord::iterator it = mBuffer.begin(); it != mBuffer.end(); ++it) {
-      message << "|[" << Get<0>(*it) << "]" << Get<1>(*it) << " (t=" << Get<2>(*it) << ") ";
-    }
-  } else {
-    for(LoggingRecord::iterator it = mBuffer.begin(); it != mBuffer.end(); ++it) {
-      message << "|[C" << Get<0>(*it) << "]" << Get<1>(*it) << " (t=" << Get<2>(*it) << ") ";
-    }
+  std::string logAnnotation;
+
+  switch (XRE_GetProcessType()) {
+  case GeckoProcessType_Default:
+    logAnnotation = "|[";
+    break;
+  case GeckoProcessType_Content:
+    logAnnotation = "|[C";
+    break;
+  case GeckoProcessType_GPU:
+    logAnnotation = "|[G";
+    break;
+  default:
+    logAnnotation = "|[X";
+    break;
+  }
+
+  for (LoggingRecord::iterator it = mBuffer.begin(); it != mBuffer.end(); ++it) {
+    message << logAnnotation << Get<0>(*it) << "]" << Get<1>(*it) << " (t=" << Get<2>(*it) << ") ";
   }
 
 #ifdef MOZ_CRASHREPORTER
@@ -304,9 +315,16 @@ class LogForwarderEvent : public Runnable
   explicit LogForwarderEvent(const nsCString& aMessage) : mMessage(aMessage) {}
 
   NS_IMETHOD Run() override {
-    MOZ_ASSERT(NS_IsMainThread() && XRE_IsContentProcess());
-    dom::ContentChild* cc = dom::ContentChild::GetSingleton();
-    cc->SendGraphicsError(mMessage);
+    MOZ_ASSERT(NS_IsMainThread() && (XRE_IsContentProcess() || XRE_IsGPUProcess()));
+
+    if (XRE_IsContentProcess()) {
+      dom::ContentChild* cc = dom::ContentChild::GetSingleton();
+      Unused << cc->SendGraphicsError(mMessage);
+    } else if (XRE_IsGPUProcess()) {
+      GPUParent* gp = GPUParent::GetSingleton();
+      Unused << gp->SendGraphicsError(mMessage);
+    }
+
     return NS_OK;
   }
 
@@ -328,8 +346,13 @@ void CrashStatsLogForwarder::Log(const std::string& aString)
   if (!XRE_IsParentProcess()) {
     nsCString stringToSend(aString.c_str());
     if (NS_IsMainThread()) {
-      dom::ContentChild* cc = dom::ContentChild::GetSingleton();
-      cc->SendGraphicsError(stringToSend);
+      if (XRE_IsContentProcess()) {
+        dom::ContentChild* cc = dom::ContentChild::GetSingleton();
+        Unused << cc->SendGraphicsError(stringToSend);
+      } else if (XRE_IsGPUProcess()) {
+        GPUParent* gp = GPUParent::GetSingleton();
+        Unused << gp->SendGraphicsError(stringToSend);
+      }
     } else {
       nsCOMPtr<nsIRunnable> r1 = new LogForwarderEvent(stringToSend);
       NS_DispatchToMainThread(r1);
@@ -499,7 +522,8 @@ gfxPlatform::gfxPlatform()
 #endif
     InitBackendPrefs(canvasMask, BackendType::CAIRO,
                      contentMask, BackendType::CAIRO);
-    mTotalSystemMemory = mozilla::hal::GetTotalSystemMemory();
+
+    mTotalSystemMemory = PR_GetPhysicalMemorySize();
 
     VRManager::ManagerInit();
 }
@@ -593,10 +617,15 @@ gfxPlatform::Init()
 
     if (XRE_IsParentProcess()) {
       GPUProcessManager::Initialize();
-    }
 
-    auto fwd = new CrashStatsLogForwarder("GraphicsCriticalError");
-    fwd->SetCircularBufferSize(gfxPrefs::GfxLoggingCrashLength());
+      if (Preferences::GetBool("media.wmf.skip-blacklist")) {
+        gfxVars::SetPDMWMFDisableD3D11Dlls(nsCString());
+        gfxVars::SetPDMWMFDisableD3D9Dlls(nsCString());
+      } else {
+        gfxVars::SetPDMWMFDisableD3D11Dlls(Preferences::GetCString("media.wmf.disable-d3d11-for-dlls"));
+        gfxVars::SetPDMWMFDisableD3D9Dlls(Preferences::GetCString("media.wmf.disable-d3d9-for-dlls"));
+      }
+    }
 
     // Drop a note in the crash report if we end up forcing an option that could
     // destabilize things.  New items should be appended at the end (of an existing
@@ -632,12 +661,7 @@ gfxPlatform::Init()
       ScopedGfxFeatureReporter::AppNote(forcedPrefs);
     }
 
-    mozilla::gfx::Config cfg;
-    cfg.mLogForwarder = fwd;
-    cfg.mMaxTextureSize = gfxPrefs::MaxTextureSize();
-    cfg.mMaxAllocSize = gfxPrefs::MaxAllocSize();
-
-    gfx::Factory::Init(cfg);
+    InitMoz2DLogging();
 
     gGfxPlatformPrefsLock = new Mutex("gfxPlatform::gGfxPlatformPrefsLock");
 
@@ -771,9 +795,40 @@ gfxPlatform::Init()
     InitNullMetadata();
     InitOpenGLConfig();
 
+    if (XRE_IsParentProcess()) {
+      gfxVars::SetDXInterop2Blocked(IsDXInterop2Blocked());
+    }
+
     if (obs) {
       obs->NotifyObservers(nullptr, "gfx-features-ready", nullptr);
     }
+}
+
+/* static*/ bool
+gfxPlatform::IsDXInterop2Blocked()
+{
+  nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
+  nsCString blockId;
+  int32_t status;
+  if (!NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DX_INTEROP2,
+                                              blockId, &status))) {
+    return true;
+  }
+  return status != nsIGfxInfo::FEATURE_STATUS_OK;
+}
+
+/* static */ void
+gfxPlatform::InitMoz2DLogging()
+{
+    auto fwd = new CrashStatsLogForwarder("GraphicsCriticalError");
+    fwd->SetCircularBufferSize(gfxPrefs::GfxLoggingCrashLength());
+
+    mozilla::gfx::Config cfg;
+    cfg.mLogForwarder = fwd;
+    cfg.mMaxTextureSize = gfxPrefs::MaxTextureSize();
+    cfg.mMaxAllocSize = gfxPrefs::MaxAllocSize();
+
+    gfx::Factory::Init(cfg);
 }
 
 static bool sLayersIPCIsUp = false;
@@ -944,7 +999,7 @@ gfxPlatform::~gfxPlatform()
 #endif
 }
 
-already_AddRefed<DrawTarget>
+/* static */ already_AddRefed<DrawTarget>
 gfxPlatform::CreateDrawTargetForSurface(gfxASurface *aSurface, const IntSize& aSize)
 {
   SurfaceFormat format = aSurface->GetSurfaceFormat();
@@ -1254,7 +1309,7 @@ gfxPlatform::InitializeSkiaCacheLimits()
 #ifdef USE_SKIA_GPU
     bool usingDynamicCache = gfxPrefs::CanvasSkiaGLDynamicCache();
     int cacheItemLimit = gfxPrefs::CanvasSkiaGLCacheItems();
-    int cacheSizeLimit = gfxPrefs::CanvasSkiaGLCacheSize();
+    uint64_t cacheSizeLimit = std::max(gfxPrefs::CanvasSkiaGLCacheSize(), (int32_t)0);
 
     // Prefs are in megabytes, but we want the sizes in bytes
     cacheSizeLimit *= 1024*1024;
@@ -1269,11 +1324,14 @@ gfxPlatform::InitializeSkiaCacheLimits()
       }
     }
 
+    // Ensure cache size doesn't overflow on 32-bit platforms.
+    cacheSizeLimit = std::min(cacheSizeLimit, (uint64_t)SIZE_MAX);
+
   #ifdef DEBUG
-    printf_stderr("Determined SkiaGL cache limits: Size %i, Items: %i\n", cacheSizeLimit, cacheItemLimit);
+    printf_stderr("Determined SkiaGL cache limits: Size %" PRIu64 ", Items: %i\n", cacheSizeLimit, cacheItemLimit);
   #endif
 
-    mSkiaGlue->GetGrContext()->setResourceCacheLimits(cacheItemLimit, cacheSizeLimit);
+    mSkiaGlue->GetGrContext()->setResourceCacheLimits(cacheItemLimit, (size_t)cacheSizeLimit);
 #endif
   }
 }
@@ -2071,13 +2129,15 @@ static mozilla::Atomic<bool> sLayersAccelerationPrefsInitialized(false);
 void VideoDecodingFailedChangedCallback(const char* aPref, void*)
 {
   sLayersHardwareVideoDecodingFailed = Preferences::GetBool(aPref, false);
-  gfxPlatform::GetPlatform()->UpdateCanUseHardareVideoDecoding();
+  gfxPlatform::GetPlatform()->UpdateCanUseHardwareVideoDecoding();
 }
 
 void
-gfxPlatform::UpdateCanUseHardareVideoDecoding()
+gfxPlatform::UpdateCanUseHardwareVideoDecoding()
 {
-  gfxVars::SetCanUseHardwareVideoDecoding(CanUseHardwareVideoDecoding());
+  if (XRE_IsParentProcess()) {
+    gfxVars::SetCanUseHardwareVideoDecoding(CanUseHardwareVideoDecoding());
+  }
 }
 
 void
@@ -2165,6 +2225,13 @@ gfxPlatform::InitGPUProcessPrefs()
       FeatureStatus::Blocked,
       "Safe-mode is enabled",
       NS_LITERAL_CSTRING("FEATURE_FAILURE_SAFE_MODE"));
+    return;
+  }
+  if (gfxPrefs::LayerScopeEnabled()) {
+    gpuProc.ForceDisable(
+      FeatureStatus::Blocked,
+      "LayerScope does not work in the GPU process",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_LAYERSCOPE"));
     return;
   }
 }

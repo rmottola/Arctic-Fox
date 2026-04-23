@@ -1113,8 +1113,6 @@ nsObjectLoadingContent::OnStopRequest(nsIRequest *aRequest,
     }
   }
 
-  NS_ENSURE_TRUE(nsContentUtils::LegacyIsCallerChromeOrNativeCode(), NS_ERROR_NOT_AVAILABLE);
-
   if (aRequest != mChannel) {
     return NS_BINDING_ABORTED;
   }
@@ -1140,8 +1138,6 @@ nsObjectLoadingContent::OnDataAvailable(nsIRequest *aRequest,
                                         nsIInputStream *aInputStream,
                                         uint64_t aOffset, uint32_t aCount)
 {
-  NS_ENSURE_TRUE(nsContentUtils::LegacyIsCallerChromeOrNativeCode(), NS_ERROR_NOT_AVAILABLE);
-
   if (aRequest != mChannel) {
     return NS_BINDING_ABORTED;
   }
@@ -1374,15 +1370,7 @@ nsObjectLoadingContent::ObjectState() const
           return NS_EVENT_STATE_BROKEN | NS_EVENT_STATE_HANDLER_BLOCKED;
         case eFallbackCrashed:
           return NS_EVENT_STATE_BROKEN | NS_EVENT_STATE_HANDLER_CRASHED;
-        case eFallbackUnsupported: {
-          // Check to see if plugins are blocked on this platform.
-          char* pluginsBlocked = PR_GetEnv("MOZ_PLUGINS_BLOCKED");
-          if (pluginsBlocked && pluginsBlocked[0] == '1') {
-            return NS_EVENT_STATE_BROKEN | NS_EVENT_STATE_TYPE_UNSUPPORTED_PLATFORM;
-          } else {
-            return NS_EVENT_STATE_BROKEN | NS_EVENT_STATE_TYPE_UNSUPPORTED;
-          }
-        }
+        case eFallbackUnsupported:
         case eFallbackOutdated:
         case eFallbackAlternate:
           return NS_EVENT_STATE_BROKEN;

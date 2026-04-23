@@ -82,6 +82,11 @@ private:
   MessageLoop* mCompositorThread;
   bool mCanSend;
 
+  void HandleTapOnMainThread(TapType aType,
+                             LayoutDevicePoint aPoint,
+                             Modifiers aModifiers,
+                             ScrollableLayerGuid aGuid,
+                             uint64_t aInputBlockId);
 };
 
 } // namespace layers

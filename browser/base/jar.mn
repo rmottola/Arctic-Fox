@@ -58,8 +58,6 @@ browser.jar:
         content/browser/aboutTabCrashed.css           (content/aboutTabCrashed.css)
         content/browser/aboutTabCrashed.js            (content/aboutTabCrashed.js)
         content/browser/aboutTabCrashed.xhtml         (content/aboutTabCrashed.xhtml)
-*       content/browser/aboutTabGroupsMigration.xhtml (content/aboutTabGroupsMigration.xhtml)
-        content/browser/aboutTabGroupsMigration.js    (content/aboutTabGroupsMigration.js)
 *       content/browser/browser.css                   (content/browser.css)
         content/browser/browser-menudragging.xul      (content/browser-menudragging.xul)
         content/browser/browser-menudragging.js       (content/browser-menudragging.js)
@@ -78,9 +76,7 @@ browser.jar:
         content/browser/browser-places.js             (content/browser-places.js)
         content/browser/browser-plugins.js            (content/browser-plugins.js)
         content/browser/browser-refreshblocker.js     (content/browser-refreshblocker.js)
-#ifdef MOZ_SAFE_BROWSING
         content/browser/browser-safebrowsing.js       (content/browser-safebrowsing.js)
-#endif
         content/browser/browser-sidebar.js            (content/browser-sidebar.js)
         content/browser/browser-syncui.js             (content/browser-syncui.js)
 *       content/browser/browser-tabPreviews.xml       (content/browser-tabPreviews.xml)
@@ -159,6 +155,7 @@ browser.jar:
         content/browser/tabbrowser.xml                (content/tabbrowser.xml)
         content/browser/urlbarBindings.xml            (content/urlbarBindings.xml)
         content/browser/utilityOverlay.js             (content/utilityOverlay.js)
+        content/browser/usercontext.svg               (content/usercontext.svg)
         content/browser/web-panels.js                 (content/web-panels.js)
 *       content/browser/web-panels.xul                (content/web-panels.xul)
 *       content/browser/baseMenuOverlay.xul           (content/baseMenuOverlay.xul)
@@ -182,10 +179,8 @@ browser.jar:
 # the following files are browser-specific overrides
 *       content/browser/license.html                  (/toolkit/content/license.html)
 % override chrome://global/content/license.html chrome://browser/content/license.html
-#ifdef MOZ_SAFE_BROWSING
         content/browser/report-phishing-overlay.xul     (content/report-phishing-overlay.xul)
         content/browser/blockedSite.xhtml               (content/blockedSite.xhtml)
 % overlay chrome://browser/content/browser.xul chrome://browser/content/report-phishing-overlay.xul
-#endif
 
 % override chrome://global/content/netError.xhtml chrome://browser/content/aboutNetError.xhtml

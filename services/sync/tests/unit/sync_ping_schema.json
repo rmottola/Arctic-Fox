@@ -3,40 +3,69 @@
   "description": "schema for Sync pings, documentation avaliable in toolkit/components/telemetry/docs/sync-ping.rst",
   "type": "object",
   "additionalProperties": false,
-  "required": ["when", "version", "took", "uid"],
+  "required": ["version", "syncs", "why"],
   "properties": {
     "version": { "type": "integer", "minimum": 0 },
-    "didLogin": { "type": "boolean" },
-    "when": { "type": "integer" },
-    "status": {
-      "type": "object",
-      "anyOf": [
-        {"required": ["sync"]},
-        {"required": ["service"]}
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "sync": { "type": "string" },
-        "service": { "type": "string" }
-      }
-    },
-    "why": { "enum": ["startup", "schedule", "score", "user", "tabs"] },
-    "took": { "type": "integer", "minimum": -1 },
-    "uid": {
-      "type": "string",
-      "oneOf": [
-        { "pattern": "^[0-9a-f]{32}$" },
-        { "maxLength": 0 }
-      ]
-    },
-    "failureReason": { "$ref": "#/definitions/error" },
-    "engines": {
+    "discarded": { "type": "integer", "minimum": 1 },
+    "why": { "enum": ["shutdown", "schedule"] },
+    "syncs": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/definitions/engine" }
+      "items": { "$ref": "#/definitions/payload" }
     }
   },
   "definitions": {
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["when", "uid", "took"],
+      "properties": {
+        "didLogin": { "type": "boolean" },
+        "when": { "type": "integer" },
+        "uid": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$"
+        },
+        "devices": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/device" }
+        },
+        "deviceID": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "type": "object",
+          "anyOf": [
+            { "required": ["sync"] },
+            { "required": ["service"] }
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "sync": { "type": "string" },
+            "service": { "type": "string" }
+          }
+        },
+        "why": { "enum": ["startup", "schedule", "score", "user", "tabs"] },
+        "took": { "type": "integer", "minimum": -1 },
+        "failureReason": { "$ref": "#/definitions/error" },
+        "engines": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/engine" }
+        }
+      }
+    },
+    "device": {
+      "required": ["os", "id", "version"],
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "os": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
     "engine": {
       "required": ["name"],
       "additionalProperties": false,
@@ -67,9 +96,23 @@
           "items": { "$ref": "#/definitions/outgoingBatch" }
         },
         "validation": {
-          "type": "array",
-          "minItems": 1,
-          "$ref": "#/definitions/validationProblem"
+          "type": "object",
+          "additionalProperties": false,
+          "anyOf": [
+            { "required": ["checked"] },
+            { "required": ["failureReason"] }
+          ],
+          "properties": {
+            "checked": { "type": "integer", "minimum": 0 },
+            "failureReason": { "$ref": "#/definitions/error" },
+            "took": { "type": "integer" },
+            "version": { "type": "integer" },
+            "problems": {
+              "type": "array",
+              "minItems": 1,
+              "$ref": "#/definitions/validationProblem"
+            }
+          }
         }
       }
     },
@@ -92,7 +135,8 @@
         { "$ref": "#/definitions/shutdownError" },
         { "$ref": "#/definitions/authError" },
         { "$ref": "#/definitions/otherError" },
-        { "$ref": "#/definitions/unexpectedError" }
+        { "$ref": "#/definitions/unexpectedError" },
+        { "$ref": "#/definitions/sqlError" }
       ]
     },
     "httpError": {
@@ -134,6 +178,13 @@
       "properties": {
         "name": { "enum": ["unexpectederror"] },
         "error": { "type": "string" }
+      }
+    },
+    "sqlError": {
+      "required": ["name"],
+      "properties": {
+        "name": { "enum": ["sqlerror"] },
+        "code": { "type": "integer" }
       }
     },
     "validationProblem": {

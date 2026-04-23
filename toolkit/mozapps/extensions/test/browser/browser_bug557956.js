@@ -196,7 +196,7 @@ function check_telemetry({disabled, metaenabled, metadisabled, upgraded, failed,
 add_test(function test_setup() {
   let oldCanRecord = Services.telemetry.canRecordExtended;
   Services.telemetry.canRecordExtended = true;
-  registerCleanupFunction(function () {
+  registerCleanupFunction(function() {
     Services.telemetry.canRecordExtended = oldCanRecord;
   });
   TelemetrySession.setup().then(run_next_test);

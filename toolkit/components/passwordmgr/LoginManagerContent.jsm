@@ -5,7 +5,7 @@
 "use strict";
 
 this.EXPORTED_SYMBOLS = [ "LoginManagerContent",
-                          "FormLikeFactory",
+                          "LoginFormFactory",
                           "UserAutoCompleteResult" ];
 
 const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
@@ -17,6 +17,8 @@ Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 Cu.import("resource://gre/modules/Promise.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "DeferredTask", "resource://gre/modules/DeferredTask.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "FormLikeFactory",
+                                  "resource://gre/modules/FormLikeFactory.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginRecipesContent",
                                   "resource://gre/modules/LoginRecipes.jsm");
 
@@ -55,7 +57,7 @@ var observer = {
     // can grab form data before it might be modified (see bug 257781).
 
     try {
-      let formLike = FormLikeFactory.createFromForm(formElement);
+      let formLike = LoginFormFactory.createFromForm(formElement);
       LoginManagerContent._onFormSubmit(formLike);
     } catch (e) {
       log("Caught error in onFormSubmit(", e.lineNumber, "):", e.message);
@@ -150,7 +152,7 @@ var LoginManagerContent = {
    * WeakMap of the root element of a FormLike to the FormLike representing its fields.
    *
    * This is used to be able to lookup an existing FormLike for a given root element since multiple
-   * calls to FormLikeFactory won't give the exact same object. When batching fills we don't always
+   * calls to LoginFormFactory won't give the exact same object. When batching fills we don't always
    * want to use the most recent list of elements for a FormLike since we may end up doing multiple
    * fills for the same set of elements when a field gets added between arming and running the
    * DeferredTask.
@@ -290,7 +292,7 @@ var LoginManagerContent = {
   _autoCompleteSearchAsync(aSearchString, aPreviousResult,
                                      aElement, aRect) {
     let doc = aElement.ownerDocument;
-    let form = FormLikeFactory.createFromField(aElement);
+    let form = LoginFormFactory.createFromField(aElement);
     let win = doc.defaultView;
 
     let formOrigin = LoginUtils._getPasswordOrigin(doc.documentURI);
@@ -344,7 +346,7 @@ var LoginManagerContent = {
     }
 
     let form = event.target;
-    let formLike = FormLikeFactory.createFromForm(form);
+    let formLike = LoginFormFactory.createFromForm(form);
     log("onDOMFormHasPassword:", form, formLike);
     this._fetchLoginsFromParentAndFillForm(formLike, window);
   },
@@ -354,15 +356,17 @@ var LoginManagerContent = {
       return;
     }
 
-    this.setupProgressListener(window);
-
     let pwField = event.target;
     if (pwField.form) {
-      // Handled by onDOMFormHasPassword which is already throttled.
+      // Fill is handled by onDOMFormHasPassword which is already throttled.
       return;
     }
 
-    let formLike = FormLikeFactory.createFromField(pwField);
+    // Only setup the listener for formless inputs.
+    // Capture within a <form> but without a submit event is bug 1287202.
+    this.setupProgressListener(window);
+
+    let formLike = LoginFormFactory.createFromField(pwField);
     log("onDOMInputPasswordAdded:", pwField, formLike);
 
     let deferredTask = this._deferredPasswordAddedTasksByRootElement.get(formLike.rootElement);
@@ -406,7 +410,7 @@ var LoginManagerContent = {
    * @param {Window} window
    */
   _fetchLoginsFromParentAndFillForm(form, window) {
-    this._updateLoginFormPresence(window);
+    this._detectInsecureFormLikes(window);
 
     let messageManager = messageManagerFromWindow(window);
     messageManager.sendAsyncMessage("LoginStats:LoginEncountered");
@@ -421,7 +425,7 @@ var LoginManagerContent = {
   },
 
   onPageShow(event, window) {
-    this._updateLoginFormPresence(window);
+    this._detectInsecureFormLikes(window);
   },
 
   /**
@@ -446,38 +450,11 @@ var LoginManagerContent = {
   },
 
   /**
-   * Compute whether there is a login form on any frame of the current page, and
-   * notify the parent process. This is one of the factors used to control the
-   * visibility of the password fill doorhanger anchor.
+   * Compute whether there is an insecure login form on any frame of the current page, and
+   * notify the parent process. This is used to control whether insecure password UI appears.
    */
-  _updateLoginFormPresence(topWindow) {
-    log("_updateLoginFormPresence", topWindow.location.href);
-    // For the login form presence notification, we currently support only one
-    // origin for each browser, so the form origin will always match the origin
-    // of the top level document.
-    let loginFormOrigin =
-        LoginUtils._getPasswordOrigin(topWindow.document.documentURI);
-
-    // Returns the first known loginForm present in this window or in any
-    // same-origin subframes. Returns null if no loginForm is currently present.
-    let getFirstLoginForm = thisWindow => {
-      let loginForms = this.stateForDocument(thisWindow.document).loginFormRootElements;
-      if (loginForms.size) {
-        return [...loginForms][0];
-      }
-      for (let i = 0; i < thisWindow.frames.length; i++) {
-        let frame = thisWindow.frames[i];
-        if (LoginUtils._getPasswordOrigin(frame.document.documentURI) !=
-            loginFormOrigin) {
-          continue;
-        }
-        let loginForm = getFirstLoginForm(frame);
-        if (loginForm) {
-          return loginForm;
-        }
-      }
-      return null;
-    };
+  _detectInsecureFormLikes(topWindow) {
+    log("_detectInsecureFormLikes", topWindow.location.href);
 
     // Returns true if this window or any subframes have insecure login forms.
     let hasInsecureLoginForms = (thisWindow, parentIsInsecure) => {
@@ -489,16 +466,8 @@ var LoginManagerContent = {
                         frame => hasInsecureLoginForms(frame, isInsecure));
     };
 
-    // Store the actual form to use on the state for the top-level document.
-    let topState = this.stateForDocument(topWindow.document);
-    topState.loginFormForFill = getFirstLoginForm(topWindow);
-    log("_updateLoginFormPresence: topState.loginFormForFill", topState.loginFormForFill);
-
-    // Determine whether to show the anchor icon for the current tab.
     let messageManager = messageManagerFromWindow(topWindow);
-    messageManager.sendAsyncMessage("RemoteLogins:updateLoginFormPresence", {
-      loginFormOrigin,
-      loginFormPresent: !!topState.loginFormForFill,
+    messageManager.sendAsyncMessage("RemoteLogins:insecureLoginFormPresent", {
       hasInsecureLoginForms: hasInsecureLoginForms(topWindow, false),
     });
   },
@@ -524,14 +493,12 @@ var LoginManagerContent = {
    *          recipes:
    *            Fill recipes transmitted together with the original message.
    *          inputElement:
-   *            Optional input password element from the form we want to fill.
+   *            Username or password input element from the form we want to fill.
    *        }
    */
   fillForm({ topDocument, loginFormOrigin, loginsFound, recipes, inputElement }) {
-    let topState = this.stateForDocument(topDocument);
-    if (!inputElement && !topState.loginFormForFill) {
-      log("fillForm: There is no login form anymore. The form may have been",
-          "removed or the document may have changed.");
+    if (!inputElement) {
+      log("fillForm: No input element specified");
       return;
     }
     if (LoginUtils._getPasswordOrigin(topDocument.documentURI) != loginFormOrigin) {
@@ -544,18 +511,15 @@ var LoginManagerContent = {
         return;
       }
     }
-    let form = topState.loginFormForFill;
+
     let clobberUsername = true;
     let options = {
       inputElement,
     };
 
-    // If we have a target input, fills it's form.
-    if (inputElement) {
-      form = FormLikeFactory.createFromField(inputElement);
-      if (inputElement.type == "password") {
-        clobberUsername = false;
-      }
+    let form = LoginFormFactory.createFromField(inputElement);
+    if (inputElement.type == "password") {
+      clobberUsername = false;
     }
     this._fillForm(form, true, clobberUsername, true, true, loginsFound, recipes, options);
   },
@@ -588,7 +552,7 @@ var LoginManagerContent = {
     if (!LoginHelper.isUsernameFieldType(acInputField))
       return;
 
-    var acForm = FormLikeFactory.createFromField(acInputField);
+    var acForm = LoginFormFactory.createFromField(acInputField);
     if (!acForm)
       return;
 
@@ -694,7 +658,7 @@ var LoginManagerContent = {
       );
       if (pwOverrideField) {
         // The field from the password override may be in a different FormLike.
-        let formLike = FormLikeFactory.createFromField(pwOverrideField);
+        let formLike = LoginFormFactory.createFromField(pwOverrideField);
         pwFields = [{
           index   : [...formLike.elements].indexOf(pwOverrideField),
           element : pwOverrideField,
@@ -916,7 +880,7 @@ var LoginManagerContent = {
                             null;
 
     // Make sure to pass the opener's top in case it was in a frame.
-    let opener = win.opener ? win.opener.top : null;
+    let openerTopWindow = win.opener ? win.opener.top : null;
 
     messageManager.sendAsyncMessage("RemoteLogins:onFormSubmit",
                                     { hostname: hostname,
@@ -924,7 +888,7 @@ var LoginManagerContent = {
                                       usernameField: mockUsername,
                                       newPasswordField: mockPassword,
                                       oldPasswordField: mockOldPassword },
-                                    { openerWin: opener });
+                                    { openerTopWindow });
   },
 
   /**
@@ -1038,7 +1002,7 @@ var LoginManagerContent = {
       if (passwordField.maxLength >= 0)
         maxPasswordLen = passwordField.maxLength;
 
-      var logins = foundLogins.filter(function (l) {
+      var logins = foundLogins.filter(function(l) {
         var fit = (l.username.length <= maxUsernameLen &&
                    l.password.length <= maxPasswordLen);
         if (!fit)
@@ -1179,7 +1143,7 @@ var LoginManagerContent = {
         !aField.ownerDocument) {
       return null;
     }
-    let form = FormLikeFactory.createFromField(aField);
+    let form = LoginFormFactory.createFromField(aField);
 
     let doc = aField.ownerDocument;
     let messageManager = messageManagerFromWindow(doc.defaultView);
@@ -1187,7 +1151,7 @@ var LoginManagerContent = {
       formOrigin: LoginUtils._getPasswordOrigin(doc.documentURI),
     })[0];
 
-    let [usernameField, newPasswordField, oldPasswordField] =
+    let [usernameField, newPasswordField] =
           this._getFormFields(form, false, recipes);
 
     // If we are not verifying a password field, we want
@@ -1379,35 +1343,17 @@ UserAutoCompleteResult.prototype = {
  * A factory to generate FormLike objects that represent a set of login fields
  * which aren't necessarily marked up with a <form> element.
  */
-var FormLikeFactory = {
-  _propsFromForm: [
-    "autocomplete",
-    "ownerDocument",
-  ],
-
+var LoginFormFactory = {
   /**
-   * Create a FormLike object from a <form>.
+   * Create a LoginForm object from a <form>.
    *
    * @param {HTMLFormElement} aForm
-   * @return {FormLike}
+   * @return {LoginForm}
    * @throws Error if aForm isn't an HTMLFormElement
    */
   createFromForm(aForm) {
-    if (!(aForm instanceof Ci.nsIDOMHTMLFormElement)) {
-      throw new Error("createFromForm: aForm must be a nsIDOMHTMLFormElement");
-    }
-
-    let formLike = {
-      action: LoginUtils._getActionOrigin(aForm),
-      elements: [...aForm.elements],
-      rootElement: aForm,
-    };
-
-    for (let prop of this._propsFromForm) {
-      formLike[prop] = aForm[prop];
-    }
-
-    this._addToJSONProperty(formLike);
+    let formLike = FormLikeFactory.createFromForm(aForm);
+    formLike.action = LoginUtils._getActionOrigin(aForm);
 
     let state = LoginManagerContent.stateForDocument(formLike.ownerDocument);
     state.loginFormRootElements.add(formLike.rootElement);
@@ -1418,19 +1364,19 @@ var FormLikeFactory = {
   },
 
   /**
-   * Create a FormLike object from a password or username field.
+   * Create a LoginForm object from a password or username field.
    *
-   * If the field is in a <form>, construct the FormLike from the form.
-   * Otherwise, create a FormLike with a rootElement (wrapper) according to
-   * heuristics. Currently all <input> not in a <form> are one FormLike but this
+   * If the field is in a <form>, construct the LoginForm from the form.
+   * Otherwise, create a LoginForm with a rootElement (wrapper) according to
+   * heuristics. Currently all <input> not in a <form> are one LoginForm but this
    * shouldn't be relied upon as the heuristics may change to detect multiple
    * "forms" (e.g. registration and login) on one page with a <form>.
    *
-   * Note that two FormLikes created from the same field won't return the same FormLike object.
-   * Use the `rootElement` property on the FormLike as a key instead.
+   * Note that two LoginForms created from the same field won't return the same LoginForm object.
+   * Use the `rootElement` property on the LoginForm as a key instead.
    *
    * @param {HTMLInputElement} aField - a password or username field in a document
-   * @return {FormLike}
+   * @return {LoginForm}
    * @throws Error if aField isn't a password or username field in a document
    */
   createFromField(aField) {
@@ -1444,23 +1390,9 @@ var FormLikeFactory = {
       return this.createFromForm(aField.form);
     }
 
-    let doc = aField.ownerDocument;
-    log("Created non-form FormLike for rootElement:", doc.documentElement);
-    let elements = [];
-    for (let el of doc.documentElement.querySelectorAll("input")) {
-      if (!el.form) {
-        elements.push(el);
-      }
-    }
-    let formLike = {
-      action: LoginUtils._getPasswordOrigin(doc.baseURI),
-      autocomplete: "on",
-      // Exclude elements inside the rootElement that are already in a <form> as
-      // they will be handled by their own FormLike.
-      elements,
-      ownerDocument: doc,
-      rootElement: doc.documentElement,
-    };
+    let formLike = FormLikeFactory.createFromField(aField);
+    formLike.action = LoginUtils._getPasswordOrigin(aField.ownerDocument.baseURI);
+    log("Created non-form FormLike for rootElement:", aField.ownerDocument.documentElement);
 
     let state = LoginManagerContent.stateForDocument(formLike.ownerDocument);
     state.loginFormRootElements.add(formLike.rootElement);
@@ -1469,59 +1401,6 @@ var FormLikeFactory = {
 
     LoginManagerContent._formLikeByRootElement.set(formLike.rootElement, formLike);
 
-    this._addToJSONProperty(formLike);
     return formLike;
-  },
-
-  /**
-   * Add a `toJSON` property to a FormLike so logging which ends up going
-   * through dump doesn't include usless garbage from DOM objects.
-   */
-  _addToJSONProperty(aFormLike) {
-    function prettyElementOutput(aElement) {
-      let idText = aElement.id ? "#" + aElement.id : "";
-      let classText = "";
-      for (let className of aElement.classList) {
-        classText += "." + className;
-      }
-      return `<${aElement.nodeName + idText + classText}>`;
-    }
-
-    Object.defineProperty(aFormLike, "toJSON", {
-      value: () => {
-        let cleansed = {};
-        for (let key of Object.keys(aFormLike)) {
-          let value = aFormLike[key];
-          let cleansedValue = value;
-
-          switch (key) {
-            case "elements": {
-              cleansedValue = [];
-              for (let element of value) {
-                cleansedValue.push(prettyElementOutput(element));
-              }
-              break;
-            }
-
-            case "ownerDocument": {
-              cleansedValue = {
-                location: {
-                  href: value.location.href,
-                },
-              };
-              break;
-            }
-
-            case "rootElement": {
-              cleansedValue = prettyElementOutput(value);
-              break;
-            }
-          }
-
-          cleansed[key] = cleansedValue;
-        }
-        return cleansed;
-      }
-    });
   },
 };

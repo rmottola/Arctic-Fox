@@ -10,8 +10,7 @@ Components.utils.import("resource://testing-common/PromiseTestUtils.jsm");
 // Prevent test failures due to the unhandled rejections in this test file.
 PromiseTestUtils.disableUncaughtRejectionObserverForSelfTest();
 
-////////////////////////////////////////////////////////////////////////////////
-//// Test runner
+// Test runner
 
 let run_promise_tests = function run_promise_tests(tests, cb) {
   let loop = function loop(index) {
@@ -79,8 +78,7 @@ let make_promise_test = function(test) {
   };
 };
 
-////////////////////////////////////////////////////////////////////////////////
-//// Tests
+// Tests
 
 let tests = [];
 
@@ -125,7 +123,7 @@ tests.push(make_promise_test(
 
     // Install a number of observers before resolving
     let i;
-    for (i = 0; i < SIZE/2; ++i) {
+    for (i = 0; i < SIZE / 2; ++i) {
       install_observer(i);
     }
 
@@ -253,7 +251,7 @@ tests.push(make_promise_test(
 
     // Install a number of observers before resolving
     let i;
-    for (i = 0; i < SIZE/2; ++i) {
+    for (i = 0; i < SIZE / 2; ++i) {
       install_observer(i);
     }
 
@@ -948,7 +946,7 @@ tests.push(
     }, null);
 
     do_print("Setting wait for second promise");
-    return promise2.catch(error => {return 3;})
+    return promise2.catch(error => { return 3; })
     .then(
       count => {
         shouldExitNestedEventLoop = true;
@@ -1074,7 +1072,7 @@ make_promise_test(function test_caught_is_not_reported() {
   let promise = wait_for_uncaught([salt], 500);
   (function() {
     let uncaught = Promise.reject("This error, on the other hand, is caught " + salt);
-    uncaught.catch(function() { /* ignore rejection */});
+    uncaught.catch(function() { /* ignore rejection */ });
     uncaught = null;
   })();
   // Isolate this in a function to increase likelihood that the gc will

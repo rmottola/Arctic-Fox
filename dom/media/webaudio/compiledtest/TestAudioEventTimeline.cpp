@@ -102,7 +102,11 @@ void TestSpecExample()
 
   ErrorResultMock rv;
 
-  float curve[] = { -1.0f, 0.0f, 1.0f };
+  uint32_t curveLength = 44100;
+  float* curve = new float[curveLength];
+  for (uint32_t i = 0; i < curveLength; ++i) {
+    curve[i] = sin(M_PI * i / float(curveLength));
+  }
 
   // This test is copied from the example in the Web Audio spec
   const double t0 = 0.0,
@@ -127,7 +131,7 @@ void TestSpecExample()
   is(rv, NS_OK, "ExponentialRampToValueAtTime succeeded");
   timeline.ExponentialRampToValueAtTime(0.05f, t6, rv);
   is(rv, NS_OK, "ExponentialRampToValueAtTime succeeded");
-  timeline.SetValueCurveAtTime(curve, ArrayLength(curve), t6, t7 - t6, rv);
+  timeline.SetValueCurveAtTime(curve, curveLength, t6, t7 - t6, rv);
   is(rv, NS_OK, "SetValueCurveAtTime succeeded");
 
   is(timeline.GetValueAtTime(0.0), 0.2f, "Correct value");
@@ -144,10 +148,11 @@ void TestSpecExample()
   is(timeline.GetValueAtTime(0.55), (0.15f * powf(0.75f / 0.15f, 0.15f / 0.2f)), "Correct value");
   is(timeline.GetValueAtTime(0.6), 0.75f, "Correct value");
   is(timeline.GetValueAtTime(0.65), (0.75f * powf(0.05f / 0.75f, 0.5f)), "Correct value");
-  is(timeline.GetValueAtTime(0.7), -1.0f, "Correct value");
-  is(timeline.GetValueAtTime(0.8), 0.0f, "Correct value");
-  is(timeline.GetValueAtTime(0.9), 1.0f, "Correct value");
-  is(timeline.GetValueAtTime(1.0), 1.0f, "Correct value");
+  is(timeline.GetValueAtTime(0.7), 0.0f, "Correct value");
+  is(timeline.GetValueAtTime(0.85), 1.0f, "Correct value");
+  is(timeline.GetValueAtTime(1.0), curve[curveLength - 1], "Correct value");
+
+  delete[] curve;
 }
 
 void TestInvalidEvents()
@@ -403,7 +408,7 @@ void TestSetTargetZeroTimeConstant()
   ErrorResultMock rv;
 
   timeline.SetTargetAtTime(20.0f, 1.0, 0.0, rv);
-  is(rv, NS_ERROR_DOM_SYNTAX_ERR, "Correct error code returned");
+  is(timeline.GetValueAtTime(1.0), 20.0f, "Should get the correct value when t0 == t1");
 }
 
 void TestExponentialInvalidPreviousZeroValue()

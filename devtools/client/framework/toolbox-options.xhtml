@@ -17,7 +17,7 @@
   <form id="options-panel">
     <div id="tools-box" class="options-vertical-pane">
       <fieldset id="default-tools-box" class="options-groupbox">
-        <legend>&options.selectDefaultTools.label;</legend>
+        <legend>&options.selectDefaultTools.label2;</legend>
       </fieldset>
 
       <fieldset id="additional-tools-box" class="options-groupbox">
@@ -81,6 +81,16 @@
                  id="webconsole-timestamp-messages"
                  data-pref="devtools.webconsole.timestampMessages"/>
           <span>&options.timestampMessages.label;</span>
+        </label>
+      </fieldset>
+
+      <fieldset id="debugger-options" class="options-groupbox">
+        <legend>&options.debugger.label;</legend>
+        <label title="&options.sourceMaps.tooltip;">
+          <input type="checkbox"
+                 id="debugger-sourcemaps"
+                 data-pref="devtools.debugger.client-source-maps-enabled"/>
+          <span>&options.sourceMaps.label;</span>
         </label>
       </fieldset>
 
@@ -171,7 +181,7 @@
                    data-pref="devtools.chrome.enabled"/>
             <span>&options.enableChrome.label5;</span>
           </label>
-          <label title="&options.enableRemote.tooltip;">
+          <label title="&options.enableRemote.tooltip2;">
             <input type="checkbox"
                    data-pref="devtools.debugger.remote-enabled"/>
             <span>&options.enableRemote.label3;</span>

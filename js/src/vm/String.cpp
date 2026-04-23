@@ -578,6 +578,17 @@ JSRope::flatten(ExclusiveContext* maybecx)
 }
 
 template <AllowGC allowGC>
+static JSLinearString*
+EnsureLinear(ExclusiveContext* cx, typename MaybeRooted<JSString*, allowGC>::HandleType string)
+{
+    JSLinearString* linear = string->ensureLinear(cx);
+    // Don't report an exception if GC is not allowed, just return nullptr.
+    if (!linear && !allowGC)
+        cx->recoverFromOutOfMemory();
+    return linear;
+}
+
+template <AllowGC allowGC>
 JSString*
 js::ConcatStrings(ExclusiveContext* cx,
                   typename MaybeRooted<JSString*, allowGC>::HandleType left,
@@ -595,8 +606,12 @@ js::ConcatStrings(ExclusiveContext* cx,
         return left;
 
     size_t wholeLength = leftLen + rightLen;
-    if (!JSString::validateLength(cx, wholeLength))
+    if (MOZ_UNLIKELY(wholeLength > JSString::MAX_LENGTH)) {
+        // Don't report an exception if GC is not allowed, just return nullptr.
+        if (allowGC)
+            js::ReportAllocationOverflow(cx);
         return nullptr;
+    }
 
     bool isLatin1 = left->hasLatin1Chars() && right->hasLatin1Chars();
     bool canUseInline = isLatin1
@@ -612,10 +627,10 @@ js::ConcatStrings(ExclusiveContext* cx,
             return nullptr;
 
         AutoCheckCannotGC nogc;
-        JSLinearString* leftLinear = left->ensureLinear(cx);
+        JSLinearString* leftLinear = EnsureLinear<allowGC>(cx, left);
         if (!leftLinear)
             return nullptr;
-        JSLinearString* rightLinear = right->ensureLinear(cx);
+        JSLinearString* rightLinear = EnsureLinear<allowGC>(cx, right);
         if (!rightLinear)
             return nullptr;
 

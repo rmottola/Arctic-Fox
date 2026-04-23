@@ -14,6 +14,8 @@
 
 "use strict";
 
+const {CSS_ANGLEUNIT} = require("devtools/shared/css/properties-db");
+
 const promise = require("promise");
 const {getCSSLexer} = require("devtools/shared/css/lexer");
 const {Task} = require("devtools/shared/task");
@@ -367,6 +369,8 @@ function parseDeclarationsInternal(isCssPropertyKnown, inputString,
         // Insert the new declarations just before the final element.
         let lastDecl = declarations.pop();
         declarations = [...declarations, ...newDecls, lastDecl];
+      } else {
+        current += " ";
       }
     } else {
       current += inputString.substring(token.startOffset, token.endOffset);
@@ -484,18 +488,12 @@ function parseDeclarations(isCssPropertyKnown, inputString,
  */
 function RuleRewriter(isCssPropertyKnown, rule, inputString) {
   this.rule = rule;
-  this.inputString = inputString;
-  // Whether there are any newlines in the input text.
-  this.hasNewLine = /[\r\n]/.test(this.inputString);
+  this.isCssPropertyKnown = isCssPropertyKnown;
+
   // Keep track of which any declarations we had to rewrite while
   // performing the requested action.
   this.changedDeclarations = {};
-  // The declarations.
-  this.declarations = parseDeclarations(isCssPropertyKnown, this.inputString,
-                                        true);
 
-  this.decl = null;
-  this.result = null;
   // If not null, a promise that must be wait upon before |apply| can
   // do its work.
   this.editPromise = null;
@@ -505,9 +503,28 @@ function RuleRewriter(isCssPropertyKnown, rule, inputString) {
   // indentation based on the style sheet's text.  This override
   // facility is for testing.
   this.defaultIndentation = null;
+
+  this.startInitialization(inputString);
 }
 
 RuleRewriter.prototype = {
+  /**
+   * An internal function to initialize the rewriter with a given
+   * input string.
+   *
+   * @param {String} inputString the input to use
+   */
+  startInitialization: function (inputString) {
+    this.inputString = inputString;
+    // Whether there are any newlines in the input text.
+    this.hasNewLine = /[\r\n]/.test(this.inputString);
+    // The declarations.
+    this.declarations = parseDeclarations(this.isCssPropertyKnown, this.inputString,
+                                          true);
+    this.decl = null;
+    this.result = null;
+  },
+
   /**
    * An internal function to complete initialization and set some
    * properties for further processing.
@@ -798,10 +815,12 @@ RuleRewriter.prototype = {
    * @param {String} value value of the new property
    * @param {String} priority priority of the new property; either
    *                          the empty string or "important"
+   * @param {Boolean} enabled True if the new property should be
+   *                          enabled, false if disabled
    * @return {Promise} a promise that is resolved when the edit has
    *                   completed
    */
-  internalCreateProperty: Task.async(function* (index, name, value, priority) {
+  internalCreateProperty: Task.async(function* (index, name, value, priority, enabled) {
     this.completeInitialization(index);
     let newIndentation = "";
     if (this.hasNewLine) {
@@ -831,13 +850,18 @@ RuleRewriter.prototype = {
       }
     }
 
-    this.result += newIndentation + CSS.escape(name) + ": " +
-      this.sanitizeText(value, index);
-
+    let newText = CSS.escape(name) + ": " + this.sanitizeText(value, index);
     if (priority === "important") {
-      this.result += " !important";
+      newText += " !important";
     }
-    this.result += ";";
+    newText += ";";
+
+    if (!enabled) {
+      newText = "/*" + COMMENT_PARSING_HEURISTIC_BYPASS_CHAR + " " +
+        escapeCSSComment(newText) + " */";
+    }
+
+    this.result += newIndentation + newText;
     if (this.hasNewLine) {
       this.result += "\n";
     }
@@ -858,10 +882,12 @@ RuleRewriter.prototype = {
    * @param {String} value value of the new property
    * @param {String} priority priority of the new property; either
    *                          the empty string or "important"
+   * @param {Boolean} enabled True if the new property should be
+   *                          enabled, false if disabled
    */
-  createProperty: function (index, name, value, priority) {
+  createProperty: function (index, name, value, priority, enabled) {
     this.editPromise = this.internalCreateProperty(index, name, value,
-                                                   priority);
+                                                   priority, enabled);
   },
 
   /**
@@ -882,7 +908,7 @@ RuleRewriter.prototype = {
     // We might see a "set" on a previously non-existent property; in
     // that case, act like "create".
     if (!this.decl) {
-      this.createProperty(index, name, value, priority);
+      this.createProperty(index, name, value, priority, true);
       return;
     }
 
@@ -911,6 +937,17 @@ RuleRewriter.prototype = {
     // If asked to remove a property that does not exist, bail out.
     if (!this.decl) {
       return;
+    }
+
+    // If the property is disabled, then first enable it, and then
+    // delete it.  We take this approach because we want to remove the
+    // entire comment if possible; but the logic for dealing with
+    // comments is hairy and already implemented in
+    // setPropertyEnabled.
+    if (this.decl.commentOffsets) {
+      this.setPropertyEnabled(index, name, true);
+      this.startInitialization(this.result);
+      this.completeInitialization(index);
     }
 
     let copyOffset = this.decl.offsets[1];
@@ -1098,6 +1135,28 @@ function parseSingleValue(isCssPropertyKnown, value) {
   };
 }
 
+/**
+ * Convert an angle value to degree.
+ *
+ * @param {Number} angleValue The angle value.
+ * @param {CSS_ANGLEUNIT} angleUnit The angleValue's angle unit.
+ * @return {Number} An angle value in degree.
+ */
+function getAngleValueInDegrees(angleValue, angleUnit) {
+  switch (angleUnit) {
+    case CSS_ANGLEUNIT.deg:
+      return angleValue;
+    case CSS_ANGLEUNIT.grad:
+      return angleValue * 0.9;
+    case CSS_ANGLEUNIT.rad:
+      return angleValue * 180 / Math.PI;
+    case CSS_ANGLEUNIT.turn:
+      return angleValue * 360;
+    default:
+      throw new Error("No matched angle unit.");
+  }
+}
+
 exports.cssTokenizer = cssTokenizer;
 exports.cssTokenizerWithLineColumn = cssTokenizerWithLineColumn;
 exports.escapeCSSComment = escapeCSSComment;
@@ -1109,3 +1168,4 @@ exports._parseCommentDeclarations = parseCommentDeclarations;
 exports.RuleRewriter = RuleRewriter;
 exports.parsePseudoClassesAndAttributes = parsePseudoClassesAndAttributes;
 exports.parseSingleValue = parseSingleValue;
+exports.getAngleValueInDegrees = getAngleValueInDegrees;

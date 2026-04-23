@@ -522,7 +522,6 @@
             default:
               // Delegate to browser.xml.
               return this._receiveMessage(aMessage);
-              break;
           }
           return undefined;
         ]]></body>
@@ -556,6 +555,15 @@
             }
             this._remoteWebNavigationImpl.canGoBack = false;
             this._remoteWebNavigationImpl.canGoForward = false;
+          ]]>
+        </body>
+      </method>
+
+      <method name="createAboutBlankContentViewer">
+        <parameter name="aPrincipal"/>
+        <body>
+          <![CDATA[
+            this.messageManager.sendAsyncMessage("Browser:CreateAboutBlank", aPrincipal);
           ]]>
         </body>
       </method>

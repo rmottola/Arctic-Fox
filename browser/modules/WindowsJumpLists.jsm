@@ -85,7 +85,6 @@ function _getString(name) {
   return _stringBundle.GetStringFromName(name);
 }
 
-/////////////////////////////////////////////////////////////////////////////
 // Task list configuration data object.
 
 var tasksCfg = [
@@ -135,7 +134,6 @@ var tasksCfg = [
   },
 ];
 
-/////////////////////////////////////////////////////////////////////////////
 // Implementation
 
 this.WinTaskbarJumpList =
@@ -510,7 +508,7 @@ this.WinTaskbarJumpList =
     if (this._enabled && !this._shuttingDown && !this._timer) {
       this._timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
       this._timer.initWithCallback(this,
-                                   _prefs.getIntPref(PREF_TASKBAR_REFRESH)*1000,
+                                   _prefs.getIntPref(PREF_TASKBAR_REFRESH) * 1000,
                                    this._timer.TYPE_REPEATING_SLACK);
     }
     else if ((!this._enabled || this._shuttingDown) && this._timer) {

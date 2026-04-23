@@ -49,6 +49,7 @@ user_pref("app.update.staging.enabled", false);
 user_pref("app.update.url.android", "");
 // Make sure GMPInstallManager won't hit the network.
 user_pref("media.gmp-manager.url.override", "http://%(server)s/dummy-gmp-manager.xml");
+user_pref("media.gmp-manager.updateEnabled", false);
 user_pref("dom.w3c_touch_events.enabled", 1);
 user_pref("layout.accessiblecaret.enabled_on_touch", false);
 user_pref("dom.webcomponents.enabled", true);
@@ -312,6 +313,8 @@ user_pref("media.eme.enabled", true);
 // Don't use auto-enabled e10s
 user_pref("browser.tabs.remote.autostart.1", false);
 user_pref("browser.tabs.remote.autostart.2", false);
+// Don't show a delay when hiding the audio indicator during tests
+user_pref("browser.tabs.delayHidingAudioPlayingIconMS", 0);
 // Don't forceably kill content processes after a timeout
 user_pref("dom.ipc.tabs.shutdownTimeoutSecs", 0);
 

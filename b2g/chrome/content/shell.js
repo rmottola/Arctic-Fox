@@ -7,7 +7,6 @@
 window.performance.mark('gecko-shell-loadstart');
 
 Cu.import('resource://gre/modules/NotificationDB.jsm');
-Cu.import("resource://gre/modules/AppsUtils.jsm");
 Cu.import('resource://gre/modules/UserAgentOverrides.jsm');
 Cu.import('resource://gre/modules/Keyboard.jsm');
 Cu.import('resource://gre/modules/ErrorPage.jsm');
@@ -66,10 +65,8 @@ XPCOMUtils.defineLazyServiceGetter(Services, 'captivePortalDetector',
                                   '@mozilla.org/toolkit/captive-detector;1',
                                   'nsICaptivePortalDetector');
 
-if (AppConstants.MOZ_SAFE_BROWSING) {
-  XPCOMUtils.defineLazyModuleGetter(this, "SafeBrowsing",
-                "resource://gre/modules/SafeBrowsing.jsm");
-}
+XPCOMUtils.defineLazyModuleGetter(this, "SafeBrowsing",
+              "resource://gre/modules/SafeBrowsing.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "SafeMode",
                                   "resource://gre/modules/SafeMode.jsm");
@@ -436,11 +433,9 @@ var shell = {
     ppmm.addMessageListener("mail-handler", this);
     ppmm.addMessageListener("file-picker", this);
 
-    if (AppConstants.MOZ_SAFE_BROWSING) {
-      setTimeout(function() {
-        SafeBrowsing.init();
-      }, 5000);
-    }
+    setTimeout(function() {
+      SafeBrowsing.init();
+    }, 5000);
   },
 
   stop: function shell_stop() {

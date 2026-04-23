@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const { interfaces: Ci, utils: Cu } = Components;
+var { interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -89,6 +89,8 @@ exports.ONVERIFIED_NOTIFICATION = "fxaccounts:onverified";
 exports.ONLOGOUT_NOTIFICATION = "fxaccounts:onlogout";
 // Internal to services/fxaccounts only
 exports.ON_FXA_UPDATE_NOTIFICATION = "fxaccounts:update";
+exports.ON_COLLECTION_CHANGED_NOTIFICATION = "sync:collection_changed";
+
 
 exports.ON_PROFILE_CHANGE_NOTIFICATION = "fxaccounts:profilechange";
 

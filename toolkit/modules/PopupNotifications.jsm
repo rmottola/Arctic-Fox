@@ -120,7 +120,7 @@ Notification.prototype = {
       return anchorElement;
 
     if (!anchorElement && this.anchorID)
-      anchorElement = iconBox.querySelector("#"+this.anchorID);
+      anchorElement = iconBox.querySelector("#" + this.anchorID);
 
     // Use a default anchor icon if it's available
     if (!anchorElement)
@@ -429,7 +429,7 @@ PopupNotifications.prototype = {
 
     let notifications = this._getNotificationsForBrowser(aBrowser);
 
-    notifications = notifications.filter(function (notification) {
+    notifications = notifications.filter(function(notification) {
       // The persistWhileVisible option allows an open notification to persist
       // across location changes
       if (notification.options.persistWhileVisible &&
@@ -483,7 +483,7 @@ PopupNotifications.prototype = {
     }
   },
 
-  handleEvent: function (aEvent) {
+  handleEvent: function(aEvent) {
     switch (aEvent.type) {
       case "popuphidden":
         this._onPopupHidden(aEvent);
@@ -499,7 +499,7 @@ PopupNotifications.prototype = {
         this.nextDismissReason = TELEMETRY_STAT_DISMISSAL_LEAVE_PAGE;
         // setTimeout(..., 0) needed, otherwise openPopup from "activate" event
         // handler results in the popup being hidden again for some reason...
-        this.window.setTimeout(function () {
+        this.window.setTimeout(function() {
           self._update();
         }, 0);
         break;
@@ -510,9 +510,7 @@ PopupNotifications.prototype = {
     }
   },
 
-////////////////////////////////////////////////////////////////////////////////
 // Utility methods
-////////////////////////////////////////////////////////////////////////////////
 
   _ignoreDismissal: null,
   _currentAnchorElement: null,
@@ -577,7 +575,7 @@ PopupNotifications.prototype = {
   /**
    * Removes all notifications from the notification popup.
    */
-  _clearPanel: function () {
+  _clearPanel: function() {
     let popupnotification;
     while ((popupnotification = this.panel.lastChild)) {
       this.panel.removeChild(popupnotification);
@@ -613,7 +611,7 @@ PopupNotifications.prototype = {
 
     const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
-    notificationsToShow.forEach(function (n) {
+    notificationsToShow.forEach(function(n) {
       let doc = this.window.document;
 
       // Append "-notification" to the ID to try to avoid ID conflicts with other stuff
@@ -679,7 +677,7 @@ PopupNotifications.prototype = {
       if (n.secondaryActions) {
         let telemetryStatId = TELEMETRY_STAT_ACTION_2;
 
-        n.secondaryActions.forEach(function (a) {
+        n.secondaryActions.forEach(function(a) {
           let item = doc.createElementNS(XUL_NS, "menuitem");
           item.setAttribute("label", a.label);
           item.setAttribute("accesskey", a.accessKey);
@@ -728,7 +726,7 @@ PopupNotifications.prototype = {
     this._refreshPanel(notificationsToShow);
 
     if (this.isPanelOpen && this._currentAnchorElement == anchorElement) {
-      notificationsToShow.forEach(function (n) {
+      notificationsToShow.forEach(function(n) {
         this._fireCallback(n, NOTIFICATION_EVENT_SHOWN);
       }, this);
       return;
@@ -755,7 +753,7 @@ PopupNotifications.prototype = {
       // On OS X and Linux we need a different panel arrow color for
       // click-to-play plugins, so copy the popupid and use css.
       this.panel.setAttribute("popupid", this.panel.firstChild.getAttribute("popupid"));
-      notificationsToShow.forEach(function (n) {
+      notificationsToShow.forEach(function(n) {
         // Record that the notification was actually displayed on screen.
         // Notifications that were opened a second time or that were originally
         // shown with "options.dismissed" will be recorded in a separate bucket.
@@ -768,13 +766,35 @@ PopupNotifications.prototype = {
       // the next reason will be that the user clicked elsewhere.
       this.nextDismissReason = TELEMETRY_STAT_DISMISSAL_CLICK_ELSEWHERE;
 
+      let target = this.panel;
+      if (target.parentNode) {
+        // NOTIFICATION_EVENT_SHOWN should be fired for the panel before
+        // anyone listening for popupshown on the panel gets run. Otherwise,
+        // the panel will not be initialized when the popupshown event
+        // listeners run.
+        // By targeting the panel's parent and using a capturing listener, we
+        // can have our listener called before others waiting for the panel to
+        // be shown (which probably expect the panel to be fully initialized)
+        target = target.parentNode;
+      }
+      if (this._popupshownListener) {
+        target.removeEventListener("popupshown", this._popupshownListener, true);
+      }
+      this._popupshownListener = function (e) {
+        target.removeEventListener("popupshown", this._popupshownListener, true);
+        this._popupshownListener = null;
+
+        notificationsToShow.forEach(function (n) {
+          this._fireCallback(n, NOTIFICATION_EVENT_SHOWN);
+        }, this);
+        // This notification is used by tests to know when all the processing
+        // required to display the panel has happened.
+        this.panel.dispatchEvent(new this.window.CustomEvent("Shown"));
+      };
+      this._popupshownListener = this._popupshownListener.bind(this);
+      target.addEventListener("popupshown", this._popupshownListener, true);
+
       this.panel.openPopup(anchorElement, "bottomcenter topleft");
-      notificationsToShow.forEach(function (n) {
-        this._fireCallback(n, NOTIFICATION_EVENT_SHOWN);
-      }, this);
-      // This notification is used by tests to know when all the processing
-      // required to display the panel has happened.
-      this.panel.dispatchEvent(new this.window.CustomEvent("Shown"));
     });
   },
 
@@ -813,7 +833,7 @@ PopupNotifications.prototype = {
     }
 
     // Filter out notifications that have been dismissed.
-    let notificationsToShow = notifications.filter(function (n) {
+    let notificationsToShow = notifications.filter(function(n) {
       return !n.dismissed && !n.options.neverShow;
     });
 
@@ -824,7 +844,7 @@ PopupNotifications.prototype = {
 
     if (haveNotifications) {
       // Also filter out notifications that are for a different anchor.
-      notificationsToShow = notificationsToShow.filter(function (n) {
+      notificationsToShow = notificationsToShow.filter(function(n) {
         return anchors.has(n.anchorElement);
       });
 
@@ -878,7 +898,7 @@ PopupNotifications.prototype = {
       // only use the default icon.
       if (anchorElement.classList.contains("notification-anchor-icon")) {
         // remove previous icon classes
-        let className = anchorElement.className.replace(/([-\w]+-notification-icon\s?)/g,"")
+        let className = anchorElement.className.replace(/([-\w]+-notification-icon\s?)/g, "")
         if (notifications.length > 0) {
           // Find the first notification this anchor used for.
           let notification = notifications[0];
@@ -1080,7 +1100,7 @@ PopupNotifications.prototype = {
 
     let notifications = this._getNotificationsForBrowser(browser);
     // Mark notifications as dismissed and call dismissal callbacks
-    Array.forEach(this.panel.childNodes, function (nEl) {
+    Array.forEach(this.panel.childNodes, function(nEl) {
       let notificationObj = nEl.notification;
       // Never call a dismissal handler on a notification that's been removed.
       if (notifications.indexOf(notificationObj) == -1)

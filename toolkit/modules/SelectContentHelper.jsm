@@ -30,7 +30,7 @@ this.EXPORTED_SYMBOLS = [
   "SelectContentHelper"
 ];
 
-this.SelectContentHelper = function (aElement, aOptions, aGlobal) {
+this.SelectContentHelper = function(aElement, aOptions, aGlobal) {
   this.element = aElement;
   this.initialSelection = aElement[aElement.selectedIndex] || null;
   this.global = aGlobal;
@@ -53,6 +53,7 @@ this.SelectContentHelper.prototype = {
     this.global.addMessageListener("Forms:DismissedDropDown", this);
     this.global.addMessageListener("Forms:MouseOver", this);
     this.global.addMessageListener("Forms:MouseOut", this);
+    this.global.addMessageListener("Forms:MouseUp", this);
     this.global.addEventListener("pagehide", this);
     this.global.addEventListener("mozhidedropdown", this);
     let MutationObserver = this.element.ownerDocument.defaultView.MutationObserver;
@@ -71,6 +72,7 @@ this.SelectContentHelper.prototype = {
     this.global.removeMessageListener("Forms:DismissedDropDown", this);
     this.global.removeMessageListener("Forms:MouseOver", this);
     this.global.removeMessageListener("Forms:MouseOut", this);
+    this.global.removeMessageListener("Forms:MouseUp", this);
     this.global.removeEventListener("pagehide", this);
     this.global.removeEventListener("mozhidedropdown", this);
     this.element = null;
@@ -88,7 +90,7 @@ this.SelectContentHelper.prototype = {
       rect: rect,
       options: this._buildOptionList(),
       selectedIndex: this.element.selectedIndex,
-      direction: getComputedDirection(this.element),
+      direction: getComputedStyles(this.element).direction,
       isOpenedViaTouch: this.isOpenedViaTouch
     });
     gOpen = true;
@@ -172,6 +174,10 @@ this.SelectContentHelper.prototype = {
         DOMUtils.removeContentState(this.element, kStateHover);
         break;
 
+      case "Forms:MouseUp":
+        DOMUtils.removeContentState(this.element, kStateActive);
+        break;
+
     }
   },
 
@@ -194,12 +200,14 @@ this.SelectContentHelper.prototype = {
 
 }
 
-function getComputedDirection(element) {
-  return element.ownerDocument.defaultView.getComputedStyle(element).getPropertyValue("direction");
+function getComputedStyles(element) {
+  return element.ownerDocument.defaultView.getComputedStyle(element);
 }
 
 function buildOptionListForChildren(node) {
   let result = [];
+
+  let win = node.ownerDocument.defaultView;
 
   for (let child of node.children) {
     let tagName = child.tagName.toUpperCase();
@@ -216,15 +224,17 @@ function buildOptionListForChildren(node) {
         textContent = "";
       }
 
+      let cs = getComputedStyles(child);
+
       let info = {
         index: child.index,
         tagName: tagName,
         textContent: textContent,
         disabled: child.disabled,
-        display: child.style.display,
+        display: cs.display,
         // We need to do this for every option element as each one can have
         // an individual style set for direction
-        textDirection: getComputedDirection(child),
+        textDirection: cs.direction,
         tooltip: child.title,
         // XXX this uses a highlight color when this is the selected element.
         // We need to suppress such highlighting in the content process to get

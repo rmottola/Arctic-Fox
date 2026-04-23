@@ -8,11 +8,14 @@ const { LocalizationHelper } = require("devtools/shared/l10n");
 const Services = require("Services");
 const appInfo = Services.appinfo;
 const { CurlUtils } = require("devtools/client/shared/curl");
-
-loader.lazyRequireGetter(this, "NetworkHelper", "devtools/shared/webconsole/network-helper");
+const {
+  getFormDataSections,
+  getUrlQuery,
+  parseQueryString,
+} = require("devtools/client/netmonitor/request-utils");
 
 loader.lazyGetter(this, "L10N", () => {
-  return new LocalizationHelper("devtools/locale/har.properties");
+  return new LocalizationHelper("devtools/client/locales/har.properties");
 });
 
 const HAR_VERSION = "1.1";
@@ -169,8 +172,7 @@ HarBuilder.prototype = {
     request.headers = this.appendHeadersPostData(request.headers, file);
     request.cookies = this.buildCookies(file.requestCookies);
 
-    request.queryString = NetworkHelper.parseQueryString(
-      NetworkHelper.nsIURL(file.url).query) || [];
+    request.queryString = parseQueryString(getUrlQuery(file.url)) || [];
 
     request.postData = this.buildPostData(file);
 
@@ -272,16 +274,19 @@ HarBuilder.prototype = {
         postData.mimeType = "application/x-www-form-urlencoded";
 
         // Extract form parameters and produce nice HAR array.
-        this._options.view._getFormDataSections(file.requestHeaders,
+        getFormDataSections(
+          file.requestHeaders,
           file.requestHeadersFromUploadStream,
-          file.requestPostData).then(formDataSections => {
-            formDataSections.forEach(section => {
-              let paramsArray = NetworkHelper.parseQueryString(section);
-              if (paramsArray) {
-                postData.params = [...postData.params, ...paramsArray];
-              }
-            });
+          file.requestPostData,
+          this._options.getString
+        ).then(formDataSections => {
+          formDataSections.forEach(section => {
+            let paramsArray = parseQueryString(section);
+            if (paramsArray) {
+              postData.params = [...postData.params, ...paramsArray];
+            }
           });
+        });
       }
     });
 

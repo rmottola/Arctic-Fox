@@ -46,7 +46,6 @@
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
 #include "mozilla/Unused.h"
-#include "mozIApplication.h"
 #include "nsContentUtils.h"
 #include "nsCSSFrameConstructor.h"
 #include "nsDocShell.h"
@@ -103,7 +102,6 @@
 #include "nsDatePickerProxy.h"
 #include "nsContentPermissionHelper.h"
 #include "nsPresShell.h"
-#include "nsIAppsService.h"
 #include "nsNetUtil.h"
 #include "nsIPermissionManager.h"
 #include "nsIURILoader.h"
@@ -326,8 +324,6 @@ private:
 };
 
 namespace {
-StaticRefPtr<TabChild> sPreallocatedTab;
-
 std::map<TabId, RefPtr<TabChild>>&
 NestedTabChildMap()
 {
@@ -348,89 +344,12 @@ TabChild::FindTabChild(const TabId& aTabId)
   return tabChild.forget();
 }
 
-static void
-PreloadSlowThingsPostFork(void* aUnused)
-{
-    nsCOMPtr<nsIObserverService> observerService =
-      mozilla::services::GetObserverService();
-    observerService->NotifyObservers(nullptr, "preload-postfork", nullptr);
-
-    MOZ_ASSERT(sPreallocatedTab);
-    // Initialize initial reflow of the PresShell has to happen after fork
-    // because about:blank content viewer is created in the above observer
-    // notification.
-    nsCOMPtr<nsIDocShell> docShell =
-      do_GetInterface(sPreallocatedTab->WebNavigation());
-    if (nsIPresShell* presShell = docShell->GetPresShell()) {
-        // Initialize and do an initial reflow of the about:blank
-        // PresShell to let it preload some things for us.
-        presShell->Initialize(0, 0);
-        nsIDocument* doc = presShell->GetDocument();
-        doc->FlushPendingNotifications(Flush_Layout);
-        // ... but after it's done, make sure it doesn't do any more
-        // work.
-        presShell->MakeZombie();
-    }
-
-}
-
-static bool sPreloaded = false;
-
-/*static*/ void
-TabChild::PreloadSlowThings()
-{
-    if (sPreloaded) {
-        // If we are alredy initialized in Nuwa, don't redo preloading.
-        return;
-    }
-    sPreloaded = true;
-
-    // Pass nullptr to aManager since at this point the TabChild is
-    // not connected to any manager. Any attempt to use the TabChild
-    // in IPC will crash.
-    RefPtr<TabChild> tab(new TabChild(nullptr,
-                                        TabId(0),
-                                        TabContext(), /* chromeFlags */ 0));
-    if (NS_FAILED(tab->Init()) ||
-        !tab->InitTabChildGlobal(DONT_LOAD_SCRIPTS)) {
-        return;
-    }
-
-    // Just load and compile these scripts, but don't run them.
-    tab->TryCacheLoadAndCompileScript(BROWSER_ELEMENT_CHILD_SCRIPT, true);
-    // Load, compile, and run these scripts.
-    tab->RecvLoadRemoteScript(
-        NS_LITERAL_STRING("chrome://global/content/preload.js"),
-        true);
-
-    sPreallocatedTab = tab;
-    ClearOnShutdown(&sPreallocatedTab);
-
-    PreloadSlowThingsPostFork(nullptr);
-}
-
 /*static*/ already_AddRefed<TabChild>
 TabChild::Create(nsIContentChild* aManager,
                  const TabId& aTabId,
                  const TabContext &aContext,
                  uint32_t aChromeFlags)
 {
-    if (sPreallocatedTab &&
-        sPreallocatedTab->mChromeFlags == aChromeFlags &&
-        aContext.IsMozBrowser()) {
-
-        RefPtr<TabChild> child = sPreallocatedTab.get();
-        sPreallocatedTab = nullptr;
-
-        MOZ_ASSERT(!child->mTriedBrowserInit);
-
-        child->mManager = aManager;
-        child->SetTabId(aTabId);
-        child->SetTabContext(aContext);
-        child->NotifyTabContextUpdated(true);
-        return child.forget();
-    }
-
     RefPtr<TabChild> iframe = new TabChild(aManager, aTabId,
                                              aContext, aChromeFlags);
     return NS_SUCCEEDED(iframe->Init()) ? iframe.forget() : nullptr;
@@ -621,13 +540,6 @@ TabChild::DoUpdateZoomConstraints(const uint32_t& aPresShellId,
                                   const ViewID& aViewId,
                                   const Maybe<ZoomConstraints>& aConstraints)
 {
-  if (sPreallocatedTab == this) {
-    // If we're the preallocated tab, bail out because doing IPC will crash.
-    // Once we get used for something we'll get another zoom constraints update
-    // and all will be well.
-    return true;
-  }
-
   if (!mApzcTreeManager) {
     return false;
   }
@@ -1837,7 +1749,7 @@ TabChild::RecvPluginEvent(const WidgetPluginEvent& aEvent)
 
 void
 TabChild::RequestNativeKeyBindings(AutoCacheNativeKeyCommands* aAutoCache,
-                                   WidgetKeyboardEvent* aEvent)
+                                   const WidgetKeyboardEvent* aEvent)
 {
   MaybeNativeKeyBinding maybeBindings;
   if (!SendRequestNativeKeyBindings(*aEvent, &maybeBindings)) {
@@ -2450,6 +2362,7 @@ TabChild::RecvSetDocShellIsActive(const bool& aIsActive,
         root->SchedulePaint();
       }
 
+      Telemetry::AutoTimer<Telemetry::TABCHILD_PAINT_TIME> timer;
       // If we need to repaint, let's do that right away. No sense waiting until
       // we get back to the event loop again. We suppress the display port so that
       // we only paint what's visible. This ensures that the tab we're switching
@@ -2461,8 +2374,7 @@ TabChild::RecvSetDocShellIsActive(const bool& aIsActive,
         RefPtr<nsViewManager> vm = presShell->GetViewManager();
         if (nsView* view = vm->GetRootView()) {
           presShell->Paint(view, view->GetBounds(),
-                           nsIPresShell::PAINT_LAYERS |
-                           nsIPresShell::PAINT_SYNC_DECODE_IMAGES);
+                           nsIPresShell::PAINT_LAYERS);
         }
       }
       APZCCallbackHelper::SuppressDisplayport(false, presShell);
@@ -2529,7 +2441,7 @@ TabChild::DeallocPRenderFrameChild(PRenderFrameChild* aFrame)
 }
 
 bool
-TabChild::InitTabChildGlobal(FrameScriptLoading aScriptLoading)
+TabChild::InitTabChildGlobal()
 {
   if (!mGlobal && !mTabChildGlobal) {
     nsCOMPtr<nsPIDOMWindowOuter> window = do_GetInterface(WebNavigation());
@@ -2553,7 +2465,7 @@ TabChild::InitTabChildGlobal(FrameScriptLoading aScriptLoading)
     root->SetParentTarget(scope);
   }
 
-  if (aScriptLoading != DONT_LOAD_SCRIPTS && !mTriedBrowserInit) {
+  if (!mTriedBrowserInit) {
     mTriedBrowserInit = true;
     // Initialize the child side of the browser element machinery,
     // if appropriate.

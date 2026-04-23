@@ -932,6 +932,7 @@ EditorBase::BeginPlaceHolderTransaction(nsIAtom* aName)
     if (selection) {
       mSelState = new SelectionState();
       mSelState->SaveSelection(selection);
+      mRangeUpdater.RegisterSelectionState(*mSelState);
     }
   }
   mPlaceHolderBatch++;
@@ -983,6 +984,7 @@ EditorBase::EndPlaceHolderTransaction()
     if (mSelState) {
       // we saved the selection state, but never got to hand it to placeholder
       // (else we ould have nulled out this pointer), so destroy it to prevent leaks.
+      mRangeUpdater.DropSelectionState(*mSelState);
       delete mSelState;
       mSelState = nullptr;
     }
@@ -2005,26 +2007,31 @@ EditorBase::StopPreservingSelection()
   mSavedSel.MakeEmpty();
 }
 
-void
+bool
 EditorBase::EnsureComposition(WidgetCompositionEvent* aCompositionEvent)
 {
   if (mComposition) {
-    return;
+    return true;
   }
   // The compositionstart event must cause creating new TextComposition
   // instance at being dispatched by IMEStateManager.
   mComposition = IMEStateManager::GetTextCompositionFor(aCompositionEvent);
   if (!mComposition) {
-    MOZ_CRASH("IMEStateManager doesn't return proper composition");
+    // However, TextComposition may be committed before the composition
+    // event comes here.
+    return false;
   }
   mComposition->StartHandlingComposition(this);
+  return true;
 }
 
 nsresult
 EditorBase::BeginIMEComposition(WidgetCompositionEvent* aCompositionEvent)
 {
   MOZ_ASSERT(!mComposition, "There is composition already");
-  EnsureComposition(aCompositionEvent);
+  if (!EnsureComposition(aCompositionEvent)) {
+    return NS_OK;
+  }
   if (mPhonetic) {
     mPhonetic->Truncate(0);
   }
@@ -2436,8 +2443,8 @@ EditorBase::InsertTextIntoTextNodeImpl(const nsAString& aStringToInsert,
 {
   RefPtr<EditTransactionBase> transaction;
   bool isIMETransaction = false;
-  int32_t replacedOffset = 0;
-  int32_t replacedLength = 0;
+  RefPtr<Text> insertedTextNode = &aTextNode;
+  int32_t insertedOffset = aOffset;
   // aSuppressIME is used when editor must insert text, yet this text is not
   // part of the current IME operation. Example: adjusting whitespace around an
   // IME insertion.
@@ -2467,8 +2474,8 @@ EditorBase::InsertTextIntoTextNodeImpl(const nsAString& aStringToInsert,
     // All characters of the composition string will be replaced with
     // aStringToInsert.  So, we need to emulate to remove the composition
     // string.
-    replacedOffset = mIMETextOffset;
-    replacedLength = mIMETextLength;
+    insertedTextNode = mIMETextNode;
+    insertedOffset = mIMETextOffset;
     mIMETextLength = aStringToInsert.Length();
   } else {
     transaction = CreateTxnForInsertText(aStringToInsert, aTextNode, aOffset);
@@ -2477,8 +2484,8 @@ EditorBase::InsertTextIntoTextNodeImpl(const nsAString& aStringToInsert,
   // Let listeners know what's up
   for (auto& listener : mActionListeners) {
     listener->WillInsertText(
-      static_cast<nsIDOMCharacterData*>(aTextNode.AsDOMNode()), aOffset,
-      aStringToInsert);
+      static_cast<nsIDOMCharacterData*>(insertedTextNode->AsDOMNode()),
+      insertedOffset, aStringToInsert);
   }
 
   // XXX We may not need these view batches anymore.  This is handled at a
@@ -2487,18 +2494,11 @@ EditorBase::InsertTextIntoTextNodeImpl(const nsAString& aStringToInsert,
   nsresult rv = DoTransaction(transaction);
   EndUpdateViewBatch();
 
-  if (replacedLength) {
-    mRangeUpdater.SelAdjDeleteText(
-      static_cast<nsIDOMCharacterData*>(aTextNode.AsDOMNode()),
-      replacedOffset, replacedLength);
-  }
-  mRangeUpdater.SelAdjInsertText(aTextNode, aOffset, aStringToInsert);
-
   // let listeners know what happened
   for (auto& listener : mActionListeners) {
     listener->DidInsertText(
-      static_cast<nsIDOMCharacterData*>(aTextNode.AsDOMNode()),
-      aOffset, aStringToInsert, rv);
+      static_cast<nsIDOMCharacterData*>(insertedTextNode->AsDOMNode()),
+      insertedOffset, aStringToInsert, rv);
   }
 
   // Added some cruft here for bug 43366.  Layout was crashing because we left
@@ -2615,7 +2615,8 @@ EditorBase::CreateTxnForInsertText(const nsAString& aStringToInsert,
                                    int32_t aOffset)
 {
   RefPtr<InsertTextTransaction> transaction =
-    new InsertTextTransaction(aTextNode, aOffset, aStringToInsert, *this);
+    new InsertTextTransaction(aTextNode, aOffset, aStringToInsert, *this,
+                              &mRangeUpdater);
   return transaction.forget();
 }
 
@@ -4245,7 +4246,7 @@ EditorBase::CreateTxnForComposition(const nsAString& aStringToInsert)
   RefPtr<CompositionTransaction> transaction =
     new CompositionTransaction(*mIMETextNode, mIMETextOffset, mIMETextLength,
                                mComposition->GetRanges(), aStringToInsert,
-                               *this);
+                               *this, &mRangeUpdater);
   return transaction.forget();
 }
 

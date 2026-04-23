@@ -17,7 +17,6 @@
 #include "nsIFileStreams.h"
 #include "nsIInputStream.h"
 #include "nsIIPCSerializableInputStream.h"
-#include "nsIMemoryReporter.h"
 #include "nsIMIMEService.h"
 #include "nsISeekableStream.h"
 #include "nsIUnicharInputStream.h"
@@ -192,8 +191,8 @@ Blob::Create(nsISupports* aParent, const nsAString& aContentType,
 Blob::CreateStringBlob(nsISupports* aParent, const nsACString& aData,
                        const nsAString& aContentType)
 {
-  RefPtr<Blob> blob = Blob::Create(aParent,
-    new BlobImplString(aData, aContentType));
+  RefPtr<BlobImpl> blobImpl = BlobImplString::Create(aData, aContentType);
+  RefPtr<Blob> blob = Blob::Create(aParent, blobImpl);
   MOZ_ASSERT(!blob->mImpl->IsFile());
   return blob.forget();
 }
@@ -565,36 +564,10 @@ File::Constructor(const GlobalObject& aGlobal,
 }
 
 /* static */ already_AddRefed<File>
-File::Constructor(const GlobalObject& aGlobal,
-                  Blob& aData,
-                  const ChromeFilePropertyBag& aBag,
-                  ErrorResult& aRv)
-{
-  if (!nsContentUtils::ThreadsafeIsCallerChrome()) {
-    aRv.ThrowTypeError<MSG_NOT_SEQUENCE>(NS_LITERAL_STRING("Argument 1 of File.constructor"));
-    return nullptr;
-  }
-
-  RefPtr<MultipartBlobImpl> impl = new MultipartBlobImpl(EmptyString());
-  impl->InitializeChromeFile(aData, aBag, aRv);
-  if (aRv.Failed()) {
-    return nullptr;
-  }
-  MOZ_ASSERT(impl->IsFile());
-
-  if (aBag.mLastModified.WasPassed()) {
-    impl->SetLastModified(aBag.mLastModified.Value());
-  }
-
-  RefPtr<File> domFile = new File(aGlobal.GetAsSupports(), impl);
-  return domFile.forget();
-}
-
-/* static */ already_AddRefed<File>
-File::Constructor(const GlobalObject& aGlobal,
-                  nsIFile* aData,
-                  const ChromeFilePropertyBag& aBag,
-                  ErrorResult& aRv)
+File::CreateFromNsIFile(const GlobalObject& aGlobal,
+                        nsIFile* aData,
+                        const ChromeFilePropertyBag& aBag,
+                        ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_IsMainThread());
   if (!nsContentUtils::IsCallerChrome()) {
@@ -620,10 +593,10 @@ File::Constructor(const GlobalObject& aGlobal,
 }
 
 /* static */ already_AddRefed<File>
-File::Constructor(const GlobalObject& aGlobal,
-                  const nsAString& aData,
-                  const ChromeFilePropertyBag& aBag,
-                  ErrorResult& aRv)
+File::CreateFromFileName(const GlobalObject& aGlobal,
+                         const nsAString& aData,
+                         const ChromeFilePropertyBag& aBag,
+                         ErrorResult& aRv)
 {
   if (!nsContentUtils::ThreadsafeIsCallerChrome()) {
     aRv.ThrowTypeError<MSG_MISSING_ARGUMENTS>(NS_LITERAL_STRING("File"));
@@ -1051,7 +1024,27 @@ EmptyBlobImpl::GetInternalStream(nsIInputStream** aStream,
 ////////////////////////////////////////////////////////////////////////////
 // BlobImplString implementation
 
-NS_IMPL_ISUPPORTS_INHERITED0(BlobImplString, BlobImpl)
+NS_IMPL_ISUPPORTS_INHERITED(BlobImplString, BlobImpl, nsIMemoryReporter)
+
+/* static */ already_AddRefed<BlobImplString>
+BlobImplString::Create(const nsACString& aData, const nsAString& aContentType)
+{
+  RefPtr<BlobImplString> blobImpl = new BlobImplString(aData, aContentType);
+  RegisterWeakMemoryReporter(blobImpl);
+  return blobImpl.forget();
+}
+
+BlobImplString::BlobImplString(const nsACString& aData,
+                               const nsAString& aContentType)
+  : BlobImplBase(aContentType, aData.Length())
+  , mData(aData)
+{
+}
+
+BlobImplString::~BlobImplString()
+{
+  UnregisterWeakMemoryReporter(this);
+}
 
 already_AddRefed<BlobImpl>
 BlobImplString::CreateSlice(uint64_t aStart, uint64_t aLength,
@@ -1068,6 +1061,17 @@ void
 BlobImplString::GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv)
 {
   aRv = NS_NewCStringInputStream(aStream, mData);
+}
+
+NS_IMETHODIMP
+BlobImplString::CollectReports(nsIHandleReportCallback* aHandleReport,
+                               nsISupports* aData, bool aAnonymize)
+{
+  MOZ_COLLECT_REPORT(
+    "explicit/dom/memory-file-data/string", KIND_HEAP, UNITS_BYTES,
+    mData.SizeOfExcludingThisIfUnshared(MallocSizeOf),
+    "Memory used to back a File/Blob based on a string.");
+  return NS_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1230,7 +1234,32 @@ BlobImplTemporaryBlob::GetInternalStream(nsIInputStream** aStream,
 ////////////////////////////////////////////////////////////////////////////
 // BlobImplStream implementation
 
-NS_IMPL_ISUPPORTS_INHERITED0(BlobImplStream, BlobImpl)
+NS_IMPL_ISUPPORTS_INHERITED(BlobImplStream, BlobImpl, nsIMemoryReporter)
+
+/* static */ already_AddRefed<BlobImplStream>
+BlobImplStream::Create(nsIInputStream* aInputStream,
+                       const nsAString& aContentType,
+                       uint64_t aLength)
+{
+  RefPtr<BlobImplStream> blobImplStream =
+    new BlobImplStream(aInputStream, aContentType, aLength);
+  blobImplStream->MaybeRegisterMemoryReporter();
+  return blobImplStream.forget();
+}
+
+/* static */ already_AddRefed<BlobImplStream>
+BlobImplStream::Create(nsIInputStream* aInputStream,
+                       const nsAString& aName,
+                       const nsAString& aContentType,
+                       int64_t aLastModifiedDate,
+                       uint64_t aLength)
+{
+  RefPtr<BlobImplStream> blobImplStream =
+    new BlobImplStream(aInputStream, aName, aContentType, aLastModifiedDate,
+                       aLength);
+  blobImplStream->MaybeRegisterMemoryReporter();
+  return blobImplStream.forget();
+}
 
 BlobImplStream::BlobImplStream(nsIInputStream* aInputStream,
                                const nsAString& aContentType,
@@ -1262,7 +1291,9 @@ BlobImplStream::BlobImplStream(nsIInputStream* aInputStream,
 }
 
 BlobImplStream::~BlobImplStream()
-{}
+{
+  UnregisterWeakMemoryReporter(this);
+}
 
 void
 BlobImplStream::GetInternalStream(nsIInputStream** aStream, ErrorResult& aRv)
@@ -1295,6 +1326,37 @@ BlobImplStream::CreateSlice(uint64_t aStart, uint64_t aLength,
   RefPtr<BlobImpl> impl =
     new BlobImplStream(this, aContentType, aStart, aLength);
   return impl.forget();
+}
+
+void
+BlobImplStream::MaybeRegisterMemoryReporter()
+{
+  // We report only stringInputStream.
+  nsCOMPtr<nsIStringInputStream> stringInputStream =
+    do_QueryInterface(mInputStream);
+  if (!stringInputStream) {
+    return;
+  }
+
+  RegisterWeakMemoryReporter(this);
+}
+
+NS_IMETHODIMP
+BlobImplStream::CollectReports(nsIHandleReportCallback* aHandleReport,
+                               nsISupports* aData, bool aAnonymize)
+{
+  nsCOMPtr<nsIStringInputStream> stringInputStream =
+    do_QueryInterface(mInputStream);
+  if (!stringInputStream) {
+    return NS_OK;
+  }
+
+  MOZ_COLLECT_REPORT(
+    "explicit/dom/memory-file-data/stream", KIND_HEAP, UNITS_BYTES,
+    stringInputStream->SizeOfIncludingThis(MallocSizeOf),
+    "Memory used to back a File/Blob based on an input stream.");
+
+  return NS_OK;
 }
 
 } // namespace dom

@@ -472,6 +472,7 @@ class Process extends BaseProcess {
       }
 
       this.fd.dispose();
+      io.updatePollFds();
       this.resolveExit(this.exitCode);
       return this.exitCode;
     }

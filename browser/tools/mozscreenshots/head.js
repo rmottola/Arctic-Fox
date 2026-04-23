@@ -2,14 +2,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* exported TestRunner, shouldCapture */
+
 "use strict";
 
 const {AddonWatcher} = Cu.import("resource://gre/modules/AddonWatcher.jsm", {});
+const chromeRegistry = Cc["@mozilla.org/chrome/chrome-registry;1"].getService(Ci.nsIChromeRegistry);
 const env = Cc["@mozilla.org/process/environment;1"].getService(Ci.nsIEnvironment);
+const EXTENSION_DIR = "chrome://mochitests/content/extensions/mozscreenshots/browser/";
+
 let TestRunner;
 
-function setup() {
-  requestLongerTimeout(20);
+function* setup() {
+  requestLongerTimeout(10);
+
+  info("installing extension temporarily");
+  let chromeURL = Services.io.newURI(EXTENSION_DIR, null, null);
+  let dir = chromeRegistry.convertChromeURL(chromeURL).QueryInterface(Ci.nsIFileURL).file;
+  yield AddonManager.installTemporaryAddon(dir);
 
   info("Checking for mozscreenshots extension");
   return new Promise((resolve) => {
@@ -33,8 +43,7 @@ function shouldCapture() {
   // Automation isn't able to schedule test jobs to only run on nightlies so we handle it here
   // (see also: bug 1116275).
   let capture = AppConstants.MOZ_UPDATE_CHANNEL == "nightly" ||
-                AppConstants.SOURCE_REVISION_URL == "" ||
-                AppConstants.SOURCE_REVISION_URL == "1"; // bug 1248027
+                AppConstants.SOURCE_REVISION_URL == "";
   if (!capture) {
     ok(true, "Capturing is disabled for this MOZ_UPDATE_CHANNEL or REPO");
   }

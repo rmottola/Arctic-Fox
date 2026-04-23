@@ -94,6 +94,7 @@ public:
   INPUTDATA_AS_CHILD_TYPE(TapGestureInput, TAPGESTURE_INPUT)
   INPUTDATA_AS_CHILD_TYPE(ScrollWheelInput, SCROLLWHEEL_INPUT)
 
+  virtual ~InputData();
   explicit InputData(InputType aInputType);
 
 protected:
@@ -427,14 +428,7 @@ public:
     PINCHGESTURE_SENTINEL,
   };
 
-  // Construct a tap gesture from a Screen point.
-  // mLocalFocusPoint remains (0,0) unless it's set later.
-  PinchGestureInput(PinchGestureType aType, uint32_t aTime,
-                    TimeStamp aTimeStamp, const ScreenPoint& aFocusPoint,
-                    float aCurrentSpan, float aPreviousSpan,
-                    Modifiers aModifiers);
-
-  // Construct a tap gesture from a ParentLayer point.
+  // Construct a pinch gesture from a ParentLayer point.
   // mFocusPoint remains (0,0) unless it's set later.
   PinchGestureInput(PinchGestureType aType, uint32_t aTime, TimeStamp aTimeStamp,
                     const ParentLayerPoint& aLocalFocusPoint,

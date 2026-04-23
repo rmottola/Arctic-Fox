@@ -59,8 +59,6 @@ function dumpn(text)
  */
 function configureToLoadJarEngines()
 {
-  let defaultBranch = Services.prefs.getDefaultBranch(null);
-
   let url = "chrome://testsearchplugin/locale/searchplugins/";
   let resProt = Services.io.getProtocolHandler("resource")
                         .QueryInterface(Ci.nsIResProtocolHandler);
@@ -101,11 +99,11 @@ function installAddonEngine(name = "engine-addon")
     QueryInterface: XPCOMUtils.generateQI([Ci.nsIDirectoryServiceProvider,
                                            Ci.nsIDirectoryServiceProvider2]),
 
-    getFile: function (prop, persistant) {
+    getFile: function(prop, persistant) {
       throw Cr.NS_ERROR_FAILURE;
     },
 
-    getFiles: function (prop) {
+    getFiles: function(prop) {
       let result = [];
 
       switch (prop) {
@@ -195,6 +193,12 @@ function promiseCacheData() {
   }));
 }
 
+function promiseSaveCacheData(data) {
+  return OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, CACHE_FILENAME),
+                             new TextEncoder().encode(JSON.stringify(data)),
+                             {compression: "lz4"});
+}
+
 function promiseEngineMetadata() {
   return new Promise(resolve => Task.spawn(function* () {
     let cache = yield promiseCacheData();
@@ -217,9 +221,7 @@ function promiseSaveGlobalMetadata(globalData) {
   return new Promise(resolve => Task.spawn(function* () {
     let data = yield promiseCacheData();
     data.metaData = globalData;
-    yield OS.File.writeAtomic(OS.Path.join(OS.Constants.Path.profileDir, CACHE_FILENAME),
-                              new TextEncoder().encode(JSON.stringify(data)),
-                              {compression: "lz4"});
+    yield promiseSaveCacheData(data);
     resolve();
   }));
 }
@@ -234,6 +236,7 @@ let forceExpiration = Task.async(function* () {
 
 /**
  * Clean the profile of any cache file left from a previous run.
+ * Returns a boolean indicating if the cache file existed.
  */
 function removeCacheFile()
 {
@@ -241,7 +244,9 @@ function removeCacheFile()
   file.append(CACHE_FILENAME);
   if (file.exists()) {
     file.remove(false);
+    return true;
   }
+  return false;
 }
 
 /**
@@ -550,7 +555,7 @@ function checkCountryResultTelemetry(aExpectedValue) {
   let histogram = Services.telemetry.getHistogramById("SEARCH_SERVICE_COUNTRY_FETCH_RESULT");
   let snapshot = histogram.snapshot();
   // The probe is declared with 8 values, but we get 9 back from .counts
-  let expectedCounts = [0,0,0,0,0,0,0,0,0];
+  let expectedCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   if (aExpectedValue != null) {
     expectedCounts[aExpectedValue] = 1;
   }

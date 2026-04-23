@@ -2,9 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-////////////////////////////////////////////////////////////////////////////////
-//// StarUI
-
 var StarUI = {
   _itemId: -1,
   uri: null,
@@ -39,7 +36,7 @@ var StarUI = {
   },
 
   _blockCommands: function SU__blockCommands() {
-    this._blockedCommands.forEach(function (elt) {
+    this._blockedCommands.forEach(function(elt) {
       // make sure not to permanently disable this item (see bug 409155)
       if (elt.hasAttribute("wasDisabled"))
         return;
@@ -53,7 +50,7 @@ var StarUI = {
   },
 
   _restoreCommandsState: function SU__restoreCommandsState() {
-    this._blockedCommands.forEach(function (elt) {
+    this._blockedCommands.forEach(function(elt) {
       if (elt.getAttribute("wasDisabled") != "true")
         elt.removeAttribute("disabled");
       elt.removeAttribute("wasDisabled");
@@ -122,7 +119,7 @@ var StarUI = {
             if (aEvent.target.classList.contains("expander-up") ||
                 aEvent.target.classList.contains("expander-down") ||
                 aEvent.target.id == "editBMPanel_newFolderButton")  {
-              //XXX Why is this necessary? The defaultPrevented check should
+              // XXX Why is this necessary? The defaultPrevented check should
               //    be enough.
               break;
             }
@@ -201,7 +198,7 @@ var StarUI = {
     this._overlayLoading = true;
     document.loadOverlay(
       "chrome://browser/content/places/editBookmarkOverlay.xul",
-      (function (aSubject, aTopic, aData) {
+      (function(aSubject, aTopic, aData) {
         //XXX We just caused localstore.rdf to be re-applied (bug 640158)
         retrieveToolbarIconsizesFromTheme();
 
@@ -263,12 +260,26 @@ var StarUI = {
         parent.setAttribute("open", "true");
       }
     }
-    this.panel.openPopup(aAnchorElement, aPosition);
+    let panel = this.panel;
+    let target = panel;
+    if (target.parentNode) {
+      // By targeting the panel's parent and using a capturing listener, we
+      // can have our listener called before others waiting for the panel to
+      // be shown (which probably expect the panel to be fully initialized)
+      target = target.parentNode;
+    }
+    target.addEventListener("popupshown", function shownListener(event) {
+      if (event.target == panel) {
+        target.removeEventListener("popupshown", shownListener, true);
 
-    gEditItemOverlay.initPanel({ node: aNode
-                               , hiddenRows: ["description", "location",
-                                              "loadInSidebar", "keyword"]
-                               , focusedElement: "preferred" });
+        gEditItemOverlay.initPanel({ node: aNode
+                                   , hiddenRows: ["description", "location",
+                                                  "loadInSidebar", "keyword"]
+                                   , focusedElement: "preferred"});
+      }
+    }, true);
+
+    this.panel.openPopup(aAnchorElement, aPosition);
   }),
 
   panelShown:
@@ -333,9 +344,6 @@ var StarUI = {
     this._batching = false;
   }
 };
-
-////////////////////////////////////////////////////////////////////////////////
-//// PlacesCommandHook
 
 var PlacesCommandHook = {
   /**
@@ -528,7 +536,7 @@ var PlacesCommandHook = {
    * @param [optional] aDescription
    *        The linked page description, if available
    */
-  bookmarkLink: Task.async(function* (aParentId, aURL, aTitle, aDescription="") {
+  bookmarkLink: Task.async(function* (aParentId, aURL, aTitle, aDescription = "") {
     let node = yield PlacesUIUtils.fetchNodeLike({ url: aURL });
     if (node) {
       PlacesUIUtils.showBookmarkDialog({ action: "edit"
@@ -660,9 +668,6 @@ var PlacesCommandHook = {
     }
   }
 };
-
-////////////////////////////////////////////////////////////////////////////////
-//// HistoryMenu
 
 XPCOMUtils.defineLazyModuleGetter(this, "RecentlyClosedTabsAndWindowsMenuUtils",
   "resource:///modules/sessionstore/RecentlyClosedTabsAndWindowsMenuUtils.jsm");
@@ -802,9 +807,6 @@ HistoryMenu.prototype = {
   }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-//// BookmarksEventHandler
-
 /**
  * Functions for handling events in the Bookmarks Toolbar and menu.
  */
@@ -836,7 +838,7 @@ var BookmarksEventHandler = {
     // If this event bubbled up from a menu or menuitem, close the menus.
     // Do this before opening tabs, to avoid hiding the open tabs confirm-dialog.
     if (target.localName == "menu" || target.localName == "menuitem") {
-      for (node = target.parentNode; node; node = node.parentNode) {
+      for (let node = target.parentNode; node; node = node.parentNode) {
         if (node.localName == "menupopup")
           node.hidePopup();
         else if (node.localName != "menu" &&
@@ -930,9 +932,6 @@ var BookmarksEventHandler = {
     return true;
   }
 };
-
-////////////////////////////////////////////////////////////////////////////////
-//// PlacesMenuDNDHandler
 
 // Handles special drag and drop functionality for Places menus that are not
 // part of a Places view (e.g. the bookmarks menu in the menubar).
@@ -1062,9 +1061,6 @@ var PlacesMenuDNDHandler = {
   }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-//// PlacesToolbarHelper
-
 /**
  * This object handles the initialization and uninitialization of the bookmarks
  * toolbar.
@@ -1156,7 +1152,7 @@ var PlacesToolbarHelper = {
     return !area || CustomizableUI.TYPE_MENU_PANEL == areaType;
   },
 
-  onPlaceholderCommand: function () {
+  onPlaceholderCommand: function() {
     let widgetGroup = CustomizableUI.getWidget("personal-bookmarks");
     let widget = widgetGroup.forWindow(window);
     if (widget.overflowed ||
@@ -1208,9 +1204,6 @@ var PlacesToolbarHelper = {
     }
   },
 };
-
-////////////////////////////////////////////////////////////////////////////////
-//// BookmarkingUI
 
 /**
  * Handles the bookmarks star button in the URL bar, as well as the bookmark
@@ -1322,8 +1315,8 @@ var BookmarkingUI = {
     if (event.target != event.currentTarget)
       return;
 
-    this._updateRecentBookmarks(document.getElementById("BMB_recentBookmarks"),
-                                "subviewbutton");
+    this._initRecentBookmarks(document.getElementById("BMB_recentBookmarks"),
+                              "subviewbutton");
 
     if (!this._popupNeedsUpdate)
       return;
@@ -1365,7 +1358,77 @@ var BookmarkingUI = {
     });
   },
 
-  _updateRecentBookmarks: function(aHeaderItem, extraCSSClass = "") {
+  RECENTLY_BOOKMARKED_PREF: "browser.bookmarks.showRecentlyBookmarked",
+
+  _initRecentBookmarks(aHeaderItem, aExtraCSSClass) {
+    this._populateRecentBookmarks(aHeaderItem, aExtraCSSClass);
+
+    // Add observers and listeners and remove them again when the menupopup closes.
+
+    let bookmarksMenu = aHeaderItem.parentNode;
+    let placesContextMenu = document.getElementById("placesContext");
+
+    let prefObserver = () => {
+      this._populateRecentBookmarks(aHeaderItem, aExtraCSSClass);
+    };
+
+    let updatePlacesContextMenu = (shouldHidePrefUI = false) => {
+      let prefEnabled = !shouldHidePrefUI && Services.prefs.getBoolPref(this.RECENTLY_BOOKMARKED_PREF);
+      let showItem = document.getElementById("placesContext_showRecentlyBookmarked");
+      let hideItem = document.getElementById("placesContext_hideRecentlyBookmarked");
+      let separator = document.getElementById("placesContext_recentlyBookmarkedSeparator");
+      showItem.hidden = shouldHidePrefUI || prefEnabled;
+      hideItem.hidden = shouldHidePrefUI || !prefEnabled;
+      separator.hidden = shouldHidePrefUI;
+      if (!shouldHidePrefUI) {
+        // Move to the bottom of the menu.
+        separator.parentNode.appendChild(separator);
+        showItem.parentNode.appendChild(showItem);
+        hideItem.parentNode.appendChild(hideItem);
+      }
+    };
+
+    let onPlacesContextMenuShowing = event => {
+      if (event.target == event.currentTarget) {
+        let triggerPopup = event.target.triggerNode;
+        while (triggerPopup && triggerPopup.localName != "menupopup") {
+          triggerPopup = triggerPopup.parentNode;
+        }
+        let shouldHidePrefUI = triggerPopup != bookmarksMenu;
+        updatePlacesContextMenu(shouldHidePrefUI);
+      }
+    };
+
+    let onBookmarksMenuHidden = event => {
+      if (event.target == event.currentTarget) {
+        updatePlacesContextMenu(true);
+
+        Services.prefs.removeObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver, false);
+        placesContextMenu.removeEventListener("popupshowing", onPlacesContextMenuShowing);
+        bookmarksMenu.removeEventListener("popuphidden", onBookmarksMenuHidden);
+      }
+    };
+
+    Services.prefs.addObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver, false);
+    placesContextMenu.addEventListener("popupshowing", onPlacesContextMenuShowing);
+    bookmarksMenu.addEventListener("popuphidden", onBookmarksMenuHidden);
+  },
+
+  _populateRecentBookmarks(aHeaderItem, aExtraCSSClass = "") {
+    while (aHeaderItem.nextSibling &&
+           aHeaderItem.nextSibling.localName == "menuitem") {
+      aHeaderItem.nextSibling.remove();
+    }
+
+    let shouldShow = Services.prefs.getBoolPref(this.RECENTLY_BOOKMARKED_PREF);
+    let separator = aHeaderItem.previousSibling;
+    aHeaderItem.hidden = !shouldShow;
+    separator.hidden = !shouldShow;
+
+    if (!shouldShow) {
+      return;
+    }
+
     const kMaxResults = 5;
 
     let options = PlacesUtils.history.getNewQueryOptions();
@@ -1374,17 +1437,6 @@ var BookmarkingUI = {
     options.sortingMode = options.SORT_BY_DATE_DESCENDING;
     options.maxResults = kMaxResults;
     let query = PlacesUtils.history.getNewQuery();
-
-    while (aHeaderItem.nextSibling &&
-           aHeaderItem.nextSibling.localName == "menuitem") {
-      aHeaderItem.nextSibling.remove();
-    }
-
-    let onItemCommand = function (aEvent) {
-      let item = aEvent.target;
-      openUILink(item.getAttribute("targetURI"), aEvent);
-      CustomizableUI.hidePanelForNode(item);
-    };
 
     let fragment = document.createDocumentFragment();
     let root = PlacesUtils.history.executeQuery(query, options).root;
@@ -1400,10 +1452,10 @@ var BookmarkingUI = {
                                  "menuitem");
       item.setAttribute("label", title || uri);
       item.setAttribute("targetURI", uri);
+      item.setAttribute("context", "hideRecentlyBookmarked");
       item.setAttribute("simulated-places-node", true);
       item.setAttribute("class", "menuitem-iconic menuitem-with-favicon bookmark-item " +
-                                 extraCSSClass);
-      item.addEventListener("command", onItemCommand);
+                                 aExtraCSSClass);
       if (icon) {
         let iconURL = "moz-anno:favicon:" + icon;
         item.setAttribute("image", iconURL);
@@ -1413,6 +1465,15 @@ var BookmarkingUI = {
     }
     root.containerOpen = false;
     aHeaderItem.parentNode.insertBefore(fragment, aHeaderItem.nextSibling);
+    aHeaderItem.setAttribute("context", "hideRecentlyBookmarked");
+  },
+
+  showRecentlyBookmarked() {
+    Services.prefs.setBoolPref(this.RECENTLY_BOOKMARKED_PREF, true);
+  },
+
+  hideRecentlyBookmarked() {
+    Services.prefs.setBoolPref(this.RECENTLY_BOOKMARKED_PREF, false);
   },
 
   _updateToolbarStyle: function BUI__updateToolbarStyle() {
@@ -1564,7 +1625,7 @@ var BookmarkingUI = {
       }
 
       delete this._pendingStmt;
-    }, this);
+    });
   },
 
   _updateStar: function BUI__updateStar() {
@@ -1607,7 +1668,7 @@ var BookmarkingUI = {
   onMainMenuPopupShowing: function BUI_onMainMenuPopupShowing(event) {
     this._updateBookmarkPageMenuItem();
     PlacesCommandHook.updateBookmarkAllTabsCommand();
-    this._updateRecentBookmarks(document.getElementById("menu_recentBookmarks"));
+    this._initRecentBookmarks(document.getElementById("menu_recentBookmarks"));
   },
 
   _showBookmarkedNotification: function BUI_showBookmarkedNotification() {
@@ -1818,11 +1879,11 @@ var BookmarkingUI = {
     }
   },
 
-  onBeginUpdateBatch: function () {},
-  onEndUpdateBatch: function () {},
-  onBeforeItemRemoved: function () {},
-  onItemVisited: function () {},
-  onItemMoved: function () {},
+  onBeginUpdateBatch: function() {},
+  onEndUpdateBatch: function() {},
+  onBeforeItemRemoved: function() {},
+  onItemVisited: function() {},
+  onItemMoved: function() {},
 
   // CustomizableUI events:
   _starButtonLabel: null,

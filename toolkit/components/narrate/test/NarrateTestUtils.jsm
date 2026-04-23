@@ -6,6 +6,7 @@
 
 const Cu = Components.utils;
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://testing-common/ContentTaskUtils.jsm");
 
 this.EXPORTED_SYMBOLS = [ "NarrateTestUtils" ];
@@ -18,8 +19,8 @@ this.NarrateTestUtils = {
   VOICE_SELECTED: "#narrate-voices .options .option.selected",
   VOICE_SELECT_LABEL: "#narrate-voices .select-toggle .current-voice",
   RATE: "#narrate-rate-input",
-  START: "#narrate-start-stop:not(.speaking)",
-  STOP: "#narrate-start-stop.speaking",
+  START: "#narrate-dropdown:not(.speaking) #narrate-start-stop",
+  STOP: "#narrate-dropdown.speaking #narrate-start-stop",
   BACK: "#narrate-skip-previous",
   FORWARD: "#narrate-skip-next",
 
@@ -47,6 +48,8 @@ this.NarrateTestUtils = {
     ok($(this.FORWARD).disabled, "forward button is disabled");
     ok(!!$(this.START), "start button is showing");
     ok(!$(this.STOP), "stop button is hidden");
+    // This checks for a localized label. Not the best...
+    ok($(this.START).title == "Start", "Button tooltip is correct");
   },
 
   isStartedState: function(window, ok) {
@@ -55,6 +58,8 @@ this.NarrateTestUtils = {
     ok(!$(this.FORWARD).disabled, "forward button is enabled");
     ok(!$(this.START), "start button is hidden");
     ok(!!$(this.STOP), "stop button is showing");
+    // This checks for a localized label. Not the best...
+    ok($(this.STOP).title == "Stop", "Button tooltip is correct");
   },
 
   selectVoice: function(window, voiceUri) {
@@ -115,10 +120,31 @@ this.NarrateTestUtils = {
     return new Promise(resolve => {
       function observeChange() {
         Services.prefs.removeObserver(pref, observeChange);
-        resolve();
+        resolve(Preferences.get(pref));
       }
 
       Services.prefs.addObserver(pref, observeChange, false);
+    });
+  },
+
+  sendBoundaryEvent: function(window, name, charIndex) {
+    let detail = { type: "boundary", args: { name, charIndex } };
+    window.dispatchEvent(new window.CustomEvent("testsynthevent",
+      { detail: detail }));
+  },
+
+  isWordHighlightGone: function(window, ok) {
+    let $ = window.document.querySelector.bind(window.document);
+    ok(!$(".narrate-word-highlight"), "No more word highlights exist");
+  },
+
+  getWordHighlights: function(window) {
+    let $$ = window.document.querySelectorAll.bind(window.document);
+    let nodes = Array.from($$(".narrate-word-highlight"));
+    return nodes.map(node => {
+      return { word: node.dataset.word,
+               left: Number(node.style.left.replace(/px$/, "")),
+               top: Number(node.style.top.replace(/px$/, ""))};
     });
   }
 };

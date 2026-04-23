@@ -40,18 +40,18 @@ const PAGECONTENT_SMALL =
   "</select></body></html>";
 
 const PAGECONTENT_SOMEHIDDEN =
-  "<html>" +
+  "<html><head><style>.hidden { display: none; }</style></head>" +
   "<body><select id='one'>" +
   "  <option value='One' style='display: none;'>OneHidden</option>" +
-  "  <option value='Two' style='display: none;'>TwoHidden</option>" +
+  "  <option value='Two' class='hidden'>TwoHidden</option>" +
   "  <option value='Three'>ThreeVisible</option>" +
   "  <option value='Four'style='display: table;'>FourVisible</option>" +
   "  <option value='Five'>FiveVisible</option>" +
-  "  <optgroup label='GroupHidden' style='display: none;'>" +
+  "  <optgroup label='GroupHidden' class='hidden'>" +
   "    <option value='Four'>Six.OneHidden</option>" +
   "    <option value='Five' style='display: block;'>Six.TwoHidden</option>" +
   "  </optgroup>" +
-  "  <option value='Six'>SevenVisible</option>" +
+  "  <option value='Six' class='hidden' style='display: block;'>SevenVisible</option>" +
   "</select></body></html>";
 
 const PAGECONTENT_TRANSLATED =
@@ -171,7 +171,7 @@ function doSelectTests(contentType, dtd)
   is((yield getInputEvents()), 1, "Tab away from select with no change - number of input events");
   is((yield getChangeEvents()), 1, "Tab away from select with no change - number of change events");
 
-  yield openSelectPopup(selectPopup, true);
+  yield openSelectPopup(selectPopup, "click");
   EventUtils.synthesizeKey("KEY_ArrowDown", { code: "ArrowDown" });
   yield hideSelectPopup(selectPopup, true);
   is((yield getInputEvents()), isWindows ? 2 : 1, "Open and close with change - number of input events");
@@ -205,7 +205,7 @@ add_task(function*() {
   let selectPopup = menulist.menupopup;
 
   // First, try it when a different <select> element than the one that is open is removed
-  yield openSelectPopup(selectPopup, true, "#one");
+  yield openSelectPopup(selectPopup, "click", "#one");
 
   yield ContentTask.spawn(gBrowser.selectedBrowser, {}, function() {
     content.document.body.removeChild(content.document.getElementById("two"));
@@ -219,7 +219,7 @@ add_task(function*() {
   yield hideSelectPopup(selectPopup);
 
   // Next, try it when the same <select> element than the one that is open is removed
-  yield openSelectPopup(selectPopup, true, "#three");
+  yield openSelectPopup(selectPopup, "click", "#three");
 
   let popupHiddenPromise = BrowserTestUtils.waitForEvent(selectPopup, "popuphidden");
   yield ContentTask.spawn(gBrowser.selectedBrowser, {}, function() {
@@ -230,7 +230,7 @@ add_task(function*() {
   ok(true, "Popup hidden when select is removed");
 
   // Finally, try it when the tab is closed while the select popup is open.
-  yield openSelectPopup(selectPopup, true, "#one");
+  yield openSelectPopup(selectPopup, "click", "#one");
 
   popupHiddenPromise = BrowserTestUtils.waitForEvent(selectPopup, "popuphidden");
   yield BrowserTestUtils.removeTab(tab);
@@ -248,7 +248,7 @@ add_task(function*() {
   let selectPopup = menulist.menupopup;
 
   // First, get the position of the select popup when no translations have been applied.
-  yield openSelectPopup(selectPopup, false);
+  yield openSelectPopup(selectPopup);
 
   let rect = selectPopup.getBoundingClientRect();
   let expectedX = rect.left;
@@ -289,7 +289,7 @@ add_task(function*() {
       });
     });
 
-    yield openSelectPopup(selectPopup, false);
+    yield openSelectPopup(selectPopup);
 
     expectedX += step[2];
     expectedY += step[3];
@@ -390,6 +390,38 @@ add_task(function* test_large_popup() {
   let selectPopup = document.getElementById("ContentSelectDropdown").menupopup;
   let browserRect = tab.linkedBrowser.getBoundingClientRect();
 
+  // Check if a drag-select works and scrolls the list.
+  yield openSelectPopup(selectPopup, "mousedown", "select", win);
+
+  let scrollPos = selectPopup.scrollBox.scrollTop;
+  let popupRect = selectPopup.getBoundingClientRect();
+
+  // First, check that scrolling does not occur when the mouse is moved over the
+  // anchor button but not the popup yet.
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 5, popupRect.top - 10, { type: "mousemove" }, win);
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position after mousemove over button");
+
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.top + 10, { type: "mousemove" }, win);
+
+  // Dragging above the popup scrolls it up.
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.top - 20, { type: "mousemove" }, win);
+  ok(selectPopup.scrollBox.scrollTop < scrollPos - 5, "scroll position at drag up");
+
+  // Dragging below the popup scrolls it down.
+  scrollPos = selectPopup.scrollBox.scrollTop;
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 20, { type: "mousemove" }, win);
+  ok(selectPopup.scrollBox.scrollTop > scrollPos + 5, "scroll position at drag down");
+
+  // Releasing the mouse button and moving the mouse does not change the scroll position.
+  scrollPos = selectPopup.scrollBox.scrollTop;
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 25, { type: "mouseup" }, win);
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mouseup");
+
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 20, { type: "mousemove" }, win);
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mouseup again");
+
+  yield hideSelectPopup(selectPopup, "escape", win);
+
   let positions = [
     "margin-top: 300px;",
     "position: fixed; bottom: 100px;",
@@ -460,7 +492,7 @@ add_task(function* test_mousemove_correcttarget() {
 
   // The popup should be closed when fullscreen mode is entered or exited.
   for (let steps = 0; steps < 2; steps++) {
-    yield openSelectPopup(selectPopup, true);
+    yield openSelectPopup(selectPopup, "click");
     let popupHiddenPromise = BrowserTestUtils.waitForEvent(selectPopup, "popuphidden");
     let sizeModeChanged = BrowserTestUtils.waitForEvent(window, "sizemodechange");
     BrowserFullScreen();

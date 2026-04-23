@@ -435,8 +435,8 @@
             try {
               var event = document.createEvent("Events");
               event.initEvent("syncfrompreference", true, true);
-              var f = new Function ("event",
-                                    aElement.getAttribute("onsyncfrompreference"));
+              var f = new Function("event",
+                                   aElement.getAttribute("onsyncfrompreference"));
               rv = f.call(aElement, event);
             }
             catch (e) {
@@ -490,8 +490,8 @@
             try {
               var event = document.createEvent("Events");
               event.initEvent("synctopreference", true, true);
-              var f = new Function ("event",
-                                    aElement.getAttribute("onsynctopreference"));
+              var f = new Function("event",
+                                   aElement.getAttribute("onsynctopreference"));
               var rv = f.call(aElement, event);
               if (rv !== undefined)
                 return rv;
@@ -631,10 +631,7 @@
             var acceptButton = docElt.getButton("accept");
             acceptButton.hidden = true;
             var cancelButton  = docElt.getButton("cancel");
-
-            let { AppConstants } =
-                Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
-            if (AppConstants.platform == "macosx") {
+            if (/Mac/.test(navigator.platform)) {
               // no buttons on Mac except Help
               cancelButton.hidden = true;
               // Move Help button to the end
@@ -643,7 +640,7 @@
               acceptButton.disabled = true;
             } else {
               // morph the Cancel button into the Close button
-              cancelButton.setAttribute ("icon", "close");
+              cancelButton.setAttribute("icon", "close");
               cancelButton.label = docElt.getAttribute("closebuttonlabel");
               cancelButton.accesskey = docElt.getAttribute("closebuttonaccesskey");
             }
@@ -763,7 +760,7 @@
             }
             OverlayLoadObserver.prototype = {
               _outer: this,
-              observe: function (aSubject, aTopic, aData)
+              observe: function(aSubject, aTopic, aData)
               {
                 this._pane.loaded = true;
                 this._outer._fireEvent("paneload", this._pane);
@@ -791,7 +788,7 @@
             event.initEvent(aEventName, true, true);
             var cancel = !aTarget.dispatchEvent(event);
             if (aTarget.hasAttribute("on" + aEventName)) {
-              var fn = new Function ("event", aTarget.getAttribute("on" + aEventName));
+              var fn = new Function("event", aTarget.getAttribute("on" + aEventName));
               var rv = fn.call(aTarget, event);
               if (rv == false)
                 cancel = true;
@@ -811,9 +808,7 @@
         <parameter name="aPaneElement"/>
         <body>
         <![CDATA[
-          let { AppConstants } =
-              Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
-          if (AppConstants.platform == "macosx") {
+          if (/Mac/.test(navigator.platform)) {
             var paneTitle = aPaneElement.label;
             if (paneTitle != "")
               document.title = paneTitle;
@@ -887,11 +882,9 @@
       <property name="_shouldAnimate">
         <getter>
         <![CDATA[
-          let { AppConstants } =
-              Components.utils.import("resource://gre/modules/AppConstants.jsm", {});
           var psvc = Components.classes["@mozilla.org/preferences-service;1"]
                                .getService(Components.interfaces.nsIPrefBranch);
-          var animate = AppConstants.platform == "macosx";
+          var animate = /Mac/.test(navigator.platform);
           try {
             animate = psvc.getBoolPref("browser.preferences.animateFadeIn");
           }

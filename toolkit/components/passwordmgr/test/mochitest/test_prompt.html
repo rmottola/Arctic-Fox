@@ -58,14 +58,6 @@ function initLogins(pi) {
             createInstance(Ci.nsILoginInfo);
   login2E = Cc["@mozilla.org/login-manager/loginInfo;1"].
             createInstance(Ci.nsILoginInfo);
-  login3A = Cc["@mozilla.org/login-manager/loginInfo;1"].
-            createInstance(Ci.nsILoginInfo);
-  login3B = Cc["@mozilla.org/login-manager/loginInfo;1"].
-            createInstance(Ci.nsILoginInfo);
-  login4  = Cc["@mozilla.org/login-manager/loginInfo;1"].
-            createInstance(Ci.nsILoginInfo);
-  proxyLogin = Cc["@mozilla.org/login-manager/loginInfo;1"].
-               createInstance(Ci.nsILoginInfo);
 
   login1.init("http://example.com", null, "http://example.com",
               "", "examplepass", "", "");
@@ -79,14 +71,6 @@ function initLogins(pi) {
                "100@beef", "user3pass", "", "");
   login2E.init("http://example2.com", null, "http://example2.com",
                "100%beef", "user3pass", "", "");
-  login3A.init("http://mochi.test:8888", null, "mochitest",
-               "mochiuser1", "mochipass1", "", "");
-  login3B.init("http://mochi.test:8888", null, "mochitest2",
-               "mochiuser2", "mochipass2", "", "");
-  login4.init("http://mochi.test:8888", null, "mochitest3",
-               "mochiuser3", "mochipass3-old", "", "");
-  proxyLogin.init(mozproxy, null, "Proxy Realm",
-                  "proxuser", "proxpass", "", "");
 
   pwmgr.addLogin(login1);
   pwmgr.addLogin(login2A);

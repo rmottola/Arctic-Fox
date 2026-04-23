@@ -174,7 +174,7 @@ function simulateItemDrag(aToDrag, aTarget) {
   synthesizeDrop(aToDrag.parentNode, aTarget);
 }
 
-function endCustomizing(aWindow=window) {
+function endCustomizing(aWindow = window) {
   if (aWindow.document.documentElement.getAttribute("customizing") != "true") {
     return true;
   }
@@ -211,7 +211,7 @@ function endCustomizing(aWindow=window) {
   });
 }
 
-function startCustomizing(aWindow=window) {
+function startCustomizing(aWindow = window) {
   if (aWindow.document.documentElement.getAttribute("customizing") == "true") {
     return null;
   }
@@ -236,7 +236,7 @@ function promiseObserverNotified(aTopic) {
   return deferred.promise;
 }
 
-function openAndLoadWindow(aOptions, aWaitForDelayedStartup=false) {
+function openAndLoadWindow(aOptions, aWaitForDelayedStartup = false) {
   let deferred = Promise.defer();
   let win = OpenBrowserWindow(aOptions);
   if (aWaitForDelayedStartup) {
@@ -349,7 +349,7 @@ function subviewHidden(aSubview) {
   return deferred.promise;
 }
 
-function waitForCondition(aConditionFn, aMaxTries=50, aCheckInterval=100) {
+function waitForCondition(aConditionFn, aMaxTries = 50, aCheckInterval = 100) {
   function tryNow() {
     tries++;
     if (aConditionFn()) {
@@ -369,7 +369,7 @@ function waitForCondition(aConditionFn, aMaxTries=50, aCheckInterval=100) {
   return deferred.promise;
 }
 
-function waitFor(aTimeout=100) {
+function waitFor(aTimeout = 100) {
   let deferred = Promise.defer();
   setTimeout(() => deferred.resolve(), aTimeout);
   return deferred.promise;
@@ -383,7 +383,7 @@ function waitFor(aTimeout=100) {
  * @param aEventType The load event type to wait for.  Defaults to "load".
  * @return {Promise} resolved when the event is handled.
  */
-function promiseTabLoadEvent(aTab, aURL, aEventType="load") {
+function promiseTabLoadEvent(aTab, aURL, aEventType = "load") {
   let deferred = Promise.defer();
   info("Wait for tab event: " + aEventType);
 
@@ -496,7 +496,6 @@ function popupHidden(aPopup) {
  */
 function promisePopupEvent(aPopup, aEventSuffix) {
   let deferred = Promise.defer();
-  let win = aPopup.ownerGlobal;
   let eventType = "popup" + aEventSuffix;
 
   function onPopupEvent(e) {
@@ -510,7 +509,7 @@ function promisePopupEvent(aPopup, aEventSuffix) {
 
 // This is a simpler version of the context menu check that
 // exists in contextmenu_common.js.
-function checkContextMenu(aContextMenu, aExpectedEntries, aWindow=window) {
+function checkContextMenu(aContextMenu, aExpectedEntries, aWindow = window) {
   let childNodes = [...aContextMenu.childNodes];
   // Ignore hidden nodes:
   childNodes = childNodes.filter((n) => !n.hidden);

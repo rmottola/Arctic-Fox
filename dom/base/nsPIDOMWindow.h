@@ -123,6 +123,12 @@ public:
   virtual nsPIDOMWindowOuter* GetScriptableParent() = 0;
   virtual already_AddRefed<nsPIWindowRoot> GetTopWindowRoot() = 0;
 
+  bool IsRootOuterWindow()
+  {
+    MOZ_ASSERT(IsOuterWindow());
+    return mIsRootOuterWindow;
+  }
+
   /**
    * Behavies identically to GetScriptableParent extept that it returns null
    * if GetScriptableParent would return this window.
@@ -318,7 +324,7 @@ public:
   {
     return mMayHavePaintEventListener;
   }
-  
+
   /**
    * Call this to indicate that some node (this window, its document,
    * or content in that document) has a touch event listener.
@@ -675,6 +681,8 @@ protected:
 
   // current desktop mode flag.
   bool                   mDesktopModeViewport;
+
+  bool                   mIsRootOuterWindow;
 
   // And these are the references between inner and outer windows.
   nsPIDOMWindowInner* MOZ_NON_OWNING_REF mInnerWindow;

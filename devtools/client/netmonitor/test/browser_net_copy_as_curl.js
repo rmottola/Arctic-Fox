@@ -8,7 +8,7 @@
  */
 
 add_task(function* () {
-  let [tab, , monitor] = yield initNetMonitor(CURL_URL);
+  let { tab, monitor } = yield initNetMonitor(CURL_URL);
   info("Starting test... ");
 
   // Different quote chars are used for Windows and POSIX
@@ -55,7 +55,7 @@ add_task(function* () {
   RequestsMenu.selectedItem = requestItem;
 
   yield waitForClipboardPromise(function setup() {
-    RequestsMenu.copyAsCurl();
+    RequestsMenu.contextMenu.copyAsCurl();
   }, function validate(result) {
     if (typeof result !== "string") {
       return false;

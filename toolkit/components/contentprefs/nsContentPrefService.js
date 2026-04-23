@@ -49,7 +49,6 @@ cache.set = function CPS_cache_set(group, name, val) {
 const privModeStorage = new ContentPrefStore();
 
 ContentPrefService.prototype = {
-  //**************************************************************************//
   // XPCOM Plumbing
 
   classID: Components.ID("{e3f772f3-023f-4b32-b074-36cf0fd5d414}"),
@@ -72,7 +71,6 @@ ContentPrefService.prototype = {
     throw Cr.NS_ERROR_NO_INTERFACE;
   },
 
-  //**************************************************************************//
   // Convenience Getters
 
   // Observer Service
@@ -103,7 +101,6 @@ ContentPrefService.prototype = {
   },
 
 
-  //**************************************************************************//
   // Destruction
 
   _destroy: function ContentPrefService__destroy() {
@@ -191,7 +188,6 @@ ContentPrefService.prototype = {
   },
 
 
-  //**************************************************************************//
   // nsIObserver
 
   observe: function ContentPrefService_observe(subject, topic, data) {
@@ -206,13 +202,11 @@ ContentPrefService.prototype = {
   },
 
 
-  //**************************************************************************//
   // in-memory cache and private-browsing stores
 
   _cache: cache,
   _privModeStorage: privModeStorage,
 
-  //**************************************************************************//
   // nsIContentPrefService
 
   getPref: function ContentPrefService_getPref(aGroup, aName, aContext, aCallback) {
@@ -228,7 +222,7 @@ ContentPrefService.prototype = {
       if (this._privModeStorage.has(group, aName)) {
         let value = this._privModeStorage.get(group, aName);
         if (aCallback) {
-          this._scheduleCallback(function() {aCallback.onResult(value);});
+          this._scheduleCallback(function() { aCallback.onResult(value); });
           return undefined;
         }
         return value;
@@ -299,7 +293,7 @@ ContentPrefService.prototype = {
                                  Cr.NS_ERROR_ILLEGAL_VALUE);
 
     let group = this._parseGroupParam(aGroup);
-    let storage = aContext && aContext.usePrivateBrowsing ? this._privModeStorage: this._cache;
+    let storage = aContext && aContext.usePrivateBrowsing ? this._privModeStorage : this._cache;
     return storage.has(group, aName);
   },
 
@@ -569,7 +563,6 @@ ContentPrefService.prototype = {
   },
 
 
-  //**************************************************************************//
   // Data Retrieval & Modification
 
   __stmtSelectPref: null,
@@ -597,7 +590,7 @@ ContentPrefService.prototype = {
     if (this._cache.has(aGroup, aSetting)) {
       value = this._cache.get(aGroup, aSetting);
       if (aCallback) {
-        this._scheduleCallback(function() {aCallback.onResult(value);});
+        this._scheduleCallback(function() { aCallback.onResult(value); });
         return undefined;
       }
       return value;
@@ -647,7 +640,7 @@ ContentPrefService.prototype = {
     if (this._cache.has(null, aName)) {
       value = this._cache.get(null, aName);
       if (aCallback) {
-        this._scheduleCallback(function() {aCallback.onResult(value);});
+        this._scheduleCallback(function() { aCallback.onResult(value); });
         return undefined;
       }
       return value;
@@ -997,7 +990,6 @@ ContentPrefService.prototype = {
   },
 
 
-  //**************************************************************************//
   // Database Creation & Access
 
   _dbVersion: 4,
@@ -1261,13 +1253,11 @@ function warnDeprecated() {
 function HostnameGrouper() {}
 
 HostnameGrouper.prototype = {
-  //**************************************************************************//
   // XPCOM Plumbing
 
   classID:          Components.ID("{8df290ae-dcaa-4c11-98a5-2429a4dc97bb}"),
   QueryInterface:   XPCOMUtils.generateQI([Ci.nsIContentURIGrouper]),
 
-  //**************************************************************************//
   // nsIContentURIGrouper
 
   group: function HostnameGrouper_group(aURI) {
@@ -1336,7 +1326,6 @@ AsyncStatement.prototype = {
   }
 };
 
-//****************************************************************************//
 // XPCOM Plumbing
 
 var components = [ContentPrefService, HostnameGrouper];

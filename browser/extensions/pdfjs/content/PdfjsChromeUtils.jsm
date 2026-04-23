@@ -49,8 +49,12 @@ var DEFAULT_PREFERENCES =
   "disableFontFace": false,
   "disableTextLayer": false,
   "useOnlyCssZoom": false,
-  "externalLinkTarget": 0
+  "externalLinkTarget": 0,
+  "enhanceTextSelection": false,
+  "renderInteractiveForms": false,
+  "disablePageLabels": false
 }
+
 
 var PdfjsChromeUtils = {
   // For security purposes when running remote, we restrict preferences

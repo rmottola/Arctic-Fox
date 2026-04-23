@@ -9,7 +9,6 @@
 #include "TabParent.h"
 
 #include "AudioChannelService.h"
-#include "AppProcessChecker.h"
 #ifdef ACCESSIBILITY
 #include "mozilla/a11y/DocAccessibleParent.h"
 #include "nsAccessibilityService.h"
@@ -467,9 +466,19 @@ TabParent::ActorDestroy(ActorDestroyReason why)
     if (why == AbnormalShutdown && os) {
       os->NotifyObservers(NS_ISUPPORTS_CAST(nsIFrameLoader*, frameLoader),
                           "oop-frameloader-crashed", nullptr);
-      nsContentUtils::DispatchTrustedEvent(frameElement->OwnerDoc(), frameElement,
-                                           NS_LITERAL_STRING("oop-browser-crashed"),
-                                           true, true);
+      nsCOMPtr<nsIFrameLoaderOwner> owner = do_QueryInterface(frameElement);
+      if (owner) {
+        RefPtr<nsFrameLoader> currentFrameLoader = owner->GetFrameLoader();
+        // It's possible that the frameloader owner has already moved on
+        // and created a new frameloader. If so, we don't fire the event,
+        // since the frameloader owner has clearly moved on.
+        if (currentFrameLoader == frameLoader) {
+          nsContentUtils::DispatchTrustedEvent(frameElement->OwnerDoc(), frameElement,
+                                               NS_LITERAL_STRING("oop-browser-crashed"),
+                                               true, true);
+
+        }
+      }
     }
 
     mFrameLoader = nullptr;
@@ -986,12 +995,7 @@ TabParent::AllocPIndexedDBPermissionRequestParent(const Principal& aPrincipal)
   }
 
   nsCOMPtr<nsIContentParent> manager = Manager();
-  if (manager->IsContentParent()) {
-    if (NS_WARN_IF(!AssertAppPrincipal(manager->AsContentParent(),
-                                       principal))) {
-      return nullptr;
-    }
-  } else {
+  if (!manager->IsContentParent()) {
     MOZ_CRASH("Figure out security checks for bridged content!");
   }
 
@@ -1486,16 +1490,6 @@ TabParent::RecvSyncMessage(const nsString& aMessage,
                            const IPC::Principal& aPrincipal,
                            nsTArray<StructuredCloneData>* aRetVal)
 {
-  // FIXME Permission check for TabParent in Content process
-  nsIPrincipal* principal = aPrincipal;
-  if (Manager()->IsContentParent()) {
-    ContentParent* parent = Manager()->AsContentParent();
-    if (!ContentParent::IgnoreIPCPrincipal() &&
-        parent && principal && !AssertAppPrincipal(parent, principal)) {
-      return IPC_FAIL_NO_REASON(this);
-    }
-  }
-
   StructuredCloneData data;
   ipc::UnpackClonedMessageDataForParent(aData, data);
 
@@ -1513,16 +1507,6 @@ TabParent::RecvRpcMessage(const nsString& aMessage,
                           const IPC::Principal& aPrincipal,
                           nsTArray<StructuredCloneData>* aRetVal)
 {
-  // FIXME Permission check for TabParent in Content process
-  nsIPrincipal* principal = aPrincipal;
-  if (Manager()->IsContentParent()) {
-    ContentParent* parent = Manager()->AsContentParent();
-    if (!ContentParent::IgnoreIPCPrincipal() &&
-        parent && principal && !AssertAppPrincipal(parent, principal)) {
-      return IPC_FAIL_NO_REASON(this);
-    }
-  }
-
   StructuredCloneData data;
   ipc::UnpackClonedMessageDataForParent(aData, data);
 
@@ -1539,16 +1523,6 @@ TabParent::RecvAsyncMessage(const nsString& aMessage,
                             const IPC::Principal& aPrincipal,
                             const ClonedMessageData& aData)
 {
-  // FIXME Permission check for TabParent in Content process
-  nsIPrincipal* principal = aPrincipal;
-  if (Manager()->IsContentParent()) {
-    ContentParent* parent = Manager()->AsContentParent();
-    if (!ContentParent::IgnoreIPCPrincipal() &&
-        parent && principal && !AssertAppPrincipal(parent, principal)) {
-      return IPC_FAIL_NO_REASON(this);
-    }
-  }
-
   StructuredCloneData data;
   ipc::UnpackClonedMessageDataForParent(aData, data);
 
@@ -2422,7 +2396,7 @@ TabParent::GetAuthPrompt(uint32_t aPromptReason, const nsIID& iid,
   nsCOMPtr<nsILoginManagerPrompter> prompter = do_QueryInterface(prompt);
   if (prompter) {
     nsCOMPtr<nsIDOMElement> browser = do_QueryInterface(mFrameElement);
-    prompter->SetE10sData(browser, nullptr);
+    prompter->SetBrowser(browser);
   }
 
   *aResult = prompt.forget().take();

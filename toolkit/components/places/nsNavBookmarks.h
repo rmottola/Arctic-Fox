@@ -280,11 +280,12 @@ private:
   int64_t mTagsRoot;
   int64_t mUnfiledRoot;
   int64_t mToolbarRoot;
+  int64_t mMobileRoot;
 
   inline bool IsRoot(int64_t aFolderId) {
     return aFolderId == mRoot || aFolderId == mMenuRoot ||
            aFolderId == mTagsRoot || aFolderId == mUnfiledRoot ||
-           aFolderId == mToolbarRoot;
+           aFolderId == mToolbarRoot || aFolderId == mMobileRoot;
   }
 
   nsresult IsBookmarkedInDatabase(int64_t aBookmarkID, bool* aIsBookmarked);
@@ -419,9 +420,9 @@ private:
 
     int64_t mID;
     uint16_t mSource;
-    int64_t mParent;
+    MOZ_INIT_OUTSIDE_CTOR int64_t mParent;
     nsCString mTitle;
-    int32_t mIndex;
+    MOZ_INIT_OUTSIDE_CTOR int32_t mIndex;
   };
 
   // Used to enable and disable the observer notifications.

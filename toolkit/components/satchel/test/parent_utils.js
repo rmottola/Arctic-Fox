@@ -1,4 +1,4 @@
-var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 Cu.import("resource://gre/modules/FormHistory.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -26,11 +26,11 @@ var ParentUtils = {
 
   updateFormHistory(changes) {
     let handler = {
-      handleError: function (error) {
+      handleError: function(error) {
         assert.ok(false, error);
         sendAsyncMessage("formHistoryUpdated", { ok: false });
       },
-      handleCompletion: function (reason) {
+      handleCompletion: function(reason) {
         if (!reason)
           sendAsyncMessage("formHistoryUpdated", { ok: true });
       },
@@ -74,9 +74,26 @@ var ParentUtils = {
           expectedCount <= 1 ||
           gAutocompletePopup.tree.view.getCellText(0, gAutocompletePopup.tree.columns[0]) ===
           expectedFirstValue);
-    }).then(() => {
+    }, "Waiting for row count change: " + expectedCount + " First value: " + expectedFirstValue).then(() => {
       let results = this.getMenuEntries();
       sendAsyncMessage("gotMenuChange", { results });
+    });
+  },
+
+  checkSelectedIndex(expectedIndex) {
+    ContentTaskUtils.waitForCondition(() => {
+      return gAutocompletePopup.popupOpen &&
+             gAutocompletePopup.selectedIndex === expectedIndex;
+    }, "Checking selected index").then(() => {
+      sendAsyncMessage("gotSelectedIndex");
+    });
+  },
+
+  getPopupState() {
+    sendAsyncMessage("gotPopupState", {
+      open: gAutocompletePopup.popupOpen,
+      selectedIndex: gAutocompletePopup.selectedIndex,
+      direction: gAutocompletePopup.style.direction,
     });
   },
 

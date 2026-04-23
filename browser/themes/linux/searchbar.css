@@ -94,6 +94,26 @@ menuitem[cmd="cmd_clearhistory"][disabled] {
   border-bottom: none;
 }
 
+.search-panel-one-offs {
+  margin: 0 !important;
+  border-top: 1px solid var(--panel-separator-color);
+}
+
+.searchbar-engine-one-off-item {
+  -moz-appearance: none;
+  display: inline-block;
+  border: none;
+  min-width: 48px;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(transparent 15%, var(--panel-separator-color) 15%, var(--panel-separator-color) 85%, transparent 85%);
+  background-size: 1px auto;
+  background-repeat: no-repeat;
+  background-position: right center;
+  color: GrayText;
+}
+
 .search-panel-tree {
   border-top: 1px solid #ccc !important;
 }
@@ -118,4 +138,20 @@ menuitem[cmd="cmd_clearhistory"][disabled] {
 
 .search-panel-tree > .autocomplete-treebody::-moz-tree-image(fromhistory, selected) {
   list-style-image: url("chrome://browser/skin/search-history-icon.svg#search-history-icon-active");
+}
+
+.search-setting-button {
+  -moz-appearance: none;
+  margin: 0;
+  min-height: 32px;
+}
+
+.search-setting-button[selected] {
+  background-color: var(--arrowpanel-dimmed-further);
+}
+
+.search-setting-button-compact > .button-box > .button-icon {
+  list-style-image: url("chrome://browser/skin/gear.svg");
+  filter: url(chrome://browser/skin/filters.svg#fill);
+  fill: currentColor;
 }

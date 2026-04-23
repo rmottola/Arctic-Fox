@@ -181,7 +181,6 @@
 @RESPATH@/components/directory.xpt
 @RESPATH@/components/docshell.xpt
 @RESPATH@/components/dom.xpt
-@RESPATH@/components/dom_apps.xpt
 @RESPATH@/components/dom_base.xpt
 @RESPATH@/components/dom_system.xpt
 @RESPATH@/components/dom_canvas.xpt
@@ -201,7 +200,6 @@
 @RESPATH@/components/dom_range.xpt
 @RESPATH@/components/dom_security.xpt
 @RESPATH@/components/dom_settings.xpt
-@RESPATH@/components/dom_permissionsettings.xpt
 @RESPATH@/components/dom_sidebar.xpt
 @RESPATH@/components/dom_storage.xpt
 @RESPATH@/components/dom_stylesheets.xpt
@@ -252,6 +250,9 @@
 @RESPATH@/browser/components/migration.xpt
 @RESPATH@/components/mimetype.xpt
 @RESPATH@/components/mozfind.xpt
+#ifdef ENABLE_INTL_API
+@RESPATH@/components/mozintl.xpt
+#endif
 @RESPATH@/components/necko_about.xpt
 @RESPATH@/components/necko_cache.xpt
 @RESPATH@/components/necko_cache2.xpt
@@ -342,12 +343,15 @@
 @RESPATH@/components/ConsoleAPIStorage.js
 @RESPATH@/components/BrowserElementParent.manifest
 @RESPATH@/components/BrowserElementParent.js
-@RESPATH@/components/BrowserElementProxy.manifest
-@RESPATH@/components/BrowserElementProxy.js
 @RESPATH@/components/FeedProcessor.manifest
 @RESPATH@/components/FeedProcessor.js
 @RESPATH@/components/WellKnownOpportunisticUtils.js
 @RESPATH@/components/WellKnownOpportunisticUtils.manifest
+#ifndef XP_MACOSX
+; OSX uses native platform impl.  Windows, Linux, and Android uses fallback JS impl.
+@BINPATH@/components/nsDNSServiceDiscovery.manifest
+@BINPATH@/components/nsDNSServiceDiscovery.js
+#endif
 @RESPATH@/browser/components/BrowserFeeds.manifest
 @RESPATH@/browser/components/FeedConverter.js
 @RESPATH@/browser/components/FeedWriter.js
@@ -474,7 +478,6 @@
 @RESPATH@/browser/components/360seProfileMigrator.js
 @RESPATH@/browser/components/EdgeProfileMigrator.js
 @RESPATH@/browser/components/IEProfileMigrator.js
-@RESPATH@/browser/components/SafariProfileMigrator.js
 #endif
 #ifdef XP_MACOSX
 @RESPATH@/browser/components/SafariProfileMigrator.js
@@ -501,17 +504,11 @@
 @RESPATH@/components/messageWakeupService.manifest
 @RESPATH@/components/SettingsManager.js
 @RESPATH@/components/SettingsManager.manifest
-@RESPATH@/components/AppsService.js
-@RESPATH@/components/AppsService.manifest
 @RESPATH@/components/recording-cmdline.js
 @RESPATH@/components/recording-cmdline.manifest
 @RESPATH@/components/htmlMenuBuilder.js
 @RESPATH@/components/htmlMenuBuilder.manifest
 
-@RESPATH@/components/PermissionSettings.js
-@RESPATH@/components/PermissionSettings.manifest
-@RESPATH@/components/PhoneNumberService.js
-@RESPATH@/components/PhoneNumberService.manifest
 @RESPATH@/components/NotificationStorage.js
 @RESPATH@/components/NotificationStorage.manifest
 @RESPATH@/components/Push.js
@@ -567,13 +564,11 @@
 @RESPATH@/modules/*
 
 ; Safe Browsing
-#ifdef MOZ_URL_CLASSIFIER
 @RESPATH@/components/nsURLClassifier.manifest
 @RESPATH@/components/nsUrlClassifierHashCompleter.js
 @RESPATH@/components/nsUrlClassifierListManager.js
 @RESPATH@/components/nsUrlClassifierLib.js
 @RESPATH@/components/url-classifier.xpt
-#endif
 
 ; Private Browsing
 @RESPATH@/components/privatebrowsing.xpt
@@ -690,7 +685,7 @@
 @RESPATH@/res/fonts/*
 @RESPATH@/res/dtd/*
 @RESPATH@/res/html/*
-#if defined(XP_MACOSX) || defined(XP_WIN)
+#if defined(XP_MACOSX)
 ; For SafariProfileMigrator.js.
 @RESPATH@/res/langGroups.properties
 #endif
@@ -798,7 +793,7 @@ bin/libfreebl_32int64_3.so
 #endif
 
 #if defined(MOZ_ASAN) && defined(CLANG_CL)
-@BINPATH@/clang_rt.asan_dynamic-i386.dll
+@BINPATH@/clang_rt.asan_dynamic-*.dll
 #endif
 
 

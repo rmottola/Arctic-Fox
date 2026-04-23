@@ -30,8 +30,10 @@ this.Preferences = {
       ["paneAdvanced", "generalTab"],
       ["paneAdvanced", "dataChoicesTab"],
       ["paneAdvanced", "networkTab"],
+      ["paneAdvanced", "networkTab", connectionDialog],
       ["paneAdvanced", "updateTab"],
       ["paneAdvanced", "encryptionTab"],
+      ["paneAdvanced", "encryptionTab", deviceManager],
     ];
     for (let [primary, advanced] of panes) {
       let configName = primary.replace(/^pane/, "prefs") + (advanced ? "-" + advanced : "");
@@ -83,3 +85,15 @@ let prefHelper = Task.async(function*(primary, advanced) {
     content.window.gSubDialog.close();
   });
 });
+
+function* connectionDialog(aBrowser) {
+  yield ContentTask.spawn(aBrowser, null, function* () {
+    content.document.getElementById("connectionSettings").click();
+  });
+}
+
+function* deviceManager(aBrowser) {
+  yield ContentTask.spawn(aBrowser, null, function* () {
+    content.document.getElementById("viewSecurityDevicesButton").click();
+  });
+}

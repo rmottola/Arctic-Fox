@@ -39,6 +39,19 @@
   height: 100%;
 }
 
+.tabs .all-tabs-menu  {
+  position: absolute;
+  top: 0;
+  offset-inline-end: 0;
+  width: 15px;
+  height: 100%;
+  border-inline-start: 1px solid var(--theme-splitter-color);
+  background: url("chrome://devtools/skin/images/dropmarker.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: var(--theme-tab-toolbar-background);
+}
+
 /* Light Theme */
 
 .theme-dark .tabs,
@@ -48,6 +61,7 @@
 
 .theme-dark .tabs .tabs-navigation,
 .theme-light .tabs .tabs-navigation {
+  position: relative;
   border-bottom: 1px solid var(--theme-splitter-color);
   background: var(--theme-tab-toolbar-background);
 }
@@ -110,7 +124,6 @@
 /* Firebug Theme */
 
 .theme-firebug .tabs .tabs-navigation {
-  background-color: rgb(219, 234, 249);
   background-image: linear-gradient(rgba(253, 253, 253, 0.2), rgba(253, 253, 253, 0));
   padding-top: 3px;
   padding-left: 3px;

@@ -39,6 +39,18 @@ XPCOMUtils.defineLazyGetter(this, "gCertUtils", function() {
   return temp;
 });
 
+XPCOMUtils.defineLazyGetter(this, "isXPOrVista64", function () {
+  let os = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime).OS;
+  if (os != "WINNT") {
+    return false;
+  }
+  let sysInfo = Cc["@mozilla.org/system-info;1"].getService(Ci.nsIPropertyBag2);
+  if (parseFloat(sysInfo.getProperty("version")) < 6) {
+    return true;
+  }
+  return Services.appinfo.is64Bit;
+});
+
 XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
                                   "resource://gre/modules/UpdateUtils.jsm");
 
@@ -80,7 +92,10 @@ GMPInstallManager.prototype = {
   /**
    * Performs an addon check.
    * @return a promise which will be resolved or rejected.
-   *         The promise is resolved with an array of GMPAddons
+   *         The promise is resolved with an object with properties:
+   *           gmpAddons: array of GMPAddons
+   *           usedFallback: whether the data was collected from online or
+   *                         from fallback data within the build
    *         The promise is rejected with an object with properties:
    *           target: The XHR request object
    *           status: The HTTP status code
@@ -104,12 +119,16 @@ GMPInstallManager.prototype = {
       }
     }
 
-    ProductAddonChecker.getProductAddonList(url, allowNonBuiltIn, certs).then((addons) => {
-      if (!addons) {
-        this._deferred.resolve([]);
+    let addonPromise = ProductAddonChecker
+      .getProductAddonList(url, allowNonBuiltIn, certs);
+
+    addonPromise.then(res => {
+      if (!res || !res.gmpAddons) {
+        this._deferred.resolve({gmpAddons: []});
       }
       else {
-        this._deferred.resolve(addons.map(a => new GMPAddon(a)));
+        res.gmpAddons = res.gmpAddons.map(a => new GMPAddon(a));
+        this._deferred.resolve(res);
       }
       delete this._deferred;
     }, (ex) => {
@@ -201,15 +220,33 @@ GMPInstallManager.prototype = {
     }
 
     try {
-      let gmpAddons = yield this.checkForAddons();
+      let {usedFallback, gmpAddons} = yield this.checkForAddons();
       this._updateLastCheck();
       log.info("Found " + gmpAddons.length + " addons advertised.");
       let addonsToInstall = gmpAddons.filter(function(gmpAddon) {
         log.info("Found addon: " + gmpAddon.toString());
 
+        if (!gmpAddon.isValid) {
+          log.info("Addon |" + gmpAddon.id + "| is invalid.");
+          return false;
+        }
+
+        if (GMPUtils.isPluginHidden(gmpAddon)) {
+          log.info("Addon |" + gmpAddon.id + "| has been hidden.");
+          return false;
+        }
+
         if (gmpAddon.isInstalled) {
           log.info("Addon |" + gmpAddon.id + "| already installed.");
           return false;
+        }
+
+        // Do not install from fallback if already installed as it
+        // may be a downgrade
+        if (usedFallback && gmpAddon.isUpdate) {
+         log.info("Addon |" + gmpAddon.id + "| not installing updates based " +
+                  "on fallback.");
+         return false;
         }
 
         let addonUpdateEnabled = false;
@@ -300,7 +337,7 @@ function GMPAddon(addon) {
   for (let name of Object.keys(addon)) {
     this[name] = addon[name];
   }
-  log.info ("Created new addon: " + this.toString());
+  log.info("Created new addon: " + this.toString());
 }
 
 GMPAddon.prototype = {
@@ -311,7 +348,7 @@ GMPAddon.prototype = {
     return this.id + " (" +
            "isValid: " + this.isValid +
            ", isInstalled: " + this.isInstalled +
-           ", hashFunction: " + this.hashFunction+
+           ", hashFunction: " + this.hashFunction +
            ", hashValue: " + this.hashValue +
            (this.size !== undefined ? ", size: " + this.size : "" ) +
            ")";
@@ -330,6 +367,14 @@ GMPAddon.prototype = {
   },
   get isEME() {
     return this.id == "gmp-widevinecdm" || this.id.indexOf("gmp-eme-") == 0;
+  },
+  /**
+   * @return true if the addon has been previously installed and this is
+   * a new version, if this is a fresh install return false
+   */
+  get isUpdate() {
+    return this.version &&
+      GMPPrefs.get(GMPPrefs.KEY_PLUGIN_VERSION, false, this.id);
   },
 };
 /**
@@ -407,6 +452,9 @@ GMPExtractor.prototype = {
 
         zipReader.extract(entry, outFile);
         extractedPaths.push(outFile.path);
+        // Ensure files are writable and executable. Otherwise we may be unable to
+        // execute or uninstall them.
+        outFile.permissions |= parseInt("0700", 8);
         log.info(entry + " was successfully extracted to: " +
             outFile.path);
       });
@@ -472,10 +520,6 @@ GMPDownloader.prototype = {
         // Success, set the prefs
         let now = Math.round(Date.now() / 1000);
         GMPPrefs.set(GMPPrefs.KEY_PLUGIN_LAST_UPDATE, now, gmpAddon.id);
-        // Reset the trial create pref, so that Gecko knows to do a test
-        // run before reporting that the GMP works to content.
-        GMPPrefs.reset(GMPPrefs.KEY_PLUGIN_TRIAL_CREATE, gmpAddon.version,
-                       gmpAddon.id);
         // Remember our ABI, so that if the profile is migrated to another
         // platform or from 32 -> 64 bit, we notice and don't try to load the
         // unexecutable plugin library.

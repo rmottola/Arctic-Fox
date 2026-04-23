@@ -134,7 +134,8 @@ class nsRootPresContext;
 // An interface for presentation contexts. Presentation contexts are
 // objects that provide an outer context for a presentation shell.
 
-class nsPresContext : public nsIObserver {
+class nsPresContext : public nsIObserver,
+                      public mozilla::SupportsWeakPtr<nsPresContext> {
 public:
   typedef mozilla::FramePropertyTable FramePropertyTable;
   typedef mozilla::LangGroupFontPrefs LangGroupFontPrefs;
@@ -145,6 +146,7 @@ public:
   NS_DECL_NSIOBSERVER
   NS_DECL_AND_IMPL_ZEROING_OPERATOR_NEW
   NS_DECL_CYCLE_COLLECTION_CLASS(nsPresContext)
+  MOZ_DECLARE_WEAKREFERENCE_TYPENAME(nsPresContext)
 
   enum nsPresContextType {
     eContext_Galley,       // unpaginated screen presentation
@@ -1054,6 +1056,12 @@ public:
 
   bool IsRootContentDocument() const;
 
+  bool HadNonBlankPaint() const {
+    return mHadNonBlankPaint;
+  }
+
+  void NotifyNonBlankPaint();
+
   bool IsGlyph() const {
     return mIsGlyph;
   }
@@ -1398,6 +1406,9 @@ protected:
 
   // Is there a pref update to process once we have a container?
   unsigned              mNeedsPrefUpdate : 1;
+
+  // Has NotifyNonBlankPaint been called on this PresContext?
+  unsigned              mHadNonBlankPaint : 1;
 
 #ifdef RESTYLE_LOGGING
   // Should we output debug information about restyling for this document?

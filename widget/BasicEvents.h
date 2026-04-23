@@ -430,6 +430,9 @@ public:
   void StopCrossProcessForwarding() { mFlags.StopCrossProcessForwarding(); }
   void PreventDefault(bool aCalledByDefaultHandler = true)
   {
+    // Legacy mouse events shouldn't be prevented on ePointerDown by default
+    // handlers.
+    MOZ_RELEASE_ASSERT(!aCalledByDefaultHandler || mMessage != ePointerDown);
     mFlags.PreventDefault(aCalledByDefaultHandler);
   }
   void PreventDefaultBeforeDispatch() { mFlags.PreventDefaultBeforeDispatch(); }
@@ -550,6 +553,10 @@ public:
    * Whether the event should cause a DOM event.
    */
   bool IsAllowedToDispatchDOMEvent() const;
+  /**
+   * Whether the event should be dispatched in system group.
+   */
+  bool IsAllowedToDispatchInSystemGroup() const;
   /**
    * Initialize mComposed
    */
@@ -867,6 +874,76 @@ enum Modifier
  ******************************************************************************/
 
 typedef uint16_t Modifiers;
+
+class MOZ_STACK_CLASS GetModifiersName final : public nsAutoCString
+{
+public:
+  explicit GetModifiersName(Modifiers aModifiers)
+  {
+    if (aModifiers & MODIFIER_ALT) {
+      AssignLiteral(NS_DOM_KEYNAME_ALT);
+    }
+    if (aModifiers & MODIFIER_ALTGRAPH) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_ALTGRAPH);
+    }
+    if (aModifiers & MODIFIER_CAPSLOCK) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_CAPSLOCK);
+    }
+    if (aModifiers & MODIFIER_CONTROL) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_CONTROL);
+    }
+    if (aModifiers & MODIFIER_FN) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_FN);
+    }
+    if (aModifiers & MODIFIER_FNLOCK) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_FNLOCK);
+    }
+    if (aModifiers & MODIFIER_META) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_META);
+    }
+    if (aModifiers & MODIFIER_NUMLOCK) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_NUMLOCK);
+    }
+    if (aModifiers & MODIFIER_SCROLLLOCK) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_SCROLLLOCK);
+    }
+    if (aModifiers & MODIFIER_SHIFT) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_SHIFT);
+    }
+    if (aModifiers & MODIFIER_SYMBOL) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_SYMBOL);
+    }
+    if (aModifiers & MODIFIER_SYMBOLLOCK) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_SYMBOLLOCK);
+    }
+    if (aModifiers & MODIFIER_OS) {
+      MaybeAppendSeparator();
+      AppendLiteral(NS_DOM_KEYNAME_OS);
+    }
+    if (IsEmpty()) {
+      AssignLiteral("none");
+    }
+  }
+
+private:
+  void MaybeAppendSeparator()
+  {
+    if (!IsEmpty()) {
+      AppendLiteral(" | ");
+    }
+  }
+};
 
 /******************************************************************************
  * mozilla::WidgetInputEvent

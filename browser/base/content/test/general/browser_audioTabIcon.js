@@ -1,4 +1,6 @@
 const PAGE = "https://example.com/browser/browser/base/content/test/general/file_mediaPlayback.html";
+const TABATTR_REMOVAL_PREFNAME = "browser.tabs.delayHidingAudioPlayingIconMS";
+const INITIAL_TABATTR_REMOVAL_DELAY_MS = Services.prefs.getIntPref(TABATTR_REMOVAL_PREFNAME);
 
 function* wait_for_tab_playing_event(tab, expectPlaying) {
   if (tab.soundPlaying == expectPlaying) {
@@ -64,7 +66,7 @@ let everMutedTabs = new WeakSet();
 
 function get_wait_for_mute_promise(tab, expectMuted) {
   return BrowserTestUtils.waitForEvent(tab, "TabAttrModified", false, event => {
-    if (event.detail.changed.indexOf("muted") >= 0) {
+    if (event.detail.changed.includes("muted")) {
       is(tab.hasAttribute("muted"), expectMuted, "The tab should " + (expectMuted ? "" : "not ") + "be muted");
       is(tab.muted, expectMuted, "The tab muted property " + (expectMuted ? "" : "not ") + "be true");
 
@@ -200,8 +202,8 @@ function* test_swapped_browser_while_playing(oldTab, newBrowser) {
 
   let newTab = gBrowser.getTabForBrowser(newBrowser);
   let AttrChangePromise = BrowserTestUtils.waitForEvent(newTab, "TabAttrModified", false, event => {
-    return event.detail.changed.indexOf("soundplaying") >= 0 &&
-           event.detail.changed.indexOf("muted") >= 0;
+    return event.detail.changed.includes("soundplaying") &&
+           event.detail.changed.includes("muted");
   });
 
   gBrowser.swapBrowsersAndCloseOther(newTab, oldTab);
@@ -237,7 +239,7 @@ function* test_swapped_browser_while_not_playing(oldTab, newBrowser) {
 
   let newTab = gBrowser.getTabForBrowser(newBrowser);
   let AttrChangePromise = BrowserTestUtils.waitForEvent(newTab, "TabAttrModified", false, event => {
-    return event.detail.changed.indexOf("muted") >= 0;
+    return event.detail.changed.includes("muted");
   });
 
   let AudioPlaybackPromise = new Promise(resolve => {
@@ -373,7 +375,7 @@ function* test_cross_process_load() {
     yield wait_for_tab_playing_event(tab, true);
 
     let soundPlayingStoppedPromise = BrowserTestUtils.waitForEvent(tab, "TabAttrModified", false,
-      event => event.detail.changed.indexOf("soundplaying") >= 0
+      event => event.detail.changed.includes("soundplaying")
     );
 
     // Go to a different process.
@@ -476,6 +478,24 @@ function* test_on_browser(browser) {
   }
 }
 
+function* test_delayed_tabattr_removal() {
+  function* test_on_browser(browser) {
+    let tab = gBrowser.getTabForBrowser(browser);
+    yield play(tab);
+
+    // Extend the delay to guarantee the soundplaying attribute
+    // is not removed from the tab when audio is stopped. Without
+    // the extended delay the attribute could be removed in the
+    // same tick and the test wouldn't catch that this broke.
+    yield pause(tab, {extendedDelay: true});
+  }
+
+  yield BrowserTestUtils.withNewTab({
+    gBrowser,
+    url: PAGE
+  }, test_on_browser);
+}
+
 add_task(function*() {
   yield new Promise((resolve) => {
     SpecialPowers.pushPrefEnv({"set": [
@@ -496,3 +516,5 @@ add_task(test_click_on_pinned_tab_after_mute);
 add_task(test_cross_process_load);
 
 add_task(test_mute_keybinding);
+
+add_task(test_delayed_tabattr_removal);

@@ -50,14 +50,18 @@
                 accesskey="&spellUndoAddToDictionary.accesskey;"
                 oncommand="InlineSpellCheckerUI.undoAddToDictionary();" />
       <menuseparator id="spell-suggestions-separator"/>
-# label and usercontextid are dynamically set.
+      <menuitem id="context-openlinkincurrent"
+                label="&openLinkCmdInCurrent.label;"
+                accesskey="&openLinkCmdInCurrent.accesskey;"
+                oncommand="gContextMenu.openLinkInCurrent();"/>
+# label and data-usercontextid are dynamically set.
       <menuitem id="context-openlinkincontainertab"
                 accesskey="&openLinkCmdInTab.accesskey;"
                 oncommand="gContextMenu.openLinkInTab(event);"/>
       <menuitem id="context-openlinkintab"
                 label="&openLinkCmdInTab.label;"
                 accesskey="&openLinkCmdInTab.accesskey;"
-                usercontextid="0"
+                data-usercontextid="0"
                 oncommand="gContextMenu.openLinkInTab(event);"/>
 
       <menu id="context-openlinkinusercontext-menu"
@@ -76,10 +80,6 @@
                 label="&openLinkInPrivateWindowCmd.label;"
                 accesskey="&openLinkInPrivateWindowCmd.accesskey;"
                 oncommand="gContextMenu.openLinkInPrivateWindow();"/>
-      <menuitem id="context-openlinkincurrent"
-                label="&openLinkCmdInCurrent.label;"
-                accesskey="&openLinkCmdInCurrent.accesskey;"
-                oncommand="gContextMenu.openLinkInCurrent();"/>
       <menuseparator id="context-sep-open"/>
       <menuitem id="context-bookmarklink"
                 label="&bookmarkThisLinkCmd.label;"

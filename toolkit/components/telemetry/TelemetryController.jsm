@@ -174,7 +174,7 @@ this.TelemetryController = Object.freeze({
   /**
    * Send a notification.
    */
-  observe: function (aSubject, aTopic, aData) {
+  observe: function(aSubject, aTopic, aData) {
     return Impl.observe(aSubject, aTopic, aData);
   },
 
@@ -297,15 +297,6 @@ this.TelemetryController = Object.freeze({
     options.overwrite = aOptions.overwrite || false;
 
     return Impl.savePing(aType, aPayload, aFilePath, options);
-  },
-
-  /**
-   * The client id send with the telemetry ping.
-   *
-   * @return The client id as string, or null.
-   */
-  get clientID() {
-    return Impl.clientID;
   },
 
   /**
@@ -439,15 +430,55 @@ var Impl = {
    * Track any pending ping send and save tasks through the promise passed here.
    * This is needed to block shutdown on any outstanding ping activity.
    */
-  _trackPendingPingTask: function (aPromise) {
+  _trackPendingPingTask: function(aPromise) {
     this._connectionsBarrier.client.addBlocker("Waiting for ping task", aPromise);
   },
 
   /**
-   * Submit ping payloads to Telemetry. This will assemble a complete ping, adding
-   * environment data, client id and some general info.
+   * Internal function to assemble a complete ping, adding environment data, client id
+   * and some general info. This waits on the client id to be loaded/generated if it's
+   * not yet available. Note that this function is synchronous unless we need to load
+   * the client id.
    * Depending on configuration, the ping will be sent to the server (immediately or later)
    * and archived locally.
+   *
+   * @param {String} aType The type of the ping.
+   * @param {Object} aPayload The actual data payload for the ping.
+   * @param {Object} [aOptions] Options object.
+   * @param {Boolean} [aOptions.addClientId=false] true if the ping should contain the client
+   *                  id, false otherwise.
+   * @param {Boolean} [aOptions.addEnvironment=false] true if the ping should contain the
+   *                  environment data.
+   * @param {Object}  [aOptions.overrideEnvironment=null] set to override the environment data.
+   * @returns {Promise} Test-only - a promise that is resolved with the ping id once the ping is stored or sent.
+   */
+  _submitPingLogic: Task.async(function* (aType, aPayload, aOptions) {
+    // Make sure to have a clientId if we need one. This cover the case of submitting
+    // a ping early during startup, before Telemetry is initialized, if no client id was
+    // cached.
+    if (!this._clientID && aOptions.addClientId) {
+      Telemetry.getHistogramById("TELEMETRY_PING_SUBMISSION_WAITING_CLIENTID").add();
+      // We can safely call |getClientID| here and during initialization: we would still
+      // spawn and return one single loading task.
+      this._clientID = yield ClientID.getClientID();
+    }
+
+    const pingData = this.assemblePing(aType, aPayload, aOptions);
+    this._log.trace("submitExternalPing - ping assembled, id: " + pingData.id);
+
+    // Always persist the pings if we are allowed to. We should not yield on any of the
+    // following operations to keep this function synchronous for the majority of the calls.
+    let archivePromise = TelemetryArchive.promiseArchivePing(pingData)
+      .catch(e => this._log.error("submitExternalPing - Failed to archive ping " + pingData.id, e));
+    let p = [ archivePromise ];
+
+    p.push(TelemetrySend.submitPing(pingData));
+
+    return Promise.all(p).then(() => pingData.id);
+  }),
+
+  /**
+   * Submit ping payloads to Telemetry.
    *
    * @param {String} aType The type of the ping.
    * @param {Object} aPayload The actual data payload for the ping.
@@ -470,20 +501,17 @@ var Impl = {
       histogram.add(aType, 1);
       return Promise.reject(new Error("Invalid type string submitted."));
     }
+    // Enforce that the payload is an object.
+    if (aPayload === null || typeof aPayload !== 'object' || Array.isArray(aPayload)) {
+      this._log.error("submitExternalPing - invalid payload type: " + typeof aPayload);
+      let histogram = Telemetry.getHistogramById("TELEMETRY_INVALID_PAYLOAD_SUBMITTED");
+      histogram.add(1);
+      return Promise.reject(new Error("Invalid payload type submitted."));
+    }
 
-    const pingData = this.assemblePing(aType, aPayload, aOptions);
-    this._log.trace("submitExternalPing - ping assembled, id: " + pingData.id);
-
-    // Always persist the pings if we are allowed to.
-    let archivePromise = TelemetryArchive.promiseArchivePing(pingData)
-      .catch(e => this._log.error("submitExternalPing - Failed to archive ping " + pingData.id, e));
-    let p = [ archivePromise ];
-
-    p.push(TelemetrySend.submitPing(pingData));
-
-    let promise = Promise.all(p);
+    let promise = this._submitPingLogic(aType, aPayload, aOptions);
     this._trackPendingPingTask(promise);
-    return promise.then(() => pingData.id);
+    return promise;
   },
 
   /**
@@ -717,7 +745,7 @@ var Impl = {
    * This triggers basic telemetry initialization for content processes.
    * @param {Boolean} [testing=false] True if we are in test mode, false otherwise.
    */
-  setupContentTelemetry: function (testing = false) {
+  setupContentTelemetry: function(testing = false) {
     this._testMode = testing;
 
     // We call |enableTelemetryRecording| here to make sure that Telemetry.canRecord* flags
@@ -792,7 +820,7 @@ var Impl = {
   /**
    * This observer drives telemetry.
    */
-  observe: function (aSubject, aTopic, aData) {
+  observe: function(aSubject, aTopic, aData) {
     // The logger might still be not available at this point.
     if (aTopic == "profile-after-change" || aTopic == "app-startup") {
       // If we don't have a logger, we need to make sure |Log.repository.getLogger()| is
@@ -809,13 +837,8 @@ var Impl = {
     case "app-startup":
       // app-startup is only registered for content processes.
       return this.setupContentTelemetry();
-      break;
     }
     return undefined;
-  },
-
-  get clientID() {
-    return this._clientID;
   },
 
   /**

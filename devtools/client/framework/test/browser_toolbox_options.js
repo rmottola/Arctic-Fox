@@ -10,8 +10,8 @@
 // and toggles appropriate things in the toolbox.
 
 var doc = null, toolbox = null, panelWin = null, modifiedPrefs = [];
-var strings = Services.strings.createBundle(
-  "chrome://devtools/locale/toolbox.properties");
+const {LocalizationHelper} = require("devtools/shared/l10n");
+const L10N = new LocalizationHelper("devtools/client/locales/toolbox.properties");
 
 add_task(function* () {
   const URL = "data:text/html;charset=utf8,test for dynamically registering " +
@@ -21,6 +21,7 @@ add_task(function* () {
   let target = TargetFactory.forTab(tab);
   toolbox = yield gDevTools.showToolbox(target);
   doc = toolbox.doc;
+  yield registerNewPerToolboxTool();
   yield testSelectTool();
   yield testOptionsShortcut();
   yield testOptions();
@@ -46,6 +47,31 @@ function registerNewTool() {
     "The tool is registered");
 }
 
+function registerNewPerToolboxTool() {
+  let toolDefinition = {
+    id: "test-pertoolbox-tool",
+    isTargetSupported: () => true,
+    visibilityswitch: "devtools.test-pertoolbox-tool.enabled",
+    url: "about:blank",
+    label: "perToolboxSomeLabel"
+  };
+
+  ok(gDevTools, "gDevTools exists");
+  ok(!gDevTools.getToolDefinitionMap().has("test-pertoolbox-tool"),
+     "The per-toolbox tool is not registered globally");
+
+  ok(toolbox, "toolbox exists");
+  ok(!toolbox.hasAdditionalTool("test-pertoolbox-tool"),
+     "The per-toolbox tool is not yet registered to the toolbox");
+
+  toolbox.addAdditionalTool(toolDefinition);
+
+  ok(!gDevTools.getToolDefinitionMap().has("test-pertoolbox-tool"),
+     "The per-toolbox tool is not registered globally");
+  ok(toolbox.hasAdditionalTool("test-pertoolbox-tool"),
+     "The per-toolbox tool has been registered to the toolbox");
+}
+
 function* testSelectTool() {
   info("Checking to make sure that the options panel can be selected.");
 
@@ -60,18 +86,18 @@ function* testOptionsShortcut() {
 
   yield toolbox.selectTool("webconsole");
   is(toolbox.currentToolId, "webconsole", "webconsole is selected");
-  synthesizeKeyShortcut(strings.GetStringFromName("toolbox.options.key"));
+  synthesizeKeyShortcut(L10N.getStr("toolbox.options.key"));
   is(toolbox.currentToolId, "options", "Toolbox selected via shortcut key (1)");
-  synthesizeKeyShortcut(strings.GetStringFromName("toolbox.options.key"));
+  synthesizeKeyShortcut(L10N.getStr("toolbox.options.key"));
   is(toolbox.currentToolId, "webconsole", "webconsole is selected (1)");
 
   yield toolbox.selectTool("webconsole");
   is(toolbox.currentToolId, "webconsole", "webconsole is selected");
-  synthesizeKeyShortcut(strings.GetStringFromName("toolbox.help.key"));
+  synthesizeKeyShortcut(L10N.getStr("toolbox.help.key"));
   is(toolbox.currentToolId, "options", "Toolbox selected via shortcut key (2)");
-  synthesizeKeyShortcut(strings.GetStringFromName("toolbox.options.key"));
+  synthesizeKeyShortcut(L10N.getStr("toolbox.options.key"));
   is(toolbox.currentToolId, "webconsole", "webconsole is reselected (2)");
-  synthesizeKeyShortcut(strings.GetStringFromName("toolbox.help.key"));
+  synthesizeKeyShortcut(L10N.getStr("toolbox.help.key"));
   is(toolbox.currentToolId, "options", "Toolbox selected via shortcut key (2)");
 }
 
@@ -168,9 +194,13 @@ function* testToggleTools() {
     "#additional-tools-box input[type=checkbox]:not([data-unsupported])");
   let enabledTools = [...toolNodes].filter(node => node.checked);
 
-  let toggleableTools = gDevTools.getDefaultTools().filter(tool => {
-    return tool.visibilityswitch;
-  }).concat(gDevTools.getAdditionalTools());
+  let toggleableTools = gDevTools.getDefaultTools()
+                                 .filter(tool => {
+                                   return tool.visibilityswitch;
+                                 })
+                                 .concat(gDevTools.getAdditionalTools())
+                                 .concat(toolbox.getAdditionalTools());
+
 
   for (let node of toolNodes) {
     let id = node.getAttribute("id");
@@ -235,7 +265,7 @@ function* toggleTool(node) {
 }
 
 function checkUnregistered(toolId, deferred, event, data) {
-  if (data.id == toolId) {
+  if (data == toolId) {
     ok(true, "Correct tool removed");
     // checking tab on the toolbox
     ok(!doc.getElementById("toolbox-tab-" + toolId),

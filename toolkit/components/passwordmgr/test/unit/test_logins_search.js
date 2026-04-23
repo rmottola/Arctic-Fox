@@ -8,8 +8,7 @@
 
 "use strict";
 
-////////////////////////////////////////////////////////////////////////////////
-//// Globals
+// Globals
 
 /**
  * Returns a list of new nsILoginInfo objects that are a subset of the test
@@ -85,15 +84,14 @@ function checkAllSearches(aQuery, aExpectedCount)
   LoginTestUtils.assertLoginListsEqual(logins, expectedLogins);
 
   // Test countLogins.
-  let count = Services.logins.countLogins(hostname, formSubmitURL, httpRealm)
+  let count = Services.logins.countLogins(hostname, formSubmitURL, httpRealm);
   do_check_eq(count, expectedLogins.length);
 
   // Test searchLogins.
   checkSearchLogins(aQuery, aExpectedCount);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//// Tests
+// Tests
 
 /**
  * Prepare data for the following tests.

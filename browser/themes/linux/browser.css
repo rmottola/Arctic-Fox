@@ -636,6 +636,13 @@ menuitem:not([type]):not(.menuitem-tooltip):not(.menuitem-iconic-tooltip) {
 }
 
 /* Primary toolbar buttons */
+.findbar-button,
+:-moz-any(#TabsToolbar, #nav-bar) .toolbarbutton-1 > .toolbarbutton-menubutton-button,
+:-moz-any(#TabsToolbar, #nav-bar) .toolbarbutton-1 {
+  -moz-appearance: none;
+}
+
+
 .toolbarbutton-1:not([type="menu-button"]) {
   -moz-box-orient: vertical;
   min-width: 0;
@@ -1242,67 +1249,103 @@ toolbar[iconsize="small"] #feed-button {
 }
 
 
+/* AutoComplete */
+
+%include ../shared/autocomplete.inc.css
+
 #treecolAutoCompleteImage {
   max-width : 36px;
 }
 
-.ac-result-type-bookmark,
+.autocomplete-richlistbox {
+  padding: 4px;
+}
+
+.autocomplete-richlistitem {
+  height: 30px;
+  min-height: 30px;
+  font: message-box;
+  border-radius: 2px;
+  border: 1px solid transparent;
+}
+
+.autocomplete-richlistitem[selected=true] {
+  background-color: Highlight;
+}
+
+.ac-title {
+  font-size: 14px;
+}
+
+.ac-tags {
+  font-size: 12px;
+}
+
+html|span.ac-tag {
+  background-color: MenuText;
+  color: Menu;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  padding: 0 1px;
+}
+
+.ac-url,
+.ac-action {
+  font-size: 12px;
+  color: -moz-nativehyperlinktext;
+}
+
+.ac-title[selected=true],
+.ac-url[selected=true],
+.ac-action[selected=true] {
+  color: inherit !important;
+}
+
+.ac-tags-text[selected] > html|span.ac-tag {
+  background-color: HighlightText;
+  color: Highlight;
+}
+
+.ac-type-icon[type=bookmark] {
+  list-style-image: url("chrome://browser/skin/urlbar-star.svg#star");
+}
+
+.ac-type-icon[type=bookmark][selected][current] {
+  list-style-image: url("chrome://browser/skin/urlbar-star.svg#star-inverted");
+}
 .autocomplete-treebody::-moz-tree-image(bookmark, treecolAutoCompleteImage) {
   list-style-image: url("chrome://browser/skin/places/star-icons.png");
   -moz-image-region: rect(0px 32px 16px 16px);
-  width: 16px;
-  height: 16px;
 }
 
-.ac-result-type-keyword,
+.ac-type-icon[type=keyword],
+.ac-site-icon[type=searchengine],
 .autocomplete-treebody::-moz-tree-image(keyword, treecolAutoCompleteImage) {
-  list-style-image: url(moz-icon://stock/gtk-find?size=menu);
-  width: 16px;
-  height: 16px;
+  list-style-image: url(chrome://global/skin/icons/autocomplete-search.svg#search-icon);
 }
 
-richlistitem[type~="action"][actiontype="searchengine"] > .ac-title-box > .ac-site-icon {
-  list-style-image: url("chrome://global/skin/icons/autocomplete-search.svg#search-icon");
+.ac-type-icon[type=keyword][selected],
+.ac-site-icon[type=searchengine][selected],
+.autocomplete-treebody::-moz-tree-image(keyword, treecolAutoCompleteImage, selected) {
+  list-style-image: url(chrome://global/skin/icons/autocomplete-search.svg#search-icon-inverted);
 }
 
-richlistitem[type~="action"][actiontype="searchengine"][selected="true"] > .ac-title-box > .ac-site-icon {
-  list-style-image: url("chrome://global/skin/icons/autocomplete-search.svg#search-icon-inverted");
-}
-
-.ac-result-type-tag,
 .autocomplete-treebody::-moz-tree-image(tag, treecolAutoCompleteImage) {
   list-style-image: url("chrome://browser/skin/places/tag.png");
   width: 16px;
   height: 16px;
 }
 
-.ac-comment {
-  font-size: 1.05em;
+.ac-type-icon[type=switchtab] {
+  list-style-image: url("chrome://browser/skin/urlbar-tab.svg#tab");
 }
 
-.ac-extra > .ac-comment {
-  font-size: inherit;
-}
-
-.ac-url-text,
-.ac-action-text {
-  color: -moz-nativehyperlinktext;
-  font-size: 0.9em;
-}
-
-richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon {
-  list-style-image: url("chrome://browser/skin/actionicon-tab.png");
-  padding: 0 3px;
+.ac-type-icon[type=switchtab][selected] {
+  list-style-image: url("chrome://browser/skin/urlbar-tab.svg#tab-inverted");
 }
 
 .autocomplete-treebody::-moz-tree-cell-text(treecolAutoCompleteComment) {
   color: GrayText;
-}
-
-.ac-comment[selected="true"],
-.ac-url-text[selected="true"],
-.ac-action-text[selected="true"] {
-  color: inherit !important;
 }
 
 .autocomplete-treebody::-moz-tree-cell-text(suggesthint, treecolAutoCompleteComment),
@@ -1793,19 +1836,6 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
 
 .alltabs-item[busy] > .menu-iconic-left > .menu-iconic-icon {
   list-style-image: url("chrome://global/skin/icons/loading.png");
-}
-
-.alltabs-item[tabIsVisible] {
-  /* box-shadow instead of background-color to work around native styling */
-  box-shadow: inset -5px 0 ThreeDShadow;
-}
-
-.alltabs-endimage[muted] {
-  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-muted);
-}
-
-.alltabs-endimage[soundplaying] {
-  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
 }
 
 /* Sidebar */

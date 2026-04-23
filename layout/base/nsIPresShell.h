@@ -206,18 +206,6 @@ public:
   bool IsDestroying() { return mIsDestroying; }
 
   /**
-   * Make a one-way transition into a "zombie" state.  In this state,
-   * no reflow is done, no painting is done, and no refresh driver
-   * ticks are processed.  This is a dangerous state: it can leave
-   * areas of the composition target unpainted if callers aren't
-   * careful.  (Don't let your zombie presshell out of the shed.)
-   *
-   * This is used in cases where a presshell is created for reasons
-   * other than reflow/painting.
-   */
-  virtual void MakeZombie() = 0;
-
-  /**
    * All frames owned by the shell are allocated from an arena.  They
    * are also recycled using free lists.  Separate free lists are
    * maintained for each frame type (aID), which must always correspond
@@ -1289,11 +1277,13 @@ public:
     uint16_t mPointerType;
     bool mActiveState;
     bool mPrimaryState;
+    bool mPreventMouseEventByContent;
     explicit PointerInfo(bool aActiveState, uint16_t aPointerType,
                          bool aPrimaryState)
       : mPointerType(aPointerType)
       , mActiveState(aActiveState)
       , mPrimaryState(aPrimaryState)
+      , mPreventMouseEventByContent(false)
     {
     }
   };
@@ -1810,7 +1800,6 @@ protected:
   bool                      mStylesHaveChanged : 1;
   bool                      mDidInitialize : 1;
   bool                      mIsDestroying : 1;
-  bool                      mIsZombie : 1;
   bool                      mIsReflowing : 1;
 
   // For all documents we initially lock down painting.

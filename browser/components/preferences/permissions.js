@@ -302,7 +302,7 @@ var gPermissionManager = {
         this._handleCapabilityChange();
       }
       else if (aData == "deleted") {
-        this._removePermissionFromList(permission);
+        this._removePermissionFromList(permission.principal);
       }
     }
   },
@@ -397,7 +397,6 @@ var gPermissionManager = {
     this._permissions = [];
 
     // load permissions into a table
-    var count = 0;
     var enumerator = Services.perms.enumerator;
     while (enumerator.hasMoreElements()) {
       var nextPermission = enumerator.getNext().QueryInterface(Components.interfaces.nsIPermission);

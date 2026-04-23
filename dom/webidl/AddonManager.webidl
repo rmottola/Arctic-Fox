@@ -24,6 +24,8 @@ interface Addon {
   readonly attribute boolean isEnabled;
   // If the add-on is currently active in the browser.
   readonly attribute boolean isActive;
+  // If the add-on may be uninstalled
+  readonly attribute boolean canUninstall;
 
   Promise<boolean> uninstall();
   Promise<void> setEnabled(boolean value);
@@ -46,6 +48,10 @@ interface AddonInstall : EventTarget {
 
 dictionary addonInstallOptions {
   required DOMString url;
+  // If a non-empty string is passed for "hash", it is used to verify the
+  // checksum of the downloaded XPI before installing.  If is omitted or if
+  // it is null or empty string, no checksum verification is performed.
+  DOMString? hash = null;
 };
 
 [HeaderFile="mozilla/AddonManagerWebAPI.h",

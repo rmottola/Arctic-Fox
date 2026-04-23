@@ -11,3 +11,12 @@
 .searchbar-engine-button {
   -moz-user-focus: none;
 }
+
+.search-one-offs {
+  -moz-binding: url("chrome://browser/content/search/search.xml#search-one-offs");
+}
+
+.search-setting-button[compact=true],
+.search-setting-button-compact:not([compact=true]) {
+  display: none;
+}

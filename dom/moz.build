@@ -27,10 +27,8 @@ interfaces = [
     'offline',
     'geolocation',
     'notification',
-    'permission',
     'svg',
     'smil',
-    'apps',
     'push',
 ]
 
@@ -47,7 +45,6 @@ DIRS += [
     'cache',
     'canvas',
     'crypto',
-    'phonenumberutils',
     'devicestorage',
     'encoding',
     'events',
@@ -95,7 +92,6 @@ DIRS += [
     'xml',
     'xslt',
     'xul',
-    'resourcestats',
     'manifest',
     'vr',
     'u2f',

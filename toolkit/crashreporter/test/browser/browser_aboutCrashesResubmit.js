@@ -16,12 +16,12 @@ function cleanup_and_finish() {
  */
 function check_crash_list(crashes) {
   let doc = content.document;
-  let crashlinks = doc.getElementById("tbody").getElementsByTagName("a");
+  let crashlinks = doc.getElementsByClassName("crashReport");
   Assert.equal(crashlinks.length, crashes.length,
     "about:crashes lists correct number of crash reports");
   // no point in checking this if the lists aren't the same length
   if (crashlinks.length == crashes.length) {
-    for (let i=0; i<crashes.length; i++) {
+    for (let i = 0; i < crashes.length; i++) {
       Assert.equal(crashlinks[i].id, crashes[i].id, i + ": crash ID is correct");
       if (crashes[i].pending) {
         // we set the breakpad.reportURL pref in test()
@@ -139,7 +139,7 @@ function test() {
                                       // at = (bug 512853)
                                       'Foo': 'ABC=XYZ'
                                      }));
-  crashes.sort((a,b) => b.date - a.date);
+  crashes.sort((a, b) => b.date - a.date);
 
   // set this pref so we can link to our test server
   Services.prefs.setCharPref("breakpad.reportURL",

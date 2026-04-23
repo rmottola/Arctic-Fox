@@ -19,7 +19,6 @@
 #include "jsapi.h"
 #include "KeyPath.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/AppProcessChecker.h"
 #include "mozilla/AutoRestore.h"
 #include "mozilla/Casting.h"
 #include "mozilla/EndianUtils.h"
@@ -71,7 +70,6 @@
 #include "nsHashKeys.h"
 #include "nsNetUtil.h"
 #include "nsISimpleEnumerator.h"
-#include "nsIAppsService.h"
 #include "nsIEventTarget.h"
 #include "nsIFile.h"
 #include "nsIFileURL.h"
@@ -5332,7 +5330,7 @@ private:
   struct IdleThreadInfo;
   struct ThreadInfo;
   class ThreadRunnable;
-  struct TransactionInfo;
+  class TransactionInfo;
   struct TransactionInfoPair;
 
   // This mutex guards mDatabases, see below.
@@ -5726,10 +5724,14 @@ private:
   NS_DECL_NSIRUNNABLE
 };
 
-struct ConnectionPool::TransactionInfo final
+class ConnectionPool::TransactionInfo final
 {
   friend class nsAutoPtr<TransactionInfo>;
 
+  nsTHashtable<nsPtrHashKey<TransactionInfo>> mBlocking;
+  nsTArray<TransactionInfo*> mBlockingOrdered;
+
+public:
   DatabaseInfo* mDatabaseInfo;
   const nsID mBackgroundChildLoggingId;
   const nsCString mDatabaseId;
@@ -5737,7 +5739,6 @@ struct ConnectionPool::TransactionInfo final
   const int64_t mLoggingSerialNumber;
   const nsTArray<nsString> mObjectStoreNames;
   nsTHashtable<nsPtrHashKey<TransactionInfo>> mBlockedOn;
-  nsTHashtable<nsPtrHashKey<TransactionInfo>> mBlocking;
   nsTArray<nsCOMPtr<nsIRunnable>> mQueuedRunnables;
   const bool mIsWriteTransaction;
   bool mRunning;
@@ -5756,10 +5757,16 @@ struct ConnectionPool::TransactionInfo final
                   TransactionDatabaseOperationBase* aTransactionOp);
 
   void
-  Schedule();
+  AddBlockingTransaction(TransactionInfo* aTransactionInfo);
+
+  void
+  RemoveBlockingTransactions();
 
 private:
   ~TransactionInfo();
+
+  void
+  MaybeUnblock(TransactionInfo* aTransactionInfo);
 };
 
 struct ConnectionPool::TransactionInfoPair final
@@ -8282,8 +8289,7 @@ public:
   { }
 
 private:
-  virtual ~SCInputStream()
-  { }
+  virtual ~SCInputStream() = default;
 
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIINPUTSTREAM
@@ -9072,7 +9078,7 @@ public:
   {
     AssertIsOnBackgroundThread();
     MOZ_ASSERT(aMaintenance);
-    MOZ_ASSERT(mCurrentMaintenance = aMaintenance);
+    MOZ_ASSERT(mCurrentMaintenance == aMaintenance);
 
     mCurrentMaintenance = nullptr;
     ProcessMaintenanceQueue();
@@ -10204,7 +10210,7 @@ RecvFlushPendingFileDeletions()
   RefPtr<FlushPendingFileDeletionsRunnable> runnable =
     new FlushPendingFileDeletionsRunnable();
 
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable.forget()));
 
   return true;
 }
@@ -10936,7 +10942,7 @@ DatabaseConnection::Close()
   AssertIsOnConnectionThread();
   MOZ_ASSERT(mStorageConnection);
   MOZ_ASSERT(!mDEBUGSavepointCount);
-  MOZ_RELEASE_ASSERT(!mInWriteTransaction);
+  MOZ_ASSERT(!mInWriteTransaction);
 
   PROFILER_LABEL("IndexedDB",
                  "DatabaseConnection::Close",
@@ -12006,7 +12012,7 @@ ConnectionPool::Start(const nsID& aBackgroundChildLoggingId,
     // Mark what we are blocking on.
     if (TransactionInfo* blockingRead = blockInfo->mLastBlockingReads) {
       transactionInfo->mBlockedOn.PutEntry(blockingRead);
-      blockingRead->mBlocking.PutEntry(transactionInfo);
+      blockingRead->AddBlockingTransaction(transactionInfo);
     }
 
     if (aIsWriteTransaction) {
@@ -12017,7 +12023,7 @@ ConnectionPool::Start(const nsID& aBackgroundChildLoggingId,
           MOZ_ASSERT(blockingWrite);
 
           transactionInfo->mBlockedOn.PutEntry(blockingWrite);
-          blockingWrite->mBlocking.PutEntry(transactionInfo);
+          blockingWrite->AddBlockingTransaction(transactionInfo);
         }
       }
 
@@ -12033,7 +12039,9 @@ ConnectionPool::Start(const nsID& aBackgroundChildLoggingId,
                                   /* aFromQueuedTransactions */ false);
   }
 
-  if (!databaseInfoIsNew && mIdleDatabases.RemoveElement(dbInfo)) {
+  if (!databaseInfoIsNew &&
+      (mIdleDatabases.RemoveElement(dbInfo) ||
+       mDatabasesPerformingIdleMaintenance.RemoveElement(dbInfo))) {
     AdjustIdleTimer();
   }
 
@@ -12301,11 +12309,11 @@ ConnectionPool::ShutdownThread(ThreadInfo& aThreadInfo)
                  runnable->SerialNumber()));
 
   // This should clean up the thread with the profiler.
-  MOZ_ALWAYS_SUCCEEDS(thread->Dispatch(runnable, NS_DISPATCH_NORMAL));
+  MOZ_ALWAYS_SUCCEEDS(thread->Dispatch(runnable.forget(),
+                                       NS_DISPATCH_NORMAL));
 
-  nsCOMPtr<nsIRunnable> shutdownRunnable =
-    NewRunnableMethod(thread, &nsIThread::Shutdown);
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(shutdownRunnable));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(
+                        NewRunnableMethod(thread, &nsIThread::Shutdown)));
 
   mTotalThreadCount--;
 }
@@ -12420,7 +12428,7 @@ ConnectionPool::ScheduleTransaction(TransactionInfo* aTransactionInfo,
           MOZ_ASSERT(dbInfo->mThreadInfo.mThread);
 
           MOZ_ALWAYS_SUCCEEDS(
-            dbInfo->mThreadInfo.mThread->Dispatch(runnable,
+            dbInfo->mThreadInfo.mThread->Dispatch(runnable.forget(),
                                                   NS_DISPATCH_NORMAL));
         }
       }
@@ -12478,7 +12486,8 @@ ConnectionPool::ScheduleTransaction(TransactionInfo* aTransactionInfo,
       queuedRunnables[index].swap(runnable);
 
       MOZ_ALWAYS_SUCCEEDS(
-        dbInfo->mThreadInfo.mThread->Dispatch(runnable, NS_DISPATCH_NORMAL));
+        dbInfo->mThreadInfo.mThread->Dispatch(runnable.forget(),
+                                              NS_DISPATCH_NORMAL));
     }
 
     queuedRunnables.Clear();
@@ -12546,18 +12555,7 @@ ConnectionPool::NoteFinishedTransaction(uint64_t aTransactionId)
     blockInfo->mLastBlockingWrites.RemoveElement(transactionInfo);
   }
 
-  for (auto iter = transactionInfo->mBlocking.Iter();
-       !iter.Done();
-       iter.Next()) {
-    TransactionInfo* blockedInfo = iter.Get()->GetKey();
-    MOZ_ASSERT(blockedInfo);
-    MOZ_ASSERT(blockedInfo->mBlockedOn.Contains(transactionInfo));
-
-    blockedInfo->mBlockedOn.RemoveEntry(transactionInfo);
-    if (!blockedInfo->mBlockedOn.Count()) {
-      blockedInfo->Schedule();
-    }
-  }
+  transactionInfo->RemoveBlockingTransactions();
 
   if (transactionInfo->mIsWriteTransaction) {
     MOZ_ASSERT(dbInfo->mWriteTransactionCount);
@@ -12620,7 +12618,7 @@ ConnectionPool::NoteIdleDatabase(DatabaseInfo* aDatabaseInfo)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(aDatabaseInfo);
-  MOZ_RELEASE_ASSERT(!aDatabaseInfo->TotalTransactionCount());
+  MOZ_ASSERT(!aDatabaseInfo->TotalTransactionCount());
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mThread);
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mRunnable);
   MOZ_ASSERT(!mIdleDatabases.Contains(aDatabaseInfo));
@@ -12794,7 +12792,7 @@ ConnectionPool::PerformIdleDatabaseMaintenance(DatabaseInfo* aDatabaseInfo)
 {
   AssertIsOnOwningThread();
   MOZ_ASSERT(aDatabaseInfo);
-  MOZ_RELEASE_ASSERT(!aDatabaseInfo->TotalTransactionCount());
+  MOZ_ASSERT(!aDatabaseInfo->TotalTransactionCount());
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mThread);
   MOZ_ASSERT(aDatabaseInfo->mThreadInfo.mRunnable);
   MOZ_ASSERT(aDatabaseInfo->mIdle);
@@ -12812,7 +12810,7 @@ ConnectionPool::PerformIdleDatabaseMaintenance(DatabaseInfo* aDatabaseInfo)
   mDatabasesPerformingIdleMaintenance.AppendElement(aDatabaseInfo);
 
   MOZ_ALWAYS_SUCCEEDS(
-    aDatabaseInfo->mThreadInfo.mThread->Dispatch(runnable,
+    aDatabaseInfo->mThreadInfo.mThread->Dispatch(runnable.forget(),
                                                  NS_DISPATCH_NORMAL));
 }
 
@@ -12833,7 +12831,7 @@ ConnectionPool::CloseDatabase(DatabaseInfo* aDatabaseInfo)
   nsCOMPtr<nsIRunnable> runnable = new CloseConnectionRunnable(aDatabaseInfo);
 
   MOZ_ALWAYS_SUCCEEDS(
-    aDatabaseInfo->mThreadInfo.mThread->Dispatch(runnable,
+    aDatabaseInfo->mThreadInfo.mThread->Dispatch(runnable.forget(),
                                                  NS_DISPATCH_NORMAL));
 }
 
@@ -12904,7 +12902,7 @@ IdleConnectionRunnable::Run()
   RefPtr<ConnectionPool> connectionPool = mDatabaseInfo->mConnectionPool;
   MOZ_ASSERT(connectionPool);
 
-  if (mDatabaseInfo->mClosing) {
+  if (mDatabaseInfo->mClosing || mDatabaseInfo->TotalTransactionCount()) {
     MOZ_ASSERT(!connectionPool->
                  mDatabasesPerformingIdleMaintenance.Contains(mDatabaseInfo));
   } else {
@@ -12912,9 +12910,7 @@ IdleConnectionRunnable::Run()
       connectionPool->
         mDatabasesPerformingIdleMaintenance.RemoveElement(mDatabaseInfo));
 
-    if (!mDatabaseInfo->TotalTransactionCount()) {
-      connectionPool->NoteIdleDatabase(mDatabaseInfo);
-    }
+    connectionPool->NoteIdleDatabase(mDatabaseInfo);
   }
 
   return NS_OK;
@@ -13328,18 +13324,55 @@ TransactionInfo::~TransactionInfo()
 
 void
 ConnectionPool::
-TransactionInfo::Schedule()
+TransactionInfo::AddBlockingTransaction(TransactionInfo* aTransactionInfo)
 {
   AssertIsOnBackgroundThread();
-  MOZ_ASSERT(mDatabaseInfo);
+  MOZ_ASSERT(aTransactionInfo);
 
-  ConnectionPool* connectionPool = mDatabaseInfo->mConnectionPool;
-  MOZ_ASSERT(connectionPool);
-  connectionPool->AssertIsOnOwningThread();
+  if (!mBlocking.Contains(aTransactionInfo)) {
+    mBlocking.PutEntry(aTransactionInfo);
+    mBlockingOrdered.AppendElement(aTransactionInfo);
+  }
+}
 
-  Unused <<
-    connectionPool->ScheduleTransaction(this,
-                                        /* aFromQueuedTransactions */ false);
+void
+ConnectionPool::
+TransactionInfo::RemoveBlockingTransactions()
+{
+  AssertIsOnBackgroundThread();
+
+  for (uint32_t index = 0, count = mBlockingOrdered.Length();
+       index < count;
+       index++) {
+    TransactionInfo* blockedInfo = mBlockingOrdered[index];
+    MOZ_ASSERT(blockedInfo);
+
+    blockedInfo->MaybeUnblock(this);
+  }
+
+  mBlocking.Clear();
+  mBlockingOrdered.Clear();
+}
+
+void
+ConnectionPool::
+TransactionInfo::MaybeUnblock(TransactionInfo* aTransactionInfo)
+{
+  AssertIsOnBackgroundThread();
+  MOZ_ASSERT(mBlockedOn.Contains(aTransactionInfo));
+
+  mBlockedOn.RemoveEntry(aTransactionInfo);
+  if (!mBlockedOn.Count()) {
+    MOZ_ASSERT(mDatabaseInfo);
+
+    ConnectionPool* connectionPool = mDatabaseInfo->mConnectionPool;
+    MOZ_ASSERT(connectionPool);
+    connectionPool->AssertIsOnOwningThread();
+
+    Unused <<
+      connectionPool->ScheduleTransaction(this,
+                                          /* aFromQueuedTransactions */ false);
+  }
 }
 
 ConnectionPool::
@@ -15853,7 +15886,11 @@ VersionChangeTransaction::SendCompleteNotification(nsresult aResult)
   }
 
   if (NS_FAILED(aResult) && NS_SUCCEEDED(openDatabaseOp->mResultCode)) {
-    openDatabaseOp->mResultCode = aResult;
+    // 3.3.1 Opening a database:
+    // "If the upgrade transaction was aborted, run the steps for closing a
+    //  database connection with connection, create and return a new AbortError
+    //  exception and abort these steps."
+    openDatabaseOp->mResultCode = NS_ERROR_DOM_INDEXEDDB_ABORT_ERR;
   }
 
   openDatabaseOp->mState = OpenDatabaseOp::State::SendingResults;
@@ -19012,8 +19049,7 @@ DatabaseMaintenance::RunOnOwningThread()
   AssertIsOnBackgroundThread();
 
   if (mCompleteCallback) {
-    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToCurrentThread(mCompleteCallback));
-    mCompleteCallback = nullptr;
+    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToCurrentThread(mCompleteCallback.forget()));
   }
 
   mMaintenance->UnregisterDatabaseMaintenance(this);
@@ -19416,38 +19452,6 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromBlob(
 
 // static
 nsresult
-DatabaseOperationBase::BindKeyRangeToStatement(
-                                            const SerializedKeyRange& aKeyRange,
-                                            mozIStorageStatement* aStatement)
-{
-  MOZ_ASSERT(!IsOnBackgroundThread());
-  MOZ_ASSERT(aStatement);
-
-  nsresult rv = NS_OK;
-
-  if (!aKeyRange.lower().IsUnset()) {
-    rv = aKeyRange.lower().BindToStatement(aStatement, NS_LITERAL_CSTRING("lower_key"));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-  }
-
-  if (aKeyRange.isOnly()) {
-    return rv;
-  }
-
-  if (!aKeyRange.upper().IsUnset()) {
-    rv = aKeyRange.upper().BindToStatement(aStatement, NS_LITERAL_CSTRING("upper_key"));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-  }
-
-  return NS_OK;
-}
-
-// static
-nsresult
 DatabaseOperationBase::GetStructuredCloneReadInfoFromExternalBlob(
                                                  uint64_t aIntData,
                                                  FileManager* aFileManager,
@@ -19522,6 +19526,38 @@ DatabaseOperationBase::GetStructuredCloneReadInfoFromExternalBlob(
   } while (true);
 
   return rv;
+}
+
+// static
+nsresult
+DatabaseOperationBase::BindKeyRangeToStatement(
+                                            const SerializedKeyRange& aKeyRange,
+                                            mozIStorageStatement* aStatement)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aStatement);
+
+  nsresult rv = NS_OK;
+
+  if (!aKeyRange.lower().IsUnset()) {
+    rv = aKeyRange.lower().BindToStatement(aStatement, NS_LITERAL_CSTRING("lower_key"));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  if (aKeyRange.isOnly()) {
+    return rv;
+  }
+
+  if (!aKeyRange.upper().IsUnset()) {
+    rv = aKeyRange.upper().BindToStatement(aStatement, NS_LITERAL_CSTRING("upper_key"));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  return NS_OK;
 }
 
 // static
@@ -20650,8 +20686,7 @@ FactoryOp::FinishSendResults()
 
   if (mBlockedDatabaseOpen) {
     if (mDelayedOp) {
-      MOZ_ALWAYS_SUCCEEDS(NS_DispatchToCurrentThread(mDelayedOp));
-      mDelayedOp = nullptr;
+      MOZ_ALWAYS_SUCCEEDS(NS_DispatchToCurrentThread(mDelayedOp.forget()));
     }
 
     MOZ_ASSERT(gFactoryOps);
@@ -22707,7 +22742,8 @@ DeleteDatabaseOp::DispatchToWorkThread()
   MOZ_ASSERT(quotaManager);
 
   nsresult rv =
-    quotaManager->IOThread()->Dispatch(versionChangeOp, NS_DISPATCH_NORMAL);
+    quotaManager->IOThread()->Dispatch(versionChangeOp.forget(),
+                                       NS_DISPATCH_NORMAL);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
@@ -22762,7 +22798,7 @@ DeleteDatabaseOp::SendBlockedNotification()
   MOZ_ASSERT(mState == State::WaitingForOtherDatabasesToClose);
 
   if (!IsActorDestroyed()) {
-    Unused << SendBlocked(0);
+    Unused << SendBlocked(mPreviousVersion);
   }
 }
 

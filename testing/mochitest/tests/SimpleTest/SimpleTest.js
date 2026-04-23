@@ -224,7 +224,7 @@ SimpleTest.setExpected();
 /**
  * Something like assert.
 **/
-SimpleTest.ok = function (condition, name, diag) {
+SimpleTest.ok = function (condition, name, diag, stack = null) {
 
     var test = {'result': !!condition, 'name': name, 'diag': diag};
     if (SimpleTest.expected == 'fail') {
@@ -238,7 +238,16 @@ SimpleTest.ok = function (condition, name, diag) {
       var successInfo = {status:"PASS", expected:"PASS", message:"TEST-PASS"};
       var failureInfo = {status:"FAIL", expected:"PASS", message:"TEST-UNEXPECTED-FAIL"};
     }
-    SimpleTest._logResult(test, successInfo, failureInfo);
+
+    if (condition) {
+        stack = null;
+    } else if (!stack) {
+      stack = (new Error).stack.replace(/^(.*@)http:\/\/mochi.test:8888\/tests\//gm, '    $1').split('\n');
+      stack.splice(0, 1);
+      stack = stack.join('\n');
+    }
+
+    SimpleTest._logResult(test, successInfo, failureInfo, stack);
     SimpleTest._tests.push(test);
 };
 
