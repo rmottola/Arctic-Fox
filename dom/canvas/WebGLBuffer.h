@@ -45,6 +45,7 @@ public:
 
     size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 
+    GLenum Usage() const { return mUsage; }
     size_t ByteLength() const { return mByteLength; }
 
     bool ElementArrayCacheBufferData(const void* ptr, size_t bufferSizeInBytes);
@@ -75,6 +76,7 @@ protected:
     ~WebGLBuffer();
 
     Kind mContent;
+    GLenum mUsage;
     size_t mByteLength;
     UniquePtr<WebGLElementArrayCache> mCache;
     size_t mNumActiveTFOs;
