@@ -1347,6 +1347,7 @@ protected:
     bool mInvalidated;
     bool mCapturedFrameInvalidated;
     bool mResetLayer;
+    bool mLayerIsMirror;
     bool mOptionsFrozen;
     bool mMinCapability;
     bool mDisableExtensions;
