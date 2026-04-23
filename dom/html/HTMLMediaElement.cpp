@@ -47,8 +47,6 @@
 
 #include "nsITimer.h"
 
-#include "mozilla/EventStateManager.h"
-
 #include "MediaError.h"
 #include "MediaDecoder.h"
 #include "MediaPrefs.h"
@@ -1574,7 +1572,7 @@ void HTMLMediaElement::UpdatePreloadAction()
     // MSE doesn't work if preload is none, so it ignores the pref when src is
     // from MSE.
     uint32_t preloadDefault = mMediaSource ?
-                              HTMLMediaElement::PRELOAD_ATTR_AUTO :
+                              HTMLMediaElement::PRELOAD_ATTR_METADATA :
                               Preferences::GetInt("media.preload.default",
                                                   HTMLMediaElement::PRELOAD_ATTR_METADATA);
     uint32_t preloadAuto =
@@ -1586,11 +1584,8 @@ void HTMLMediaElement::UpdatePreloadAction()
       nextAction = static_cast<PreloadAction>(preloadDefault);
     } else if (val->Type() == nsAttrValue::eEnum) {
       PreloadAttrValue attr = static_cast<PreloadAttrValue>(val->GetEnumValue());
-      // If loaded through an MSE source, preload should be ignored, so treat
-      // it as empty/auto in that case.
       if (attr == HTMLMediaElement::PRELOAD_ATTR_EMPTY ||
-          attr == HTMLMediaElement::PRELOAD_ATTR_AUTO ||
-          (mLoadingSrc && IsMediaSourceURI(mLoadingSrc)))
+          attr == HTMLMediaElement::PRELOAD_ATTR_AUTO)
       {
         nextAction = static_cast<PreloadAction>(preloadAuto);
       } else if (attr == HTMLMediaElement::PRELOAD_ATTR_METADATA) {
