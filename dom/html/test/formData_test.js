@@ -77,10 +77,6 @@ function testSet() {
   is(f.getAll("other")[0], "value4", "set() should replace existing entries.");
 }
 
-function testIterate() {
-  todo(false, "Implement this in Bug 1085284.");
-}
-
 function testFilename() {
   var f = new FormData();
   f.append("blob", new Blob(["hi"]));
@@ -208,7 +204,6 @@ function runTest(doneCb) {
   testGetAll();
   testDelete();
   testSet();
-  testIterate();
   testFilename();
   testIterable();
   // Finally, send an XHR and verify the response matches.
