@@ -35,42 +35,6 @@ function turnOnPointerEvents(callback) {
   }, callback);
 }
 
-// Function checks that test should have status PASS
-function result_function(testObj) {
-if(testObj["status"] != testObj["PASS"])
-  console.log(testObj["status"] + " = " + testObj["PASS"] + ". " + testObj["name"]);
-  is(testObj["status"], testObj["PASS"], testObj["name"]);
-}
-
-// Function allows to correct finish test in mochitest system
-function completion_function() {
-  console.log("w3c tests have been finished");
-  if(!SimpleTest._stopOnLoad) {
-    console.log("Finishing Mochitest system");
-    SimpleTest.finish();
-  }
-}
-
-// Helper function to send PointerEvent with different parameters
-function sendPointerEvent(int_win, elemId, pointerEventType, inputSource, params) {
-  var elem = int_win.document.getElementById(elemId);
-  if(!!elem) {
-    var rect = elem.getBoundingClientRect();
-    var eventObj = {type: pointerEventType, inputSource: inputSource};
-    if(params && "button" in params)
-      eventObj.button = params.button;
-    if(params && "isPrimary" in params)
-      eventObj.isPrimary = params.isPrimary;
-    else if(MouseEvent.MOZ_SOURCE_MOUSE == inputSource)
-      eventObj.isPrimary = true;
-    console.log(elemId, eventObj);
-    var salt = ("pointermove" == pointerEventType) ? 1 : 2;
-    synthesizePointer(elem, rect.width*salt/5, rect.height/2, eventObj, int_win);
-  } else {
-    is(!!elem, true, "Document should have element with id: " + elemId);
-  }
-}
-
 // Helper function to send MouseEvent with different parameters
 function sendMouseEvent(int_win, elemId, mouseEventType, params) {
   var elem = int_win.document.getElementById(elemId);
@@ -83,8 +47,15 @@ function sendMouseEvent(int_win, elemId, mouseEventType, params) {
       eventObj.inputSource = params.inputSource;
     if(params && "buttons" in params)
       eventObj.buttons = params.buttons;
+
+    // Default to the center of the target element but we can still send to a
+    // position outside of the target element.
+    var offsetX = params && "offsetX" in params ? params.offsetX : rect.width / 2;
+    var offsetY = params && "offsetY" in params ? params.offsetY : rect.height / 2;
+
     console.log(elemId, eventObj);
-    synthesizeMouse(elem, rect.width/4, rect.height/2, eventObj, int_win);
+    synthesizeMouse(elem, offsetX, offsetY, eventObj, int_win);
+
   } else {
     is(!!elem, true, "Document should have element with id: " + elemId);
   }
@@ -96,9 +67,57 @@ function sendTouchEvent(int_win, elemId, touchEventType, params) {
   if(!!elem) {
     var rect = elem.getBoundingClientRect();
     var eventObj = {type: touchEventType};
+
+    // Default to the center of the target element but we can still send to a
+    // position outside of the target element.
+    var offsetX = params && "offsetX" in params ? params.offsetX : rect.width / 2;
+    var offsetY = params && "offsetY" in params ? params.offsetY : rect.height / 2;
+
     console.log(elemId, eventObj);
-    synthesizeTouch(elem, rect.width/4, rect.height/2, eventObj, int_win);
+    synthesizeTouch(elem, offsetX, offsetY, eventObj, int_win);
   } else {
     is(!!elem, true, "Document should have element with id: " + elemId);
   }
+}
+
+// Helper function to run Point Event test in a new tab.
+function runTestInNewWindow(aFile) {
+  var w = window.open('', "_blank");
+  w.is = function(a, b, msg) { return is(a, b, aFile + " | " + msg); };
+  w.ok = function(cond, name, diag) { return ok(cond, aFile + " | " + name, diag); };
+  w.location = location.href.substring(0, location.href.lastIndexOf('/') + 1) + aFile;
+
+  w.testContext = {
+    result_callback: (aTestObj) => {
+      if(aTestObj["status"] != aTestObj["PASS"]) {
+        console.log(aTestObj["status"] + " = " + aTestObj["PASS"] + ". " + aTestObj["name"]);
+      }
+      is(aTestObj["status"], aTestObj["PASS"], aTestObj["name"]);
+    },
+
+    completion_callback: () => {
+      if (!!w.testContext.executionPromise) {
+        // We need to wait tests done and execute finished then we can close the window
+        w.testContext.executionPromise.then(() => {
+          w.close();
+          SimpleTest.finish();
+        });        
+      } else {
+        // execute may synchronous trigger tests done. In that case executionPromise
+        // is not yet assigned 
+        w.close();
+        SimpleTest.finish();
+      }
+    },
+
+    execute: (aWindow) => {
+      turnOnPointerEvents(() => {
+        w.testContext.executionPromise = new Promise((aResolve, aReject) => {
+          executeTest(aWindow);
+          aResolve();
+        });
+      });
+    }
+  };
+  return w;
 }
