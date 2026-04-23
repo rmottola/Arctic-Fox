@@ -4002,7 +4002,7 @@ public:
     }
   }
 
-  ~EnterLeaveDispatcher()
+  void Dispatch()
   {
     if (mEventMessage == eMouseEnter || mEventMessage == ePointerEnter) {
       for (int32_t i = mTargets.Count() - 1; i >= 0; --i) {
@@ -4087,6 +4087,7 @@ EventStateManager::NotifyMouseOut(WidgetMouseEvent* aMouseEvent,
   // Fire mouseout
   DispatchMouseOrPointerEvent(aMouseEvent, isPointer ? ePointerOut : eMouseOut,
                               wrapper->mLastOverElement, aMovingInto);
+  leaveDispatcher.Dispatch();
 
   wrapper->mLastOverFrame = nullptr;
   wrapper->mLastOverElement = nullptr;
@@ -4161,6 +4162,7 @@ EventStateManager::NotifyMouseOver(WidgetMouseEvent* aMouseEvent,
       DispatchMouseOrPointerEvent(aMouseEvent,
                                   isPointer ? ePointerOver : eMouseOver,
                                   aContent, lastOverElement);
+    enterDispatcher->Dispatch();
     wrapper->mLastOverElement = aContent;
   } else {
     wrapper->mLastOverFrame = nullptr;
