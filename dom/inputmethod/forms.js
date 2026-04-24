@@ -410,7 +410,9 @@ var FormAssistant = {
     addEventListener("focus", this, true, false);
     addEventListener("blur", this, true, false);
     addEventListener("resize", this, true, false);
-    addEventListener("submit", this, true, false);
+    // We should not blur the fucus if the submit event is cancelled,
+    // therefore we are binding our event listener in the bubbling phase here.
+    addEventListener("submit", this, false, false);
     addEventListener("pagehide", this, true, false);
     addEventListener("beforeunload", this, true, false);
     addEventListener("input", this, true, false);
@@ -613,7 +615,7 @@ var FormAssistant = {
         }
         // fall through
       case "submit":
-        if (this.focusedElement) {
+        if (this.focusedElement && !evt.defaultPrevented) {
           this.focusedElement.blur();
         }
         break;
@@ -1440,7 +1442,7 @@ function replaceSurroundingText(element, text, offset, length) {
   return true;
 }
 
-let CompositionManager =  {
+var CompositionManager =  {
   _isStarted: false,
   _tip: null,
   _KeyboardEventForWin: null,
