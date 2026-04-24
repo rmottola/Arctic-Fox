@@ -2278,8 +2278,10 @@ CanvasRenderingContext2D::SetMozCurrentTransform(JSContext* aCx,
 void
 CanvasRenderingContext2D::GetMozCurrentTransform(JSContext* aCx,
                                                  JS::MutableHandle<JSObject*> aResult,
-                                                 ErrorResult& aError) const
+                                                 ErrorResult& aError)
 {
+  EnsureTarget();
+
   MatrixToJSObject(aCx, mTarget ? mTarget->GetTransform() : Matrix(),
                    aResult, aError);
 }
@@ -2307,8 +2309,10 @@ CanvasRenderingContext2D::SetMozCurrentTransformInverse(JSContext* aCx,
 void
 CanvasRenderingContext2D::GetMozCurrentTransformInverse(JSContext* aCx,
                                                         JS::MutableHandle<JSObject*> aResult,
-                                                        ErrorResult& aError) const
+                                                        ErrorResult& aError)
 {
+  EnsureTarget();
+
   if (!mTarget) {
     MatrixToJSObject(aCx, Matrix(), aResult, aError);
     return;
