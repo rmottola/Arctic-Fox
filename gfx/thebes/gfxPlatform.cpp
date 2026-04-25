@@ -179,7 +179,7 @@ using namespace mozilla::gfx;
 class SRGBOverrideObserver final : public nsIObserver,
                                    public nsSupportsWeakReference
 {
-    ~SRGBOverrideObserver() {}
+    ~SRGBOverrideObserver() = default;
 public:
     NS_DECL_ISUPPORTS
     NS_DECL_NSIOBSERVER
@@ -308,7 +308,7 @@ void CrashStatsLogForwarder::UpdateCrashReport()
 
 class LogForwarderEvent : public Runnable
 {
-  virtual ~LogForwarderEvent() {}
+  virtual ~LogForwarderEvent() = default;
 
   NS_DECL_ISUPPORTS_INHERITED
 
@@ -362,7 +362,7 @@ void CrashStatsLogForwarder::Log(const std::string& aString)
 
 class CrashTelemetryEvent : public Runnable
 {
-  virtual ~CrashTelemetryEvent() {}
+  virtual ~CrashTelemetryEvent() = default;
 
   NS_DECL_ISUPPORTS_INHERITED
 
@@ -448,7 +448,7 @@ static const char* kObservedPrefs[] = {
 
 class FontPrefsObserver final : public nsIObserver
 {
-    ~FontPrefsObserver() {}
+    ~FontPrefsObserver() = default;
 public:
     NS_DECL_ISUPPORTS
     NS_DECL_NSIOBSERVER
@@ -473,7 +473,7 @@ FontPrefsObserver::Observe(nsISupports *aSubject,
 
 class MemoryPressureObserver final : public nsIObserver
 {
-    ~MemoryPressureObserver() {}
+    ~MemoryPressureObserver() = default;
 public:
     NS_DECL_ISUPPORTS
     NS_DECL_NSIOBSERVER
