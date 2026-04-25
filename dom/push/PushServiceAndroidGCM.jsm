@@ -215,11 +215,16 @@ this.PushServiceAndroidGCM = {
         // The Push server requires padding.
         pad: true,
       }) : null;
-    // Caller handles errors.
-    return Messaging.sendRequestForResult({
+    let message = {
       type: "PushServiceAndroidGCM:SubscribeChannel",
       appServerKey: appServerKey,
-    }).then(data => {
+    }
+    if (record.scope == FXA_PUSH_SCOPE) {
+      message.service = "fxa";
+    }
+    // Caller handles errors.
+    return Messaging.sendRequestForResult(message)
+    .then(data => {
       console.debug("Got data:", data);
       return PushCrypto.generateKeys()
         .then(exportedKeys =>
