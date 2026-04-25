@@ -19,6 +19,9 @@ XPCOMUtils.defineLazyServiceGetter(this, "gContentSecurityManager",
                                    "@mozilla.org/contentsecuritymanager;1",
                                    "nsIContentSecurityManager");
 
+var prefs = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefBranch);
+prefs.setCharPref("dom.securecontext.whitelist", "example.net,example.org");
+
 add_task(function* test_isOriginPotentiallyTrustworthy() {
   for (let [uriSpec, expectedResult] of [
     ["http://example.com/", false],
