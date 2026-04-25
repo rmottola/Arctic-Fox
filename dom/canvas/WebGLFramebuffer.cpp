@@ -537,7 +537,7 @@ WebGLFBAttachPoint::GetParameter(const char* funcName, WebGLContext* webgl, JSCo
 
         if (format->componentType == webgl::ComponentType::Special) {
             // Special format is used for DS mixed format(e.g. D24S8 and D32FS8).
-            MOZ_ASSERT(format->unsizedFormat == webgl::UnsizedFormat::DS);
+            MOZ_ASSERT(format->unsizedFormat == webgl::UnsizedFormat::DEPTH_STENCIL);
             MOZ_ASSERT(attachment == LOCAL_GL_DEPTH_ATTACHMENT ||
                        attachment == LOCAL_GL_STENCIL_ATTACHMENT);
 
@@ -1609,10 +1609,22 @@ WebGLFramebuffer::BlitFramebuffer(WebGLContext* webgl,
     bool colorFormatsMatch = true;
     bool colorTypesMatch = true;
 
+    const auto fnNarrowComponentType = [&](const webgl::FormatInfo* format) {
+        switch (format->componentType) {
+        case webgl::ComponentType::NormInt:
+        case webgl::ComponentType::NormUInt:
+            return webgl::ComponentType::Float;
+
+        default:
+            return format->componentType;
+        }
+    };
+
     const auto fnCheckColorFormat = [&](const webgl::FormatInfo* dstFormat) {
         dstHasColor = true;
         colorFormatsMatch &= (dstFormat == srcColorFormat);
-        colorTypesMatch &= (dstFormat->componentType == srcColorFormat->componentType);
+        colorTypesMatch &= ( fnNarrowComponentType(dstFormat) ==
+                             fnNarrowComponentType(srcColorFormat) );
     };
 
     if (dstFB) {

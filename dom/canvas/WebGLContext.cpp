@@ -118,6 +118,7 @@ WebGLContext::WebGLContext()
     , mBufferFetchingHasPerVertex(false)
     , mMaxFetchedVertices(0)
     , mMaxFetchedInstances(0)
+    , mLayerIsMirror(false)
     , mBypassShaderValidation(false)
     , mContextLossHandler(this)
     , mNeedsFakeNoAlpha(false)
@@ -730,11 +731,8 @@ WebGLContext::CreateAndInitGL(bool forceEnabled,
     const bool useEGL = PR_GetEnv("MOZ_WEBGL_FORCE_EGL");
 
 #ifdef XP_WIN
-    if (!IsWebGL2()) {
-        // Use only ANGLE on Windows for WebGL 1.
-        tryNativeGL = false;
-        tryANGLE = true;
-    }
+    tryNativeGL = false;
+    tryANGLE = true;
 
     if (gfxPrefs::WebGLDisableWGL()) {
         tryNativeGL = false;
@@ -831,8 +829,11 @@ void
 WebGLContext::ThrowEvent_WebGLContextCreationError(const nsACString& text)
 {
     RefPtr<EventTarget> target = mCanvasElement;
-    if (!target) {
+    if (!target && mOffscreenCanvas) {
         target = mOffscreenCanvas;
+    } else if (!target) {
+        GenerateWarning("Failed to create WebGL context: %s", text.BeginReading());
+        return;
     }
 
     const auto kEventName = NS_LITERAL_STRING("webglcontextcreationerror");
@@ -1385,6 +1386,10 @@ WebGLContext::GetCanvasLayer(nsDisplayListBuilder* builder,
     canvasLayer->Updated();
 
     mResetLayer = false;
+    // We only wish to update mLayerIsMirror when a new layer is returned.
+    // If a cached layer is returned above, aMirror is not changing since
+    // the last cached layer was created and mLayerIsMirror is still valid.
+    mLayerIsMirror = aMirror;
 
     return canvasLayer.forget();
 }
@@ -2434,6 +2439,14 @@ WebGLContext::GetUnpackSize(bool isFunc3D, uint32_t width, uint32_t height,
 already_AddRefed<layers::SharedSurfaceTextureClient>
 WebGLContext::GetVRFrame()
 {
+    if (!mLayerIsMirror) {
+        /**
+         * Do not allow VR frame submission until a mirroring canvas layer has
+         * been returned by GetCanvasLayer
+         */
+        return nullptr;
+    }
+
     VRManagerChild* vrmc = VRManagerChild::Get();
     if (!vrmc) {
         return nullptr;
@@ -2501,6 +2514,16 @@ WebGLContext::StartVRPresentation()
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static inline size_t
+SizeOfViewElem(const dom::ArrayBufferView& view)
+{
+    const auto& elemType = view.Type();
+    if (elemType == js::Scalar::MaxTypedArrayViewType) // DataViews.
+        return 1;
+
+    return js::Scalar::byteSize(elemType);
+}
+
 bool
 WebGLContext::ValidateArrayBufferView(const char* funcName,
                                       const dom::ArrayBufferView& view, GLuint elemOffset,
@@ -2511,8 +2534,7 @@ WebGLContext::ValidateArrayBufferView(const char* funcName,
     uint8_t* const bytes = view.DataAllowShared();
     const size_t byteLen = view.LengthAllowShared();
 
-    const auto& elemType = view.Type();
-    const auto& elemSize = js::Scalar::byteSize(elemType);
+    const auto& elemSize = SizeOfViewElem(view);
 
     size_t elemCount = byteLen / elemSize;
     if (elemOffset > elemCount) {

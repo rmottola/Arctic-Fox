@@ -1239,8 +1239,11 @@ WebGLTexture::TexImage(const char* funcName, TexImageTarget target, GLint level,
     const GLint zOffset = 0;
 
     GLenum glError;
-    blob->TexOrSubImage(isSubImage, needsRespec, funcName, this, target, level,
-                        driverUnpackInfo, xOffset, yOffset, zOffset, &glError);
+    if (!blob->TexOrSubImage(isSubImage, needsRespec, funcName, this, target, level,
+                             driverUnpackInfo, xOffset, yOffset, zOffset, &glError))
+    {
+        return;
+    }
 
     if (glError == LOCAL_GL_OUT_OF_MEMORY) {
         mContext->ErrorOutOfMemory("%s: Driver ran out of memory during upload.",
@@ -1324,8 +1327,11 @@ WebGLTexture::TexSubImage(const char* funcName, TexImageTarget target, GLint lev
     const bool needsRespec = false;
 
     GLenum glError;
-    blob->TexOrSubImage(isSubImage, needsRespec, funcName, this, target, level,
-                        driverUnpackInfo, xOffset, yOffset, zOffset, &glError);
+    if (!blob->TexOrSubImage(isSubImage, needsRespec, funcName, this, target, level,
+                             driverUnpackInfo, xOffset, yOffset, zOffset, &glError))
+    {
+        return;
+    }
 
     if (glError == LOCAL_GL_OUT_OF_MEMORY) {
         mContext->ErrorOutOfMemory("%s: Driver ran out of memory during upload.",
@@ -1912,7 +1918,7 @@ ValidateCopyDestUsage(const char* funcName, WebGLContext* webgl,
 }
 
 bool
-WebGLTexture::ValidateCopyTexImageForFeedback(const char* funcName, uint32_t level) const
+WebGLTexture::ValidateCopyTexImageForFeedback(const char* funcName, uint32_t level, GLint layer) const
 {
     const auto& fb = mContext->mBoundReadFramebuffer;
     if (fb) {
@@ -1920,6 +1926,7 @@ WebGLTexture::ValidateCopyTexImageForFeedback(const char* funcName, uint32_t lev
         MOZ_ASSERT(attach);
 
         if (attach->Texture() == this &&
+            attach->Layer() == layer &&
             uint32_t(attach->MipLevel()) == level)
         {
             // Note that the TexImageTargets *don't* have to match for this to be
@@ -2110,7 +2117,7 @@ WebGLTexture::CopyTexSubImage(const char* funcName, TexImageTarget target, GLint
         return;
     auto srcFormat = srcUsage->format;
 
-    if (!ValidateCopyTexImageForFeedback(funcName, level))
+    if (!ValidateCopyTexImageForFeedback(funcName, level, zOffset))
         return;
 
     ////////////////////////////////////

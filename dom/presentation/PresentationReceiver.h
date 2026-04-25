@@ -49,7 +49,7 @@ private:
 
   virtual ~PresentationReceiver();
 
-  bool Init();
+  MOZ_IS_CLASS_INIT bool Init();
 
   void Shutdown();
 

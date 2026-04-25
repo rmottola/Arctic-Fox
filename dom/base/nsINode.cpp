@@ -153,6 +153,7 @@ nsINode::~nsINode()
   MOZ_ASSERT(!HasSlots(), "nsNodeUtils::LastRelease was not called?");
   MOZ_ASSERT(mSubtreeRoot == this, "Didn't restore state properly?");
 #ifdef MOZ_STYLO
+  NS_ASSERTION(!HasServoData(), "expected ServoNodeData to be cleared earlier");
   ClearServoData();
 #endif
 }
@@ -1407,6 +1408,15 @@ nsINode::UnoptimizableCCNode() const
           AsElement()->IsInNamespace(kNameSpaceID_XBL));
 }
 
+void
+nsINode::ClearServoData() {
+#ifdef MOZ_STYLO
+  Servo_Node_ClearNodeData(this);
+#else
+  MOZ_CRASH("Accessing servo node data in non-stylo build");
+#endif
+}
+
 /* static */
 bool
 nsINode::Traverse(nsINode *tmp, nsCycleCollectionTraversalCallback &cb)
@@ -1877,7 +1887,8 @@ nsINode::Prepend(const Sequence<OwningNodeOrString>& aNodes,
     return;
   }
 
-  InsertBefore(*node, mFirstChild, aRv);
+  nsCOMPtr<nsINode> refNode = mFirstChild;
+  InsertBefore(*node, refNode, aRv);
 }
 
 void

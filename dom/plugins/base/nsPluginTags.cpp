@@ -248,6 +248,7 @@ nsPluginTag::nsPluginTag(nsPluginInfo* aPluginInfo,
            aPluginInfo->fMimeDescriptionArray,
            aPluginInfo->fExtensionArray,
            aPluginInfo->fVariantCount);
+  InitSandboxLevel();
   EnsureMembersAreUTF8();
   FixupVersion();
 }
@@ -367,6 +368,7 @@ void nsPluginTag::InitMime(const char* const* aMimeTypes,
           mIsFlashPlugin = true;
           mSupportsAsyncInit = true;
         }
+        break;
       case nsPluginHost::eSpecialType_Silverlight:
       case nsPluginHost::eSpecialType_Unity:
       case nsPluginHost::eSpecialType_Test:
@@ -753,13 +755,6 @@ nsPluginTag::GetNiceName(nsACString & aResult)
 {
   aResult = GetNiceFileName();
   return NS_OK;
-}
-
-void nsPluginTag::ImportFlagsToPrefs(uint32_t flags)
-{
-  if (!(flags & NS_PLUGIN_FLAG_ENABLED)) {
-    SetPluginState(ePluginState_Disabled);
-  }
 }
 
 NS_IMETHODIMP

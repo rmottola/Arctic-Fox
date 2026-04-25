@@ -14,19 +14,14 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1000870
     <script type="text/javascript">
       SimpleTest.waitForExplicitFinish();
       function startTest() {
-        var iframe = document.getElementById("testFrame");
-        iframe.src = "pointerevent_element_haspointercapture.html";
+        runTestInNewWindow("pointerevent_pointerId_scope-manual.html");
       }
       function executeTest(int_win) {
-        sendMouseEvent(int_win, "target0", "mousemove");
-        sendMouseEvent(int_win, "target0", "mousedown", {button:0});
-        sendMouseEvent(int_win, "target0", "mousemove", {button:0});
-        sendMouseEvent(int_win, "target1", "mousemove", {button:0});
-        sendMouseEvent(int_win, "target1", "mouseup", {button:0});
+        sendTouchEvent(int_win, "target0", "touchstart");
+        sendTouchEvent(int_win, "target0", "touchend");
       }
     </script>
   </head>
   <body>
-    <iframe id="testFrame" height="800" width="1000"></iframe>
   </body>
 </html>

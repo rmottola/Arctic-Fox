@@ -1167,7 +1167,7 @@ static nsresult FireEventForAccessibility(nsIDOMHTMLInputElement* aTarget,
 //
 
 HTMLInputElement::HTMLInputElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo,
-                                   FromParser aFromParser)
+                                   FromParser aFromParser, FromClone aFromClone)
   : nsGenericHTMLFormElementWithState(aNodeInfo)
   , mType(kInputDefaultType->value)
   , mAutocompleteAttrState(nsContentUtils::eAutocompleteAttrState_Unknown)
@@ -1178,7 +1178,8 @@ HTMLInputElement::HTMLInputElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
   , mChecked(false)
   , mHandlingSelectEvent(false)
   , mShouldInitChecked(false)
-  , mParserCreating(aFromParser != NOT_FROM_PARSER)
+  , mDoneCreating(aFromParser == NOT_FROM_PARSER &&
+                  aFromClone == FromClone::no)
   , mInInternalActivate(false)
   , mCheckedIsToggled(false)
   , mIndeterminate(false)
@@ -1313,7 +1314,8 @@ HTMLInputElement::Clone(mozilla::dom::NodeInfo* aNodeInfo, nsINode** aResult) co
   *aResult = nullptr;
 
   already_AddRefed<mozilla::dom::NodeInfo> ni = RefPtr<mozilla::dom::NodeInfo>(aNodeInfo).forget();
-  RefPtr<HTMLInputElement> it = new HTMLInputElement(ni, NOT_FROM_PARSER);
+  RefPtr<HTMLInputElement> it = new HTMLInputElement(ni, NOT_FROM_PARSER,
+                                                     FromClone::yes);
 
   nsresult rv = const_cast<HTMLInputElement*>(this)->CopyInnerTo(it);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -1355,6 +1357,8 @@ HTMLInputElement::Clone(mozilla::dom::NodeInfo* aNodeInfo, nsINode** aResult) co
       break;
   }
 
+  it->DoneCreatingElement();
+
   it->mLastValueChangeWasInteractive = mLastValueChangeWasInteractive;
   it.forget(aResult);
   return NS_OK;
@@ -1369,12 +1373,12 @@ HTMLInputElement::BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
     //
     // When name or type changes, radio should be removed from radio group.
     // (type changes are handled in the form itself currently)
-    // If the parser is not done creating the radio, we also should not do it.
+    // If we are not done creating the radio, we also should not do it.
     //
     if ((aName == nsGkAtoms::name ||
          (aName == nsGkAtoms::type && !mForm)) &&
         mType == NS_FORM_INPUT_RADIO &&
-        (mForm || !mParserCreating)) {
+        (mForm || mDoneCreating)) {
       WillRemoveFromRadioGroup();
     } else if (aNotify && aName == nsGkAtoms::src &&
                mType == NS_FORM_INPUT_IMAGE) {
@@ -1419,12 +1423,12 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
     //
     // When name or type changes, radio should be added to radio group.
     // (type changes are handled in the form itself currently)
-    // If the parser is not done creating the radio, we also should not do it.
+    // If we are not done creating the radio, we also should not do it.
     //
     if ((aName == nsGkAtoms::name ||
          (aName == nsGkAtoms::type && !mForm)) &&
         mType == NS_FORM_INPUT_RADIO &&
-        (mForm || !mParserCreating)) {
+        (mForm || mDoneCreating)) {
       AddedToRadioGroup();
       UpdateValueMissingValidityStateForRadio(false);
     }
@@ -1442,9 +1446,9 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
     // Checked must be set no matter what type of control it is, since
     // mChecked must reflect the new value
     if (aName == nsGkAtoms::checked && !mCheckedChanged) {
-      // Delay setting checked if the parser is creating this element (wait
+      // Delay setting checked if we are creating this element (wait
       // until everything is set)
-      if (mParserCreating) {
+      if (!mDoneCreating) {
         mShouldInitChecked = true;
       } else {
         DoSetChecked(DefaultChecked(), true, true);
@@ -1498,7 +1502,7 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       UpdateTooLongValidityState();
     } else if (MinOrMaxLengthApplies() && aName == nsGkAtoms::minlength) {
       UpdateTooShortValidityState();
-    } else if (aName == nsGkAtoms::pattern && !mParserCreating) {
+    } else if (aName == nsGkAtoms::pattern && mDoneCreating) {
       UpdatePatternMismatchValidityState();
     } else if (aName == nsGkAtoms::multiple) {
       UpdateTypeMismatchValidityState();
@@ -1524,10 +1528,10 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       }
       // Validity state must be updated *after* the SetValueInternal call above
       // or else the following assert will not be valid.
-      // We don't assert the state of underflow during parsing since
+      // We don't assert the state of underflow during creation since
       // DoneCreatingElement sanitizes.
       UpdateRangeOverflowValidityState();
-      MOZ_ASSERT(mParserCreating ||
+      MOZ_ASSERT(!mDoneCreating ||
                  mType != NS_FORM_INPUT_RANGE ||
                  !GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
                  "HTML5 spec does not allow underflow for type=range");
@@ -1544,7 +1548,7 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       // See corresponding @max comment
       UpdateRangeUnderflowValidityState();
       UpdateStepMismatchValidityState();
-      MOZ_ASSERT(mParserCreating ||
+      MOZ_ASSERT(!mDoneCreating ||
                  mType != NS_FORM_INPUT_RANGE ||
                  !GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
                  "HTML5 spec does not allow underflow for type=range");
@@ -1559,7 +1563,7 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       }
       // See corresponding @max comment
       UpdateStepMismatchValidityState();
-      MOZ_ASSERT(mParserCreating ||
+      MOZ_ASSERT(!mDoneCreating ||
                  mType != NS_FORM_INPUT_RANGE ||
                  !GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW),
                  "HTML5 spec does not allow underflow for type=range");
@@ -3182,10 +3186,10 @@ HTMLInputElement::SetValueInternal(const nsAString& aValue, uint32_t aFlags)
       // it if it's useless.
       nsAutoString value(aValue);
 
-      if (!mParserCreating) {
+      if (mDoneCreating) {
         SanitizeValue(value);
       }
-      // else DoneCreatingElement calls us again once mParserCreating is false
+      // else DoneCreatingElement calls us again once mDoneCreating is true
 
       bool setValueChanged = !!(aFlags & nsTextEditorState::eSetValue_Notify);
       if (setValueChanged) {
@@ -3197,7 +3201,7 @@ HTMLInputElement::SetValueInternal(const nsAString& aValue, uint32_t aFlags)
           return NS_ERROR_OUT_OF_MEMORY;
         }
         if (mType == NS_FORM_INPUT_EMAIL) {
-          UpdateAllValidityStates(mParserCreating);
+          UpdateAllValidityStates(!mDoneCreating);
         }
       } else {
         free(mInputData.mValue);
@@ -3225,11 +3229,11 @@ HTMLInputElement::SetValueInternal(const nsAString& aValue, uint32_t aFlags)
             frame->UpdateInputBoxValue();
           }
         }
-        if (!mParserCreating) {
+        if (mDoneCreating) {
           OnValueChanged(/* aNotify = */ true,
                          /* aWasInteractiveUserChange = */ false);
         }
-        // else DoneCreatingElement calls us again once mParserCreating is false
+        // else DoneCreatingElement calls us again once mDoneCreating is true
       }
 
       if (mType == NS_FORM_INPUT_COLOR) {
@@ -3684,7 +3688,7 @@ HTMLInputElement::DispatchSelectEvent(nsPresContext* aPresContext)
 
   // If already handling select event, don't dispatch a second.
   if (!mHandlingSelectEvent) {
-    WidgetEvent event(nsContentUtils::LegacyIsCallerChromeOrNativeCode(), eFormSelect);
+    WidgetEvent event(true, eFormSelect);
 
     mHandlingSelectEvent = true;
     EventDispatcher::Dispatch(static_cast<nsIContent*>(this),
@@ -3963,19 +3967,6 @@ HTMLInputElement::GetEventTargetParent(EventChainPreVisitor& aVisitor)
         // that).
         frame->InvalidateFrame();
       }
-    } else if (aVisitor.mEvent->mMessage == eKeyUp) {
-      WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
-      if ((keyEvent->mKeyCode == NS_VK_UP ||
-           keyEvent->mKeyCode == NS_VK_DOWN) &&
-          !(keyEvent->IsShift() || keyEvent->IsControl() ||
-            keyEvent->IsAlt() || keyEvent->IsMeta() ||
-            keyEvent->IsAltGraph() || keyEvent->IsFn() ||
-            keyEvent->IsOS())) {
-        // The up/down arrow key events fire 'change' events when released
-        // so that at the end of a series of up/down arrow key repeat events
-        // the value is considered to be "commited" by the user.
-        FireChangeEventIfNeeded();
-      }
     }
   }
 
@@ -4154,6 +4145,8 @@ HTMLInputElement::SetValueOfRangeForUserEvent(Decimal aValue)
 {
   MOZ_ASSERT(aValue.isFinite());
 
+  Decimal oldValue = GetValueAsDecimal();
+
   nsAutoString val;
   ConvertNumberToString(aValue, val);
   // TODO: What should we do if SetValueInternal fails?  (The allocation
@@ -4164,10 +4157,13 @@ HTMLInputElement::SetValueOfRangeForUserEvent(Decimal aValue)
   if (frame) {
     frame->UpdateForValueChange();
   }
-  nsContentUtils::DispatchTrustedEvent(OwnerDoc(),
-                                       static_cast<nsIDOMHTMLInputElement*>(this),
-                                       NS_LITERAL_STRING("input"), true,
-                                       false);
+
+  if (GetValueAsDecimal() != oldValue) {
+    nsContentUtils::DispatchTrustedEvent(OwnerDoc(),
+                                         static_cast<nsIDOMHTMLInputElement*>(this),
+                                         NS_LITERAL_STRING("input"), true,
+                                         false);
+  }
 }
 
 void
@@ -4209,6 +4205,9 @@ HTMLInputElement::StopNumberControlSpinnerSpin(SpinnerStopState aState)
     nsNumberControlFrame* numberControlFrame =
       do_QueryFrame(GetPrimaryFrame());
     if (numberControlFrame) {
+      MOZ_ASSERT(aState == eAllowDispatchingEvents,
+                 "Shouldn't have primary frame for the element when we're not "
+                 "allowed to dispatch events to it anymore.");
       numberControlFrame->SpinnerStateChanged();
     }
   }
@@ -4347,6 +4346,17 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
   }
 
   return NS_OK;
+}
+
+/**
+ * Return true if the input event should be ignore because of it's modifiers
+ */
+static bool
+IgnoreInputEventWithModifier(WidgetInputEvent* aEvent)
+{
+  return aEvent->IsShift() || aEvent->IsControl() || aEvent->IsAlt() ||
+         aEvent->IsMeta() || aEvent->IsAltGraph() || aEvent->IsFn() ||
+         aEvent->IsOS();
 }
 
 nsresult
@@ -4495,10 +4505,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         keyEvent && keyEvent->mMessage == eKeyPress &&
         aVisitor.mEvent->IsTrusted() &&
         (keyEvent->mKeyCode == NS_VK_UP || keyEvent->mKeyCode == NS_VK_DOWN) &&
-        !(keyEvent->IsShift() || keyEvent->IsControl() ||
-          keyEvent->IsAlt() || keyEvent->IsMeta() ||
-          keyEvent->IsAltGraph() || keyEvent->IsFn() ||
-          keyEvent->IsOS())) {
+        !IgnoreInputEventWithModifier(keyEvent)) {
       // We handle the up/down arrow keys specially for <input type=number>.
       // On some platforms the editor for the nested text control will
       // process these keys to send the cursor to the start/end of the text
@@ -4512,6 +4519,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
       // event to increase/decrease the value of the number control.
       if (!aVisitor.mEvent->DefaultPreventedByContent() && IsMutable()) {
         StepNumberControlForUserEvent(keyEvent->mKeyCode == NS_VK_UP ? 1 : -1);
+        FireChangeEventIfNeeded();
         aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
       }
     } else if (nsEventStatus_eIgnore == aVisitor.mEventStatus) {
@@ -4689,6 +4697,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
                   break;
               }
               SetValueOfRangeForUserEvent(newValue);
+              FireChangeEventIfNeeded();
               aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
             }
           }
@@ -4715,10 +4724,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           }
           if (mType == NS_FORM_INPUT_NUMBER && aVisitor.mEvent->IsTrusted()) {
             if (mouseEvent->button == WidgetMouseEvent::eLeftButton &&
-                !(mouseEvent->IsShift() || mouseEvent->IsControl() ||
-                  mouseEvent->IsAlt() || mouseEvent->IsMeta() ||
-                  mouseEvent->IsAltGraph() || mouseEvent->IsFn() ||
-                  mouseEvent->IsOS())) {
+                !IgnoreInputEventWithModifier(mouseEvent)) {
               nsNumberControlFrame* numberControlFrame =
                 do_QueryFrame(GetPrimaryFrame());
               if (numberControlFrame) {
@@ -4766,6 +4772,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
                 do_QueryFrame(GetPrimaryFrame());
               if (numberControlFrame && numberControlFrame->IsFocused()) {
                 StepNumberControlForUserEvent(wheelEvent->mDeltaY > 0 ? -1 : 1);
+                FireChangeEventIfNeeded();
                 aVisitor.mEvent->PreventDefault();
               }
             } else if (mType == NS_FORM_INPUT_RANGE &&
@@ -4779,6 +4786,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
               MOZ_ASSERT(value.isFinite() && step.isFinite());
               SetValueOfRangeForUserEvent(wheelEvent->mDeltaY < 0 ?
                                           value + step : value - step);
+              FireChangeEventIfNeeded();
               aVisitor.mEvent->PreventDefault();
             }
           }
@@ -4879,10 +4887,7 @@ HTMLInputElement::PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor)
         break; // don't start drag if someone else is already capturing
       }
       WidgetInputEvent* inputEvent = aVisitor.mEvent->AsInputEvent();
-      if (inputEvent->IsShift() || inputEvent->IsControl() ||
-          inputEvent->IsAlt() || inputEvent->IsMeta() ||
-          inputEvent->IsAltGraph() || inputEvent->IsFn() ||
-          inputEvent->IsOS()) {
+      if (IgnoreInputEventWithModifier(inputEvent)) {
         break; // ignore
       }
       if (aVisitor.mEvent->mMessage == eMouseDown) {
@@ -5148,7 +5153,7 @@ HTMLInputElement::HandleTypeChange(uint8_t aNewType)
 void
 HTMLInputElement::SanitizeValue(nsAString& aValue)
 {
-  NS_ASSERTION(!mParserCreating, "The element parsing should be finished!");
+  NS_ASSERTION(mDoneCreating, "The element creation should be finished!");
 
   switch (mType) {
     case NS_FORM_INPUT_TEXT:
@@ -5274,6 +5279,15 @@ HTMLInputElement::SanitizeValue(nsAString& aValue)
         }
       }
       break;
+    case NS_FORM_INPUT_DATETIME_LOCAL:
+      {
+        if (!aValue.IsEmpty() && !IsValidDateTimeLocal(aValue)) {
+          aValue.Truncate();
+        } else {
+          NormalizeDateTimeLocal(aValue);
+        }
+      }
+      break;
     case NS_FORM_INPUT_COLOR:
       {
         if (IsValidSimpleColor(aValue)) {
@@ -5361,7 +5375,15 @@ HTMLInputElement::IsValidDate(const nsAString& aValue) const
   return ParseDate(aValue, &year, &month, &day);
 }
 
-bool HTMLInputElement::ParseYear(const nsAString& aValue, uint32_t* aYear) const
+bool
+HTMLInputElement::IsValidDateTimeLocal(const nsAString& aValue) const
+{
+  uint32_t year, month, day, time;
+  return ParseDateTimeLocal(aValue, &year, &month, &day, &time);
+}
+
+bool
+HTMLInputElement::ParseYear(const nsAString& aValue, uint32_t* aYear) const
 {
   if (aValue.Length() < 4) {
     return false;
@@ -5371,9 +5393,9 @@ bool HTMLInputElement::ParseYear(const nsAString& aValue, uint32_t* aYear) const
       *aYear > 0;
 }
 
-bool HTMLInputElement::ParseMonth(const nsAString& aValue,
-                                  uint32_t* aYear,
-                                  uint32_t* aMonth) const
+bool
+HTMLInputElement::ParseMonth(const nsAString& aValue, uint32_t* aYear,
+                             uint32_t* aMonth) const
 {
   // Parse the year, month values out a string formatted as 'yyyy-mm'.
   if (aValue.Length() < 7) {
@@ -5394,9 +5416,9 @@ bool HTMLInputElement::ParseMonth(const nsAString& aValue,
          *aMonth > 0 && *aMonth <= 12;
 }
 
-bool HTMLInputElement::ParseWeek(const nsAString& aValue,
-                                 uint32_t* aYear,
-                                 uint32_t* aWeek) const
+bool
+HTMLInputElement::ParseWeek(const nsAString& aValue, uint32_t* aYear,
+                            uint32_t* aWeek) const
 {
   // Parse the year, month values out a string formatted as 'yyyy-Www'.
   if (aValue.Length() < 8) {
@@ -5422,10 +5444,9 @@ bool HTMLInputElement::ParseWeek(const nsAString& aValue,
 
 }
 
-bool HTMLInputElement::ParseDate(const nsAString& aValue,
-                                 uint32_t* aYear,
-                                 uint32_t* aMonth,
-                                 uint32_t* aDay) const
+bool
+HTMLInputElement::ParseDate(const nsAString& aValue, uint32_t* aYear,
+                            uint32_t* aMonth, uint32_t* aDay) const
 {
 /*
  * Parse the year, month, day values out a date string formatted as 'yyyy-mm-dd'.
@@ -5450,6 +5471,85 @@ bool HTMLInputElement::ParseDate(const nsAString& aValue,
 
   return DigitSubStringToNumber(aValue, endOfMonthOffset + 1, 2, aDay) &&
          *aDay > 0 && *aDay <= NumberOfDaysInMonth(*aMonth, *aYear);
+}
+
+bool
+HTMLInputElement::ParseDateTimeLocal(const nsAString& aValue, uint32_t* aYear,
+                                     uint32_t* aMonth, uint32_t* aDay,
+                                     uint32_t* aTime) const
+{
+  // Parse the year, month, day and time values out a string formatted as
+  // 'yyyy-mm-ddThh:mm[:ss.s] or 'yyyy-mm-dd hh:mm[:ss.s]', where fractions of
+  // seconds can be 1 to 3 digits.
+  // The minimum length allowed is 16, which is of the form 'yyyy-mm-ddThh:mm'
+  // or 'yyyy-mm-dd hh:mm'.
+  if (aValue.Length() < 16) {
+    return false;
+  }
+
+  const uint32_t sepIndex = 10;
+  if (aValue[sepIndex] != 'T' && aValue[sepIndex] != ' ') {
+    return false;
+  }
+
+  const nsAString& dateStr = Substring(aValue, 0, sepIndex);
+  if (!ParseDate(dateStr, aYear, aMonth, aDay)) {
+    return false;
+  }
+
+  const nsAString& timeStr = Substring(aValue, sepIndex + 1,
+                                       aValue.Length() - sepIndex + 1);
+  if (!ParseTime(timeStr, aTime)) {
+    return false;
+  }
+
+  return true;
+}
+
+void
+HTMLInputElement::NormalizeDateTimeLocal(nsAString& aValue) const
+{
+  if (aValue.IsEmpty()) {
+    return;
+  }
+
+  // Use 'T' as the separator between date string and time string.
+  const uint32_t sepIndex = 10;
+  if (aValue[sepIndex] == ' ') {
+    aValue.Replace(sepIndex, 1, NS_LITERAL_STRING("T"));
+  }
+
+  // Time expressed as the shortest possible string.
+  if (aValue.Length() == 16) {
+    return;
+  }
+
+  // Fractions of seconds part is optional, ommit it if it's 0.
+  if (aValue.Length() > 19) {
+    uint32_t milliseconds;
+    if (!DigitSubStringToNumber(aValue, 20, aValue.Length() - 20,
+                                &milliseconds)) {
+      return;
+    }
+
+    if (milliseconds != 0) {
+      return;
+    }
+
+    aValue.Cut(19, aValue.Length() - 19);
+  }
+
+  // Seconds part is optional, ommit it if it's 0.
+  uint32_t seconds;
+  if (!DigitSubStringToNumber(aValue, 17, aValue.Length() - 17, &seconds)) {
+    return;
+  }
+
+  if (seconds != 0) {
+    return;
+  }
+
+  aValue.Cut(16, aValue.Length() - 16);
 }
 
 double
@@ -6683,7 +6783,7 @@ HTMLInputElement::SaveState()
 void
 HTMLInputElement::DoneCreatingElement()
 {
-  mParserCreating = false;
+  mDoneCreating = true;
 
   //
   // Restore state as needed.  Note that disabled state applies to all control
@@ -6783,6 +6883,14 @@ HTMLInputElement::IntrinsicState() const
                         !mCanShowInvalidUI)))) {
       state |= NS_EVENT_STATE_MOZ_UI_VALID;
     }
+
+    // :in-range and :out-of-range only apply if the element currently has a range
+    if (mHasRange) {
+      state |= (GetValidityState(VALIDITY_STATE_RANGE_OVERFLOW) ||
+                GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW))
+                 ? NS_EVENT_STATE_OUTOFRANGE
+                 : NS_EVENT_STATE_INRANGE;
+    }
   }
 
   if (PlaceholderApplies() &&
@@ -6793,14 +6901,6 @@ HTMLInputElement::IntrinsicState() const
 
   if (mForm && !mForm->GetValidity() && IsSubmitControl()) {
     state |= NS_EVENT_STATE_MOZ_SUBMITINVALID;
-  }
-
-  // :in-range and :out-of-range only apply if the element currently has a range.
-  if (mHasRange) {
-    state |= (GetValidityState(VALIDITY_STATE_RANGE_OVERFLOW) ||
-              GetValidityState(VALIDITY_STATE_RANGE_UNDERFLOW))
-               ? NS_EVENT_STATE_OUTOFRANGE
-               : NS_EVENT_STATE_INRANGE;
   }
 
   return state;
@@ -6919,8 +7019,8 @@ HTMLInputElement::AddedToRadioGroup()
     return;
   }
 
-  // Make sure not to notify if we're still being created by the parser
-  bool notify = !mParserCreating;
+  // Make sure not to notify if we're still being created
+  bool notify = mDoneCreating;
 
   //
   // If the input element is checked, and we add it to the group, it will
@@ -7677,7 +7777,7 @@ HTMLInputElement::UpdateTooShortValidityState()
 void
 HTMLInputElement::UpdateValueMissingValidityStateForRadio(bool aIgnoreSelf)
 {
-  bool notify = !mParserCreating;
+  bool notify = mDoneCreating;
   nsCOMPtr<nsIDOMHTMLInputElement> selection = GetSelectedRadioButton();
 
   aIgnoreSelf = aIgnoreSelf || !IsMutable();
@@ -8196,7 +8296,7 @@ HTMLInputElement::GetDefaultValueFromContent(nsAString& aValue)
     GetDefaultValue(aValue);
     // This is called by the frame to show the value.
     // We have to sanitize it when needed.
-    if (!mParserCreating) {
+    if (mDoneCreating) {
       SanitizeValue(aValue);
     }
   }

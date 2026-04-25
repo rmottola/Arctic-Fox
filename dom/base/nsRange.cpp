@@ -3332,7 +3332,6 @@ nsRange::ExcludeNonSelectableNodes(nsTArray<RefPtr<nsRange>>* aOutRanges)
   }
 }
 
-
 struct InnerTextAccumulator
 {
   explicit InnerTextAccumulator(mozilla::dom::DOMString& aValue)
@@ -3376,7 +3375,8 @@ IsVisibleAndNotInReplacedElement(nsIFrame* aFrame)
   }
   for (nsIFrame* f = aFrame->GetParent(); f; f = f->GetParent()) {
     if (f->IsFrameOfType(nsIFrame::eReplaced) &&
-        !f->GetContent()->IsHTMLElement(nsGkAtoms::button)) {
+        !f->GetContent()->IsHTMLElement(nsGkAtoms::button) &&
+        !f->GetContent()->IsHTMLElement(nsGkAtoms::select)) {
       return false;
     }
   }

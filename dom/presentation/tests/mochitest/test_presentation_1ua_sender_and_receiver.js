@@ -238,6 +238,24 @@ function testCloseConnection() {
       };
     }),
     new Promise(function(aResolve, aReject) {
+      let timeout = setTimeout(function() {
+        gScript.removeMessageListener('device-disconnected',
+                                      deviceDisconnectedHandler);
+        ok(true, "terminate after close should not trigger device.disconnect");
+        aResolve();
+      }, 3000);
+
+      function deviceDisconnectedHandler() {
+        gScript.removeMessageListener('device-disconnected',
+                                      deviceDisconnectedHandler);
+        ok(false, "terminate after close should not trigger device.disconnect");
+        clearTimeout(timeout);
+        aResolve();
+      }
+
+      gScript.addMessageListener('device-disconnected', deviceDisconnectedHandler);
+    }),
+    new Promise(function(aResolve, aReject) {
       gScript.addMessageListener('receiver-closed', function onReceiverClosed() {
         gScript.removeMessageListener('receiver-closed', onReceiverClosed);
         gScript.removeMessageListener('control-channel-established',
@@ -301,6 +319,8 @@ function testReconnect() {
         aReject();
       });
     });
+
+    postMessageToIframe('prepare-for-reconnect');
   });
 }
 

@@ -638,7 +638,7 @@ public:
                                          ErrorResult& aRv);
 
   mozilla::dom::EventHandlerNonNull* GetOnencrypted();
-  void SetOnencrypted(mozilla::dom::EventHandlerNonNull* listener);
+  void SetOnencrypted(mozilla::dom::EventHandlerNonNull* aCallback);
 
   mozilla::dom::EventHandlerNonNull* GetOnwaitingforkey();
   void SetOnwaitingforkey(mozilla::dom::EventHandlerNonNull* aCallback);
@@ -1229,9 +1229,11 @@ protected:
   // Notifies the audio channel agent when the element starts or stops playing.
   void NotifyAudioChannelAgent(bool aPlaying);
 
-  // Creates the audio channel agent in the beginning and this agent would be
-  // used to communicate with the AudioChannelService.
-  void CreateAudioChannelAgent();
+  // True if we create the audio channel agent successfully or we already have
+  // one. The agent is used to communicate with the AudioChannelService. eg.
+  // notify we are playing/audible and receive muted/unmuted/suspend/resume
+  // commands from AudioChannelService.
+  bool MaybeCreateAudioChannelAgent();
 
   // Determine if the element should be paused because of suspend conditions.
   bool ShouldElementBePaused();
@@ -1271,6 +1273,7 @@ protected:
 
   // A method to check whether the media element is allowed to start playback.
   bool IsAllowedToPlay();
+  bool IsAllowedToPlayByAudioChannel();
 
   // If the network state is empty and then we would trigger DoLoad().
   void MaybeDoLoad();
@@ -1659,17 +1662,10 @@ protected:
   // MediaStream.
   nsCOMPtr<nsIPrincipal> mSrcStreamVideoPrincipal;
 
-  enum ElementInTreeState {
-    // The MediaElement is not in the DOM tree now.
-    ELEMENT_NOT_INTREE,
-    // The MediaElement is in the DOM tree now.
-    ELEMENT_INTREE,
-    // The MediaElement is not in the DOM tree now but had been binded to the
-    // tree before.
-    ELEMENT_NOT_INTREE_HAD_INTREE
-  };
-
-  ElementInTreeState mElementInTreeState;
+  // True if UnbindFromTree() is called on the element.
+  // Note this flag is false when the element is in a phase after creation and
+  // before attaching to the DOM tree.
+  bool mUnboundFromTree = false;
 
 public:
   // Helper class to measure times for MSE telemetry stats

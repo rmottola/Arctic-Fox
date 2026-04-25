@@ -1293,13 +1293,6 @@ DataTransfer::CacheExternalData(const char* aFormat, uint32_t aIndex,
   return NS_OK;
 }
 
-// there isn't a way to get a list of the formats that might be available on
-// all platforms, so just check for the types that can actually be imported
-// XXXndeakin there are some other formats but those are platform specific.
-const char* kFormats[] = { kFileMime, kHTMLMime, kURLMime, kURLDataMime,
-                           kUnicodeMime, kPNGImageMime, kJPEGImageMime,
-                           kGIFImageMime };
-
 void
 DataTransfer::CacheExternalDragFormats()
 {
@@ -1322,8 +1315,9 @@ DataTransfer::CacheExternalDragFormats()
   // there isn't a way to get a list of the formats that might be available on
   // all platforms, so just check for the types that can actually be imported
   // XXXndeakin there are some other formats but those are platform specific.
-  const char* formats[] = { kFileMime, kHTMLMime, kRTFMime,
-                            kURLMime, kURLDataMime, kUnicodeMime };
+  // NOTE: kFileMime must have index 0
+  const char* formats[] = { kFileMime, kHTMLMime, kURLMime, kURLDataMime,
+                            kUnicodeMime, kPNGImageMime };
 
   uint32_t count;
   dragSession->GetNumDropItems(&count);
@@ -1344,11 +1338,11 @@ DataTransfer::CacheExternalDragFormats()
       // the GetData method does take an index. Here, we just assume that
       // every item being dragged has the same set of flavors.
       bool supported;
-      dragSession->IsDataFlavorSupported(kFormats[f], &supported);
+      dragSession->IsDataFlavorSupported(formats[f], &supported);
       // if the format is supported, add an item to the array with null as
       // the data. When retrieved, GetRealData will read the data.
       if (supported) {
-        CacheExternalData(kFormats[f], c, sysPrincipal, /* hidden = */ f && hasFileData);
+        CacheExternalData(formats[f], c, sysPrincipal, /* hidden = */ f && hasFileData);
       }
     }
   }
@@ -1379,12 +1373,19 @@ DataTransfer::CacheExternalClipboardFormats()
   const char *fileMime[] = { kFileMime };
   clipboard->HasDataMatchingFlavors(fileMime, 1, mClipboardType, &hasFileData);
 
+  // We will be ignoring any application/x-moz-file files found in the paste
+  // datatransfer within e10s, as they will fail to be sent over IPC. Because of
+  // that, we will unset hasFileData, whether or not it would have been set.
+  // (bug 1308007)
+  if (XRE_IsContentProcess()) {
+    hasFileData = false;
+  }
+
   // there isn't a way to get a list of the formats that might be available on
   // all platforms, so just check for the types that can actually be imported.
-  // Note that the loop below assumes that kCustomTypesMime will be first.
+  // NOTE: kCustomTypesMime must have index 0, kFileMime index 1
   const char* formats[] = { kCustomTypesMime, kFileMime, kHTMLMime, kRTFMime,
-                            kURLMime, kURLDataMime, kUnicodeMime, kPNGImageMime,
-                            kJPEGImageMime, kGIFImageMime };
+                            kURLMime, kURLDataMime, kUnicodeMime, kPNGImageMime };
 
   for (uint32_t f = 0; f < mozilla::ArrayLength(formats); ++f) {
     // check each format one at a time
@@ -1397,6 +1398,14 @@ DataTransfer::CacheExternalClipboardFormats()
       if (f == 0) {
         FillInExternalCustomTypes(0, sysPrincipal);
       } else {
+        // In non-e10s we support pasting files from explorer.exe.
+        // Unfortunately, we fail to send that data over IPC in e10s, so we
+        // don't want to add the item to the DataTransfer and end up producing a
+        // null `application/x-moz-file`. (bug 1308007)
+        if (XRE_IsContentProcess() && f == 1) {
+          continue;
+        }
+
         // If we aren't the file data, and we have file data, we want to be hidden
         CacheExternalData(formats[f], 0, sysPrincipal, /* hidden = */ f != 1 && hasFileData);
       }

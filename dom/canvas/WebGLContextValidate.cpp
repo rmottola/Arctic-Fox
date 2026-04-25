@@ -122,49 +122,6 @@ WebGLContext::ValidateBlendFuncEnumsCompatibility(GLenum sfactor,
     return true;
 }
 
-/**
- * Check data ranges [readOffset, readOffset + size] and [writeOffset,
- * writeOffset + size] for overlap.
- *
- * It is assumed that offset and size have already been validated.
- */
-bool
-WebGLContext::ValidateDataRanges(WebGLintptr readOffset, WebGLintptr writeOffset, WebGLsizeiptr size, const char* info)
-{
-    MOZ_ASSERT((CheckedInt<WebGLsizeiptr>(readOffset) + size).isValid());
-    MOZ_ASSERT((CheckedInt<WebGLsizeiptr>(writeOffset) + size).isValid());
-
-    bool separate = (readOffset + size < writeOffset || writeOffset + size < readOffset);
-    if (!separate) {
-        ErrorInvalidValue("%s: ranges [readOffset, readOffset + size) and [writeOffset, "
-                          "writeOffset + size) overlap", info);
-    }
-
-    return separate;
-}
-
-bool
-WebGLContext::ValidateTextureTargetEnum(GLenum target, const char* info)
-{
-    switch (target) {
-    case LOCAL_GL_TEXTURE_2D:
-    case LOCAL_GL_TEXTURE_CUBE_MAP:
-        return true;
-
-    case LOCAL_GL_TEXTURE_3D:
-        if (IsWebGL2())
-            return true;
-
-        break;
-
-    default:
-        break;
-    }
-
-    ErrorInvalidEnumInfo(info, target);
-    return false;
-}
-
 bool
 WebGLContext::ValidateComparisonEnum(GLenum target, const char* info)
 {
@@ -672,6 +629,8 @@ WebGLContext::InitAndValidateGL(FailureReason* const out_failReason)
     mStencilRefFront = 0;
     mStencilRefBack = 0;
 
+    mLineWidth = 1.0;
+
     /*
     // Technically, we should be setting mStencil[...] values to
     // `allOnes`, but either ANGLE breaks or the SGX540s on Try break.
@@ -868,19 +827,11 @@ WebGLContext::InitAndValidateGL(FailureReason* const out_failReason)
     }
 
     if (gl->IsCompatibilityProfile()) {
-        // gl_PointSize is always available in ES2 GLSL, but has to be
-        // specifically enabled on desktop GLSL.
-        gl->fEnable(LOCAL_GL_VERTEX_PROGRAM_POINT_SIZE);
-
-        /* gl_PointCoord is always available in ES2 GLSL and in newer desktop
-         * GLSL versions, but apparently not in OpenGL 2 and apparently not (due
-         * to a driver bug) on certain NVIDIA setups. See:
-         *   http://www.opengl.org/discussion_boards/ubbthreads.php?ubb=showflat&Number=261472
-         *
-         * Note that this used to cause crashes on old ATI drivers... Hopefully
-         * not a significant anymore. See bug 602183.
-         */
         gl->fEnable(LOCAL_GL_POINT_SPRITE);
+    }
+
+    if (!gl->IsGLES()) {
+        gl->fEnable(LOCAL_GL_PROGRAM_POINT_SIZE);
     }
 
 #ifdef XP_MACOSX

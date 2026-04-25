@@ -54,8 +54,6 @@ class nsNodeSupportsWeakRefTearoff;
 class nsNodeWeakReference;
 class nsDOMMutationObserver;
 
-extern "C" void Servo_Node_ClearNodeData(nsINode*);
-
 namespace mozilla {
 class EventListenerManager;
 namespace dom {
@@ -763,9 +761,8 @@ public:
    *                       (though a null return value does not imply the
    *                       property was not set, i.e. it can be set to null).
    */
-  virtual void* GetProperty(uint16_t aCategory,
-                            nsIAtom *aPropertyName,
-                            nsresult *aStatus = nullptr) const;
+  void* GetProperty(uint16_t aCategory, nsIAtom *aPropertyName,
+                    nsresult *aStatus = nullptr) const;
 
   /**
    * Set a property to be associated with this node. This will overwrite an
@@ -784,8 +781,7 @@ public:
    *                                       was already set
    * @throws NS_ERROR_OUT_OF_MEMORY if that occurs
    */
-  nsresult SetProperty(nsIAtom *aPropertyName,
-                       void *aValue,
+  nsresult SetProperty(nsIAtom *aPropertyName, void *aValue,
                        NSPropertyDtorFunc aDtor = nullptr,
                        bool aTransfer = false)
   {
@@ -811,12 +807,11 @@ public:
    *                                       was already set
    * @throws NS_ERROR_OUT_OF_MEMORY if that occurs
    */
-  virtual nsresult SetProperty(uint16_t aCategory,
-                               nsIAtom *aPropertyName,
-                               void *aValue,
-                               NSPropertyDtorFunc aDtor = nullptr,
-                               bool aTransfer = false,
-                               void **aOldValue = nullptr);
+  nsresult SetProperty(uint16_t aCategory,
+                       nsIAtom *aPropertyName, void *aValue,
+                       NSPropertyDtorFunc aDtor = nullptr,
+                       bool aTransfer = false,
+                       void **aOldValue = nullptr);
 
   /**
    * A generic destructor for property values allocated with new.
@@ -845,7 +840,7 @@ public:
    * @param aCategory      category of property to destroy.
    * @param aPropertyName  name of property to destroy.
    */
-  virtual void DeleteProperty(uint16_t aCategory, nsIAtom *aPropertyName);
+  void DeleteProperty(uint16_t aCategory, nsIAtom *aPropertyName);
 
   /**
    * Unset a property associated with this node. The value will not be
@@ -880,9 +875,8 @@ public:
    *                       (though a null return value does not imply the
    *                       property was not set, i.e. it can be set to null).
    */
-  virtual void* UnsetProperty(uint16_t aCategory,
-                              nsIAtom *aPropertyName,
-                              nsresult *aStatus = nullptr);
+  void* UnsetProperty(uint16_t aCategory, nsIAtom *aPropertyName,
+                      nsresult *aStatus = nullptr);
 
   bool HasProperties() const
   {
@@ -2082,13 +2076,7 @@ public:
 #endif
   }
 
-  void ClearServoData() {
-#ifdef MOZ_STYLO
-    Servo_Node_ClearNodeData(this);
-#else
-    MOZ_CRASH("Accessing servo node data in non-stylo build");
-#endif
-  }
+  void ClearServoData();
 
 protected:
   static bool Traverse(nsINode *tmp, nsCycleCollectionTraversalCallback &cb);

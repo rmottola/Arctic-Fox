@@ -2707,8 +2707,13 @@ PluginModuleParent::NPP_NewInternal(NPMIMEType pluginType, NPP instance,
     if (mIsFlashPlugin) {
         parentInstance->InitMetadata(strPluginType, srcAttribute);
 #ifdef XP_WIN
-        bool supportsAsyncRender = false;
-        CallModuleSupportsAsyncRender(&supportsAsyncRender);
+        bool supportsAsyncRender =
+          Preferences::GetBool("dom.ipc.plugins.asyncdrawing.enabled", false);
+        if (supportsAsyncRender) {
+          // Prefs indicates we want async plugin rendering, make sure
+          // the flash module has support.
+          CallModuleSupportsAsyncRender(&supportsAsyncRender);
+        }
 #ifdef _WIN64
         // For 64-bit builds force windowless if the flash library doesn't support
         // async rendering regardless of sandbox level.
@@ -2731,6 +2736,17 @@ PluginModuleParent::NPP_NewInternal(NPMIMEType pluginType, NPP instance,
                values.AppendElement(opaqueAttributeValue);
            }
         }
+
+      // Update the flashvar bgcolor if it's not set, fixes a rendering problem with
+      // async plugin painting and transparent flash.
+      if (supportsAsyncRender) {
+        NS_NAMED_LITERAL_CSTRING(bgcolorAttributeName, "bgcolor");
+        NS_NAMED_LITERAL_CSTRING(bgcolorAttributeDefault, "#FFFFFF");
+        if (!names.Contains(bgcolorAttributeName)) {
+          names.AppendElement(bgcolorAttributeName);
+          values.AppendElement(bgcolorAttributeDefault);
+        }
+      }
 #endif
     }
 
@@ -3107,12 +3123,21 @@ PluginModuleParent::RecvReturnSitesWithData(nsTArray<nsCString>&& aSites,
 }
 
 layers::TextureClientRecycleAllocator*
-PluginModuleParent::EnsureTextureAllocator()
+PluginModuleParent::EnsureTextureAllocatorForDirectBitmap()
 {
-    if (!mTextureAllocator) {
-        mTextureAllocator = new TextureClientRecycleAllocator(ImageBridgeChild::GetSingleton().get());
+    if (!mTextureAllocatorForDirectBitmap) {
+        mTextureAllocatorForDirectBitmap = new TextureClientRecycleAllocator(ImageBridgeChild::GetSingleton().get());
     }
-    return mTextureAllocator;
+    return mTextureAllocatorForDirectBitmap;
+}
+
+layers::TextureClientRecycleAllocator*
+PluginModuleParent::EnsureTextureAllocatorForDXGISurface()
+{
+    if (!mTextureAllocatorForDXGISurface) {
+        mTextureAllocatorForDXGISurface = new TextureClientRecycleAllocator(ImageBridgeChild::GetSingleton().get());
+    }
+    return mTextureAllocatorForDXGISurface;
 }
 
 

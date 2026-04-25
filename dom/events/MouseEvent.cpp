@@ -67,6 +67,8 @@ MouseEvent::InitMouseEvent(const nsAString& aType,
                            uint16_t aButton,
                            EventTarget* aRelatedTarget)
 {
+  NS_ENSURE_TRUE_VOID(!mEvent->mFlags.mIsBeingDispatched);
+
   UIEvent::InitUIEvent(aType, aCanBubble, aCancelable, aView, aDetail);
 
   switch(mEvent->mClass) {
@@ -138,6 +140,8 @@ MouseEvent::InitMouseEvent(const nsAString& aType,
                            EventTarget* aRelatedTarget,
                            const nsAString& aModifiersList)
 {
+  NS_ENSURE_TRUE_VOID(!mEvent->mFlags.mIsBeingDispatched);
+
   Modifiers modifiers = ComputeModifierState(aModifiersList);
 
   InitMouseEvent(aType, aCanBubble, aCancelable, aView, aDetail,
@@ -210,6 +214,8 @@ MouseEvent::InitNSMouseEvent(const nsAString& aType,
                              float aPressure,
                              uint16_t aInputSource)
 {
+  NS_ENSURE_TRUE_VOID(!mEvent->mFlags.mIsBeingDispatched);
+
   MouseEvent::InitMouseEvent(aType, aCanBubble, aCancelable,
                              aView, aDetail, aScreenX, aScreenY,
                              aClientX, aClientY,
@@ -351,13 +357,21 @@ NS_IMETHODIMP
 MouseEvent::GetScreenX(int32_t* aScreenX)
 {
   NS_ENSURE_ARG_POINTER(aScreenX);
-  *aScreenX = ScreenX();
+  *aScreenX = ScreenX(CallerType::System);
   return NS_OK;
 }
 
 int32_t
-MouseEvent::ScreenX()
+MouseEvent::ScreenX(CallerType aCallerType)
 {
+  if (aCallerType != CallerType::System &&
+      nsContentUtils::ResistFingerprinting()) {
+    // Sanitize to something sort of like client cooords, but not quite
+    // (defaulting to (0,0) instead of our pre-specified client coords).
+    return Event::GetClientCoords(mPresContext, mEvent, mEvent->mRefPoint,
+                                  CSSIntPoint(0, 0)).x;
+  }
+
   return Event::GetScreenCoords(mPresContext, mEvent, mEvent->mRefPoint).x;
 }
 
@@ -365,13 +379,21 @@ NS_IMETHODIMP
 MouseEvent::GetScreenY(int32_t* aScreenY)
 {
   NS_ENSURE_ARG_POINTER(aScreenY);
-  *aScreenY = ScreenY();
+  *aScreenY = ScreenY(CallerType::System);
   return NS_OK;
 }
 
 int32_t
-MouseEvent::ScreenY()
+MouseEvent::ScreenY(CallerType aCallerType)
 {
+  if (aCallerType != CallerType::System &&
+      nsContentUtils::ResistFingerprinting()) {
+    // Sanitize to something sort of like client cooords, but not quite
+    // (defaulting to (0,0) instead of our pre-specified client coords).
+    return Event::GetClientCoords(mPresContext, mEvent, mEvent->mRefPoint,
+                                  CSSIntPoint(0, 0)).y;
+  }
+
   return Event::GetScreenCoords(mPresContext, mEvent, mEvent->mRefPoint).y;
 }
 

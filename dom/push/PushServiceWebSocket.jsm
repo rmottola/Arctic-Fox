@@ -19,10 +19,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 const {PushDB} = Cu.import("resource://gre/modules/PushDB.jsm");
 const {PushRecord} = Cu.import("resource://gre/modules/PushRecord.jsm");
-const {
-  PushCrypto,
-  getCryptoParams,
-} = Cu.import("resource://gre/modules/PushCrypto.jsm");
+const {PushCrypto} = Cu.import("resource://gre/modules/PushCrypto.jsm");
 
 const kPUSHWSDB_DB_NAME = "pushapi";
 const kPUSHWSDB_DB_VERSION = 5; // Change this if the IndexedDB format changes
@@ -344,10 +341,13 @@ this.PushServiceWebSocket = {
 
   _shutdownWS: function(shouldCancelPending = true) {
     console.debug("shutdownWS()");
+
+    if (this._currentState == STATE_READY) {
+      prefs.ignore("userAgentID", this);
+    }
+
     this._currentState = STATE_SHUT_DOWN;
     this._skipReconnect = false;
-
-    prefs.ignore("userAgentID", this);
 
     if (this._wsListener) {
       this._wsListener._pushService = null;
@@ -465,8 +465,10 @@ this.PushServiceWebSocket = {
       console.warn("makeWebSocket: Network is offline.");
       return null;
     }
-    let socket = Cc["@mozilla.org/network/protocol;1?name=wss"]
-                   .createInstance(Ci.nsIWebSocketChannel);
+    let contractId = uri.scheme == "ws" ?
+                     "@mozilla.org/network/protocol;1?name=ws" :
+                     "@mozilla.org/network/protocol;1?name=wss";
+    let socket = Cc[contractId].createInstance(Ci.nsIWebSocketChannel);
 
     socket.initLoadInfo(null, // aLoadingNode
                         Services.scriptSecurityManager.getSystemPrincipal(),
@@ -687,22 +689,17 @@ this.PushServiceWebSocket = {
         updateRecord
       );
     } else {
-      let params = getCryptoParams(update.headers);
-      if (params) {
-        let message = ChromeUtils.base64URLDecode(update.data, {
-          // The Push server may append padding.
-          padding: "ignore",
-        });
-        promise = this._mainPushService.receivedPushMessage(
-          update.channelID,
-          update.version,
-          message,
-          params,
-          updateRecord
-        );
-      } else {
-        promise = Promise.reject(new Error("Invalid crypto headers"));
-      }
+      let message = ChromeUtils.base64URLDecode(update.data, {
+        // The Push server may append padding.
+        padding: "ignore",
+      });
+      promise = this._mainPushService.receivedPushMessage(
+        update.channelID,
+        update.version,
+        update.headers,
+        message,
+        updateRecord
+      );
     }
     promise.then(status => {
       this._sendAck(update.channelID, update.version, status);

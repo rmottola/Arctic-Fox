@@ -775,7 +775,7 @@ PluginInstanceParent::RecvShowDirectBitmap(Shmem&& buffer,
     }
 
     // Allocate a texture for the compositor.
-    RefPtr<TextureClientRecycleAllocator> allocator = mParent->EnsureTextureAllocator();
+    RefPtr<TextureClientRecycleAllocator> allocator = mParent->EnsureTextureAllocatorForDirectBitmap();
     RefPtr<TextureClient> texture = allocator->CreateOrRecycle(
         format, size, BackendSelector::Content,
         TextureFlags::NO_FLAGS,
@@ -815,6 +815,11 @@ PluginInstanceParent::SetCurrentImage(Image* aImage)
     imageList.AppendElement(holder);
     mImageContainer->SetCurrentImages(imageList);
 
+    // Invalidate our area in the page so the image gets flushed.
+    gfx::IntRect rect = aImage->GetPictureRect();
+    NPRect nprect = {uint16_t(rect.x), uint16_t(rect.y), uint16_t(rect.width), uint16_t(rect.height)};
+    RecvNPN_InvalidateRect(nprect);
+
     RecordDrawingModel();
 }
 
@@ -836,7 +841,7 @@ PluginInstanceParent::RecvShowDirectDXGISurface(const WindowsHandle& handle,
         return IPC_FAIL_NO_REASON(this);
     }
 
-    RefPtr<TextureClientRecycleAllocator> allocator = mParent->EnsureTextureAllocator();
+    RefPtr<TextureClientRecycleAllocator> allocator = mParent->EnsureTextureAllocatorForDXGISurface();
     RefPtr<TextureClient> texture = allocator->CreateOrRecycle(
         surface->GetFormat(), surface->GetSize(),
         BackendSelector::Content,
@@ -1341,12 +1346,6 @@ PluginInstanceParent::NPP_SetWindow(const NPWindow* aWindow)
         MaybeCreateChildPopupSurrogate();
     } else {
         SubclassPluginWindow(reinterpret_cast<HWND>(aWindow->window));
-
-        // Skip SetWindow call for hidden QuickTime plugins.
-        if ((mParent->GetQuirks() & QUIRK_QUICKTIME_AVOID_SETWINDOW) &&
-            aWindow->width == 0 && aWindow->height == 0) {
-            return NPERR_NO_ERROR;
-        }
 
         window.window = reinterpret_cast<uint64_t>(aWindow->window);
         window.x = aWindow->x;

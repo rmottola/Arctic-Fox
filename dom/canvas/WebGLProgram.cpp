@@ -176,6 +176,10 @@ QueryProgramInfo(WebGLProgram* prog, gl::GLContext* gl)
         GLenum elemType = 0; // `type`
         gl->fGetActiveAttrib(prog->mGLName, i, mappedName.Length()+1, &lengthWithoutNull,
                              &elemCount, &elemType, mappedName.BeginWriting());
+        GLenum error = gl->fGetError();
+        if (error != LOCAL_GL_NO_ERROR) {
+            gfxCriticalNote << "Failed to do glGetActiveAttrib: " << error;
+        }
 
         mappedName.SetLength(lengthWithoutNull);
 
@@ -516,7 +520,7 @@ WebGLProgram::BindAttribLocation(GLuint loc, const nsAString& name)
     }
 
     if (StringBeginsWith(name, NS_LITERAL_STRING("gl_"))) {
-        mContext->ErrorInvalidOperation("bindAttribLocation: Can't set the  location of a"
+        mContext->ErrorInvalidOperation("bindAttribLocation: Can't set the location of a"
                                         " name that starts with 'gl_'.");
         return;
     }
@@ -902,6 +906,12 @@ void
 WebGLProgram::GetUniformIndices(const dom::Sequence<nsString>& uniformNames,
                                 dom::Nullable< nsTArray<GLuint> >& retval) const
 {
+    const char funcName[] = "getUniformIndices";
+    if (!IsLinked()) {
+        mContext->ErrorInvalidOperation("%s: `program` must be linked.", funcName);
+        return;
+    }
+
     size_t count = uniformNames.Length();
     nsTArray<GLuint>& arr = retval.SetValue();
 

@@ -108,6 +108,7 @@ public:
               const nsAString& aOrigin,
               uint64_t aWindowId,
               nsIDOMEventTarget* aEventTarget,
+              nsIPrincipal* aPrincipal,
               nsIPresentationServiceCallback* aCallback,
               nsIPresentationTransportBuilderConstructor* aBuilderConstructor);
 
@@ -121,6 +122,7 @@ private:
   nsString mOrigin;
   uint64_t mWindowId;
   nsWeakPtr mChromeEventHandler;
+  nsCOMPtr<nsIPrincipal> mPrincipal;
   nsCOMPtr<nsIPresentationServiceCallback> mCallback;
   nsCOMPtr<nsIPresentationTransportBuilderConstructor> mBuilderConstructor;
 };
@@ -135,6 +137,7 @@ PresentationDeviceRequest::PresentationDeviceRequest(
                const nsAString& aOrigin,
                uint64_t aWindowId,
                nsIDOMEventTarget* aEventTarget,
+               nsIPrincipal* aPrincipal,
                nsIPresentationServiceCallback* aCallback,
                nsIPresentationTransportBuilderConstructor* aBuilderConstructor)
   : mRequestUrls(aUrls)
@@ -142,6 +145,7 @@ PresentationDeviceRequest::PresentationDeviceRequest(
   , mOrigin(aOrigin)
   , mWindowId(aWindowId)
   , mChromeEventHandler(do_GetWeakReference(aEventTarget))
+  , mPrincipal(aPrincipal)
   , mCallback(aCallback)
   , mBuilderConstructor(aBuilderConstructor)
 {
@@ -170,6 +174,14 @@ PresentationDeviceRequest::GetChromeEventHandler(nsIDOMEventTarget** aChromeEven
 {
   nsCOMPtr<nsIDOMEventTarget> handler(do_QueryReferent(mChromeEventHandler));
   handler.forget(aChromeEventHandler);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PresentationDeviceRequest::GetPrincipal(nsIPrincipal** aPrincipal)
+{
+  nsCOMPtr<nsIPrincipal> principal(mPrincipal);
+  principal.forget(aPrincipal);
   return NS_OK;
 }
 
@@ -653,6 +665,7 @@ PresentationService::StartSession(
                const nsAString& aDeviceId,
                uint64_t aWindowId,
                nsIDOMEventTarget* aEventTarget,
+               nsIPrincipal* aPrincipal,
                nsIPresentationServiceCallback* aCallback,
                nsIPresentationTransportBuilderConstructor* aBuilderConstructor)
 {
@@ -669,6 +682,7 @@ PresentationService::StartSession(
                                   aOrigin,
                                   aWindowId,
                                   aEventTarget,
+                                  aPrincipal,
                                   aCallback,
                                   aBuilderConstructor);
 

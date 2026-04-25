@@ -591,6 +591,8 @@ Event::InitEvent(const nsAString& aEventTypeArg,
   mEvent->mFlags.mDefaultPrevented = false;
   mEvent->mFlags.mDefaultPreventedByContent = false;
   mEvent->mFlags.mDefaultPreventedByChrome = false;
+  mEvent->mFlags.mPropagationStopped = false;
+  mEvent->mFlags.mImmediatePropagationStopped = false;
 
   // Clearing the old targets, so that the event is targeted correctly when
   // re-dispatching it.
@@ -891,12 +893,6 @@ Event::GetScreenCoords(nsPresContext* aPresContext,
                        WidgetEvent* aEvent,
                        LayoutDeviceIntPoint aPoint)
 {
-  if (!nsContentUtils::LegacyIsCallerChromeOrNativeCode() &&
-      nsContentUtils::ResistFingerprinting()) {
-    // When resisting fingerprinting, return client coordinates instead.
-    return GetClientCoords(aPresContext, aEvent, aPoint, CSSIntPoint(0, 0));
-  }
-
   if (EventStateManager::sIsPointerLocked) {
     return EventStateManager::sLastScreenPoint;
   }

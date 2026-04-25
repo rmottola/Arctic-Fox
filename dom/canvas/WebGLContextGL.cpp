@@ -126,9 +126,8 @@ WebGLContext::BindFramebuffer(GLenum target, WebGLFramebuffer* wfb)
     if (!ValidateObjectAllowDeletedOrNull("bindFramebuffer", wfb))
         return;
 
-    // silently ignore a deleted frame buffer
     if (wfb && wfb->IsDeleted())
-        return;
+        return ErrorInvalidOperation("bindFramebuffer: Cannot bind a deleted object.");
 
     MakeContextCurrent();
 
@@ -170,9 +169,8 @@ WebGLContext::BindRenderbuffer(GLenum target, WebGLRenderbuffer* wrb)
     if (!ValidateObjectAllowDeletedOrNull("bindRenderbuffer", wrb))
         return;
 
-    // silently ignore a deleted buffer
     if (wrb && wrb->IsDeleted())
-        return;
+        return ErrorInvalidOperation("bindRenderbuffer: Cannot bind a deleted object.");
 
     // Usually, we would now call into glBindRenderbuffer. However, since we have to
     // potentially emulate packed-depth-stencil, there's not a specific renderbuffer that
@@ -630,28 +628,17 @@ WebGLContext::GetBufferParameter(GLenum target, GLenum pname)
     if (!buffer)
         return JS::NullValue();
 
-    MakeContextCurrent();
-
     switch (pname) {
-        case LOCAL_GL_BUFFER_SIZE:
-        case LOCAL_GL_BUFFER_USAGE:
-        {
-            GLint i = 0;
-            gl->fGetBufferParameteriv(target, pname, &i);
-            if (pname == LOCAL_GL_BUFFER_SIZE) {
-                return JS::Int32Value(i);
-            }
+    case LOCAL_GL_BUFFER_SIZE:
+        return JS::NumberValue(buffer->ByteLength());
 
-            MOZ_ASSERT(pname == LOCAL_GL_BUFFER_USAGE);
-            return JS::NumberValue(uint32_t(i));
-        }
-            break;
+    case LOCAL_GL_BUFFER_USAGE:
+        return JS::NumberValue(buffer->Usage());
 
-        default:
-            ErrorInvalidEnumInfo("getBufferParameter: parameter", pname);
+    default:
+        ErrorInvalidEnumInfo("getBufferParameter: parameter", pname);
+        return JS::NullValue();
     }
-
-    return JS::NullValue();
 }
 
 JS::Value
@@ -2471,6 +2458,12 @@ WebGLContext::LineWidth(GLfloat width)
     if (!isValid) {
         ErrorInvalidValue("lineWidth: `width` must be positive and non-zero.");
         return;
+    }
+
+    mLineWidth = width;
+
+    if (gl->IsCoreProfile() && width > 1.0) {
+        width = 1.0;
     }
 
     MakeContextCurrent();
