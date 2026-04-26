@@ -898,7 +898,7 @@ void
 MessageChannel::SpinInternalEventLoop()
 {
   if (mozilla::PaintTracker::IsPainting()) {
-    NS_RUNTIMEABORT("Don't spin an event loop while painting.");
+    MOZ_CRASH("Don't spin an event loop while painting.");
   }
 
   NS_ASSERTION(mTopFrame && mTopFrame->mSpinNestedEvents,
@@ -1280,7 +1280,7 @@ MessageChannel::WaitForInterruptNotify()
 
   if (!InterruptStackDepth() && !AwaitingIncomingMessage()) {
     // There is currently no way to recover from this condition.
-    NS_RUNTIMEABORT("StackDepth() is 0 in call to MessageChannel::WaitForNotify!");
+    MOZ_CRASH("StackDepth() is 0 in call to MessageChannel::WaitForNotify!");
   }
 
   NS_ASSERTION(mFlags & REQUIRE_DEFERRED_MESSAGE_PROTECTION,

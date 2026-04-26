@@ -124,7 +124,7 @@ txToDocHandlerFactory::createHandlerWith(txOutputFormat* aFormat,
         }
     }
 
-    NS_RUNTIMEABORT("Unknown output method");
+    MOZ_CRASH("Unknown output method");
 
     return NS_ERROR_FAILURE;
 }
@@ -174,7 +174,7 @@ txToDocHandlerFactory::createHandlerWith(txOutputFormat* aFormat,
         }
     }
 
-    NS_RUNTIMEABORT("Unknown output method");
+    MOZ_CRASH("Unknown output method");
 
     return NS_ERROR_FAILURE;
 }
