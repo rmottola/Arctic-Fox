@@ -2918,7 +2918,8 @@ var gCSSProperties = {
       "\"liga\" off", "\"liga\" 0", '"cv01" 3, "cv02" 4',
       '"cswh", "smcp" off, "salt" 4', '"cswh" 1, "smcp" off, "salt" 4',
       '"cswh" 0, \'blah\', "liga", "smcp" off, "salt" 4',
-      '"liga"        ,"smcp" 0         , "blah"'
+      '"liga"        ,"smcp" 0         , "blah"',
+      '"ab\\"c"', '"ab\\\\c"'
     ],
     invalid_values: [
       'liga', 'liga 1', 'liga normal', '"liga" normal', 'normal liga',
@@ -5546,17 +5547,6 @@ if (IsCSSPropertyPrefEnabled("layout.css.text-combine-upright.enabled")) {
     gCSSProperties["text-combine-upright"].other_values.push(
       "digits", "digits 2", "digits 3", "digits 4", "digits     3");
   }
-}
-
-if (IsCSSPropertyPrefEnabled("layout.css.masking.enabled")) {
-  gCSSProperties["mask-type"] = {
-    domProp: "maskType",
-    inherited: false,
-    type: CSS_TYPE_LONGHAND,
-    initial_values: [ "luminance" ],
-    other_values: [ "alpha" ],
-    invalid_values: []
-  };
 }
 
 if (IsCSSPropertyPrefEnabled("svg.paint-order.enabled")) {
