@@ -1235,9 +1235,12 @@ exports.CSS_PROPERTIES = {
       "-moz-tab-size"
     ],
     "supports": [
+      6,
       7
     ],
     "values": [
+      "-moz-calc",
+      "calc",
       "inherit",
       "initial",
       "unset"
@@ -6282,18 +6285,6 @@ exports.CSS_PROPERTIES = {
       "normal",
       "sub",
       "super",
-      "unset"
-    ]
-  },
-  "font-variation-settings": {
-    "isInherited": true,
-    "subproperties": [
-      "font-variation-settings"
-    ],
-    "supports": [],
-    "values": [
-      "inherit",
-      "initial",
       "unset"
     ]
   },
