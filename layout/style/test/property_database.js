@@ -4869,13 +4869,6 @@ var gCSSProperties = {
     alias_for: "hyphens",
     subproperties: [ "hyphens" ],
   },
-  "-moz-text-align-last": {
-    domProp: "MozTextAlignLast",
-    inherited: true,
-    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-    alias_for: "text-align-last",
-    subproperties: [ "text-align-last" ],
-  },
 }
 
 function logical_axis_prop_get_computed(cs, property)
