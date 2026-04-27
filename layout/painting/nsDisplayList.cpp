@@ -7217,6 +7217,25 @@ nsDisplayMask::BuildLayer(nsDisplayListBuilder* aBuilder,
   return container.forget();
 }
 
+bool
+nsDisplayMask::PaintMask(nsDisplayListBuilder* aBuilder,
+                         gfxContext* aMaskContext)
+{
+  MOZ_ASSERT(aMaskContext->GetDrawTarget()->GetFormat() == SurfaceFormat::A8);
+
+  nsRect borderArea = nsRect(ToReferenceFrame(), mFrame->GetSize());
+  nsSVGIntegrationUtils::PaintFramesParams params(*aMaskContext,
+                                                  mFrame,  mVisibleRect,
+                                                  borderArea, aBuilder,
+                                                  nullptr,
+                                                  mHandleOpacity);
+  ComputeMaskGeometry(params);
+  image::DrawResult result = nsSVGIntegrationUtils::PaintMask(params);
+
+  nsDisplayMaskGeometry::UpdateDrawResult(this, result);
+  return (result == image::DrawResult::SUCCESS) ? true : false;
+}
+
 LayerState
 nsDisplayMask::GetLayerState(nsDisplayListBuilder* aBuilder,
                              LayerManager* aManager,
@@ -7306,6 +7325,8 @@ nsDisplayMask::PaintAsLayer(nsDisplayListBuilder* aBuilder,
                             nsRenderingContext* aCtx,
                             LayerManager* aManager)
 {
+  MOZ_ASSERT(!ShouldPaintOnMaskLayer(aManager));
+
   nsRect borderArea = nsRect(ToReferenceFrame(), mFrame->GetSize());
   nsSVGIntegrationUtils::PaintFramesParams params(*aCtx->ThebesContext(),
                                                   mFrame,  mVisibleRect,
