@@ -14,7 +14,6 @@
 #include "mozilla/BinarySearch.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/fallible.h"
-#include "mozilla/Function.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Move.h"
@@ -30,6 +29,7 @@
 #include "nsDebug.h"
 #include "nsISupportsImpl.h"
 #include "nsRegionFwd.h"
+#include <functional>
 #include <initializer_list>
 #include <new>
 
@@ -748,6 +748,12 @@ DECLARE_USE_COPY_CONSTRUCTORS(mozilla::dom::indexedDB::ObjectStoreCursorResponse
 DECLARE_USE_COPY_CONSTRUCTORS(mozilla::dom::indexedDB::SerializedStructuredCloneReadInfo);
 DECLARE_USE_COPY_CONSTRUCTORS(JSStructuredCloneData)
 DECLARE_USE_COPY_CONSTRUCTORS(mozilla::dom::MessagePortMessage)
+
+template<typename T>
+struct nsTArray_CopyChooser<std::function<T>>
+{
+  typedef nsTArray_CopyWithConstructors<std::function<T>> Type;
+};
 
 
 //

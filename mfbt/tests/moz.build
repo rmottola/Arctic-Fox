@@ -20,7 +20,6 @@ CppUnitTests([
     'TestEnumTypeTraits',
     'TestFastBernoulliTrial',
     'TestFloatingPoint',
-    'TestFunction',
     'TestIntegerPrintfMacros',
     'TestIntegerRange',
     'TestJSONWriter',

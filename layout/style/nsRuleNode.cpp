@@ -10,11 +10,11 @@
  */
 
 #include <algorithm>
+#include <functional>
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/Function.h"
 #include "mozilla/dom/AnimationEffectReadOnlyBinding.h" // for PlaybackDirection
 #include "mozilla/Likely.h"
 #include "mozilla/LookAndFeel.h"
@@ -124,7 +124,7 @@ GetImageRequest(nsPresContext* aPresContext, const nsCSSValue& aValue)
 // (The expectation is then that aCallback will set the resulting
 // imgRequestProxy in a style struct somewhere.)
 static void
-SetImageRequest(function<void(imgRequestProxy*)> aCallback,
+SetImageRequest(std::function<void(imgRequestProxy*)> aCallback,
                 nsPresContext* aPresContext,
                 const nsCSSValue& aValue)
 {
@@ -135,7 +135,7 @@ SetImageRequest(function<void(imgRequestProxy*)> aCallback,
 }
 
 static void
-SetStyleImageRequest(function<void(nsStyleImageRequest*)> aCallback,
+SetStyleImageRequest(std::function<void(nsStyleImageRequest*)> aCallback,
                      nsPresContext* aPresContext,
                      const nsCSSValue& aValue,
                      nsStyleImageRequest::Mode aModeFlags =

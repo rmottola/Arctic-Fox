@@ -9,7 +9,6 @@
 #include <cmath>                 // for M_PI
 #include <stdint.h>
 #include "mozilla/Assertions.h"
-#include "mozilla/Function.h"
 #include "mozilla/gfx/LoggingConstants.h"
 #include "nsTArray.h"
 
