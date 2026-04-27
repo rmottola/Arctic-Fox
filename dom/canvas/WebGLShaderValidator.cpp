@@ -107,6 +107,10 @@ ShaderOutput(gl::GLContext* gl)
         case 440: return SH_GLSL_440_CORE_OUTPUT;
         case 450: return SH_GLSL_450_CORE_OUTPUT;
         default:
+           // A fix for driver with glsl460
+            if (version > 450) {
+                return SH_GLSL_450_CORE_OUTPUT;
+            }
             MOZ_CRASH("GFX: Unexpected GLSL version.");
         }
     }
