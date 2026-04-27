@@ -1949,11 +1949,12 @@ nsStyleImageRequest::nsStyleImageRequest(Mode aModeFlags,
   , mResolved(true)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aRequestProxy);
   MOZ_ASSERT(aImageValue);
   MOZ_ASSERT(!!(aModeFlags & Mode::Track) == !!aImageTracker);
 
-  MaybeTrackAndLock();
+  if (mRequestProxy) {
+    MaybeTrackAndLock();
+  }
 }
 
 nsStyleImageRequest::nsStyleImageRequest(
@@ -3952,13 +3953,8 @@ nsCursorImage::nsCursorImage(const nsCursorImage& aOther)
   : mHaveHotspot(aOther.mHaveHotspot)
   , mHotspotX(aOther.mHotspotX)
   , mHotspotY(aOther.mHotspotY)
+  , mImage(aOther.mImage)
 {
-  SetImage(aOther.GetImage());
-}
-
-nsCursorImage::~nsCursorImage()
-{
-  SetImage(nullptr);
 }
 
 nsCursorImage&
@@ -3968,7 +3964,7 @@ nsCursorImage::operator=(const nsCursorImage& aOther)
     mHaveHotspot = aOther.mHaveHotspot;
     mHotspotX = aOther.mHotspotX;
     mHotspotY = aOther.mHotspotY;
-    SetImage(aOther.GetImage());
+    mImage = aOther.mImage;
   }
 
   return *this;
@@ -3986,7 +3982,7 @@ nsCursorImage::operator==(const nsCursorImage& aOther) const
   return mHaveHotspot == aOther.mHaveHotspot &&
          mHotspotX == aOther.mHotspotX &&
          mHotspotY == aOther.mHotspotY &&
-         EqualImages(mImage, aOther.mImage);
+         DefinitelyEqualImages(mImage, aOther.mImage);
 }
 
 nsStyleUserInterface::nsStyleUserInterface(StyleStructContext aContext)
@@ -4013,6 +4009,19 @@ nsStyleUserInterface::nsStyleUserInterface(const nsStyleUserInterface& aSource)
 nsStyleUserInterface::~nsStyleUserInterface()
 {
   MOZ_COUNT_DTOR(nsStyleUserInterface);
+}
+
+void
+nsStyleUserInterface::FinishStyle(nsPresContext* aPresContext)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aPresContext->StyleSet()->IsServo());
+
+  for (nsCursorImage& cursor : mCursorImages) {
+    if (cursor.mImage && !cursor.mImage->IsResolved()) {
+      cursor.mImage->Resolve(aPresContext);
+    }
+  }
 }
 
 nsChangeHint
