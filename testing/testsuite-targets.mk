@@ -329,6 +329,11 @@ stage-extensions: make-stage-dir
 	$(NSINSTALL) -D $(PKG_STAGE)/extensions/
 	@$(foreach ext,$(TEST_EXTENSIONS), cp -RL $(DIST)/xpi-stage/$(ext) $(PKG_STAGE)/extensions;)
 
+
+check::
+	@$(topsrcdir)/mach --log-no-times python-test
+
+
 .PHONY: \
   reftest \
   crashtest \
@@ -348,4 +353,5 @@ stage-extensions: make-stage-dir
   stage-steeplechase \
   stage-instrumentation-tests \
   test-packages-manifest \
+  check \
   $(NULL)
