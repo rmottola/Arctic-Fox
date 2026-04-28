@@ -4979,7 +4979,7 @@ nsDisplayText::nsDisplayText(nsDisplayListBuilder* aBuilder, nsTextFrame* aFrame
       mGlyphs.Clear();
     } else {
       g->glyphs().SetLength(glyphs.size());
-      PodCopy(g->glyphs().begin(), glyphs.data(), glyphs.size());
+      PodCopy(g->glyphs().Elements(), glyphs.data(), glyphs.size());
       g->color() = color;
     }
   }
