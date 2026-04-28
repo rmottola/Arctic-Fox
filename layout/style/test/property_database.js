@@ -1864,6 +1864,14 @@ var gCSSProperties = {
     ],
     invalid_values: [ "5", "..25px", ".+5px", ".px", "-.px", "++5px", "-+4px", "+-3px", "--7px", "+-.6px", "-+.5px", "++.7px", "--.4px" ],
   },
+  "mask-type": {
+    domProp: "maskType",
+    inherited: false,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "luminance" ],
+    other_values: [ "alpha" ],
+    invalid_values: [],
+  },
   "-moz-outline-radius": {
     domProp: "MozOutlineRadius",
     inherited: false,
