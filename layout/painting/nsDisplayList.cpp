@@ -7262,10 +7262,13 @@ bool nsDisplayMask::ShouldPaintOnMaskLayer(LayerManager* aManager)
   nsSVGUtils::MaskUsage maskUsage;
   nsSVGUtils::DetermineMaskUsage(mFrame, mHandleOpacity, maskUsage);
 
-  if (!maskUsage.shouldGenerateMaskLayer ||
-      maskUsage.opacity != 1.0 || maskUsage.shouldApplyClipPath ||
-      maskUsage.shouldApplyBasicShape ||
-      maskUsage.shouldGenerateClipMaskLayer) {
+  if (!maskUsage.shouldGenerateMaskLayer &&
+      !maskUsage.shouldGenerateClipMaskLayer) {
+    return false;
+  }
+
+  if (maskUsage.opacity != 1.0 || maskUsage.shouldApplyClipPath ||
+      maskUsage.shouldApplyBasicShape) {
     return false;
   }
 
