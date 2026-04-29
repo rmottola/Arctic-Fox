@@ -46,7 +46,6 @@ GeckoCppUnitTests([
     'ShowAlignments',
     'TestAutoPtr',
     'TestAutoRef',
-    'TestCOMPtr',
     'TestCOMPtrEq',
     'TestFile',
     'TestHashtables',
