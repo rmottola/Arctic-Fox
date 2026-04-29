@@ -937,7 +937,6 @@ nsSVGIntegrationUtils::PaintMaskAndClipPath(const PaintFramesParams& aParams)
                                   maskFrames, offsetToUserSpace);
 
       if (paintResult.transparentBlackMask) {
-        MOZ_ASSERT(paintResult.result != DrawResult::SUCCESS);
         return paintResult.result;
       }
 
