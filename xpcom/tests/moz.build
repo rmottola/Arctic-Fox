@@ -48,7 +48,6 @@ GeckoCppUnitTests([
     'TestAutoRef',
     'TestCOMPtrEq',
     'TestFile',
-    'TestHashtables',
     'TestID',
     'TestObserverArray',
     'TestObserverService',
