@@ -1310,6 +1310,7 @@
 
       <method name="swapBrowsers">
         <parameter name="aOtherBrowser"/>
+        <parameter name="aFlags"/>
         <body>
         <![CDATA[
           // The request comes from a XPCOM component, we'd want to redirect
@@ -1319,7 +1320,7 @@
           if (tabbrowser) {
             let tab = tabbrowser.getTabForBrowser(this);
             if (tab) {
-              tabbrowser.swapBrowsers(tab, aOtherBrowser);
+              tabbrowser.swapBrowsers(tab, aOtherBrowser, aFlags);
               return;
             }
           }
