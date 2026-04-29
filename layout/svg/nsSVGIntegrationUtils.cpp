@@ -958,10 +958,12 @@ nsSVGIntegrationUtils::PaintMaskAndClipPath(const PaintFramesParams& aParams)
       SetupContextMatrix(firstFrame, aParams, offsetToBoundingBox,
                          offsetToUserSpace, false);
       Matrix clipMaskTransform;
-      RefPtr<SourceSurface> clipMaskSurface =
+      DrawResult clipMaskResult;
+      RefPtr<SourceSurface> clipMaskSurface;
+      Tie(clipMaskResult, clipMaskSurface) =
         clipPathFrame->GetClipMask(context, frame, cssPxToDevPxMatrix,
                                    &clipMaskTransform, maskSurface,
-                                   maskTransform, &result);
+                                   maskTransform);
 
       if (clipMaskSurface) {
         maskSurface = clipMaskSurface;
@@ -969,9 +971,9 @@ nsSVGIntegrationUtils::PaintMaskAndClipPath(const PaintFramesParams& aParams)
       } else {
         // Either entire surface is clipped out, or gfx buffer allocation
         // failure in nsSVGClipPathFrame::GetClipMask.
-        return result;
+        return clipMaskResult;
       }
-
+      result &= clipMaskResult;
       shouldPushMask = true;
     }
 
