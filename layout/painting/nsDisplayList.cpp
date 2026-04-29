@@ -6997,6 +6997,10 @@ bool nsDisplaySVGEffects::ValidateSVGFrame()
     }
   }
 
+  if (gfxPrefs::DrawMaskLayer()) {
+    return false;
+  }
+
   return true;
 }
 
