@@ -1096,15 +1096,8 @@ gfxFcFontSet::SortPreferredFonts(bool &aWaitForUserFont)
 
     FcFontSet *sets[1] = { fontSet };
     FcResult result;
-#ifdef SOLARIS
-    // Get around a crash of FcFontSetSort when FcConfig is nullptr
-    // Solaris's FcFontSetSort needs an FcConfig (bug 474758)
     fontSet.own(FcFontSetSort(FcConfigGetCurrent(), sets, 1, mSortPattern,
                               FcFalse, nullptr, &result));
-#else
-    fontSet.own(FcFontSetSort(nullptr, sets, 1, mSortPattern,
-                              FcFalse, nullptr, &result));
-#endif
 
     if (truncateMarker != nullptr && fontSet) {
         nsAutoRef<FcFontSet> truncatedSet(FcFontSetCreate());
