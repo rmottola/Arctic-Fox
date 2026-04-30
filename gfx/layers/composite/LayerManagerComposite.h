@@ -172,7 +172,6 @@ protected:
   mozilla::TimeStamp mWarnTime;
 
   bool mWindowOverlayChanged;
-  RefPtr<PaintCounter> mPaintCounter;
   TimeDuration mLastPaintTime;
   TimeStamp mRenderStartTime;
 };
