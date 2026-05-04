@@ -372,6 +372,7 @@ nsSSLStatus::SetCertificateTransparencyInfo(
         hasValidSCTs = true;
         break;
       case VerifiedSCT::Status::UnknownLog:
+      case VerifiedSCT::Status::ValidFromDisqualifiedLog:
         hasUnknownLogSCTs = true;
         break;
       case VerifiedSCT::Status::InvalidSignature:
