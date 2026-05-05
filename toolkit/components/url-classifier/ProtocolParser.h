@@ -8,7 +8,7 @@
 
 #include "HashStore.h"
 #include "nsICryptoHMAC.h"
-#include "safebrowsing.pb.h"
+#include "chromium/safebrowsing.pb.h"
 
 namespace mozilla {
 namespace safebrowsing {
