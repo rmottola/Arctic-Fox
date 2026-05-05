@@ -6,18 +6,17 @@
 
 #include "nsWidgetsCID.h"
 #include "nsIComponentRegistrar.h"
+#ifdef MOZ_CRASHREPORTER
+#include "nsICrashReporter.h"
+#endif
 
 #ifndef TEST_NAME
 #error "Must #define TEST_NAME before including places_test_harness_tail.h"
 #endif
 
-#ifndef TEST_FILE
-#error "Must #define TEST_FILE before include places_test_harness_tail.h"
-#endif
-
 int gTestsIndex = 0;
 
-#define TEST_INFO_STR "TEST-INFO | (%s) | "
+#define TEST_INFO_STR "TEST-INFO | "
 
 class RunNextTest : public mozilla::Runnable
 {
@@ -28,8 +27,7 @@ public:
     if (gTestsIndex < int(mozilla::ArrayLength(gTests))) {
       do_test_pending();
       Test &test = gTests[gTestsIndex++];
-      (void)fprintf(stderr, TEST_INFO_STR "Running %s.\n", TEST_FILE,
-                    test.name);
+      (void)fprintf(stderr, TEST_INFO_STR "Running %s.\n", test.name);
       test.func();
     }
 
@@ -65,7 +63,7 @@ do_test_finished()
 void
 disable_idle_service()
 {
-  (void)fprintf(stderr, TEST_INFO_STR  "Disabling Idle Service.\n", TEST_FILE);
+  (void)fprintf(stderr, TEST_INFO_STR  "Disabling Idle Service.\n");
   static NS_DEFINE_IID(kIdleCID, NS_IDLE_SERVICE_CID);
   nsresult rv;
   nsCOMPtr<nsIFactory> idleFactory = do_GetClassObject(kIdleCID, &rv);
@@ -77,20 +75,8 @@ disable_idle_service()
   do_check_success(rv);
 }
 
-int
-main(int aArgc,
-     char** aArgv)
+TEST(IHistory, Test)
 {
-  ScopedXPCOM xpcom(TEST_NAME);
-  if (xpcom.failed())
-    return -1;
-  // Initialize a profile folder to ensure a clean shutdown.
-  nsCOMPtr<nsIFile> profile = xpcom.GetProfileDirectory();
-  if (!profile) {
-    fail("Couldn't get the profile directory.");
-    return -1;
-  }
-
   RefPtr<WaitForConnectionClosed> spinClose = new WaitForConnectionClosed();
 
   // Tinderboxes are constantly on idle.  Since idle tasks can interact with
@@ -107,14 +93,4 @@ main(int aArgc,
 
   // And let any other events finish before we quit.
   (void)NS_ProcessPendingEvents(nullptr);
-
-  // Check that we have passed all of our tests, and output accordingly.
-  if (gPassedTests == gTotalTests) {
-    passed(TEST_FILE);
-  }
-
-  (void)fprintf(stderr, TEST_INFO_STR  "%u of %u tests passed\n",
-                TEST_FILE, unsigned(gPassedTests), unsigned(gTotalTests));
-
-  return gPassedTests == gTotalTests ? 0 : -1;
 }
