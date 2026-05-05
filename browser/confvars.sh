@@ -29,6 +29,11 @@ if test "$OS_ARCH" = "WINNT"; then
   fi
 fi
 
+if test "$MOZ_UPDATE_CHANNEL" = "default" -o \
+        "$MOZ_UPDATE_CHANNEL" = "nightly"; then
+  MOZ_RUST_URLPARSE=1
+fi
+
 # Enable building ./signmar and running libmar signature tests
 MOZ_ENABLE_SIGNMAR=1
 
@@ -71,7 +76,6 @@ if test "$OS_TARGET" = "WINNT" -o "$OS_TARGET" = "Darwin"; then
 fi
 MOZ_JSDOWNLOADS=1
 MOZ_RUST_MP4PARSE=1
-MOZ_RUST_URLPARSE=1
 
 # Include the DevTools client, not just the server (which is the default)
 MOZ_DEVTOOLS=all
