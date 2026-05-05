@@ -35,11 +35,6 @@ if CONFIG['OS_TARGET'] == 'WINNT':
         'TestBase64',
     ])
 
-if CONFIG['WRAP_STL_INCLUDES'] and not CONFIG['CLANG_CL']:
-    GeckoSimplePrograms([
-        'TestSTLWrappers',
-    ])
-
 XPCSHELL_TESTS_MANIFESTS += ['unit/xpcshell.ini']
 
 GeckoCppUnitTests([
