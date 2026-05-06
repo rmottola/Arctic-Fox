@@ -566,7 +566,7 @@ VRControllerManagerOpenVR::Init()
 void
 VRControllerManagerOpenVR::Destroy()
 {
-  mOpenVRController.Clear();
+  RemoveDevices();
   mOpenVRInstalled = false;
 }
 
@@ -759,4 +759,11 @@ VRControllerManagerOpenVR::ScanForDevices()
   #endif
     }
   }
+}
+
+void
+VRControllerManagerOpenVR::RemoveDevices()
+{
+  mOpenVRController.Clear();
+  mControllerCount = 0;
 }
