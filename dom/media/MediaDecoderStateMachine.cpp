@@ -488,13 +488,13 @@ public:
 
   void HandleAudioDecoded(MediaData* aAudio) override
   {
-    mMaster->Push(aAudio, MediaData::AUDIO_DATA);
+    mMaster->Push(aAudio);
     MaybeFinishDecodeFirstFrame();
   }
 
   void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
-    mMaster->Push(aVideo, MediaData::VIDEO_DATA);
+    mMaster->Push(aVideo);
     MaybeFinishDecodeFirstFrame();
   }
 
@@ -589,13 +589,13 @@ public:
 
   void HandleAudioDecoded(MediaData* aAudio) override
   {
-    mMaster->Push(aAudio, MediaData::AUDIO_DATA);
+    mMaster->Push(aAudio);
     MaybeStopPrerolling();
   }
 
   void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
-    mMaster->Push(aVideo, MediaData::VIDEO_DATA);
+    mMaster->Push(aVideo);
     MaybeStopPrerolling();
     CheckSlowDecoding(aDecodeStart);
   }
@@ -883,13 +883,13 @@ private:
     mSeekTaskRequest.Complete();
 
     if (aValue.mSeekedAudioData) {
-      mMaster->Push(aValue.mSeekedAudioData, MediaData::AUDIO_DATA);
+      mMaster->Push(aValue.mSeekedAudioData);
       mMaster->mDecodedAudioEndTime = std::max(
         aValue.mSeekedAudioData->GetEndTime(), mMaster->mDecodedAudioEndTime);
     }
 
     if (aValue.mSeekedVideoData) {
-      mMaster->Push(aValue.mSeekedVideoData, MediaData::VIDEO_DATA);
+      mMaster->Push(aValue.mSeekedVideoData);
       mMaster->mDecodedVideoEndTime = std::max(
         aValue.mSeekedVideoData->GetEndTime(), mMaster->mDecodedVideoEndTime);
     }
@@ -972,7 +972,7 @@ public:
   {
     // This might be the sample we need to exit buffering.
     // Schedule Step() to check it.
-    mMaster->Push(aAudio, MediaData::AUDIO_DATA);
+    mMaster->Push(aAudio);
     mMaster->ScheduleStateMachine();
   }
 
@@ -980,7 +980,7 @@ public:
   {
     // This might be the sample we need to exit buffering.
     // Schedule Step() to check it.
-    mMaster->Push(aVideo, MediaData::VIDEO_DATA);
+    mMaster->Push(aVideo);
     mMaster->ScheduleStateMachine();
   }
 
@@ -1995,7 +1995,7 @@ MediaDecoderStateMachine::OnAudioDecoded(MediaData* aAudio)
 }
 
 void
-MediaDecoderStateMachine::Push(MediaData* aSample, MediaData::Type aSampleType)
+MediaDecoderStateMachine::Push(MediaData* aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
   MOZ_ASSERT(aSample);
@@ -2011,9 +2011,8 @@ MediaDecoderStateMachine::Push(MediaData* aSample, MediaData::Type aSampleType)
     // to reach playing.
     aSample->As<VideoData>()->mFrameID = ++mCurrentFrameID;
     VideoQueue().Push(aSample);
-  } else {
-    // TODO: Handle MediaRawData, determine which queue should be pushed.
   }
+
   DispatchDecodeTasksIfNeeded();
 }
 
