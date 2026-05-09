@@ -140,8 +140,7 @@ private:
 
 MediaDecoderReaderWrapper::MediaDecoderReaderWrapper(AbstractThread* aOwnerThread,
                                                      MediaDecoderReader* aReader)
-  : mForceZeroStartTime(aReader->ForceZeroStartTime())
-  , mOwnerThread(aOwnerThread)
+  : mOwnerThread(aOwnerThread)
   , mReader(aReader)
 {}
 
