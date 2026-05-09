@@ -54,8 +54,6 @@ protected:
 public:
   media::TimeIntervals GetBuffered() override;
 
-  RefPtr<BufferedUpdatePromise> UpdateBufferedWithPromise() override;
-
   bool ForceZeroStartTime() const override;
 
   // For Media Resource Management
