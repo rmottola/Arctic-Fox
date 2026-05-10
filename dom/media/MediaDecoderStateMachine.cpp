@@ -197,6 +197,9 @@ public:
   virtual void HandleAudioDecoded(MediaData* aAudio) {}
   virtual void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) {}
   virtual void HandleNotDecoded(MediaData::Type aType, const MediaResult& aError);
+  virtual void HandleAudioWaited(MediaData::Type aType);
+  virtual void HandleVideoWaited(MediaData::Type aType);
+  virtual void HandleNotWaited(const WaitForDataRejectValue& aRejection);
   virtual void HandleEndOfStream() {}
   virtual void HandleWaitingForData() {}
   virtual void HandleAudioCaptured() {}
@@ -1197,6 +1200,27 @@ StateObject::HandleNotDecoded(MediaData::Type aType, const MediaResult& aError)
   HandleEndOfStream();
 }
 
+void
+MediaDecoderStateMachine::
+StateObject::HandleAudioWaited(MediaData::Type aType)
+{
+  mMaster->EnsureAudioDecodeTaskQueued();
+}
+
+void
+MediaDecoderStateMachine::
+StateObject::HandleVideoWaited(MediaData::Type aType)
+{
+  mMaster->EnsureVideoDecodeTaskQueued();
+}
+
+void
+MediaDecoderStateMachine::
+StateObject::HandleNotWaited(const WaitForDataRejectValue& aRejection)
+{
+
+}
+
 RefPtr<MediaDecoder::SeekPromise>
 MediaDecoderStateMachine::
 StateObject::HandleSeek(SeekTarget aTarget)
@@ -2066,7 +2090,7 @@ MediaDecoderStateMachine::OnAudioWaited(MediaData::Type aType)
 {
   MOZ_ASSERT(OnTaskQueue());
   MOZ_ASSERT(aType == MediaData::AUDIO_DATA);
-  EnsureAudioDecodeTaskQueued();
+  mStateObj->HandleAudioWaited(aType);
 }
 
 void
@@ -2074,13 +2098,14 @@ MediaDecoderStateMachine::OnVideoWaited(MediaData::Type aType)
 {
   MOZ_ASSERT(OnTaskQueue());
   MOZ_ASSERT(aType == MediaData::VIDEO_DATA);
-  EnsureVideoDecodeTaskQueued();
+  mStateObj->HandleVideoWaited(aType);
 }
 
 void
 MediaDecoderStateMachine::OnNotWaited(const WaitForDataRejectValue& aRejection)
 {
   MOZ_ASSERT(OnTaskQueue());
+  mStateObj->HandleNotWaited(aRejection);
 }
 
 bool
