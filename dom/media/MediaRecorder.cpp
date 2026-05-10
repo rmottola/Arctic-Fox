@@ -994,9 +994,9 @@ void
 MediaRecorder::RegisterActivityObserver()
 {
   if (nsPIDOMWindowInner* window = GetOwner()) {
-    nsIDocument* doc = window->GetExtantDoc();
-    if (doc) {
-      doc->RegisterActivityObserver(
+    mDocument = window->GetExtantDoc();
+    if (mDocument) {
+      mDocument->RegisterActivityObserver(
         NS_ISUPPORTS_CAST(nsIDocumentActivity*, this));
     }
   }
@@ -1005,12 +1005,9 @@ MediaRecorder::RegisterActivityObserver()
 void
 MediaRecorder::UnRegisterActivityObserver()
 {
-  if (nsPIDOMWindowInner* window = GetOwner()) {
-    nsIDocument* doc = window->GetExtantDoc();
-    if (doc) {
-      doc->UnregisterActivityObserver(
-        NS_ISUPPORTS_CAST(nsIDocumentActivity*, this));
-    }
+  if (mDocument) {
+    mDocument->UnregisterActivityObserver(
+      NS_ISUPPORTS_CAST(nsIDocumentActivity*, this));
   }
 }
 
