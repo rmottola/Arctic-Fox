@@ -30,19 +30,16 @@
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
 - Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
 - Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
-- 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
-- 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
-- Bug 1263340 - finish to part 8
 
 
 impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
-
-
-## Enhancing JS
- Bug 1316079 - Mark JS::PropertyDescriptor as JS_PUBLIC_API to fix lin¿
+## Remove libstagefright
+1408298
+Depends on: 1415809, 1417011, 
+Check: 1448762
 
 ### FIXME / TODO
 - Reapply Bug 486262 - Part 2 with removal of tabbrowser.dtd - breaks browser currently
