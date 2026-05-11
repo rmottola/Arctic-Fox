@@ -850,7 +850,6 @@ Saiz::Saiz(Box& aBox, AtomType aDefaultType)
   if (defaultSampleInfoSize) {
     if (!mSampleInfoSize.SetCapacity(count, fallible)) {
       LOG(Saiz, "OOM");
-      reader->DiscardRemaining();
       return;
     }
     for (int i = 0; i < count; i++) {
@@ -860,11 +859,9 @@ Saiz::Saiz(Box& aBox, AtomType aDefaultType)
   } else {
     if (!reader->ReadArray(mSampleInfoSize, count)) {
       LOG(Saiz, "Incomplete Box (OOM or missing count:%u)", count);
-      reader->DiscardRemaining();
       return;
     }
   }
-  reader->DiscardRemaining();
   mValid = true;
 }
 
@@ -898,7 +895,6 @@ Saio::Saio(Box& aBox, AtomType aDefaultType)
   }
   if (!mOffsets.SetCapacity(count, fallible)) {
     LOG(Saiz, "OOM");
-    reader->DiscardRemaining();
     return;
   }
   if (version == 0) {
