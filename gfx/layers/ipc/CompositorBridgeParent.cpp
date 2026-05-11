@@ -194,8 +194,8 @@ CompositorBridgeParent::LayerTreeState::~LayerTreeState()
 }
 
 typedef map<uint64_t, CompositorBridgeParent::LayerTreeState> LayerTreeMap;
-static LayerTreeMap sIndirectLayerTrees;
-static StaticAutoPtr<mozilla::Monitor> sIndirectLayerTreesLock;
+LayerTreeMap sIndirectLayerTrees;
+StaticAutoPtr<mozilla::Monitor> sIndirectLayerTreesLock;
 
 static void EnsureLayerTreeMapReady()
 {
@@ -1540,7 +1540,7 @@ CompositorBridgeParent::RecvAdoptChild(const uint64_t& child)
   return IPC_OK();
 }
 
-static void
+void
 EraseLayerState(uint64_t aId)
 {
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
@@ -1874,7 +1874,7 @@ CompositorBridgeParent::CreateForContent(Endpoint<PCompositorBridgeParent>&& aEn
   return true;
 }
 
-static void
+void
 UpdateIndirectTree(uint64_t aId, Layer* aRoot, const TargetConfig& aTargetConfig)
 {
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
