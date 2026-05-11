@@ -308,7 +308,8 @@ class JSFunction : public js::NativeObject
             nonLazyScript()->setAsyncKind(asyncKind);
     }
 
-    bool getUnresolvedLength(JSContext* cx, js::MutableHandleValue v);
+    static bool getUnresolvedLength(JSContext* cx, js::HandleFunction fun,
+                                    js::MutableHandleValue v);
 
     JSAtom* getUnresolvedName(JSContext* cx);
 
@@ -467,7 +468,7 @@ class JSFunction : public js::NativeObject
         return u.i.s.script_;
     }
 
-    bool getLength(JSContext* cx, uint16_t* length);
+    static bool getLength(JSContext* cx, js::HandleFunction fun, uint16_t* length);
 
     js::LazyScript* lazyScript() const {
         MOZ_ASSERT(isInterpretedLazy() && u.i.s.lazy_);

@@ -124,7 +124,7 @@ js::WrapAsyncFunction(JSContext* cx, HandleFunction unwrapped)
 
     RootedAtom funName(cx, unwrapped->name());
     uint16_t length;
-    if (!unwrapped->getLength(cx, &length))
+    if (!JSFunction::getLength(cx, unwrapped, &length))
         return nullptr;
 
     // Steps 3 (partially).
