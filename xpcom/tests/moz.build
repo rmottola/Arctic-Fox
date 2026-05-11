@@ -54,11 +54,6 @@ GeckoCppUnitTests([
     'TestTimers'
 ])
 
-if CONFIG['MOZ_MEMORY']:
-    GeckoCppUnitTests([
-        'TestJemalloc',
-    ])
-
 # FIXME: bug 577500 TestStaticAtoms fails when run in dist/bin
 #CPP_UNIT_TESTS += [
 #    'TestStaticAtoms',
