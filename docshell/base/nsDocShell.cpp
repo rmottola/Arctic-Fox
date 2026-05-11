@@ -8831,9 +8831,6 @@ nsDocShell::RestoreFromHistory()
   nsCOMPtr<nsPIDOMWindowOuter> privWin = GetWindow();
   NS_ASSERTION(privWin, "could not get nsPIDOMWindow interface");
 
-  rv = privWin->RestoreWindowState(windowState);
-  NS_ENSURE_SUCCESS(rv, rv);
-
   // Now, dispatch a title change event which would happen as the
   // <head> is parsed.
   document->NotifyPossibleTitleChange(false);
@@ -8893,6 +8890,12 @@ nsDocShell::RestoreFromHistory()
     rv = childShell->BeginRestore(nullptr, false);
     NS_ENSURE_SUCCESS(rv, rv);
   }
+
+  // Make sure to restore the window state after adding the child shells back
+  // to the tree.  This is necessary for Thaw() and Resume() to propagate
+  // properly.
+  rv = privWin->RestoreWindowState(windowState);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr<nsIPresShell> shell = GetPresShell();
 
