@@ -5506,6 +5506,9 @@ pref("browser.safebrowsing.id", "navclient-auto-ffox");
 pref("browser.safebrowsing.id", "Firefox");
 #endif
 
+// Allow users to ignore Safe Browsing warnings.
+pref("browser.safebrowsing.allowOverride", true);
+
 // Turn off Spatial navigation by default.
 pref("snav.enabled", false);
 

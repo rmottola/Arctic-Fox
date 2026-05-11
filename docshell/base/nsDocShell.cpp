@@ -5288,6 +5288,8 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
   return NS_OK;
 }
 
+#define PREF_SAFEBROWSING_ALLOWOVERRIDE "browser.safebrowsing.allowOverride"
+
 NS_IMETHODIMP
 nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
                           const char* aErrorPage,
@@ -5361,6 +5363,10 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
   errorPageUrl.AppendASCII(escapedError.get());
   errorPageUrl.AppendLiteral("&u=");
   errorPageUrl.AppendASCII(escapedUrl.get());
+  if ((strcmp(aErrorPage, "blocked") == 0) &&
+      Preferences::GetBool(PREF_SAFEBROWSING_ALLOWOVERRIDE, true)) {
+    errorPageUrl.AppendLiteral("&o=1");
+  }
   if (!escapedCSSClass.IsEmpty()) {
     errorPageUrl.AppendLiteral("&s=");
     errorPageUrl.AppendASCII(escapedCSSClass.get());
