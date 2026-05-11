@@ -9582,7 +9582,7 @@ public:
                     nsIURI* aOriginalURI, bool aLoadReplace,
                     bool aIsFromProcessingFrameAttributes,
                     nsIURI* aReferrer, uint32_t aReferrerPolicy,
-                    nsIPrincipal* aTriggeringPrincipal, 
+                    nsIPrincipal* aTriggeringPrincipal,
                     nsIPrincipal* aPrincipalToInherit, uint32_t aFlags,
                     const char* aTypeHint, nsIInputStream* aPostData,
                     nsIInputStream* aHeadersData, uint32_t aLoadType,
@@ -9929,7 +9929,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
     bool inherits;
     // One more twist: Don't inherit the principal for external loads.
     if (aLoadType != LOAD_NORMAL_EXTERNAL && !principalToInherit &&
-        (aFlags & INTERNAL_LOAD_FLAGS_INHERIT_PRINCIPAL) &&   
+        (aFlags & INTERNAL_LOAD_FLAGS_INHERIT_PRINCIPAL) &&
          NS_SUCCEEDED(nsContentUtils::URIInheritsSecurityContext(aURI,
                                                                  &inherits)) &&
          inherits) {
@@ -10338,7 +10338,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       nsCOMPtr<nsIPrincipal> triggeringPrincipal, principalToInherit;
       if (mOSHE) {
         mOSHE->GetTriggeringPrincipal(getter_AddRefs(triggeringPrincipal));
-        mOSHE->GetPrincipalToInherit(getter_AddRefs(principalToInherit)); 
+        mOSHE->GetPrincipalToInherit(getter_AddRefs(principalToInherit));
       }
       // Pass true for aCloneSHChildren, since we're not
       // changing documents here, so all of our subframes are
@@ -12495,7 +12495,7 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
     // Don't cache the presentation if we're going to just reload the
     // current entry. Caching would lead to trying to save the different
     // content viewers in the same nsISHEntry object.
-    rv = CreateAboutBlankContentViewer(triggeringPrincipal, nullptr,
+    rv = CreateAboutBlankContentViewer(principalToInherit, nullptr,
                                        aEntry != mOSHE);
 
     if (NS_FAILED(rv)) {
