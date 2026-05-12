@@ -578,7 +578,7 @@ public:
 
   mozilla::dom::TabGroup* TabGroup();
 
-  mozilla::dom::DocGroup* GetDocGroup();
+  mozilla::dom::DocGroup* GetDocGroup() const;
 
   virtual mozilla::ThrottledEventQueue* GetThrottledEventQueue() = 0;
 
