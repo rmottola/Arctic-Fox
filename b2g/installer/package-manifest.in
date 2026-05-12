@@ -154,6 +154,7 @@
 @RESPATH@/components/dom_activities.xpt
 @RESPATH@/components/dom_audiochannel.xpt
 @RESPATH@/components/dom_base.xpt
+@RESPATH@/components/dom_file.xpt
 @RESPATH@/components/dom_system.xpt
 #ifdef MOZ_WIDGET_GONK
 @RESPATH@/components/dom_wifi.xpt
