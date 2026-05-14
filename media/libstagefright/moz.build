@@ -34,6 +34,7 @@ elif CONFIG['OS_TARGET'] in ('DragonFly', 'FreeBSD', 'OpenBSD', 'NetBSD',
         DEFINES['off64_t'] = 'off_t'
         LOCAL_INCLUDES += [ 'ports/bsd/include' ]
 else:
+    DEFINES['_LARGEFILE64_SOURCE'] = True
     DEFINES['HAVE_SYS_UIO_H'] = True
 
 if CONFIG['OS_TARGET'] != 'Android':
