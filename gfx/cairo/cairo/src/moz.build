@@ -217,12 +217,14 @@ if CONFIG['MOZ_TREE_FREETYPE']:
 if CONFIG['GNU_CC'] or CONFIG['CLANG_CL']:
     CFLAGS += [
         '-Wno-enum-compare',
+        '-Wno-int-conversion',
         '-Wno-int-to-pointer-cast',
         '-Wno-sign-compare',
         '-Wno-type-limits',
         '-Wno-missing-field-initializers',
         '-Wno-conversion',
         '-Wno-unused-but-set-variable',
+        '-Wno-incompatible-pointer-types',
     ]
 if CONFIG['CLANG_CXX'] or CONFIG['CLANG_CL']:
     CFLAGS += [
