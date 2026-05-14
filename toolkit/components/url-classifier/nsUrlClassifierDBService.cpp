@@ -103,12 +103,6 @@ LazyLogModule gUrlClassifierDbServiceLog("UrlClassifierDbService");
 #define CHECK_PHISHING_PREF     "browser.safebrowsing.phishing.enabled"
 #define CHECK_PHISHING_DEFAULT  false
 
-#define CHECK_TRACKING_PREF     "privacy.trackingprotection.enabled"
-#define CHECK_TRACKING_DEFAULT  false
-
-#define CHECK_TRACKING_PB_PREF    "privacy.trackingprotection.pbmode.enabled"
-#define CHECK_TRACKING_PB_DEFAULT false
-
 #define CHECK_BLOCKED_PREF    "browser.safebrowsing.blockedURIs.enabled"
 #define CHECK_BLOCKED_DEFAULT false
 
@@ -1215,7 +1209,6 @@ nsUrlClassifierDBService::GetInstance(nsresult *result)
 nsUrlClassifierDBService::nsUrlClassifierDBService()
  : mCheckMalware(CHECK_MALWARE_DEFAULT)
  , mCheckPhishing(CHECK_PHISHING_DEFAULT)
- , mCheckTracking(CHECK_TRACKING_DEFAULT)
  , mCheckBlockedURIs(CHECK_BLOCKED_DEFAULT)
  , mInUpdate(false)
 {
@@ -1310,9 +1303,6 @@ nsUrlClassifierDBService::Init()
     CHECK_MALWARE_DEFAULT);
   mCheckPhishing = Preferences::GetBool(CHECK_PHISHING_PREF,
     CHECK_PHISHING_DEFAULT);
-  mCheckTracking =
-    Preferences::GetBool(CHECK_TRACKING_PREF, CHECK_TRACKING_DEFAULT) ||
-    Preferences::GetBool(CHECK_TRACKING_PB_PREF, CHECK_TRACKING_PB_DEFAULT);
   mCheckBlockedURIs = Preferences::GetBool(CHECK_BLOCKED_PREF,
     CHECK_BLOCKED_DEFAULT);
   uint32_t gethashNoise = Preferences::GetUint(GETHASH_NOISE_PREF,
@@ -1386,8 +1376,6 @@ nsUrlClassifierDBService::Init()
   //       situations. See Bug 1247798 and Bug 1244803.
   Preferences::AddStrongObserver(this, CHECK_MALWARE_PREF);
   Preferences::AddStrongObserver(this, CHECK_PHISHING_PREF);
-  Preferences::AddStrongObserver(this, CHECK_TRACKING_PREF);
-  Preferences::AddStrongObserver(this, CHECK_TRACKING_PB_PREF);
   Preferences::AddStrongObserver(this, CHECK_BLOCKED_PREF);
   Preferences::AddStrongObserver(this, GETHASH_NOISE_PREF);
   Preferences::AddStrongObserver(this, CONFIRM_AGE_PREF);
@@ -1808,11 +1796,6 @@ nsUrlClassifierDBService::Observe(nsISupports *aSubject, const char *aTopic,
     } else if (NS_LITERAL_STRING(CHECK_PHISHING_PREF).Equals(aData)) {
       mCheckPhishing = Preferences::GetBool(CHECK_PHISHING_PREF,
         CHECK_PHISHING_DEFAULT);
-    } else if (NS_LITERAL_STRING(CHECK_TRACKING_PREF).Equals(aData) ||
-               NS_LITERAL_STRING(CHECK_TRACKING_PB_PREF).Equals(aData)) {
-      mCheckTracking =
-        Preferences::GetBool(CHECK_TRACKING_PREF, CHECK_TRACKING_DEFAULT) ||
-        Preferences::GetBool(CHECK_TRACKING_PB_PREF, CHECK_TRACKING_PB_DEFAULT);
     } else if (NS_LITERAL_STRING(CHECK_BLOCKED_PREF).Equals(aData)) {
       mCheckBlockedURIs = Preferences::GetBool(CHECK_BLOCKED_PREF,
         CHECK_BLOCKED_DEFAULT);
@@ -1870,8 +1853,6 @@ nsUrlClassifierDBService::Shutdown()
   if (prefs) {
     prefs->RemoveObserver(CHECK_MALWARE_PREF, this);
     prefs->RemoveObserver(CHECK_PHISHING_PREF, this);
-    prefs->RemoveObserver(CHECK_TRACKING_PREF, this);
-    prefs->RemoveObserver(CHECK_TRACKING_PB_PREF, this);
     prefs->RemoveObserver(CHECK_BLOCKED_PREF, this);
     prefs->RemoveObserver(PHISH_TABLE_PREF, this);
     prefs->RemoveObserver(MALWARE_TABLE_PREF, this);
