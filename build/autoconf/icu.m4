@@ -75,10 +75,15 @@ if test -n "$USE_ICU"; then
     fi
     MOZ_ICU_VERSION="$version"
 
-    # TODO: the l is actually endian-dependent
-    # We could make this set as 'l' or 'b' for little or big, respectively,
-    # but we'd need to check in a big-endian version of the file.
-    ICU_DATA_FILE="icudt${version}l.dat"
+    # ICU Data File name is endian-dependent
+    AC_C_BIGENDIAN
+
+    if test "$ac_cv_c_bigendian" = "yes"; then
+      ICU_DATA_FILE="icudt${version}b.dat"
+    else
+      ICU_DATA_FILE="icudt${version}l.dat"
+    fi
+    AC_MSG_RESULT([Using ICU $ICU_DATA_FILE data file])
 
     dnl We won't build ICU data as a separate file when building
     dnl JS standalone so that embedders don't have to deal with it.
