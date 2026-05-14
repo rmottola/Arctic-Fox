@@ -8607,7 +8607,7 @@ nsGlobalWindow::PostMessageMozOuter(JSContext* aCx, JS::Handle<JS::Value> aMessa
     return;
   }
 
-  aError = NS_DispatchToCurrentThread(event);
+  aError = Dispatch("PostMessage", TaskCategory::Other, event.forget());
 }
 
 void
