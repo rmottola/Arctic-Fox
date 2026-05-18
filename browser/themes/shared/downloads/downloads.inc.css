@@ -104,6 +104,14 @@
   margin: 0;
 }
 
+.downloadsDropmarker > .button-box > .button-menu-dropmarker > .dropmarker-icon {
+  width: 16px;
+  height: 16px;
+  list-style-image: url("chrome://global/skin/icons/menubutton-dropmarker.svg");
+  filter: url("chrome://global/skin/filters.svg#fill");
+  fill: currentColor;
+}
+
 /*** List items and similar elements in the summary ***/
 
 #downloadsSummary,
@@ -206,6 +214,14 @@ richlistitem[type="download"]:last-child {
 
 .downloadButton > .button-box {
   padding: 0;
+}
+
+.downloadButton > .button-box > .button-icon {
+  width: 16px;
+  height: 16px;
+  margin: 1px;
+  filter: url("chrome://global/skin/filters.svg#fill");
+  fill: currentColor;
 }
 
 
