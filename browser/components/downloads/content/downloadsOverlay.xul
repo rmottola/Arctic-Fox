@@ -117,7 +117,6 @@
                    flex="1"
                    align="stretch">
           <richlistbox id="downloadsListBox"
-                       class="plain"
                        context="downloadsContextMenu"
                        onmouseover="DownloadsView.onDownloadMouseOver(event);"
                        onmouseout="DownloadsView.onDownloadMouseOut(event);"
@@ -166,11 +165,11 @@
           <hbox id="downloadsPanel-blockedSubview-buttons"
                 align="stretch">
             <button id="downloadsPanel-blockedSubview-openButton"
-                    class="plain"
+                    class="downloadsPanelFooterButton"
                     command="downloadsCmd_chooseOpen"
                     flex="1"/>
             <button id="downloadsPanel-blockedSubview-deleteButton"
-                    class="plain"
+                    class="downloadsPanelFooterButton"
                     oncommand="DownloadsBlockedSubview.confirmBlock();"
                     default="true"
                     flex="1"/>
