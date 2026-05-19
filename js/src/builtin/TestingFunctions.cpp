@@ -2577,7 +2577,7 @@ SharedAddress(JSContext* cx, unsigned argc, Value* vp)
 #else
     RootedObject obj(cx, CheckedUnwrap(&args[0].toObject()));
     if (!obj) {
-        JS_ReportErrorASCII(cx, "Permission denied to access object");
+        ReportAccessDenied(cx);
         return false;
     }
     if (!obj->is<SharedArrayBufferObject>()) {
@@ -3574,12 +3574,12 @@ GetLcovInfo(JSContext* cx, unsigned argc, Value* vp)
     if (args.hasDefined(0)) {
         global = ToObject(cx, args[0]);
         if (!global) {
-            JS_ReportErrorASCII(cx, "First argument should be an object");
+            JS_ReportErrorASCII(cx, "Permission denied to access global");
             return false;
         }
         global = CheckedUnwrap(global);
         if (!global) {
-            JS_ReportErrorASCII(cx, "Permission denied to access global");
+            ReportAccessDenied(cx);
             return false;
         }
         if (!global->is<GlobalObject>()) {
