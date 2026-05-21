@@ -952,6 +952,13 @@ VARIABLES = {
         a Cargo.toml file that exists in this moz.build's directory.
         """),
 
+    'RUST_LIBRARY_FEATURES': (List, list,
+        """Cargo features to activate for this library.
+
+        This variable should not be used directly; you should be using the
+        RustLibrary template instead.
+        """),
+
     'UNIFIED_SOURCES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
         """Source code files that can be compiled together.
 
@@ -963,13 +970,15 @@ VARIABLES = {
 
     'GENERATED_FILES': (StrictOrderingOnAppendListWithFlagsFactory({
                 'script': unicode,
-                'inputs': list }), list,
+                'inputs': list,
+                'flags': list, }), list,
         """Generic generated files.
 
         This variable contains a list of files for the build system to
         generate at export time. The generation method may be declared
-        with optional ``script`` and ``inputs`` flags on individual entries.
-        If the optional ``script`` flag is not present on an entry, it
+        with optional ``script``, ``inputs`` and ``flags`` attributes on
+        individual entries.
+        If the optional ``script`` attribute is not present on an entry, it
         is assumed that rules for generating the file are present in
         the associated Makefile.in.
 
@@ -1003,6 +1012,9 @@ VARIABLES = {
 
         The chosen script entry point may optionally return a set of strings,
         indicating extra files the output depends on.
+
+        When the ``flags`` attribute is present, the given list of flags is
+        passed as extra arguments following the inputs.
         """),
 
     'DEFINES': (InitializedDefines, dict,
@@ -1152,10 +1164,6 @@ VARIABLES = {
         """Whether the library contains a binary XPCOM component manifest.
 
         Implies FORCE_SHARED_LIB.
-        """),
-
-    'PYTHON_UNIT_TESTS': (StrictOrderingOnAppendList, list,
-        """A list of python unit tests.
         """),
 
     'HOST_LIBRARY_NAME': (unicode, unicode,
@@ -1342,6 +1350,20 @@ VARIABLES = {
         ``HOST_BIN_SUFFIX``, the name will remain unchanged.
         """),
 
+    'RUST_PROGRAMS': (StrictOrderingOnAppendList, list,
+        """Compile a list of Rust host executable names.
+
+        Each name in this variable corresponds to an executable built from
+        the Cargo.toml in the same directory.
+        """),
+
+    'HOST_RUST_PROGRAMS': (StrictOrderingOnAppendList, list,
+        """Compile a list of Rust executable names.
+
+        Each name in this variable corresponds to an executable built from
+        the Cargo.toml in the same directory.
+        """),
+
     'CONFIGURE_SUBST_FILES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
         """Output files that will be generated using configure-like substitution.
 
@@ -1515,20 +1537,24 @@ VARIABLES = {
         """List of manifest files defining Android instrumentation tests.
         """),
 
+    'FIREFOX_UI_FUNCTIONAL_MANIFESTS': (ManifestparserManifestList, list,
+        """List of manifest files defining firefox-ui-functional tests.
+        """),
+
+    'FIREFOX_UI_UPDATE_MANIFESTS': (ManifestparserManifestList, list,
+        """List of manifest files defining firefox-ui-update tests.
+        """),
+
+    'PUPPETEER_FIREFOX_MANIFESTS': (ManifestparserManifestList, list,
+        """List of manifest files defining puppeteer unit tests for Firefox.
+        """),
+
     'MARIONETTE_LAYOUT_MANIFESTS': (ManifestparserManifestList, list,
         """List of manifest files defining marionette-layout tests.
         """),
 
-    'MARIONETTE_LOOP_MANIFESTS': (ManifestparserManifestList, list,
-        """List of manifest files defining marionette-loop tests.
-        """),
-
     'MARIONETTE_UNIT_MANIFESTS': (ManifestparserManifestList, list,
         """List of manifest files defining marionette-unit tests.
-        """),
-
-    'MARIONETTE_UPDATE_MANIFESTS': (ManifestparserManifestList, list,
-        """List of manifest files defining marionette-update tests.
         """),
 
     'MARIONETTE_WEBAPI_MANIFESTS': (ManifestparserManifestList, list,
@@ -1570,6 +1596,11 @@ VARIABLES = {
     'XPCSHELL_TESTS_MANIFESTS': (ManifestparserManifestList, list,
         """List of manifest files defining xpcshell tests.
         """),
+
+    'PYTHON_UNITTEST_MANIFESTS': (ManifestparserManifestList, list,
+        """List of manifest files defining python unit tests.
+        """),
+
 
     # The following variables are used to control the target of installed files.
     'XPI_NAME': (unicode, unicode,

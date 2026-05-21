@@ -423,6 +423,28 @@ CreateCSSValueList(const InfallibleTArray<TransformFunction>& aFunctions)
   return new nsCSSValueSharedList(result.forget());
 }
 
+static StyleAnimationValue
+ToStyleAnimationValue(const Animatable& aAnimatable)
+{
+  StyleAnimationValue result;
+
+  switch (aAnimatable.type()) {
+    case Animatable::TArrayOfTransformFunction: {
+      const InfallibleTArray<TransformFunction>& transforms =
+        aAnimatable.get_ArrayOfTransformFunction();
+      result.SetTransformValue(CreateCSSValueList(transforms));
+      break;
+    }
+    case Animatable::Tfloat:
+      result.SetFloatValue(aAnimatable.get_float());
+      break;
+    default:
+      MOZ_ASSERT_UNREACHABLE("Unsupported type");
+  }
+
+  return result;
+}
+
 void
 Layer::SetAnimations(const AnimationArray& aAnimations)
 {
@@ -446,6 +468,11 @@ Layer::SetAnimations(const AnimationArray& aAnimations)
         break;
     }
 
+    if (animation.baseStyle().type() != BaseAnimationStyle::Tnull_t) {
+      mBaseAnimationStyle =
+        ToStyleAnimationValue(animation.baseStyle().get_Animatable());
+    }
+
     AnimData* data = mAnimationData.AppendElement();
     InfallibleTArray<Maybe<ComputedTimingFunction>>& functions =
       data->mFunctions;
@@ -462,24 +489,9 @@ Layer::SetAnimations(const AnimationArray& aAnimations)
     // animation.
     InfallibleTArray<StyleAnimationValue>& startValues = data->mStartValues;
     InfallibleTArray<StyleAnimationValue>& endValues = data->mEndValues;
-    for (uint32_t j = 0; j < segments.Length(); j++) {
-      const AnimationSegment& segment = segments[j];
-      StyleAnimationValue* startValue = startValues.AppendElement();
-      StyleAnimationValue* endValue = endValues.AppendElement();
-      if (segment.endState().type() == Animatable::TArrayOfTransformFunction) {
-        const InfallibleTArray<TransformFunction>& startFunctions =
-          segment.startState().get_ArrayOfTransformFunction();
-        startValue->SetTransformValue(CreateCSSValueList(startFunctions));
-
-        const InfallibleTArray<TransformFunction>& endFunctions =
-          segment.endState().get_ArrayOfTransformFunction();
-        endValue->SetTransformValue(CreateCSSValueList(endFunctions));
-      } else {
-        NS_ASSERTION(segment.endState().type() == Animatable::Tfloat,
-                     "Unknown Animatable type");
-        startValue->SetFloatValue(segment.startState().get_float());
-        endValue->SetFloatValue(segment.endState().get_float());
-      }
+    for (const AnimationSegment& segment : segments) {
+      startValues.AppendElement(ToStyleAnimationValue(segment.startState()));
+      endValues.AppendElement(ToStyleAnimationValue(segment.endState()));
     }
   }
 
@@ -497,8 +509,10 @@ Layer::StartPendingAnimations(const TimeStamp& aReadyTime)
         for (size_t animIdx = 0, animEnd = layer->mAnimations.Length();
              animIdx < animEnd; animIdx++) {
           Animation& anim = layer->mAnimations[animIdx];
-          if (anim.startTime().IsNull()) {
-            anim.startTime() = aReadyTime - anim.initialCurrentTime();
+
+          // If the animation is play-pending, resolve the start time.
+          if (anim.startTime().IsNull() && !anim.isNotPlaying()) {
+            anim.startTime() = aReadyTime - anim.holdTime() + anim.delay();
             updated = true;
           }
         }
@@ -576,7 +590,7 @@ Layer::CanUseOpaqueSurface()
 const Maybe<ParentLayerIntRect>&
 Layer::GetLocalClipRect()
 {
-  if (LayerComposite* shadow = AsLayerComposite()) {
+  if (HostLayer* shadow = AsHostLayer()) {
     return shadow->GetShadowClipRect();
   }
   return GetClipRect();
@@ -585,7 +599,7 @@ Layer::GetLocalClipRect()
 const LayerIntRegion&
 Layer::GetLocalVisibleRegion()
 {
-  if (LayerComposite* shadow = AsLayerComposite()) {
+  if (HostLayer* shadow = AsHostLayer()) {
     return shadow->GetShadowVisibleRegion();
   }
   return GetVisibleRegion();
@@ -782,7 +796,7 @@ Layer::CalculateScissorRect(const RenderTargetIntRect& aCurrentScissorRect)
   }
 
   if (GetLocalVisibleRegion().IsEmpty() &&
-      !(AsLayerComposite() && AsLayerComposite()->NeedToDrawCheckerboarding())) {
+      !(AsHostLayer() && AsHostLayer()->NeedToDrawCheckerboarding())) {
     // When our visible region is empty, our parent may not have created the
     // intermediate surface that we would require for correct clipping; however,
     // this does not matter since we are invisible.
@@ -887,7 +901,7 @@ Layer::GetTransformTyped() const
 Matrix4x4
 Layer::GetLocalTransform()
 {
-  if (LayerComposite* shadow = AsLayerComposite())
+  if (HostLayer* shadow = AsHostLayer())
     return shadow->GetShadowTransform();
   else
     return GetTransform();
@@ -941,7 +955,7 @@ float
 Layer::GetLocalOpacity()
 {
   float opacity = mOpacity;
-  if (LayerComposite* shadow = AsLayerComposite())
+  if (HostLayer* shadow = AsHostLayer())
     opacity = shadow->GetShadowOpacity();
   return std::min(std::max(opacity, 0.0f), 1.0f);
 }
@@ -1661,7 +1675,7 @@ LayerManager::BeginTabSwitch()
   mTabSwitchStart = TimeStamp::Now();
 }
 
-static void PrintInfo(std::stringstream& aStream, LayerComposite* aLayerComposite);
+static void PrintInfo(std::stringstream& aStream, HostLayer* aLayerComposite);
 
 #ifdef MOZ_DUMP_PAINTING
 template <typename T>
@@ -1671,11 +1685,11 @@ void WriteSnapshotToDumpFile_internal(T* aObj, DataSourceSurface* aSurf)
   string.Append('-');
   string.AppendInt((uint64_t)aObj);
   if (gfxUtils::sDumpPaintFile != stderr) {
-    fprintf_stderr(gfxUtils::sDumpPaintFile, "array[\"%s\"]=\"", string.BeginReading());
+    fprintf_stderr(gfxUtils::sDumpPaintFile, R"(array["%s"]=")", string.BeginReading());
   }
   gfxUtils::DumpAsDataURI(aSurf, gfxUtils::sDumpPaintFile);
   if (gfxUtils::sDumpPaintFile != stderr) {
-    fprintf_stderr(gfxUtils::sDumpPaintFile, "\";");
+    fprintf_stderr(gfxUtils::sDumpPaintFile, R"(";)");
   }
 }
 
@@ -1702,8 +1716,8 @@ Layer::Dump(std::stringstream& aStream, const char* aPrefix,
             bool aDumpHtml, bool aSorted)
 {
 #ifdef MOZ_DUMP_PAINTING
-  bool dumpCompositorTexture = gfxEnv::DumpCompositorTextures() && AsLayerComposite() &&
-                               AsLayerComposite()->GetCompositableHost();
+  bool dumpCompositorTexture = gfxEnv::DumpCompositorTextures() && AsHostLayer() &&
+                               AsHostLayer()->GetCompositableHost();
   bool dumpClientTexture = gfxEnv::DumpPaint() && AsShadowableLayer() &&
                            AsShadowableLayer()->GetCompositableClient();
   nsCString layerId(Name());
@@ -1711,10 +1725,10 @@ Layer::Dump(std::stringstream& aStream, const char* aPrefix,
   layerId.AppendInt((uint64_t)this);
 #endif
   if (aDumpHtml) {
-    aStream << nsPrintfCString("<li><a id=\"%p\" ", this).get();
+    aStream << nsPrintfCString(R"(<li><a id="%p" )", this).get();
 #ifdef MOZ_DUMP_PAINTING
     if (dumpCompositorTexture || dumpClientTexture) {
-      aStream << nsPrintfCString("href=\"javascript:ViewImage('%s')\"", layerId.BeginReading()).get();
+      aStream << nsPrintfCString(R"lit(href="javascript:ViewImage('%s')")lit", layerId.BeginReading()).get();
     }
 #endif
     aStream << ">";
@@ -1723,15 +1737,15 @@ Layer::Dump(std::stringstream& aStream, const char* aPrefix,
 
 #ifdef MOZ_DUMP_PAINTING
   if (dumpCompositorTexture) {
-    AsLayerComposite()->GetCompositableHost()->Dump(aStream, aPrefix, aDumpHtml);
+    AsHostLayer()->GetCompositableHost()->Dump(aStream, aPrefix, aDumpHtml);
   } else if (dumpClientTexture) {
     if (aDumpHtml) {
-      aStream << nsPrintfCString("<script>array[\"%s\"]=\"", layerId.BeginReading()).get();
+      aStream << nsPrintfCString(R"(<script>array["%s"]=")", layerId.BeginReading()).get();
     }
     AsShadowableLayer()->GetCompositableClient()->Dump(aStream, aPrefix,
         aDumpHtml, TextureDumpMode::DoNotCompress);
     if (aDumpHtml) {
-      aStream << "\";</script>";
+      aStream << R"(";</script>)";
     }
   }
 #endif
@@ -1875,7 +1889,7 @@ Layer::LogSelf(const char* aPrefix)
 
   if (mMaskLayer) {
     nsAutoCString pfx(aPrefix);
-    pfx += "   \\ MaskLayer ";
+    pfx += R"(   \ MaskLayer )";
     mMaskLayer->LogSelf(pfx.get());
   }
 }
@@ -1886,7 +1900,7 @@ Layer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
   aStream << aPrefix;
   aStream << nsPrintfCString("%s%s (0x%p)", mManager->Name(), Name(), this).get();
 
-  layers::PrintInfo(aStream, AsLayerComposite());
+  layers::PrintInfo(aStream, AsHostLayer());
 
   if (mClipRect) {
     AppendToString(aStream, *mClipRect, " [clip=", "]");
@@ -2030,7 +2044,7 @@ Layer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
   layer->set_ptr(reinterpret_cast<uint64_t>(this));
   layer->set_parentptr(reinterpret_cast<uint64_t>(aParent));
   // Shadow
-  if (LayerComposite* lc = AsLayerComposite()) {
+  if (HostLayer* lc = AsHostLayer()) {
     LayersPacket::Layer::Shadow* s = layer->mutable_shadow();
     if (const Maybe<ParentLayerIntRect>& clipRect = lc->GetShadowClipRect()) {
       DumpRect(s->mutable_clip(), *clipRect);
@@ -2200,6 +2214,35 @@ ColorLayer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
   layer->set_color(mColor.ToABGR());
 }
 
+void
+TextLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
+{
+  Layer::PrintInfo(aStream, aPrefix);
+  AppendToString(aStream, mBounds, " [bounds=", "]");
+}
+
+void
+TextLayer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
+{
+  Layer::DumpPacket(aPacket, aParent);
+  // Get this layer data
+  using namespace layerscope;
+  LayersPacket::Layer* layer = aPacket->mutable_layer(aPacket->layer_size()-1);
+  layer->set_type(LayersPacket::Layer::TextLayer);
+}
+
+void
+BorderLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
+{
+  Layer::PrintInfo(aStream, aPrefix);
+}
+
+void
+BorderLayer::DumpPacket(layerscope::LayersPacket* aPacket, const void* aParent)
+{
+  Layer::DumpPacket(aPacket, aParent);
+}
+
 CanvasLayer::CanvasLayer(LayerManager* aManager, void* aImplData)
   : Layer(aManager, aImplData)
   , mPreTransCallback(nullptr)
@@ -2210,8 +2253,7 @@ CanvasLayer::CanvasLayer(LayerManager* aManager, void* aImplData)
   , mDirty(false)
 {}
 
-CanvasLayer::~CanvasLayer()
-{}
+CanvasLayer::~CanvasLayer() = default;
 
 void
 CanvasLayer::PrintInfo(std::stringstream& aStream, const char* aPrefix)
@@ -2459,7 +2501,7 @@ LayerManager::ClearPendingScrollInfoUpdate()
 }
 
 void
-PrintInfo(std::stringstream& aStream, LayerComposite* aLayerComposite)
+PrintInfo(std::stringstream& aStream, HostLayer* aLayerComposite)
 {
   if (!aLayerComposite) {
     return;
@@ -2499,6 +2541,21 @@ IntRect
 ToOutsideIntRect(const gfxRect &aRect)
 {
   return IntRect::RoundOut(aRect.x, aRect.y, aRect.width, aRect.height);
+}
+
+TextLayer::TextLayer(LayerManager* aManager, void* aImplData)
+  : Layer(aManager, aImplData)
+{}
+
+TextLayer::~TextLayer()
+{}
+
+void
+TextLayer::SetGlyphs(nsTArray<GlyphArray>&& aGlyphs)
+{
+  MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) Glyphs", this));
+  mGlyphs = Move(aGlyphs);
+  Mutated();
 }
 
 } // namespace layers

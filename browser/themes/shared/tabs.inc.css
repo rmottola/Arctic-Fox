@@ -211,12 +211,12 @@
 .tab-icon-sound[muted],
 .tab-icon-sound[blocked] {
   list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
-  filter: url(chrome://browser/skin/filters.svg#fill);
+  filter: url(chrome://global/skin/filters.svg#fill);
   fill: currentColor;
 }
 
 .tab-icon-sound[muted] {
-  list-style-image: url("chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-muted");
+  list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio-muted);
 }
 
 .tab-icon-sound[muted]:hover {
@@ -508,7 +508,7 @@
 .alltabs-endimage[muted],
 .alltabs-endimage[blocked] {
   list-style-image: url(chrome://browser/skin/tabbrowser/tab-audio.svg#tab-audio);
-  filter: url(chrome://browser/skin/filters.svg#fill);
+  filter: url(chrome://global/skin/filters.svg#fill);
   fill: currentColor;
 }
 

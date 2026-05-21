@@ -118,3 +118,13 @@
   margin-inline-start: 0;
   word-wrap: break-word;
 }
+
+.identity-popup-permission-remove-button > .button-box > .button-icon {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  list-style-image: url(chrome://browser/skin/panel-icons.svg#cancel);
+  filter: url(chrome://global/skin/filters.svg#fill);
+  fill: graytext;
+}
+

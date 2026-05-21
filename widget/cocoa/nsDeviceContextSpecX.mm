@@ -76,16 +76,6 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(const nsAString& aTitle,
       }
     }
 
-    OSStatus status;
-    status = ::PMSetFirstPage(mPrintSettings, aStartPage, false);
-    NS_ASSERTION(status == noErr, "PMSetFirstPage failed");
-    status = ::PMSetLastPage(mPrintSettings, aEndPage, false);
-    NS_ASSERTION(status == noErr, "PMSetLastPage failed");
-
-    status = ::PMSessionBeginCGDocumentNoDialog(mPrintSession, mPrintSettings, mPageFormat);
-    if (status != noErr)
-      return NS_ERROR_ABORT;
-
     return NS_OK;
 
     NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
@@ -93,35 +83,7 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(const nsAString& aTitle,
 
 NS_IMETHODIMP nsDeviceContextSpecX::EndDocument()
 {
-    NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
-
-    ::PMSessionEndDocumentNoDialog(mPrintSession);
-    return NS_OK;
-
-    NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
-}
-
-NS_IMETHODIMP nsDeviceContextSpecX::BeginPage()
-{
-    NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
-
-    PMSessionError(mPrintSession);
-    OSStatus status = ::PMSessionBeginPageNoDialog(mPrintSession, mPageFormat, NULL);
-    if (status != noErr) return NS_ERROR_ABORT;
-    return NS_OK;
-
-    NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
-}
-
-NS_IMETHODIMP nsDeviceContextSpecX::EndPage()
-{
-    NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
-
-    OSStatus status = ::PMSessionEndPageNoDialog(mPrintSession);
-    if (status != noErr) return NS_ERROR_ABORT;
-    return NS_OK;
-
-    NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+  return NS_OK;
 }
 
 void nsDeviceContextSpecX::GetPaperRect(double* aTop, double* aLeft, double* aBottom, double* aRight)
@@ -139,27 +101,12 @@ void nsDeviceContextSpecX::GetPaperRect(double* aTop, double* aLeft, double* aBo
 
 already_AddRefed<PrintTarget> nsDeviceContextSpecX::MakePrintTarget()
 {
-    NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
-
     double top, left, bottom, right;
     GetPaperRect(&top, &left, &bottom, &right);
     const double width = right - left;
     const double height = bottom - top;
     IntSize size = IntSize::Floor(width, height);
 
-    CGContextRef context;
-    ::PMSessionGetCGGraphicsContext(mPrintSession, &context);
-
-    if (context) {
-        // Initially, origin is at bottom-left corner of the paper.
-        // Here, we translate it to top-left corner of the paper.
-        CGContextTranslateCTM(context, 0, height);
-        CGContextScaleCTM(context, 1.0, -1.0);
-        return PrintTargetCG::CreateOrNull(context, size);
-    }
-
-    // Apparently we do need this branch - bug 368933.
-    return PrintTargetCG::CreateOrNull(size, SurfaceFormat::A8R8G8B8_UINT32);
-
-    NS_OBJC_END_TRY_ABORT_BLOCK_NSNULL;
+    return PrintTargetCG::CreateOrNull(mPrintSession, mPageFormat,
+                                       mPrintSettings, size);
 }

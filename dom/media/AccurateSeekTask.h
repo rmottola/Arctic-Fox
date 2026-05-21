@@ -29,6 +29,20 @@ public:
 
   bool NeedToResetMDSM() const override;
 
+  int64_t CalculateNewCurrentTime() const override;
+
+  void HandleAudioDecoded(MediaData* aAudio) override;
+
+  void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override;
+
+  void HandleNotDecoded(MediaData::Type aType, const MediaResult& aError) override;
+
+  void HandleAudioWaited(MediaData::Type aType) override;
+
+  void HandleVideoWaited(MediaData::Type aType) override;
+
+  void HandleNotWaited(const WaitForDataRejectValue& aRejection) override;
+
 private:
   ~AccurateSeekTask();
 
@@ -45,16 +59,6 @@ private:
   void OnSeekResolved(media::TimeUnit);
 
   void OnSeekRejected(nsresult aResult);
-
-  void OnAudioDecoded(MediaData* aAudioSample);
-
-  void OnVideoDecoded(MediaData* aVideoSample);
-
-  void OnNotDecoded(MediaData::Type, const MediaResult&);
-
-  void SetCallbacks();
-
-  void CancelCallbacks();
 
   void AdjustFastSeekIfNeeded(MediaData* aSample);
 
@@ -76,11 +80,6 @@ private:
    * Track the current seek promise made by the reader.
    */
   MozPromiseRequestHolder<MediaDecoderReader::SeekPromise> mSeekRequest;
-
-  MediaEventListener mAudioCallback;
-  MediaEventListener mVideoCallback;
-  MediaEventListener mAudioWaitCallback;
-  MediaEventListener mVideoWaitCallback;
 };
 
 } // namespace mozilla

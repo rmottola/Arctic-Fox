@@ -1600,6 +1600,7 @@ StyleAnimationValue::ComputeDistance(nsCSSPropertyID aProperty,
           }
           double diffsquared = 0.0;
           switch (unit) {
+            case eCSSUnit_Number:
             case eCSSUnit_Pixel: {
               float diff = v1.GetFloatValue() - v2.GetFloatValue();
               diffsquared = diff * diff;
@@ -1746,6 +1747,22 @@ void
 AppendToCSSValueList(UniquePtr<nsCSSValueList>& aHead,
                      UniquePtr<nsCSSValueList>&& aValueToAppend,
                      nsCSSValueList** aTail)
+{
+  MOZ_ASSERT(!aHead == !*aTail,
+             "Can't have head w/o tail, & vice versa");
+
+  if (!aHead) {
+    aHead = Move(aValueToAppend);
+    *aTail = aHead.get();
+  } else {
+    (*aTail) = (*aTail)->mNext = aValueToAppend.release();
+  }
+}
+
+void
+AppendToCSSValuePairList(UniquePtr<nsCSSValuePairList>& aHead,
+                         UniquePtr<nsCSSValuePairList>&& aValueToAppend,
+                         nsCSSValuePairList** aTail)
 {
   MOZ_ASSERT(!aHead == !*aTail,
              "Can't have head w/o tail, & vice versa");
@@ -2109,9 +2126,13 @@ AddCSSValuePairList(nsCSSPropertyID aProperty,
       if (unit == eCSSUnit_Null) {
         return nullptr;
       }
-      if (!AddCSSValuePixelPercentCalc(restrictions, unit,
-                                       aCoeff1, v1,
-                                       aCoeff2, v2, vr)) {
+      if (unit == eCSSUnit_Number) {
+        AddCSSValueNumber(aCoeff1, v1,
+                          aCoeff2, v2,
+                          vr, restrictions);
+      } else if (!AddCSSValuePixelPercentCalc(restrictions, unit,
+                                              aCoeff1, v1,
+                                              aCoeff2, v2, vr)) {
         if (v1 != v2) {
           return nullptr;
         }
@@ -4335,6 +4356,34 @@ StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
           break;
         }
 
+        case eCSSProperty_font_variation_settings: {
+          auto font = static_cast<const nsStyleFont*>(styleStruct);
+          UniquePtr<nsCSSValuePairList> result;
+          if (!font->mFont.fontVariationSettings.IsEmpty()) {
+            // Make a new list that clones the current settings
+            nsCSSValuePairList* tail = nullptr;
+            for (auto v : font->mFont.fontVariationSettings) {
+              auto clone = MakeUnique<nsCSSValuePairList>();
+              // OpenType font tags are stored in nsFont as 32-bit unsigned
+              // values, but represented in CSS as 4-character ASCII strings,
+              // beginning with the high byte of the value. So to clone the
+              // tag here, we append each of its 4 bytes to a string.
+              nsAutoString tagString;
+              tagString.Append(char(v.mTag >> 24));
+              tagString.Append(char(v.mTag >> 16));
+              tagString.Append(char(v.mTag >> 8));
+              tagString.Append(char(v.mTag));
+              clone->mXValue.SetStringValue(tagString, eCSSUnit_String);
+              clone->mYValue.SetFloatValue(v.mValue, eCSSUnit_Number);
+              AppendToCSSValuePairList(result, Move(clone), &tail);
+            }
+            aComputedValue.SetAndAdoptCSSValuePairListValue(result.release());
+          } else {
+            aComputedValue.SetNormalValue();
+          }
+          break;
+        }
+
         default:
           MOZ_ASSERT(false, "missing property implementation");
           return false;
@@ -4359,15 +4408,15 @@ StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
     case eStyleAnimType_Sides_Bottom:
     case eStyleAnimType_Sides_Left: {
       static_assert(
-       NS_SIDE_TOP    == eStyleAnimType_Sides_Top   -eStyleAnimType_Sides_Top &&
-       NS_SIDE_RIGHT  == eStyleAnimType_Sides_Right -eStyleAnimType_Sides_Top &&
-       NS_SIDE_BOTTOM == eStyleAnimType_Sides_Bottom-eStyleAnimType_Sides_Top &&
-       NS_SIDE_LEFT   == eStyleAnimType_Sides_Left  -eStyleAnimType_Sides_Top,
+       eSideTop    == eStyleAnimType_Sides_Top   -eStyleAnimType_Sides_Top &&
+       eSideRight  == eStyleAnimType_Sides_Right -eStyleAnimType_Sides_Top &&
+       eSideBottom == eStyleAnimType_Sides_Bottom-eStyleAnimType_Sides_Top &&
+       eSideLeft   == eStyleAnimType_Sides_Left  -eStyleAnimType_Sides_Top,
        "box side constants out of sync with animation side constants");
 
       const nsStyleCoord &coord =
         StyleDataAtOffset<nsStyleSides>(styleStruct, ssOffset).
-          Get(mozilla::css::Side(animType - eStyleAnimType_Sides_Top));
+          Get(mozilla::Side(animType - eStyleAnimType_Sides_Top));
       return StyleCoordToValue(coord, aComputedValue);
     }
     case eStyleAnimType_Corner_TopLeft:

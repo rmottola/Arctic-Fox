@@ -41,6 +41,7 @@
 #include "mozilla/layers/CompositorOGL.h"  // for CompositorOGL
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/CompositorTypes.h"
+#include "mozilla/layers/CompositorVsyncScheduler.h"
 #include "mozilla/layers/CrossProcessCompositorBridgeParent.h"
 #include "mozilla/layers/FrameUniformityData.h"
 #include "mozilla/layers/ImageBridgeParent.h"
@@ -193,8 +194,8 @@ CompositorBridgeParent::LayerTreeState::~LayerTreeState()
 }
 
 typedef map<uint64_t, CompositorBridgeParent::LayerTreeState> LayerTreeMap;
-static LayerTreeMap sIndirectLayerTrees;
-static StaticAutoPtr<mozilla::Monitor> sIndirectLayerTreesLock;
+LayerTreeMap sIndirectLayerTrees;
+StaticAutoPtr<mozilla::Monitor> sIndirectLayerTreesLock;
 
 static void EnsureLayerTreeMapReady()
 {
@@ -854,14 +855,14 @@ CompositorBridgeParent::SetShadowProperties(Layer* aLayer)
         }
 
         // FIXME: Bug 717688 -- Do these updates in LayerTransactionParent::RecvUpdate.
-        LayerComposite* layerComposite = layer->AsLayerComposite();
+        HostLayer* layerCompositor = layer->AsHostLayer();
         // Set the layerComposite's base transform to the layer's base transform.
-        layerComposite->SetShadowBaseTransform(layer->GetBaseTransform());
-        layerComposite->SetShadowTransformSetByAnimation(false);
-        layerComposite->SetShadowVisibleRegion(layer->GetVisibleRegion());
-        layerComposite->SetShadowClipRect(layer->GetClipRect());
-        layerComposite->SetShadowOpacity(layer->GetOpacity());
-        layerComposite->SetShadowOpacitySetByAnimation(false);
+        layerCompositor->SetShadowBaseTransform(layer->GetBaseTransform());
+        layerCompositor->SetShadowTransformSetByAnimation(false);
+        layerCompositor->SetShadowVisibleRegion(layer->GetVisibleRegion());
+        layerCompositor->SetShadowClipRect(layer->GetClipRect());
+        layerCompositor->SetShadowOpacity(layer->GetOpacity());
+        layerCompositor->SetShadowOpacitySetByAnimation(false);
       }
     );
 }
@@ -1158,7 +1159,9 @@ CompositorBridgeParent::ShadowLayersUpdated(LayerTransactionParent* aLayerTree,
   // race condition.
   mLayerManager->UpdateRenderBounds(aTargetConfig.naturalBounds());
   mLayerManager->SetRegionToClear(aTargetConfig.clearRegion());
-  mLayerManager->GetCompositor()->SetScreenRotation(aTargetConfig.rotation());
+  if (mLayerManager->GetCompositor()) {
+    mLayerManager->GetCompositor()->SetScreenRotation(aTargetConfig.rotation());
+  }
 
   mCompositionManager->Updated(aIsFirstPaint, aTargetConfig, aPaintSyncId);
   Layer* root = aLayerTree->GetRoot();
@@ -1424,7 +1427,7 @@ CompositorBridgeParent::AllocPLayerTransactionParent(const nsTArray<LayersBacken
   mCompositionManager = new AsyncCompositionManager(mLayerManager);
   *aSuccess = true;
 
-  *aTextureFactoryIdentifier = mCompositor->GetTextureFactoryIdentifier();
+  *aTextureFactoryIdentifier = mLayerManager->GetTextureFactoryIdentifier();
   LayerTransactionParent* p = new LayerTransactionParent(mLayerManager, this, 0);
   p->AddIPDLReference();
   return p;
@@ -1526,7 +1529,7 @@ CompositorBridgeParent::RecvAdoptChild(const uint64_t& child)
       sIndirectLayerTrees[child].mLayerTree->mLayerManager = mLayerManager;
     }
     if (sIndirectLayerTrees[child].mRoot) {
-      sIndirectLayerTrees[child].mRoot->AsLayerComposite()->SetLayerManager(mLayerManager);
+      sIndirectLayerTrees[child].mRoot->AsHostLayer()->SetLayerManager(static_cast<HostLayerManager*>(mLayerManager.get()));
     }
     parent = sIndirectLayerTrees[child].mApzcTreeManagerParent;
   }
@@ -1537,7 +1540,7 @@ CompositorBridgeParent::RecvAdoptChild(const uint64_t& child)
   return IPC_OK();
 }
 
-static void
+void
 EraseLayerState(uint64_t aId)
 {
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
@@ -1871,7 +1874,7 @@ CompositorBridgeParent::CreateForContent(Endpoint<PCompositorBridgeParent>&& aEn
   return true;
 }
 
-static void
+void
 UpdateIndirectTree(uint64_t aId, Layer* aRoot, const TargetConfig& aTargetConfig)
 {
   MonitorAutoLock lock(*sIndirectLayerTreesLock);

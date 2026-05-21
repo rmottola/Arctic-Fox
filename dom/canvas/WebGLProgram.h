@@ -130,7 +130,6 @@ class WebGLProgram final
     : public nsWrapperCache
     , public WebGLRefCountedObject<WebGLProgram>
     , public LinkedListElement<WebGLProgram>
-    , public WebGLContextBoundObject
 {
     friend class WebGLTransformFeedback;
 
@@ -145,7 +144,7 @@ public:
     // GL funcs
     void AttachShader(WebGLShader* shader);
     void BindAttribLocation(GLuint index, const nsAString& name);
-    void DetachShader(WebGLShader* shader);
+    void DetachShader(const WebGLShader* shader);
     already_AddRefed<WebGLActiveInfo> GetActiveAttrib(GLuint index) const;
     already_AddRefed<WebGLActiveInfo> GetActiveUniform(GLuint index) const;
     void GetAttachedShaders(nsTArray<RefPtr<WebGLShader>>* const out) const;

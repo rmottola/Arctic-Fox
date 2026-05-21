@@ -81,14 +81,6 @@ dnl ========================================================
 MOZ_USE_PTHREADS=
 _PTHREAD_LDFLAGS=""
 
-dnl Do not allow objdir == srcdir builds.
-dnl ==============================================================
-_topsrcdir=`cd \`dirname $0\`; pwd -W 2>/dev/null || pwd -P`
-_objdir=`pwd -P`
-
-MOZ_BUILD_ROOT=`pwd -W 2>/dev/null || pwd -P`
-DIST="$MOZ_BUILD_ROOT/dist"
-
 MOZ_DEFAULT_COMPILER
 
 if test "$COMPILE_ENVIRONMENT"; then
@@ -188,7 +180,6 @@ else
     AC_PROG_RANLIB
     MOZ_PATH_PROGS(AS, $AS as, $CC)
     AC_CHECK_PROGS(AR, ar, :)
-    AC_CHECK_PROGS(LD, ld, :)
     AC_CHECK_PROGS(STRIP, strip, :)
     AC_CHECK_PROGS(WINDRES, windres, :)
     AC_CHECK_PROGS(OTOOL, otool, :)
@@ -306,7 +297,7 @@ case "$target" in
         fi
 
         # Check linker version
-        _LD_FULL_VERSION=`"${LD}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
+        _LD_FULL_VERSION=`"${LINK}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
         _LD_MAJOR_VERSION=`echo ${_LD_FULL_VERSION} | $AWK -F\. '{ print $1 }'`
         if test "$_LD_MAJOR_VERSION" != "$_CC_SUITE"; then
             AC_MSG_ERROR([The linker major version, $_LD_FULL_VERSION,  does not match the compiler suite version, $_CC_SUITE.])
@@ -435,7 +426,6 @@ AC_SUBST(MIDL_FLAGS)
 AC_SUBST(_MSC_VER)
 
 AC_SUBST(GNU_AS)
-AC_SUBST(GNU_LD)
 AC_SUBST(GNU_CC)
 AC_SUBST(GNU_CXX)
 
@@ -709,20 +699,6 @@ if test "$GNU_CC"; then
     _USE_CPP_INCLUDE_FLAG=1
 
     ASFLAGS="$ASFLAGS $_DEFINES_CFLAGS"
-
-else
-    MKSHLIB='$(LD) $(DSO_LDOPTS) -h $(DSO_SONAME) -o $@'
-    MKCSHLIB='$(LD) $(DSO_LDOPTS) -h $(DSO_SONAME) -o $@'
-
-    DSO_LDOPTS='-shared'
-    if test "$GNU_LD"; then
-        # Don't allow undefined symbols in libraries
-        DSO_LDOPTS="$DSO_LDOPTS -z defs"
-    fi
-
-    DSO_CFLAGS=''
-    DSO_PIC_CFLAGS='-KPIC'
-    _DEFINES_CFLAGS='$(ACDEFINES) -D_MOZILLA_CONFIG_H_ -DMOZILLA_CLIENT'
 fi
 
 if test "$GNU_CXX"; then
@@ -731,9 +707,6 @@ if test "$GNU_CXX"; then
 
     _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -include $(topobjdir)/mozilla-config.h'
     _USE_CPP_INCLUDE_FLAG=1
-
-else
-    _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -D_MOZILLA_CONFIG_H_ $(ACDEFINES)'
 fi
 
 dnl ========================================================
@@ -916,21 +889,6 @@ case "$target" in
         LDFLAGS=$_SAVE_LDFLAGS
     fi
 
-    dnl With newer linkers we need to pass -allow_heap_execute because of
-    dnl Microsoft Silverlight (5.1.10411.0 at least).
-    AC_MSG_CHECKING([for -allow_heap_execute option to ld])
-    _SAVE_LDFLAGS=$LDFLAGS
-    LDFLAGS="$LDFLAGS -Wl,-allow_heap_execute"
-    AC_TRY_LINK(,[return 0;],_HAVE_ALLOW_HEAP_EXECUTE=1,
-                _HAVE_ALLOW_HEAP_EXECUTE=)
-    if test -n "$_HAVE_ALLOW_HEAP_EXECUTE" ; then
-        AC_MSG_RESULT([yes])
-        MOZ_ALLOW_HEAP_EXECUTE_FLAGS="-Wl,-allow_heap_execute"
-    else
-        AC_MSG_RESULT([no])
-    fi
-    LDFLAGS=$_SAVE_LDFLAGS
-
     MOZ_FIX_LINK_PATHS="-Wl,-executable_path,${DIST}/bin"
     ;;
 
@@ -1006,7 +964,6 @@ case "$target" in
         MOZ_FOLD_LIBS_FLAGS=-mnop-fun-dllimport
     else
         TARGET_COMPILER_ABI=msvc
-        HOST_LD='$(LD)'
         if test "$AS_BIN"; then
             AS="$(basename "$AS_BIN")"
         fi
@@ -1021,8 +978,8 @@ case "$target" in
         DLL_PREFIX=
         LIB_PREFIX=
         IMPORT_LIB_SUFFIX=lib
-        MKSHLIB='$(LD) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
-        MKCSHLIB='$(LD) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
+        MKSHLIB='$(LINK) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
+        MKCSHLIB='$(LINK) -NOLOGO -DLL -OUT:$@ -PDB:$(LINK_PDBFILE) $(DSO_LDOPTS)'
         dnl Set subsystem version 5 for Windows XP.
         if test "$CPU_ARCH" = "x86"; then
             WIN32_SUBSYSTEM_VERSION=5.01
@@ -1081,16 +1038,14 @@ case "$target" in
         # MSVC warning C4267 warns for narrowing type conversions from size_t
         # to 32-bit integer types on 64-bit platforms.  Since this is virtually
         # the same thing as C4244, we disable C4267, too.
-        # MSVC warning C4345 warns of newly conformant behavior as of VS2003.
-        # MSVC warning C4351 warns of newly conformant behavior as of VS2005.
         # MSVC warning C4800 warns when a value is implicitly cast to bool,
         # because this also forces narrowing to a single byte, which can be a
         # perf hit.  But this matters so little in practice (and often we want
         # that behavior) that it's better to turn it off.
-        # MSVC warning wd4595 warns non-member operator new or delete functions
+        # MSVC warning C4595 warns non-member operator new or delete functions
         # may not be declared inline, as of VS2015 Update 2.
         CFLAGS="$CFLAGS -wd4244 -wd4267"
-        CXXFLAGS="$CXXFLAGS -wd4251 -wd4244 -wd4267 -wd4345 -wd4351 -wd4800 -wd4595"
+        CXXFLAGS="$CXXFLAGS -wd4251 -wd4244 -wd4267 -wd4800 -wd4595"
         if test -n "$CLANG_CL"; then
             # XXX We should combine some of these with our generic GCC-style
             # warning checks.
@@ -2476,6 +2431,7 @@ if test -n "$MOZ_RUST"; then
     fi
     if test -n "$MOZ_RUST_URLPARSE"; then
         AC_DEFINE(MOZ_RUST_URLPARSE)
+        AC_SUBST(MOZ_RUST_URLPARSE)
     fi
 fi
 
@@ -4402,7 +4358,6 @@ AC_SUBST(MOZ_OPTIMIZE)
 AC_SUBST(MOZ_FRAMEPTR_FLAGS)
 AC_SUBST(MOZ_OPTIMIZE_FLAGS)
 AC_SUBST(MOZ_OPTIMIZE_LDFLAGS)
-AC_SUBST_LIST(MOZ_ALLOW_HEAP_EXECUTE_FLAGS)
 AC_SUBST(MOZ_PGO_OPTIMIZE_FLAGS)
 
 dnl ========================================================
@@ -5397,7 +5352,6 @@ AC_SUBST(AR_EXTRACT)
 AC_SUBST(AS)
 AC_SUBST(ASFLAGS)
 AC_SUBST(AS_DASH_C_FLAG)
-AC_SUBST(LD)
 AC_SUBST(RC)
 AC_SUBST(RCFLAGS)
 AC_SUBST(WINDRES)
@@ -5761,7 +5715,6 @@ AC_SUBST(HOST_LDFLAGS)
 AC_SUBST(HOST_OPTIMIZE_FLAGS)
 AC_SUBST(HOST_AR)
 AC_SUBST(HOST_AR_FLAGS)
-AC_SUBST(HOST_LD)
 AC_SUBST(HOST_RANLIB)
 AC_SUBST(HOST_BIN_SUFFIX)
 
@@ -5941,14 +5894,8 @@ dnl ========================================================
 
 # The control structure code will be removed as soon as the feature is stable
 # Refer to bug 1281101 for more details.
-
-# Enable mask-as-shorthand property by default for nightly and aurora channels
-if test -z "$RELEASE_OR_BETA"; then
-  dnl mask as shorthand property enabled
-  MOZ_ENABLE_MASK_AS_SHORTHAND=1
-  AC_DEFINE(MOZ_ENABLE_MASK_AS_SHORTHAND)
-fi
-
+MOZ_ENABLE_MASK_AS_SHORTHAND=1
+AC_DEFINE(MOZ_ENABLE_MASK_AS_SHORTHAND)
 AC_SUBST(MOZ_ENABLE_MASK_AS_SHORTHAND)
 
 # Avoid using obsolete NSPR features
@@ -6084,7 +6031,6 @@ export RANLIB
 export CPP
 export CC
 export CXX
-export LD
 export ARFLAGS
 export CPPFLAGS
 export CFLAGS

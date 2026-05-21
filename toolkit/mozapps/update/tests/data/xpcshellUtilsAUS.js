@@ -114,6 +114,8 @@ var gGREDirOrig;
 var gGREBinDirOrig;
 var gAppDirOrig;
 
+var gApplyToDirOverride;
+
 var gServiceLaunchedCallbackLog = null;
 var gServiceLaunchedCallbackArgs = null;
 
@@ -1113,6 +1115,18 @@ function getAppVersion() {
                   getService(Ci.nsIINIParserFactory).
                   createINIParser(iniFile);
   return iniParser.getString("App", "Version");
+}
+
+/**
+ * Override the apply-to directory parameter to be passed to the updater.
+ * This ought to cause the updater to fail when using any value that isn't the
+ * default, automatically computed one.
+ *
+ * @param dir
+ *        Complete string to use as the apply-to directory parameter.
+ */
+function overrideApplyToDir(dir) {
+  gApplyToDirOverride = dir;
 }
 
 /**

@@ -32,9 +32,19 @@
 
 #define CHILD_PROCESS_SHUTDOWN_MESSAGE NS_LITERAL_STRING("child-process-shutdown")
 
+#define NO_REMOTE_TYPE ""
+
+// These must match the similar ones in E10SUtils.jsm.
+#define DEFAULT_REMOTE_TYPE "web"
+#define FILE_REMOTE_TYPE "file"
+
+// This must start with the DEFAULT_REMOTE_TYPE above.
+#define LARGE_ALLOCATION_REMOTE_TYPE "webLargeAllocation"
+
 class nsConsoleService;
 class nsICycleCollectorLogSink;
 class nsIDumpGCAndCCLogsCallback;
+class nsITabParent;
 class nsITimer;
 class ParentIdleListener;
 class nsIWidget;
@@ -129,7 +139,7 @@ public:
    * 3. normal iframe
    */
   static already_AddRefed<ContentParent>
-  GetNewOrUsedBrowserProcess(bool aForBrowserElement = false,
+  GetNewOrUsedBrowserProcess(const nsAString& aRemoteType = NS_LITERAL_STRING(NO_REMOTE_TYPE),
                              hal::ProcessPriority aPriority =
                              hal::ProcessPriority::PROCESS_PRIORITY_FOREGROUND,
                              ContentParent* aOpener = nullptr,
@@ -479,23 +489,36 @@ public:
 
   void ForkNewProcess(bool aBlocking);
 
-  virtual mozilla::ipc::IPCResult RecvCreateWindow(PBrowserParent* aThisTabParent,
-                                                   PBrowserParent* aOpener,
-                                                   layout::PRenderFrameParent* aRenderFrame,
-                                                   const uint32_t& aChromeFlags,
-                                                   const bool& aCalledFromJS,
-                                                   const bool& aPositionSpecified,
-                                                   const bool& aSizeSpecified,
-                                                   const nsCString& aFeatures,
-                                                   const nsCString& aBaseURI,
-                                                   const DocShellOriginAttributes& aOpenerOriginAttributes,
-                                                   const float& aFullZoom,
-                                                   nsresult* aResult,
-                                                   bool* aWindowIsNew,
-                                                   InfallibleTArray<FrameScriptInfo>* aFrameScripts,
-                                                   nsCString* aURLToLoad,
-                                                   layers::TextureFactoryIdentifier* aTextureFactoryIdentifier,
-                                                   uint64_t* aLayersId) override;
+  virtual mozilla::ipc::IPCResult
+  RecvCreateWindow(PBrowserParent* aThisTabParent,
+                   PBrowserParent* aNewTab,
+                   layout::PRenderFrameParent* aRenderFrame,
+                   const uint32_t& aChromeFlags,
+                   const bool& aCalledFromJS,
+                   const bool& aPositionSpecified,
+                   const bool& aSizeSpecified,
+                   const nsCString& aFeatures,
+                   const nsCString& aBaseURI,
+                   const DocShellOriginAttributes& aOpenerOriginAttributes,
+                   const float& aFullZoom,
+                   nsresult* aResult,
+                   bool* aWindowIsNew,
+                   InfallibleTArray<FrameScriptInfo>* aFrameScripts,
+                   nsCString* aURLToLoad,
+                   layers::TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                   uint64_t* aLayersId) override;
+
+  virtual mozilla::ipc::IPCResult RecvCreateWindowInDifferentProcess(
+    PBrowserParent* aThisTab,
+    const uint32_t& aChromeFlags,
+    const bool& aCalledFromJS,
+    const bool& aPositionSpecified,
+    const bool& aSizeSpecified,
+    const URIParams& aURIToLoad,
+    const nsCString& aFeatures,
+    const nsCString& aBaseURI,
+    const DocShellOriginAttributes& aOpenerOriginAttributes,
+    const float& aFullZoom) override;
 
   static bool AllocateLayerTreeId(TabParent* aTabParent, uint64_t* aId);
 
@@ -522,6 +545,23 @@ public:
 
   virtual int32_t Pid() const override;
 
+  virtual PURLClassifierParent*
+  AllocPURLClassifierParent(const Principal& aPrincipal,
+                            const bool& aUseTrackingProtection,
+                            bool* aSuccess) override;
+  virtual mozilla::ipc::IPCResult
+  RecvPURLClassifierConstructor(PURLClassifierParent* aActor,
+                                const Principal& aPrincipal,
+                                const bool& aUseTrackingProtection,
+                                bool* aSuccess) override;
+  virtual bool
+  DeallocPURLClassifierParent(PURLClassifierParent* aActor) override;
+
+  virtual mozilla::ipc::IPCResult
+  RecvClassifyLocal(const URIParams& aURI,
+                    const nsCString& aTables,
+                    nsTArray<nsCString>* aResults) override;
+
   // Use the PHangMonitor channel to ask the child to repaint a tab.
   void ForceTabPaint(TabParent* aTabParent, uint64_t aLayerObserverEpoch);
 
@@ -536,8 +576,7 @@ protected:
   void OnCompositorUnexpectedShutdown() override;
 
 private:
-  static nsTArray<ContentParent*>* sBrowserContentParents;
-  static nsTArray<ContentParent*>* sLargeAllocationContentParents;
+  static nsClassHashtable<nsStringHashKey, nsTArray<ContentParent*>>* sBrowserContentParents;
   static nsTArray<ContentParent*>* sPrivateContent;
   static StaticAutoPtr<LinkedList<ContentParent> > sContentParents;
 
@@ -562,10 +601,26 @@ private:
       const bool& aIsForBrowser) override;
   using PContentParent::SendPTestShellConstructor;
 
+  mozilla::ipc::IPCResult
+  CommonCreateWindow(PBrowserParent* aThisTab,
+                     bool aSetOpener,
+                     const uint32_t& aChromeFlags,
+                     const bool& aCalledFromJS,
+                     const bool& aPositionSpecified,
+                     const bool& aSizeSpecified,
+                     nsIURI* aURIToLoad,
+                     const nsCString& aFeatures,
+                     const nsCString& aBaseURI,
+                     const DocShellOriginAttributes& aOpenerOriginAttributes,
+                     const float& aFullZoom,
+                     nsresult& aResult,
+                     nsCOMPtr<nsITabParent>& aNewTabParent,
+                     bool* aWindowIsNew);
+
   FORWARD_SHMEM_ALLOCATOR_TO(PContentParent)
 
   ContentParent(ContentParent* aOpener,
-                bool aIsForBrowser);
+                const nsAString& aRemoteType);
 
   // The common initialization for the constructors.
   void InitializeMembers();
@@ -593,6 +648,12 @@ private:
   // otherwise.  If you pass a FOREGROUND* priority here, it's (hopefully)
   // unlikely that the process will be killed after this point.
   bool SetPriorityAndCheckIsAlive(hal::ProcessPriority aPriority);
+
+  /**
+   * Decide whether the process should be kept alive even when it would normally
+   * be shut down, for example when all its tabs are closed.
+   */
+  bool ShouldKeepProcessAlive() const;
 
   /**
    * Mark this ContentParent as dead for the purposes of Get*().
@@ -913,14 +974,6 @@ private:
 
   virtual mozilla::ipc::IPCResult RecvGetLookAndFeelCache(nsTArray<LookAndFeelInt>* aLookAndFeelIntCache) override;
 
-  virtual mozilla::ipc::IPCResult RecvCreateFakeVolume(const nsString& aFsName,
-                                                       const nsString& aMountPoint) override;
-
-  virtual mozilla::ipc::IPCResult RecvSetFakeVolumeState(const nsString& aFsName,
-                                                         const int32_t& aFsState) override;
-
-  virtual mozilla::ipc::IPCResult RecvRemoveFakeVolume(const nsString& fsName) override;
-
   virtual mozilla::ipc::IPCResult RecvKeywordToURI(const nsCString& aKeyword,
                                                    nsString* aProviderName,
                                                    OptionalInputStreamParams* aPostData,
@@ -1045,6 +1098,8 @@ private:
   GeckoChildProcessHost* mSubprocess;
   ContentParent* mOpener;
 
+  nsString mRemoteType;
+
   ContentParentId mChildID;
   int32_t mGeolocationWatchID;
 
@@ -1064,10 +1119,6 @@ private:
   // false, but some previously scheduled IPC traffic may still pass
   // through.
   bool mIsAlive;
-
-  // True only the if process is already a browser or has
-  // been transformed into one.
-  bool mMetamorphosed;
 
   bool mSendPermissionUpdates;
   bool mIsForBrowser;
@@ -1117,7 +1168,6 @@ private:
   nsRefPtrHashtable<nsIDHashKey, GetFilesHelper> mGetFilesPendingRequests;
 
   nsTArray<nsCString> mBlobURLs;
-  bool mLargeAllocationProcess;
 };
 
 } // namespace dom

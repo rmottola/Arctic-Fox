@@ -515,6 +515,19 @@ GetSuitableScale(float aMaxScale, float aMinScale,
   return std::max(std::min(aMaxScale, displayVisibleRatio), aMinScale);
 }
 
+static inline void
+UpdateMinMaxScale(const nsIFrame* aFrame,
+                  const StyleAnimationValue& aValue,
+                  gfxSize& aMinScale,
+                  gfxSize& aMaxScale)
+{
+  gfxSize size = aValue.GetScaleValue(aFrame);
+  aMaxScale.width = std::max<float>(aMaxScale.width, size.width);
+  aMaxScale.height = std::max<float>(aMaxScale.height, size.height);
+  aMinScale.width = std::min<float>(aMinScale.width, size.width);
+  aMinScale.height = std::min<float>(aMinScale.height, size.height);
+}
+
 static void
 GetMinAndMaxScaleForAnimationProperty(const nsIFrame* aFrame,
                                       nsTArray<RefPtr<dom::Animation>>&
@@ -534,19 +547,28 @@ GetMinAndMaxScaleForAnimationProperty(const nsIFrame* aFrame,
     MOZ_ASSERT(effect, "A playing animation should have a keyframe effect");
     for (size_t propIdx = effect->Properties().Length(); propIdx-- != 0; ) {
       const AnimationProperty& prop = effect->Properties()[propIdx];
-      if (prop.mProperty == eCSSProperty_transform) {
-        for (uint32_t segIdx = prop.mSegments.Length(); segIdx-- != 0; ) {
-          const AnimationPropertySegment& segment = prop.mSegments[segIdx];
-          gfxSize from = segment.mFromValue.GetScaleValue(aFrame);
-          aMaxScale.width = std::max<float>(aMaxScale.width, from.width);
-          aMaxScale.height = std::max<float>(aMaxScale.height, from.height);
-          aMinScale.width = std::min<float>(aMinScale.width, from.width);
-          aMinScale.height = std::min<float>(aMinScale.height, from.height);
-          gfxSize to = segment.mToValue.GetScaleValue(aFrame);
-          aMaxScale.width = std::max<float>(aMaxScale.width, to.width);
-          aMaxScale.height = std::max<float>(aMaxScale.height, to.height);
-          aMinScale.width = std::min<float>(aMinScale.width, to.width);
-          aMinScale.height = std::min<float>(aMinScale.height, to.height);
+      if (prop.mProperty != eCSSProperty_transform) {
+        continue;
+      }
+
+      // We need to factor in the scale of the base style if the base style
+      // will be used on the compositor.
+      if (effect->NeedsBaseStyle(prop.mProperty)) {
+        EffectSet* effects = EffectSet::GetEffectSet(aFrame);
+        StyleAnimationValue baseStyle =
+          effects->GetBaseStyle(prop.mProperty);
+        MOZ_ASSERT(!baseStyle.IsNull(), "The base value should be set");
+        UpdateMinMaxScale(aFrame, baseStyle, aMinScale, aMaxScale);
+      }
+
+      for (const AnimationPropertySegment& segment : prop.mSegments) {
+        // In case of add or accumulate composite, StyleAnimationValue does
+        // not have a valid value.
+        if (segment.mFromComposite == dom::CompositeOperation::Replace) {
+          UpdateMinMaxScale(aFrame, segment.mFromValue, aMinScale, aMaxScale);
+        }
+        if (segment.mToComposite == dom::CompositeOperation::Replace) {
+          UpdateMinMaxScale(aFrame, segment.mToValue, aMinScale, aMaxScale);
         }
       }
     }
@@ -1400,7 +1422,7 @@ nsLayoutUtils::GetChildListNameFor(nsIFrame* aChildFrame)
         id = nsIFrame::kAbsoluteList;
       }
 #ifdef MOZ_XUL
-    } else if (StyleDisplay::Popup == disp->mDisplay) {
+    } else if (StyleDisplay::MozPopup == disp->mDisplay) {
       // Out-of-flows that are DISPLAY_POPUP must be kids of the root popup set
 #ifdef DEBUG
       nsIFrame* parent = aChildFrame->GetParent();
@@ -3167,9 +3189,11 @@ nsLayoutUtils::GetFramesForArea(nsIFrame* aFrame, const nsRect& aRect,
     builder.SetDescendIntoSubdocuments(false);
   }
 
+  builder.SetHitTestShouldStopAtFirstOpaque(aFlags & ONLY_VISIBLE);
+
   builder.EnterPresShell(aFrame);
   aFrame->BuildDisplayListForStackingContext(&builder, aRect, &list);
-  builder.LeavePresShell(aFrame);
+  builder.LeavePresShell(aFrame, nullptr);
 
 #ifdef MOZ_DUMP_PAINTING
   if (gDumpEventList) {
@@ -3549,7 +3573,7 @@ nsLayoutUtils::PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFram
            builder, list, aFrame, canvasArea, aBackstop);
   }
 
-  builder.LeavePresShell(aFrame);
+  builder.LeavePresShell(aFrame, &list);
   Telemetry::AccumulateTimeDelta(Telemetry::PAINT_BUILD_DISPLAYLIST_TIME,
                                  startBuildDisplayList);
 
@@ -4640,9 +4664,9 @@ GetBSizeTakenByBoxSizing(StyleBoxSizing aBoxSizing,
       const nsStyleSides& stylePadding =
         aFrame->StylePadding()->mPadding;
       const nsStyleCoord& paddingStart =
-        stylePadding.Get(aHorizontalAxis ? NS_SIDE_TOP : NS_SIDE_LEFT);
+        stylePadding.Get(aHorizontalAxis ? eSideTop : eSideLeft);
       const nsStyleCoord& paddingEnd =
-        stylePadding.Get(aHorizontalAxis ? NS_SIDE_BOTTOM : NS_SIDE_RIGHT);
+        stylePadding.Get(aHorizontalAxis ? eSideBottom : eSideRight);
       nscoord pad;
       // XXXbz Calling GetPercentBSize on padding values looks bogus, since
       // percent padding is always a percentage of the inline-size of the
@@ -6729,23 +6753,23 @@ nsLayoutUtils::HasNonZeroCorner(const nsStyleCorners& aCorners)
 }
 
 // aCorner is a "full corner" value, i.e. NS_CORNER_TOP_LEFT etc
-static bool IsCornerAdjacentToSide(uint8_t aCorner, css::Side aSide)
+static bool IsCornerAdjacentToSide(uint8_t aCorner, Side aSide)
 {
-  static_assert((int)NS_SIDE_TOP == NS_CORNER_TOP_LEFT, "Check for Full Corner");
-  static_assert((int)NS_SIDE_RIGHT == NS_CORNER_TOP_RIGHT, "Check for Full Corner");
-  static_assert((int)NS_SIDE_BOTTOM == NS_CORNER_BOTTOM_RIGHT, "Check for Full Corner");
-  static_assert((int)NS_SIDE_LEFT == NS_CORNER_BOTTOM_LEFT, "Check for Full Corner");
-  static_assert((int)NS_SIDE_TOP == ((NS_CORNER_TOP_RIGHT - 1)&3), "Check for Full Corner");
-  static_assert((int)NS_SIDE_RIGHT == ((NS_CORNER_BOTTOM_RIGHT - 1)&3), "Check for Full Corner");
-  static_assert((int)NS_SIDE_BOTTOM == ((NS_CORNER_BOTTOM_LEFT - 1)&3), "Check for Full Corner");
-  static_assert((int)NS_SIDE_LEFT == ((NS_CORNER_TOP_LEFT - 1)&3), "Check for Full Corner");
+  static_assert((int)eSideTop == NS_CORNER_TOP_LEFT, "Check for Full Corner");
+  static_assert((int)eSideRight == NS_CORNER_TOP_RIGHT, "Check for Full Corner");
+  static_assert((int)eSideBottom == NS_CORNER_BOTTOM_RIGHT, "Check for Full Corner");
+  static_assert((int)eSideLeft == NS_CORNER_BOTTOM_LEFT, "Check for Full Corner");
+  static_assert((int)eSideTop == ((NS_CORNER_TOP_RIGHT - 1)&3), "Check for Full Corner");
+  static_assert((int)eSideRight == ((NS_CORNER_BOTTOM_RIGHT - 1)&3), "Check for Full Corner");
+  static_assert((int)eSideBottom == ((NS_CORNER_BOTTOM_LEFT - 1)&3), "Check for Full Corner");
+  static_assert((int)eSideLeft == ((NS_CORNER_TOP_LEFT - 1)&3), "Check for Full Corner");
 
   return aSide == aCorner || aSide == ((aCorner - 1)&3);
 }
 
 /* static */ bool
 nsLayoutUtils::HasNonZeroCornerOnSide(const nsStyleCorners& aCorners,
-                                      css::Side aSide)
+                                      Side aSide)
 {
   static_assert(NS_CORNER_TOP_LEFT_X/2 == NS_CORNER_TOP_LEFT, "Check for Non Zero on side");
   static_assert(NS_CORNER_TOP_LEFT_Y/2 == NS_CORNER_TOP_LEFT, "Check for Non Zero on side");

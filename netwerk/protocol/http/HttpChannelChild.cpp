@@ -2086,6 +2086,7 @@ HttpChannelChild::ContinueAsyncOpen()
   openArgs.appCacheClientID() = appCacheClientId;
   openArgs.allowSpdy() = mAllowSpdy;
   openArgs.allowAltSvc() = mAllowAltSvc;
+  openArgs.beConservative() = mBeConservative;
   openArgs.initialRwin() = mInitialRwin;
 
   uint32_t cacheKey = 0;

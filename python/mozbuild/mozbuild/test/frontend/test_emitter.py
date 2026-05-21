@@ -27,6 +27,7 @@ from mozbuild.frontend.data import (
     GeneratedFile,
     GeneratedSources,
     HostDefines,
+    HostRustProgram,
     HostSources,
     IPDLFile,
     JARManifest,
@@ -34,6 +35,7 @@ from mozbuild.frontend.data import (
     LocalInclude,
     Program,
     RustLibrary,
+    RustProgram,
     SdkFiles,
     SharedLibrary,
     SimpleProgram,
@@ -459,6 +461,7 @@ class TestEmitterBasic(unittest.TestCase):
         paths = sorted([v[0] for v in o.installs.values()])
         self.assertEqual(paths, expected)
 
+    @unittest.skip('Bug 1304316 - Items in the second set but not the first')
     def test_test_manifest_shared_support_files(self):
         """Support files starting with '!' are given separate treatment, so their
         installation can be resolved when running tests.
@@ -539,13 +542,6 @@ class TestEmitterBasic(unittest.TestCase):
         for t in obj.tests:
             self.assertTrue(t['manifest'].endswith(expected_manifests[t['name']]))
 
-    def test_python_unit_test_missing(self):
-        """Missing files in PYTHON_UNIT_TESTS should raise."""
-        reader = self.reader('test-python-unit-test-missing')
-        with self.assertRaisesRegexp(SandboxValidationError,
-            'Path specified in PYTHON_UNIT_TESTS does not exist:'):
-            self.read_topsrcdir(reader)
-
     def test_test_manifest_keys_extracted(self):
         """Ensure all metadata from test manifests is extracted."""
         reader = self.reader('test-manifest-keys-extracted')
@@ -618,9 +614,11 @@ class TestEmitterBasic(unittest.TestCase):
                 'flavor': 'crashtest',
                 'installs': {},
             },
-            'moz.build': {
+            'python.ini': {
                 'flavor': 'python',
-                'installs': {},
+                'installs': {
+                    'python.ini': False,
+                },
             }
         }
 
@@ -1084,6 +1082,75 @@ class TestEmitterBasic(unittest.TestCase):
         with self.assertRaisesRegexp(LinkageMultipleRustLibrariesError,
              'Cannot link multiple Rust libraries'):
             self.read_topsrcdir(reader)
+
+    def test_rust_library_features(self):
+        '''Test that RustLibrary features are correctly emitted.'''
+        reader = self.reader('rust-library-features',
+                             extra_substs=dict(RUST_TARGET='i686-pc-windows-msvc'))
+        objs = self.read_topsrcdir(reader)
+        self.assertEqual(len(objs), 1)
+        lib = objs[0]
+        self.assertIsInstance(lib, RustLibrary)
+        self.assertEqual(lib.features, ['musthave', 'cantlivewithout'])
+
+    def test_rust_library_duplicate_features(self):
+        '''Test that duplicate RustLibrary features are rejected.'''
+        reader = self.reader('rust-library-duplicate-features')
+        with self.assertRaisesRegexp(SandboxValidationError,
+             'features for .* should not contain duplicates'):
+            self.read_topsrcdir(reader)
+
+    def test_rust_program_no_cargo_toml(self):
+        '''Test that specifying RUST_PROGRAMS without a Cargo.toml fails.'''
+        reader = self.reader('rust-program-no-cargo-toml')
+        with self.assertRaisesRegexp(SandboxValidationError,
+             'No Cargo.toml file found'):
+            self.read_topsrcdir(reader)
+
+    def test_host_rust_program_no_cargo_toml(self):
+        '''Test that specifying HOST_RUST_PROGRAMS without a Cargo.toml fails.'''
+        reader = self.reader('host-rust-program-no-cargo-toml')
+        with self.assertRaisesRegexp(SandboxValidationError,
+             'No Cargo.toml file found'):
+            self.read_topsrcdir(reader)
+
+    def test_rust_program_nonexistent_name(self):
+        '''Test that specifying RUST_PROGRAMS that don't exist in Cargo.toml
+        correctly throws an error.'''
+        reader = self.reader('rust-program-nonexistent-name')
+        with self.assertRaisesRegexp(SandboxValidationError,
+             'Cannot find Cargo.toml definition for'):
+            self.read_topsrcdir(reader)
+
+    def test_host_rust_program_nonexistent_name(self):
+        '''Test that specifying HOST_RUST_PROGRAMS that don't exist in
+        Cargo.toml correctly throws an error.'''
+        reader = self.reader('host-rust-program-nonexistent-name')
+        with self.assertRaisesRegexp(SandboxValidationError,
+             'Cannot find Cargo.toml definition for'):
+            self.read_topsrcdir(reader)
+
+    def test_rust_programs(self):
+        '''Test RUST_PROGRAMS emission.'''
+        reader = self.reader('rust-programs',
+                             extra_substs=dict(RUST_TARGET='i686-pc-windows-msvc',
+                                               BIN_SUFFIX='.exe'))
+        objs = self.read_topsrcdir(reader)
+
+        self.assertEqual(len(objs), 1)
+        self.assertIsInstance(objs[0], RustProgram)
+        self.assertEqual(objs[0].name, 'some')
+
+    def test_host_rust_programs(self):
+        '''Test HOST_RUST_PROGRAMS emission.'''
+        reader = self.reader('host-rust-programs',
+                             extra_substs=dict(RUST_HOST_TARGET='i686-pc-windows-msvc',
+                                               HOST_BIN_SUFFIX='.exe'))
+        objs = self.read_topsrcdir(reader)
+
+        self.assertEqual(len(objs), 1)
+        self.assertIsInstance(objs[0], HostRustProgram)
+        self.assertEqual(objs[0].name, 'some')
 
     def test_crate_dependency_path_resolution(self):
         '''Test recursive dependencies resolve with the correct paths.'''

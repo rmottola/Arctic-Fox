@@ -2886,7 +2886,7 @@ public:
     return mHasScrollLinkedEffect;
   }
 
-  mozilla::dom::DocGroup* GetDocGroup();
+  mozilla::dom::DocGroup* GetDocGroup() const;
 
   virtual void AddIntersectionObserver(
     mozilla::dom::DOMIntersectionObserver* aObserver) = 0;
@@ -2903,8 +2903,7 @@ public:
                             already_AddRefed<nsIRunnable>&& aRunnable) override;
 
   virtual already_AddRefed<nsIEventTarget>
-  CreateEventTarget(const char* aName,
-                    mozilla::dom::TaskCategory aCategory) override;
+  EventTargetFor(mozilla::dom::TaskCategory aCategory) const override;
 
 protected:
   bool GetUseCounter(mozilla::UseCounter aUseCounter)

@@ -65,7 +65,7 @@ MOZ_DEFINE_MALLOC_SIZE_OF(ImagesMallocSizeOf)
 
 class imgMemoryReporter final : public nsIMemoryReporter
 {
-  ~imgMemoryReporter() { }
+  ~imgMemoryReporter() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -1066,7 +1066,7 @@ public:
   imgCacheExpirationTracker();
 
 protected:
-  void NotifyExpired(imgCacheEntry* entry);
+  void NotifyExpired(imgCacheEntry* entry) override;
 };
 
 imgCacheExpirationTracker::imgCacheExpirationTracker()

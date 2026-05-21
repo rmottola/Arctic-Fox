@@ -33,8 +33,6 @@ public:
 
   virtual ~MediaFormatReader();
 
-  nsresult Init() override;
-
   size_t SizeOfVideoQueueInFrames() override;
   size_t SizeOfAudioQueueInFrames() override;
 
@@ -48,15 +46,13 @@ public:
   void ReadUpdatedMetadata(MediaInfo* aInfo) override;
 
   RefPtr<SeekPromise>
-  Seek(SeekTarget aTarget, int64_t aUnused) override;
+  Seek(const SeekTarget& aTarget, int64_t aUnused) override;
 
 protected:
   void NotifyDataArrivedInternal() override;
 
 public:
   media::TimeIntervals GetBuffered() override;
-
-  RefPtr<BufferedUpdatePromise> UpdateBufferedWithPromise() override;
 
   bool ForceZeroStartTime() const override;
 
@@ -74,20 +70,6 @@ public:
   bool IsWaitForDataSupported() const override { return true; }
   RefPtr<WaitForDataPromise> WaitForData(MediaData::Type aType) override;
 
-  // MediaFormatReader supports demuxed-only mode.
-  bool IsDemuxOnlySupported() const override { return true; }
-
-  void SetDemuxOnly(bool aDemuxedOnly) override
-  {
-    if (OnTaskQueue()) {
-      mDemuxOnly = aDemuxedOnly;
-      return;
-    }
-    nsCOMPtr<nsIRunnable> r = NewRunnableMethod<bool>(
-      this, &MediaDecoderReader::SetDemuxOnly, aDemuxedOnly);
-    OwnerThread()->Dispatch(r.forget());
-  }
-
   bool UseBufferingHeuristics() const override
   {
     return mTrackDemuxersMayBlock;
@@ -102,6 +84,7 @@ public:
   void SetVideoBlankDecode(bool aIsBlankDecode) override;
 
 private:
+  nsresult InitInternal() override;
 
   bool HasVideo() const { return mVideo.mTrackDemuxer; }
   bool HasAudio() const { return mAudio.mTrackDemuxer; }
@@ -548,12 +531,8 @@ private:
   // Set to true if any of our track buffers may be blocking.
   bool mTrackDemuxersMayBlock;
 
-  // Set the demuxed-only flag.
-  Atomic<bool> mDemuxOnly;
-
   // Seeking objects.
   void SetSeekTarget(const SeekTarget& aTarget);
-  media::TimeUnit DemuxStartTime();
   bool IsSeeking() const { return mPendingSeekTime.isSome(); }
   bool IsVideoSeeking() const
   {
@@ -595,6 +574,18 @@ private:
   UniquePtr<DecoderFactory> mDecoderFactory;
 
   MediaEventListener mCompositorUpdatedListener;
+
+  void OnFirstDemuxCompleted(TrackInfo::TrackType aType,
+                             RefPtr<MediaTrackDemuxer::SamplesHolder> aSamples);
+
+  void OnFirstDemuxFailed(TrackInfo::TrackType aType, const MediaResult& aError);
+
+  void MaybeResolveMetadataPromise();
+
+  UniquePtr<MetadataTags> mTags;
+
+  // A flag indicating if the start time is known or not.
+  bool mHasStartTime = false;
 };
 
 } // namespace mozilla

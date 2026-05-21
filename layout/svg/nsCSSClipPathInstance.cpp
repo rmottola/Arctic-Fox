@@ -8,14 +8,19 @@
 
 #include "gfx2DGlue.h"
 #include "gfxPlatform.h"
+#include "mozilla/dom/SVGSVGElement.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/PathHelpers.h"
 #include "nsCSSRendering.h"
 #include "nsIFrame.h"
 #include "nsRenderingContext.h"
 #include "nsRuleNode.h"
+#include "nsSVGElement.h"
+#include "nsSVGUtils.h"
+#include "nsSVGViewBox.h"
 
 using namespace mozilla;
+using namespace mozilla::dom;
 using namespace mozilla::gfx;
 
 /* static*/ void
@@ -23,13 +28,13 @@ nsCSSClipPathInstance::ApplyBasicShapeClip(gfxContext& aContext,
                                            nsIFrame* aFrame)
 {
   auto& clipPathStyle = aFrame->StyleSVGReset()->mClipPath;
+
+#ifdef DEBUG
   StyleShapeSourceType type = clipPathStyle.GetType();
-  MOZ_ASSERT(type != StyleShapeSourceType::None, "unexpected none value");
-  // In the future nsCSSClipPathInstance may handle <clipPath> references as
-  // well. For the time being return early.
-  if (type == StyleShapeSourceType::URL) {
-    return;
-  }
+  MOZ_ASSERT(type == StyleShapeSourceType::Shape ||
+             type == StyleShapeSourceType::Box,
+             "This function is used with basic-shape and geometry-box only.");
+#endif
 
   nsCSSClipPathInstance instance(aFrame, clipPathStyle);
 

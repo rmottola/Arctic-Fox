@@ -152,27 +152,27 @@ private:
   already_AddRefed<CSSValue> GetEllipseRadii(const nsStyleCorners& aRadius,
                                              uint8_t aFullCorner);
 
-  already_AddRefed<CSSValue> GetOffsetWidthFor(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetOffsetWidthFor(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetAbsoluteOffset(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetAbsoluteOffset(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetRelativeOffset(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetRelativeOffset(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetStickyOffset(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetStickyOffset(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetStaticOffset(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetStaticOffset(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetPaddingWidthFor(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetPaddingWidthFor(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetBorderColorsFor(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetBorderColorsFor(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetBorderStyleFor(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetBorderStyleFor(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetBorderWidthFor(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetBorderWidthFor(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetBorderColorFor(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetBorderColorFor(mozilla::Side aSide);
 
-  already_AddRefed<CSSValue> GetMarginWidthFor(mozilla::css::Side aSide);
+  already_AddRefed<CSSValue> GetMarginWidthFor(mozilla::Side aSide);
 
   already_AddRefed<CSSValue> GetSVGPaintFor(bool aFill);
 
@@ -253,6 +253,7 @@ private:
   already_AddRefed<CSSValue> DoGetColor();
   already_AddRefed<CSSValue> DoGetFontFamily();
   already_AddRefed<CSSValue> DoGetFontFeatureSettings();
+  already_AddRefed<CSSValue> DoGetFontVariationSettings();
   already_AddRefed<CSSValue> DoGetFontKerning();
   already_AddRefed<CSSValue> DoGetFontLanguageOverride();
   already_AddRefed<CSSValue> DoGetFontSize();

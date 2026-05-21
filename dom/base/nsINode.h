@@ -8,7 +8,6 @@
 #define nsINode_h___
 
 #include "mozilla/Likely.h"
-#include "mozilla/ServoTypes.h"
 #include "mozilla/UniquePtr.h"
 #include "nsCOMPtr.h"               // for member, local
 #include "nsGkAtoms.h"              // for nsGkAtoms::baseURIProperty
@@ -186,14 +185,13 @@ enum {
   // These two bits are shared by Gecko's and Servo's restyle systems for
   // different purposes. They should not be accessed directly, and access to
   // them should be properly guarded by asserts.
+  //
+  // FIXME(bholley): These should move to Element, and we only need one now.
   NODE_SHARED_RESTYLE_BIT_1 =             NODE_FLAG_BIT(21),
   NODE_SHARED_RESTYLE_BIT_2 =             NODE_FLAG_BIT(22),
 
-  // Whether this node is dirty for Servo's style system.
-  NODE_IS_DIRTY_FOR_SERVO =               NODE_SHARED_RESTYLE_BIT_1,
-
   // Whether this node has dirty descendants for Servo's style system.
-  NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO =  NODE_SHARED_RESTYLE_BIT_2,
+  NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO =  NODE_SHARED_RESTYLE_BIT_1,
 
   // Remaining bits are node type specific.
   NODE_TYPE_SPECIFIC_BITS_OFFSET =        23
@@ -921,6 +919,14 @@ public:
   inline nsINode* GetFlattenedTreeParentNode() const;
 
   /**
+   * Like GetFlattenedTreeParentNode, but returns null for any native
+   * anonymous content that was generated for ancestor frames of the
+   * root element's primary frame, such as scrollbar elements created
+   * by the root scroll frame.
+   */
+  inline nsINode* GetFlattenedTreeParentNodeForStyle() const;
+
+  /**
    * Get the parent nsINode for this node if it is an Element.
    * @return the parent node
    */
@@ -980,48 +986,6 @@ public:
 #else
   bool IsStyledByServo() const { return false; }
 #endif
-
-  bool IsDirtyForServo() const
-  {
-    MOZ_ASSERT(IsStyledByServo());
-    return HasFlag(NODE_IS_DIRTY_FOR_SERVO);
-  }
-
-  bool HasDirtyDescendantsForServo() const
-  {
-    MOZ_ASSERT(IsStyledByServo());
-    return HasFlag(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO);
-  }
-
-  void SetIsDirtyForServo() {
-    MOZ_ASSERT(IsStyledByServo());
-    SetFlags(NODE_IS_DIRTY_FOR_SERVO);
-  }
-
-  void SetHasDirtyDescendantsForServo() {
-    MOZ_ASSERT(IsStyledByServo());
-    SetFlags(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO);
-  }
-
-  void SetIsDirtyAndHasDirtyDescendantsForServo() {
-    MOZ_ASSERT(IsStyledByServo());
-    SetFlags(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO | NODE_IS_DIRTY_FOR_SERVO);
-  }
-
-  void UnsetIsDirtyForServo() {
-    MOZ_ASSERT(IsStyledByServo());
-    UnsetFlags(NODE_IS_DIRTY_FOR_SERVO);
-  }
-
-  void UnsetHasDirtyDescendantsForServo() {
-    MOZ_ASSERT(IsStyledByServo());
-    UnsetFlags(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO);
-  }
-
-  void UnsetIsDirtyAndHasDirtyDescendantsForServo() {
-    MOZ_ASSERT(IsStyledByServo());
-    UnsetFlags(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO | NODE_IS_DIRTY_FOR_SERVO);
-  }
 
   inline void UnsetRestyleFlagsIfGecko();
 
@@ -1324,6 +1288,14 @@ public:
    * in HTMLInputElement with number type as increasing / decreasing its value.
    */
   virtual bool IsNodeApzAwareInternal() const;
+
+  // HTML elements named <shadow> may or may not be HTMLShadowElement.  This is
+  // a way to ask an element whether it's an HTMLShadowElement.
+  virtual bool IsHTMLShadowElement() const { return false; }
+
+  // Elements named <content> may or may not be HTMLContentElement.  This is a
+  // way to ask an element whether it's an HTMLContentElement.
+  virtual bool IsHTMLContentElement() const { return false; }
 
 protected:
   nsIURI* GetExplicitBaseURI() const {
@@ -2068,16 +2040,6 @@ public:
 #undef TOUCH_EVENT
 #undef EVENT
 
-  bool HasServoData() {
-#ifdef MOZ_STYLO
-    return !!mServoData.Get();
-#else
-    MOZ_CRASH("Accessing servo node data in non-stylo build");
-#endif
-  }
-
-  void ClearServoData();
-
 protected:
   static bool Traverse(nsINode *tmp, nsCycleCollectionTraversalCallback &cb);
   static void Unlink(nsINode *tmp);
@@ -2115,11 +2077,6 @@ protected:
 
   // Storage for more members that are usually not needed; allocated lazily.
   nsSlots* mSlots;
-
-#ifdef MOZ_STYLO
-  // Per-node data managed by Servo.
-  mozilla::ServoCell<ServoNodeData*> mServoData;
-#endif
 };
 
 inline nsIDOMNode* GetAsDOMNode(nsINode* aNode)

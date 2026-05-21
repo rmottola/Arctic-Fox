@@ -375,6 +375,7 @@ nsHttpChannel::Connect()
     mConnectionInfo->SetAnonymous((mLoadFlags & LOAD_ANONYMOUS) != 0);
     mConnectionInfo->SetPrivate(mPrivateBrowsing);
     mConnectionInfo->SetNoSpdy(mCaps & NS_HTTP_DISALLOW_SPDY);
+    mConnectionInfo->SetBeConservative((mCaps & NS_HTTP_BE_CONSERVATIVE) || mBeConservative);
 
     // Consider opening a TCP connection right away.
     SpeculativeConnect();
@@ -789,8 +790,12 @@ nsHttpChannel::SetupTransaction()
         }
     }
 
-    if (!mAllowSpdy)
+    if (!mAllowSpdy) {
         mCaps |= NS_HTTP_DISALLOW_SPDY;
+    }
+    if (mBeConservative) {
+        mCaps |= NS_HTTP_BE_CONSERVATIVE;
+    }
 
     // Use the URI path if not proxying (transparent proxying such as proxy
     // CONNECT does not count here). Also figure out what HTTP version to use.
@@ -5885,12 +5890,14 @@ nsHttpChannel::BeginConnect()
         return AsyncCall(&nsHttpChannel::HandleAsyncAPIRedirect);
     }
     // Check to see if this principal exists on local blocklists.
-    RefPtr<nsChannelClassifier> channelClassifier = new nsChannelClassifier();
+    RefPtr<nsChannelClassifier> channelClassifier = new nsChannelClassifier(this);
     if (mLoadFlags & LOAD_CLASSIFY_URI) {
         nsCOMPtr<nsIURIClassifier> classifier = do_GetService(NS_URICLASSIFIERSERVICE_CONTRACTID);
         bool tpEnabled = false;
-        channelClassifier->ShouldEnableTrackingProtection(this, &tpEnabled);
-        if (classifier && tpEnabled) {
+        channelClassifier->ShouldEnableTrackingProtection(&tpEnabled);
+        bool annotateChannelEnabled =
+            Preferences::GetBool("privacy.trackingprotection.annotate_channels");
+        if (classifier && (tpEnabled || annotateChannelEnabled)) {
             // We skip speculative connections by setting mLocalBlocklist only
             // when tracking protection is enabled. Though we could do this for
             // both phishing and malware, it is not necessary for correctness,
@@ -5901,7 +5908,7 @@ nsHttpChannel::BeginConnect()
             if (NS_SUCCEEDED(rv) && uri) {
                 nsAutoCString tables;
                 Preferences::GetCString("urlclassifier.trackingTable", &tables);
-                nsAutoCString results;
+                nsTArray<nsCString> results;
                 rv = classifier->ClassifyLocalWithTables(uri, tables, results);
                 if (NS_SUCCEEDED(rv) && !results.IsEmpty()) {
                     LOG(("nsHttpChannel::ClassifyLocalWithTables found "
@@ -6012,7 +6019,7 @@ nsHttpChannel::BeginConnect()
     // be overridden.
     LOG(("nsHttpChannel::Starting nsChannelClassifier %p [this=%p]",
          channelClassifier.get(), this));
-    channelClassifier->Start(this);
+    channelClassifier->Start();
     if (callContinueBeginConnect) {
         return ContinueBeginConnectWithResult();
     }

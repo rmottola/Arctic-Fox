@@ -1696,7 +1696,7 @@ class CGClassConstructor(CGAbstractStaticMethod):
         chromeOnlyCheck = ""
         if isChromeOnly(self._ctor):
             chromeOnlyCheck = dedent("""
-                if (!nsContentUtils::ThreadsafeIsCallerChrome()) {
+                if (!nsContentUtils::ThreadsafeIsSystemCaller(cx)) {
                   return ThrowingConstructor(cx, argc, vp);
                 }
 
@@ -2883,7 +2883,7 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
         else:
             properties = "nullptr"
         if self.properties.hasChromeOnly():
-            chromeProperties = "nsContentUtils::ThreadsafeIsCallerChrome() ? sChromeOnlyNativeProperties.Upcast() : nullptr"
+            chromeProperties = "nsContentUtils::ThreadsafeIsSystemCaller(aCx) ? sChromeOnlyNativeProperties.Upcast() : nullptr"
         else:
             chromeProperties = "nullptr"
 
@@ -3293,7 +3293,7 @@ def getConditionList(idlobj, cxName, objName):
         assert isinstance(pref, list) and len(pref) == 1
         conditions.append('Preferences::GetBool("%s")' % pref[0])
     if idlobj.getExtendedAttribute("ChromeOnly"):
-        conditions.append("nsContentUtils::ThreadsafeIsCallerChrome()")
+        conditions.append("nsContentUtils::ThreadsafeIsSystemCaller(%s)" % cxName)
     func = idlobj.getExtendedAttribute("Func")
     if func:
         assert isinstance(func, list) and len(func) == 1
@@ -3438,7 +3438,7 @@ def InitUnforgeablePropertiesOnHolder(descriptor, properties, failureCode,
         if array.hasChromeOnly():
             unforgeables.append(
                 CGIfWrapper(CGGeneric(template % array.variableName(True)),
-                            "nsContentUtils::ThreadsafeIsCallerChrome()"))
+                            "nsContentUtils::ThreadsafeIsSystemCaller(aCx)"))
 
     if descriptor.interface.getExtendedAttribute("Unforgeable"):
         # We do our undefined toJSON and toPrimitive here, not as a regular
@@ -3631,6 +3631,7 @@ class CGWrapWithCacheMethod(CGAbstractMethod):
         return fill(
             """
             $*{assertInheritance}
+            MOZ_ASSERT_IF(aGivenProto, js::IsObjectInContextCompartment(aGivenProto, aCx));
             MOZ_ASSERT(!aCache->GetWrapper(),
                        "You should probably not be using Wrap() directly; use "
                        "GetOrCreateDOMReflector instead");
@@ -3731,6 +3732,7 @@ class CGWrapNonWrapperCacheMethod(CGAbstractMethod):
         return fill(
             """
             $*{assertions}
+            MOZ_ASSERT_IF(aGivenProto, js::IsObjectInContextCompartment(aGivenProto, aCx));
 
             JS::Rooted<JSObject*> global(aCx, JS::CurrentGlobalOrNull(aCx));
             $*{declareProto}
@@ -3781,7 +3783,7 @@ class CGWrapGlobalMethod(CGAbstractMethod):
         else:
             properties = "nullptr"
         if self.properties.hasChromeOnly():
-            chromeProperties = "nsContentUtils::ThreadsafeIsCallerChrome() ? sChromeOnlyNativeProperties.Upcast() : nullptr"
+            chromeProperties = "nsContentUtils::ThreadsafeIsSystemCaller(aCx) ? sChromeOnlyNativeProperties.Upcast() : nullptr"
         else:
             chromeProperties = "nullptr"
 
@@ -5783,30 +5785,24 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
             exceptionCode=exceptionCode)
 
         if failureCode is not None:
-            if isDefinitelyObject:
-                dictionaryTest = "IsObjectValueConvertibleToDictionary"
+            # This means we're part of an overload or union conversion, and
+            # should simply skip stuff if our value is not convertible to
+            # dictionary, instead of trying and throwing.  If we're either
+            # isDefinitelyObject or isNullOrUndefined then we're convertible to
+            # dictionary and don't need to check here.
+            if isDefinitelyObject or isNullOrUndefined:
+                template = conversionCode
             else:
-                dictionaryTest = "IsConvertibleToDictionary"
-
-            template = fill("""
-                { // scope for isConvertible
-                  bool isConvertible;
-                  if (!${testConvertible}(cx, ${val}, &isConvertible)) {
-                    $*{exceptionCode}
-                  }
-                  if (!isConvertible) {
-                    $*{failureCode}
-                  }
-
-                  $*{conversionCode}
-                }
-
-                """,
-                testConvertible=dictionaryTest,
-                val=val,
-                exceptionCode=exceptionCode,
-                failureCode=failureCode,
-                conversionCode=conversionCode)
+                template = fill(
+                    """
+                    if (!IsConvertibleToDictionary(${val})) {
+                      $*{failureCode}
+                    }
+                    $*{conversionCode}
+                    """,
+                    val=val,
+                    failureCode=failureCode,
+                    conversionCode=conversionCode)
         else:
             template = conversionCode
 
@@ -6985,7 +6981,11 @@ class CGCallGenerator(CGThing):
             args.append(CGGeneric("subjectPrincipal"))
 
         if needsCallerType:
-            args.append(CGGeneric("callerType"))
+            if descriptor.interface.isExposedInAnyWorker():
+                systemCallerGetter = "nsContentUtils::ThreadsafeIsSystemCaller"
+            else:
+                systemCallerGetter = "nsContentUtils::IsSystemCaller"
+            args.append(CGGeneric("%s(cx) ? CallerType::System : CallerType::NonSystem" % systemCallerGetter))
 
         if isFallible:
             args.append(CGGeneric("rv"))
@@ -7052,24 +7052,6 @@ class CGCallGenerator(CGThing):
                     subjectPrincipal = static_cast<nsIPrincipal*>(nsJSPrincipals::get(principals));
                     """,
                     getPrincipal=getPrincipal)))
-
-        if needsCallerType:
-            # Note that we do not want to use
-            # IsCallerChrome/ThreadsafeIsCallerChrome directly because those
-            # will pull in the check for UniversalXPConnect, which we ideally
-            # don't want to have in the new thing we're doing here.  If not
-            # NS_IsMainThread(), though, we'll go ahead and call
-            # ThreasafeIsCallerChrome(), since that won't mess with
-            # UnivesalXPConnect and we don't want to worry about the right
-            # worker includes here.
-            callerCheck = CGGeneric("callerType = nsContentUtils::IsSystemPrincipal(nsContentUtils::SubjectPrincipal()) ? CallerType::System : CallerType::NonSystem;\n")
-            if descriptor.interface.isExposedInAnyWorker():
-                callerCheck = CGIfElseWrapper(
-                    "NS_IsMainThread()",
-                    callerCheck,
-                    CGGeneric("callerType = nsContentUtils::ThreadsafeIsCallerChrome() ? CallerType::System : CallerType::NonSystem;\n"));
-            self.cgRoot.prepend(callerCheck)
-            self.cgRoot.prepend(CGGeneric("CallerType callerType;\n"))
 
         if isFallible:
             self.cgRoot.prepend(CGGeneric("binding_detail::FastErrorResult rv;\n"))
@@ -7626,7 +7608,7 @@ class CGPerSignatureCall(CGThing):
                 # migrate some DOMStringLists to FrozenArray.
                 postConversionSteps += dedent(
                     """
-                    if (args.rval().isObject() && nsContentUtils::ThreadsafeIsCallerChrome()) {
+                    if (args.rval().isObject() && nsContentUtils::ThreadsafeIsSystemCaller(cx)) {
                       JS::Rooted<JSObject*> rvalObj(cx, &args.rval().toObject());
                       JS::Rooted<JS::Value> includesVal(cx);
                       if (!JS_GetProperty(cx, rvalObj, "includes", &includesVal) ||
@@ -8044,12 +8026,12 @@ class CGMethodCall(CGThing):
             # 1)  A platform object that's not a platform array object, being
             #     passed to an interface or "object" arg.
             # 2)  A Date object being passed to a Date or "object" arg.
-            # 3)  A RegExp object being passed to a RegExp or "object" arg.
-            # 4)  A callable object being passed to a callback or "object" arg.
-            # 5)  An iterable object being passed to a sequence arg.
-            # 6)  Any non-Date and non-RegExp object being passed to a
-            #     array or callback interface or dictionary or
-            #     "object" arg.
+            #     XXXbz This is actually gone from the spec now, but we still
+            #     have some APIs using Date.
+            # 3)  A callable object being passed to a callback or "object" arg.
+            # 4)  An iterable object being passed to a sequence arg.
+            # 5)  Any object being passed to a array or callback interface or
+            #     dictionary or "object" arg.
 
             # First grab all the overloads that have a non-callback interface
             # (which includes typed arrays and arraybuffers) at the
@@ -12575,7 +12557,9 @@ class CGDictionary(CGThing):
         body = dedent("""
             // Passing a null JSContext is OK only if we're initing from null,
             // Since in that case we will not have to do any property gets
-            MOZ_ASSERT_IF(!cx, val.isNull());
+            // Also evaluate isNullOrUndefined in order to avoid false-positive
+            // checkers by static analysis tools
+            MOZ_ASSERT_IF(!cx, val.isNull() && val.isNullOrUndefined());
             """)
 
         if self.needToInitIds:
@@ -12605,14 +12589,8 @@ class CGDictionary(CGThing):
         else:
             body += dedent(
                 """
-                { // scope for isConvertible
-                  bool isConvertible;
-                  if (!IsConvertibleToDictionary(cx, val, &isConvertible)) {
-                    return false;
-                  }
-                  if (!isConvertible) {
-                    return ThrowErrorMessage(cx, MSG_NOT_DICTIONARY, sourceDescription);
-                  }
+                if (!IsConvertibleToDictionary(val)) {
+                  return ThrowErrorMessage(cx, MSG_NOT_DICTIONARY, sourceDescription);
                 }
 
                 """)

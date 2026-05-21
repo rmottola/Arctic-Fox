@@ -21,6 +21,7 @@ XPIDL_MODULE = 'url-classifier'
 DEFINES['GOOGLE_PROTOBUF_NO_RTTI'] = True
 
 UNIFIED_SOURCES += [
+    'chromium/safebrowsing.pb.cc',
     'ChunkSet.cpp',
     'Classifier.cpp',
     'LookupCache.cpp',
@@ -29,7 +30,6 @@ UNIFIED_SOURCES += [
     'nsUrlClassifierDBService.cpp',
     'nsUrlClassifierProxies.cpp',
     'nsUrlClassifierUtils.cpp',
-    'protobuf/safebrowsing.pb.cc',
     'ProtocolParser.cpp',
     'RiceDeltaDecoder.cpp',
 ]
@@ -62,11 +62,11 @@ EXTRA_JS_MODULES += [
 ]
 
 EXPORTS += [
+    'chromium/safebrowsing.pb.h',
     'Entries.h',
     'LookupCache.h',
     'LookupCacheV4.h',
     'nsUrlClassifierPrefixSet.h',
-    'protobuf/safebrowsing.pb.h',
     'VariableLengthPrefixSet.h',
 ]
 
@@ -74,7 +74,6 @@ FINAL_LIBRARY = 'xul'
 
 LOCAL_INCLUDES += [
     '../build',
-    '/ipc/chromium/src',
 ]
 
 CXXFLAGS += CONFIG['SQLITE_CFLAGS']
@@ -84,3 +83,5 @@ if CONFIG['GNU_CXX']:
 
 if CONFIG['NIGHTLY_BUILD'] or CONFIG['MOZ_DEBUG']:
     DEFINES['MOZ_SAFEBROWSING_DUMP_FAILED_UPDATES'] = True
+
+include('/ipc/chromium/chromium-config.mozbuild')

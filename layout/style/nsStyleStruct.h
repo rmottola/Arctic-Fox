@@ -320,12 +320,25 @@ public:
   // when obtaining and releasing the imgRequestProxy, and whether
   // RequestDiscard will be called on release.
   enum class Mode : uint8_t {
-    Track   = 0x1,  // used by all except nsCursorImage
-    Lock    = 0x2,  // used by all except nsStyleContentData
-    Discard = 0x4,  // used only by nsCursorImage
+    // The imgRequestProxy will be added to the ImageTracker when resolved
+    // Without this flag, the nsStyleImageRequest itself will call LockImage/
+    // UnlockImage on the imgRequestProxy, rather than leaving locking to the
+    // ImageTracker to manage.
+    //
+    // This flag is currently used by all nsStyleImageRequests except
+    // those for list-style-image and cursor.
+    Track = 0x1,
+
+    // The imgRequestProxy will have its RequestDiscard method called when
+    // the nsStyleImageRequest is going away.
+    //
+    // This is currently used only for cursor images.
+    Discard = 0x2,
   };
 
   // Must be called from the main thread.
+  //
+  // aImageTracker must be non-null iff aModeFlags contains Track.
   nsStyleImageRequest(Mode aModeFlags,
                       imgRequestProxy* aRequestProxy,
                       mozilla::css::ImageValue* aImageValue,
@@ -355,6 +368,8 @@ public:
   // Returns whether the ImageValue objects in the two nsStyleImageRequests
   // return true from URLValueData::DefinitelyEqualURIs.
   bool DefinitelyEquals(const nsStyleImageRequest& aOther) const;
+
+  mozilla::css::ImageValue* GetImageValue() const { return mImageValue; }
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(nsStyleImageRequest);
 
@@ -879,6 +894,7 @@ struct nsStyleImageLayers {
                               nsStyleImageLayers::LayerType aType) const;
 
   bool HasLayerWithImage() const;
+  nsStyleImageLayers& operator=(const nsStyleImageLayers& aOther);
 
   static const nsCSSPropertyID kBackgroundLayerTable[];
   static const nsCSSPropertyID kMaskLayerTable[];
@@ -1247,7 +1263,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleBorder
     }
   }
 
-  void ClearBorderColors(mozilla::css::Side aSide) {
+  void ClearBorderColors(mozilla::Side aSide) {
     if (mBorderColors && mBorderColors[aSide]) {
       delete mBorderColors[aSide];
       mBorderColors[aSide] = nullptr;
@@ -1259,13 +1275,13 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleBorder
   // Note that this does *not* consider the effects of 'border-image':
   // if border-style is none, but there is a loaded border image,
   // HasVisibleStyle will be false even though there *is* a border.
-  bool HasVisibleStyle(mozilla::css::Side aSide) const
+  bool HasVisibleStyle(mozilla::Side aSide) const
   {
     return IsVisibleBorderStyle(mBorderStyle[aSide]);
   }
 
   // aBorderWidth is in twips
-  void SetBorderWidth(mozilla::css::Side aSide, nscoord aBorderWidth)
+  void SetBorderWidth(mozilla::Side aSide, nscoord aBorderWidth)
   {
     nscoord roundedWidth =
       NS_ROUND_BORDER_TO_PIXELS(aBorderWidth, mTwipsPerPixel);
@@ -1292,20 +1308,20 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleBorder
   // this is zero if and only if there is no border to be painted for this
   // side.  That is, this value takes into account the border style and the
   // value is rounded to the nearest device pixel by NS_ROUND_BORDER_TO_PIXELS.
-  nscoord GetComputedBorderWidth(mozilla::css::Side aSide) const
+  nscoord GetComputedBorderWidth(mozilla::Side aSide) const
   {
     return GetComputedBorder().Side(aSide);
   }
 
-  uint8_t GetBorderStyle(mozilla::css::Side aSide) const
+  uint8_t GetBorderStyle(mozilla::Side aSide) const
   {
-    NS_ASSERTION(aSide <= NS_SIDE_LEFT, "bad side");
+    NS_ASSERTION(aSide <= mozilla::eSideLeft, "bad side");
     return mBorderStyle[aSide];
   }
 
-  void SetBorderStyle(mozilla::css::Side aSide, uint8_t aStyle)
+  void SetBorderStyle(mozilla::Side aSide, uint8_t aStyle)
   {
-    NS_ASSERTION(aSide <= NS_SIDE_LEFT, "bad side");
+    NS_ASSERTION(aSide <= mozilla::eSideLeft, "bad side");
     mBorderStyle[aSide] = aStyle;
     mComputedBorder.Side(aSide) =
       (HasVisibleStyle(aSide) ? mBorder.Side(aSide) : 0);
@@ -1470,7 +1486,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleOutline
   // value used by layout.  (We must store mOutlineWidth for the same
   // style struct resolution reasons that we do nsStyleBorder::mBorder;
   // see that field's comment.)
-  nsStyleCoord  mOutlineWidth;    // [reset] coord, enum (see nsStyleConsts.h)
+  nscoord       mOutlineWidth;    // [reset] coord, enum (see nsStyleConsts.h)
   nscoord       mOutlineOffset;   // [reset]
   mozilla::StyleComplexColor mOutlineColor; // [reset]
   uint8_t       mOutlineStyle;    // [reset] See nsStyleConsts.h
@@ -1876,7 +1892,7 @@ public:
   bool MaxHeightDependsOnContainer() const
     { return HeightCoordDependsOnContainer(mMaxHeight); }
 
-  bool OffsetHasPercent(mozilla::css::Side aSide) const
+  bool OffsetHasPercent(mozilla::Side aSide) const
   {
     return mOffset.Get(aSide).HasPercent();
   }
@@ -2067,16 +2083,16 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleText
   uint8_t mTextEmphasisPosition;        // [inherited] see nsStyleConsts.h
   uint8_t mTextEmphasisStyle;           // [inherited] see nsStyleConsts.h
   uint8_t mTextRendering;               // [inherited] see nsStyleConsts.h
-  int32_t mTabSize;                     // [inherited] see nsStyleConsts.h
   mozilla::StyleComplexColor mTextEmphasisColor;      // [inherited]
   mozilla::StyleComplexColor mWebkitTextFillColor;    // [inherited]
   mozilla::StyleComplexColor mWebkitTextStrokeColor;  // [inherited]
 
+  nsStyleCoord mTabSize;                // [inherited] coord, factor, calc
   nsStyleCoord mWordSpacing;            // [inherited] coord, percent, calc
   nsStyleCoord mLetterSpacing;          // [inherited] coord, normal
   nsStyleCoord mLineHeight;             // [inherited] coord, factor, normal
   nsStyleCoord mTextIndent;             // [inherited] coord, percent, calc
-  nsStyleCoord mWebkitTextStrokeWidth;  // [inherited] coord
+  nscoord mWebkitTextStrokeWidth;       // [inherited] coord
 
   RefPtr<nsCSSShadowArray> mTextShadow; // [inherited] nullptr in case of a zero-length
 
@@ -2122,7 +2138,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleText
   }
 
   bool HasWebkitTextStroke() const {
-    return mWebkitTextStrokeWidth.GetCoordValue() > 0;
+    return mWebkitTextStrokeWidth > 0;
   }
 
   // These are defined in nsStyleStructInlines.h.
@@ -2771,6 +2787,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay
                         nsChangeHint_UpdateOverflow |
                         nsChangeHint_UpdatePostTransformOverflow |
                         nsChangeHint_UpdateContainingBlock |
+                        nsChangeHint_AddOrRemoveTransform |
                         nsChangeHint_NeutralChange);
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
@@ -2783,7 +2800,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay
   // We guarantee that if mBinding is non-null, so are mBinding->GetURI() and
   // mBinding->mOriginPrincipal.
   RefPtr<mozilla::css::URLValue> mBinding; // [reset]
-  mozilla::StyleDisplay mDisplay;          // [reset] see nsStyleConsts.h SyleDisplay
+  mozilla::StyleDisplay mDisplay;          // [reset] see nsStyleConsts.h StyleDisplay
   mozilla::StyleDisplay mOriginalDisplay;  // [reset] saved mDisplay for
                                            //         position:absolute/fixed
                                            //         and float:left/right;
@@ -2887,12 +2904,12 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay
     return mozilla::StyleDisplay::Inline == aDisplay ||
            mozilla::StyleDisplay::InlineBlock == aDisplay ||
            mozilla::StyleDisplay::InlineTable == aDisplay ||
-           mozilla::StyleDisplay::InlineBox == aDisplay ||
+           mozilla::StyleDisplay::MozInlineBox == aDisplay ||
            mozilla::StyleDisplay::InlineFlex == aDisplay ||
            mozilla::StyleDisplay::WebkitInlineBox == aDisplay ||
            mozilla::StyleDisplay::InlineGrid == aDisplay ||
-           mozilla::StyleDisplay::InlineXulGrid == aDisplay ||
-           mozilla::StyleDisplay::InlineStack == aDisplay ||
+           mozilla::StyleDisplay::MozInlineGrid == aDisplay ||
+           mozilla::StyleDisplay::MozInlineStack == aDisplay ||
            mozilla::StyleDisplay::Ruby == aDisplay ||
            mozilla::StyleDisplay::RubyBase == aDisplay ||
            mozilla::StyleDisplay::RubyBaseContainer == aDisplay ||
@@ -3173,12 +3190,12 @@ struct nsStyleContentData
   void TrackImage(mozilla::dom::ImageTracker* aImageTracker);
   void UntrackImage(mozilla::dom::ImageTracker* aImageTracker);
 
-  void SetImage(imgRequestProxy* aRequest)
+  void SetImage(already_AddRefed<imgRequestProxy> aRequest)
   {
     MOZ_ASSERT(!mImageTracked,
                "Setting a new image without untracking the old one!");
     MOZ_ASSERT(mType == eStyleContentType_Image, "Wrong type!");
-    NS_IF_ADDREF(mContent.mImage = aRequest);
+    mContent.mImage = aRequest.take();
   }
 };
 
@@ -3319,10 +3336,10 @@ struct nsCursorImage
 {
   bool mHaveHotspot;
   float mHotspotX, mHotspotY;
+  RefPtr<nsStyleImageRequest> mImage;
 
   nsCursorImage();
   nsCursorImage(const nsCursorImage& aOther);
-  ~nsCursorImage();
 
   nsCursorImage& operator=(const nsCursorImage& aOther);
 
@@ -3332,22 +3349,9 @@ struct nsCursorImage
     return !(*this == aOther);
   }
 
-  void SetImage(imgIRequest *aImage) {
-    if (mImage) {
-      mImage->UnlockImage();
-      mImage->RequestDiscard();
-    }
-    mImage = aImage;
-    if (mImage) {
-      mImage->LockImage();
-    }
+  imgRequestProxy* GetImage() const {
+    return mImage->get();
   }
-  imgIRequest* GetImage() const {
-    return mImage;
-  }
-
-private:
-  nsCOMPtr<imgIRequest> mImage;
 };
 
 struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleUserInterface
@@ -3355,7 +3359,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleUserInterface
   explicit nsStyleUserInterface(StyleStructContext aContext);
   nsStyleUserInterface(const nsStyleUserInterface& aOther);
   ~nsStyleUserInterface();
-  void FinishStyle(nsPresContext* aPresContext) {}
+
+  void FinishStyle(nsPresContext* aPresContext);
 
   void* operator new(size_t sz, nsStyleUserInterface* aSelf) { return aSelf; }
   void* operator new(size_t sz, nsPresContext* aContext) {
@@ -3953,7 +3958,7 @@ STATIC_ASSERT_FIELD_OFFSET_MATCHES(nsSize, nsSize_Simple, width);
 STATIC_ASSERT_FIELD_OFFSET_MATCHES(nsSize, nsSize_Simple, height);
 
 /**
- * <div rustbindgen="true" replaces="UniquePtr">
+ * <div rustbindgen="true" replaces="mozilla::UniquePtr">
  *
  * TODO(Emilio): This is a workaround and we should be able to get rid of this
  * one.

@@ -18,6 +18,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/DataSurfaceHelpers.h"
+#include "mozilla/HangMonitor.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/WindowsVersion.h"
@@ -449,6 +450,13 @@ struct CoTaskMemFreePolicy
   }
 };
 
+SetThreadDpiAwarenessContextProc WinUtils::sSetThreadDpiAwarenessContext = NULL;
+EnableNonClientDpiScalingProc WinUtils::sEnableNonClientDpiScaling = NULL;
+#ifdef ACCESSIBILITY
+typedef NTSTATUS (NTAPI* NtTestAlertPtr)(VOID);
+static NtTestAlertPtr sNtTestAlert = nullptr;
+#endif
+
 
 /* static */
 void
@@ -473,6 +481,33 @@ WinUtils::Initialize()
       dwmFlushProcPtr = (DwmFlushProc)::GetProcAddress(sDwmDll, "DwmFlush");
     }
   }
+
+  if (IsWin10OrLater()) {
+    HMODULE user32Dll = ::GetModuleHandleW(L"user32");
+    if (user32Dll) {
+      sEnableNonClientDpiScaling = (EnableNonClientDpiScalingProc)
+        ::GetProcAddress(user32Dll, "EnableNonClientDpiScaling");
+      sSetThreadDpiAwarenessContext = (SetThreadDpiAwarenessContextProc)
+        ::GetProcAddress(user32Dll, "SetThreadDpiAwarenessContext");
+    }
+  }
+
+#ifdef ACCESSIBILITY
+  sNtTestAlert = reinterpret_cast<NtTestAlertPtr>(
+      ::GetProcAddress(::GetModuleHandleW(L"ntdll.dll"), "NtTestAlert"));
+  MOZ_ASSERT(sNtTestAlert);
+#endif
+}
+
+// static
+LRESULT WINAPI
+WinUtils::NonClientDpiScalingDefWindowProcW(HWND hWnd, UINT msg,
+                                            WPARAM wParam, LPARAM lParam)
+{
+  if (msg == WM_NCCREATE && sEnableNonClientDpiScaling) {
+    sEnableNonClientDpiScaling(hWnd);
+  }
+  return ::DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
 // static
@@ -667,11 +702,31 @@ WinUtils::MonitorFromRect(const gfx::Rect& rect)
   return ::MonitorFromRect(&globalWindowBounds, MONITOR_DEFAULTTONEAREST);
 }
 
+#ifdef ACCESSIBILITY
+#ifndef STATUS_SUCCESS
+#define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
+#endif
+
+static Atomic<bool> sAPCPending;
+
+/* static */
+void
+WinUtils::SetAPCPending()
+{
+  sAPCPending = true;
+}
+#endif // ACCESSIBILITY
+
 /* static */
 bool
 WinUtils::PeekMessage(LPMSG aMsg, HWND aWnd, UINT aFirstMessage,
                       UINT aLastMessage, UINT aOption)
 {
+#ifdef ACCESSIBILITY
+  if (NS_IsMainThread() && sAPCPending.exchange(false)) {
+    while (sNtTestAlert() != STATUS_SUCCESS) ;
+  }
+#endif
 #ifdef NS_ENABLE_TSF
   ITfMessagePump* msgPump = TSFTextStore::GetMessagePump();
   if (msgPump) {
@@ -740,9 +795,21 @@ WinUtils::WaitForMessage(DWORD aTimeoutMs)
     if (result == WAIT_TIMEOUT) {
       break;
     }
+#if defined(ACCESSIBILITY)
     if (result == WAIT_IO_COMPLETION) {
+      if (NS_IsMainThread()) {
+        if (sAPCPending.exchange(false)) {
+          // Clear out any pending APCs
+          while (sNtTestAlert() != STATUS_SUCCESS) ;
+        }
+        // We executed an APC that would have woken up the hang monitor. Since
+        // there are no more APCs pending and we are now going to sleep again,
+        // we should notify the hang monitor.
+        mozilla::HangMonitor::Suspend();
+      }
       continue;
     }
+#endif // defined(ACCESSIBILITY)
 
     // Sent messages (via SendMessage and friends) are processed differently
     // than queued messages (via PostMessage); the destination window procedure
@@ -1075,10 +1142,8 @@ WinUtils::GetIsMouseFromTouch(EventMessage aEventMessage)
 {
   const uint32_t MOZ_T_I_SIGNATURE = TABLET_INK_TOUCH | TABLET_INK_SIGNATURE;
   const uint32_t MOZ_T_I_CHECK_TCH = TABLET_INK_TOUCH | TABLET_INK_CHECK;
-  return ((aEventMessage == eMouseMove ||
-           aEventMessage == eMouseDown ||
-           aEventMessage == eMouseUp ||
-           aEventMessage == eMouseDoubleClick) &&
+  return ((aEventMessage == eMouseMove || aEventMessage == eMouseDown ||
+           aEventMessage == eMouseUp || aEventMessage == eMouseDoubleClick) &&
          (GetMessageExtraInfo() & MOZ_T_I_SIGNATURE) == MOZ_T_I_CHECK_TCH);
 }
 

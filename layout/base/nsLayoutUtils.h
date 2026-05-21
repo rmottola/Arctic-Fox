@@ -803,7 +803,11 @@ public:
     /**
      * When set, return only content in the same document as aFrame.
      */
-    IGNORE_CROSS_DOC = 0x04
+    IGNORE_CROSS_DOC = 0x04,
+    /**
+     * When set, return only content that is actually visible.
+     */
+    ONLY_VISIBLE = 0x08
   };
 
   /**
@@ -821,7 +825,7 @@ public:
    * frames under the area of a rectangle that receives a mouse event,
    * or nullptr if there is no such frame.
    * @param aRect the rect, relative to the frame origin
-   * @param aOutFrames an array to add all the frames found
+   * @param aOutFrames an array to append all the frames found
    * @param aFlags some combination of FrameForPointFlags
    */
   static nsresult GetFramesForArea(nsIFrame* aFrame, const nsRect& aRect,
@@ -1938,7 +1942,7 @@ public:
    * given side.
    */
   static bool HasNonZeroCornerOnSide(const nsStyleCorners& aCorners,
-                                       mozilla::css::Side aSide);
+                                       mozilla::Side aSide);
 
   /**
    * Determine if a widget is likely to require transparency or translucency.

@@ -10,6 +10,7 @@
 #include "prnetdb.h"
 #include "prprf.h"
 
+#include "nsUrlClassifierDBService.h"
 #include "nsUrlClassifierUtils.h"
 #include "nsPrintfCString.h"
 #include "mozilla/Base64.h"
@@ -141,9 +142,16 @@ ProtocolParserV2::AppendStream(const nsACString& aData)
 
   nsresult rv;
   mPending.Append(aData);
+#ifdef MOZ_SAFEBROWSING_DUMP_FAILED_UPDATES
+  mRawUpdate.Append(aData);
+#endif
 
   bool done = false;
   while (!done) {
+    if (nsUrlClassifierDBService::ShutdownHasStarted()) {
+      return NS_ERROR_ABORT;
+    }
+
     if (mState == PROTOCOL_STATE_CONTROL) {
       rv = ProcessControl(&done);
     } else if (mState == PROTOCOL_STATE_CHUNK) {

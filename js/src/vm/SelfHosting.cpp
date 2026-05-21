@@ -461,7 +461,7 @@ intrinsic_FinishBoundFunctionInit(JSContext* cx, unsigned argc, Value* vp)
     // Try to avoid invoking the resolve hook.
     if (targetObj->is<JSFunction>() && !targetObj->as<JSFunction>().hasResolvedLength()) {
         RootedValue targetLength(cx);
-        if (!targetObj->as<JSFunction>().getUnresolvedLength(cx, &targetLength))
+        if (!JSFunction::getUnresolvedLength(cx, targetObj.as<JSFunction>(), &targetLength))
             return false;
 
         length = Max(0.0, targetLength.toNumber() - argCount);
@@ -996,7 +996,7 @@ intrinsic_IsWrappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
 
     JSObject* unwrapped = CheckedUnwrap(obj);
     if (!unwrapped) {
-        JS_ReportErrorASCII(cx, "Permission denied to access object");
+        ReportAccessDenied(cx);
         return false;
     }
 
@@ -1027,7 +1027,7 @@ intrinsic_PossiblyWrappedArrayBufferByteLength(JSContext* cx, unsigned argc, Val
 
     JSObject* obj = CheckedUnwrap(&args[0].toObject());
     if (!obj) {
-        JS_ReportErrorASCII(cx, "Permission denied to access object");
+        ReportAccessDenied(cx);
         return false;
     }
 
@@ -1052,7 +1052,7 @@ intrinsic_ArrayBufferCopyData(JSContext* cx, unsigned argc, Value* vp)
         MOZ_ASSERT(wrapped->is<WrapperObject>());
         RootedObject toBufferObj(cx, CheckedUnwrap(wrapped));
         if (!toBufferObj) {
-            JS_ReportErrorASCII(cx, "Permission denied to access object");
+            ReportAccessDenied(cx);
             return false;
         }
         toBuffer = toBufferObj.as<T>();
@@ -1135,7 +1135,7 @@ intrinsic_IsPossiblyWrappedTypedArray(JSContext* cx, unsigned argc, Value* vp)
     if (args[0].isObject()) {
         JSObject* obj = CheckedUnwrap(&args[0].toObject());
         if (!obj) {
-            JS_ReportErrorASCII(cx, "Permission denied to access object");
+            ReportAccessDenied(cx);
             return false;
         }
 
@@ -1208,7 +1208,7 @@ intrinsic_PossiblyWrappedTypedArrayLength(JSContext* cx, unsigned argc, Value* v
 
     JSObject* obj = CheckedUnwrap(&args[0].toObject());
     if (!obj) {
-        JS_ReportErrorASCII(cx, "Permission denied to access object");
+        ReportAccessDenied(cx);
         return false;
     }
 
@@ -1227,7 +1227,7 @@ intrinsic_PossiblyWrappedTypedArrayHasDetachedBuffer(JSContext* cx, unsigned arg
 
     JSObject* obj = CheckedUnwrap(&args[0].toObject());
     if (!obj) {
-        JS_ReportErrorASCII(cx, "Permission denied to access object");
+        ReportAccessDenied(cx);
         return false;
     }
 
@@ -2466,7 +2466,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     // See builtin/Intl.h for descriptions of the intl_* functions.
     JS_FN("intl_availableCalendars", intl_availableCalendars, 1,0),
     JS_FN("intl_availableCollations", intl_availableCollations, 1,0),
-    JS_FN("intl_availableTimeZones", intl_availableTimeZones, 0,0),
     JS_FN("intl_canonicalizeTimeZone", intl_canonicalizeTimeZone, 1,0),
     JS_FN("intl_Collator", intl_Collator, 2,0),
     JS_FN("intl_Collator_availableLocales", intl_Collator_availableLocales, 0,0),
@@ -2478,6 +2477,8 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("intl_FormatDateTime", intl_FormatDateTime, 2,0),
     JS_FN("intl_FormatNumber", intl_FormatNumber, 2,0),
     JS_FN("intl_GetCalendarInfo", intl_GetCalendarInfo, 1,0),
+    JS_FN("intl_ComputeDisplayNames", intl_ComputeDisplayNames, 3,0),
+    JS_FN("intl_IsValidTimeZoneName", intl_IsValidTimeZoneName, 1,0),
     JS_FN("intl_NumberFormat", intl_NumberFormat, 2,0),
     JS_FN("intl_NumberFormat_availableLocales", intl_NumberFormat_availableLocales, 0,0),
     JS_FN("intl_numberingSystem", intl_numberingSystem, 1,0),

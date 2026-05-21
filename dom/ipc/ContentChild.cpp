@@ -10,7 +10,6 @@
 
 #include "ContentChild.h"
 
-#include "BlobChild.h"
 #include "CrashReporterChild.h"
 #include "GeckoProfiler.h"
 #include "TabChild.h"
@@ -37,6 +36,8 @@
 #include "mozilla/dom/PushNotifier.h"
 #include "mozilla/dom/workers/ServiceWorkerManager.h"
 #include "mozilla/dom/nsIContentChild.h"
+#include "mozilla/dom/URLClassifierChild.h"
+#include "mozilla/dom/ipc/BlobChild.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/psm/PSMContentListener.h"
 #include "mozilla/hal_sandbox/PHalChild.h"
@@ -509,12 +510,21 @@ ContentChild::ContentChild()
   nsDebugImpl::SetMultiprocessMode("Child");
 }
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4722) /* Silence "destructor never returns" warning */
+#endif
+
 ContentChild::~ContentChild()
 {
 #ifndef NS_FREE_PERMANENT_DATA
-  NS_RUNTIMEABORT("Content Child shouldn't be destroyed.");
+  MOZ_CRASH("Content Child shouldn't be destroyed.");
 #endif
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 NS_INTERFACE_MAP_BEGIN(ContentChild)
   NS_INTERFACE_MAP_ENTRY(nsIContentChild)
@@ -654,6 +664,43 @@ ContentChild::ProvideWindow(mozIDOMWindowProxy* aParent,
                              aForceNoOpener, aWindowIsNew, aReturn);
 }
 
+static nsresult
+GetWindowParamsFromParent(mozIDOMWindowProxy* aParent,
+                          nsACString& aBaseURIString, float* aFullZoom,
+                          DocShellOriginAttributes& aOriginAttributes)
+{
+  *aFullZoom = 1.0f;
+  auto* opener = nsPIDOMWindowOuter::From(aParent);
+  if (!opener) {
+    return NS_OK;
+  }
+
+  nsCOMPtr<nsIDocument> doc = opener->GetDoc();
+  nsCOMPtr<nsIURI> baseURI = doc->GetDocBaseURI();
+  if (!baseURI) {
+    NS_ERROR("nsIDocument didn't return a base URI");
+    return NS_ERROR_FAILURE;
+  }
+
+  baseURI->GetSpec(aBaseURIString);
+
+  RefPtr<nsDocShell> openerDocShell =
+    static_cast<nsDocShell*>(opener->GetDocShell());
+  if (!openerDocShell) {
+    return NS_OK;
+  }
+
+  aOriginAttributes = openerDocShell->GetOriginAttributes();
+
+  nsCOMPtr<nsIContentViewer> cv;
+  nsresult rv = openerDocShell->GetContentViewer(getter_AddRefs(cv));
+  if (NS_SUCCEEDED(rv) && cv) {
+    cv->GetFullZoom(aFullZoom);
+  }
+
+  return NS_OK;
+}
+
 nsresult
 ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
                                   mozIDOMWindowProxy* aParent,
@@ -673,8 +720,43 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
 
   nsAutoPtr<IPCTabContext> ipcContext;
   TabId openerTabId = TabId(0);
+  nsAutoCString features(aFeatures);
 
+  nsresult rv;
   if (aTabOpener) {
+    // Check to see if the target URI can be loaded in this process.
+    // If not create and load it in an unrelated tab/window.
+    nsCOMPtr<nsIWebBrowserChrome3> browserChrome3;
+    rv = aTabOpener->GetWebBrowserChrome(getter_AddRefs(browserChrome3));
+    if (NS_SUCCEEDED(rv) && browserChrome3) {
+      bool shouldLoad;
+      rv = browserChrome3->ShouldLoadURIInThisProcess(aURI, &shouldLoad);
+      if (NS_SUCCEEDED(rv) && !shouldLoad) {
+        nsAutoCString baseURIString;
+        float fullZoom;
+        DocShellOriginAttributes originAttributes;
+        rv = GetWindowParamsFromParent(aParent, baseURIString, &fullZoom,
+                                       originAttributes);
+        if (NS_WARN_IF(NS_FAILED(rv))) {
+          return rv;
+        }
+
+        URIParams uriToLoad;
+        SerializeURI(aURI, uriToLoad);
+        Unused << SendCreateWindowInDifferentProcess(aTabOpener, aChromeFlags,
+                                                     aCalledFromJS,
+                                                     aPositionSpecified,
+                                                     aSizeSpecified,
+                                                     uriToLoad, features,
+                                                     baseURIString,
+                                                     originAttributes, fullZoom);
+
+        // We return NS_ERROR_ABORT, so that the caller knows that we've abandoned
+        // the window open as far as it is concerned.
+        return NS_ERROR_ABORT;
+      }
+    }
+
     PopupIPCTabContext context;
     openerTabId = aTabOpener->GetTabId();
     context.opener() = openerTabId;
@@ -713,7 +795,6 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
     GetID(), IsForBrowser());
 
   nsString name(aName);
-  nsAutoCString features(aFeatures);
   nsTArray<FrameScriptInfo> frameScripts;
   nsCString urlToLoad;
 
@@ -739,40 +820,20 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
                                          &layersId);
   } else {
     nsAutoCString baseURIString;
-    if (aTabOpener) {
-      auto* opener = nsPIDOMWindowOuter::From(aParent);
-      nsCOMPtr<nsIDocument> doc = opener->GetDoc();
-      nsCOMPtr<nsIURI> baseURI = doc->GetDocBaseURI();
-      if (!baseURI) {
-        NS_ERROR("nsIDocument didn't return a base URI");
-        return NS_ERROR_FAILURE;
-      }
-
-      baseURI->GetSpec(baseURIString);
+    float fullZoom;
+    DocShellOriginAttributes originAttributes;
+    rv = GetWindowParamsFromParent(aParent, baseURIString, &fullZoom,
+                                   originAttributes);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
     }
 
-    auto* opener = nsPIDOMWindowOuter::From(aParent);
-    nsIDocShell* openerShell;
-    RefPtr<nsDocShell> openerDocShell;
-    float fullZoom = 1.0f;
-    if (opener && (openerShell = opener->GetDocShell())) {
-      openerDocShell = static_cast<nsDocShell*>(openerShell);
-      nsCOMPtr<nsIContentViewer> cv;
-      openerDocShell->GetContentViewer(getter_AddRefs(cv));
-      if (cv) {
-        cv->GetFullZoom(&fullZoom);
-      }
-    }
-
-    nsresult rv;
     if (!SendCreateWindow(aTabOpener, newChild, renderFrame,
                           aChromeFlags, aCalledFromJS, aPositionSpecified,
                           aSizeSpecified,
                           features,
                           baseURIString,
-                          openerDocShell
-                            ? openerDocShell->GetOriginAttributes()
-                            : DocShellOriginAttributes(),
+                          originAttributes,
                           fullZoom,
                           &rv,
                           aWindowIsNew,
@@ -1439,20 +1500,6 @@ ContentChild::RecvSetProcessSandbox(const MaybeFileDesc& aBroker)
 }
 
 mozilla::ipc::IPCResult
-ContentChild::RecvNotifyLayerAllocated(const dom::TabId& aTabId, const uint64_t& aLayersId)
-{
-  if (!CompositorBridgeChild::Get()->IPCOpen()) {
-    return IPC_OK();
-  }
-
-  // Note: sending the constructor could fail, but we do not propagate the
-  // error back since the GPU process is fallible.
-  APZChild* apz = ContentProcessController::Create(aTabId);
-  CompositorBridgeChild::Get()->SendPAPZConstructor(apz, aLayersId);
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
 ContentChild::RecvBidiKeyboardNotify(const bool& aIsLangRTL,
                                      const bool& aHaveBidiKeyboards)
 {
@@ -2087,7 +2134,7 @@ ContentChild::ProcessingError(Result aCode, const char* aReason)
       break;
 
     default:
-      NS_RUNTIMEABORT("not reached");
+      MOZ_CRASH("not reached");
   }
 
 #if defined(MOZ_CRASHREPORTER) && !defined(MOZ_B2G)
@@ -2100,7 +2147,7 @@ ContentChild::ProcessingError(Result aCode, const char* aReason)
         reason);
   }
 #endif
-  NS_RUNTIMEABORT("Content child abort due to IPC error");
+  MOZ_CRASH("Content child abort due to IPC error");
 }
 
 nsresult
@@ -2371,6 +2418,21 @@ ContentChild::RecvAppInfo(const nsCString& version, const nsCString& buildID,
 }
 
 mozilla::ipc::IPCResult
+ContentChild::RecvRemoteType(const nsString& aRemoteType)
+{
+  MOZ_ASSERT(DOMStringIsNull(mRemoteType));
+
+  mRemoteType.Assign(aRemoteType);
+  return IPC_OK();
+}
+
+const nsAString&
+ContentChild::GetRemoteType() const
+{
+  return mRemoteType;
+}
+
+mozilla::ipc::IPCResult
 ContentChild::RecvInitServiceWorkers(const ServiceWorkerConfiguration& aConfig)
 {
   RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
@@ -2405,18 +2467,6 @@ ContentChild::RecvLastPrivateDocShellDestroyed()
 }
 
 mozilla::ipc::IPCResult
-ContentChild::RecvVolumes(nsTArray<VolumeInfo>&& aVolumes)
-{
-#ifdef MOZ_WIDGET_GONK
-  RefPtr<nsVolumeService> vs = nsVolumeService::GetSingleton();
-  if (vs) {
-    vs->RecvVolumesFromParent(aVolumes);
-  }
-#endif
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
 ContentChild::RecvFilePathUpdate(const nsString& aStorageType,
                                  const nsString& aStorageName,
                                  const nsString& aPath,
@@ -2435,61 +2485,6 @@ ContentChild::RecvFilePathUpdate(const nsString& aStorageType,
   CopyASCIItoUTF16(aReason, reason);
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
   obs->NotifyObservers(dsf, "file-watcher-update", reason.get());
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
-ContentChild::RecvFileSystemUpdate(const nsString& aFsName,
-                                   const nsString& aVolumeName,
-                                   const int32_t& aState,
-                                   const int32_t& aMountGeneration,
-                                   const bool& aIsMediaPresent,
-                                   const bool& aIsSharing,
-                                   const bool& aIsFormatting,
-                                   const bool& aIsFake,
-                                   const bool& aIsUnmounting,
-                                   const bool& aIsRemovable,
-                                   const bool& aIsHotSwappable)
-{
-#ifdef MOZ_WIDGET_GONK
-  RefPtr<nsVolume> volume = new nsVolume(aFsName, aVolumeName, aState,
-                                         aMountGeneration, aIsMediaPresent,
-                                         aIsSharing, aIsFormatting, aIsFake,
-                                         aIsUnmounting, aIsRemovable, aIsHotSwappable);
-
-  RefPtr<nsVolumeService> vs = nsVolumeService::GetSingleton();
-  if (vs) {
-    vs->UpdateVolume(volume);
-  }
-#else
-  // Remove warnings about unused arguments
-  Unused << aFsName;
-  Unused << aVolumeName;
-  Unused << aState;
-  Unused << aMountGeneration;
-  Unused << aIsMediaPresent;
-  Unused << aIsSharing;
-  Unused << aIsFormatting;
-  Unused << aIsFake;
-  Unused << aIsUnmounting;
-  Unused << aIsRemovable;
-  Unused << aIsHotSwappable;
-#endif
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
-ContentChild::RecvVolumeRemoved(const nsString& aFsName)
-{
-#ifdef MOZ_WIDGET_GONK
-  RefPtr<nsVolumeService> vs = nsVolumeService::GetSingleton();
-  if (vs) {
-    vs->RemoveVolumeByName(aFsName);
-  }
-#else
-  // Remove warnings about unused arguments
-  Unused << aFsName;
-#endif
   return IPC_OK();
 }
 
@@ -2517,16 +2512,6 @@ ContentChild::RecvMinimizeMemoryUsage()
   NS_ENSURE_TRUE(mgr, IPC_OK());
 
   Unused << mgr->MinimizeMemoryUsage(/* callback = */ nullptr);
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
-ContentChild::RecvNotifyPhoneStateChange(const nsString& aState)
-{
-  nsCOMPtr<nsIObserverService> os = services::GetObserverService();
-  if (os) {
-    os->NotifyObservers(nullptr, "phone-state-changed", aState.get());
-  }
   return IPC_OK();
 }
 
@@ -2601,7 +2586,7 @@ ContentChild::AllocPOfflineCacheUpdateChild(const URIParams& manifestURI,
                                             const PrincipalInfo& aLoadingPrincipalInfo,
                                             const bool& stickDocument)
 {
-  NS_RUNTIMEABORT("unused");
+  MOZ_CRASH("unused");
   return nullptr;
 }
 
@@ -2882,7 +2867,7 @@ ContentChild::AllocPContentPermissionRequestChild(const InfallibleTArray<Permiss
                                                   const IPC::Principal& aPrincipal,
                                                   const TabId& aTabId)
 {
-  NS_RUNTIMEABORT("unused");
+  MOZ_CRASH("unused");
   return nullptr;
 }
 
@@ -3217,6 +3202,23 @@ ContentChild::FatalErrorIfNotUsingGPUProcess(const char* const aProtocolName,
     formattedMessage.AppendLiteral(R"(".)");
     NS_WARNING(formattedMessage.get());
   }
+}
+
+PURLClassifierChild*
+ContentChild::AllocPURLClassifierChild(const Principal& aPrincipal,
+                                       const bool& aUseTrackingProtection,
+                                       bool* aSuccess)
+{
+  *aSuccess = true;
+  return new URLClassifierChild();
+}
+
+bool
+ContentChild::DeallocPURLClassifierChild(PURLClassifierChild* aActor)
+{
+  MOZ_ASSERT(aActor);
+  delete aActor;
+  return true;
 }
 
 } // namespace dom

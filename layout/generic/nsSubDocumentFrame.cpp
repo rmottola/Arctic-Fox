@@ -496,7 +496,7 @@ nsSubDocumentFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   }
 
   if (subdocRootFrame) {
-    aBuilder->LeavePresShell(subdocRootFrame);
+    aBuilder->LeavePresShell(subdocRootFrame, &childItems);
 
     if (ignoreViewportScrolling) {
       aBuilder->SetIgnoreScrollFrame(savedIgnoreScrollFrame);

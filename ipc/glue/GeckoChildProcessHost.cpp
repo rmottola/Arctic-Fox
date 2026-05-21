@@ -733,7 +733,8 @@ GeckoChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aExt
 #if defined(OS_LINUX) || defined(OS_MACOSX) || defined(OS_BSD)
   base::environment_map newEnvVars;
   ChildPrivileges privs = mPrivileges;
-  if (privs == base::PRIVILEGES_DEFAULT) {
+  if (privs == base::PRIVILEGES_DEFAULT ||
+      privs == base::PRIVILEGES_FILEREAD) {
     privs = DefaultChildPrivileges();
   }
 
@@ -1026,7 +1027,8 @@ GeckoChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aExt
         // For now we treat every failure as fatal in SetSecurityLevelForContentProcess
         // and just crash there right away. Should this change in the future then we
         // should also handle the error here.
-        mSandboxBroker.SetSecurityLevelForContentProcess(mSandboxLevel);
+        mSandboxBroker.SetSecurityLevelForContentProcess(mSandboxLevel,
+                                                         mPrivileges);
         shouldSandboxCurrentProcess = true;
         AddContentSandboxAllowedFiles(mSandboxLevel, mAllowedFilesRead);
       }
@@ -1167,7 +1169,7 @@ GeckoChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aExt
                             FALSE, 0)
 #endif
      ) {
-    NS_RUNTIMEABORT("cannot open handle to child process");
+    MOZ_CRASH("cannot open handle to child process");
   }
   MonitorAutoLock lock(mMonitor);
   mProcessState = PROCESS_CREATED;
@@ -1191,7 +1193,7 @@ void
 GeckoChildProcessHost::OnChannelConnected(int32_t peer_pid)
 {
   if (!OpenPrivilegedHandle(peer_pid)) {
-    NS_RUNTIMEABORT("can't open handle to child process");
+    MOZ_CRASH("can't open handle to child process");
   }
   MonitorAutoLock lock(mMonitor);
   mProcessState = PROCESS_CONNECTED;

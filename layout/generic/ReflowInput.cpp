@@ -531,9 +531,34 @@ void
 ReflowInput::InitResizeFlags(nsPresContext* aPresContext, nsIAtom* aFrameType)
 {
   const WritingMode wm = mWritingMode; // just a shorthand
+  // We should report that we have a resize in the inline dimension if
+  // *either* the border-box size or the content-box size in that
+  // dimension has changed.  It might not actually be necessary to do
+  // this if the border-box size has changed and the content-box size
+  // has not changed, but since we've historically used the flag to mean
+  // border-box size change, continue to do that.  (It's possible for
+  // the content-box size to change without a border-box size change or
+  // a style change given (1) a fixed width (possibly fixed by max-width
+  // or min-width), (2) box-sizing:border-box or padding-box, and
+  // (3) percentage padding.)
+  //
+  // However, we don't actually have the information at this point to
+  // tell whether the content-box size has changed, since both style
+  // data and the UsedPaddingProperty() have already been updated.  So,
+  // instead, we explicitly check for the case where it's possible for
+  // the content-box size to have changed without either (a) a change in
+  // the border-box size or (b) an nsChangeHint_NeedDirtyReflow change
+  // hint due to change in border or padding.  Thus we test using the
+  // conditions from the previous paragraph, except without testing (1)
+  // since it's complicated to test properly and less likely to help
+  // with optimizing cases away.
   bool isIResize =
+    // is the border-box resizing?
     mFrame->ISize(wm) !=
-      ComputedISize() + ComputedLogicalBorderPadding().IStartEnd(wm);
+      ComputedISize() + ComputedLogicalBorderPadding().IStartEnd(wm) ||
+    // or is the content-box resizing?  (see comment above)
+    (mStylePosition->mBoxSizing != StyleBoxSizing::Content &&
+     mStylePadding->IsWidthDependent());
 
   if ((mFrame->GetStateBits() & NS_FRAME_FONT_INFLATION_FLOW_ROOT) &&
       nsLayoutUtils::FontSizeInflationEnabled(aPresContext)) {
@@ -809,7 +834,7 @@ ReflowInput::InitFrameType(nsIAtom* aFrameType)
     else if (disp->IsFloating(mFrame)) {
       frameType = NS_CSS_FRAME_TYPE_FLOATING;
     } else {
-      NS_ASSERTION(disp->mDisplay == StyleDisplay::Popup,
+      NS_ASSERTION(disp->mDisplay == StyleDisplay::MozPopup,
                    "unknown out of flow frame type");
       frameType = NS_CSS_FRAME_TYPE_UNKNOWN;
     }
@@ -830,9 +855,9 @@ ReflowInput::InitFrameType(nsIAtom* aFrameType)
     case StyleDisplay::Inline:
     case StyleDisplay::InlineBlock:
     case StyleDisplay::InlineTable:
-    case StyleDisplay::InlineBox:
-    case StyleDisplay::InlineXulGrid:
-    case StyleDisplay::InlineStack:
+    case StyleDisplay::MozInlineBox:
+    case StyleDisplay::MozInlineGrid:
+    case StyleDisplay::MozInlineStack:
     case StyleDisplay::InlineFlex:
     case StyleDisplay::WebkitInlineBox:
     case StyleDisplay::InlineGrid:
@@ -877,10 +902,10 @@ ReflowInput::ComputeRelativeOffsets(WritingMode aWM,
                                           nsMargin& aComputedOffsets)
 {
   LogicalMargin offsets(aWM);
-  mozilla::css::Side inlineStart = aWM.PhysicalSide(eLogicalSideIStart);
-  mozilla::css::Side inlineEnd   = aWM.PhysicalSide(eLogicalSideIEnd);
-  mozilla::css::Side blockStart  = aWM.PhysicalSide(eLogicalSideBStart);
-  mozilla::css::Side blockEnd    = aWM.PhysicalSide(eLogicalSideBEnd);
+  mozilla::Side inlineStart = aWM.PhysicalSide(eLogicalSideIStart);
+  mozilla::Side inlineEnd   = aWM.PhysicalSide(eLogicalSideIEnd);
+  mozilla::Side blockStart  = aWM.PhysicalSide(eLogicalSideBStart);
+  mozilla::Side blockEnd    = aWM.PhysicalSide(eLogicalSideBEnd);
 
   const nsStylePosition* position = aFrame->StylePosition();
 
@@ -1115,9 +1140,9 @@ ReflowInput::CalculateBorderPaddingMargin(
                        nscoord* aOutsideBoxSizing) const
 {
   WritingMode wm = GetWritingMode();
-  mozilla::css::Side startSide =
+  mozilla::Side startSide =
     wm.PhysicalSide(MakeLogicalSide(aAxis, eLogicalEdgeStart));
-  mozilla::css::Side endSide =
+  mozilla::Side endSide =
     wm.PhysicalSide(MakeLogicalSide(aAxis, eLogicalEdgeEnd));
 
   nsMargin styleBorder = mStyleBorder->GetComputedBorder();
@@ -2355,9 +2380,14 @@ ReflowInput::InitConstraints(nsPresContext*     aPresContext,
           ComputeSizeFlags(computeSizeFlags | ComputeSizeFlags::eUseAutoBSize);
       }
 
-      nsIFrame* parent = mFrame->GetParent();
-      nsIAtom* parentFrameType = parent ? parent->GetType() : nullptr;
-      if (parentFrameType == nsGkAtoms::gridContainerFrame) {
+      nsIFrame* alignCB = mFrame->GetParent();
+      nsIAtom* alignCBType = alignCB ? alignCB->GetType() : nullptr;
+      if (alignCBType == nsGkAtoms::tableWrapperFrame &&
+          alignCB->GetParent()) {
+        alignCB = alignCB->GetParent();
+        alignCBType = alignCB->GetType();
+      }
+      if (alignCBType == nsGkAtoms::gridContainerFrame) {
         // Shrink-wrap grid items that will be aligned (rather than stretched)
         // in its inline axis.
         auto inlineAxisAlignment = wm.IsOrthogonalTo(cbwm) ?
@@ -2385,7 +2415,7 @@ ReflowInput::InitConstraints(nsPresContext*     aPresContext,
             ComputeSizeFlags(computeSizeFlags | ComputeSizeFlags::eShrinkWrap);
         }
 
-        if (parentFrameType == nsGkAtoms::flexContainerFrame) {
+        if (alignCBType == nsGkAtoms::flexContainerFrame) {
           computeSizeFlags =
             ComputeSizeFlags(computeSizeFlags | ComputeSizeFlags::eShrinkWrap);
 
@@ -2427,8 +2457,8 @@ ReflowInput::InitConstraints(nsPresContext*     aPresContext,
       if (isBlock &&
           !IsSideCaption(mFrame, mStyleDisplay, cbwm) &&
           mStyleDisplay->mDisplay != StyleDisplay::InlineTable &&
-          parentFrameType != nsGkAtoms::flexContainerFrame &&
-          parentFrameType != nsGkAtoms::gridContainerFrame) {
+          alignCBType != nsGkAtoms::flexContainerFrame &&
+          alignCBType != nsGkAtoms::gridContainerFrame) {
         CalculateBlockSideMargins(aFrameType);
       }
     }

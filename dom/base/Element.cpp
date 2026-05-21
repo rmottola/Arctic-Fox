@@ -1736,18 +1736,6 @@ Element::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
     }
   }
 
-  // It would be cleanest to mark nodes as dirty when (a) they're created and
-  // (b) they're unbound from a tree. However, we can't easily do (a) right now,
-  // because IsStyledByServo() is not always easy to check at node creation time,
-  // and the bits have different meaning in the non-IsStyledByServo case.
-  //
-  // So for now, we just mark nodes as dirty when they're inserted into a
-  // document or shadow tree.
-  if (IsStyledByServo() && IsInComposedDoc()) {
-    MOZ_ASSERT(!HasServoData());
-    SetIsDirtyForServo();
-  }
-
   // XXXbz script execution during binding can trigger some of these
   // postcondition asserts....  But we do want that, since things will
   // generally be quite broken when that happens.
@@ -3885,7 +3873,7 @@ Element::ClearDataset()
   slots->mDataset = nullptr;
 }
 
-nsTArray<Element::nsDOMSlots::IntersectionObserverRegistration>*
+nsDataHashtable<nsPtrHashKey<DOMIntersectionObserver>, int32_t>*
 Element::RegisteredIntersectionObservers()
 {
   nsDOMSlots* slots = DOMSlots();
@@ -3895,34 +3883,43 @@ Element::RegisteredIntersectionObservers()
 void
 Element::RegisterIntersectionObserver(DOMIntersectionObserver* aObserver)
 {
-  RegisteredIntersectionObservers()->AppendElement(
-    nsDOMSlots::IntersectionObserverRegistration { aObserver, -1 });
+  nsDataHashtable<nsPtrHashKey<DOMIntersectionObserver>, int32_t>* observers =
+    RegisteredIntersectionObservers();
+  if (observers->Contains(aObserver)) {
+    return;
+  }
+  RegisteredIntersectionObservers()->Put(aObserver, -1);
 }
 
 void
 Element::UnregisterIntersectionObserver(DOMIntersectionObserver* aObserver)
 {
-  nsTArray<nsDOMSlots::IntersectionObserverRegistration>* observers =
+  nsDataHashtable<nsPtrHashKey<DOMIntersectionObserver>, int32_t>* observers =
     RegisteredIntersectionObservers();
-  for (uint32_t i = 0; i < observers->Length(); ++i) {
-    nsDOMSlots::IntersectionObserverRegistration reg = observers->ElementAt(i);
-    if (reg.observer == aObserver) {
-      observers->RemoveElementAt(i);
-      break;
-    }
-  }
+  observers->Remove(aObserver);
 }
 
 bool
 Element::UpdateIntersectionObservation(DOMIntersectionObserver* aObserver, int32_t aThreshold)
 {
-  nsTArray<nsDOMSlots::IntersectionObserverRegistration>* observers =
+  nsDataHashtable<nsPtrHashKey<DOMIntersectionObserver>, int32_t>* observers =
     RegisteredIntersectionObservers();
-  for (auto& reg : *observers) {
-    if (reg.observer == aObserver && reg.previousThreshold != aThreshold) {
-      reg.previousThreshold = aThreshold;
-      return true;
-    }
+  if (!observers->Contains(aObserver)) {
+    return false;
+  }
+  int32_t previousThreshold = observers->Get(aObserver);
+  if (previousThreshold != aThreshold) {
+    observers->Put(aObserver, aThreshold);
+    return true;
   }
   return false;
+}
+
+void
+Element::ClearServoData() {
+#ifdef MOZ_STYLO
+  Servo_Element_ClearData(this);
+#else
+  MOZ_CRASH("Accessing servo node data in non-stylo build");
+#endif
 }

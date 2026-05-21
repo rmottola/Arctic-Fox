@@ -3062,6 +3062,11 @@ nsHalfOpenSocket::SetupStreams(nsISocketTransport **transport,
     if (ci->GetPrivate())
         tmpFlags |= nsISocketTransport::NO_PERMANENT_STORAGE;
 
+    if ((mCaps & NS_HTTP_BE_CONSERVATIVE) || ci->GetBeConservative()) {
+        LOG(("Setting Socket to BE_CONSERVATIVE"));
+        tmpFlags |= nsISocketTransport::BE_CONSERVATIVE;
+    }
+
     // For backup connections, we disable IPv6. That's because some users have
     // broken IPv6 connectivity (leading to very long timeouts), and disabling
     // IPv6 on the backup connection gives them a much better user experience
@@ -3081,10 +3086,10 @@ nsHalfOpenSocket::SetupStreams(nsISocketTransport **transport,
 
     socketTransport->SetConnectionFlags(tmpFlags);
 
-    nsAutoCString firstPartyDomain =
-      NS_ConvertUTF16toUTF8(mEnt->mConnInfo->GetOriginAttributes().mFirstPartyDomain);
-    if (!firstPartyDomain.IsEmpty()) {
-        socketTransport->SetFirstPartyDomain(firstPartyDomain);
+    NeckoOriginAttributes originAttributes =
+        mEnt->mConnInfo->GetOriginAttributes();
+    if (originAttributes != NeckoOriginAttributes()) {
+        socketTransport->SetOriginAttributes(originAttributes);
     }
 
     socketTransport->SetQoSBits(gHttpHandler->GetQoSBits());

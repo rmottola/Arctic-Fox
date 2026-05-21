@@ -495,7 +495,8 @@ nsComputedDOMStyle::GetStyleContextForElementNoFlush(Element* aElement,
     sc = styleSet->ResolvePseudoElementStyle(aElement, type, parentContext,
                                              pseudoElement);
   } else {
-    sc = styleSet->ResolveStyleFor(aElement, parentContext);
+    sc = styleSet->ResolveStyleFor(aElement, parentContext, ConsumeStyleBehavior::DontConsume,
+                                   LazyComputeBehavior::Allow);
   }
 
   if (aStyleType == eDefaultOnly) {
@@ -919,7 +920,7 @@ nsComputedDOMStyle::DoGetFloat()
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBottom()
 {
-  return GetOffsetWidthFor(NS_SIDE_BOTTOM);
+  return GetOffsetWidthFor(eSideBottom);
 }
 
 already_AddRefed<CSSValue>
@@ -1582,6 +1583,23 @@ nsComputedDOMStyle::DoGetFontFeatureSettings()
     nsAutoString result;
     nsStyleUtil::AppendFontFeatureSettings(font->mFont.fontFeatureSettings,
                                            result);
+    val->SetString(result);
+  }
+  return val.forget();
+}
+
+already_AddRefed<CSSValue>
+nsComputedDOMStyle::DoGetFontVariationSettings()
+{
+  RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
+
+  const nsStyleFont* font = StyleFont();
+  if (font->mFont.fontVariationSettings.IsEmpty()) {
+    val->SetIdent(eCSSKeyword_normal);
+  } else {
+    nsAutoString result;
+    nsStyleUtil::AppendFontVariationSettings(font->mFont.fontVariationSettings,
+                                             result);
     val->SetString(result);
   }
   return val.forget();
@@ -2399,20 +2417,29 @@ void
 nsComputedDOMStyle::SetValueToURLValue(const css::URLValueData* aURL,
                                        nsROCSSPrimitiveValue* aValue)
 {
-  if (aURL && aURL->IsLocalRef()) {
-    nsString fragment;
-    aURL->GetSourceString(fragment);
-    fragment.Insert(u"url(\"", 0);
-    fragment.Append(u"\")");
-    aValue->SetString(fragment);
-  } else {
-    nsCOMPtr<nsIURI> url;
-    if (aURL && (url = aURL->GetURI())) {
-      aValue->SetURI(url);
-    } else {
-      aValue->SetIdent(eCSSKeyword_none);
+  if (!aURL) {
+    aValue->SetIdent(eCSSKeyword_none);
+    return;
+  }
+
+  // If we have a usable nsIURI in the URLValueData, and the url() wasn't
+  // a fragment-only URL, serialize the nsIURI.
+  if (!aURL->IsLocalRef()) {
+    if (nsIURI* uri = aURL->GetURI()) {
+      aValue->SetURI(uri);
+      return;
     }
   }
+
+  // Otherwise, serialize the specified URL value.
+  nsAutoString source;
+  aURL->GetSourceString(source);
+
+  nsAutoString url;
+  url.AppendLiteral(u"url(");
+  nsStyleUtil::AppendEscapedCSSString(source, url, '"');
+  url.Append(')');
+  aValue->SetString(url);
 }
 
 already_AddRefed<CSSValue>
@@ -2954,25 +2981,25 @@ nsComputedDOMStyle::DoGetGridRowGap()
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetPaddingTop()
 {
-  return GetPaddingWidthFor(NS_SIDE_TOP);
+  return GetPaddingWidthFor(eSideTop);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetPaddingBottom()
 {
-  return GetPaddingWidthFor(NS_SIDE_BOTTOM);
+  return GetPaddingWidthFor(eSideBottom);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetPaddingLeft()
 {
-  return GetPaddingWidthFor(NS_SIDE_LEFT);
+  return GetPaddingWidthFor(eSideLeft);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetPaddingRight()
 {
-  return GetPaddingWidthFor(NS_SIDE_RIGHT);
+  return GetPaddingWidthFor(eSideRight);
 }
 
 already_AddRefed<CSSValue>
@@ -3036,50 +3063,50 @@ nsComputedDOMStyle::DoGetTableLayout()
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderTopStyle()
 {
-  return GetBorderStyleFor(NS_SIDE_TOP);
+  return GetBorderStyleFor(eSideTop);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderBottomStyle()
 {
-  return GetBorderStyleFor(NS_SIDE_BOTTOM);
+  return GetBorderStyleFor(eSideBottom);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderLeftStyle()
 {
-  return GetBorderStyleFor(NS_SIDE_LEFT);
+  return GetBorderStyleFor(eSideLeft);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderRightStyle()
 {
-  return GetBorderStyleFor(NS_SIDE_RIGHT);
+  return GetBorderStyleFor(eSideRight);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderBottomColors()
 {
-  return GetBorderColorsFor(NS_SIDE_BOTTOM);
+  return GetBorderColorsFor(eSideBottom);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderLeftColors()
 {
-  return GetBorderColorsFor(NS_SIDE_LEFT);
+  return GetBorderColorsFor(eSideLeft);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderRightColors()
 {
-  return GetBorderColorsFor(NS_SIDE_RIGHT);
+  return GetBorderColorsFor(eSideRight);
 }
 
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderTopColors()
 {
-  return GetBorderColorsFor(NS_SIDE_TOP);
+  return GetBorderColorsFor(eSideTop);
 }
 
 already_AddRefed<CSSValue>
@@ -3113,73 +3140,73 @@ nsComputedDOMStyle::DoGetBorderTopRightRadius()
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderTopWidth()
 {
-  return GetBorderWidthFor(NS_SIDE_TOP);
+  return GetBorderWidthFor(eSideTop);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderBottomWidth()
 {
-  return GetBorderWidthFor(NS_SIDE_BOTTOM);
+  return GetBorderWidthFor(eSideBottom);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderLeftWidth()
 {
-  return GetBorderWidthFor(NS_SIDE_LEFT);
+  return GetBorderWidthFor(eSideLeft);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderRightWidth()
 {
-  return GetBorderWidthFor(NS_SIDE_RIGHT);
+  return GetBorderWidthFor(eSideRight);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderTopColor()
 {
-  return GetBorderColorFor(NS_SIDE_TOP);
+  return GetBorderColorFor(eSideTop);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderBottomColor()
 {
-  return GetBorderColorFor(NS_SIDE_BOTTOM);
+  return GetBorderColorFor(eSideBottom);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderLeftColor()
 {
-  return GetBorderColorFor(NS_SIDE_LEFT);
+  return GetBorderColorFor(eSideLeft);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBorderRightColor()
 {
-  return GetBorderColorFor(NS_SIDE_RIGHT);
+  return GetBorderColorFor(eSideRight);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarginTopWidth()
 {
-  return GetMarginWidthFor(NS_SIDE_TOP);
+  return GetMarginWidthFor(eSideTop);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarginBottomWidth()
 {
-  return GetMarginWidthFor(NS_SIDE_BOTTOM);
+  return GetMarginWidthFor(eSideBottom);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarginLeftWidth()
 {
-  return GetMarginWidthFor(NS_SIDE_LEFT);
+  return GetMarginWidthFor(eSideLeft);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarginRightWidth()
 {
-  return GetMarginWidthFor(NS_SIDE_RIGHT);
+  return GetMarginWidthFor(eSideRight);
 }
 
 already_AddRefed<CSSValue>
@@ -3936,7 +3963,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetTabSize()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  val->SetNumber(StyleText()->mTabSize);
+  SetValueToCoord(val, StyleText()->mTabSize, true);
   return val.forget();
 }
 
@@ -4054,7 +4081,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetWebkitTextStrokeWidth()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  val->SetAppUnits(StyleText()->mWebkitTextStrokeWidth.GetCoordValue());
+  val->SetAppUnits(StyleText()->mWebkitTextStrokeWidth);
   return val.forget();
 }
 
@@ -4120,11 +4147,8 @@ nsComputedDOMStyle::DoGetCursor()
   for (const nsCursorImage& item : ui->mCursorImages) {
     RefPtr<nsDOMCSSValueList> itemList = GetROCSSValueList(false);
 
-    nsCOMPtr<nsIURI> uri;
-    item.GetImage()->GetURI(getter_AddRefs(uri));
-
     RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-    val->SetURI(uri);
+    SetValueToURLValue(item.mImage->GetImageValue(), val);
     itemList->AppendCSSValue(val.forget());
 
     if (item.mHaveHotspot) {
@@ -4963,19 +4987,19 @@ nsComputedDOMStyle::DoGetObjectPosition()
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetLeft()
 {
-  return GetOffsetWidthFor(NS_SIDE_LEFT);
+  return GetOffsetWidthFor(eSideLeft);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetRight()
 {
-  return GetOffsetWidthFor(NS_SIDE_RIGHT);
+  return GetOffsetWidthFor(eSideRight);
 }
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetTop()
 {
-  return GetOffsetWidthFor(NS_SIDE_TOP);
+  return GetOffsetWidthFor(eSideTop);
 }
 
 nsDOMCSSValueList*
@@ -4985,7 +5009,7 @@ nsComputedDOMStyle::GetROCSSValueList(bool aCommaDelimited)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetOffsetWidthFor(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetOffsetWidthFor(mozilla::Side aSide)
 {
   const nsStyleDisplay* display = StyleDisplay();
 
@@ -5016,7 +5040,7 @@ nsComputedDOMStyle::GetOffsetWidthFor(mozilla::css::Side aSide)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetAbsoluteOffset(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetAbsoluteOffset(mozilla::Side aSide)
 {
   MOZ_ASSERT(mOuterFrame, "need a frame, so we can call GetContainingBlock()");
 
@@ -5043,21 +5067,21 @@ nsComputedDOMStyle::GetAbsoluteOffset(mozilla::css::Side aSide)
 
   nscoord offset = 0;
   switch (aSide) {
-    case NS_SIDE_TOP:
+    case eSideTop:
       offset = rect.y - margin.top - border.top - scrollbarSizes.top;
 
       break;
-    case NS_SIDE_RIGHT:
+    case eSideRight:
       offset = containerRect.width - rect.width -
         rect.x - margin.right - border.right - scrollbarSizes.right;
 
       break;
-    case NS_SIDE_BOTTOM:
+    case eSideBottom:
       offset = containerRect.height - rect.height -
         rect.y - margin.bottom - border.bottom - scrollbarSizes.bottom;
 
       break;
-    case NS_SIDE_LEFT:
+    case eSideLeft:
       offset = rect.x - margin.left - border.left - scrollbarSizes.left;
 
       break;
@@ -5071,13 +5095,13 @@ nsComputedDOMStyle::GetAbsoluteOffset(mozilla::css::Side aSide)
   return val.forget();
 }
 
-static_assert(NS_SIDE_TOP == 0 && NS_SIDE_RIGHT == 1 &&
-              NS_SIDE_BOTTOM == 2 && NS_SIDE_LEFT == 3,
+static_assert(eSideTop == 0 && eSideRight == 1 &&
+              eSideBottom == 2 && eSideLeft == 3,
               "box side constants not as expected for NS_OPPOSITE_SIDE");
-#define NS_OPPOSITE_SIDE(s_) mozilla::css::Side(((s_) + 2) & 3)
+#define NS_OPPOSITE_SIDE(s_) mozilla::Side(((s_) + 2) & 3)
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetRelativeOffset(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetRelativeOffset(mozilla::Side aSide)
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
@@ -5096,7 +5120,7 @@ nsComputedDOMStyle::GetRelativeOffset(mozilla::css::Side aSide)
     sign = -1;
   }
   PercentageBaseGetter baseGetter;
-  if (aSide == NS_SIDE_LEFT || aSide == NS_SIDE_RIGHT) {
+  if (aSide == eSideLeft || aSide == eSideRight) {
     baseGetter = &nsComputedDOMStyle::GetCBContentWidth;
   } else {
     baseGetter = &nsComputedDOMStyle::GetCBContentHeight;
@@ -5107,7 +5131,7 @@ nsComputedDOMStyle::GetRelativeOffset(mozilla::css::Side aSide)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetStickyOffset(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetStickyOffset(mozilla::Side aSide)
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
@@ -5125,7 +5149,7 @@ nsComputedDOMStyle::GetStickyOffset(mozilla::css::Side aSide)
     return val.forget();
   }
   PercentageBaseGetter baseGetter;
-  if (aSide == NS_SIDE_LEFT || aSide == NS_SIDE_RIGHT) {
+  if (aSide == eSideLeft || aSide == eSideRight) {
     baseGetter = &nsComputedDOMStyle::GetScrollFrameContentWidth;
   } else {
     baseGetter = &nsComputedDOMStyle::GetScrollFrameContentHeight;
@@ -5137,7 +5161,7 @@ nsComputedDOMStyle::GetStickyOffset(mozilla::css::Side aSide)
 
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetStaticOffset(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetStaticOffset(mozilla::Side aSide)
 
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
@@ -5146,7 +5170,7 @@ nsComputedDOMStyle::GetStaticOffset(mozilla::css::Side aSide)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetPaddingWidthFor(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetPaddingWidthFor(mozilla::Side aSide)
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
@@ -5200,7 +5224,7 @@ nsComputedDOMStyle::GetLineHeightCoord(nscoord& aCoord)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetBorderColorsFor(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetBorderColorsFor(mozilla::Side aSide)
 {
   const nsStyleBorder *border = StyleBorder();
 
@@ -5228,7 +5252,7 @@ nsComputedDOMStyle::GetBorderColorsFor(mozilla::css::Side aSide)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetBorderWidthFor(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetBorderWidthFor(mozilla::Side aSide)
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
@@ -5245,7 +5269,7 @@ nsComputedDOMStyle::GetBorderWidthFor(mozilla::css::Side aSide)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetBorderColorFor(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetBorderColorFor(mozilla::Side aSide)
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   SetValueFromComplexColor(val, StyleBorder()->mBorderColor[aSide]);
@@ -5253,7 +5277,7 @@ nsComputedDOMStyle::GetBorderColorFor(mozilla::css::Side aSide)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetMarginWidthFor(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetMarginWidthFor(mozilla::Side aSide)
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
@@ -5274,7 +5298,7 @@ nsComputedDOMStyle::GetMarginWidthFor(mozilla::css::Side aSide)
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::GetBorderStyleFor(mozilla::css::Side aSide)
+nsComputedDOMStyle::GetBorderStyleFor(mozilla::Side aSide)
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(

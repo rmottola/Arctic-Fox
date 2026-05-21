@@ -139,6 +139,28 @@ VideoData::~VideoData()
 {
 }
 
+void
+VideoData::SetListener(UniquePtr<Listener> aListener)
+{
+  MOZ_ASSERT(!mSentToCompositor, "Listener should be registered before sending data");
+
+  mListener = Move(aListener);
+}
+
+void
+VideoData::MarkSentToCompositor()
+{
+  if (mSentToCompositor) {
+    return;
+  }
+
+  mSentToCompositor = true;
+  if (mListener != nullptr) {
+    mListener->OnSentToCompositor();
+    mListener = nullptr;
+  }
+}
+
 size_t
 VideoData::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
 {
@@ -392,6 +414,15 @@ MediaRawData::MediaRawData(const uint8_t* aData, size_t aSize)
 {
 }
 
+MediaRawData::MediaRawData(const uint8_t* aData, size_t aSize,
+                           const uint8_t* aAlphaData, size_t aAlphaSize)
+  : MediaData(RAW_DATA, 0)
+  , mCrypto(mCryptoInternal)
+  , mBuffer(aData, aSize)
+  , mAlphaBuffer(aAlphaData, aAlphaSize)
+{
+}
+
 already_AddRefed<MediaRawData>
 MediaRawData::Clone() const
 {
@@ -406,6 +437,9 @@ MediaRawData::Clone() const
   s->mTrackInfo = mTrackInfo;
   s->mEOS = mEOS;
   if (!s->mBuffer.Append(mBuffer.Data(), mBuffer.Length())) {
+    return nullptr;
+  }
+  if (!s->mAlphaBuffer.Append(mAlphaBuffer.Data(), mAlphaBuffer.Length())) {
     return nullptr;
   }
   return s.forget();

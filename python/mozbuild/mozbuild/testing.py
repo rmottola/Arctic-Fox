@@ -277,13 +277,15 @@ TEST_MANIFESTS = dict(
     ANDROID_INSTRUMENTATION=('instrumentation', 'instrumentation', '.', False),
     JETPACK_PACKAGE=('jetpack-package', 'testing/mochitest', 'jetpack-package', True),
     JETPACK_ADDON=('jetpack-addon', 'testing/mochitest', 'jetpack-addon', False),
+    FIREFOX_UI_FUNCTIONAL=('firefox-ui-functional', 'firefox-ui', '.', False),
+    FIREFOX_UI_UPDATE=('firefox-ui-update', 'firefox-ui', '.', False),
+    PUPPETEER_FIREFOX=('firefox-ui-functional', 'firefox-ui', '.', False),
+    PYTHON_UNITTEST=('python', 'python', '.', False),
 
     # marionette tests are run from the srcdir
     # TODO(ato): make packaging work as for other test suites
     MARIONETTE=('marionette', 'marionette', '.', False),
-    MARIONETTE_LOOP=('marionette', 'marionette', '.', False),
     MARIONETTE_UNIT=('marionette', 'marionette', '.', False),
-    MARIONETTE_UPDATE=('marionette', 'marionette', '.', False),
     MARIONETTE_WEBAPI=('marionette', 'marionette', '.', False),
 
     METRO_CHROME=('metro-chrome', 'testing/mochitest', 'metro', True),
@@ -302,8 +304,7 @@ WEB_PLATFORM_TESTS_FLAVORS = ('web-platform-tests',)
 def all_test_flavors():
     return ([v[0] for v in TEST_MANIFESTS.values()] +
             list(REFTEST_FLAVORS) +
-            list(WEB_PLATFORM_TESTS_FLAVORS) +
-            ['python'])
+            list(WEB_PLATFORM_TESTS_FLAVORS))
 
 class TestInstallInfo(object):
     def __init__(self):

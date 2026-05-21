@@ -47,6 +47,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(DOMIntersectionObserver)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCallback)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mRoot)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mQueuedEntries)
+  tmp->Disconnect();
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(DOMIntersectionObserver)
@@ -184,9 +185,10 @@ DOMIntersectionObserver::Connect()
   if (mConnected) {
     return;
   }
+
+  mConnected = true;
   nsIDocument* document = mOwner->GetExtantDoc();
   document->AddIntersectionObserver(this);
-  mConnected = true;
 }
 
 void
@@ -290,7 +292,7 @@ DOMIntersectionObserver::Update(nsIDocument* aDocument, DOMHighResTimeStamp time
 
   nsMargin rootMargin;
   NS_FOR_CSS_SIDES(side) {
-    nscoord basis = side == NS_SIDE_TOP || side == NS_SIDE_BOTTOM ?
+    nscoord basis = side == eSideTop || side == eSideBottom ?
       rootRect.height : rootRect.width;
     nsCSSValue value = mRootMargin.*nsCSSRect::sides[side];
     nsStyleCoord coord;

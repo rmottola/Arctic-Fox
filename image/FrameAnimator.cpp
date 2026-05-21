@@ -200,13 +200,11 @@ FrameAnimator::AdvanceFrame(AnimationState& aState, TimeStamp aTime)
   MOZ_ASSERT(nextFrameIndex < aState.KnownFrameCount());
   RawAccessFrameRef nextFrame = GetRawFrame(nextFrameIndex);
 
-  // If we're done decoding, we know we've got everything we're going to get.
-  // If we aren't, we only display fully-downloaded frames; everything else
-  // gets delayed.
-  bool canDisplay = aState.mDoneDecoding ||
-                    (nextFrame && nextFrame->IsFinished());
-
-  if (!canDisplay) {
+  // We should always check to see if we have the next frame even if we have
+  // previously finished decoding. If we needed to redecode (e.g. due to a draw
+  // failure) we would have discarded all the old frames and may not yet have
+  // the new ones.
+  if (!nextFrame || !nextFrame->IsFinished()) {
     // Uh oh, the frame we want to show is currently being decoded (partial)
     // Wait until the next refresh driver tick and try again
     return ret;
@@ -295,10 +293,11 @@ FrameAnimator::RequestRefresh(AnimationState& aState, const TimeStamp& aTime)
 }
 
 LookupResult
-FrameAnimator::GetCompositedFrame(uint32_t aFrameNum)
+FrameAnimator::GetCompositedFrame(AnimationState& aState)
 {
   // If we have a composited version of this frame, return that.
-  if (mLastCompositedFrameIndex == int32_t(aFrameNum)) {
+  if (mLastCompositedFrameIndex >= 0 &&
+      (uint32_t(mLastCompositedFrameIndex) == aState.mCurrentAnimationFrameIndex)) {
     return LookupResult(DrawableSurface(mCompositingFrame->DrawableRef()),
                         MatchType::EXACT);
   }
@@ -316,7 +315,7 @@ FrameAnimator::GetCompositedFrame(uint32_t aFrameNum)
 
   // Seek to the appropriate frame. If seeking fails, it means that we couldn't
   // get the frame we're looking for; treat this as if the lookup failed.
-  if (NS_FAILED(result.Surface().Seek(aFrameNum))) {
+  if (NS_FAILED(result.Surface().Seek(aState.mCurrentAnimationFrameIndex))) {
     return LookupResult(MatchType::NOT_FOUND);
   }
 

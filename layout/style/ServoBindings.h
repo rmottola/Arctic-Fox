@@ -64,6 +64,16 @@ struct nsStyleDisplay;
   void Gecko_Release##name_##ArbitraryThread(ThreadSafe##name_##Holder* aPtr) \
   { NS_RELEASE(aPtr); }                                                       \
 
+
+#define DEFINE_ARRAY_TYPE_FOR(type_)                                \
+  struct nsTArrayBorrowed_##type_ {                                 \
+    nsTArray<type_>* mArray;                                        \
+    MOZ_IMPLICIT nsTArrayBorrowed_##type_(nsTArray<type_>* aArray)  \
+      : mArray(aArray) {}                                           \
+  }
+DEFINE_ARRAY_TYPE_FOR(uintptr_t);
+#undef DEFINE_ARRAY_TYPE_FOR
+
 extern "C" {
 
 // Object refcounting.
@@ -128,7 +138,7 @@ nsIAtom* Gecko_GetElementId(RawGeckoElementBorrowed element);
 
 SERVO_DECLARE_ELEMENT_ATTR_MATCHING_FUNCTIONS(Gecko_, RawGeckoElementBorrowed)
 SERVO_DECLARE_ELEMENT_ATTR_MATCHING_FUNCTIONS(Gecko_Snapshot,
-                                              ServoElementSnapshot*)
+                                              const ServoElementSnapshot*)
 
 #undef SERVO_DECLARE_ELEMENT_ATTR_MATCHING_FUNCTIONS
 
@@ -143,11 +153,6 @@ void Gecko_ReleaseAtom(nsIAtom* aAtom);
 const uint16_t* Gecko_GetAtomAsUTF16(nsIAtom* aAtom, uint32_t* aLength);
 bool Gecko_AtomEqualsUTF8(nsIAtom* aAtom, const char* aString, uint32_t aLength);
 bool Gecko_AtomEqualsUTF8IgnoreCase(nsIAtom* aAtom, const char* aString, uint32_t aLength);
-
-// Strings (temporary until bug 1294742)
-void Gecko_Utf8SliceToString(nsString* aString,
-                             const uint8_t* aBuffer,
-                             size_t aBufferLen);
 
 // Font style
 void Gecko_FontFamilyList_Clear(FontFamilyList* aList);
@@ -186,6 +191,16 @@ void Gecko_SetListStyleImage(nsStyleList* style_struct,
                              ThreadSafePrincipalHolder* principal);
 void Gecko_CopyListStyleImageFrom(nsStyleList* dest, const nsStyleList* src);
 
+// cursor style.
+void Gecko_SetCursorArrayLength(nsStyleUserInterface* ui, size_t len);
+void Gecko_SetCursorImage(nsCursorImage* cursor,
+                          const uint8_t* string_bytes, uint32_t string_length,
+                          ThreadSafeURIHolder* base_uri,
+                          ThreadSafeURIHolder* referrer,
+                          ThreadSafePrincipalHolder* principal);
+void Gecko_CopyCursorArrayFrom(nsStyleUserInterface* dest,
+                               const nsStyleUserInterface* src);
+
 // Display style.
 void Gecko_SetMozBinding(nsStyleDisplay* style_struct,
                          const uint8_t* string_bytes, uint32_t string_length,
@@ -200,17 +215,16 @@ void Gecko_SetNodeFlags(RawGeckoNodeBorrowed node, uint32_t flags);
 void Gecko_UnsetNodeFlags(RawGeckoNodeBorrowed node, uint32_t flags);
 
 // Incremental restyle.
-// TODO: We would avoid a few ffi calls if we decide to make an API like the
-// former CalcAndStoreStyleDifference, but that would effectively mean breaking
-// some safety guarantees in the servo side.
-//
 // Also, we might want a ComputedValues to ComputedValues API for animations?
 // Not if we do them in Gecko...
 nsStyleContext* Gecko_GetStyleContext(RawGeckoNodeBorrowed node,
                                       nsIAtom* aPseudoTagOrNull);
 nsChangeHint Gecko_CalcStyleDifference(nsStyleContext* oldstyle,
                                        ServoComputedValuesBorrowed newstyle);
-void Gecko_StoreStyleDifference(RawGeckoNodeBorrowed node, nsChangeHint change);
+
+// Element snapshot.
+ServoElementSnapshotOwned Gecko_CreateElementSnapshot(RawGeckoElementBorrowed element);
+void Gecko_DropElementSnapshot(ServoElementSnapshotOwned snapshot);
 
 // `array` must be an nsTArray
 // If changing this signature, please update the

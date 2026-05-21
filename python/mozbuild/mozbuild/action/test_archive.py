@@ -51,7 +51,6 @@ TEST_HARNESS_DLLS = [
 ]
 
 TEST_PLUGIN_DLLS = [
-    'npctrltest',
     'npsecondtest',
     'npswftest',
     'nptest',
@@ -64,7 +63,6 @@ TEST_PLUGIN_DIRS = [
     'SecondTest.plugin/**',
     'Test.plugin/**',
     'ThirdTest.plugin/**',
-    'npctrltest.plugin/**',
     'npswftest.plugin/**',
 ]
 
@@ -95,6 +93,35 @@ ARCHIVE_FILES = {
             'source': buildconfig.topobjdir,
             'base': '_tests',
             'pattern': 'modules/**',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing/marionette',
+            'patterns': [
+                'client/**',
+                'mach_test_package_commands.py',
+            ],
+            'dest': 'marionette',
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': 'testing/marionette/harness',
+            'pattern': '**',
+            'dest': 'marionette',
+            'ignore': [
+                'marionette/tests'
+            ]
+        },
+        {
+            'source': buildconfig.topsrcdir,
+            'base': '',
+            'manifests': [
+                'testing/marionette/harness/marionette/tests/unit-tests.ini',
+                'testing/marionette/harness/marionette/tests/webapi-tests.ini',
+            ],
+            # We also need the manifests and harness_unit tests
+            'pattern': 'testing/marionette/harness/marionette/tests/**',
+            'dest': 'marionette/tests',
         },
         {
             'source': buildconfig.topobjdir,

@@ -82,7 +82,7 @@ GPUChild::EnsureGPUReady()
   SendGetDeviceStatus(&data);
 
   gfxPlatform::GetPlatform()->ImportGPUDeviceData(data);
-  Telemetry::AccumulateTimeDelta(Telemetry::GPU_PROCESS_LAUNCH_TIME_MS, mHost->GetLaunchTime());
+  Telemetry::AccumulateTimeDelta(Telemetry::GPU_PROCESS_LAUNCH_TIME_MS_2, mHost->GetLaunchTime());
   mGPUReady = true;
 }
 
@@ -95,7 +95,7 @@ GPUChild::RecvInitComplete(const GPUDeviceData& aData)
   }
 
   gfxPlatform::GetPlatform()->ImportGPUDeviceData(aData);
-  Telemetry::AccumulateTimeDelta(Telemetry::GPU_PROCESS_LAUNCH_TIME_MS, mHost->GetLaunchTime());
+  Telemetry::AccumulateTimeDelta(Telemetry::GPU_PROCESS_LAUNCH_TIME_MS_2, mHost->GetLaunchTime());
   mGPUReady = true;
   return IPC_OK();
 }
@@ -172,6 +172,12 @@ GPUChild::ActorDestroy(ActorDestroyReason aWhy)
 #endif
     Telemetry::Accumulate(Telemetry::SUBPROCESS_ABNORMAL_ABORT,
         nsDependentCString(XRE_ChildProcessTypeToString(GeckoProcessType_GPU), 1));
+
+    // Notify the Telemetry environment so that we can refresh and do a subsession split
+    if (nsCOMPtr<nsIObserverService> obsvc = services::GetObserverService()) {
+      obsvc->NotifyObservers(nullptr, "compositor:process-aborted", nullptr);
+    }
+
   }
 
   gfxVars::RemoveReceiver(this);

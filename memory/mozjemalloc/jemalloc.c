@@ -199,6 +199,13 @@
  */
 #define MALLOC_VALIDATE
 
+/*
+ * MALLOC_BALANCE enables monitoring of arena lock contention and dynamically
+ * re-balances arena load if exponentially averaged contention exceeds a
+ * certain threshold.
+ */
+/* #define	MALLOC_BALANCE */
+
 #if defined(MOZ_MEMORY_LINUX) && !defined(MOZ_MEMORY_ANDROID)
 #define	_GNU_SOURCE /* For mremap(2). */
 #if 0 /* Enable in order to test decommit code on Linux. */
@@ -423,6 +430,10 @@ void *_mmap(void *addr, size_t length, int prot, int flags,
 #endif
 #endif
 
+#ifdef MOZ_MEMORY_DARWIN
+static const bool isthreaded = true;
+#endif
+
 #if defined(MOZ_MEMORY_SOLARIS) && defined(MAP_ALIGN) && !defined(JEMALLOC_NEVER_USES_MAP_ALIGN)
 #define JEMALLOC_USES_MAP_ALIGN	 /* Required on Solaris 10. Might improve performance elsewhere. */
 #endif
@@ -457,7 +468,9 @@ void *_mmap(void *addr, size_t length, int prot, int flags,
 #  define SIZEOF_PTR_2POW       2
 #endif
 #define PIC
-#ifdef MOZ_MEMORY_DARWIN
+#ifndef MOZ_MEMORY_DARWIN
+static const bool isthreaded = true;
+#else
 #  define NO_TLS
 #endif
 #if 0
@@ -511,6 +524,13 @@ void *_mmap(void *addr, size_t length, int prot, int flags,
 /* We can't use TLS in non-PIC programs, since TLS relies on loader magic. */
 #if (!defined(PIC) && !defined(NO_TLS))
 #  define NO_TLS
+#endif
+
+#ifdef NO_TLS
+   /* MALLOC_BALANCE requires TLS. */
+#  ifdef MALLOC_BALANCE
+#    undef MALLOC_BALANCE
+#  endif
 #endif
 
 /*
@@ -591,6 +611,24 @@ void *_mmap(void *addr, size_t length, int prot, int flags,
  * worst-case spinning.
  */
 #define	BLOCK_COST_2POW		4
+
+#ifdef MALLOC_BALANCE
+   /*
+    * We use an exponential moving average to track recent lock contention,
+    * where the size of the history window is N, and alpha=2/(N+1).
+    *
+    * Due to integer math rounding, very small values here can cause
+    * substantial degradation in accuracy, thus making the moving average decay
+    * faster than it would with precise calculation.
+    */
+#  define BALANCE_ALPHA_INV_2POW	9
+
+   /*
+    * Threshold value for the exponential moving contention average at which to
+    * re-assign a thread.
+    */
+#  define BALANCE_THRESHOLD_DEFAULT	(1U << (SPIN_LIMIT_2POW-4))
+#endif
 
 /******************************************************************************/
 
@@ -705,6 +743,11 @@ struct arena_stats_s {
 	size_t		allocated_large;
 	uint64_t	nmalloc_large;
 	uint64_t	ndalloc_large;
+
+#ifdef MALLOC_BALANCE
+	/* Number of times this arena reassigned a thread due to contention. */
+	uint64_t	nbalance;
+#endif
 };
 
 #endif /* #ifdef MALLOC_STATS */
@@ -989,6 +1032,14 @@ struct arena_s {
 	 */
 	arena_avail_tree_t	runs_avail;
 
+#ifdef MALLOC_BALANCE
+	/*
+	 * The arena load balancing machinery needs to keep track of how much
+	 * lock contention there is.  This value is exponentially averaged.
+	 */
+	uint32_t		contention;
+#endif
+
 	/*
 	 * bins is used to store rings of free regions of the following sizes,
 	 * assuming a 16-byte quantum, 4kB pagesize, and default MALLOC_OPTIONS.
@@ -1227,7 +1278,11 @@ static size_t		base_committed;
 static arena_t		**arenas;
 static unsigned		narenas;
 #ifndef NO_TLS
+#  ifdef MALLOC_BALANCE
+static unsigned		narenas_2pow;
+#  else
 static unsigned		next_arena;
+#  endif
 #endif
 #ifdef MOZ_MEMORY
 static malloc_spinlock_t arenas_lock; /* Protects arenas initialization. */
@@ -1269,6 +1324,9 @@ static const bool	opt_zero = false;
 #endif
 
 static size_t	opt_dirty_max = DIRTY_MAX_DEFAULT;
+#ifdef MALLOC_BALANCE
+static uint64_t	opt_balance_threshold = BALANCE_THRESHOLD_DEFAULT;
+#endif
 static bool	opt_print_stats = false;
 #ifdef MALLOC_STATIC_SIZES
 #define opt_quantum_2pow	QUANTUM_2POW_MIN
@@ -1363,6 +1421,9 @@ static void	arena_run_trim_tail(arena_t *arena, arena_chunk_t *chunk,
 static arena_run_t *arena_bin_nonfull_run_get(arena_t *arena, arena_bin_t *bin);
 static void *arena_bin_malloc_hard(arena_t *arena, arena_bin_t *bin);
 static size_t arena_bin_run_size_calc(arena_bin_t *bin, size_t min_run_size);
+#ifdef MALLOC_BALANCE
+static void	arena_lock_balance_hard(arena_t *arena);
+#endif
 static void	*arena_malloc_large(arena_t *arena, size_t size, bool zero);
 static void	*arena_palloc(arena_t *arena, size_t alignment, size_t size,
     size_t alloc_size);
@@ -1589,7 +1650,9 @@ static bool
 malloc_mutex_init(malloc_mutex_t *mutex)
 {
 #if defined(MOZ_MEMORY_WINDOWS)
-	InitializeSRWLock(mutex);
+	if (isthreaded)
+		if (! __crtInitCritSecAndSpinCount(mutex, _CRT_SPINCOUNT))
+			return (true);
 #elif defined(MOZ_MEMORY_DARWIN)
 	mutex->lock = OS_SPINLOCK_INIT;
 #elif defined(MOZ_MEMORY_LINUX) && !defined(MOZ_MEMORY_ANDROID)
@@ -1624,7 +1687,8 @@ malloc_mutex_lock(malloc_mutex_t *mutex)
 #elif defined(MOZ_MEMORY)
 	pthread_mutex_lock(mutex);
 #else
-	_SPINLOCK(&mutex->lock);
+	if (isthreaded)
+		_SPINLOCK(&mutex->lock);
 #endif
 }
 
@@ -1639,7 +1703,8 @@ malloc_mutex_unlock(malloc_mutex_t *mutex)
 #elif defined(MOZ_MEMORY)
 	pthread_mutex_unlock(mutex);
 #else
-	_SPINUNLOCK(&mutex->lock);
+	if (isthreaded)
+		_SPINUNLOCK(&mutex->lock);
 #endif
 }
 
@@ -1650,7 +1715,9 @@ static bool
 malloc_spin_init(malloc_spinlock_t *lock)
 {
 #if defined(MOZ_MEMORY_WINDOWS)
-	InitializeSRWLock(lock);
+	if (isthreaded)
+		if (! __crtInitCritSecAndSpinCount(lock, _CRT_SPINCOUNT))
+			return (true);
 #elif defined(MOZ_MEMORY_DARWIN)
 	lock->lock = OS_SPINLOCK_INIT;
 #elif defined(MOZ_MEMORY_LINUX) && !defined(MOZ_MEMORY_ANDROID)
@@ -1683,7 +1750,8 @@ malloc_spin_lock(malloc_spinlock_t *lock)
 #elif defined(MOZ_MEMORY)
 	pthread_mutex_lock(lock);
 #else
-	_SPINLOCK(&lock->lock);
+	if (isthreaded)
+		_SPINLOCK(&lock->lock);
 #endif
 }
 
@@ -1697,7 +1765,8 @@ malloc_spin_unlock(malloc_spinlock_t *lock)
 #elif defined(MOZ_MEMORY)
 	pthread_mutex_unlock(lock);
 #else
-	_SPINUNLOCK(&lock->lock);
+	if (isthreaded)
+		_SPINUNLOCK(&lock->lock);
 #endif
 }
 
@@ -1751,28 +1820,30 @@ malloc_spin_lock(pthread_mutex_t *lock)
 {
 	unsigned ret = 0;
 
-	if (_pthread_mutex_trylock(lock) != 0) {
-		unsigned i;
-		volatile unsigned j;
+	if (isthreaded) {
+		if (_pthread_mutex_trylock(lock) != 0) {
+			unsigned i;
+			volatile unsigned j;
 
-		/* Exponentially back off. */
-		for (i = 1; i <= SPIN_LIMIT_2POW; i++) {
-			for (j = 0; j < (1U << i); j++)
-				ret++;
+			/* Exponentially back off. */
+			for (i = 1; i <= SPIN_LIMIT_2POW; i++) {
+				for (j = 0; j < (1U << i); j++)
+					ret++;
 
-			CPU_SPINWAIT;
-			if (_pthread_mutex_trylock(lock) == 0)
-				return (ret);
+				CPU_SPINWAIT;
+				if (_pthread_mutex_trylock(lock) == 0)
+					return (ret);
+			}
+
+			/*
+			 * Spinning failed.  Block until the lock becomes
+			 * available, in order to avoid indefinite priority
+			 * inversion.
+			 */
+			_pthread_mutex_lock(lock);
+			assert((ret << BLOCK_COST_2POW) != 0);
+			return (ret << BLOCK_COST_2POW);
 		}
-
-		/*
-		 * Spinning failed.  Block until the lock becomes
-		 * available, in order to avoid indefinite priority
-		 * inversion.
-		 */
-		_pthread_mutex_lock(lock);
-		assert((ret << BLOCK_COST_2POW) != 0);
-		return (ret << BLOCK_COST_2POW);
 	}
 
 	return (ret);
@@ -1781,7 +1852,9 @@ malloc_spin_lock(pthread_mutex_t *lock)
 static inline void
 malloc_spin_unlock(pthread_mutex_t *lock)
 {
-	_pthread_mutex_unlock(lock);
+
+	if (isthreaded)
+		_pthread_mutex_unlock(lock);
 }
 #endif
 
@@ -1834,6 +1907,56 @@ pow2_ceil(size_t x)
 	x++;
 	return (x);
 }
+
+#ifdef MALLOC_BALANCE
+/*
+ * Use a simple linear congruential pseudo-random number generator:
+ *
+ *   prn(y) = (a*x + c) % m
+ *
+ * where the following constants ensure maximal period:
+ *
+ *   a == Odd number (relatively prime to 2^n), and (a-1) is a multiple of 4.
+ *   c == Odd number (relatively prime to 2^n).
+ *   m == 2^32
+ *
+ * See Knuth's TAOCP 3rd Ed., Vol. 2, pg. 17 for details on these constraints.
+ *
+ * This choice of m has the disadvantage that the quality of the bits is
+ * proportional to bit position.  For example. the lowest bit has a cycle of 2,
+ * the next has a cycle of 4, etc.  For this reason, we prefer to use the upper
+ * bits.
+ */
+#  define PRN_DEFINE(suffix, var, a, c)					\
+static inline void							\
+sprn_##suffix(uint32_t seed)						\
+{									\
+	var = seed;							\
+}									\
+									\
+static inline uint32_t							\
+prn_##suffix(uint32_t lg_range)						\
+{									\
+	uint32_t ret, x;						\
+									\
+	assert(lg_range > 0);						\
+	assert(lg_range <= 32);						\
+									\
+	x = (var * (a)) + (c);						\
+	var = x;							\
+	ret = x >> (32 - lg_range);					\
+									\
+	return (ret);							\
+}
+#  define SPRN(suffix, seed)	sprn_##suffix(seed)
+#  define PRN(suffix, lg_range)	prn_##suffix(lg_range)
+#endif
+
+#ifdef MALLOC_BALANCE
+/* Define the PRNG used for arena assignment. */
+static __thread uint32_t balance_x;
+PRN_DEFINE(balance, balance_x, 1297, 1301)
+#endif
 
 #ifdef MALLOC_UTRACE
 static int
@@ -3003,6 +3126,11 @@ choose_arena(void)
 	 * introduces a bootstrapping issue.
 	 */
 #ifndef NO_TLS
+	if (isthreaded == false) {
+	    /* Avoid the overhead of TLS for single-threaded operation. */
+	    return (arenas[0]);
+	}
+
 #  ifdef MOZ_MEMORY_WINDOWS
 	ret = (arena_t*)TlsGetValue(tlsIndex);
 #  else
@@ -3014,7 +3142,7 @@ choose_arena(void)
 		RELEASE_ASSERT(ret != NULL);
 	}
 #else
-	if (narenas > 1) {
+	if (isthreaded && narenas > 1) {
 		unsigned long ind;
 
 		/*
@@ -3071,12 +3199,31 @@ choose_arena_hard(void)
 {
 	arena_t *ret;
 
+	assert(isthreaded);
+
+#ifdef MALLOC_BALANCE
+	/* Seed the PRNG used for arena load balancing. */
+	SPRN(balance, (uint32_t)(uintptr_t)(_pthread_self()));
+#endif
+
 	if (narenas > 1) {
+#ifdef MALLOC_BALANCE
+		unsigned ind;
+
+		ind = PRN(balance, narenas_2pow);
+		if ((ret = arenas[ind]) == NULL) {
+			malloc_spin_lock(&arenas_lock);
+			if ((ret = arenas[ind]) == NULL)
+				ret = arenas_extend(ind);
+			malloc_spin_unlock(&arenas_lock);
+		}
+#else
 		malloc_spin_lock(&arenas_lock);
 		if ((ret = arenas[next_arena]) == NULL)
 			ret = arenas_extend(next_arena);
 		next_arena = (next_arena + 1) % narenas;
 		malloc_spin_unlock(&arenas_lock);
+#endif
 	} else
 		ret = arenas[0];
 
@@ -4010,6 +4157,63 @@ arena_bin_run_size_calc(arena_bin_t *bin, size_t min_run_size)
 	return (good_run_size);
 }
 
+#ifdef MALLOC_BALANCE
+static inline void
+arena_lock_balance(arena_t *arena)
+{
+	unsigned contention;
+
+	contention = malloc_spin_lock(&arena->lock);
+	if (narenas > 1) {
+		/*
+		 * Calculate the exponentially averaged contention for this
+		 * arena.  Due to integer math always rounding down, this value
+		 * decays somewhat faster then normal.
+		 */
+		arena->contention = (((uint64_t)arena->contention
+		    * (uint64_t)((1U << BALANCE_ALPHA_INV_2POW)-1))
+		    + (uint64_t)contention) >> BALANCE_ALPHA_INV_2POW;
+		if (arena->contention >= opt_balance_threshold)
+			arena_lock_balance_hard(arena);
+	}
+}
+
+static void
+arena_lock_balance_hard(arena_t *arena)
+{
+	uint32_t ind;
+
+	arena->contention = 0;
+#ifdef MALLOC_STATS
+	arena->stats.nbalance++;
+#endif
+	ind = PRN(balance, narenas_2pow);
+	if (arenas[ind] != NULL) {
+#ifdef MOZ_MEMORY_WINDOWS
+		TlsSetValue(tlsIndex, arenas[ind]);
+#else
+		arenas_map = arenas[ind];
+#endif
+	} else {
+		malloc_spin_lock(&arenas_lock);
+		if (arenas[ind] != NULL) {
+#ifdef MOZ_MEMORY_WINDOWS
+			TlsSetValue(tlsIndex, arenas[ind]);
+#else
+			arenas_map = arenas[ind];
+#endif
+		} else {
+#ifdef MOZ_MEMORY_WINDOWS
+			TlsSetValue(tlsIndex, arenas_extend(ind));
+#else
+			arenas_map = arenas_extend(ind);
+#endif
+		}
+		malloc_spin_unlock(&arenas_lock);
+	}
+}
+#endif
+
 static inline void *
 arena_malloc_small(arena_t *arena, size_t size, bool zero)
 {
@@ -4044,8 +4248,11 @@ arena_malloc_small(arena_t *arena, size_t size, bool zero)
 	}
 	RELEASE_ASSERT(size == bin->reg_size);
 
+#ifdef MALLOC_BALANCE
+	arena_lock_balance(arena);
+#else
 	malloc_spin_lock(&arena->lock);
-
+#endif
 	if ((run = bin->runcur) != NULL && run->nfree > 0)
 		ret = arena_bin_malloc_easy(arena, bin, run);
 	else
@@ -4083,7 +4290,11 @@ arena_malloc_large(arena_t *arena, size_t size, bool zero)
 
 	/* Large allocation. */
 	size = PAGE_CEILING(size);
+#ifdef MALLOC_BALANCE
+	arena_lock_balance(arena);
+#else
 	malloc_spin_lock(&arena->lock);
+#endif
 	ret = (void *)arena_run_alloc(arena, NULL, size, true, zero);
 	if (ret == NULL) {
 		malloc_spin_unlock(&arena->lock);
@@ -4155,8 +4366,11 @@ arena_palloc(arena_t *arena, size_t alignment, size_t size, size_t alloc_size)
 	assert((size & pagesize_mask) == 0);
 	assert((alignment & pagesize_mask) == 0);
 
+#ifdef MALLOC_BALANCE
+	arena_lock_balance(arena);
+#else
 	malloc_spin_lock(&arena->lock);
-
+#endif
 	ret = (void *)arena_run_alloc(arena, NULL, alloc_size, true, false);
 	if (ret == NULL) {
 		malloc_spin_unlock(&arena->lock);
@@ -4579,7 +4793,11 @@ arena_ralloc_large_shrink(arena_t *arena, arena_chunk_t *chunk, void *ptr,
 	 * Shrink the run, and make trailing pages available for other
 	 * allocations.
 	 */
+#ifdef MALLOC_BALANCE
+	arena_lock_balance(arena);
+#else
 	malloc_spin_lock(&arena->lock);
+#endif
 	arena_run_trim_tail(arena, chunk, (arena_run_t *)ptr, oldsize, size,
 	    true);
 #ifdef MALLOC_STATS
@@ -4599,7 +4817,11 @@ arena_ralloc_large_grow(arena_t *arena, arena_chunk_t *chunk, void *ptr,
 
 	/* Try to extend the run. */
 	assert(size > oldsize);
+#ifdef MALLOC_BALANCE
+	arena_lock_balance(arena);
+#else
 	malloc_spin_lock(&arena->lock);
+#endif
 	if (pageind + npages < chunk_npages && (chunk->map[pageind+npages].bits
 	    & CHUNK_MAP_ALLOCATED) == 0 && (chunk->map[pageind+npages].bits &
 	    ~pagesize_mask) >= size - oldsize) {
@@ -4776,6 +4998,10 @@ arena_new(arena_t *arena)
 	arena->ndirty = 0;
 
 	arena_avail_tree_new(&arena->runs_avail);
+
+#ifdef MALLOC_BALANCE
+	arena->contention = 0;
+#endif
 
 	/* Initialize bins. */
 	prev_run_size = pagesize;
@@ -5237,6 +5463,10 @@ malloc_print_stats(void)
 #endif
 		_malloc_message("Max arenas: ", umax2s(narenas, 10, s), "\n",
 		    "");
+#ifdef MALLOC_BALANCE
+		_malloc_message("Arena balance threshold: ",
+		    umax2s(opt_balance_threshold, 10, s), "\n", "");
+#endif
 		_malloc_message("Pointer size: ", umax2s(sizeof(void *), 10, s),
 		    "\n", "");
 		_malloc_message("Quantum size: ", umax2s(quantum, 10, s), "\n",
@@ -5254,6 +5484,9 @@ malloc_print_stats(void)
 #ifdef MALLOC_STATS
 		{
 			size_t allocated, mapped = 0;
+#ifdef MALLOC_BALANCE
+			uint64_t nbalance = 0;
+#endif
 			unsigned i;
 			arena_t *arena;
 
@@ -5268,6 +5501,9 @@ malloc_print_stats(void)
 					allocated +=
 					    arenas[i]->stats.allocated_large;
 					mapped += arenas[i]->stats.mapped;
+#ifdef MALLOC_BALANCE
+					nbalance += arenas[i]->stats.nbalance;
+#endif
 					malloc_spin_unlock(&arenas[i]->lock);
 				}
 			}
@@ -5288,6 +5524,11 @@ malloc_print_stats(void)
 #else
 			malloc_printf("Allocated: %zu, mapped: %zu\n",
 			    allocated, mapped);
+#endif
+
+#ifdef MALLOC_BALANCE
+			malloc_printf("Arena balance reassignments: %llu\n",
+			    nbalance);
 #endif
 
 			/* Print chunk stats. */
@@ -5495,8 +5736,18 @@ MALLOC_OUT:
 					opt_abort = true;
 					break;
 				case 'b':
+#ifdef MALLOC_BALANCE
+					opt_balance_threshold >>= 1;
+#endif
 					break;
 				case 'B':
+#ifdef MALLOC_BALANCE
+					if (opt_balance_threshold == 0)
+						opt_balance_threshold = 1;
+					else if ((opt_balance_threshold << 1)
+					    > opt_balance_threshold)
+						opt_balance_threshold <<= 1;
+#endif
 					break;
 #ifdef MALLOC_FILL
 #ifndef MALLOC_PRODUCTION
@@ -5739,6 +5990,12 @@ MALLOC_OUT:
 		if (narenas == 0)
 			narenas = 1;
 	}
+#ifdef MALLOC_BALANCE
+	assert(narenas != 0);
+	for (narenas_2pow = 0;
+	     (narenas >> (narenas_2pow + 1)) != 0;
+	     narenas_2pow++);
+#endif
 
 #ifdef NO_TLS
 	if (narenas > 1) {
@@ -5768,7 +6025,9 @@ MALLOC_OUT:
 #endif
 
 #ifndef NO_TLS
+#  ifndef MALLOC_BALANCE
 	next_arena = 0;
+#  endif
 #endif
 
 	/* Allocate and initialize arenas. */
@@ -5807,6 +6066,14 @@ MALLOC_OUT:
 #else
 	arenas_map = arenas[0];
 #endif
+#endif
+
+	/*
+	 * Seed here for the initial thread, since choose_arena_hard() is only
+	 * called for other threads.  The seed value doesn't really matter.
+	 */
+#ifdef MALLOC_BALANCE
+	SPRN(balance, 42);
 #endif
 
 	malloc_spin_init(&arenas_lock);
@@ -6349,7 +6616,13 @@ jemalloc_stats_impl(jemalloc_stats_t *stats)
 #endif
 	    false;
 	stats->narenas = narenas;
-	stats->balance_threshold = SIZE_T_MAX;
+	stats->balance_threshold =
+#ifdef MALLOC_BALANCE
+	    opt_balance_threshold
+#else
+	    SIZE_T_MAX
+#endif
+	    ;
 	stats->quantum = quantum;
 	stats->small_max = small_max;
 	stats->large_max = arena_maxclass;

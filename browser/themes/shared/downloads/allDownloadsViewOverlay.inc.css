@@ -87,3 +87,11 @@
   padding: 5px;
   list-style-image: url("chrome://browser/skin/downloads/buttons.png");
 }
+
+.downloadButton > .button-box > .button-icon {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  filter: url("chrome://global/skin/filters.svg#fill");
+  fill: currentColor;
+}

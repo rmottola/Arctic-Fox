@@ -3576,7 +3576,7 @@ Debugger::unwrapDebuggeeArgument(JSContext* cx, const Value& v)
     /* If we have a cross-compartment wrapper, dereference as far as is secure. */
     obj = CheckedUnwrap(obj);
     if (!obj) {
-        JS_ReportErrorASCII(cx, "Permission denied to access object");
+        ReportAccessDenied(cx);
         return nullptr;
     }
 
@@ -8331,7 +8331,7 @@ DebuggerObject_checkThis(JSContext* cx, const CallArgs& args, const char* fnname
    THIS_DEBUGOBJECT_REFERENT(cx, argc, vp, fnname, args, obj);                      \
    obj = CheckedUnwrap(obj);                                                        \
    if (!obj) {                                                                      \
-       JS_ReportErrorASCII(cx, "Permission denied to access object");               \
+       ReportAccessDenied(cx);                                                      \
        return false;                                                                \
    }                                                                                \
    if (!obj->is<PromiseObject>()) {                                                 \
@@ -8345,7 +8345,7 @@ DebuggerObject_checkThis(JSContext* cx, const CallArgs& args, const char* fnname
    THIS_DEBUGOBJECT_OWNER_REFERENT(cx, argc, vp, fnname, args, dbg, obj);           \
    obj = CheckedUnwrap(obj);                                                        \
    if (!obj) {                                                                      \
-       JS_ReportErrorASCII(cx, "Permission denied to access object");               \
+       ReportAccessDenied(cx);                                                      \
        return false;                                                                \
    }                                                                                \
    if (!obj->is<PromiseObject>()) {                                                 \
@@ -9643,7 +9643,7 @@ DebuggerObject::getErrorReport(JSContext* cx, HandleObject maybeError, JSErrorRe
         obj = CheckedUnwrap(obj);
 
     if (!obj) {
-        JS_ReportErrorASCII(cx, "Permission denied to access object");
+        ReportAccessDenied(cx);
         return false;
     }
 
@@ -9927,8 +9927,7 @@ DebuggerObject::defineProperty(JSContext* cx, HandleDebuggerObject object, Handl
     Rooted<PropertyDescriptor> desc(cx, desc_);
     if (!dbg->unwrapPropertyDescriptor(cx, referent, &desc))
         return false;
-    if (!CheckPropertyDescriptorAccessors(cx, desc))
-        return false;
+    JS_TRY_OR_RETURN_FALSE(cx, CheckPropertyDescriptorAccessors(cx, desc));
 
     Maybe<AutoCompartment> ac;
     ac.emplace(cx, referent);
@@ -9956,8 +9955,7 @@ DebuggerObject::defineProperties(JSContext* cx, HandleDebuggerObject object,
     for (size_t i = 0; i < descs.length(); i++) {
         if (!dbg->unwrapPropertyDescriptor(cx, referent, descs[i]))
             return false;
-        if (!CheckPropertyDescriptorAccessors(cx, descs[i]))
-            return false;
+        JS_TRY_OR_RETURN_FALSE(cx, CheckPropertyDescriptorAccessors(cx, descs[i]));
     }
 
     Maybe<AutoCompartment> ac;
@@ -10219,7 +10217,7 @@ DebuggerObject::requirePromise(JSContext* cx, HandleDebuggerObject object)
    if (IsCrossCompartmentWrapper(referent)) {
        referent = CheckedUnwrap(referent);
        if (!referent) {
-           JS_ReportErrorASCII(cx, "Permission denied to access object");
+           ReportAccessDenied(cx);
            return false;
        }
    }

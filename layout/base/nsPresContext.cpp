@@ -76,6 +76,7 @@
 #include "nsLayoutStylesheetCache.h"
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
+#include "mozilla/ServoRestyleManagerInlines.h"
 
 #if defined(MOZ_WIDGET_GTK)
 #include "gfxPlatformGtk.h" // xxx - for UseFcFontList
@@ -882,10 +883,6 @@ nsPresContext::Init(nsDeviceContext* aDeviceContext)
   mInitialized = true;
 #endif
 
-  mBorderWidthTable[NS_STYLE_BORDER_WIDTH_THIN] = CSSPixelsToAppUnits(1);
-  mBorderWidthTable[NS_STYLE_BORDER_WIDTH_MEDIUM] = CSSPixelsToAppUnits(3);
-  mBorderWidthTable[NS_STYLE_BORDER_WIDTH_THICK] = CSSPixelsToAppUnits(5);
-
   return NS_OK;
 }
 
@@ -1388,7 +1385,9 @@ GetPropagatedScrollbarStylesForViewport(nsPresContext* aPresContext,
   // Check the style on the document root element
   StyleSetHandle styleSet = aPresContext->StyleSet();
   RefPtr<nsStyleContext> rootStyle;
-  rootStyle = styleSet->ResolveStyleFor(docElement, nullptr);
+  rootStyle = styleSet->ResolveStyleFor(docElement, nullptr,
+                                        ConsumeStyleBehavior::DontConsume,
+                                        LazyComputeBehavior::Allow);
   if (CheckOverflow(rootStyle->StyleDisplay(), aStyles)) {
     // tell caller we stole the overflow style from the root element
     return docElement;
@@ -1416,7 +1415,9 @@ GetPropagatedScrollbarStylesForViewport(nsPresContext* aPresContext,
   }
 
   RefPtr<nsStyleContext> bodyStyle;
-  bodyStyle = styleSet->ResolveStyleFor(bodyElement->AsElement(), rootStyle);
+  bodyStyle = styleSet->ResolveStyleFor(bodyElement->AsElement(), rootStyle,
+                                        ConsumeStyleBehavior::DontConsume,
+                                        LazyComputeBehavior::Allow);
 
   if (CheckOverflow(bodyStyle->StyleDisplay(), aStyles)) {
     // tell caller we stole the overflow style from the body element

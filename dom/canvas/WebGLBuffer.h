@@ -22,7 +22,6 @@ class WebGLBuffer final
     : public nsWrapperCache
     , public WebGLRefCountedObject<WebGLBuffer>
     , public LinkedListElement<WebGLBuffer>
-    , public WebGLContextBoundObject
 {
     friend class WebGLContext;
     friend class WebGL2Context;
@@ -79,8 +78,6 @@ protected:
     GLenum mUsage;
     size_t mByteLength;
     UniquePtr<WebGLElementArrayCache> mCache;
-    size_t mNumActiveTFOs;
-    bool mBoundForTF;
 };
 
 } // namespace mozilla

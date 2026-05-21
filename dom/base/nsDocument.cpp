@@ -19,6 +19,7 @@
 #include "mozilla/IntegerRange.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Likely.h"
+#include "mozilla/PresShell.h"
 #include <algorithm>
 
 #include "mozilla/Logging.h"
@@ -82,7 +83,6 @@
 #include "nsCanvasFrame.h"
 #include "nsContentCID.h"
 #include "nsError.h"
-#include "nsPresShell.h"
 #include "nsPresContext.h"
 #include "nsIJSON.h"
 #include "nsThreadUtils.h"
@@ -2873,7 +2873,7 @@ nsDocument::SetPrincipal(nsIPrincipal *aNewPrincipal)
 }
 
 mozilla::dom::DocGroup*
-nsIDocument::GetDocGroup()
+nsIDocument::GetDocGroup() const
 {
 #ifdef DEBUG
   // Sanity check that we have an up-to-date and accurate docgroup
@@ -2901,12 +2901,12 @@ nsIDocument::Dispatch(const char* aName,
 }
 
 already_AddRefed<nsIEventTarget>
-nsIDocument::CreateEventTarget(const char* aName, TaskCategory aCategory)
+nsIDocument::EventTargetFor(TaskCategory aCategory) const
 {
   if (mDocGroup) {
-    return mDocGroup->CreateEventTarget(aName, aCategory);
+    return mDocGroup->EventTargetFor(aCategory);
   }
-  return DispatcherTrait::CreateEventTarget(aName, aCategory);
+  return DispatcherTrait::EventTargetFor(aCategory);
 }
 
 NS_IMETHODIMP
@@ -2958,21 +2958,21 @@ nsDocument::GetAllowPlugins(bool * aAllowPlugins)
 }
 
 bool
-nsDocument::IsElementAnimateEnabled(JSContext* /*unused*/, JSObject* /*unused*/)
+nsDocument::IsElementAnimateEnabled(JSContext* aCx, JSObject* /*unused*/)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  return nsContentUtils::IsCallerChrome() ||
+  return nsContentUtils::IsSystemCaller(aCx) ||
          Preferences::GetBool("dom.animations-api.core.enabled") ||
          Preferences::GetBool("dom.animations-api.element-animate.enabled");
 }
 
 bool
-nsDocument::IsWebAnimationsEnabled(JSContext* /*unused*/, JSObject* /*unused*/)
+nsDocument::IsWebAnimationsEnabled(JSContext* aCx, JSObject* /*unused*/)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  return nsContentUtils::IsCallerChrome() ||
+  return nsContentUtils::IsSystemCaller(aCx) ||
          Preferences::GetBool("dom.animations-api.core.enabled");
 }
 
@@ -5739,7 +5739,28 @@ nsDocument::IsWebComponentsEnabled(JSContext* aCx, JSObject* aObject)
   nsCOMPtr<nsPIDOMWindowInner> window =
     do_QueryInterface(nsJSUtils::GetStaticScriptGlobal(global));
 
-  if (window) {
+  return IsWebComponentsEnabled(window);
+}
+
+bool
+nsDocument::IsWebComponentsEnabled(dom::NodeInfo* aNodeInfo)
+{
+  if (Preferences::GetBool("dom.webcomponents.enabled")) {
+    return true;
+  }
+
+  nsIDocument* doc = aNodeInfo->GetDocument();
+  // Use GetScopeObject() here so that data documents work the same way as the
+  // main document they're associated with.
+  nsCOMPtr<nsPIDOMWindowInner> window =
+    do_QueryInterface(doc->GetScopeObject());
+  return IsWebComponentsEnabled(window);
+}
+
+bool
+nsDocument::IsWebComponentsEnabled(nsPIDOMWindowInner* aWindow)
+{
+  if (aWindow) {
     nsresult rv;
     nsCOMPtr<nsIPermissionManager> permMgr =
       do_GetService(NS_PERMISSIONMANAGER_CONTRACTID, &rv);
@@ -5747,7 +5768,7 @@ nsDocument::IsWebComponentsEnabled(JSContext* aCx, JSObject* aObject)
 
     uint32_t perm;
     rv = permMgr->TestPermissionFromWindow(
-      window, "moz-extremely-unstable-and-will-change-webcomponents", &perm);
+      aWindow, "moz-extremely-unstable-and-will-change-webcomponents", &perm);
     NS_ENSURE_SUCCESS(rv, false);
 
     return perm == nsIPermissionManager::ALLOW_ACTION;
@@ -10992,7 +11013,7 @@ nsresult nsDocument::RemoteFrameFullscreenReverted()
 nsDocument::IsUnprefixedFullscreenEnabled(JSContext* aCx, JSObject* aObject)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  return nsContentUtils::IsCallerChrome() ||
+  return nsContentUtils::IsSystemCaller(aCx) ||
          nsContentUtils::IsUnprefixedFullscreenApiEnabled();
 }
 
@@ -11845,7 +11866,7 @@ nsDocument::PostVisibilityUpdateEvent()
 {
   nsCOMPtr<nsIRunnable> event =
     NewRunnableMethod(this, &nsDocument::UpdateVisibilityState);
-  NS_DispatchToMainThread(event);
+  Dispatch("UpdateVisibility", TaskCategory::Other, event.forget());
 }
 
 void

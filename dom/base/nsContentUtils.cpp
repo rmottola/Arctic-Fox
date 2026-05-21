@@ -102,6 +102,7 @@
 #include "nsHtml5Module.h"
 #include "nsHtml5StringParser.h"
 #include "nsIAddonPolicyService.h"
+#include "nsIAnonymousContentCreator.h"
 #include "nsIAsyncVerifyRedirectCallback.h"
 #include "nsICategoryManager.h"
 #include "nsIChannelEventSink.h"
@@ -2125,15 +2126,6 @@ nsContentUtils::ShouldResistFingerprinting(nsIDocShell* aDocShell)
   return !isChrome && sPrivacyResistFingerprinting;
 }
 
-namespace mozilla {
-namespace dom {
-namespace workers {
-extern bool IsCurrentThreadRunningChromeWorker();
-extern JSContext* GetCurrentThreadJSContext();
-} // namespace workers
-} // namespace dom
-} // namespace mozilla
-
 bool
 nsContentUtils::ThreadsafeIsCallerChrome()
 {
@@ -2159,6 +2151,31 @@ nsContentUtils::IsCallerContentXBL()
     }
 
     return xpc::IsContentXBLScope(c);
+}
+
+bool
+nsContentUtils::IsSystemCaller(JSContext* aCx)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  // This is similar to what SubjectPrincipal() does, except we do in fact
+  // assume that we're in a compartment here; anyone who calls this function in
+  // situations where that's not the case is doing it wrong.
+  JSCompartment *compartment = js::GetContextCompartment(aCx);
+  MOZ_ASSERT(compartment);
+
+  JSPrincipals *principals = JS_GetCompartmentPrincipals(compartment);
+  return nsJSPrincipals::get(principals) == sSystemPrincipal;
+}
+
+bool
+nsContentUtils::ThreadsafeIsSystemCaller(JSContext* aCx)
+{
+  if (NS_IsMainThread()) {
+    return IsSystemCaller(aCx);
+  }
+
+  return workers::GetWorkerPrivateFromContext(aCx)->UsesSystemPrincipal();
 }
 
 // static
@@ -3739,6 +3756,16 @@ nsContentUtils::IsPlainTextType(const nsACString& aContentType)
          aContentType.EqualsLiteral(TEXT_CACHE_MANIFEST) ||
          aContentType.EqualsLiteral(TEXT_VTT) ||
          IsScriptType(aContentType);
+}
+
+bool
+nsContentUtils::IsUtf8OnlyPlainTextType(const nsACString& aContentType)
+{
+  // NOTE: This must be a subset of the list in IsPlainTextType().
+  return aContentType.EqualsLiteral(TEXT_CACHE_MANIFEST) ||
+         aContentType.EqualsLiteral(APPLICATION_JSON) ||
+         aContentType.EqualsLiteral(TEXT_JSON) ||
+         aContentType.EqualsLiteral(TEXT_VTT);
 }
 
 bool
@@ -7047,7 +7074,7 @@ nsContentUtils::GetHTMLEditor(nsPresContext* aPresContext)
 }
 
 bool
-nsContentUtils::IsContentInsertionPoint(const nsIContent* aContent)
+nsContentUtils::IsContentInsertionPoint(nsIContent* aContent)
 {
   // Check if the content is a XBL insertion point.
   if (aContent->IsActiveChildrenElement()) {
@@ -7055,11 +7082,9 @@ nsContentUtils::IsContentInsertionPoint(const nsIContent* aContent)
   }
 
   // Check if the content is a web components content insertion point.
-  if (aContent->IsHTMLElement(nsGkAtoms::content)) {
-    return static_cast<const HTMLContentElement*>(aContent)->IsInsertionPoint();
-  }
-
-  return false;
+  HTMLContentElement* contentElement =
+    HTMLContentElement::FromContent(aContent);
+  return contentElement && contentElement->IsInsertionPoint();
 }
 
 // static
@@ -9762,4 +9787,22 @@ nsContentUtils::AttemptLargeAllocationLoad(nsIHttpChannel* aChannel)
   NS_ENSURE_SUCCESS(rv, false);
 
   return reloadSucceeded;
+}
+
+/* static */ void
+nsContentUtils::AppendDocumentLevelNativeAnonymousContentTo(
+    nsIDocument* aDocument,
+    nsTArray<nsIContent*>& aElements)
+{
+  MOZ_ASSERT(aDocument);
+
+  // XXXheycam This probably needs to find the nsCanvasFrame's NAC too.
+  if (nsIPresShell* presShell = aDocument->GetShell()) {
+    if (nsIFrame* scrollFrame = presShell->GetRootScrollFrame()) {
+      nsIAnonymousContentCreator* creator = do_QueryFrame(scrollFrame);
+      MOZ_ASSERT(creator,
+                 "scroll frame should always implement nsIAnonymousContentCreator");
+      creator->AppendAnonymousContentTo(aElements, 0);
+    }
+  }
 }

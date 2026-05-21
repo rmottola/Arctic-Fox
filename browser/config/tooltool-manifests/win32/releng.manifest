@@ -13,10 +13,20 @@
 "unpack": true
 },
 {
-"size": 167175,
-"digest": "0b71a936edf5bd70cf274aaa5d7abc8f77fe8e7b5593a208f805cc9436fac646b9c4f0b43c2b10de63ff3da671497d35536077ecbc72dba7f8159a38b580f831",
+"version": "sccache rev b21198a7183a2fe226ff49348b1c0b51bae9f4f8",
 "algorithm": "sha512",
-"filename": "sccache.tar.bz2",
+"visibility": "public",
+"filename": "sccache2.tar.bz2",
+"unpack": true,
+"digest": "7dee5c5602b3830cb8ac45ebaa8542714bbac0e50eabbff58a06972a02ceeab75ed7c56ff22a23f760b8317ae8e9a01cdecfaf75a7acbd2a4cdd817967170d2e",
+"size": 1179901
+},
+{
+"version": "Visual Studio 2015 Update 3 14.0.25425.01 / SDK 10.0.14393.0",
+"size": 326656969,
+"digest": "babc414ffc0457d27f5a1ed24a8e4873afbe2f1c1a4075469a27c005e1babc3b2a788f643f825efedff95b79686664c67ec4340ed535487168a3482e68559bc7",
+"algorithm": "sha512",
+"filename": "vs2015u3.zip",
 "unpack": true
 }
 ]

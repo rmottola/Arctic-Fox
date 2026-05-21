@@ -428,7 +428,7 @@ NS_IMPL_FRAMEARENA_HELPERS(nsFrame)
 void
 nsFrame::operator delete(void *, size_t)
 {
-  NS_RUNTIMEABORT("nsFrame::operator delete should never be called");
+  MOZ_CRASH("nsFrame::operator delete should never be called");
 }
 
 NS_QUERYFRAME_HEAD(nsFrame)
@@ -4632,11 +4632,11 @@ IntrinsicSizeOffsets(nsIFrame* aFrame, bool aForISize)
 
   const nsStyleBorder* styleBorder = aFrame->StyleBorder();
   if (verticalAxis) {
-    result.hBorder += styleBorder->GetComputedBorderWidth(NS_SIDE_TOP);
-    result.hBorder += styleBorder->GetComputedBorderWidth(NS_SIDE_BOTTOM);
+    result.hBorder += styleBorder->GetComputedBorderWidth(eSideTop);
+    result.hBorder += styleBorder->GetComputedBorderWidth(eSideBottom);
   } else {
-    result.hBorder += styleBorder->GetComputedBorderWidth(NS_SIDE_LEFT);
-    result.hBorder += styleBorder->GetComputedBorderWidth(NS_SIDE_RIGHT);
+    result.hBorder += styleBorder->GetComputedBorderWidth(eSideLeft);
+    result.hBorder += styleBorder->GetComputedBorderWidth(eSideRight);
   }
 
   const nsStyleDisplay* disp = aFrame->StyleDisplay();
@@ -4720,8 +4720,24 @@ nsFrame::ComputeSize(nsRenderingContext* aRenderingContext,
   const nsStyleCoord* blockStyleCoord = &stylePos->BSize(aWM);
 
   nsIAtom* parentFrameType = GetParent() ? GetParent()->GetType() : nullptr;
+  auto alignCB = GetParent();
   bool isGridItem = (parentFrameType == nsGkAtoms::gridContainerFrame &&
                      !(GetStateBits() & NS_FRAME_OUT_OF_FLOW));
+  if (parentFrameType == nsGkAtoms::tableWrapperFrame &&
+      GetType() == nsGkAtoms::tableFrame) {
+    // An inner table frame is sized as a grid item if its table wrapper is,
+    // because they actually have the same CB (the wrapper's CB).
+    // @see ReflowInput::InitCBReflowInput
+    auto tableWrapper = GetParent();
+    auto grandParent = tableWrapper->GetParent();
+    isGridItem = (grandParent->GetType() == nsGkAtoms::gridContainerFrame &&
+                  !(tableWrapper->GetStateBits() & NS_FRAME_OUT_OF_FLOW));
+    if (isGridItem) {
+      // When resolving justify/align-self below, we want to use the grid
+      // container's justify/align-items value and WritingMode.
+      alignCB = grandParent;
+    }
+  }
   bool isFlexItem = (parentFrameType == nsGkAtoms::flexContainerFrame &&
                      !(GetStateBits() & NS_FRAME_OUT_OF_FLOW));
   bool isInlineFlexItem = false;
@@ -4772,9 +4788,9 @@ nsFrame::ComputeSize(nsRenderingContext* aRenderingContext,
     if (!(aFlags & nsIFrame::eShrinkWrap) &&
         !StyleMargin()->HasInlineAxisAuto(aWM)) {
       auto inlineAxisAlignment =
-        aWM.IsOrthogonalTo(GetParent()->GetWritingMode()) ?
-          StylePosition()->UsedAlignSelf(GetParent()->StyleContext()) :
-          StylePosition()->UsedJustifySelf(GetParent()->StyleContext());
+        aWM.IsOrthogonalTo(alignCB->GetWritingMode()) ?
+          StylePosition()->UsedAlignSelf(alignCB->StyleContext()) :
+          StylePosition()->UsedJustifySelf(alignCB->StyleContext());
       stretch = inlineAxisAlignment == NS_STYLE_ALIGN_NORMAL ||
                 inlineAxisAlignment == NS_STYLE_ALIGN_STRETCH;
     }
@@ -4859,9 +4875,9 @@ nsFrame::ComputeSize(nsRenderingContext* aRenderingContext,
         bool stretch = false;
         if (!StyleMargin()->HasBlockAxisAuto(aWM)) {
           auto blockAxisAlignment =
-            !aWM.IsOrthogonalTo(GetParent()->GetWritingMode()) ?
-              StylePosition()->UsedAlignSelf(StyleContext()->GetParent()) :
-              StylePosition()->UsedJustifySelf(StyleContext()->GetParent());
+            !aWM.IsOrthogonalTo(alignCB->GetWritingMode()) ?
+              StylePosition()->UsedAlignSelf(alignCB->StyleContext()) :
+              StylePosition()->UsedJustifySelf(alignCB->StyleContext());
           stretch = blockAxisAlignment == NS_STYLE_ALIGN_NORMAL ||
                     blockAxisAlignment == NS_STYLE_ALIGN_STRETCH;
         }
@@ -5809,8 +5825,8 @@ nsIFrame::GetOffsetToCrossDoc(const nsIFrame* aOther, const int32_t aAPD) const
   if (PresContext()->GetRootPresContext() !=
         aOther->PresContext()->GetRootPresContext()) {
     // crash right away, we are almost certainly going to crash anyway.
-    NS_RUNTIMEABORT("trying to get the offset between frames in different "
-                    "document hierarchies?");
+    MOZ_CRASH("trying to get the offset between frames in different "
+              "document hierarchies?");
   }
 
   const nsIFrame* root = nullptr;

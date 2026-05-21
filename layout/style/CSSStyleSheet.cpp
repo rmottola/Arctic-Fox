@@ -23,6 +23,7 @@
 #include "nsGkAtoms.h"
 #include "nsQueryObject.h"
 #include "nsString.h"
+#include "nsStyleSet.h"
 #include "nsTArray.h"
 #include "nsIDOMCSSStyleSheet.h"
 #include "mozilla/dom/CSSRuleList.h"
@@ -1386,9 +1387,10 @@ CSSStyleSheet::FindOwningWindowInnerID() const
   }
 
   if (windowID == 0 && mOwnerRule) {
-    RefPtr<CSSStyleSheet> sheet = static_cast<css::Rule*>(mOwnerRule)->GetStyleSheet();
+    RefPtr<StyleSheet> sheet =
+      static_cast<css::Rule*>(mOwnerRule)->GetStyleSheet();
     if (sheet) {
-      windowID = sheet->FindOwningWindowInnerID();
+      windowID = sheet->AsGecko()->FindOwningWindowInnerID();
     }
   }
 

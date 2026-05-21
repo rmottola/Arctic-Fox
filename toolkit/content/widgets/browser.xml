@@ -338,6 +338,25 @@
                 onget="return (this.getAttribute('remote') == 'true');"
                 readonly="true"/>
 
+      <property name="remoteType"
+                readonly="true">
+        <getter>
+          <![CDATA[
+            if (!this.isRemoteBrowser) {
+              return null;
+            }
+
+            let remoteType = this.getAttribute("remoteType");
+            if (remoteType) {
+              return remoteType;
+            }
+
+            let E10SUtils = Components.utils.import("resource://gre/modules/E10SUtils.jsm", {}).E10SUtils;
+            return E10SUtils.DEFAULT_REMOTE_TYPE;
+          ]]>
+        </getter>
+      </property>
+
       <property name="messageManager"
                 readonly="true">
         <getter>
@@ -1291,6 +1310,7 @@
 
       <method name="swapBrowsers">
         <parameter name="aOtherBrowser"/>
+        <parameter name="aFlags"/>
         <body>
         <![CDATA[
           // The request comes from a XPCOM component, we'd want to redirect
@@ -1300,7 +1320,7 @@
           if (tabbrowser) {
             let tab = tabbrowser.getTabForBrowser(this);
             if (tab) {
-              tabbrowser.swapBrowsers(tab, aOtherBrowser);
+              tabbrowser.swapBrowsers(tab, aOtherBrowser, aFlags);
               return;
             }
           }

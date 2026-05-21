@@ -145,7 +145,14 @@ public:
      * Skip native anonymous content created for placeholder of HTML input,
      * used in conjunction with eAllChildren or eAllButXBL.
      */
-    eSkipPlaceholderContent = 2
+    eSkipPlaceholderContent = 2,
+
+    /**
+     * Skip native anonymous content created by ancestor frames of the root
+     * element's primary frame, such as scrollbar elements created by the root
+     * scroll frame.
+     */
+    eSkipDocumentLevelNativeAnonymousContent = 4,
   };
 
   /**
@@ -724,10 +731,9 @@ public:
    */
   inline nsIContent *GetFlattenedTreeParent() const;
 
-  /**
-   * Helper method, which we leave public so that it's accessible from nsINode.
-   */
-  nsINode *GetFlattenedTreeParentNodeInternal() const;
+  // Helper method, which we leave public so that it's accessible from nsINode.
+  enum FlattenedParentType { eNotForStyle, eForStyle };
+  nsINode* GetFlattenedTreeParentNodeInternal(FlattenedParentType aType) const;
 
   /**
    * Gets the custom element data used by web components custom element.
@@ -937,14 +943,6 @@ public:
    * element.  Also, when the content isn't editable, this returns null.
    */
   mozilla::dom::Element* GetEditingHost();
-
-
-  /**
-   * Set NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO all the way up the flattened
-   * parent chain to the document. If an ancestor is found with the bit already
-   * set, this method asserts that all of its ancestors also have the bit set.
-   */
-  void MarkAncestorsAsHavingDirtyDescendantsForServo();
 
   /**
    * Determining language. Look at the nearest ancestor element that has a lang

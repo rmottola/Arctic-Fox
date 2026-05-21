@@ -6,8 +6,8 @@
 
 TEST_DIRS += ['example']
 
-PYTHON_UNIT_TESTS += [
-    'selftest.py',
+PYTHON_UNITTEST_MANIFESTS += [
+    'python.ini',
 ]
 
 TESTING_JS_MODULES += [

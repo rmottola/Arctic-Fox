@@ -944,13 +944,13 @@
     "bug_numbers": [1255198],
     "description": "This metric is recorded every time a navigator.geolocation.watchPosition() request gets allowed/fulfilled. A false value is recorded if the owner is not visible according to document.isVisible."
   },
-  "GPU_PROCESS_LAUNCH_TIME_MS" : {
+  "GPU_PROCESS_LAUNCH_TIME_MS_2" : {
     "alert_emails": ["george@mozilla.com", "danderson@mozilla.com"],
     "expires_in_version": "never",
-    "bug_numbers": [1297790],
+    "bug_numbers": [1297790, 1317796],
     "kind": "exponential",
-    "high": 1000,
-    "n_buckets": 50,
+    "high": 64000,
+    "n_buckets": 100,
     "releaseChannelCollection": "opt-out",
     "description": "GPU process launch time in milliseconds"
   },
@@ -8363,13 +8363,6 @@
     "n_values": 64,
     "description": "TLS/SSL version intolerance was falsely detected, server rejected handshake (see tlsIntoleranceTelemetryBucket() in nsNSSIOLayer.cpp)."
   },
-  "SSL_WEAK_CIPHERS_FALLBACK": {
-    "alert_emails": ["seceng-telemetry@mozilla.com"],
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 64,
-    "description": "Fallback attempted when server did not support any strong cipher suites"
-  },
   "SSL_CIPHER_SUITE_FULL": {
     "alert_emails": ["seceng-telemetry@mozilla.com"],
     "expires_in_version": "never",
@@ -8431,14 +8424,14 @@
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 32,
-    "description": "Symmetric cipher used in full handshake (null=0, rc4=1, 3des=4, aes-cbc=7, camellia=8, seed=9, aes-gcm=10)"
+    "description": "Symmetric cipher used in full handshake (null=0, 3des=4, aes-cbc=7, aes-gcm=10, chacha20=11)"
   },
   "SSL_SYMMETRIC_CIPHER_RESUMED": {
     "alert_emails": ["seceng-telemetry@mozilla.com"],
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 32,
-    "description": "Symmetric cipher used in resumed handshake (null=0, rc4=1, 3des=4, aes-cbc=7, camellia=8, seed=9, aes-gcm=10)"
+    "description": "Symmetric cipher used in resumed handshake (null=0, 3des=4, aes-cbc=7, aes-gcm=10, chacha20=11)"
   },
   "SSL_REASONS_FOR_NOT_FALSE_STARTING": {
     "alert_emails": ["seceng-telemetry@mozilla.com"],
@@ -8515,7 +8508,7 @@
     "n_values": 10,
     "bug_numbers": [1293231],
     "releaseChannelCollection": "opt-out",
-    "description": "Verification status of Signed Certificate Timestamps received (0=Decoding error, 1=SCT verified, 2=SCT from unknown log, 3=Invalid SCT signature, 4=SCT timestamp is in the future)"
+    "description": "Verification status of Signed Certificate Timestamps received (0=Decoding error, 1=Valid SCT, 2=SCT from unknown log, 3=Invalid SCT signature, 4=SCT timestamp is in the future, 5=Valid SCT from a disqualified log)"
   },
   "SSL_SERVER_AUTH_EKU": {
     "alert_emails": ["seceng-telemetry@mozilla.com"],

@@ -447,6 +447,12 @@ public:
     YUVColorSpace mYUVColorSpace = YUVColorSpace::BT601;
   };
 
+  class Listener {
+  public:
+    virtual void OnSentToCompositor() = 0;
+    virtual ~Listener() {}
+  };
+
   // Constructs a VideoData object. If aImage is nullptr, creates a new Image
   // holding a copy of the YCbCr data passed in aBuffer. If aImage is not
   // nullptr, it's stored as the underlying video image and aBuffer is assumed
@@ -530,8 +536,6 @@ public:
 
   int32_t mFrameID;
 
-  bool mSentToCompositor;
-
   VideoData(int64_t aOffset,
             int64_t aTime,
             int64_t aDuration,
@@ -540,8 +544,15 @@ public:
             IntSize aDisplay,
             uint32_t aFrameID);
 
+  void SetListener(UniquePtr<Listener> aListener);
+  void MarkSentToCompositor();
+  bool IsSentToCompositor() { return mSentToCompositor; }
+
 protected:
   ~VideoData();
+
+  bool mSentToCompositor;
+  UniquePtr<Listener> mListener;
 };
 
 class CryptoTrack
@@ -617,15 +628,22 @@ private:
 class MediaRawData : public MediaData {
 public:
   MediaRawData();
-  MediaRawData(const uint8_t* aData, size_t mSize);
+  MediaRawData(const uint8_t* aData, size_t aSize);
+  MediaRawData(const uint8_t* aData, size_t aSize,
+               const uint8_t* aAlphaData, size_t aAlphaSize);
 
   // Pointer to data or null if not-yet allocated
   const uint8_t* Data() const { return mBuffer.Data(); }
+  // Pointer to alpha data or null if not-yet allocated
+  const uint8_t* AlphaData() const { return mAlphaBuffer.Data(); }
   // Size of buffer.
   size_t Size() const { return mBuffer.Length(); }
+  size_t AlphaSize() const { return mAlphaBuffer.Length(); }
   size_t ComputedSizeOfIncludingThis() const
   {
-    return sizeof(*this) + mBuffer.ComputedSizeOfExcludingThis();
+    return sizeof(*this)
+           + mBuffer.ComputedSizeOfExcludingThis()
+           + mAlphaBuffer.ComputedSizeOfExcludingThis();
   }
 
   const CryptoSample& mCrypto;
@@ -650,6 +668,7 @@ protected:
 private:
   friend class MediaRawDataWriter;
   AlignedByteBuffer mBuffer;
+  AlignedByteBuffer mAlphaBuffer;
   CryptoSample mCryptoInternal;
   MediaRawData(const MediaRawData&); // Not implemented
 };

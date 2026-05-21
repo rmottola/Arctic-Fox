@@ -7,6 +7,8 @@
 #define WEBGL_EXTENSIONS_H_
 
 #include "mozilla/AlreadyAddRefed.h"
+#include "nsString.h"
+#include "nsTArray.h"
 #include "nsWrapperCache.h"
 #include "WebGLObjectModel.h"
 #include "WebGLTypes.h"
@@ -14,8 +16,8 @@
 namespace mozilla {
 
 namespace dom {
-template<typename T>
-class Sequence;
+template<typename> struct Nullable;
+template<typename> class Sequence;
 } // namespace dom
 
 namespace webgl {
@@ -59,6 +61,22 @@ protected:
     WebGLExtensionType::WrapObject(JSContext* cx, JS::Handle<JSObject*> givenProto) {              \
         return dom::WebGLBindingType##Binding::Wrap(cx, this, givenProto); \
     }
+
+////
+
+class WebGLExtensionCompressedTextureASTC
+    : public WebGLExtensionBase
+{
+public:
+    explicit WebGLExtensionCompressedTextureASTC(WebGLContext* webgl);
+    virtual ~WebGLExtensionCompressedTextureASTC();
+
+    void GetSupportedProfiles(dom::Nullable< nsTArray<nsString> >& retval) const;
+
+    static bool IsSupported(const WebGLContext* webgl);
+
+    DECL_WEBGL_EXTENSION_GOOP
+};
 
 class WebGLExtensionCompressedTextureATC
     : public WebGLExtensionBase
@@ -127,7 +145,7 @@ public:
     explicit WebGLExtensionDebugShaders(WebGLContext*);
     virtual ~WebGLExtensionDebugShaders();
 
-    void GetTranslatedShaderSource(WebGLShader* shader, nsAString& retval);
+    void GetTranslatedShaderSource(const WebGLShader& shader, nsAString& retval) const;
 
     DECL_WEBGL_EXTENSION_GOOP
 };
@@ -326,7 +344,7 @@ public:
 
     already_AddRefed<WebGLVertexArray> CreateVertexArrayOES();
     void DeleteVertexArrayOES(WebGLVertexArray* array);
-    bool IsVertexArrayOES(WebGLVertexArray* array);
+    bool IsVertexArrayOES(const WebGLVertexArray* array);
     void BindVertexArrayOES(WebGLVertexArray* array);
 
     DECL_WEBGL_EXTENSION_GOOP
@@ -372,12 +390,12 @@ public:
     already_AddRefed<WebGLQuery> CreateQueryEXT() const;
     void DeleteQueryEXT(WebGLQuery* query) const;
     bool IsQueryEXT(const WebGLQuery* query) const;
-    void BeginQueryEXT(GLenum target, WebGLQuery* query) const;
+    void BeginQueryEXT(GLenum target, WebGLQuery& query) const;
     void EndQueryEXT(GLenum target) const;
-    void QueryCounterEXT(WebGLQuery* query, GLenum target) const;
+    void QueryCounterEXT(WebGLQuery& query, GLenum target) const;
     void GetQueryEXT(JSContext* cx, GLenum target, GLenum pname,
                      JS::MutableHandleValue retval) const;
-    void GetQueryObjectEXT(JSContext* cx, const WebGLQuery* query,
+    void GetQueryObjectEXT(JSContext* cx, const WebGLQuery& query,
                            GLenum pname, JS::MutableHandleValue retval) const;
 
     static bool IsSupported(const WebGLContext*);

@@ -85,7 +85,7 @@ public:
   virtual void SetScreenRenderOffset(const ScreenPoint& aOffset) override
   {
     if (aOffset.x || aOffset.y) {
-      NS_RUNTIMEABORT("SetScreenRenderOffset not supported by CompositorD3D11.");
+      MOZ_CRASH("SetScreenRenderOffset not supported by CompositorD3D11.");
     }
     // If the offset is 0, 0 that's okay.
   }
@@ -114,6 +114,8 @@ public:
    * Flush the current frame to the screen.
    */
   virtual void EndFrame() override;
+
+  virtual void CancelFrame() override;
 
   /**
    * Setup the viewport and projection matrix for rendering

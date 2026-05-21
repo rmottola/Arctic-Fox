@@ -56,51 +56,67 @@ ShadowLayerParent::Destroy()
   Disconnect();
 }
 
-ContainerLayerComposite*
-ShadowLayerParent::AsContainerLayerComposite() const
+ContainerLayer*
+ShadowLayerParent::AsContainerLayer() const
 {
   return mLayer && mLayer->GetType() == Layer::TYPE_CONTAINER
-         ? static_cast<ContainerLayerComposite*>(mLayer.get())
+         ? static_cast<ContainerLayer*>(mLayer.get())
          : nullptr;
 }
 
-CanvasLayerComposite*
-ShadowLayerParent::AsCanvasLayerComposite() const
+CanvasLayer*
+ShadowLayerParent::AsCanvasLayer() const
 {
   return mLayer && mLayer->GetType() == Layer::TYPE_CANVAS
-         ? static_cast<CanvasLayerComposite*>(mLayer.get())
+         ? static_cast<CanvasLayer*>(mLayer.get())
          : nullptr;
 }
 
-ColorLayerComposite*
-ShadowLayerParent::AsColorLayerComposite() const
+ColorLayer*
+ShadowLayerParent::AsColorLayer() const
 {
   return mLayer && mLayer->GetType() == Layer::TYPE_COLOR
-         ? static_cast<ColorLayerComposite*>(mLayer.get())
+         ? static_cast<ColorLayer*>(mLayer.get())
          : nullptr;
 }
 
-ImageLayerComposite*
-ShadowLayerParent::AsImageLayerComposite() const
+ImageLayer*
+ShadowLayerParent::AsImageLayer() const
 {
   return mLayer && mLayer->GetType() == Layer::TYPE_IMAGE
-         ? static_cast<ImageLayerComposite*>(mLayer.get())
+         ? static_cast<ImageLayer*>(mLayer.get())
          : nullptr;
 }
 
-RefLayerComposite*
-ShadowLayerParent::AsRefLayerComposite() const
+RefLayer*
+ShadowLayerParent::AsRefLayer() const
 {
   return mLayer && mLayer->GetType() == Layer::TYPE_REF
-         ? static_cast<RefLayerComposite*>(mLayer.get())
+         ? static_cast<RefLayer*>(mLayer.get())
          : nullptr;
 }
 
-PaintedLayerComposite*
-ShadowLayerParent::AsPaintedLayerComposite() const
+PaintedLayer*
+ShadowLayerParent::AsPaintedLayer() const
 {
   return mLayer && mLayer->GetType() == Layer::TYPE_PAINTED
-         ? static_cast<PaintedLayerComposite*>(mLayer.get())
+    ? static_cast<PaintedLayer*>(mLayer.get())
+         : nullptr;
+}
+
+TextLayer*
+ShadowLayerParent::AsTextLayer() const
+{
+  return mLayer && mLayer->GetType() == Layer::TYPE_TEXT
+         ? static_cast<TextLayer*>(mLayer.get())
+         : nullptr;
+}
+
+BorderLayer*
+ShadowLayerParent::AsBorderLayer() const
+{
+  return mLayer && mLayer->GetType() == Layer::TYPE_BORDER
+         ? static_cast<BorderLayer*>(mLayer.get())
          : nullptr;
 }
 
@@ -109,7 +125,7 @@ ShadowLayerParent::ActorDestroy(ActorDestroyReason why)
 {
   switch (why) {
   case AncestorDeletion:
-    NS_RUNTIMEABORT("shadow layer deleted out of order!");
+    MOZ_CRASH("shadow layer deleted out of order!");
     return;                     // unreached
 
   case Deletion:
@@ -127,7 +143,7 @@ ShadowLayerParent::ActorDestroy(ActorDestroyReason why)
     break;
 
   case FailedConstructor:
-    NS_RUNTIMEABORT("FailedConstructor isn't possible in PLayerTransaction");
+    MOZ_CRASH("FailedConstructor isn't possible in PLayerTransaction");
     return;                     // unreached
   }
 

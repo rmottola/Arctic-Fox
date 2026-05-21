@@ -296,6 +296,24 @@ CompositorBridgeChild::ChildProcessHasCompositorBridge()
   return sCompositorBridge != nullptr;
 }
 
+/* static */ bool
+CompositorBridgeChild::CompositorIsInGPUProcess()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (XRE_IsParentProcess()) {
+    return !!GPUProcessManager::Get()->GetGPUChild();
+  }
+
+  MOZ_ASSERT(XRE_IsContentProcess());
+  CompositorBridgeChild* bridge = CompositorBridgeChild::Get();
+  if (!bridge) {
+    return false;
+  }
+
+  return bridge->OtherPid() != dom::ContentChild::GetSingleton()->OtherPid();
+}
+
 PLayerTransactionChild*
 CompositorBridgeChild::AllocPLayerTransactionChild(const nsTArray<LayersBackend>& aBackendHints,
                                                    const uint64_t& aId,
@@ -1074,23 +1092,12 @@ CompositorBridgeChild::DeallocPCompositorWidgetChild(PCompositorWidgetChild* aAc
 #endif
 }
 
-RefPtr<IAPZCTreeManager>
-CompositorBridgeChild::GetAPZCTreeManager(uint64_t aLayerTreeId)
+bool
+CompositorBridgeChild::GetAPZEnabled(uint64_t aLayerTreeId)
 {
-  bool apzEnabled = false;
-  Unused << SendAsyncPanZoomEnabled(aLayerTreeId, &apzEnabled);
-
-  if (!apzEnabled) {
-    return nullptr;
-  }
-
-  PAPZCTreeManagerChild* child = SendPAPZCTreeManagerConstructor(aLayerTreeId);
-  if (!child) {
-    return nullptr;
-  }
-  APZCTreeManagerChild* parent = static_cast<APZCTreeManagerChild*>(child);
-
-  return RefPtr<IAPZCTreeManager>(parent);
+  bool result = false;
+  Unused << SendAsyncPanZoomEnabled(aLayerTreeId, &result);
+  return result;
 }
 
 PAPZCTreeManagerChild*

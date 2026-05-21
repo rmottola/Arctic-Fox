@@ -221,10 +221,6 @@ function plInit() {
       var browserLoadFunc = function (ev) {
         browserWindow.removeEventListener('load', browserLoadFunc, true);
 
-        function firstPageCanLoadAsRemote() {
-          return E10SUtils.canLoadURIInProcess(pageUrls[0], Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT);
-        }
-
         // do this half a second after load, because we need to be
         // able to resize the window and not have it get clobbered
         // by the persisted values

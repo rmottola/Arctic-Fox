@@ -55,7 +55,7 @@ LazyLogModule gMediaStreamGraphLog("MediaStreamGraph");
 #ifdef ENABLE_LIFECYCLE_LOG
 #  ifdef ANDROID
 #    include "android/log.h"
-#    define LIFECYCLE_LOG(...)  __android_log_print(ANDROID_LOG_INFO, "Gecko - MSG", ## __VA_ARGS__); printf(__VA_ARGS__);printf("\n");
+#    define LIFECYCLE_LOG(...)  __android_log_print(ANDROID_LOG_INFO, "Gecko - MSG", ## __VA_ARGS__);
 #  else
 #    define LIFECYCLE_LOG(...) printf(__VA_ARGS__);printf("\n");
 #  endif
@@ -124,7 +124,7 @@ MediaStreamGraphImpl::AddStreamGraphThread(MediaStream* aStream)
   } else {
     mStreams.AppendElement(aStream);
     STREAM_LOG(LogLevel::Debug, ("Adding media stream %p to graph %p, count %lu", aStream, this, mStreams.Length()));
-    LIFECYCLE_LOG("Adding media stream %p to graph %p, count %lu", aStream, this, mStreams.Length());
+    LIFECYCLE_LOG("Adding media stream %p to graph %p, count %lu", aStream, this, (long)mStreams.Length());
   }
 
   SetStreamOrderDirty();
@@ -157,7 +157,7 @@ MediaStreamGraphImpl::RemoveStreamGraphThread(MediaStream* aStream)
   STREAM_LOG(LogLevel::Debug, ("Removed media stream %p from graph %p, count %lu",
                                aStream, this, mStreams.Length()));
   LIFECYCLE_LOG("Removed media stream %p from graph %p, count %lu",
-                aStream, this, mStreams.Length());
+                aStream, this, (long)mStreams.Length());
 
   NS_RELEASE(aStream); // probably destroying it
 }
@@ -1904,6 +1904,30 @@ MediaStream::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
   return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
 }
 
+void
+MediaStream::IncrementSuspendCount()
+{
+  ++mSuspendedCount;
+  if (mSuspendedCount == 1) {
+    for (uint32_t i = 0; i < mConsumers.Length(); ++i) {
+      mConsumers[i]->Suspended();
+    }
+  }
+}
+
+void
+MediaStream::DecrementSuspendCount()
+{
+    NS_ASSERTION(mSuspendedCount > 0, "Suspend count underrun");
+    --mSuspendedCount;
+
+  if (mSuspendedCount == 0) {
+    for (uint32_t i = 0; i < mConsumers.Length(); ++i) {
+      mConsumers[i]->Resumed();
+    }
+  }
+}
+
 MediaStreamGraphImpl*
 MediaStream::GraphImpl()
 {
@@ -2682,7 +2706,7 @@ SourceMediaStream::AddTrackInternal(TrackID aID, TrackRate aRate, StreamTime aSt
   nsTArray<TrackData> *track_data = (aFlags & ADDTRACK_QUEUED) ?
                                     &mPendingTracks : &mUpdateTracks;
   TrackData* data = track_data->AppendElement();
-  LIFECYCLE_LOG("AddTrackInternal: %lu/%lu", mPendingTracks.Length(), mUpdateTracks.Length());
+  LIFECYCLE_LOG("AddTrackInternal: %lu/%lu", (long)mPendingTracks.Length(), (long)mUpdateTracks.Length());
   data->mID = aID;
   data->mInputRate = aRate;
   data->mResamplerChannelCount = 0;
@@ -2708,7 +2732,7 @@ SourceMediaStream::FinishAddTracks()
 {
   MutexAutoLock lock(mMutex);
   mUpdateTracks.AppendElements(Move(mPendingTracks));
-  LIFECYCLE_LOG("FinishAddTracks: %lu/%lu", mPendingTracks.Length(), mUpdateTracks.Length());
+  LIFECYCLE_LOG("FinishAddTracks: %lu/%lu", (long)mPendingTracks.Length(), (long)mUpdateTracks.Length());
   if (GraphImpl()) {
     GraphImpl()->EnsureNextIteration();
   }
@@ -3134,6 +3158,18 @@ MediaInputPort::GetNextInputInterval(GraphTime aTime)
 }
 
 void
+MediaInputPort::Suspended()
+{
+  mDest->InputSuspended(this);
+}
+
+void
+MediaInputPort::Resumed()
+{
+  mDest->InputResumed(this);
+}
+
+void
 MediaInputPort::Destroy()
 {
   class Message : public ControlMessage {
@@ -3307,6 +3343,11 @@ ProcessedMediaStream::DestroyImpl()
   for (int32_t i = mInputs.Length() - 1; i >= 0; --i) {
     mInputs[i]->Disconnect();
   }
+
+  for (int32_t i = mSuspendedInputs.Length() - 1; i >= 0; --i) {
+    mSuspendedInputs[i]->Disconnect();
+  }
+
   MediaStream::DestroyImpl();
   // The stream order is only important if there are connections, in which
   // case MediaInputPort::Disconnect() called SetStreamOrderDirty().
@@ -3939,6 +3980,29 @@ MediaStreamGraph::StartNonRealtimeProcessing(uint32_t aTicksToProcess)
 void
 ProcessedMediaStream::AddInput(MediaInputPort* aPort)
 {
+  MediaStream* s = aPort->GetSource();
+  if (!s->IsSuspended()) {
+    mInputs.AppendElement(aPort);
+  } else {
+    mSuspendedInputs.AppendElement(aPort);
+  }
+  GraphImpl()->SetStreamOrderDirty();
+}
+
+void
+ProcessedMediaStream::InputSuspended(MediaInputPort* aPort)
+{
+  GraphImpl()->AssertOnGraphThreadOrNotRunning();
+  mInputs.RemoveElement(aPort);
+  mSuspendedInputs.AppendElement(aPort);
+  GraphImpl()->SetStreamOrderDirty();
+}
+
+void
+ProcessedMediaStream::InputResumed(MediaInputPort* aPort)
+{
+  GraphImpl()->AssertOnGraphThreadOrNotRunning();
+  mSuspendedInputs.RemoveElement(aPort);
   mInputs.AppendElement(aPort);
   GraphImpl()->SetStreamOrderDirty();
 }

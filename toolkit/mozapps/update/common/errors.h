@@ -10,8 +10,7 @@
 #define OK 0
 
 // Error codes that are no longer used should not be used again unless they
-// aren't used in client code (e.g. nsUpdateService.js, updates.js,
-// UpdatePrompt.js, etc.).
+// aren't used in client code (e.g. nsUpdateService.js, updates.js, etc.).
 
 #define MAR_ERROR_EMPTY_ACTION_LIST 1
 #define LOADSOURCE_ERROR_WRONG_SIZE 2
@@ -83,7 +82,9 @@
 #define WRITE_ERROR_DELETE_BACKUP 69
 #define WRITE_ERROR_EXTRACT 70
 #define REMOVE_FILE_SPEC_ERROR 71
-#define INVALID_STAGED_PARENT_ERROR 72
+#define INVALID_APPLYTO_DIR_STAGED_ERROR 72
+#define LOCK_ERROR_PATCH_FILE 73
+#define INVALID_APPLYTO_DIR_ERROR 74
 
 // Error codes 80 through 99 are reserved for nsUpdateService.js
 

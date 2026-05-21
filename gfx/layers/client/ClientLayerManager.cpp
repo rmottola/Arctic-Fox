@@ -112,10 +112,6 @@ ClientLayerManager::ClientLayerManager(nsIWidget* aWidget)
 
 ClientLayerManager::~ClientLayerManager()
 {
-  if (mTransactionIdAllocator) {
-    TimeStamp now = TimeStamp::Now();
-    DidComposite(mLatestTransactionId, now, now);
-  }
   mMemoryPressureObserver->Destroy();
   ClearCachedResources();
   // Stop receiveing AsyncParentMessage at Forwarder.
@@ -137,6 +133,22 @@ ClientLayerManager::Destroy()
   // former will early-return if the later has already run.
   ClearCachedResources();
   LayerManager::Destroy();
+
+  if (mTransactionIdAllocator) {
+    // Make sure to notify the refresh driver just in case it's waiting on a
+    // pending transaction. Do this at the top of the event loop so we don't
+    // cause a paint to occur during compositor shutdown.
+    RefPtr<TransactionIdAllocator> allocator = mTransactionIdAllocator;
+    uint64_t id = mLatestTransactionId;
+
+    RefPtr<Runnable> task = NS_NewRunnableFunction([allocator, id] () -> void {
+      allocator->NotifyTransactionCompleted(id);
+    });
+    NS_DispatchToMainThread(task.forget());
+  }
+
+  // Forget the widget pointer in case we outlive our owning widget.
+  mWidget = nullptr;
 }
 
 int32_t
@@ -686,7 +698,7 @@ ClientLayerManager::ForwardTransaction(bool aScheduleComposite)
         break;
       }
       default:
-        NS_RUNTIMEABORT("not reached");
+        MOZ_CRASH("not reached");
       }
     }
 
@@ -820,7 +832,7 @@ ClientLayerManager::GetBackendName(nsAString& aName)
     }
     case LayersBackend::LAYERS_CLIENT:
     case LayersBackend::LAYERS_LAST: aName.AssignLiteral("Reserved"); return;
-    default: NS_RUNTIMEABORT("Invalid backend");
+    default: MOZ_CRASH("Invalid backend");
   }
 }
 

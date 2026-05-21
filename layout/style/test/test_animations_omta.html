@@ -61,7 +61,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=964646
       25% { transform: translate(100px) }
     }
     @keyframes kf4 {
-      to, from { border-collapse: collapse; transform: translate(37px) }
+      to, from { display: none; transform: translate(37px) }
     }
     @keyframes kf_cascade1 {
       from { transform: translate(50px) }
@@ -633,12 +633,12 @@ addAsyncAnimTest(function *() {
   new_div("animation: kf4 ease 10s");
   yield waitForPaintsFlushed();
   var cs = window.getComputedStyle(gDiv);
-  is(cs.borderCollapse, "separate",
+  is(cs.display, "block",
      "non-animatable properties should be ignored (linear, 0s)");
   omta_is("transform", { tx: 37 }, RunningOn.Compositor,
           "animatable properties should still apply (linear, 0s)");
   advance_clock(1000);
-  is(cs.borderCollapse, "separate",
+  is(cs.display, "block",
      "non-animatable properties should be ignored (linear, 1s)");
   omta_is("transform", { tx: 37 }, RunningOn.Compositor,
           "animatable properties should still apply (linear, 1s)");
@@ -646,12 +646,12 @@ addAsyncAnimTest(function *() {
   new_div("animation: kf4 step-start 10s");
   yield waitForPaintsFlushed();
   cs = window.getComputedStyle(gDiv);
-  is(cs.borderCollapse, "separate",
+  is(cs.display, "block",
      "non-animatable properties should be ignored (step-start, 0s)");
   omta_is("transform", { tx: 37 }, RunningOn.Compositor,
           "animatable properties should still apply (step-start, 0s)");
   advance_clock(1000);
-  is(cs.borderCollapse, "separate",
+  is(cs.display, "block",
      "non-animatable properties should be ignored (step-start, 1s)");
   omta_is("transform", { tx: 37 }, RunningOn.Compositor,
           "animatable properties should still apply (step-start, 1s)");
@@ -1898,7 +1898,7 @@ addAsyncAnimTest(function *() {
   listen();
   yield waitForPaintsFlushed();
   advance_clock(0);
-  omta_is("transform", { ty: 0 }, RunningOn.MainThread,
+  omta_is("transform", { ty: 0 }, RunningOn.Compositor,
           "transform during backwards fill of zero-duration animation");
   advance_clock(2000); // Skip over animation
   yield waitForPaints();
@@ -1953,7 +1953,7 @@ addAsyncAnimTest(function *() {
   listen();
   yield waitForPaintsFlushed();
   advance_clock(0);
-  omta_is("transform", { ty: 0 }, RunningOn.MainThread,
+  omta_is("transform", { ty: 0 }, RunningOn.Compositor,
           "transform during backwards fill of infinitely repeating " +
           "zero-duration animation");
   advance_clock(2000);

@@ -881,11 +881,19 @@ public:
     return mFramesReflowed;
   }
 
-  /**
-   * This table maps border-width enums 'thin', 'medium', 'thick'
-   * to actual nscoord values.
-   */
-  const nscoord* GetBorderWidthTable() { return mBorderWidthTable; }
+  static nscoord GetBorderWidthForKeyword(unsigned int aBorderWidthKeyword)
+  {
+    // This table maps border-width enums 'thin', 'medium', 'thick'
+    // to actual nscoord values.
+    static const nscoord kBorderWidths[] = {
+      CSSPixelsToAppUnits(1),
+      CSSPixelsToAppUnits(3),
+      CSSPixelsToAppUnits(5)
+    };
+    MOZ_ASSERT(size_t(aBorderWidthKeyword) < mozilla::ArrayLength(kBorderWidths));
+
+    return kBorderWidths[aBorderWidthKeyword];
+  }
 
   gfxTextPerfMetrics *GetTextPerfMetrics() { return mTextPerf; }
 
@@ -1206,8 +1214,6 @@ protected:
 
   // Can't be inline because we can't include nsStyleSet.h.
   bool HasCachedStyleData();
-
-  bool IsChromeSlow() const;
 
   // Creates a one-shot timer with the given aCallback & aDelay.
   // Returns a refcounted pointer to the timer (or nullptr on failure).

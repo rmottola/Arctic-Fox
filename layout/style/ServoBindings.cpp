@@ -32,23 +32,20 @@
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/DeclarationBlockInlines.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/ElementInlines.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
 
-#define IMPL_STRONG_REF_TYPE_FOR(type_) \
-  already_AddRefed<type_>               \
-  type_##Strong::Consume() {            \
-    RefPtr<type_> result;               \
-    result.swap(mPtr);                  \
-    return result.forget();             \
+#define SERVO_ARC_TYPE(name_, type_) \
+  already_AddRefed<type_>            \
+  type_##Strong::Consume() {         \
+    RefPtr<type_> result;            \
+    result.swap(mPtr);               \
+    return result.forget();          \
   }
-
-IMPL_STRONG_REF_TYPE_FOR(ServoComputedValues)
-IMPL_STRONG_REF_TYPE_FOR(RawServoStyleSheet)
-IMPL_STRONG_REF_TYPE_FOR(RawServoDeclarationBlock)
-
-#undef IMPL_STRONG_REF_TYPE_FOR
+#include "mozilla/ServoArcTypeList.h"
+#undef SERVO_ARC_TYPE
 
 uint32_t
 Gecko_ChildrenCount(RawGeckoNodeBorrowed aNode)
@@ -65,7 +62,7 @@ Gecko_NodeIsElement(RawGeckoNodeBorrowed aNode)
 RawGeckoNodeBorrowedOrNull
 Gecko_GetParentNode(RawGeckoNodeBorrowed aNode)
 {
-  return aNode->GetFlattenedTreeParentNode();
+  return aNode->GetFlattenedTreeParentNodeForStyle();
 }
 
 RawGeckoNodeBorrowedOrNull
@@ -95,8 +92,7 @@ Gecko_GetNextSibling(RawGeckoNodeBorrowed aNode)
 RawGeckoElementBorrowedOrNull
 Gecko_GetParentElement(RawGeckoElementBorrowed aElement)
 {
-  nsINode* parentNode = aElement->GetFlattenedTreeParentNode();
-  return parentNode->IsElement() ? parentNode->AsElement() : nullptr;
+  return aElement->GetFlattenedTreeParentElementForStyle();
 }
 
 RawGeckoElementBorrowedOrNull
@@ -273,45 +269,18 @@ Gecko_CalcStyleDifference(nsStyleContext* aOldStyleContext,
   return result;
 }
 
-void
-Gecko_StoreStyleDifference(RawGeckoNodeBorrowed aNode, nsChangeHint aChangeHintToStore)
+ServoElementSnapshotOwned
+Gecko_CreateElementSnapshot(RawGeckoElementBorrowed aElement)
 {
-#ifdef MOZ_STYLO
-  MOZ_ASSERT(aNode->IsElement());
-  MOZ_ASSERT(aNode->IsDirtyForServo(),
-             "Change hint stored in a not-dirty node");
+  return new ServoElementSnapshot(aElement);
+}
 
-  const Element* aElement = aNode->AsElement();
-  nsIFrame* primaryFrame = aElement->GetPrimaryFrame();
-  if (!primaryFrame) {
-    // If there's no primary frame, that means that either this content is
-    // undisplayed (so we only need to check at the restyling phase for the
-    // display value on the element), or is a display: contents element.
-    //
-    // In this second case, we should store it in the frame constructor display
-    // contents map. Note that while this operation looks hairy, this would be
-    // thread-safe because the content should be there already (we'd only need
-    // to read the map and modify our entry).
-    //
-    // That being said, we still don't support display: contents anyway, so it's
-    // probably not worth it to do all the roundtrip just yet until we have a
-    // more concrete plan.
-    return;
-  }
-
-  if ((aChangeHintToStore & nsChangeHint_ReconstructFrame) &&
-      aNode->IsInNativeAnonymousSubtree())
-  {
-    NS_WARNING("stylo: Removing forbidden frame reconstruction hint on native "
-               "anonymous content. Fix this in bug 1297857!");
-    aChangeHintToStore &= ~nsChangeHint_ReconstructFrame;
-  }
-
-  primaryFrame->StyleContext()->StoreChangeHint(aChangeHintToStore);
-#else
-  MOZ_CRASH("stylo: Shouldn't call Gecko_StoreStyleDifference in "
-            "non-stylo build");
-#endif
+void
+Gecko_DropElementSnapshot(ServoElementSnapshotOwned aSnapshot)
+{
+  MOZ_ASSERT(NS_IsMainThread(),
+             "ServoAttrSnapshots can only be dropped on the main thread");
+  delete aSnapshot;
 }
 
 RawServoDeclarationBlockStrongBorrowedOrNull
@@ -579,7 +548,7 @@ ClassOrClassList(Implementor* aElement, nsIAtom** aClass, nsIAtom*** aClassList)
   }
 
 SERVO_IMPL_ELEMENT_ATTR_MATCHING_FUNCTIONS(Gecko_, RawGeckoElementBorrowed)
-SERVO_IMPL_ELEMENT_ATTR_MATCHING_FUNCTIONS(Gecko_Snapshot, ServoElementSnapshot*)
+SERVO_IMPL_ELEMENT_ATTR_MATCHING_FUNCTIONS(Gecko_Snapshot, const ServoElementSnapshot*)
 
 #undef SERVO_IMPL_ELEMENT_ATTR_MATCHING_FUNCTIONS
 
@@ -633,19 +602,6 @@ Gecko_AtomEqualsUTF8IgnoreCase(nsIAtom* aAtom, const char* aString, uint32_t aLe
   aAtom->ToString(atomStr);
   NS_ConvertUTF8toUTF16 inStr(nsDependentCSubstring(aString, aLength));
   return nsContentUtils::EqualsIgnoreASCIICase(atomStr, inStr);
-}
-
-void
-Gecko_Utf8SliceToString(nsString* aString,
-                        const uint8_t* aBuffer,
-                        size_t aBufferLen)
-{
-  MOZ_ASSERT(aString);
-  MOZ_ASSERT(aBuffer);
-
-  aString->Truncate();
-  AppendUTF8toUTF16(Substring(reinterpret_cast<const char*>(aBuffer),
-                              aBufferLen), *aString);
 }
 
 void
@@ -782,6 +738,33 @@ Gecko_CopyImageValueFrom(nsStyleImage* aImage, const nsStyleImage* aOther)
   MOZ_ASSERT(aOther);
 
   *aImage = *aOther;
+}
+
+void
+Gecko_SetCursorArrayLength(nsStyleUserInterface* aStyleUI, size_t aLen)
+{
+  aStyleUI->mCursorImages.Clear();
+  aStyleUI->mCursorImages.SetLength(aLen);
+}
+
+void
+Gecko_SetCursorImage(nsCursorImage* aCursor,
+                     const uint8_t* aURLString, uint32_t aURLStringLength,
+                     ThreadSafeURIHolder* aBaseURI,
+                     ThreadSafeURIHolder* aReferrer,
+                     ThreadSafePrincipalHolder* aPrincipal)
+{
+  aCursor->mImage =
+    CreateStyleImageRequest(nsStyleImageRequest::Mode::Discard,
+                            aURLString, aURLStringLength,
+                            aBaseURI, aReferrer, aPrincipal);
+}
+
+void
+Gecko_CopyCursorArrayFrom(nsStyleUserInterface* aDest,
+                          const nsStyleUserInterface* aSrc)
+{
+  aDest->mCursorImages = aSrc->mCursorImages;
 }
 
 nsStyleGradient*

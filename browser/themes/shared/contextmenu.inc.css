@@ -8,6 +8,14 @@
   -moz-appearance: none;
 }
 
+#context-navigation > .menuitem-iconic > .menu-iconic-left > .menu-iconic-icon {
+  width: 16px;
+  height: 16px;
+  margin: 7px;
+  filter: url(chrome://global/skin/filters.svg#fill);
+  fill: currentColor;
+}
+
 #context-back {
   list-style-image: url("chrome://browser/skin/content-contextmenu.svg#back");
 }

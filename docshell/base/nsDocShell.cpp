@@ -42,6 +42,7 @@
 
 #include "nsArray.h"
 #include "nsArrayUtils.h"
+#include "nsICaptivePortalService.h"
 #include "nsIDOMStorage.h"
 #include "nsIContentViewer.h"
 #include "nsIDocumentLoaderFactory.h"
@@ -5287,6 +5288,8 @@ nsDocShell::DisplayLoadError(nsresult aError, nsIURI* aURI,
   return NS_OK;
 }
 
+#define PREF_SAFEBROWSING_ALLOWOVERRIDE "browser.safebrowsing.allowOverride"
+
 NS_IMETHODIMP
 nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
                           const char* aErrorPage,
@@ -5360,6 +5363,10 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
   errorPageUrl.AppendASCII(escapedError.get());
   errorPageUrl.AppendLiteral("&u=");
   errorPageUrl.AppendASCII(escapedUrl.get());
+  if ((strcmp(aErrorPage, "blocked") == 0) &&
+      Preferences::GetBool(PREF_SAFEBROWSING_ALLOWOVERRIDE, true)) {
+    errorPageUrl.AppendLiteral("&o=1");
+  }
   if (!escapedCSSClass.IsEmpty()) {
     errorPageUrl.AppendLiteral("&s=");
     errorPageUrl.AppendASCII(escapedCSSClass.get());
@@ -5370,6 +5377,13 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
   nsAutoCString frameType(FrameTypeToString(mFrameType));
   errorPageUrl.AppendLiteral("&f=");
   errorPageUrl.AppendASCII(frameType.get());
+
+  nsCOMPtr<nsICaptivePortalService> cps = do_GetService(NS_CAPTIVEPORTAL_CID);
+  int32_t cpsState;
+  if (cps && NS_SUCCEEDED(cps->GetState(&cpsState)) &&
+      cpsState == nsICaptivePortalService::LOCKED_PORTAL) {
+    errorPageUrl.AppendLiteral("&captive=true");
+  }
 
   // netError.xhtml's getDescription only handles the "d" parameter at the
   // end of the URL, so append it last.
@@ -5759,6 +5773,8 @@ nsDocShell::Destroy()
 {
   NS_ASSERTION(mItemType == typeContent || mItemType == typeChrome,
                "Unexpected item type in docshell");
+
+  AssertOriginAttributesMatchPrivateBrowsing();
 
   if (!mIsBeingDestroyed) {
     nsCOMPtr<nsIObserverService> serv = services::GetObserverService();
@@ -8552,11 +8568,14 @@ nsDocShell::RestoreFromHistory()
   int32_t minFontSize = 0;
   float textZoom = 1.0f;
   float pageZoom = 1.0f;
+  float overrideDPPX = 0.0f;
+
   bool styleDisabled = false;
   if (oldCv && newCv) {
     oldCv->GetMinFontSize(&minFontSize);
     oldCv->GetTextZoom(&textZoom);
     oldCv->GetFullZoom(&pageZoom);
+    oldCv->GetOverrideDPPX(&overrideDPPX);
     oldCv->GetAuthorStyleDisabled(&styleDisabled);
   }
 
@@ -8789,6 +8808,7 @@ nsDocShell::RestoreFromHistory()
     newCv->SetMinFontSize(minFontSize);
     newCv->SetTextZoom(textZoom);
     newCv->SetFullZoom(pageZoom);
+    newCv->SetOverrideDPPX(overrideDPPX);
     newCv->SetAuthorStyleDisabled(styleDisabled);
   }
 
@@ -8826,9 +8846,6 @@ nsDocShell::RestoreFromHistory()
   // window object.
   nsCOMPtr<nsPIDOMWindowOuter> privWin = GetWindow();
   NS_ASSERTION(privWin, "could not get nsPIDOMWindow interface");
-
-  rv = privWin->RestoreWindowState(windowState);
-  NS_ENSURE_SUCCESS(rv, rv);
 
   // Now, dispatch a title change event which would happen as the
   // <head> is parsed.
@@ -8889,6 +8906,12 @@ nsDocShell::RestoreFromHistory()
     rv = childShell->BeginRestore(nullptr, false);
     NS_ENSURE_SUCCESS(rv, rv);
   }
+
+  // Make sure to restore the window state after adding the child shells back
+  // to the tree.  This is necessary for Thaw() and Resume() to propagate
+  // properly.
+  rv = privWin->RestoreWindowState(windowState);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr<nsIPresShell> shell = GetPresShell();
 
@@ -9279,6 +9302,7 @@ nsDocShell::SetupNewViewer(nsIContentViewer* aNewViewer)
   int32_t minFontSize;
   float textZoom;
   float pageZoom;
+  float overrideDPPX;
   bool styleDisabled;
   // |newMUDV| also serves as a flag to set the data from the above vars
   nsCOMPtr<nsIContentViewer> newCv;
@@ -9319,6 +9343,8 @@ nsDocShell::SetupNewViewer(nsIContentViewer* aNewViewer)
         NS_ENSURE_SUCCESS(oldCv->GetTextZoom(&textZoom),
                           NS_ERROR_FAILURE);
         NS_ENSURE_SUCCESS(oldCv->GetFullZoom(&pageZoom),
+                          NS_ERROR_FAILURE);
+        NS_ENSURE_SUCCESS(oldCv->GetOverrideDPPX(&overrideDPPX),
                           NS_ERROR_FAILURE);
         NS_ENSURE_SUCCESS(oldCv->GetAuthorStyleDisabled(&styleDisabled),
                           NS_ERROR_FAILURE);
@@ -9387,6 +9413,8 @@ nsDocShell::SetupNewViewer(nsIContentViewer* aNewViewer)
     NS_ENSURE_SUCCESS(newCv->SetTextZoom(textZoom),
                       NS_ERROR_FAILURE);
     NS_ENSURE_SUCCESS(newCv->SetFullZoom(pageZoom),
+                      NS_ERROR_FAILURE);
+    NS_ENSURE_SUCCESS(newCv->SetOverrideDPPX(overrideDPPX),
                       NS_ERROR_FAILURE);
     NS_ENSURE_SUCCESS(newCv->SetAuthorStyleDisabled(styleDisabled),
                       NS_ERROR_FAILURE);
@@ -9582,7 +9610,7 @@ public:
                     nsIURI* aOriginalURI, bool aLoadReplace,
                     bool aIsFromProcessingFrameAttributes,
                     nsIURI* aReferrer, uint32_t aReferrerPolicy,
-                    nsIPrincipal* aTriggeringPrincipal, 
+                    nsIPrincipal* aTriggeringPrincipal,
                     nsIPrincipal* aPrincipalToInherit, uint32_t aFlags,
                     const char* aTypeHint, nsIInputStream* aPostData,
                     nsIInputStream* aHeadersData, uint32_t aLoadType,
@@ -9929,7 +9957,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
     bool inherits;
     // One more twist: Don't inherit the principal for external loads.
     if (aLoadType != LOAD_NORMAL_EXTERNAL && !principalToInherit &&
-        (aFlags & INTERNAL_LOAD_FLAGS_INHERIT_PRINCIPAL) &&   
+        (aFlags & INTERNAL_LOAD_FLAGS_INHERIT_PRINCIPAL) &&
          NS_SUCCEEDED(nsContentUtils::URIInheritsSecurityContext(aURI,
                                                                  &inherits)) &&
          inherits) {
@@ -10338,7 +10366,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
       nsCOMPtr<nsIPrincipal> triggeringPrincipal, principalToInherit;
       if (mOSHE) {
         mOSHE->GetTriggeringPrincipal(getter_AddRefs(triggeringPrincipal));
-        mOSHE->GetPrincipalToInherit(getter_AddRefs(principalToInherit)); 
+        mOSHE->GetPrincipalToInherit(getter_AddRefs(principalToInherit));
       }
       // Pass true for aCloneSHChildren, since we're not
       // changing documents here, so all of our subframes are
@@ -11615,6 +11643,10 @@ nsDocShell::OnNewURI(nsIURI* aURI, nsIChannel* aChannel,
           shAvailable, updateSHistory, updateGHistory, equalUri));
 
   if (shAvailable && mCurrentURI && !mOSHE && aLoadType != LOAD_ERROR_PAGE) {
+    // XXX mCurrentURI can be changed from any caller regardless what actual
+    // loaded document is, so testing mCurrentURI isn't really a reliable way.
+    // Session restore is one example which changes current URI in order to
+    // show address before loading. See bug 1301399.
     NS_ASSERTION(NS_IsAboutBlank(mCurrentURI),
                  "no SHEntry for a non-transient viewer?");
   }
@@ -12495,7 +12527,7 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
     // Don't cache the presentation if we're going to just reload the
     // current entry. Caching would lead to trying to save the different
     // content viewers in the same nsISHEntry object.
-    rv = CreateAboutBlankContentViewer(triggeringPrincipal, nullptr,
+    rv = CreateAboutBlankContentViewer(principalToInherit, nullptr,
                                        aEntry != mOSHE);
 
     if (NS_FAILED(rv)) {
@@ -13814,6 +13846,7 @@ public:
                    const nsAString& aFileName,
                    nsIInputStream* aPostDataStream,
                    nsIInputStream* aHeadersDataStream,
+                   bool aNoOpenerImplied,
                    bool aIsTrusted);
 
   NS_IMETHOD Run() override
@@ -13830,6 +13863,7 @@ public:
       mHandler->OnLinkClickSync(mContent, mURI,
                                 mTargetSpec.get(), mFileName,
                                 mPostDataStream, mHeadersDataStream,
+                                mNoOpenerImplied,
                                 nullptr, nullptr);
     }
     return NS_OK;
@@ -13844,6 +13878,7 @@ private:
   nsCOMPtr<nsIInputStream> mHeadersDataStream;
   nsCOMPtr<nsIContent> mContent;
   PopupControlState mPopupState;
+  bool mNoOpenerImplied;
   bool mIsTrusted;
 };
 
@@ -13854,6 +13889,7 @@ OnLinkClickEvent::OnLinkClickEvent(nsDocShell* aHandler,
                                    const nsAString& aFileName,
                                    nsIInputStream* aPostDataStream,
                                    nsIInputStream* aHeadersDataStream,
+                                   bool aNoOpenerImplied,
                                    bool aIsTrusted)
   : mHandler(aHandler)
   , mURI(aURI)
@@ -13863,6 +13899,7 @@ OnLinkClickEvent::OnLinkClickEvent(nsDocShell* aHandler,
   , mHeadersDataStream(aHeadersDataStream)
   , mContent(aContent)
   , mPopupState(mHandler->mScriptGlobal->GetPopupControlState())
+  , mNoOpenerImplied(aNoOpenerImplied)
   , mIsTrusted(aIsTrusted)
 {
 }
@@ -13900,11 +13937,15 @@ nsDocShell::OnLinkClick(nsIContent* aContent,
   nsAutoString target;
 
   nsCOMPtr<nsIWebBrowserChrome3> browserChrome3 = do_GetInterface(mTreeOwner);
+  bool noOpenerImplied = false;
   if (browserChrome3) {
     nsCOMPtr<nsIDOMNode> linkNode = do_QueryInterface(aContent);
     nsAutoString oldTarget(aTargetSpec);
     rv = browserChrome3->OnBeforeLinkTraversal(oldTarget, aURI,
                                                linkNode, mIsAppTab, target);
+    if (!oldTarget.Equals(target)) {
+      noOpenerImplied = true;
+    }
   }
 
   if (NS_FAILED(rv)) {
@@ -13913,7 +13954,8 @@ nsDocShell::OnLinkClick(nsIContent* aContent,
 
   nsCOMPtr<nsIRunnable> ev =
     new OnLinkClickEvent(this, aContent, aURI, target.get(), aFileName,
-                         aPostDataStream, aHeadersDataStream, aIsTrusted);
+                         aPostDataStream, aHeadersDataStream, noOpenerImplied,
+                         aIsTrusted);
   return NS_DispatchToCurrentThread(ev);
 }
 
@@ -13924,6 +13966,7 @@ nsDocShell::OnLinkClickSync(nsIContent* aContent,
                             const nsAString& aFileName,
                             nsIInputStream* aPostDataStream,
                             nsIInputStream* aHeadersDataStream,
+                            bool aNoOpenerImplied,
                             nsIDocShell** aDocShell,
                             nsIRequest** aRequest)
 {
@@ -13988,6 +14031,9 @@ nsDocShell::OnLinkClickSync(nsIContent* aContent,
       if (token.LowerCaseEqualsLiteral("noopener")) {
         flags |= INTERNAL_LOAD_FLAGS_NO_OPENER;
       }
+    }
+    if (aNoOpenerImplied) {
+      flags |= INTERNAL_LOAD_FLAGS_NO_OPENER;
     }
   }
 
@@ -14384,6 +14430,7 @@ nsDocShell::SetOriginAttributes(const DocShellOriginAttributes& aAttrs)
   }
 
   SetPrivateBrowsing(isPrivate);
+  AssertOriginAttributesMatchPrivateBrowsing();
 
   return NS_OK;
 }

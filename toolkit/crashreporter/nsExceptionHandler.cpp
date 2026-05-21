@@ -3416,7 +3416,7 @@ OOPInit()
 #elif defined(XP_LINUX)
   if (!CrashGenerationServer::CreateReportChannel(&serverSocketFd,
                                                   &clientSocketFd))
-    NS_RUNTIMEABORT("can't create crash reporter socketpair()");
+    MOZ_CRASH("can't create crash reporter socketpair()");
 
   const std::string dumpPath =
       gExceptionHandler->minidump_descriptor().directory();
@@ -3444,7 +3444,7 @@ OOPInit()
 #endif
 
   if (!crashServer->Start())
-    NS_RUNTIMEABORT("can't start crash reporter server()");
+    MOZ_CRASH("can't start crash reporter server()");
 
   pidToMinidump = new ChildMinidumpMap();
 

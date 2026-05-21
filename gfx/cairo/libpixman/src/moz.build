@@ -146,6 +146,7 @@ if CONFIG['GNU_CC']:
         '-Wno-missing-field-initializers',
         '-Wno-sign-compare',
         '-Wno-unused',                      # too many unused warnings; ignore
+        '-Wno-incompatible-pointer-types',
     ]
     if CONFIG['CLANG_CXX']:
         CFLAGS += [

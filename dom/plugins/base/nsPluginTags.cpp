@@ -369,8 +369,6 @@ void nsPluginTag::InitMime(const char* const* aMimeTypes,
           mSupportsAsyncInit = true;
         }
         break;
-      case nsPluginHost::eSpecialType_Silverlight:
-      case nsPluginHost::eSpecialType_Unity:
       case nsPluginHost::eSpecialType_Test:
         mSupportsAsyncInit = true;
         break;

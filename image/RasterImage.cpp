@@ -277,8 +277,7 @@ RasterImage::LookupFrameInternal(const IntSize& aSize,
     MOZ_ASSERT(mFrameAnimator);
     MOZ_ASSERT(ToSurfaceFlags(aFlags) == DefaultSurfaceFlags(),
                "Can't composite frames with non-default surface flags");
-    const size_t index = mAnimationState->GetCurrentAnimationFrameIndex();
-    return mFrameAnimator->GetCompositedFrame(index);
+    return mFrameAnimator->GetCompositedFrame(*mAnimationState);
   }
 
   SurfaceFlags surfaceFlags = ToSurfaceFlags(aFlags);
@@ -587,8 +586,8 @@ RasterImage::GetImageContainer(LayerManager* aManager, uint32_t aFlags)
     return nullptr;
   }
 
-  if (IsUnlocked() && mProgressTracker) {
-    mProgressTracker->OnUnlockedDraw();
+  if (IsUnlocked()) {
+    SendOnUnlockedDraw(aFlags);
   }
 
   RefPtr<layers::ImageContainer> container = mImageContainer.get();
@@ -947,12 +946,9 @@ RasterImage::OnImageDataAvailable(nsIRequest*,
                                   uint32_t aCount)
 {
   nsresult rv = mSourceBuffer->AppendFromInputStream(aInputStream, aCount);
-  MOZ_ASSERT(rv == NS_OK || rv == NS_ERROR_OUT_OF_MEMORY);
-
-  if (MOZ_UNLIKELY(rv == NS_ERROR_OUT_OF_MEMORY)) {
+  if (NS_FAILED(rv)) {
     DoError();
   }
-
   return rv;
 }
 
@@ -1038,7 +1034,7 @@ RasterImage::CanDiscard() {
 }
 
 NS_IMETHODIMP
-RasterImage::StartDecoding()
+RasterImage::StartDecoding(uint32_t aFlags)
 {
   if (mError) {
     return NS_ERROR_FAILURE;
@@ -1049,7 +1045,8 @@ RasterImage::StartDecoding()
     return NS_OK;
   }
 
-  return RequestDecodeForSize(mSize, FLAG_SYNC_DECODE_IF_FAST);
+  uint32_t flags = (aFlags & FLAG_ASYNC_NOTIFY) | FLAG_SYNC_DECODE_IF_FAST;
+  return RequestDecodeForSize(mSize, flags);
 }
 
 NS_IMETHODIMP
@@ -1062,6 +1059,7 @@ RasterImage::RequestDecodeForSize(const IntSize& aSize, uint32_t aFlags)
   }
 
   if (!mHasSize) {
+    mWantFullDecode = true;
     return NS_OK;
   }
 
@@ -1346,9 +1344,10 @@ RasterImage::Draw(gfxContext* aContext,
     return DrawResult::BAD_ARGS;
   }
 
-  if (IsUnlocked() && mProgressTracker) {
-    mProgressTracker->OnUnlockedDraw();
+  if (IsUnlocked()) {
+    SendOnUnlockedDraw(aFlags);
   }
+
 
   // If we're not using SamplingFilter::GOOD, we shouldn't high-quality scale or
   // downscale during decode.

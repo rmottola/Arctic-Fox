@@ -1233,10 +1233,10 @@ public:
     // We won't need mOnFailure now.
     mOnFailure = nullptr;
 
-    if (!MediaManager::IsPrivateBrowsing(window)) {
+    if (!OriginAttributes::IsPrivateBrowsing(mOrigin)) {
       // Call GetOriginKey again, this time w/persist = true, to promote
       // deviceIds to persistent, in case they're not already. Fire'n'forget.
-      RefPtr<Pledge<nsCString>> p = media::GetOriginKey(mOrigin, false, true);
+      RefPtr<Pledge<nsCString>> p = media::GetOriginKey(mOrigin, true);
     }
     return NS_OK;
   }
@@ -1938,13 +1938,6 @@ MediaManager::NotifyRecordingStatusChange(nsPIDOMWindowInner* aWindow,
   return NS_OK;
 }
 
-bool MediaManager::IsPrivateBrowsing(nsPIDOMWindowInner* window)
-{
-  nsCOMPtr<nsIDocument> doc = window->GetDoc();
-  nsCOMPtr<nsILoadContext> loadContext = doc->GetLoadContext();
-  return loadContext && loadContext->UsePrivateBrowsing();
-}
-
 int MediaManager::AddDeviceChangeCallback(DeviceChangeCallback* aCallback)
 {
   bool fakeDeviceChangeEventOn = mPrefs.mFakeDeviceChangeEventOn;
@@ -2083,8 +2076,14 @@ if (privileged) {
                           (uint32_t) GetUserMediaSecurityState::Other);
   }
 
-  nsCString origin;
-  rv = nsPrincipal::GetOriginForURI(docURI, origin);
+  nsCOMPtr<nsIPrincipal> principal =
+    nsGlobalWindow::Cast(aWindow)->GetPrincipal();
+  if (NS_WARN_IF(!principal)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  nsAutoCString origin;
+  rv = principal->GetOrigin(origin);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -2247,7 +2246,6 @@ if (privileged) {
   StreamListeners* listeners = AddWindowID(windowID);
 
   // Create a disabled listener to act as a placeholder
-  nsIPrincipal* principal = aWindow->GetExtantDoc()->NodePrincipal();
   RefPtr<GetUserMediaCallbackMediaStreamListener> listener =
     new GetUserMediaCallbackMediaStreamListener(mMediaThread, windowID,
                                                 MakePrincipalHandle(principal));
@@ -2502,9 +2500,12 @@ MediaManager::EnumerateDevicesImpl(uint64_t aWindowId,
   // 2. Get the raw devices list
   // 3. Anonymize the raw list with the origin-key.
 
-  bool privateBrowsing = IsPrivateBrowsing(window);
-  nsCString origin;
-  nsPrincipal::GetOriginForURI(window->GetDocumentURI(), origin);
+  nsCOMPtr<nsIPrincipal> principal =
+    nsGlobalWindow::Cast(window)->GetPrincipal();
+  MOZ_ASSERT(principal);
+
+  nsAutoCString origin;
+  principal->GetOrigin(origin);
 
   bool persist = IsActivelyCapturingOrHasAPermission(aWindowId);
 
@@ -2513,8 +2514,7 @@ MediaManager::EnumerateDevicesImpl(uint64_t aWindowId,
   // thread later once GetOriginKey resolves. Needed variables are "captured"
   // (passed by value) safely into the lambda.
 
-  RefPtr<Pledge<nsCString>> p = media::GetOriginKey(origin, privateBrowsing,
-                                                      persist);
+  RefPtr<Pledge<nsCString>> p = media::GetOriginKey(origin, persist);
   p->Then([id, aWindowId, aVideoType, aAudioType,
            aFake](const nsCString& aOriginKey) mutable {
     MOZ_ASSERT(NS_IsMainThread());

@@ -36,7 +36,6 @@ DIRS += ['interfaces/' + i for i in interfaces]
 
 DIRS += [
     'animation',
-    'apps',
     'base',
     'archivereader',
     'bindings',
@@ -49,6 +48,7 @@ DIRS += [
     'encoding',
     'events',
     'fetch',
+    'file',
     'filehandle',
     'filesystem',
     'flyweb',

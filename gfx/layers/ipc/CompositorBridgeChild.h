@@ -88,6 +88,10 @@ public:
 
   static bool ChildProcessHasCompositorBridge();
 
+  // Returns whether the compositor is in the GPU process (false if in the UI
+  // process). This may only be called on the main thread.
+  static bool CompositorIsInGPUProcess();
+
   void AddOverfillObserver(ClientLayerManager* aLayerManager);
 
   virtual mozilla::ipc::IPCResult
@@ -216,7 +220,7 @@ public:
   PCompositorWidgetChild* AllocPCompositorWidgetChild(const CompositorWidgetInitData& aInitData) override;
   bool DeallocPCompositorWidgetChild(PCompositorWidgetChild* aActor) override;
 
-  RefPtr<IAPZCTreeManager> GetAPZCTreeManager(uint64_t aLayerTreeId);
+  bool GetAPZEnabled(uint64_t aLayerTreeId);
 
   PAPZCTreeManagerChild* AllocPAPZCTreeManagerChild(const uint64_t& aLayersId) override;
   bool DeallocPAPZCTreeManagerChild(PAPZCTreeManagerChild* aActor) override;

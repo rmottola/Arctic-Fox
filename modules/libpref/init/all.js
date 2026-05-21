@@ -405,7 +405,7 @@ pref("media.gmp.storage.version.expected", 1);
 
 // Filter what triggers user notifications.
 // See DecoderDoctorDocumentWatcher::ReportAnalysis for details.
-pref("media.decoder-doctor.notifications-allowed", "MediaWMFNeeded,MediaWidevineNoWMFNoSilverlight,MediaCannotInitializePulseAudio,MediaCannotPlayNoDecoders,MediaUnsupportedLibavcodec");
+pref("media.decoder-doctor.notifications-allowed", "MediaWMFNeeded,MediaWidevineNoWMF,MediaCannotInitializePulseAudio,MediaCannotPlayNoDecoders,MediaUnsupportedLibavcodec");
 // Whether we report partial failures.
 pref("media.decoder-doctor.verbose", false);
 // Whether DD should consider WMF-disabled a WMF failure, useful for testing.
@@ -613,6 +613,9 @@ pref("media.video-queue.send-to-compositor-size", 9999);
 
 // Whether to disable the video stats to prevent fingerprinting
 pref("media.video_stats.enabled", true);
+
+// Whether to check the decoder supports recycling.
+pref("media.decoder.recycle.enabled", false);
 
 // Weather we allow AMD switchable graphics
 pref("layers.amd-switchable-gfx.enabled", true);
@@ -1512,6 +1515,8 @@ pref("privacy.donottrackheader.enabled",    false);
 pref("privacy.trackingprotection.enabled",  false);
 // Enforce tracking protection in Private Browsing mode
 pref("privacy.trackingprotection.pbmode.enabled",  true);
+// Annotate channels based on the tracking protection list in all modes
+pref("privacy.trackingprotection.annotate_channels",  false);
 
 pref("dom.event.contextmenu.enabled",       true);
 pref("dom.event.clipboardevents.enabled",   true);
@@ -2768,9 +2773,6 @@ pref("layout.css.devPixelsPerPx", "-1.0");
 // Is support for CSS initial-letter property enabled?
 pref("layout.css.initial-letter.enabled", false);
 
-// Is support for CSS Masking features enabled?
-pref("layout.css.masking.enabled", true);
-
 // Is support for mix-blend-mode enabled?
 pref("layout.css.mix-blend-mode.enabled", true);
 
@@ -2836,6 +2838,9 @@ pref("layout.css.image-orientation.enabled", true);
 
 // Is support for the font-display @font-face descriptor enabled?
 pref("layout.css.font-display.enabled", false);
+
+// Is support for variation fonts enabled?
+pref("layout.css.font-variations.enabled", false);
 
 // Are sets of prefixed properties supported?
 pref("layout.css.prefixes.border-image", true);
@@ -3169,6 +3174,17 @@ pref("dom.ipc.plugins.asyncdrawing.enabled", true);
 #endif
 
 pref("dom.ipc.processCount", 1);
+
+// Override default dom.ipc.processCount for some remote content process types.
+pref("dom.ipc.processCount.webLargeAllocation", 2);
+
+// Pref to control whether we use separate content processes for top-level load
+// of file:// URIs.
+#if defined(NIGHTLY_BUILD)
+pref("browser.tabs.remote.separateFileUriProcess", true);
+#else
+pref("browser.tabs.remote.separateFileUriProcess", false);
+#endif
 
 // Enable caching of Moz2D Path objects for SVG geometry elements
 pref("svg.path-caching.enabled", true);
@@ -4820,6 +4836,7 @@ pref("webgl.enable-privileged-extensions", false);
 pref("webgl.bypass-shader-validation", false);
 pref("webgl.disable-fail-if-major-performance-caveat", false);
 pref("webgl.disable-DOM-blit-uploads", false);
+pref("webgl.allow-fb-invalidation", false);
 pref("webgl.webgl2-compat-mode", false);
 
 pref("webgl.enable-webgl2", true);
@@ -5491,6 +5508,9 @@ pref("browser.safebrowsing.id", "navclient-auto-ffox");
 pref("browser.safebrowsing.id", "Firefox");
 #endif
 
+// Allow users to ignore Safe Browsing warnings.
+pref("browser.safebrowsing.allowOverride", true);
+
 // Turn off Spatial navigation by default.
 pref("snav.enabled", false);
 
@@ -5580,10 +5600,6 @@ pref("dom.caches.enabled", true);
 pref("camera.control.low_memory_thresholdMB", 404);
 #endif
 
-// SystemUpdate API
-pref("dom.system_update.enabled", false);
-pref("dom.system_update.debug", false);
-
 // UDPSocket API
 pref("dom.udpsocket.enabled", false);
 
@@ -5598,7 +5614,6 @@ pref("dom.presentation.receiver.enabled", false);
 // Presentation Device
 pref("dom.presentation.tcp_server.debug", false);
 pref("dom.presentation.discovery.enabled", false);
-pref("dom.presentation.discovery.legacy.enabled", false);
 pref("dom.presentation.discovery.timeout_ms", 10000);
 pref("dom.presentation.discoverable", false);
 pref("dom.presentation.discoverable.encrypted", true);

@@ -2204,7 +2204,7 @@ nsTreeBodyFrame::GetImage(int32_t aRowIndex, nsTreeColumn* aCol, bool aUseContex
       return NS_ERROR_FAILURE;
 
     // We don't want discarding/decode-on-draw for xul images
-    imageRequest->StartDecoding();
+    imageRequest->StartDecoding(imgIContainer::FLAG_NONE);
     imageRequest->LockImage();
 
     // In a case it was already cached.
@@ -3267,7 +3267,7 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
         CalcComplexColor(borderStyle->mBorderLeftColor);
       ColorPattern colorPatt(ToDeviceColor(color));
 
-      uint8_t style = borderStyle->GetBorderStyle(NS_SIDE_LEFT);
+      uint8_t style = borderStyle->GetBorderStyle(eSideLeft);
       StrokeOptions strokeOptions;
       nsLayoutUtils::InitDashPattern(strokeOptions, style);
 

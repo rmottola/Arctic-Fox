@@ -42,7 +42,6 @@ void ReleaseVRManagerParentSingleton() {
 VRManagerChild::VRManagerChild()
   : TextureForwarder()
   , mDisplaysInitialized(false)
-  , mGamepadManager(nullptr)
   , mInputFrameID(-1)
   , mMessageLoop(MessageLoop::current())
   , mFrameRequestCallbackCounter(0)
@@ -269,13 +268,22 @@ mozilla::ipc::IPCResult
 VRManagerChild::RecvUpdateDisplayInfo(nsTArray<VRDisplayInfo>&& aDisplayUpdates)
 {
   UpdateDisplayInfo(aDisplayUpdates);
-  for (auto& nav : mNavigatorCallbacks) {
+  for (auto& windowId : mNavigatorCallbacks) {
     /** We must call NotifyVRDisplaysUpdated for every
-     * Navigator in mNavigatorCallbacks to ensure that
+     * window's Navigator in mNavigatorCallbacks to ensure that
      * the promise returned by Navigator.GetVRDevices
      * can resolve.  This must happen even if no changes
      * to VRDisplays have been detected here.
      */
+    nsGlobalWindow* window = nsGlobalWindow::GetInnerWindowWithId(windowId);
+    if (!window) {
+      continue;
+    }
+    ErrorResult result;
+    dom::Navigator* nav = window->GetNavigator(result);
+    if (NS_WARN_IF(result.Failed())) {
+      continue;
+    }
     nav->NotifyVRDisplaysUpdated();
   }
   mNavigatorCallbacks.Clear();
@@ -300,11 +308,11 @@ VRManagerChild::GetVRDisplays(nsTArray<RefPtr<VRDisplayClient>>& aDisplays)
 }
 
 bool
-VRManagerChild::RefreshVRDisplaysWithCallback(dom::Navigator* aNavigator)
+VRManagerChild::RefreshVRDisplaysWithCallback(uint64_t aWindowId)
 {
   bool success = SendRefreshDisplays();
   if (success) {
-    mNavigatorCallbacks.AppendElement(aNavigator);
+    mNavigatorCallbacks.AppendElement(aWindowId);
   }
   return success;
 }
@@ -475,10 +483,13 @@ VRManagerChild::RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent)
 {
 #ifdef MOZ_GAMEPAD
   // VRManagerChild could be at other processes, but GamepadManager
-  // only exists at the content process or the parent process
+  // only exists at the content process or the same process
   // in non-e10s mode.
-  if (mGamepadManager) {
-      mGamepadManager->Update(aGamepadEvent);
+  MOZ_ASSERT(XRE_IsContentProcess() || IsSameProcess());
+
+  RefPtr<GamepadManager> gamepadManager(GamepadManager::GetService());
+  if (gamepadManager) {
+    gamepadManager->Update(aGamepadEvent);
   }
 #endif
 
@@ -576,14 +587,6 @@ void
 VRManagerChild::HandleFatalError(const char* aName, const char* aMsg) const
 {
   dom::ContentChild::FatalErrorIfNotUsingGPUProcess(aName, aMsg, OtherPid());
-}
-
-void
-VRManagerChild::SetGamepadManager(dom::GamepadManager* aGamepadManager)
-{
-  MOZ_ASSERT(aGamepadManager);
-
-  mGamepadManager = aGamepadManager;
 }
 
 } // namespace gfx

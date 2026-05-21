@@ -12,6 +12,7 @@ define(function (require, exports, module) {
 
   // Reps
   const { isGrip, cropString } = require("./rep-utils");
+  const { MODE } = require("./constants");
 
   // Shortcuts
   const DOM = React.DOM;
@@ -24,7 +25,8 @@ define(function (require, exports, module) {
 
     propTypes: {
       object: React.PropTypes.object.isRequired,
-      mode: React.PropTypes.string,
+      // @TODO Change this to Object.values once it's supported in Node's version of V8
+      mode: React.PropTypes.oneOf(Object.keys(MODE).map(key => MODE[key])),
     },
 
     getTextContent: function (grip) {
@@ -32,17 +34,20 @@ define(function (require, exports, module) {
     },
 
     getTitle: function (grip) {
+      const title = "#text";
       if (this.props.objectLink) {
         return this.props.objectLink({
           object: grip
-        }, "#text ");
+        }, title);
       }
-      return "";
+      return title;
     },
 
     render: function () {
-      let grip = this.props.object;
-      let mode = this.props.mode || "short";
+      let {
+        object: grip,
+        mode = MODE.SHORT,
+      } = this.props;
 
       let baseConfig = {className: "objectBox objectBox-textNode"};
       if (this.props.onDOMNodeMouseOver) {
@@ -57,33 +62,17 @@ define(function (require, exports, module) {
         });
       }
 
-      if (mode == "short" || mode == "tiny") {
-        return (
-          DOM.span(baseConfig,
-            this.getTitle(grip),
-            DOM.span({className: "nodeValue"},
-              "\"" + this.getTextContent(grip) + "\""
-            )
-          )
-        );
+      if (mode === MODE.TINY) {
+        return DOM.span(baseConfig, this.getTitle(grip));
       }
 
-      let objectLink = this.props.objectLink || DOM.span;
       return (
         DOM.span(baseConfig,
           this.getTitle(grip),
-          objectLink({
-            object: grip
-          }, "<"),
-          DOM.span({className: "nodeTag"}, "TextNode"),
-          " textContent=\"",
           DOM.span({className: "nodeValue"},
-            this.getTextContent(grip)
-          ),
-          "\"",
-          objectLink({
-            object: grip
-          }, ">;")
+            " ",
+            `"${this.getTextContent(grip)}"`
+          )
         )
       );
     },

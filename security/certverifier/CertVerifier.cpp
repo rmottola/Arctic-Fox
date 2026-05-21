@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "CTKnownLogs.h"
+#include "CTLogVerifier.h"
 #include "ExtendedValidation.h"
 #include "MultiLogCTVerifier.h"
 #include "NSSCertDBTrustDomain.h"
@@ -159,14 +160,25 @@ CertVerifier::LoadKnownCTLogs()
   for (const CTLogInfo& log : kCTLogList) {
     Input publicKey;
     Result rv = publicKey.Init(
-      BitwiseCast<const uint8_t*, const char*>(log.logKey), log.logKeyLength);
+      BitwiseCast<const uint8_t*, const char*>(log.key), log.keyLength);
     if (rv != Success) {
       MOZ_ASSERT_UNREACHABLE("Failed reading a log key for a known CT Log");
       continue;
     }
-    rv = mCTVerifier->AddLog(publicKey);
+
+    CTLogVerifier logVerifier;
+    const CTLogOperatorInfo& logOperator =
+      kCTLogOperatorList[log.operatorIndex];
+    rv = logVerifier.Init(publicKey, logOperator.id, log.status,
+                          log.disqualificationTime);
     if (rv != Success) {
       MOZ_ASSERT_UNREACHABLE("Failed initializing a known CT Log");
+      continue;
+    }
+
+    rv = mCTVerifier->AddLog(Move(logVerifier));
+    if (rv != Success) {
+      MOZ_ASSERT_UNREACHABLE("Failed activating a known CT Log");
       continue;
     }
   }
@@ -258,35 +270,39 @@ CertVerifier::VerifySignedCertificateTimestamps(
   }
 
   if (MOZ_LOG_TEST(gCertVerifierLog, LogLevel::Debug)) {
-    size_t verifiedCount = 0;
+    size_t validCount = 0;
     size_t unknownLogCount = 0;
+    size_t disqualifiedLogCount = 0;
     size_t invalidSignatureCount = 0;
     size_t invalidTimestampCount = 0;
-    for (const SignedCertificateTimestamp& sct : result.scts) {
-      switch (sct.verificationStatus) {
-        case SignedCertificateTimestamp::VerificationStatus::OK:
-          verifiedCount++;
+    for (const VerifiedSCT& verifiedSct : result.verifiedScts) {
+      switch (verifiedSct.status) {
+        case VerifiedSCT::Status::Valid:
+          validCount++;
           break;
-        case SignedCertificateTimestamp::VerificationStatus::UnknownLog:
+        case VerifiedSCT::Status::ValidFromDisqualifiedLog:
+          disqualifiedLogCount++;
+          break;
+        case VerifiedSCT::Status::UnknownLog:
           unknownLogCount++;
           break;
-        case SignedCertificateTimestamp::VerificationStatus::InvalidSignature:
+        case VerifiedSCT::Status::InvalidSignature:
           invalidSignatureCount++;
           break;
-        case SignedCertificateTimestamp::VerificationStatus::InvalidTimestamp:
+        case VerifiedSCT::Status::InvalidTimestamp:
           invalidTimestampCount++;
           break;
-        case SignedCertificateTimestamp::VerificationStatus::None:
+        case VerifiedSCT::Status::None:
         default:
-          MOZ_ASSERT_UNREACHABLE("Unexpected SCT verificationStatus");
+          MOZ_ASSERT_UNREACHABLE("Unexpected SCT verification status");
       }
     }
     MOZ_LOG(gCertVerifierLog, LogLevel::Debug,
             ("SCT verification result: "
-             "verified=%zu unknownLog=%zu "
+             "valid=%zu unknownLog=%zu disqualifiedLog=%zu "
              "invalidSignature=%zu invalidTimestamp=%zu "
              "decodingErrors=%zu\n",
-             verifiedCount, unknownLogCount,
+             validCount, unknownLogCount, disqualifiedLogCount,
              invalidSignatureCount, invalidTimestampCount,
              result.decodingErrors));
   }
@@ -328,7 +344,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
             /*optional*/ const Flags flags,
             /*optional*/ const SECItem* stapledOCSPResponseSECItem,
             /*optional*/ const SECItem* sctsFromTLSSECItem,
-            /*optional*/ const char* firstPartyDomain,
+            /*optional*/ const NeckoOriginAttributes& originAttributes,
         /*optional out*/ SECOidTag* evOidPolicy,
         /*optional out*/ OCSPStaplingStatus* ocspStaplingStatus,
         /*optional out*/ KeySizeStatus* keySizeStatus,
@@ -422,7 +438,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        ValidityCheckingMode::CheckingOff,
                                        SHA1Mode::Allowed,
                                        NetscapeStepUpPolicy::NeverMatch,
-                                       firstPartyDomain,
+                                       originAttributes,
                                        builtChain, nullptr, nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
@@ -496,7 +512,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                       mCertShortLifetimeInDays, mPinningMode, MIN_RSA_BITS,
                       ValidityCheckingMode::CheckForEV,
                       sha1ModeConfigurations[i], mNetscapeStepUpPolicy,
-                      firstPartyDomain, builtChain, pinningTelemetryInfo,
+                      originAttributes, builtChain, pinningTelemetryInfo,
                       hostname);
         rv = BuildCertChainForOneKeyUsage(trustDomain, certDER, time,
                                           KeyUsage::digitalSignature,// (EC)DHE
@@ -584,7 +600,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                            ValidityCheckingMode::CheckingOff,
                                            sha1ModeConfigurations[j],
                                            mNetscapeStepUpPolicy,
-                                           firstPartyDomain, builtChain,
+                                           originAttributes, builtChain,
                                            pinningTelemetryInfo, hostname);
           rv = BuildCertChainForOneKeyUsage(trustDomain, certDER, time,
                                             KeyUsage::digitalSignature,//(EC)DHE
@@ -649,7 +665,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
                                        SHA1Mode::Allowed, mNetscapeStepUpPolicy,
-                                       firstPartyDomain, builtChain, nullptr,
+                                       originAttributes, builtChain, nullptr,
                                        nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeCA, KeyUsage::keyCertSign,
@@ -666,7 +682,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        ValidityCheckingMode::CheckingOff,
                                        SHA1Mode::Allowed,
                                        NetscapeStepUpPolicy::NeverMatch,
-                                       firstPartyDomain, builtChain, nullptr,
+                                       originAttributes, builtChain, nullptr,
                                        nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
@@ -694,7 +710,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        ValidityCheckingMode::CheckingOff,
                                        SHA1Mode::Allowed,
                                        NetscapeStepUpPolicy::NeverMatch,
-                                       firstPartyDomain, builtChain, nullptr,
+                                       originAttributes, builtChain, nullptr,
                                        nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
@@ -719,7 +735,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        ValidityCheckingMode::CheckingOff,
                                        SHA1Mode::Allowed,
                                        NetscapeStepUpPolicy::NeverMatch,
-                                       firstPartyDomain, builtChain, nullptr,
+                                       originAttributes, builtChain, nullptr,
                                        nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
@@ -753,7 +769,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                     ValidityCheckingMode::CheckingOff,
                                     SHA1Mode::Allowed,
                                     NetscapeStepUpPolicy::NeverMatch,
-                                    firstPartyDomain, builtChain, nullptr,
+                                    originAttributes, builtChain, nullptr,
                                     nullptr);
       rv = BuildCertChain(sslTrust, certDER, time, endEntityOrCA,
                           keyUsage, eku, CertPolicyId::anyPolicy,
@@ -766,7 +782,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                         ValidityCheckingMode::CheckingOff,
                                         SHA1Mode::Allowed,
                                         NetscapeStepUpPolicy::NeverMatch,
-                                        firstPartyDomain, builtChain, nullptr,
+                                        originAttributes, builtChain, nullptr,
                                         nullptr);
         rv = BuildCertChain(emailTrust, certDER, time, endEntityOrCA,
                             keyUsage, eku, CertPolicyId::anyPolicy,
@@ -781,7 +797,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                                   ValidityCheckingMode::CheckingOff,
                                                   SHA1Mode::Allowed,
                                                   NetscapeStepUpPolicy::NeverMatch,
-                                                  firstPartyDomain, builtChain,
+                                                  originAttributes, builtChain,
                                                   nullptr, nullptr);
           rv = BuildCertChain(objectSigningTrust, certDER, time,
                               endEntityOrCA, keyUsage, eku,
@@ -813,7 +829,7 @@ CertVerifier::VerifySSLServerCert(const UniqueCERTCertificate& peerCert,
                           /*out*/ UniqueCERTCertList& builtChain,
                      /*optional*/ bool saveIntermediatesInPermanentDatabase,
                      /*optional*/ Flags flags,
-                     /*optional*/ const char* firstPartyDomain,
+                     /*optional*/ const NeckoOriginAttributes& originAttributes,
                  /*optional out*/ SECOidTag* evOidPolicy,
                  /*optional out*/ OCSPStaplingStatus* ocspStaplingStatus,
                  /*optional out*/ KeySizeStatus* keySizeStatus,
@@ -838,7 +854,7 @@ CertVerifier::VerifySSLServerCert(const UniqueCERTCertificate& peerCert,
   // if VerifyCert succeeded.
   Result rv = VerifyCert(peerCert.get(), certificateUsageSSLServer, time,
                          pinarg, hostname, builtChain, flags,
-                         stapledOCSPResponse, sctsFromTLS, firstPartyDomain,
+                         stapledOCSPResponse, sctsFromTLS, originAttributes,
                          evOidPolicy, ocspStaplingStatus, keySizeStatus,
                          sha1ModeResult, pinningTelemetryInfo, ctInfo);
   if (rv != Success) {

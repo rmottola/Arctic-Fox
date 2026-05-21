@@ -8,6 +8,7 @@
 
 #include "base/win/windows_version.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Logging.h"
 #include "sandbox/win/src/sandbox.h"
 #include "sandbox/win/src/security_level.h"
 
@@ -15,6 +16,10 @@ namespace mozilla
 {
 
 sandbox::BrokerServices *SandboxBroker::sBrokerService = nullptr;
+
+static LazyLogModule sSandboxBrokerLog("SandboxBroker");
+
+#define LOG_E(...) MOZ_LOG(sSandboxBrokerLog, LogLevel::Error, (__VA_ARGS__))
 
 /* static */
 void
@@ -87,7 +92,8 @@ SandboxBroker::LaunchApp(const wchar_t *aPath,
 
 #if defined(MOZ_CONTENT_SANDBOX)
 void
-SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel)
+SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel,
+                                                 base::ChildPrivileges aPrivs)
 {
   MOZ_RELEASE_ASSERT(mPolicy, "mPolicy must be set before this call.");
 
@@ -120,6 +126,16 @@ SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel)
     accessTokenLevel = sandbox::USER_NON_ADMIN;
     initialIntegrityLevel = sandbox::INTEGRITY_LEVEL_LOW;
     delayedIntegrityLevel = sandbox::INTEGRITY_LEVEL_LOW;
+  }
+
+  // If PRIVILEGES_FILEREAD required, don't allow settings that block reads.
+  if (aPrivs == base::ChildPrivileges::PRIVILEGES_FILEREAD) {
+    if (accessTokenLevel < sandbox::USER_NON_ADMIN) {
+      accessTokenLevel = sandbox::USER_NON_ADMIN;
+    }
+    if (delayedIntegrityLevel > sandbox::INTEGRITY_LEVEL_LOW) {
+      delayedIntegrityLevel = sandbox::INTEGRITY_LEVEL_LOW;
+    }
   }
 
   sandbox::ResultCode result = mPolicy->SetJobLevel(jobLevel,
@@ -458,7 +474,12 @@ SandboxBroker::AllowReadFile(wchar_t const *file)
     mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
                      sandbox::TargetPolicy::FILES_ALLOW_READONLY,
                      file);
-  return (sandbox::SBOX_ALL_OK == result);
+  if (sandbox::SBOX_ALL_OK != result) {
+    LOG_E("Failed (ResultCode %d) to add read access to: %S", result, file);
+    return false;
+  }
+
+  return true;
 }
 
 bool
@@ -472,7 +493,13 @@ SandboxBroker::AllowReadWriteFile(wchar_t const *file)
     mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
                      sandbox::TargetPolicy::FILES_ALLOW_ANY,
                      file);
-  return (sandbox::SBOX_ALL_OK == result);
+  if (sandbox::SBOX_ALL_OK != result) {
+    LOG_E("Failed (ResultCode %d) to add read/write access to: %S",
+          result, file);
+    return false;
+  }
+
+  return true;
 }
 
 bool
@@ -486,7 +513,12 @@ SandboxBroker::AllowDirectory(wchar_t const *dir)
     mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
                      sandbox::TargetPolicy::FILES_ALLOW_DIR_ANY,
                      dir);
-  return (sandbox::SBOX_ALL_OK == result);
+  if (sandbox::SBOX_ALL_OK != result) {
+    LOG_E("Failed (ResultCode %d) to add directory access to: %S", result, dir);
+    return false;
+  }
+
+  return true;
 }
 
 bool

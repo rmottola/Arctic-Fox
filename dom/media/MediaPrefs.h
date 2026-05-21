@@ -129,6 +129,7 @@ private:
   DECL_MEDIA_PREF("media.decoder.fuzzing.enabled",            PDMFuzzingEnabled, bool, false);
   DECL_MEDIA_PREF("media.decoder.fuzzing.video-output-minimum-interval-ms", PDMFuzzingInterval, uint32_t, 0);
   DECL_MEDIA_PREF("media.decoder.fuzzing.dont-delay-inputexhausted", PDMFuzzingDelayInputExhausted, bool, true);
+  DECL_MEDIA_PREF("media.decoder.recycle.enabled",            MediaDecoderCheckRecycling, bool, false);
   DECL_MEDIA_PREF("media.gmp.decoder.enabled",                PDMGMPEnabled, bool, true);
   DECL_MEDIA_PREF("media.gmp.decoder.aac",                    GMPAACPreferred, uint32_t, 0);
   DECL_MEDIA_PREF("media.gmp.decoder.h264",                   GMPH264Preferred, uint32_t, 0);
@@ -154,6 +155,10 @@ private:
   // Flac
   DECL_MEDIA_PREF("media.ogg.flac.enabled",                   FlacInOgg, bool, false);
   DECL_MEDIA_PREF("media.flac.enabled",                       FlacEnabled, bool, true);
+
+#if defined(MOZ_RUST_MP4PARSE) && !defined(RELEASE_BUILD)
+  DECL_MEDIA_PREF("media.rust.test_mode",                     RustTestMode, bool, false);
+#endif
 
 public:
   // Manage the singleton:

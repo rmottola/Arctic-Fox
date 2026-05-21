@@ -11,10 +11,7 @@ XPIDL_SOURCES += [
 XPIDL_MODULE = 'dom'
 
 EXPORTS.mozilla.dom.ipc += [
-    'BlobChild.h',
-    'BlobParent.h',
     'IdType.h',
-    'nsIRemoteBlob.h',
     'StructuredCloneData.h',
 ]
 
@@ -36,6 +33,8 @@ EXPORTS.mozilla.dom += [
     'TabContext.h',
     'TabMessageUtils.h',
     'TabParent.h',
+    'URLClassifierChild.h',
+    'URLClassifierParent.h',
 ]
 
 EXPORTS.mozilla += [
@@ -64,24 +63,21 @@ UNIFIED_SOURCES += [
     'TabContext.cpp',
     'TabMessageUtils.cpp',
     'TabParent.cpp',
+    'URLClassifierChild.cpp',
+    'URLClassifierParent.cpp',
 ]
 
-# Blob.cpp cannot be compiled in unified mode because it triggers a fatal gcc warning.
 # CrashReporterChild.cpp cannot be compiled in unified mode because of name clashes
 # in OS X headers.
 # ContentChild.cpp cannot be compiled in unified mode on  linux due to Time conflict
 SOURCES += [
-    'Blob.cpp',
     'ContentChild.cpp',
     'CrashReporterChild.cpp',
     'ProcessHangMonitor.cpp',
 ]
 
 IPDL_SOURCES += [
-    'BlobTypes.ipdlh',
     'DOMTypes.ipdlh',
-    'PBlob.ipdl',
-    'PBlobStream.ipdl',
     'PBrowser.ipdl',
     'PBrowserOrId.ipdlh',
     'PColorPicker.ipdl',
@@ -99,6 +95,7 @@ IPDL_SOURCES += [
     'PProcessHangMonitor.ipdl',
     'PScreenManager.ipdl',
     'PTabContext.ipdlh',
+    'PURLClassifier.ipdl',
     'ServiceWorkerConfiguration.ipdlh',
 ]
 

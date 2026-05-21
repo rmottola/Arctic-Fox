@@ -848,12 +848,14 @@ Saiz::Saiz(Box& aBox, AtomType aDefaultType)
   uint8_t defaultSampleInfoSize = reader->ReadU8();
   uint32_t count = reader->ReadU32();
   if (defaultSampleInfoSize) {
-    for (int i = 0; i < count; i++) {
-      mSampleInfoSize.AppendElement(defaultSampleInfoSize);
+    if (!mSampleInfoSize.SetLength(count, fallible)) {
+      LOG(Saiz, "OOM");
+      return;
     }
+    memset(mSampleInfoSize.Elements(), defaultSampleInfoSize, mSampleInfoSize.Length());
   } else {
     if (!reader->ReadArray(mSampleInfoSize, count)) {
-      LOG(Saiz, "Incomplete Box (missing count:%u)", count);
+      LOG(Saiz, "Incomplete Box (OOM or missing count:%u)", count);
       return;
     }
   }
@@ -883,19 +885,22 @@ Saio::Saio(Box& aBox, AtomType aDefaultType)
   }
   size_t count = reader->ReadU32();
   need = (version ? sizeof(uint64_t) : sizeof(uint32_t)) * count;
-  if (reader->Remaining() < count) {
+  if (reader->Remaining() < need) {
     LOG(Saio, "Incomplete Box (have:%lld need:%lld)",
         (uint64_t)reader->Remaining(), (uint64_t)need);
     return;
   }
-  mOffsets.SetCapacity(count);
+  if (!mOffsets.SetCapacity(count, fallible)) {
+    LOG(Saiz, "OOM");
+    return;
+  }
   if (version == 0) {
     for (size_t i = 0; i < count; i++) {
-      mOffsets.AppendElement(reader->ReadU32());
+      MOZ_ALWAYS_TRUE(mOffsets.AppendElement(reader->ReadU32(), fallible));
     }
   } else {
     for (size_t i = 0; i < count; i++) {
-      mOffsets.AppendElement(reader->ReadU64());
+      MOZ_ALWAYS_TRUE(mOffsets.AppendElement(reader->ReadU64(), fallible));
     }
   }
   mValid = true;

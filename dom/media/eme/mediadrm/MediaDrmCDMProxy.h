@@ -18,11 +18,11 @@
 
 #include "MediaCodec.h"
 #include "nsString.h"
-#include "nsAutoPtr.h"
 
 using namespace mozilla::java;
 
 namespace mozilla {
+
 class MediaDrmCDMCallbackProxy;
 class MediaDrmCDMProxy : public CDMProxy {
 public:
@@ -37,8 +37,7 @@ public:
   void Init(PromiseId aPromiseId,
             const nsAString& aOrigin,
             const nsAString& aTopLevelOrigin,
-            const nsAString& aGMPName,
-            bool aInPrivateBrowsing) override;
+            const nsAString& aGMPName) override;
 
   void CreateSession(uint32_t aCreateSessionToken,
                      MediaKeySessionType aSessionType,
@@ -167,19 +166,20 @@ private:
   };
 
   nsCString mNodeId;
-  mozilla::UniquePtr<MediaDrmProxySupport> mCDM;
-  nsAutoPtr<MediaDrmCDMCallbackProxy> mCallback;
+  UniquePtr<MediaDrmProxySupport> mCDM;
+  UniquePtr<MediaDrmCDMCallbackProxy> mCallback;
   bool mShutdownCalled;
 
 // =====================================================================
 // For MediaDrmProxySupport
   void md_Init(uint32_t aPromiseId);
-  void md_CreateSession(nsAutoPtr<CreateSessionData> aData);
-  void md_UpdateSession(nsAutoPtr<UpdateSessionData> aData);
-  void md_CloseSession(nsAutoPtr<SessionOpData> aData);
+  void md_CreateSession(UniquePtr<CreateSessionData>&& aData);
+  void md_UpdateSession(UniquePtr<UpdateSessionData>&& aData);
+  void md_CloseSession(UniquePtr<SessionOpData>&& aData);
   void md_Shutdown();
 // =====================================================================
 };
 
 } // namespace mozilla
+
 #endif // MediaDrmCDMProxy_h_

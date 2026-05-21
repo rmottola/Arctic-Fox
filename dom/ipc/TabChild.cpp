@@ -27,10 +27,12 @@
 #include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/APZCCallbackHelper.h"
 #include "mozilla/layers/APZCTreeManager.h"
+#include "mozilla/layers/APZCTreeManagerChild.h"
 #include "mozilla/layers/APZEventState.h"
 #include "mozilla/layers/ContentProcessController.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/DoubleTapToZoom.h"
+#include "mozilla/layers/IAPZCTreeManager.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layers/ShadowLayers.h"
@@ -39,6 +41,7 @@
 #include "mozilla/LookAndFeel.h"
 #include "mozilla/MouseEvents.h"
 #include "mozilla/Move.h"
+#include "mozilla/PresShell.h"
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/Services.h"
@@ -101,7 +104,6 @@
 #include "nsColorPickerProxy.h"
 #include "nsDatePickerProxy.h"
 #include "nsContentPermissionHelper.h"
-#include "nsPresShell.h"
 #include "nsNetUtil.h"
 #include "nsIPermissionManager.h"
 #include "nsIURILoader.h"
@@ -220,7 +222,7 @@ TabChildBase::DispatchMessageManagerMessage(const nsAString& aMessageName,
 {
     AutoSafeJSContext cx;
     JS::Rooted<JS::Value> json(cx, JS::NullValue());
-    StructuredCloneData data;
+    dom::ipc::StructuredCloneData data;
     if (JS_ParseJSON(cx,
                       static_cast<const char16_t*>(aJSONData.BeginReading()),
                       aJSONData.Length(),
@@ -1804,6 +1806,10 @@ TabChild::RecvRealKeyEvent(const WidgetKeyboardEvent& event,
     mIgnoreKeyPressEvent = status == nsEventStatus_eConsumeNoDefault;
   }
 
+  if (localEvent.mFlags.mIsSuppressedOrDelayed) {
+    localEvent.PreventDefault();
+  }
+
   // If a response is desired from the content process, resend the key event.
   // If mAccessKeyForwardedToChild is set, then don't resend the key event yet
   // as RecvHandleAccessKey will do this.
@@ -1962,7 +1968,7 @@ TabChild::RecvPDocumentRendererConstructor(PDocumentRendererChild* actor,
 PColorPickerChild*
 TabChild::AllocPColorPickerChild(const nsString&, const nsString&)
 {
-  NS_RUNTIMEABORT("unused");
+  MOZ_CRASH("unused");
   return nullptr;
 }
 
@@ -1977,7 +1983,7 @@ TabChild::DeallocPColorPickerChild(PColorPickerChild* aColorPicker)
 PDatePickerChild*
 TabChild::AllocPDatePickerChild(const nsString&, const nsString&)
 {
-  NS_RUNTIMEABORT("unused");
+  MOZ_CRASH("unused");
   return nullptr;
 }
 
@@ -1992,7 +1998,7 @@ TabChild::DeallocPDatePickerChild(PDatePickerChild* aDatePicker)
 PFilePickerChild*
 TabChild::AllocPFilePickerChild(const nsString&, const int16_t&)
 {
-  NS_RUNTIMEABORT("unused");
+  MOZ_CRASH("unused");
   return nullptr;
 }
 
@@ -2533,7 +2539,7 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
       mLayersId = aLayersId;
     }
 
-    mApzcTreeManager = CompositorBridgeChild::Get()->GetAPZCTreeManager(mLayersId);
+    InitAPZState();
 
     nsCOMPtr<nsIObserverService> observerService =
         mozilla::services::GetObserverService();
@@ -2543,6 +2549,28 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
                                      BEFORE_FIRST_PAINT,
                                      false);
     }
+}
+
+void
+TabChild::InitAPZState()
+{
+  auto cbc = CompositorBridgeChild::Get();
+
+  if (!cbc->GetAPZEnabled(mLayersId)) {
+    return;
+  }
+
+  // Initialize the ApzcTreeManager. This takes multiple casts because of ugly multiple inheritance.
+  PAPZCTreeManagerChild* baseProtocol = cbc->SendPAPZCTreeManagerConstructor(mLayersId);
+  APZCTreeManagerChild* derivedProtocol = static_cast<APZCTreeManagerChild*>(baseProtocol);
+
+  mApzcTreeManager = RefPtr<IAPZCTreeManager>(derivedProtocol);
+
+  // Initialize the GeckoContentController for this tab. We don't hold a reference because we don't need it.
+  // The ContentProcessController will hold a reference to the tab, and will be destroyed by the compositor or ipdl
+  // during destruction.
+  RefPtr<GeckoContentController> contentController = new ContentProcessController(this);
+  cbc->SendPAPZConstructor(new APZChild(contentController), mLayersId);
 }
 
 void
@@ -2888,11 +2916,7 @@ TabChild::ReinitRendering()
   ShadowLayerForwarder* lf = lm->AsShadowForwarder();
   lf->IdentifyTextureHost(mTextureFactoryIdentifier);
 
-  mApzcTreeManager = CompositorBridgeChild::Get()->GetAPZCTreeManager(mLayersId);
-  if (mApzcTreeManager) {
-    APZChild* apz = ContentProcessController::Create(mUniqueId);
-    CompositorBridgeChild::Get()->SendPAPZConstructor(apz, mLayersId);
-  }
+  InitAPZState();
 
   nsCOMPtr<nsIDocument> doc(GetDocument());
   doc->NotifyLayerManagerRecreated();
