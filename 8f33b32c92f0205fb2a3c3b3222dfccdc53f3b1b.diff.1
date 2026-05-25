@@ -1,0 +1,1542 @@
+diff --git a/js/src/builtin/ModuleObject.cpp b/js/src/builtin/ModuleObject.cpp
+index 61c1e3bc8a4d3..710c7a76cbfb3 100644
+--- a/js/src/builtin/ModuleObject.cpp
++++ b/js/src/builtin/ModuleObject.cpp
+@@ -1205,7 +1205,7 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
+       case PNK_FUNCTION: {
+           RootedFunction func(cx_, kid->pn_funbox->function());
+           if (!func->isArrow()) {
+-              RootedAtom localName(cx_, func->name());
++              RootedAtom localName(cx_, func->explicitName());
+               RootedAtom exportName(cx_, isDefault ? cx_->names().default_ : localName.get());
+               MOZ_ASSERT_IF(isDefault, localName);
+               if (!appendExportEntry(exportName, localName))
+diff --git a/js/src/builtin/ReflectParse.cpp b/js/src/builtin/ReflectParse.cpp
+index 607765bd4b1fc..2a0a08a5dc8d4 100644
+--- a/js/src/builtin/ReflectParse.cpp
++++ b/js/src/builtin/ReflectParse.cpp
+@@ -3410,7 +3410,7 @@ ASTSerializer::function(ParseNode* pn, ASTType type, MutableHandleValue dst)
+     bool isExpression = pn->pn_funbox->isExprBody();
+ 
+     RootedValue id(cx);
+-    RootedAtom funcAtom(cx, func->name());
++    RootedAtom funcAtom(cx, func->explicitName());
+     if (!optIdentifier(funcAtom, nullptr, &id))
+         return false;
+ 
+diff --git a/js/src/frontend/BytecodeEmitter.cpp b/js/src/frontend/BytecodeEmitter.cpp
+index a9fd62592dbfb..914bc5f566e56 100644
+--- a/js/src/frontend/BytecodeEmitter.cpp
++++ b/js/src/frontend/BytecodeEmitter.cpp
+@@ -4072,7 +4072,7 @@ BytecodeEmitter::isRunOnceLambda()
+     FunctionBox* funbox = sc->asFunctionBox();
+     return !funbox->argumentsHasLocalBinding() &&
+            !funbox->isGenerator() &&
+-           !funbox->function()->name();
++           !funbox->function()->explicitName();
+ }
+ 
+ bool
+@@ -4493,7 +4493,7 @@ BytecodeEmitter::emitIteratorNext(ParseNode* pn, bool allowSelfHosted)
+ }
+ 
+ bool
+-BytecodeEmitter::emitDefault(ParseNode* defaultExpr)
++BytecodeEmitter::emitDefault(ParseNode* defaultExpr, ParseNode* pattern)
+ {
+     if (!emit1(JSOP_DUP))                                 // VALUE VALUE
+         return false;
+@@ -4509,13 +4509,79 @@ BytecodeEmitter::emitDefault(ParseNode* defaultExpr)
+         return false;
+     if (!emit1(JSOP_POP))                                 // .
+         return false;
+-    if (!emitTreeInBranch(defaultExpr))                   // DEFAULTVALUE
++    if (!emitInitializerInBranch(defaultExpr, pattern))   // DEFAULTVALUE
+         return false;
+     if (!emitJumpTargetAndPatch(jump))
+         return false;
+     return true;
+ }
+ 
++bool
++BytecodeEmitter::setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name,
++                                     FunctionPrefixKind prefixKind)
++{
++    if (maybeFun->isKind(PNK_FUNCTION)) {
++        // Function doesn't have 'name' property at this point.
++        // Set function's name at compile time.
++        RootedFunction fun(cx, maybeFun->pn_funbox->function());
++
++        // Single node can be emitted multiple times if it appears in
++        // array destructuring default.  If function already has a name,
++        // just return.
++        if (fun->hasCompileTimeName()) {
++#ifdef DEBUG
++            RootedAtom funName(cx, NameToFunctionName(cx, name, prefixKind));
++            if (!funName)
++                return false;
++            MOZ_ASSERT(funName == maybeFun->pn_funbox->function()->compileTimeName());
++#endif
++            return true;
++        }
++
++        RootedAtom funName(cx, NameToFunctionName(cx, name, prefixKind));
++        if (!funName)
++            return false;
++        if (fun->hasGuessedAtom())
++            fun->clearGuessedAtom();
++        fun->setCompileTimeName(name);
++        return true;
++    }
++
++    uint32_t nameIndex;
++    if (!makeAtomIndex(name, &nameIndex))
++        return false;
++    if (!emitIndexOp(JSOP_STRING, nameIndex))   // FUN NAME
++        return false;
++    uint8_t kind = uint8_t(prefixKind);
++    if (!emit2(JSOP_SETFUNNAME, kind))          // FUN
++        return false;
++    return true;
++}
++
++bool
++BytecodeEmitter::emitInitializer(ParseNode* initializer, ParseNode* pattern)
++{
++    if (!emitTree(initializer))
++        return false;
++
++    if (!pattern->isInParens() && pattern->isKind(PNK_NAME) &&
++        initializer->isDirectRHSAnonFunction())
++    {
++        RootedAtom name(cx, pattern->name());
++        if (!setOrEmitSetFunName(initializer, name, FunctionPrefixKind::None))
++            return false;
++    }
++
++    return true;
++}
++
++bool
++BytecodeEmitter::emitInitializerInBranch(ParseNode* initializer, ParseNode* pattern)
++{
++    TDZCheckCache tdzCache(this);
++    return emitInitializer(initializer, pattern);
++}
++
+ class MOZ_STACK_CLASS IfThenElseEmitter
+ {
+     BytecodeEmitter* bce_;
+@@ -4836,7 +4902,7 @@ BytecodeEmitter::emitDestructuringOpsArray(ParseNode* pattern, DestructuringFlav
+         if (pndefault) {
+             // Emit only pndefault tree here, as undefined check in emitDefault
+             // should always be true.
+-            if (!emitTreeInBranch(pndefault))                     // ... OBJ? ITER VALUE
++            if (!emitInitializerInBranch(pndefault, subpattern))  // ... OBJ? ITER VALUE
+                 return false;
+         } else {
+             if (!isElision) {
+@@ -4874,7 +4940,7 @@ BytecodeEmitter::emitDestructuringOpsArray(ParseNode* pattern, DestructuringFlav
+             return false;
+ 
+         if (pndefault) {
+-            if (!emitDefault(pndefault))                          // ... OBJ? ITER VALUE
++            if (!emitDefault(pndefault, subpattern))              // ... OBJ? ITER VALUE
+                 return false;
+         }
+ 
+@@ -4982,7 +5048,7 @@ BytecodeEmitter::emitDestructuringOpsObject(ParseNode* pattern, DestructuringFla
+             return false;
+ 
+         if (subpattern->isKind(PNK_ASSIGN)) {
+-            if (!emitDefault(subpattern->pn_right))
++            if (!emitDefault(subpattern->pn_right, subpattern->pn_left))
+                 return false;
+             subpattern = subpattern->pn_left;
+         }
+@@ -5096,7 +5162,7 @@ BytecodeEmitter::emitSingleDeclaration(ParseNode* declList, ParseNode* decl,
+     if (!initializer && declList->isKind(PNK_VAR))
+         return true;
+ 
+-    auto emitRhs = [initializer, declList](BytecodeEmitter* bce, const NameLocation&, bool) {
++    auto emitRhs = [initializer, declList, decl](BytecodeEmitter* bce, const NameLocation&, bool) {
+         if (!initializer) {
+             // Lexical declarations are initialized to undefined without an
+             // initializer.
+@@ -5107,7 +5173,7 @@ BytecodeEmitter::emitSingleDeclaration(ParseNode* declList, ParseNode* decl,
+         }
+ 
+         MOZ_ASSERT(initializer);
+-        return bce->emitTree(initializer);
++        return bce->emitInitializer(initializer, decl);
+     };
+ 
+     if (!emitInitializeName(decl, emitRhs))
+@@ -5166,6 +5232,12 @@ BytecodeEmitter::emitAssignment(ParseNode* lhs, JSOp op, ParseNode* rhs)
+             if (!EmitAssignmentRhs(bce, rhs, emittedBindOp ? 2 : 1))
+                 return false;
+ 
++            if (!lhs->isInParens() && op == JSOP_NOP && rhs && rhs->isDirectRHSAnonFunction()) {
++                RootedAtom name(bce->cx, lhs->name());
++                if (!bce->setOrEmitSetFunName(rhs, name, FunctionPrefixKind::None))
++                    return false;
++            }
++
+             // Emit the compound assignment op if there is one.
+             if (op != JSOP_NOP && !bce->emit1(op))
+                 return false;
+@@ -6285,8 +6357,8 @@ BytecodeEmitter::emitForIn(ParseNode* forInLoop, EmitterScope* headLexicalEmitte
+                 if (!updateSourceCoordNotes(decl->pn_pos.begin))
+                     return false;
+ 
+-                auto emitRhs = [initializer](BytecodeEmitter* bce, const NameLocation&, bool) {
+-                    return bce->emitTree(initializer);
++                auto emitRhs = [decl, initializer](BytecodeEmitter* bce, const NameLocation&, bool) {
++                    return bce->emitInitializer(initializer, decl);
+                 };
+ 
+                 if (!emitInitializeName(decl, emitRhs))
+@@ -6905,7 +6977,7 @@ BytecodeEmitter::emitFunction(ParseNode* pn, bool needsProto)
+ {
+     FunctionBox* funbox = pn->pn_funbox;
+     RootedFunction fun(cx, funbox->function());
+-    RootedAtom name(cx, fun->name());
++    RootedAtom name(cx, fun->explicitName());
+     MOZ_ASSERT_IF(fun->isInterpretedLazy(), fun->lazyScript());
+     MOZ_ASSERT_IF(pn->isOp(JSOP_FUNWITHPROTO), needsProto);
+ 
+@@ -8534,6 +8606,10 @@ BytecodeEmitter::emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp,
+                    op == JSOP_INITPROP_GETTER ||
+                    op == JSOP_INITPROP_SETTER);
+ 
++        FunctionPrefixKind prefixKind = op == JSOP_INITPROP_GETTER ? FunctionPrefixKind::Get
++                                        : op == JSOP_INITPROP_SETTER ? FunctionPrefixKind::Set
++                                        : FunctionPrefixKind::None;
++
+         if (op == JSOP_INITPROP_GETTER || op == JSOP_INITPROP_SETTER)
+             objp.set(nullptr);
+ 
+@@ -8575,6 +8651,12 @@ BytecodeEmitter::emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp,
+               case JSOP_INITHIDDENPROP_SETTER:  op = JSOP_INITHIDDENELEM_SETTER; break;
+               default: MOZ_CRASH("Invalid op");
+             }
++            if (propdef->pn_right->isDirectRHSAnonFunction()) {
++                if (!emitDupAt(1))
++                    return false;
++                if (!emit2(JSOP_SETFUNNAME, uint8_t(prefixKind)))
++                    return false;
++            }
+             if (!emit1(op))
+                 return false;
+         } else {
+@@ -8599,6 +8681,11 @@ BytecodeEmitter::emitPropertyList(ParseNode* pn, MutableHandlePlainObject objp,
+                     objp.set(nullptr);
+             }
+ 
++            if (propdef->pn_right->isDirectRHSAnonFunction()) {
++                RootedAtom keyName(cx, key->pn_atom);
++                if (!setOrEmitSetFunName(propdef->pn_right, keyName, prefixKind))
++                    return false;
++            }
+             if (!emitIndex32(op, index))
+                 return false;
+         }
+@@ -9019,7 +9106,7 @@ BytecodeEmitter::emitFunctionFormalParameters(ParseNode* pn)
+                 return false;
+             if (!emit1(JSOP_POP))
+                 return false;
+-            if (!emitTreeInBranch(initializer))
++            if (!emitInitializerInBranch(initializer, bindingElement))
+                 return false;
+             if (!emitJumpTargetAndPatch(jump))
+                 return false;
+diff --git a/js/src/frontend/BytecodeEmitter.h b/js/src/frontend/BytecodeEmitter.h
+index 08e0eb54f5ae4..9a2ddb568ab6b 100644
+--- a/js/src/frontend/BytecodeEmitter.h
++++ b/js/src/frontend/BytecodeEmitter.h
+@@ -677,7 +677,16 @@ struct MOZ_STACK_CLASS BytecodeEmitter
+ 
+     // Check if the value on top of the stack is "undefined". If so, replace
+     // that value on the stack with the value defined by |defaultExpr|.
+-    MOZ_MUST_USE bool emitDefault(ParseNode* defaultExpr);
++    // |pattern| is a lhs node of the default expression.  If it's an
++    // identifier and |defaultExpr| is an anonymous function, |SetFunctionName|
++    // is called at compile time.
++    MOZ_MUST_USE bool emitDefault(ParseNode* defaultExpr, ParseNode* pattern);
++
++    MOZ_MUST_USE bool setOrEmitSetFunName(ParseNode* maybeFun, HandleAtom name,
++                                          FunctionPrefixKind prefixKind);
++
++    MOZ_MUST_USE bool emitInitializer(ParseNode* initializer, ParseNode* pattern);
++    MOZ_MUST_USE bool emitInitializerInBranch(ParseNode* initializer, ParseNode* pattern);
+ 
+     MOZ_MUST_USE bool emitCallSiteObject(ParseNode* pn);
+     MOZ_MUST_USE bool emitTemplateString(ParseNode* pn);
+diff --git a/js/src/frontend/FullParseHandler.h b/js/src/frontend/FullParseHandler.h
+index b931c9690a23a..3938d97437e65 100644
+--- a/js/src/frontend/FullParseHandler.h
++++ b/js/src/frontend/FullParseHandler.h
+@@ -667,6 +667,11 @@ class FullParseHandler
+                                                                    ParseNode* pn);
+     inline void setLastFunctionFormalParameterDestructuring(ParseNode* funcpn, ParseNode* pn);
+ 
++    void checkAndSetIsDirectRHSAnonFunction(ParseNode* pn) {
++        if (IsAnonymousFunctionDefinition(pn))
++            pn->setDirectRHSAnonFunction(true);
++    }
++
+     ParseNode* newFunctionStatement() {
+         return new_<CodeNode>(PNK_FUNCTION, JSOP_NOP, pos());
+     }
+@@ -949,6 +954,8 @@ FullParseHandler::setLastFunctionFormalParameterDefault(ParseNode* funcpn, Parse
+     if (!pn)
+         return false;
+ 
++    checkAndSetIsDirectRHSAnonFunction(defaultValue);
++
+     funcpn->pn_body->pn_pos.end = pn->pn_pos.end;
+     ParseNode* pnchild = funcpn->pn_body->pn_head;
+     ParseNode* pnlast = funcpn->pn_body->last();
+diff --git a/js/src/frontend/ParseNode-inl.h b/js/src/frontend/ParseNode-inl.h
+index 395d09b5b992d..21bd837668fe8 100644
+--- a/js/src/frontend/ParseNode-inl.h
++++ b/js/src/frontend/ParseNode-inl.h
+@@ -18,7 +18,7 @@ inline PropertyName*
+ ParseNode::name() const
+ {
+     MOZ_ASSERT(isKind(PNK_FUNCTION) || isKind(PNK_NAME));
+-    JSAtom* atom = isKind(PNK_FUNCTION) ? pn_funbox->function()->name() : pn_atom;
++    JSAtom* atom = isKind(PNK_FUNCTION) ? pn_funbox->function()->explicitName() : pn_atom;
+     return atom->asPropertyName();
+ }
+ 
+diff --git a/js/src/frontend/ParseNode.cpp b/js/src/frontend/ParseNode.cpp
+index f79baba9efdf3..ece3a45dfbc06 100644
+--- a/js/src/frontend/ParseNode.cpp
++++ b/js/src/frontend/ParseNode.cpp
+@@ -902,3 +902,21 @@ FunctionBox::trace(JSTracer* trc)
+     if (enclosingScope_)
+         TraceRoot(trc, &enclosingScope_, "funbox-enclosingScope");
+ }
++
++bool
++js::frontend::IsAnonymousFunctionDefinition(ParseNode* pn)
++{
++    // ES 2017 draft
++    // 12.15.2 (ArrowFunction, AsyncArrowFunction).
++    // 14.1.12 (FunctionExpression).
++    // 14.4.8 (GeneratorExpression).
++    // 14.6.8 (AsyncFunctionExpression)
++    if (pn->isKind(PNK_FUNCTION) && !pn->pn_funbox->function()->explicitName())
++        return true;
++
++    // 14.5.8 (ClassExpression)
++    if (pn->is<ClassNode>() && !pn->as<ClassNode>().names())
++        return true;
++
++    return false;
++}
+diff --git a/js/src/frontend/ParseNode.h b/js/src/frontend/ParseNode.h
+index 4f1f0af9ae68b..6bd5bb324a996 100644
+--- a/js/src/frontend/ParseNode.h
++++ b/js/src/frontend/ParseNode.h
+@@ -450,6 +450,9 @@ class ParseNode
+     uint8_t pn_op;      /* see JSOp enum and jsopcode.tbl */
+     uint8_t pn_arity:4; /* see ParseNodeArity enum */
+     bool pn_parens:1;   /* this expr was enclosed in parens */
++    bool pn_rhs_anon_fun:1;  /* this expr is anonymous function or class that
++                              * is a direct RHS of PNK_ASSIGN or PNK_COLON of
++                              * property, that needs SetFunctionName. */
+ 
+     ParseNode(const ParseNode& other) = delete;
+     void operator=(const ParseNode& other) = delete;
+@@ -460,6 +463,7 @@ class ParseNode
+         pn_op(op),
+         pn_arity(arity),
+         pn_parens(false),
++        pn_rhs_anon_fun(false),
+         pn_pos(0, 0),
+         pn_next(nullptr)
+     {
+@@ -472,6 +476,7 @@ class ParseNode
+         pn_op(op),
+         pn_arity(arity),
+         pn_parens(false),
++        pn_rhs_anon_fun(false),
+         pn_pos(pos),
+         pn_next(nullptr)
+     {
+@@ -512,6 +517,13 @@ class ParseNode
+     bool isLikelyIIFE() const              { return isInParens(); }
+     void setInParens(bool enabled)         { pn_parens = enabled; }
+ 
++    bool isDirectRHSAnonFunction() const {
++        return pn_rhs_anon_fun;
++    }
++    void setDirectRHSAnonFunction(bool enabled) {
++        pn_rhs_anon_fun = enabled;
++    }
++
+     TokenPos            pn_pos;         /* two 16-bit pairs here, for 64 bits */
+     ParseNode*          pn_next;        /* intrinsic link in parent PN_LIST */
+ 
+@@ -1448,6 +1460,9 @@ FunctionFormalParametersList(ParseNode* fn, unsigned* numFormals)
+     return argsBody->pn_head;
+ }
+ 
++bool
++IsAnonymousFunctionDefinition(ParseNode* pn);
++
+ } /* namespace frontend */
+ } /* namespace js */
+ 
+diff --git a/js/src/frontend/Parser.cpp b/js/src/frontend/Parser.cpp
+index e580b66c78d67..c9aded92ec69d 100644
+--- a/js/src/frontend/Parser.cpp
++++ b/js/src/frontend/Parser.cpp
+@@ -326,10 +326,14 @@ ParseContext::init()
+         if (fun->isNamedLambda()) {
+             if (!namedLambdaScope_->init(this))
+                 return false;
+-            AddDeclaredNamePtr p = namedLambdaScope_->lookupDeclaredNameForAdd(fun->name());
++            AddDeclaredNamePtr p =
++                namedLambdaScope_->lookupDeclaredNameForAdd(fun->explicitName());
+             MOZ_ASSERT(!p);
+-            if (!namedLambdaScope_->addDeclaredName(this, p, fun->name(), DeclarationKind::Const))
++            if (!namedLambdaScope_->addDeclaredName(this, p, fun->explicitName(),
++                                                    DeclarationKind::Const))
++            {
+                 return false;
++            }
+         }
+ 
+         if (!functionScope_->init(this))
+@@ -367,7 +371,7 @@ ParseContext::removeInnerFunctionBoxesForAnnexB(JSAtom* name)
+ {
+     for (uint32_t i = 0; i < innerFunctionBoxesForAnnexB_->length(); i++) {
+         if (FunctionBox* funbox = innerFunctionBoxesForAnnexB_[i]) {
+-            if (funbox->function()->name() == name)
++            if (funbox->function()->explicitName() == name)
+                 innerFunctionBoxesForAnnexB_[i] = nullptr;
+         }
+     }
+@@ -3467,8 +3471,8 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
+     if (!body)
+         return false;
+ 
+-    if ((kind != Method && !IsConstructorKind(kind)) && fun->name()) {
+-        RootedPropertyName propertyName(context, fun->name()->asPropertyName());
++    if ((kind != Method && !IsConstructorKind(kind)) && fun->explicitName()) {
++        RootedPropertyName propertyName(context, fun->explicitName()->asPropertyName());
+         if (!checkStrictBinding(propertyName, handler.getPosition(pn)))
+             return false;
+     }
+@@ -4337,6 +4341,8 @@ Parser<ParseHandler>::declarationPattern(Node decl, DeclarationKind declKind, To
+     if (!init)
+         return null();
+ 
++    handler.checkAndSetIsDirectRHSAnonFunction(init);
++
+     if (forHeadKind) {
+         // For for(;;) declarations, consistency with |for (;| parsing requires
+         // that the ';' first be examined as Operand, even though absence of a
+@@ -4370,6 +4376,8 @@ Parser<ParseHandler>::initializerInNameDeclaration(Node decl, Node binding,
+     if (!initializer)
+         return false;
+ 
++    handler.checkAndSetIsDirectRHSAnonFunction(initializer);
++
+     if (forHeadKind) {
+         if (initialDeclaration) {
+             bool isForIn, isForOf;
+@@ -5058,7 +5066,7 @@ Parser<FullParseHandler>::exportDeclaration()
+         if (!kid)
+             return null();
+ 
+-        if (!checkExportedName(kid->pn_funbox->function()->name()))
++        if (!checkExportedName(kid->pn_funbox->function()->explicitName()))
+             return null();
+         break;
+ 
+@@ -6669,8 +6677,6 @@ Parser<ParseHandler>::classDefinition(YieldHandling yieldHandling,
+             return null();
+         }
+ 
+-        // FIXME: Implement ES6 function "name" property semantics
+-        // (bug 883377).
+         RootedAtom funName(context);
+         switch (propType) {
+           case PropertyType::GetterNoExpressionClosure:
+@@ -6693,6 +6699,8 @@ Parser<ParseHandler>::classDefinition(YieldHandling yieldHandling,
+         if (!fn)
+             return null();
+ 
++        handler.checkAndSetIsDirectRHSAnonFunction(fn);
++
+         JSOp op = JSOpFromPropertyType(propType);
+         if (!handler.addClassMethodDefinition(classMethods, propName, fn, op, isStatic))
+             return null();
+@@ -7747,6 +7755,9 @@ Parser<ParseHandler>::assignExpr(InHandling inHandling, YieldHandling yieldHandl
+             return null();
+     }
+ 
++    if (kind == PNK_ASSIGN)
++        handler.checkAndSetIsDirectRHSAnonFunction(rhs);
++
+     return handler.newAssignment(kind, lhs, rhs, op);
+ }
+ 
+@@ -9079,6 +9090,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError*
+             if (!propExpr)
+                 return null();
+ 
++            handler.checkAndSetIsDirectRHSAnonFunction(propExpr);
++
+             if (foldConstants && !FoldConstants(context, &propExpr, this))
+                 return null();
+ 
+@@ -9191,6 +9204,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError*
+                     return null();
+             }
+ 
++            handler.checkAndSetIsDirectRHSAnonFunction(rhs);
++
+             Node propExpr = handler.newAssignment(PNK_ASSIGN, lhs, rhs, JSOP_NOP);
+             if (!propExpr)
+                 return null();
+@@ -9201,8 +9216,6 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError*
+             if (!abortIfSyntaxParser())
+                 return null();
+         } else {
+-            // FIXME: Implement ES6 function "name" property semantics
+-            // (bug 883377).
+             RootedAtom funName(context);
+             if (!tokenStream.isCurrentTokenType(TOK_RB)) {
+                 funName = propAtom;
+@@ -9218,6 +9231,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError*
+             if (!fn)
+                 return null();
+ 
++            handler.checkAndSetIsDirectRHSAnonFunction(fn);
++
+             JSOp op = JSOpFromPropertyType(propType);
+             if (!handler.addObjectMethodDefinition(literal, propName, fn, op))
+                 return null();
+diff --git a/js/src/frontend/SyntaxParseHandler.h b/js/src/frontend/SyntaxParseHandler.h
+index 1ad99caabd075..9dc3c10723789 100644
+--- a/js/src/frontend/SyntaxParseHandler.h
++++ b/js/src/frontend/SyntaxParseHandler.h
+@@ -345,6 +345,8 @@ class SyntaxParseHandler
+ 
+     MOZ_MUST_USE bool setLastFunctionFormalParameterDefault(Node funcpn, Node pn) { return true; }
+ 
++    void checkAndSetIsDirectRHSAnonFunction(Node pn) {}
++
+     Node newFunctionStatement() { return NodeFunctionDefinition; }
+     Node newFunctionExpression() { return NodeFunctionDefinition; }
+     Node newArrowFunction() { return NodeFunctionDefinition; }
+diff --git a/js/src/jsapi.cpp b/js/src/jsapi.cpp
+index c65b222d44dd2..a871e6edefb8f 100644
+--- a/js/src/jsapi.cpp
++++ b/js/src/jsapi.cpp
+@@ -2084,7 +2084,7 @@ DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue val
+         getter != JS_PropertyStub && setter != JS_StrictPropertyStub)
+     {
+         if (getter && !(attrs & JSPROP_GETTER)) {
+-            RootedAtom atom(cx, IdToFunctionName(cx, id, "get"));
++            RootedAtom atom(cx, IdToFunctionName(cx, id, FunctionPrefixKind::Get));
+             if (!atom)
+                 return false;
+             JSFunction* getobj = NewNativeFunction(cx, (Native) getter, 0, atom);
+@@ -2100,7 +2100,7 @@ DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue val
+         if (setter && !(attrs & JSPROP_SETTER)) {
+             // Root just the getter, since the setter is not yet a JSObject.
+             AutoRooterGetterSetter getRoot(cx, JSPROP_GETTER, &getter, nullptr);
+-            RootedAtom atom(cx, IdToFunctionName(cx, id, "set"));
++            RootedAtom atom(cx, IdToFunctionName(cx, id, FunctionPrefixKind::Set));
+             if (!atom)
+                 return false;
+             JSFunction* setobj = NewNativeFunction(cx, (Native) setter, 1, atom);
+@@ -3604,7 +3604,7 @@ JS_GetFunctionObject(JSFunction* fun)
+ JS_PUBLIC_API(JSString*)
+ JS_GetFunctionId(JSFunction* fun)
+ {
+-    return fun->name();
++    return fun->explicitName();
+ }
+ 
+ JS_PUBLIC_API(JSString*)
+diff --git a/js/src/jscntxt.cpp b/js/src/jscntxt.cpp
+index 748ab15338931..a886b3a794033 100644
+--- a/js/src/jscntxt.cpp
++++ b/js/src/jscntxt.cpp
+@@ -810,7 +810,7 @@ js::ReportMissingArg(JSContext* cx, HandleValue v, unsigned arg)
+ 
+     SprintfLiteral(argbuf, "%u", arg);
+     if (IsFunctionObject(v)) {
+-        RootedAtom name(cx, v.toObject().as<JSFunction>().name());
++        RootedAtom name(cx, v.toObject().as<JSFunction>().explicitName());
+         bytes = DecompileValueGenerator(cx, JSDVG_SEARCH_STACK, v, name);
+         if (!bytes)
+             return;
+diff --git a/js/src/jsfun.cpp b/js/src/jsfun.cpp
+index 2598f0eed7463..cc1ff68e4fc66 100644
+--- a/js/src/jsfun.cpp
++++ b/js/src/jsfun.cpp
+@@ -562,7 +562,7 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleScope enclosingScope,
+             return false;
+         }
+ 
+-        if (fun->name() || fun->hasGuessedAtom())
++        if (fun->explicitName() || fun->hasCompileTimeName() || fun->hasGuessedAtom())
+             firstword |= HasAtom;
+ 
+         if (fun->isStarGenerator())
+@@ -990,8 +990,8 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool prettyPrint)
+         if (!ok)
+             return nullptr;
+     }
+-    if (fun->name()) {
+-        if (!out.append(fun->name()))
++    if (fun->explicitName()) {
++        if (!out.append(fun->explicitName()))
+             return nullptr;
+     }
+ 
+@@ -1309,14 +1309,14 @@ JSFunction::getUnresolvedName(JSContext* cx)
+     if (isClassConstructor()) {
+         // It's impossible to have an empty named class expression. We use
+         // empty as a sentinel when creating default class constructors.
+-        MOZ_ASSERT(name() != cx->names().empty);
++        MOZ_ASSERT(explicitOrCompileTimeName() != cx->names().empty);
+ 
+         // Unnamed class expressions should not get a .name property at all.
+-        return name();
++        return explicitOrCompileTimeName();
+     }
+ 
+-    // Returns the empty string for unnamed functions (FIXME: bug 883377).
+-    return name() != nullptr ? name() : cx->names().empty;
++    return explicitOrCompileTimeName() != nullptr ? explicitOrCompileTimeName()
++                                                  : cx->names().empty;
+ }
+ 
+ static const js::Value&
+@@ -2079,34 +2079,109 @@ js::CloneFunctionAndScript(JSContext* cx, HandleFunction fun, HandleObject enclo
+  * Implements steps 3-5 of 9.2.11 SetFunctionName in ES2016.
+  */
+ JSAtom*
+-js::IdToFunctionName(JSContext* cx, HandleId id, const char* prefix /* = nullptr */)
++js::IdToFunctionName(JSContext* cx, HandleId id,
++                     FunctionPrefixKind prefixKind /* = FunctionPrefixKind::None */)
+ {
+-    if (JSID_IS_ATOM(id) && !prefix)
++    // No prefix fastpath.
++    if (JSID_IS_ATOM(id) && prefixKind == FunctionPrefixKind::None)
+         return JSID_TO_ATOM(id);
+ 
+-    // Step 3.
+-    MOZ_ASSERT_IF(prefix, !JSID_IS_SYMBOL(id));
++    // Step 3 (implicit).
+ 
+     // Step 4.
+     if (JSID_IS_SYMBOL(id)) {
++        // Step 4.a.
+         RootedAtom desc(cx, JSID_TO_SYMBOL(id)->description());
++
++        // Step 4.b, no prefix fastpath.
++        if (!desc && prefixKind == FunctionPrefixKind::None)
++            return cx->names().empty;
++
++        // Step 5 (reordered).
+         StringBuffer sb(cx);
+-        if (!sb.append('[') || !sb.append(desc) || !sb.append(']'))
+-            return nullptr;
++        if (prefixKind == FunctionPrefixKind::Get) {
++            if (!sb.append("get "))
++                return nullptr;
++        } else if (prefixKind == FunctionPrefixKind::Set) {
++            if (!sb.append("set "))
++                return nullptr;
++        }
++
++        // Step 4.b.
++        if (desc) {
++            // Step 4.c.
++            if (!sb.append('[') || !sb.append(desc) || !sb.append(']'))
++                return nullptr;
++        }
+         return sb.finishAtom();
+     }
+ 
+-    // Step 5.
+     RootedValue idv(cx, IdToValue(id));
+-    if (!prefix)
+-        return ToAtom<CanGC>(cx, idv);
++    RootedAtom name(cx, ToAtom<CanGC>(cx, idv));
++    if (!name)
++        return nullptr;
++
++    // Step 5.
++    return NameToFunctionName(cx, name, prefixKind);
++}
++
++JSAtom*
++js::NameToFunctionName(ExclusiveContext* cx, HandleAtom name,
++                       FunctionPrefixKind prefixKind /* = FunctionPrefixKind::None */)
++{
++    if (prefixKind == FunctionPrefixKind::None)
++        return name;
+ 
+     StringBuffer sb(cx);
+-    if (!sb.append(prefix, strlen(prefix)) || !sb.append(' ') || !sb.append(ToAtom<CanGC>(cx, idv)))
++    if (prefixKind == FunctionPrefixKind::Get) {
++        if (!sb.append("get "))
++            return nullptr;
++    } else {
++        if (!sb.append("set "))
++            return nullptr;
++    }
++    if (!sb.append(name))
+         return nullptr;
+     return sb.finishAtom();
+ }
+ 
++bool
++js::SetFunctionNameIfNoOwnName(JSContext* cx, HandleFunction fun, HandleValue name,
++                               FunctionPrefixKind prefixKind)
++{
++    MOZ_ASSERT(name.isString() || name.isSymbol() || name.isNumber());
++
++    if (fun->isClassConstructor()) {
++        // A class may have static 'name' method or accessor.
++        RootedId nameId(cx, NameToId(cx->names().name));
++        bool result;
++        if (!HasOwnProperty(cx, fun, nameId, &result))
++            return false;
++
++        if (result)
++            return true;
++    } else {
++        // Anonymous function shouldn't have own 'name' property at this point.
++        MOZ_ASSERT(!fun->containsPure(cx->names().name));
++    }
++
++    RootedId id(cx);
++    if (!ValueToId<CanGC>(cx, name, &id))
++        return false;
++
++    RootedAtom funNameAtom(cx, IdToFunctionName(cx, id, prefixKind));
++    if (!funNameAtom)
++        return false;
++
++    RootedValue funNameVal(cx, StringValue(funNameAtom));
++    if (!NativeDefineProperty(cx, fun, cx->names().name, funNameVal, nullptr, nullptr,
++                              JSPROP_READONLY))
++    {
++        return false;
++    }
++    return true;
++}
++
+ JSFunction*
+ js::DefineFunction(JSContext* cx, HandleObject obj, HandleId id, Native native,
+                    unsigned nargs, unsigned flags, AllocKind allocKind /* = AllocKind::FUNCTION */)
+diff --git a/js/src/jsfun.h b/js/src/jsfun.h
+index 8c4d72930a5c0..1d584cda3efae 100644
+--- a/js/src/jsfun.h
++++ b/js/src/jsfun.h
+@@ -31,6 +31,12 @@ static const uint32_t JSSLOT_BOUND_FUNCTION_ARGS       = 4;
+ static const char FunctionConstructorMedialSigils[] = ") {\n";
+ static const char FunctionConstructorFinalBrace[] = "\n}";
+ 
++enum class FunctionPrefixKind {
++    None,
++    Get,
++    Set
++};
++
+ class JSFunction : public js::NativeObject
+ {
+   public:
+@@ -59,6 +65,9 @@ class JSFunction : public js::NativeObject
+                                        function-statement) */
+         SELF_HOSTED      = 0x0080,  /* function is self-hosted builtin and must not be
+                                        decompilable nor constructible. */
++        HAS_COMPILE_TIME_NAME = 0x0100, /* function had no explicit name, but a
++                                           name was set by SetFunctionName
++                                           at compile time */
+         INTERPRETED_LAZY = 0x0200,  /* function is interpreted but doesn't have a script yet */
+         RESOLVED_LENGTH  = 0x0400,  /* f.length has been resolved (see fun_resolve). */
+         RESOLVED_NAME    = 0x0800,  /* f.name has been resolved (see fun_resolve). */
+@@ -92,7 +101,7 @@ class JSFunction : public js::NativeObject
+         NO_XDR_FLAGS = RESOLVED_LENGTH | RESOLVED_NAME,
+ 
+         STABLE_ACROSS_CLONES = CONSTRUCTOR | HAS_GUESSED_ATOM | LAMBDA |
+-                               SELF_HOSTED | FUNCTION_KIND_MASK
++                               SELF_HOSTED | HAS_COMPILE_TIME_NAME | FUNCTION_KIND_MASK
+     };
+ 
+     static_assert((INTERPRETED | INTERPRETED_LAZY) == js::JS_FUNCTION_INTERPRETED_BITS,
+@@ -176,6 +185,7 @@ class JSFunction : public js::NativeObject
+     bool isAsmJSNative()            const { return kind() == AsmJS; }
+ 
+     /* Possible attributes of an interpreted function: */
++    bool hasCompileTimeName()       const { return flags() & HAS_COMPILE_TIME_NAME; }
+     bool hasGuessedAtom()           const { return flags() & HAS_GUESSED_ATOM; }
+     bool isLambda()                 const { return flags() & LAMBDA; }
+     bool isBoundFunction()          const { return flags() & BOUND_FUN; }
+@@ -217,7 +227,7 @@ class JSFunction : public js::NativeObject
+     }
+ 
+     bool isNamedLambda() const {
+-        return isLambda() && displayAtom() && !hasGuessedAtom();
++        return isLambda() && displayAtom() && !hasCompileTimeName() && !hasGuessedAtom();
+     }
+ 
+     bool hasLexicalThis() const {
+@@ -301,14 +311,12 @@ class JSFunction : public js::NativeObject
+ 
+     JSAtom* getUnresolvedName(JSContext* cx);
+ 
+-    JSAtom* name() const { return hasGuessedAtom() ? nullptr : atom_.get(); }
+-
+-    // Because display names (see Debugger.Object.displayName) are already stored
+-    // on functions and will always contain a valid es6 function name, as described
+-    // in "ECMA-262 (2016-02-27) 9.2.11 SetFunctionName," we have opted to save
+-    // memory by parsing the existing display name when a function's name property
+-    // is accessed.
+-    JSAtom* functionName(JSContext* cx) const;
++    JSAtom* explicitName() const {
++        return (hasCompileTimeName() || hasGuessedAtom()) ? nullptr : atom_.get();
++    }
++    JSAtom* explicitOrCompileTimeName() const {
++        return hasGuessedAtom() ? nullptr : atom_.get();
++    }
+ 
+     void initAtom(JSAtom* atom) { atom_.init(atom); }
+ 
+@@ -318,9 +326,24 @@ class JSFunction : public js::NativeObject
+         return atom_;
+     }
+ 
++    void setCompileTimeName(JSAtom* atom) {
++        MOZ_ASSERT(!atom_);
++        MOZ_ASSERT(atom);
++        MOZ_ASSERT(!hasGuessedAtom());
++        MOZ_ASSERT(!isClassConstructor());
++        atom_ = atom;
++        flags_ |= HAS_COMPILE_TIME_NAME;
++    }
++    JSAtom* compileTimeName() const {
++        MOZ_ASSERT(hasCompileTimeName());
++        MOZ_ASSERT(atom_);
++        return atom_;
++    }
++
+     void setGuessedAtom(JSAtom* atom) {
+         MOZ_ASSERT(!atom_);
+         MOZ_ASSERT(atom);
++        MOZ_ASSERT(!hasCompileTimeName());
+         MOZ_ASSERT(!hasGuessedAtom());
+         atom_ = atom;
+         flags_ |= HAS_GUESSED_ATOM;
+@@ -664,7 +687,16 @@ NewFunctionWithProto(ExclusiveContext* cx, JSNative native, unsigned nargs,
+                      NewFunctionProtoHandling protoHandling = NewFunctionClassProto);
+ 
+ extern JSAtom*
+-IdToFunctionName(JSContext* cx, HandleId id, const char* prefix = nullptr);
++IdToFunctionName(JSContext* cx, HandleId id,
++                 FunctionPrefixKind prefixKind = FunctionPrefixKind::None);
++
++extern JSAtom*
++NameToFunctionName(ExclusiveContext* cx, HandleAtom name,
++                   FunctionPrefixKind prefixKind = FunctionPrefixKind::None);
++
++extern bool
++SetFunctionNameIfNoOwnName(JSContext* cx, HandleFunction fun, HandleValue name,
++                           FunctionPrefixKind prefixKind);
+ 
+ extern JSFunction*
+ DefineFunction(JSContext* cx, HandleObject obj, HandleId id, JSNative native,
+diff --git a/js/src/jsfuninlines.h b/js/src/jsfuninlines.h
+index 25aac6b7f3838..13fe51e26bf37 100644
+--- a/js/src/jsfuninlines.h
++++ b/js/src/jsfuninlines.h
+@@ -16,7 +16,7 @@ namespace js {
+ inline const char*
+ GetFunctionNameBytes(JSContext* cx, JSFunction* fun, JSAutoByteString* bytes)
+ {
+-    if (JSAtom* name = fun->name())
++    if (JSAtom* name = fun->explicitName())
+         return bytes->encodeLatin1(cx, name);
+     return js_anonymous_str;
+ }
+diff --git a/js/src/tests/ecma_6/Function/function-name-assignment.js b/js/src/tests/ecma_6/Function/function-name-assignment.js
+new file mode 100644
+index 0000000000000..5e4d1c004f0a2
+--- /dev/null
++++ b/js/src/tests/ecma_6/Function/function-name-assignment.js
+@@ -0,0 +1,139 @@
++var BUGNUMBER = 883377;
++var summary = "Anonymous function name should be set based on assignment";
++
++print(BUGNUMBER + ": " + summary);
++
++var fooSymbol = Symbol("foo");
++var emptySymbol = Symbol("");
++var undefSymbol = Symbol();
++var globalVar;
++
++var exprs = [
++    ["function() {}", false],
++    ["function named() {}", true],
++    ["function*() {}", false],
++    ["function* named() {}", true],
++    ["async function() {}", false],
++    ["async function named() {}", true],
++    ["() => {}", false],
++    ["async () => {}", false],
++    ["class {}", false],
++    ["class named {}", true],
++];
++
++function testAssignmentExpression(expr, named) {
++    eval(`
++    var assignment;
++    assignment = ${expr};
++    assertEq(assignment.name, named ? "named" : "assignment");
++
++    globalVar = ${expr};
++    assertEq(globalVar.name, named ? "named" : "globalVar");
++
++    var obj = { dynamic: null };
++    with (obj) {
++        dynamic = ${expr};
++    }
++    assertEq(obj.dynamic.name, named ? "named" : "dynamic");
++
++    (function namedLambda(param1, param2) {
++        var assignedToNamedLambda;
++        assignedToNamedLambda = namedLambda = ${expr};
++        assertEq(namedLambda.name, "namedLambda");
++        assertEq(assignedToNamedLambda.name, named ? "named" : "namedLambda");
++
++        param1 = ${expr};
++        assertEq(param1.name, named ? "named" : "param1");
++
++        {
++            let param1 = ${expr};
++            assertEq(param1.name, named ? "named" : "param1");
++
++            param2 = ${expr};
++            assertEq(param2.name, named ? "named" : "param2");
++        }
++    })();
++
++    {
++        let nextedLexical1, nextedLexical2;
++        {
++            let nextedLexical1 = ${expr};
++            assertEq(nextedLexical1.name, named ? "named" : "nextedLexical1");
++
++            nextedLexical2 = ${expr};
++            assertEq(nextedLexical2.name, named ? "named" : "nextedLexical2");
++        }
++    }
++    `);
++
++    // Not applicable cases: not IsIdentifierRef.
++    eval(`
++    var inParen;
++    (inParen) = ${expr};
++    assertEq(inParen.name, named ? "named" : "");
++    `);
++
++    // Not applicable cases: not direct RHS.
++    if (!expr.includes("=>")) {
++        eval(`
++        var a = true && ${expr};
++        assertEq(a.name, named ? "named" : "");
++        `);
++    } else {
++        // Arrow function cannot be RHS of &&.
++        eval(`
++        var a = true && (${expr});
++        assertEq(a.name, named ? "named" : "");
++        `);
++    }
++
++    // Not applicable cases: property.
++    eval(`
++    var obj = {};
++
++    obj.prop = ${expr};
++    assertEq(obj.prop.name, named ? "named" : "");
++
++    obj["literal"] = ${expr};
++    assertEq(obj["literal"].name, named ? "named" : "");
++    `);
++
++    // Not applicable cases: assigned again.
++    eval(`
++    var tmp = [${expr}];
++    assertEq(tmp[0].name, named ? "named" : "");
++
++    var assignment;
++    assignment = tmp[0];
++    assertEq(assignment.name, named ? "named" : "");
++    `);
++}
++for (var [expr, named] of exprs) {
++    testAssignmentExpression(expr, named);
++}
++
++function testVariableDeclaration(expr, named) {
++    eval(`
++    var varDecl = ${expr};
++    assertEq(varDecl.name, named ? "named" : "varDecl");
++    `);
++}
++for (var [expr, named] of exprs) {
++    testVariableDeclaration(expr, named);
++}
++
++function testLexicalBinding(expr, named) {
++    eval(`
++    let lexical = ${expr};
++    assertEq(lexical.name, named ? "named" : "lexical");
++
++    const constLexical = ${expr};
++    assertEq(constLexical.name, named ? "named" : "constLexical");
++    `);
++}
++for (var [expr, named] of exprs) {
++    testLexicalBinding(expr, named);
++}
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0);
+diff --git a/js/src/tests/ecma_6/Function/function-name-binding.js b/js/src/tests/ecma_6/Function/function-name-binding.js
+new file mode 100644
+index 0000000000000..bdd6c131c07b7
+--- /dev/null
++++ b/js/src/tests/ecma_6/Function/function-name-binding.js
+@@ -0,0 +1,54 @@
++var BUGNUMBER = 883377;
++var summary = "Anonymous function name should be set based on binding pattern";
++
++print(BUGNUMBER + ": " + summary);
++
++var exprs = [
++    ["function() {}", false],
++    ["function named() {}", true],
++    ["function*() {}", false],
++    ["function* named() {}", true],
++    ["async function() {}", false],
++    ["async function named() {}", true],
++    ["() => {}", false],
++    ["async () => {}", false],
++    ["class {}", false],
++    ["class named {}", true],
++];
++
++function testAssignmentProperty(expr, named) {
++    var f = eval(`(function({ prop1 = ${expr} }) { return prop1; })`);
++    assertEq(f({}).name, named ? "named" : "prop1");
++
++    eval(`
++    var { prop1 = ${expr} } = {};
++    assertEq(prop1.name, named ? "named" : "prop1");
++    `);
++}
++for (var [expr, named] of exprs) {
++    testAssignmentProperty(expr, named);
++}
++
++function testAssignmentElement(expr, named) {
++    var f = eval(`(function([elem1 = ${expr}]) { return elem1; })`);
++    assertEq(f([]).name, named ? "named" : "elem1");
++
++    eval(`
++    var [elem1 = ${expr}] = [];
++    assertEq(elem1.name, named ? "named" : "elem1");
++    `);
++}
++for (var [expr, named] of exprs) {
++    testAssignmentElement(expr, named);
++}
++
++function testSingleNameBinding(expr, named) {
++    var f = eval(`(function(param1 = ${expr}) { return param1; })`);
++    assertEq(f().name, named ? "named" : "param1");
++}
++for (var [expr, named] of exprs) {
++    testSingleNameBinding(expr, named);
++}
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0);
+diff --git a/js/src/tests/ecma_6/Function/function-name-class.js b/js/src/tests/ecma_6/Function/function-name-class.js
+new file mode 100644
+index 0000000000000..edde690556f94
+--- /dev/null
++++ b/js/src/tests/ecma_6/Function/function-name-class.js
+@@ -0,0 +1,32 @@
++var BUGNUMBER = 883377;
++var summary = "Anonymous class with name method shouldn't be affected by assignment";
++
++print(BUGNUMBER + ": " + summary);
++
++var classWithStaticNameMethod = class { static name() {} };
++assertEq(typeof classWithStaticNameMethod.name, "function");
++
++var classWithStaticNameGetter = class { static get name() { return "static name"; } };
++assertEq(typeof Object.getOwnPropertyDescriptor(classWithStaticNameGetter, "name").get, "function");
++assertEq(classWithStaticNameGetter.name, "static name");
++
++var classWithStaticNameSetter = class { static set name(v) {} };
++assertEq(typeof Object.getOwnPropertyDescriptor(classWithStaticNameSetter, "name").set, "function");
++
++var n = "NAME".toLowerCase();
++var classWithStaticNameMethodComputed = class { static [n]() {} };
++assertEq(typeof classWithStaticNameMethodComputed.name, "function");
++
++// It doesn't apply for non-static method.
++
++var classWithNameMethod = class { name() {} };
++assertEq(classWithNameMethod.name, "classWithNameMethod");
++
++var classWithNameGetter = class { get name() { return "name"; } };
++assertEq(classWithNameGetter.name, "classWithNameGetter");
++
++var classWithNameSetter = class { set name(v) {} };
++assertEq(classWithNameSetter.name, "classWithNameSetter");
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0);
+diff --git a/js/src/tests/ecma_6/Function/function-name-for.js b/js/src/tests/ecma_6/Function/function-name-for.js
+new file mode 100644
+index 0000000000000..2f04a5fa8d51f
+--- /dev/null
++++ b/js/src/tests/ecma_6/Function/function-name-for.js
+@@ -0,0 +1,31 @@
++var BUGNUMBER = 883377;
++var summary = "Anonymous function name should be set based on for-in initializer";
++
++print(BUGNUMBER + ": " + summary);
++
++var exprs = [
++    ["function() {}", false],
++    ["function named() {}", true],
++    ["function*() {}", false],
++    ["function* named() {}", true],
++    ["async function() {}", false],
++    ["async function named() {}", true],
++    ["() => {}", false],
++    ["async () => {}", false],
++    ["class {}", false],
++    ["class named {}", true],
++];
++
++function testForInHead(expr, named) {
++    eval(`
++    for (var forInHead = ${expr} in {}) {
++    }
++    `);
++    assertEq(forInHead.name, named ? "named" : "forInHead");
++}
++for (var [expr, named] of exprs) {
++    testForInHead(expr, named);
++}
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0);
+diff --git a/js/src/tests/ecma_6/Function/function-name-method.js b/js/src/tests/ecma_6/Function/function-name-method.js
+new file mode 100644
+index 0000000000000..3b2eeee793d40
+--- /dev/null
++++ b/js/src/tests/ecma_6/Function/function-name-method.js
+@@ -0,0 +1,70 @@
++var BUGNUMBER = 883377;
++var summary = "Anonymous function name should be set based on method definition";
++
++print(BUGNUMBER + ": " + summary);
++
++var fooSymbol = Symbol("foo");
++var emptySymbol = Symbol("");
++var undefSymbol = Symbol();
++
++function testMethod(prefix, classPrefix="", prototype=false) {
++    var param = (prefix == "set" || prefix == "static set") ? "v" : "";
++    var sep = classPrefix ? "" : ",";
++    var objOrClass = eval(`(${classPrefix}{
++        ${prefix} prop(${param}) {} ${sep}
++        ${prefix} "literal"(${param}) {} ${sep}
++        ${prefix} ""(${param}) {} ${sep}
++        ${prefix} 5(${param}) {} ${sep}
++        ${prefix} [Symbol.iterator](${param}) {} ${sep}
++        ${prefix} [fooSymbol](${param}) {} ${sep}
++        ${prefix} [emptySymbol](${param}) {} ${sep}
++        ${prefix} [undefSymbol](${param}) {} ${sep}
++        ${prefix} [/a/](${param}) {} ${sep}
++    })`);
++
++    var target = prototype ? objOrClass.prototype : objOrClass;
++
++    function testOne(methodName, expectedName) {
++        var f;
++        if (prefix == "get" || prefix == "static get") {
++            f = Object.getOwnPropertyDescriptor(target, methodName).get;
++            expectedName = "get " + expectedName;
++        } else if (prefix == "set" || prefix == "static set") {
++            f = Object.getOwnPropertyDescriptor(target, methodName).set;
++            expectedName = "set " + expectedName;
++        } else {
++            f = Object.getOwnPropertyDescriptor(target, methodName).value;
++        }
++
++        assertEq(f.name, expectedName);
++    }
++    testOne("prop", "prop");
++    testOne("literal", "literal");
++    testOne("", "");
++    testOne(5, "5");
++    testOne(Symbol.iterator, "[Symbol.iterator]");
++    testOne(fooSymbol, "[foo]");
++    testOne(emptySymbol, "[]");
++    testOne(undefSymbol, "");
++    testOne(/a/, "/a/");
++}
++testMethod("");
++testMethod("*");
++testMethod("async");
++testMethod("get");
++testMethod("set");
++
++testMethod("", "class", true);
++testMethod("*", "class", true);
++testMethod("async", "class", true);
++testMethod("get", "class", true);
++testMethod("set", "class", true);
++
++testMethod("static", "class");
++testMethod("static *", "class");
++testMethod("static async", "class");
++testMethod("static get", "class");
++testMethod("static set", "class");
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0);
+diff --git a/js/src/tests/ecma_6/Function/function-name-property.js b/js/src/tests/ecma_6/Function/function-name-property.js
+new file mode 100644
+index 0000000000000..7ad174b10feb0
+--- /dev/null
++++ b/js/src/tests/ecma_6/Function/function-name-property.js
+@@ -0,0 +1,58 @@
++var BUGNUMBER = 883377;
++var summary = "Anonymous function name should be set based on property name";
++
++print(BUGNUMBER + ": " + summary);
++
++var fooSymbol = Symbol("foo");
++var emptySymbol = Symbol("");
++var undefSymbol = Symbol();
++
++var exprs = [
++    ["function() {}", false],
++    ["function named() {}", true],
++    ["function*() {}", false],
++    ["function* named() {}", true],
++    ["async function() {}", false],
++    ["async function named() {}", true],
++    ["() => {}", false],
++    ["async () => {}", false],
++    ["class {}", false],
++    ["class named {}", true],
++];
++
++function testPropertyDefinition(expr, named) {
++    var obj = eval(`({
++        prop: ${expr},
++        "literal": ${expr},
++        "": ${expr},
++        5: ${expr},
++        0.4: ${expr},
++        [Symbol.iterator]: ${expr},
++        [fooSymbol]: ${expr},
++        [emptySymbol]: ${expr},
++        [undefSymbol]: ${expr},
++        [/a/]: ${expr},
++    })`);
++    assertEq(obj.prop.name, named ? "named" : "prop");
++    assertEq(obj["literal"].name, named ? "named" : "literal");
++    assertEq(obj[""].name, named ? "named" : "");
++    assertEq(obj[5].name, named ? "named" : "5");
++    assertEq(obj[0.4].name, named ? "named" : "0.4");
++    assertEq(obj[Symbol.iterator].name, named ? "named" : "[Symbol.iterator]");
++    assertEq(obj[fooSymbol].name, named ? "named" : "[foo]");
++    assertEq(obj[emptySymbol].name, named ? "named" : "[]");
++    assertEq(obj[undefSymbol].name, named ? "named" : "");
++    assertEq(obj[/a/].name, named ? "named" : "/a/");
++
++    // Not applicable cases: __proto__.
++    obj = {
++        __proto__: function() {}
++    };
++    assertEq(obj.__proto__.name, "");
++}
++for (var [expr, named] of exprs) {
++    testPropertyDefinition(expr, named);
++}
++
++if (typeof reportCompare === "function")
++    reportCompare(0, 0);
+diff --git a/js/src/vm/AsyncFunction.cpp b/js/src/vm/AsyncFunction.cpp
+index 5554c9982e84d..7c2c453217706 100644
+--- a/js/src/vm/AsyncFunction.cpp
++++ b/js/src/vm/AsyncFunction.cpp
+@@ -119,7 +119,7 @@ js::WrapAsyncFunctionWithProto(JSContext* cx, HandleFunction unwrapped, HandleOb
+     // Create a new function with AsyncFunctionPrototype, reusing the name and
+     // the length of `unwrapped`.
+ 
+-    RootedAtom funName(cx, unwrapped->name());
++    RootedAtom funName(cx, unwrapped->explicitName());
+     uint16_t length;
+     if (!JSFunction::getLength(cx, unwrapped, &length))
+         return nullptr;
+@@ -133,6 +133,9 @@ js::WrapAsyncFunctionWithProto(JSContext* cx, HandleFunction unwrapped, HandleOb
+     if (!wrapped)
+         return nullptr;
+ 
++    if (unwrapped->hasCompileTimeName())
++        wrapped->setCompileTimeName(unwrapped->compileTimeName());
++
+     // Link them to each other to make GetWrappedAsyncFunction and
+     // GetUnwrappedAsyncFunction work.
+     unwrapped->setExtendedSlot(UNWRAPPED_ASYNC_WRAPPED_SLOT, ObjectValue(*wrapped));
+diff --git a/js/src/vm/Debugger.cpp b/js/src/vm/Debugger.cpp
+index ea54436e7d782..a3ce649e667d7 100644
+--- a/js/src/vm/Debugger.cpp
++++ b/js/src/vm/Debugger.cpp
+@@ -9669,7 +9669,7 @@ DebuggerObject::name() const
+ {
+     MOZ_ASSERT(isFunction());
+ 
+-    return referent()->as<JSFunction>().name();
++    return referent()->as<JSFunction>().explicitName();
+ }
+ 
+ JSAtom*
+diff --git a/js/src/vm/GlobalObject.cpp b/js/src/vm/GlobalObject.cpp
+index ec073ca9cecc7..75e0147782c7b 100644
+--- a/js/src/vm/GlobalObject.cpp
++++ b/js/src/vm/GlobalObject.cpp
+@@ -803,10 +803,10 @@ GlobalObject::getSelfHostedFunction(JSContext* cx, Handle<GlobalObject*> global,
+         return false;
+     if (exists) {
+         RootedFunction fun(cx, &funVal.toObject().as<JSFunction>());
+-        if (fun->name() == name)
++        if (fun->explicitName() == name)
+             return true;
+ 
+-        if (fun->name() == selfHostedName) {
++        if (fun->explicitName() == selfHostedName) {
+             // This function was initially cloned because it was called by
+             // other self-hosted code, so the clone kept its self-hosted name,
+             // instead of getting the name it's intended to have in content
+diff --git a/js/src/vm/Interpreter.cpp b/js/src/vm/Interpreter.cpp
+index 12caf39c0c10f..41ce8141b380f 100644
+--- a/js/src/vm/Interpreter.cpp
++++ b/js/src/vm/Interpreter.cpp
+@@ -1868,7 +1868,6 @@ CASE(EnableInterruptsPseudoOpcode)
+ /* Various 1-byte no-ops. */
+ CASE(JSOP_NOP)
+ CASE(JSOP_NOP_DESTRUCTURING)
+-CASE(JSOP_UNUSED182)
+ CASE(JSOP_UNUSED183)
+ CASE(JSOP_UNUSED187)
+ CASE(JSOP_UNUSED192)
+@@ -3490,6 +3489,19 @@ CASE(JSOP_TOASYNC)
+ }
+ END_CASE(JSOP_TOASYNC)
+ 
++CASE(JSOP_SETFUNNAME)
++{
++    MOZ_ASSERT(REGS.stackDepth() >= 2);
++    FunctionPrefixKind prefixKind = FunctionPrefixKind(GET_UINT8(REGS.pc));
++    ReservedRooted<Value> name(&rootValue0, REGS.sp[-1]);
++    ReservedRooted<JSFunction*> fun(&rootFunction0, &REGS.sp[-2].toObject().as<JSFunction>());
++    if (!SetFunctionNameIfNoOwnName(cx, fun, name, prefixKind))
++        goto error;
++
++    REGS.sp--;
++}
++END_CASE(JSOP_SETFUNNAME)
++
+ CASE(JSOP_CALLEE)
+     MOZ_ASSERT(REGS.fp()->isFunctionFrame());
+     PUSH_COPY(REGS.fp()->calleev());
+@@ -4353,7 +4365,7 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject envChain,
+         parent = parent->enclosingEnvironment();
+ 
+     /* ES5 10.5 (NB: with subsequent errata). */
+-    RootedPropertyName name(cx, fun->name()->asPropertyName());
++    RootedPropertyName name(cx, fun->explicitName()->asPropertyName());
+ 
+     RootedShape shape(cx);
+     RootedObject pobj(cx);
+@@ -5001,7 +5013,7 @@ js::ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber,
+     RootedPropertyName name(cx);
+ 
+     if (op == JSOP_THROWSETCALLEE) {
+-        name = script->functionNonDelazifying()->name()->asPropertyName();
++        name = script->functionNonDelazifying()->explicitName()->asPropertyName();
+     } else if (IsLocalOp(op)) {
+         name = FrameSlotName(script, pc)->asPropertyName();
+     } else if (IsAtomOp(op)) {
+@@ -5069,8 +5081,8 @@ js::ThrowUninitializedThis(JSContext* cx, AbstractFramePtr frame)
+     if (fun->isDerivedClassConstructor()) {
+         const char* name = "anonymous";
+         JSAutoByteString str;
+-        if (fun->name()) {
+-            if (!AtomToPrintableString(cx, fun->name(), &str))
++        if (fun->explicitName()) {
++            if (!AtomToPrintableString(cx, fun->explicitName(), &str))
+                 return false;
+             name = str.ptr();
+         }
+diff --git a/js/src/vm/Opcodes.h b/js/src/vm/Opcodes.h
+index 18ae6f07364a8..f6636004d317b 100644
+--- a/js/src/vm/Opcodes.h
++++ b/js/src/vm/Opcodes.h
+@@ -1870,7 +1870,16 @@
+      *   Stack: =>
+      */ \
+     macro(JSOP_POPVARENV,          181, "popvarenv",            NULL,  1,  0,  0,  JOF_BYTE) \
+-    macro(JSOP_UNUSED182,     182,"unused182",  NULL,     1,  0,  0,  JOF_BYTE) \
++    /*
++     * Pops the top two values on the stack as 'name' and 'fun', defines the
++     * name of 'fun' to 'name' with prefix if any, and pushes 'fun' back onto
++     * the stack.
++     *   Category: Statements
++     *   Type: Function
++     *   Operands: uint8_t prefixKind
++     *   Stack: fun, name => fun
++     */ \
++    macro(JSOP_SETFUNNAME,    182,"setfunname", NULL,     2,  2,  1,  JOF_UINT8) \
+     macro(JSOP_UNUSED183,     183,"unused183",  NULL,     1,  0,  0,  JOF_BYTE) \
+     \
+     /*
+diff --git a/js/src/vm/SelfHosting.cpp b/js/src/vm/SelfHosting.cpp
+index d953342012316..b15bda1d2a904 100644
+--- a/js/src/vm/SelfHosting.cpp
++++ b/js/src/vm/SelfHosting.cpp
+@@ -2879,7 +2879,7 @@ CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
+     RootedObject clone(cx);
+     if (selfHostedObject->is<JSFunction>()) {
+         RootedFunction selfHostedFunction(cx, &selfHostedObject->as<JSFunction>());
+-        bool hasName = selfHostedFunction->name() != nullptr;
++        bool hasName = selfHostedFunction->explicitName() != nullptr;
+ 
+         // Arrow functions use the first extended slot for their lexical |this| value.
+         MOZ_ASSERT(!selfHostedFunction->isArrow());
+@@ -2895,7 +2895,7 @@ CloneObject(JSContext* cx, HandleNativeObject selfHostedObject)
+         // self-hosting compartment has to be stored on the clone.
+         if (clone && hasName) {
+             clone->as<JSFunction>().setExtendedSlot(LAZY_FUNCTION_NAME_SLOT,
+-                                                    StringValue(selfHostedFunction->name()));
++                                                    StringValue(selfHostedFunction->explicitName()));
+         }
+     } else if (selfHostedObject->is<RegExpObject>()) {
+         RegExpObject& reobj = selfHostedObject->as<RegExpObject>();
+@@ -2978,10 +2978,10 @@ JSRuntime::createLazySelfHostedFunctionClone(JSContext* cx, HandlePropertyName s
+         return false;
+ 
+     if (!selfHostedFun->isClassConstructor() && !selfHostedFun->hasGuessedAtom() &&
+-        selfHostedFun->name() != selfHostedName)
++        selfHostedFun->explicitName() != selfHostedName)
+     {
+         MOZ_ASSERT(selfHostedFun->getExtendedSlot(HAS_SELFHOSTED_CANONICAL_NAME_SLOT).toBoolean());
+-        funName = selfHostedFun->name();
++        funName = selfHostedFun->explicitName();
+     }
+ 
+     fun.set(NewScriptedFunction(cx, nargs, JSFunction::INTERPRETED_LAZY,
+diff --git a/js/src/vm/TypeInference.cpp b/js/src/vm/TypeInference.cpp
+index f398533054fc5..a80da30464bc1 100644
+--- a/js/src/vm/TypeInference.cpp
++++ b/js/src/vm/TypeInference.cpp
+@@ -4548,7 +4548,7 @@ TypeScript::printTypes(JSContext* cx, HandleScript script) const
+             uintptr_t(script.get()), script->filename(), script->lineno());
+ 
+     if (script->functionNonDelazifying()) {
+-        if (JSAtom* name = script->functionNonDelazifying()->name())
++        if (JSAtom* name = script->functionNonDelazifying()->explicitName())
+             name->dumpCharsNoNewline();
+     }
+ 
+diff --git a/js/src/vm/TypedArrayObject.cpp b/js/src/vm/TypedArrayObject.cpp
+index 7c89df8773c12..48fa41147beee 100644
+--- a/js/src/vm/TypedArrayObject.cpp
++++ b/js/src/vm/TypedArrayObject.cpp
+@@ -2797,7 +2797,7 @@ bool
+ DataViewObject::defineGetter(JSContext* cx, PropertyName* name, HandleNativeObject proto)
+ {
+     RootedId id(cx, NameToId(name));
+-    RootedAtom atom(cx, IdToFunctionName(cx, id, "get"));
++    RootedAtom atom(cx, IdToFunctionName(cx, id, FunctionPrefixKind::Get));
+     if (!atom)
+         return false;
+     unsigned attrs = JSPROP_SHARED | JSPROP_GETTER;
+diff --git a/js/src/wasm/AsmJS.cpp b/js/src/wasm/AsmJS.cpp
+index cd4a0dea25a6b..e1a608a215124 100644
+--- a/js/src/wasm/AsmJS.cpp
++++ b/js/src/wasm/AsmJS.cpp
+@@ -680,7 +680,7 @@ FunctionObject(ParseNode* fn)
+ static inline PropertyName*
+ FunctionName(ParseNode* fn)
+ {
+-    if (JSAtom* name = FunctionObject(fn)->name())
++    if (JSAtom* name = FunctionObject(fn)->explicitName())
+         return name->asPropertyName();
+     return nullptr;
+ }
+@@ -8038,7 +8038,7 @@ TryInstantiate(JSContext* cx, CallArgs args, Module& module, const AsmJSMetadata
+ static bool
+ HandleInstantiationFailure(JSContext* cx, CallArgs args, const AsmJSMetadata& metadata)
+ {
+-    RootedAtom name(cx, args.callee().as<JSFunction>().name());
++    RootedAtom name(cx, args.callee().as<JSFunction>().explicitName());
+ 
+     if (cx->isExceptionPending())
+         return false;
+@@ -8129,7 +8129,7 @@ InstantiateAsmJS(JSContext* cx, unsigned argc, JS::Value* vp)
+ static JSFunction*
+ NewAsmJSModuleFunction(ExclusiveContext* cx, JSFunction* origFun, HandleObject moduleObj)
+ {
+-    RootedAtom name(cx, origFun->name());
++    RootedAtom name(cx, origFun->explicitName());
+ 
+     JSFunction::Flags flags = origFun->isLambda() ? JSFunction::ASMJS_LAMBDA_CTOR
+                                                   : JSFunction::ASMJS_CTOR;
+@@ -8849,7 +8849,7 @@ js::AsmJSModuleToString(JSContext* cx, HandleFunction fun, bool addParenToLambda
+     if (!out.append("function "))
+         return nullptr;
+ 
+-    if (fun->name() && !out.append(fun->name()))
++    if (fun->explicitName() && !out.append(fun->explicitName()))
+         return nullptr;
+ 
+     bool haveSource = source->hasSourceData();
+@@ -8897,8 +8897,8 @@ js::AsmJSFunctionToString(JSContext* cx, HandleFunction fun)
+ 
+     if (!haveSource) {
+         // asm.js functions can't be anonymous
+-        MOZ_ASSERT(fun->name());
+-        if (!out.append(fun->name()))
++        MOZ_ASSERT(fun->explicitName());
++        if (!out.append(fun->explicitName()))
+             return nullptr;
+         if (!out.append("() {\n    [sourceless code]\n}"))
+             return nullptr;

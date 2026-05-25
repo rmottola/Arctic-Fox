@@ -326,10 +326,14 @@ ParseContext::init()
         if (fun->isNamedLambda()) {
             if (!namedLambdaScope_->init(this))
                 return false;
-            AddDeclaredNamePtr p = namedLambdaScope_->lookupDeclaredNameForAdd(fun->name());
+            AddDeclaredNamePtr p =
+                namedLambdaScope_->lookupDeclaredNameForAdd(fun->explicitName());
             MOZ_ASSERT(!p);
-            if (!namedLambdaScope_->addDeclaredName(this, p, fun->name(), DeclarationKind::Const))
+            if (!namedLambdaScope_->addDeclaredName(this, p, fun->explicitName(),
+                                                    DeclarationKind::Const))
+            {
                 return false;
+            }
         }
 
         if (!functionScope_->init(this))
@@ -367,7 +371,7 @@ ParseContext::removeInnerFunctionBoxesForAnnexB(JSAtom* name)
 {
     for (uint32_t i = 0; i < innerFunctionBoxesForAnnexB_->length(); i++) {
         if (FunctionBox* funbox = innerFunctionBoxesForAnnexB_[i]) {
-            if (funbox->function()->name() == name)
+            if (funbox->function()->explicitName() == name)
                 innerFunctionBoxesForAnnexB_[i] = nullptr;
         }
     }
@@ -3466,8 +3470,8 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
     if (!body)
         return false;
 
-    if ((kind != Method && !IsConstructorKind(kind)) && fun->name()) {
-        RootedPropertyName propertyName(context, fun->name()->asPropertyName());
+    if ((kind != Method && !IsConstructorKind(kind)) && fun->explicitName()) {
+        RootedPropertyName propertyName(context, fun->explicitName()->asPropertyName());
         if (!checkStrictBinding(propertyName, handler.getPosition(pn)))
             return false;
     }
@@ -4335,6 +4339,8 @@ Parser<ParseHandler>::declarationPattern(Node decl, DeclarationKind declKind, To
     if (!init)
         return null();
 
+    handler.checkAndSetIsDirectRHSAnonFunction(init);
+
     if (forHeadKind) {
         // For for(;;) declarations, consistency with |for (;| parsing requires
         // that the ';' first be examined as Operand, even though absence of a
@@ -4367,6 +4373,8 @@ Parser<ParseHandler>::initializerInNameDeclaration(Node decl, Node binding,
                                   yieldHandling, TripledotProhibited);
     if (!initializer)
         return false;
+
+    handler.checkAndSetIsDirectRHSAnonFunction(initializer);
 
     if (forHeadKind) {
         if (initialDeclaration) {
@@ -5056,7 +5064,7 @@ Parser<FullParseHandler>::exportDeclaration()
         if (!kid)
             return null();
 
-        if (!checkExportedName(kid->pn_funbox->function()->name()))
+        if (!checkExportedName(kid->pn_funbox->function()->explicitName()))
             return null();
         break;
 
@@ -6667,8 +6675,6 @@ Parser<ParseHandler>::classDefinition(YieldHandling yieldHandling,
             return null();
         }
 
-        // FIXME: Implement ES6 function "name" property semantics
-        // (bug 883377).
         RootedAtom funName(context);
         switch (propType) {
           case PropertyType::GetterNoExpressionClosure:
@@ -6690,6 +6696,8 @@ Parser<ParseHandler>::classDefinition(YieldHandling yieldHandling,
         Node fn = methodDefinition(propType, funName);
         if (!fn)
             return null();
+
+        handler.checkAndSetIsDirectRHSAnonFunction(fn);
 
         JSOp op = JSOpFromPropertyType(propType);
         if (!handler.addClassMethodDefinition(classMethods, propName, fn, op, isStatic))
@@ -7744,6 +7752,9 @@ Parser<ParseHandler>::assignExpr(InHandling inHandling, YieldHandling yieldHandl
         if (!rhs)
             return null();
     }
+
+    if (kind == PNK_ASSIGN)
+        handler.checkAndSetIsDirectRHSAnonFunction(rhs);
 
     return handler.newAssignment(kind, lhs, rhs, op);
 }
@@ -9139,6 +9150,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
             if (!propExpr)
                 return null();
 
+            handler.checkAndSetIsDirectRHSAnonFunction(propExpr);
+
             if (foldConstants && !FoldConstants(context, &propExpr, this))
                 return null();
 
@@ -9251,6 +9264,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
                     return null();
             }
 
+            handler.checkAndSetIsDirectRHSAnonFunction(rhs);
+
             Node propExpr = handler.newAssignment(PNK_ASSIGN, lhs, rhs, JSOP_NOP);
             if (!propExpr)
                 return null();
@@ -9261,8 +9276,6 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
             if (!abortIfSyntaxParser())
                 return null();
         } else {
-            // FIXME: Implement ES6 function "name" property semantics
-            // (bug 883377).
             RootedAtom funName(context);
             if (!tokenStream.isCurrentTokenType(TOK_RB)) {
                 funName = propAtom;
@@ -9277,6 +9290,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
             Node fn = methodDefinition(propType, funName);
             if (!fn)
                 return null();
+
+            handler.checkAndSetIsDirectRHSAnonFunction(fn);
 
             JSOp op = JSOpFromPropertyType(propType);
             if (!handler.addObjectMethodDefinition(literal, propName, fn, op))

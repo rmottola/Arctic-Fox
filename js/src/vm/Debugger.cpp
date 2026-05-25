@@ -9504,7 +9504,7 @@ DebuggerObject::name() const
 {
     MOZ_ASSERT(isFunction());
 
-    return referent()->as<JSFunction>().name();
+    return referent()->as<JSFunction>().explicitName();
 }
 
 JSAtom*
