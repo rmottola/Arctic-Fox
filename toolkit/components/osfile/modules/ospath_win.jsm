@@ -139,7 +139,7 @@ exports.dirname = dirname;
  * Empty components are ignored, i.e. `OS.Path.join("foo", "", "bar)` is the
  * same as `OS.Path.join("foo", "bar")`.
  */
-let join = function(...path) {
+var join = function(...path) {
   let paths = [];
   let root;
   let absolute = false;
