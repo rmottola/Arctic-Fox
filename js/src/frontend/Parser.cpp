@@ -859,7 +859,7 @@ Parser<ParseHandler>::trace(JSTracer* trc)
 }
 
 void
-MarkParser(JSTracer* trc, AutoGCRooter* parser)
+TraceParser(JSTracer* trc, AutoGCRooter* parser)
 {
     static_cast<Parser<FullParseHandler>*>(parser)->trace(trc);
 }
