@@ -1408,6 +1408,7 @@ HelperThread::ThreadMain(void* arg)
     FIX_FPU();
 
     static_cast<HelperThread*>(arg)->threadLoop();
+    Mutex::ShutDown();
 }
 
 void
