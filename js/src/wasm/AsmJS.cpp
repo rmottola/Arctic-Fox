@@ -1660,7 +1660,6 @@ class MOZ_STACK_CLASS ModuleValidator
 
     // State used to build the AsmJSModule in finish():
     ModuleGenerator       mg_;
-    ExportVector          exports_;
     MutableAsmJSMetadata  asmJSMetadata_;
 
     // Error reporting:
@@ -1738,7 +1737,6 @@ class MOZ_STACK_CLASS ModuleValidator
         arrayViews_(cx),
         atomicsPresent_(false),
         simdPresent_(false),
-        mg_(ImportVector()),
         errorString_(nullptr),
         errorOffset_(UINT32_MAX),
         errorOverRecursed_(false)
@@ -2144,7 +2142,7 @@ class MOZ_STACK_CLASS ModuleValidator
 
         // Declare which function is exported which gives us an index into the
         // module ExportVector.
-        if (!exports_.emplaceBack(Move(fieldChars), func.index(), DefinitionKind::Function))
+        if (!mg_.addExport(Move(fieldChars), func.index()))
             return false;
 
         // The exported function might have already been exported in which case
@@ -2359,9 +2357,6 @@ class MOZ_STACK_CLASS ModuleValidator
         if (!arrayViews_.empty())
             mg_.initMemoryUsage(atomicsPresent_ ? MemoryUsage::Shared : MemoryUsage::Unshared);
 
-        if (!mg_.setExports(Move(exports_)))
-            return nullptr;
-
         asmJSMetadata_->usesSimd = simdPresent_;
 
         MOZ_ASSERT(asmJSMetadata_->asmJSFuncNames.empty());
@@ -2385,7 +2380,9 @@ class MOZ_STACK_CLASS ModuleValidator
         if (!bytes)
             return nullptr;
 
-        return mg_.finish(*bytes);
+        return mg_.finish(*bytes,
+                          DataSegmentVector(),
+                          NameInBytecodeVector());
     }
 };
 
