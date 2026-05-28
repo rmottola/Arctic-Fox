@@ -3917,15 +3917,12 @@ nsCSSFrameConstructor::ConstructFrameFromItemInternal(FrameConstructionItem& aIt
             InitAndRestoreFrame(aState, content, container, outerFrame);
             innerFrame = outerFrame;
             break;
-          // XXX: when grid is implemented, this is needed.
-          /*
           case StyleDisplay::Grid:
           case StyleDisplay::InlineGrid:
             outerFrame = NS_NewGridContainerFrame(mPresShell, outerSC);
             InitAndRestoreFrame(aState, content, container, outerFrame);
             innerFrame = outerFrame;
             break;
-          */
           default: {
             nsContainerFrame* columnSetFrame = nullptr;
             RefPtr<nsStyleContext> innerSC = outerSC;
@@ -3951,7 +3948,6 @@ nsCSSFrameConstructor::ConstructFrameFromItemInternal(FrameConstructionItem& aIt
           }
         }
       } else {
-        // Grid/Flex/Columnset not allowed, fall back to block frame.
         innerFrame = NS_NewBlockFormattingContext(mPresShell, outerSC);
         InitAndRestoreFrame(aState, content, container, innerFrame);
         outerFrame = innerFrame;
