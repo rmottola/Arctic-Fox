@@ -149,7 +149,9 @@ static mozilla::LazyLogModule gPrintingLog("printing");
 //-----------------------------------------------------
 
 class nsDocumentViewer;
-class nsPrintEventDispatcher;
+namespace mozilla {
+class AutoPrintEventDispatcher;
+}
 
 // a small delegate class used to avoid circular references
 
@@ -251,18 +253,6 @@ public:
 
   // nsIDocumentViewerPrint Printing Methods
   NS_DECL_NSIDOCUMENTVIEWERPRINT
-
-
-  static void DispatchBeforePrint(nsIDocument* aTop)
-  {
-    DispatchEventToWindowTree(aTop, NS_LITERAL_STRING("beforeprint"));
-  }
-  static void DispatchAfterPrint(nsIDocument* aTop)
-  {
-    DispatchEventToWindowTree(aTop, NS_LITERAL_STRING("afterprint"));
-  }
-  static void DispatchEventToWindowTree(nsIDocument* aTop,
-                                        const nsAString& aEvent);
 
 protected:
   virtual ~nsDocumentViewer();
@@ -402,7 +392,7 @@ protected:
   RefPtr<nsPrintEngine>          mPrintEngine;
   float                            mOriginalPrintPreviewScale;
   float                            mPrintPreviewZoom;
-  nsAutoPtr<nsPrintEventDispatcher> mBeforeAndAfterPrint;
+  nsAutoPtr<AutoPrintEventDispatcher> mAutoBeforeAndAfterPrint;
 #endif // NS_PRINT_PREVIEW
 
 #ifdef DEBUG
@@ -420,20 +410,53 @@ protected:
   bool mHidden;
 };
 
-class nsPrintEventDispatcher
+namespace mozilla {
+
+/**
+ * A RAII class for automatic dispatch of the 'beforeprint' and 'afterprint'
+ * events ('beforeprint' on construction, 'afterprint' on destruction).
+ *
+ * https://developer.mozilla.org/en-US/docs/Web/Events/beforeprint
+ * https://developer.mozilla.org/en-US/docs/Web/Events/afterprint
+ */
+class AutoPrintEventDispatcher
 {
 public:
-  explicit nsPrintEventDispatcher(nsIDocument* aTop) : mTop(aTop)
+  explicit AutoPrintEventDispatcher(nsIDocument* aTop) : mTop(aTop)
   {
-    nsDocumentViewer::DispatchBeforePrint(mTop);
+    DispatchEventToWindowTree(mTop, NS_LITERAL_STRING("beforeprint"));
   }
-  ~nsPrintEventDispatcher()
+  ~AutoPrintEventDispatcher()
   {
-    nsDocumentViewer::DispatchAfterPrint(mTop);
+    DispatchEventToWindowTree(mTop, NS_LITERAL_STRING("afterprint"));
+  }
+
+private:
+  static void DispatchEventToWindowTree(nsIDocument* aDoc,
+                                        const nsAString& aEvent)
+  {
+    nsCOMArray<nsIDocument> targets;
+    CollectDocuments(aDoc, &targets);
+    for (int32_t i = 0; i < targets.Count(); ++i) {
+      nsIDocument* d = targets[i];
+      nsContentUtils::DispatchTrustedEvent(d, d->GetWindow(),
+                                           aEvent, false, false, nullptr);
+    }
+  }
+
+  static bool CollectDocuments(nsIDocument* aDocument, void* aData)
+  {
+    if (aDocument) {
+      static_cast<nsCOMArray<nsIDocument>*>(aData)->AppendObject(aDocument);
+      aDocument->EnumerateSubDocuments(CollectDocuments, aData);
+    }
+    return true;
   }
 
   nsCOMPtr<nsIDocument> mTop;
 };
+
+}
 
 class nsDocumentShownDispatcher : public Runnable
 {
@@ -1586,7 +1609,8 @@ nsDocumentViewer::Destroy()
       return NS_OK;
     }
   }
-  mBeforeAndAfterPrint = nullptr;
+  // Dispatch the 'afterprint' event now, if pending:
+  mAutoBeforeAndAfterPrint = nullptr;
 #endif
 
   // Don't let the document get unloaded while we are printing.
@@ -3823,8 +3847,9 @@ nsDocumentViewer::Print(nsIPrintSettings*       aPrintSettings,
     return rv;
   }
 
-  nsAutoPtr<nsPrintEventDispatcher> beforeAndAfterPrint(
-    new nsPrintEventDispatcher(mDocument));
+  // Dispatch 'beforeprint' event and ensure 'afterprint' will be dispatched:
+  nsAutoPtr<AutoPrintEventDispatcher> autoBeforeAndAfterPrint(
+    new AutoPrintEventDispatcher(mDocument));
   NS_ENSURE_STATE(!GetIsPrinting());
   // If we are hosting a full-page plugin, tell it to print
   // first. It shows its own native print UI.
@@ -3852,9 +3877,10 @@ nsDocumentViewer::Print(nsIPrintSettings*       aPrintSettings,
       return rv;
     }
   }
-
   if (mPrintEngine->HasPrintCallbackCanvas()) {
-    mBeforeAndAfterPrint = beforeAndAfterPrint;
+    // Postpone the 'afterprint' event until after the mozPrintCallback
+    // callbacks have been called:
+    mAutoBeforeAndAfterPrint = autoBeforeAndAfterPrint;
   }
   dom::Element* root = mDocument->GetRootElement();
   if (root && root->HasAttr(kNameSpaceID_None, nsGkAtoms::mozdisallowselectionprint)) {
@@ -3903,8 +3929,9 @@ nsDocumentViewer::PrintPreview(nsIPrintSettings* aPrintSettings,
   nsCOMPtr<nsIDocument> doc = window->GetDoc();
   NS_ENSURE_STATE(doc);
 
-  nsAutoPtr<nsPrintEventDispatcher> beforeAndAfterPrint(
-    new nsPrintEventDispatcher(doc));
+  // Dispatch 'beforeprint' event and ensure 'afterprint' will be dispatched:
+  nsAutoPtr<AutoPrintEventDispatcher> autoBeforeAndAfterPrint(
+    new AutoPrintEventDispatcher(doc));
   NS_ENSURE_STATE(!GetIsPrinting());
   // beforeprint event may have caused ContentViewer to be shutdown.
   NS_ENSURE_STATE(mContainer);
@@ -3929,7 +3956,9 @@ nsDocumentViewer::PrintPreview(nsIPrintSettings* aPrintSettings,
     }
   }
   if (mPrintEngine->HasPrintCallbackCanvas()) {
-    mBeforeAndAfterPrint = beforeAndAfterPrint;
+    // Postpone the 'afterprint' event until after the mozPrintCallback
+    // callbacks have been called:
+    mAutoBeforeAndAfterPrint = autoBeforeAndAfterPrint;
   }
   dom::Element* root = doc->GetRootElement();
   if (root && root->HasAttr(kNameSpaceID_None, nsGkAtoms::mozdisallowselectionprint)) {
@@ -4274,28 +4303,6 @@ nsDocumentViewer::ShouldAttachToTopLevel()
   return false;
 }
 
-bool CollectDocuments(nsIDocument* aDocument, void* aData)
-{
-  if (aDocument) {
-    static_cast<nsCOMArray<nsIDocument>*>(aData)->AppendObject(aDocument);
-    aDocument->EnumerateSubDocuments(CollectDocuments, aData);
-  }
-  return true;
-}
-
-void
-nsDocumentViewer::DispatchEventToWindowTree(nsIDocument* aDoc,
-                                              const nsAString& aEvent)
-{
-  nsCOMArray<nsIDocument> targets;
-  CollectDocuments(aDoc, &targets);
-  for (int32_t i = 0; i < targets.Count(); ++i) {
-    nsIDocument* d = targets[i];
-    nsContentUtils::DispatchTrustedEvent(d, d->GetWindow(),
-                                         aEvent, false, false, nullptr);
-  }
-}
-
 //------------------------------------------------------------
 // XXX this always returns false for subdocuments
 bool
@@ -4325,7 +4332,8 @@ nsDocumentViewer::SetIsPrinting(bool aIsPrinting)
   }
 
   if (!aIsPrinting) {
-    mBeforeAndAfterPrint = nullptr;
+    // Dispatch the 'afterprint' event now, if pending:
+    mAutoBeforeAndAfterPrint = nullptr;
   }
 #endif
 }
@@ -4358,7 +4366,8 @@ nsDocumentViewer::SetIsPrintPreview(bool aIsPrintPreview)
     SetIsPrintingInDocShellTree(docShell, aIsPrintPreview, true);
   }
   if (!aIsPrintPreview) {
-    mBeforeAndAfterPrint = nullptr;
+    // Dispatch the 'afterprint' event now, if pending:
+    mAutoBeforeAndAfterPrint = nullptr;
   }
 #endif
   if (!aIsPrintPreview) {
