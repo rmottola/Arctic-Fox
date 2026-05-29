@@ -6437,6 +6437,8 @@ DrawImageInternal(gfxContext&            aContext,
 {
   DrawResult result = DrawResult::SUCCESS;
 
+  aImageFlags |= imgIContainer::FLAG_ASYNC_NOTIFY;
+
   if (aPresContext->Type() == nsPresContext::eContext_Print) {
     // We want vector images to be passed on as vector commands, not a raster
     // image.
