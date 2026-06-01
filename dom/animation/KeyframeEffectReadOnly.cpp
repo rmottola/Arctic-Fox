@@ -1344,6 +1344,18 @@ KeyframeEffectReadOnly::ShouldBlockAsyncTransformAnimations(
   return false;
 }
 
+bool
+KeyframeEffectReadOnly::HasGeometricProperties() const
+{
+  for (const AnimationProperty& property : mProperties) {
+    if (IsGeometricProperty(property.mProperty)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void
 KeyframeEffectReadOnly::SetPerformanceWarning(
   nsCSSPropertyID aProperty,
