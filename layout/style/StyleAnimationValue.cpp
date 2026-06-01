@@ -4536,6 +4536,10 @@ StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
           eUnit_Visibility);
         return true;
       }
+      if (aStyleContext->StyleSource().IsServoComputedValues()) {
+        NS_ERROR("stylo: extracting discretely animated values not supported");
+        return false;
+      }
       auto cssValue = MakeUnique<nsCSSValue>(eCSSUnit_Unset);
       aStyleContext->RuleNode()->GetDiscretelyAnimatedCSSValue(aProperty,
                                                                cssValue.get());
