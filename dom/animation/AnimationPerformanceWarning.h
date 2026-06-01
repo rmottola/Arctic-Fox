@@ -26,6 +26,7 @@ struct AnimationPerformanceWarning
     TransformPreserve3D,
     TransformSVG,
     TransformWithGeometricProperties,
+    TransformWithSyncGeometricAnimations,
     TransformFrameInactive,
     OpacityFrameInactive,
     HasRenderingObserver,
