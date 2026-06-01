@@ -78,7 +78,7 @@ function assert_animation_property_state_equals(actual, expected) {
 // Check that the animation is running on compositor and
 // warning property is not set for the CSS property regardless
 // expected values.
-function assert_property_state_on_compositor(actual, expected) {
+function assert_all_properties_running_on_compositor(actual, expected) {
   assert_equals(actual.length, expected.length);
 
   var sortedActual = actual.sort(compare_property_state);
@@ -701,7 +701,7 @@ function start() {
                                        { class: 'compositable' },
                                        subtest.frames, 100 * MS_PER_SEC);
       return animation.ready.then(function() {
-        assert_property_state_on_compositor(
+        assert_all_properties_running_on_compositor(
           animation.effect.getProperties(),
           subtest.expected);
         animation.effect.target.style = subtest.style;
@@ -713,7 +713,7 @@ function start() {
         animation.effect.target.style = '';
         return waitForFrame();
       }).then(function() {
-        assert_property_state_on_compositor(
+        assert_all_properties_running_on_compositor(
           animation.effect.getProperties(),
           subtest.expected);
       });
@@ -730,7 +730,7 @@ function start() {
                                        { class: 'compositable' },
                                        subtest.frames, 100 * MS_PER_SEC);
       return animation.ready.then(function() {
-        assert_property_state_on_compositor(
+        assert_all_properties_running_on_compositor(
           animation.effect.getProperties(),
           subtest.expected);
         animation.effect.target.id = subtest.id;
@@ -742,7 +742,7 @@ function start() {
         animation.effect.target.id = '';
         return waitForFrame();
       }).then(function() {
-        assert_property_state_on_compositor(
+        assert_all_properties_running_on_compositor(
           animation.effect.getProperties(),
           subtest.expected);
       });
