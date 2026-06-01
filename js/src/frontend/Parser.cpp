@@ -2163,7 +2163,7 @@ Parser<ParseHandler>::declareDotGeneratorName()
 
 template <typename ParseHandler>
 bool
-Parser<ParseHandler>::finishFunctionScopes()
+Parser<ParseHandler>::finishFunctionScopes(bool isStandaloneFunction)
 {
     FunctionBox* funbox = pc->functionBox();
 
@@ -2172,7 +2172,7 @@ Parser<ParseHandler>::finishFunctionScopes()
             return false;
     }
 
-    if (funbox->function()->isNamedLambda()) {
+    if (funbox->function()->isNamedLambda() && !isStandaloneFunction) {
         if (!propagateFreeNamesAndMarkClosedOverBindings(pc->namedLambdaScope()))
             return false;
     }
@@ -2182,9 +2182,9 @@ Parser<ParseHandler>::finishFunctionScopes()
 
 template <>
 bool
-Parser<FullParseHandler>::finishFunction()
+Parser<FullParseHandler>::finishFunction(bool isStandaloneFunction /* = false */)
 {
-    if (!finishFunctionScopes())
+    if (!finishFunctionScopes(isStandaloneFunction))
         return false;
 
     FunctionBox* funbox = pc->functionBox();
@@ -2205,7 +2205,7 @@ Parser<FullParseHandler>::finishFunction()
         funbox->functionScopeBindings().set(*bindings);
     }
 
-    if (funbox->function()->isNamedLambda()) {
+    if (funbox->function()->isNamedLambda() && !isStandaloneFunction) {
         Maybe<LexicalScope::Data*> bindings = newLexicalScopeData(pc->namedLambdaScope());
         if (!bindings)
             return false;
@@ -2217,14 +2217,14 @@ Parser<FullParseHandler>::finishFunction()
 
 template <>
 bool
-Parser<SyntaxParseHandler>::finishFunction()
+Parser<SyntaxParseHandler>::finishFunction(bool isStandaloneFunction /* = false */)
 {
     // The LazyScript for a lazily parsed function needs to know its set of
     // free variables and inner functions so that when it is fully parsed, we
     // can skip over any already syntax parsed inner functions and still
     // retain correct scope information.
 
-    if (!finishFunctionScopes())
+    if (!finishFunctionScopes(isStandaloneFunction))
         return false;
 
     // There are too many bindings or inner functions to be saved into the
@@ -2319,7 +2319,7 @@ Parser<FullParseHandler>::standaloneFunction(HandleFunction fun,
     YieldHandling yieldHandling = GetYieldHandling(generatorKind, asyncKind);
     AutoAwaitIsKeyword awaitIsKeyword(&tokenStream, asyncKind == AsyncFunction);
     if (!functionFormalParametersAndBody(InAllowed, yieldHandling, fn, Statement,
-                                         parameterListEnd))
+                                         parameterListEnd, /* isStandaloneFunction = */ true))
     {
         return null();
     }
@@ -3392,7 +3392,8 @@ bool
 Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
                                                       YieldHandling yieldHandling,
                                                       Node pn, FunctionSyntaxKind kind,
-                                                      Maybe<uint32_t> parameterListEnd /* = Nothing() */)
+                                                      Maybe<uint32_t> parameterListEnd /* = Nothing() */,
+                                                      bool isStandaloneFunction /* = false */)
 {
     // Given a properly initialized parse context, try to parse an actual
     // function without concern for conversion to strict mode, use of lazy
@@ -3499,7 +3500,7 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
     if (IsMethodDefinitionKind(kind) && pc->superScopeNeedsHomeObject())
         funbox->setNeedsHomeObject();
 
-    if (!finishFunction())
+    if (!finishFunction(isStandaloneFunction))
         return false;
 
     handler.setEndPosition(body, pos().begin);
