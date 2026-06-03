@@ -4143,10 +4143,10 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, HandleFunction fun,
                        &inspector, &info, optimizationInfo, /* baselineFrame = */ nullptr);
 
     if (!builder.build()) {
-        if (cx->isThrowingOverRecursed() ||
-            cx->isThrowingOutOfMemory() ||
-            builder.abortReason() == AbortReason_Alloc)
-        {
+        if (cx->isThrowingOverRecursed() || cx->isThrowingOutOfMemory())
+            return false;
+        if (builder.abortReason() == AbortReason_Alloc) {
+            ReportOutOfMemory(cx);
             return false;
         }
         MOZ_ASSERT(!cx->isExceptionPending());
@@ -4378,8 +4378,12 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
                        &inspector, &info, optimizationInfo, /* baselineFrame = */ nullptr);
 
     if (!builder.build()) {
-        if (cx->isThrowingOverRecursed() || builder.abortReason() == AbortReason_Alloc)
+        if (cx->isThrowingOverRecursed() || cx->isThrowingOutOfMemory())
             return false;
+        if (builder.abortReason() == AbortReason_Alloc) {
+            ReportOutOfMemory(cx);
+            return false;
+        }
         MOZ_ASSERT(!cx->isExceptionPending());
         return true;
     }
