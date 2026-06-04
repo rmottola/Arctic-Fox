@@ -74,7 +74,7 @@ class MozconfigLoader(object):
     DEPRECATED_TOPSRCDIR_PATHS = ('mozconfig.sh', 'myconfig.sh')
     DEPRECATED_HOME_PATHS = ('.mozconfig', '.mozconfig.sh', '.mozmyconfig.sh')
 
-    IGNORE_SHELL_VARIABLES = {'_'}
+    IGNORE_SHELL_VARIABLES = {'_', 'LINENO', 'RANDOM'}
 
     ENVIRONMENT_VARIABLES = {
         'CC', 'CXX', 'CFLAGS', 'CXXFLAGS', 'LDFLAGS', 'MOZ_OBJDIR',
