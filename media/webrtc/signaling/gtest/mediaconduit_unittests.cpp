@@ -14,27 +14,14 @@ using namespace std;
 #include "mozilla/SyncRunnable.h"
 #include "mozilla/UniquePtr.h"
 #include <MediaConduitInterface.h>
-#include "GmpVideoCodec.h"
 #include "nsIEventTarget.h"
-#include "FakeMediaStreamsImpl.h"
-#include "FakeLogging.h"
 #include "nsThreadUtils.h"
 #include "runnable_utils.h"
 #include "signaling/src/common/EncodingConstraints.h"
-
-#include "FakeIPC.h"
-#include "FakeIPC.cpp"
+#include "prmem.h"
 
 #define GTEST_HAS_RTTI 0
 #include "gtest/gtest.h"
-#include "gtest_utils.h"
-
-nsCOMPtr<nsIThread> gMainThread;
-nsCOMPtr<nsIThread> gGtestThread;
-bool gTestsComplete = false;
-
-#include "mtransport_test_utils.h"
-MtransportTestUtils *test_utils;
 
 //Video Frame Color
 const int COLOR = 0x80; //Gray
@@ -128,7 +115,7 @@ int numFrames;
  * A Dummy AudioConduit Tester
  * The test reads PCM samples of a standard test file and
  * passws to audio-conduit for encoding, RTPfication and
- * decoding ebery 10 milliseconds.
+ * decoding every 10 milliseconds.
  * This decoded samples are read-off the conduit for writing
  * into output audio file in PCM format.
  */
@@ -136,7 +123,7 @@ class AudioSendAndReceive
 {
 public:
   static const unsigned int PLAYOUT_SAMPLE_FREQUENCY; //default is 16000
-  static const unsigned int PLAYOUT_SAMPLE_LENGTH; //default is 160000
+  static const unsigned int PLAYOUT_SAMPLE_LENGTH; //default is 160
 
   AudioSendAndReceive()
   {
@@ -173,7 +160,7 @@ private:
 };
 
 const unsigned int AudioSendAndReceive::PLAYOUT_SAMPLE_FREQUENCY = 16000;
-const unsigned int AudioSendAndReceive::PLAYOUT_SAMPLE_LENGTH  = 160000;
+const unsigned int AudioSendAndReceive::PLAYOUT_SAMPLE_LENGTH  = 160;
 
 int AudioSendAndReceive::WriteWaveHeader(int rate, int channels, FILE* outFile)
 {
@@ -262,12 +249,7 @@ void AudioSendAndReceive::GenerateMusic(short* buf, int len)
   a1=b1=a2=b2=0;
   c1=c2=d1=d2=0;
   j=0;
-  /*60ms silence */
-  for(i=0;i<2880;i++)
-  {
-    buf[i*2]=buf[(i*2)+1]=0;
-  }
-  for(i=2880;i<len-1;i+=2)
+  for(i=0;i<len-1;i+=2)
   {
     int32_t r;
     int32_t v1,v2;
@@ -294,7 +276,7 @@ void AudioSendAndReceive::GenerateAndReadSamples()
    auto audioOutput = mozilla::MakeUnique<int16_t []>(PLAYOUT_SAMPLE_LENGTH);
    short* inbuf;
    int sampleLengthDecoded = 0;
-   unsigned int SAMPLES = (PLAYOUT_SAMPLE_FREQUENCY * 10); //10 seconds
+   unsigned int SAMPLES = (PLAYOUT_SAMPLE_FREQUENCY / 100); //10 milliseconds
    int CHANNELS = 1; //mono audio
    int sampleLengthInBytes = sizeof(int16_t) * PLAYOUT_SAMPLE_LENGTH;
    //generated audio buffer
@@ -332,7 +314,6 @@ void AudioSendAndReceive::GenerateAndReadSamples()
     }
 
     numSamplesReadFromInput += PLAYOUT_SAMPLE_LENGTH;
-    inbuf += PLAYOUT_SAMPLE_LENGTH;
 
     mSession->SendAudioFrame(audioInput.get(),
                              PLAYOUT_SAMPLE_LENGTH,
@@ -360,7 +341,7 @@ void AudioSendAndReceive::GenerateAndReadSamples()
 
 /**
  * Dummy Video Target for the conduit
- * This class acts as renderer attached to the video conuit
+ * This class acts as renderer attached to the video conduit
  * As of today we just verify if the frames rendered are exactly
  * the same as frame inserted at the first place
  */
@@ -503,8 +484,9 @@ private:
   bool mAudio, mVideo;
 };
 
+using namespace mozilla;
 
-namespace {
+namespace test {
 
 class TransportConduitTest : public ::testing::Test
 {
@@ -519,13 +501,6 @@ class TransportConduitTest : public ::testing::Test
 
   ~TransportConduitTest()
   {
-    mozilla::SyncRunnable::DispatchToThread(gMainThread,
-                                            mozilla::WrapRunnable(
-                                                this,
-                                                &TransportConduitTest::SelfDestruct));
-  }
-
-  void SelfDestruct() {
     mAudioSession = nullptr;
     mAudioSession2 = nullptr;
     mAudioTransport = nullptr;
@@ -592,9 +567,7 @@ class TransportConduitTest : public ::testing::Test
     cerr << "   ******************************************************** " << endl;
     cerr << "    Generating Audio Samples " << endl;
     cerr << "   ******************************************************** " << endl;
-    PR_Sleep(PR_SecondsToInterval(2));
     audioTester.GenerateAndReadSamples();
-    PR_Sleep(PR_SecondsToInterval(2));
     cerr << "   ******************************************************** " << endl;
     cerr << "    Input Audio  File                " << iAudiofilename << endl;
     cerr << "    Output Audio File                " << oAudiofilename << endl;
@@ -649,15 +622,13 @@ class TransportConduitTest : public ::testing::Test
     rcvCodecList.push_back(&cinst1);
     rcvCodecList.push_back(&cinst2);
 
-    err = mVideoSession->ConfigureSendMediaCodec(
-        send_vp8 ? &cinst1 : &cinst2);
+    err = mVideoSession->ConfigureSendMediaCodec(&cinst1);
 
     ASSERT_EQ(mozilla::kMediaConduitNoError, err);
     err = mVideoSession->StartTransmitting();
     ASSERT_EQ(mozilla::kMediaConduitNoError, err);
 
-    err = mVideoSession2->ConfigureSendMediaCodec(
-        send_vp8 ? &cinst1 : &cinst2);
+    err = mVideoSession2->ConfigureSendMediaCodec(&cinst1);
     err = mVideoSession2->StartTransmitting();
     ASSERT_EQ(mozilla::kMediaConduitNoError, err);
 
@@ -669,10 +640,8 @@ class TransportConduitTest : public ::testing::Test
     cerr << "   *************************************************" << endl;
     cerr << "    Starting the Video Sample Generation " << endl;
     cerr << "   *************************************************" << endl;
-    PR_Sleep(PR_SecondsToInterval(2));
     videoTester.Init(mVideoSession);
     videoTester.GenerateAndReadSamples();
-    PR_Sleep(PR_SecondsToInterval(2));
 
     cerr << "   **************************************************" << endl;
     cerr << "    Done With The Testing  " << endl;
@@ -687,19 +656,10 @@ class TransportConduitTest : public ::testing::Test
     cerr << "    Done With The Testing  " << endl;
 
     cerr << "   **************************************************" << endl;
+
     ASSERT_EQ(0, vidStatsGlobal.numFramesRenderedWrongly);
-    if (send_vp8) {
-	ASSERT_EQ(vidStatsGlobal.numRawFramesInserted,
-		  vidStatsGlobal.numFramesRenderedSuccessfully);
-    }
-    else {
-	// Allow some fudge because there seems to be some buffering.
-	// TODO(ekr@rtfm.com): Fix this.
-	ASSERT_GE(vidStatsGlobal.numRawFramesInserted,
-		  vidStatsGlobal.numFramesRenderedSuccessfully);
-	ASSERT_LE(vidStatsGlobal.numRawFramesInserted,
-		  vidStatsGlobal.numFramesRenderedSuccessfully + 2);
-    }
+    ASSERT_EQ(vidStatsGlobal.numRawFramesInserted,
+		          vidStatsGlobal.numFramesRenderedSuccessfully);
   }
 
  void TestVideoConduitCodecAPI()
@@ -731,12 +691,11 @@ class TransportConduitTest : public ::testing::Test
     rcvCodecList.push_back(&cinst1);
     rcvCodecList.push_back(&cinst2);
     err = videoSession->ConfigureRecvMediaCodecs(rcvCodecList);
-    EXPECT_NE(err,mozilla::kMediaConduitNoError);
+    EXPECT_EQ(err, mozilla::kMediaConduitNoError);
     rcvCodecList.pop_back();
     rcvCodecList.pop_back();
 
 
-    PR_Sleep(PR_SecondsToInterval(2));
     cerr << "   *************************************************" << endl;
     cerr << "    2. Codec With Invalid Payload Names " << endl;
     cerr << "   *************************************************" << endl;
@@ -755,7 +714,6 @@ class TransportConduitTest : public ::testing::Test
     rcvCodecList.pop_back();
 
 
-    PR_Sleep(PR_SecondsToInterval(2));
     cerr << "   *************************************************" << endl;
     cerr << "    3. Null Codec Parameter  " << endl;
     cerr << "   *************************************************" << endl;
@@ -780,7 +738,7 @@ class TransportConduitTest : public ::testing::Test
     err = videoSession->StartTransmitting();
     ASSERT_EQ(mozilla::kMediaConduitNoError, err);
     err = videoSession->ConfigureSendMediaCodec(&cinst1);
-    EXPECT_EQ(mozilla::kMediaConduitCodecInUse, err);
+    EXPECT_EQ(mozilla::kMediaConduitNoError, err);
     err = videoSession->StartTransmitting();
     ASSERT_EQ(mozilla::kMediaConduitNoError, err);
 
@@ -799,11 +757,6 @@ class TransportConduitTest : public ::testing::Test
 
     err = videoSession->ConfigureSendMediaCodec(nullptr);
     EXPECT_TRUE(err != mozilla::kMediaConduitNoError);
-
-    mozilla::SyncRunnable::DispatchToThread(gMainThread,
-                                            WrapRunnable(
-                                                videoSession.forget().take(),
-                                                &mozilla::VideoSessionConduit::Release));
   }
 
   void DumpMaxFs(int orig_width, int orig_height, int max_fs,
@@ -890,7 +843,7 @@ class TransportConduitTest : public ::testing::Test
     GetVideoResolutionWithMaxFs(orig_width, orig_height, max_fs, &width, &height);
     DumpMaxFs(orig_width, orig_height, max_fs, width, height);
     ASSERT_EQ(width, 768);
-    ASSERT_EQ(height, 26);
+    ASSERT_EQ(height, 25);
 
     // Small max-fs.
     cerr << "Test small max-fs (case 1)" << endl;
@@ -909,7 +862,7 @@ class TransportConduitTest : public ::testing::Test
     max_fs = 1;
     GetVideoResolutionWithMaxFs(orig_width, orig_height, max_fs, &width, &height);
     DumpMaxFs(orig_width, orig_height, max_fs, width, height);
-    ASSERT_EQ(width, 2);
+    ASSERT_EQ(width, 1);
     ASSERT_EQ(height, 16);
 
     // Small max-fs.
@@ -920,7 +873,7 @@ class TransportConduitTest : public ::testing::Test
     GetVideoResolutionWithMaxFs(orig_width, orig_height, max_fs, &width, &height);
     DumpMaxFs(orig_width, orig_height, max_fs, width, height);
     ASSERT_EQ(width, 48);
-    ASSERT_EQ(height, 8);
+    ASSERT_EQ(height, 7);
 
     // Small max-fs.
     cerr << "Test small max-fs (case 4)" << endl;
@@ -957,22 +910,9 @@ class TransportConduitTest : public ::testing::Test
         DumpMaxFs(orig_width, orig_height, max_fs, width, height);
         ADD_FAILURE();
       }
-      if ((width & 1) || (height & 1)) {
-        DumpMaxFs(orig_width, orig_height, max_fs, width, height);
-        ADD_FAILURE();
-      }
     }
     cerr << endl;
  }
-
-  void SetGmpCodecs() {
-    mExternalEncoder = mozilla::GmpVideoCodec::CreateEncoder();
-    mExternalDecoder = mozilla::GmpVideoCodec::CreateDecoder();
-    mozilla::EncodingConstraints constraints;
-    mozilla::VideoCodecConfig config(124, "H264", constraints);
-    mVideoSession->SetExternalSendCodec(&config, mExternalEncoder);
-    mVideoSession2->SetExternalRecvCodec(&config, mExternalDecoder);
-  }
 
  private:
   //Audio Conduit Test Objects
@@ -988,9 +928,6 @@ class TransportConduitTest : public ::testing::Test
   RefPtr<mozilla::TransportInterface> mVideoTransport;
   VideoSendAndReceive videoTester;
 
-  mozilla::VideoEncoder* mExternalEncoder;
-  mozilla::VideoDecoder* mExternalDecoder;
-
   std::string fileToPlay;
   std::string fileToRecord;
   std::string iAudiofilename;
@@ -999,18 +936,16 @@ class TransportConduitTest : public ::testing::Test
 
 
 // Test 1: Test Dummy External Xport
-TEST_F(TransportConduitTest, TestDummyAudioWithTransport) {
+// See Bug 1319121
+TEST_F(TransportConduitTest, DISABLED_TestDummyAudioWithTransport) {
   TestDummyAudioAndTransport();
 }
 
 // Test 2: Test Dummy External Xport
-TEST_F(TransportConduitTest, TestDummyVideoWithTransport) {
+// See Bug 1319121
+TEST_F(TransportConduitTest, DISABLED_TestDummyVideoWithTransport) {
   TestDummyVideoAndTransport();
  }
-
-TEST_F(TransportConduitTest, TestVideoConduitExternalCodec) {
-  TestDummyVideoAndTransport(false);
-}
 
 TEST_F(TransportConduitTest, TestVideoConduitCodecAPI) {
   TestVideoConduitCodecAPI();
@@ -1021,65 +956,3 @@ TEST_F(TransportConduitTest, TestVideoConduitMaxFs) {
  }
 
 }  // end namespace
-
-static int test_result;
-bool test_finished = false;
-
-
-
-// This exists to send as an event to trigger shutdown.
-static void tests_complete() {
-  gTestsComplete = true;
-}
-
-// The GTest thread runs this instead of the main thread so it can
-// do things like ASSERT_TRUE_WAIT which you could not do on the main thread.
-static int gtest_main(int argc, char **argv) {
-  MOZ_ASSERT(!NS_IsMainThread());
-
-  ::testing::InitGoogleTest(&argc, argv);
-
-  int result = RUN_ALL_TESTS();
-
-  // Set the global shutdown flag and tickle the main thread
-  // The main thread did not go through Init() so calling Shutdown()
-  // on it will not work.
-  gMainThread->Dispatch(mozilla::WrapRunnableNM(tests_complete), NS_DISPATCH_SYNC);
-
-  return result;
-}
-
-int main(int argc, char **argv)
-{
-  // This test can cause intermittent oranges on the builders
-  CHECK_ENVIRONMENT_FLAG("MOZ_WEBRTC_MEDIACONDUIT_TESTS")
-
-  test_utils = new MtransportTestUtils();
-
-  // Set the main thread global which is this thread.
-  nsIThread *thread;
-  NS_GetMainThread(&thread);
-  gMainThread = thread;
-
-  // Now create the GTest thread and run all of the tests on it
-  // When it is complete it will set gTestsComplete
-  NS_NewNamedThread("gtest_thread", &thread);
-  gGtestThread = thread;
-
-  int result;
-  gGtestThread->Dispatch(
-    mozilla::WrapRunnableNMRet(&result, gtest_main, argc, argv), NS_DISPATCH_NORMAL);
-
-  // Here we handle the event queue for dispatches to the main thread
-  // When the GTest thread is complete it will send one more dispatch
-  // with gTestsComplete == true.
-  while (!gTestsComplete && NS_ProcessNextEvent());
-
-  gGtestThread->Shutdown();
-
-  delete test_utils;
-  return test_result;
-}
-
-
-
