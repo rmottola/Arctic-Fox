@@ -171,11 +171,12 @@ DOMIntersectionObserver::UnlinkTarget(Element& aTarget)
     if (!mObservationTargets.Contains(&aTarget)) {
         return false;
     }
-    if (mObservationTargets.Count() == 1) {
+
+    mObservationTargets.RemoveEntry(&aTarget);
+    if (mObservationTargets.Count() == 0) {
         Disconnect();
         return false;
     }
-    mObservationTargets.RemoveEntry(&aTarget);
     return true;
 }
 
@@ -197,6 +198,8 @@ DOMIntersectionObserver::Disconnect()
   if (!mConnected) {
     return;
   }
+
+  mConnected = false;
   for (auto iter = mObservationTargets.Iter(); !iter.Done(); iter.Next()) {
     Element* target = iter.Get()->GetKey();
     target->UnregisterIntersectionObserver(this);
@@ -206,7 +209,6 @@ DOMIntersectionObserver::Disconnect()
     nsIDocument* document = mOwner->GetExtantDoc();
     document->RemoveIntersectionObserver(this);
   }
-  mConnected = false;
 }
 
 void
@@ -280,7 +282,10 @@ DOMIntersectionObserver::Update(nsIDocument* aDocument, DOMHighResTimeStamp time
       if (rootFrame) {
         nsPresContext* presContext = rootFrame->PresContext();
         while (!presContext->IsRootContentDocument()) {
-          presContext = rootFrame->PresContext()->GetParentPresContext();
+          presContext = presContext->GetParentPresContext();
+          if (!presContext) {
+            break;
+          }
           rootFrame = presContext->PresShell()->GetRootScrollFrame();
         }
         root = rootFrame->GetContent()->AsElement();
