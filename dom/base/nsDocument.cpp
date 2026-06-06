@@ -2909,6 +2909,22 @@ nsIDocument::EventTargetFor(TaskCategory aCategory) const
   return DispatcherTrait::EventTargetFor(aCategory);
 }
 
+void
+nsIDocument::NoteScriptTrackingStatus(const nsACString& aURL, bool aIsTracking)
+{
+  if (aIsTracking) {
+    mTrackingScripts.PutEntry(aURL);
+  } else {
+    MOZ_ASSERT(!mTrackingScripts.Contains(aURL));
+  }
+}
+
+bool
+nsIDocument::IsScriptTracking(const nsACString& aURL) const
+{
+  return mTrackingScripts.Contains(aURL);
+}
+
 NS_IMETHODIMP
 nsDocument::GetApplicationCache(nsIApplicationCache **aApplicationCache)
 {
