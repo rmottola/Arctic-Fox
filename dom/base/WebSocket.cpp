@@ -120,21 +120,19 @@ public:
 
   bool IsTargetThread() const;
 
-  void Init(JSContext* aCx,
-            nsIPrincipal* aPrincipal,
-            bool aIsServerSide,
-            const nsAString& aURL,
-            nsTArray<nsString>& aProtocolArray,
-            const nsACString& aScriptFile,
-            uint32_t aScriptLine,
-            uint32_t aScriptColumn,
-            ErrorResult& aRv,
-            bool* aConnectionFailed);
+  nsresult Init(JSContext* aCx,
+                nsIPrincipal* aPrincipal,
+                bool aIsServerSide,
+                const nsAString& aURL,
+                nsTArray<nsString>& aProtocolArray,
+                const nsACString& aScriptFile,
+                uint32_t aScriptLine,
+                uint32_t aScriptColumn,
+                bool* aConnectionFailed);
 
-  void AsyncOpen(nsIPrincipal* aPrincipal, uint64_t aInnerWindowID,
-                 nsITransportProvider* aTransportProvider,
-                 const nsACString& aNegotiatedExtensions,
-                 ErrorResult& aRv);
+  nsresult AsyncOpen(nsIPrincipal* aPrincipal, uint64_t aInnerWindowID,
+                     nsITransportProvider* aTransportProvider,
+                     const nsACString& aNegotiatedExtensions);
 
   nsresult ParseURL(const nsAString& aURL);
   nsresult InitializeConnection(nsIPrincipal* aPrincipal);
@@ -1065,8 +1063,7 @@ public:
                const nsAString& aURL,
                nsTArray<nsString>& aProtocolArray,
                const nsACString& aScriptFile, uint32_t aScriptLine,
-               uint32_t aScriptColumn,
-               ErrorResult& aRv, bool* aConnectionFailed)
+               uint32_t aScriptColumn, bool* aConnectionFailed)
     : WebSocketMainThreadRunnable(aImpl->mWorkerPrivate,
                                   NS_LITERAL_CSTRING("WebSocket :: init"))
     , mImpl(aImpl)
@@ -1076,11 +1073,17 @@ public:
     , mScriptFile(aScriptFile)
     , mScriptLine(aScriptLine)
     , mScriptColumn(aScriptColumn)
-    , mRv(aRv)
     , mConnectionFailed(aConnectionFailed)
+    , mErrorCode(NS_OK)
   {
     MOZ_ASSERT(mWorkerPrivate);
     mWorkerPrivate->AssertIsOnWorkerThread();
+  }
+
+  nsresult
+  ErrorCode() const
+  {
+    return mErrorCode;
   }
 
 protected:
@@ -1088,7 +1091,7 @@ protected:
   {
     AutoJSAPI jsapi;
     if (NS_WARN_IF(!jsapi.Init(aWindow))) {
-      mRv.Throw(NS_ERROR_FAILURE);
+      mErrorCode = NS_ERROR_FAILURE;
       return true;
     }
 
@@ -1096,19 +1099,19 @@ protected:
 
     nsIDocument* doc = aWindow->GetExtantDoc();
     if (!doc) {
-      mRv.Throw(NS_ERROR_FAILURE);
+      mErrorCode = NS_ERROR_FAILURE;
       return true;
     }
 
     nsCOMPtr<nsIPrincipal> principal = doc->NodePrincipal();
     if (!principal) {
-      mRv.Throw(NS_ERROR_FAILURE);
+      mErrorCode = NS_ERROR_FAILURE;
       return true;
     }
 
-    mImpl->Init(jsapi.cx(), principal, mIsServerSide, mURL, mProtocolArray,
-                mScriptFile, mScriptLine, mScriptColumn, mRv,
-                mConnectionFailed);
+    mErrorCode =
+      mImpl->Init(jsapi.cx(), principal, mIsServerSide, mURL, mProtocolArray,
+                  mScriptFile, mScriptLine, mScriptColumn, mConnectionFailed);
     return true;
   }
 
@@ -1117,9 +1120,10 @@ protected:
     MOZ_ASSERT(NS_IsMainThread());
     MOZ_ASSERT(aTopLevelWorkerPrivate && !aTopLevelWorkerPrivate->GetWindow());
 
-    mImpl->Init(nullptr, aTopLevelWorkerPrivate->GetPrincipal(), mIsServerSide,
-                mURL, mProtocolArray, mScriptFile, mScriptLine, mScriptColumn,
-                mRv, mConnectionFailed);
+    mErrorCode =
+      mImpl->Init(nullptr, aTopLevelWorkerPrivate->GetPrincipal(),
+                  mIsServerSide, mURL, mProtocolArray, mScriptFile, mScriptLine,
+                  mScriptColumn, mConnectionFailed);
     return true;
   }
 
@@ -1132,21 +1136,27 @@ protected:
   nsCString mScriptFile;
   uint32_t mScriptLine;
   uint32_t mScriptColumn;
-  ErrorResult& mRv;
   bool* mConnectionFailed;
+  nsresult mErrorCode;
 };
 
 class AsyncOpenRunnable final : public WebSocketMainThreadRunnable
 {
 public:
-  AsyncOpenRunnable(WebSocketImpl* aImpl, ErrorResult& aRv)
+  explicit AsyncOpenRunnable(WebSocketImpl* aImpl)
     : WebSocketMainThreadRunnable(aImpl->mWorkerPrivate,
                                   NS_LITERAL_CSTRING("WebSocket :: AsyncOpen"))
     , mImpl(aImpl)
-    , mRv(aRv)
+    , mErrorCode(NS_OK)
   {
     MOZ_ASSERT(mWorkerPrivate);
     mWorkerPrivate->AssertIsOnWorkerThread();
+  }
+
+  nsresult
+  ErrorCode() const
+  {
+    return mErrorCode;
   }
 
 protected:
@@ -1157,13 +1167,13 @@ protected:
 
     nsIDocument* doc = aWindow->GetExtantDoc();
     if (!doc) {
-      mRv.Throw(NS_ERROR_FAILURE);
+      mErrorCode = NS_ERROR_FAILURE;
       return true;
     }
 
     nsCOMPtr<nsIPrincipal> principal = doc->NodePrincipal();
     if (!principal) {
-      mRv.Throw(NS_ERROR_FAILURE);
+      mErrorCode = NS_ERROR_FAILURE;
       return true;
     }
 
@@ -1178,7 +1188,7 @@ protected:
       windowID = topInner->WindowID();
     }
 
-    mImpl->AsyncOpen(principal, windowID, nullptr, EmptyCString(), mRv);
+    mErrorCode = mImpl->AsyncOpen(principal, windowID, nullptr, EmptyCString());
     return true;
   }
 
@@ -1187,8 +1197,9 @@ protected:
     MOZ_ASSERT(NS_IsMainThread());
     MOZ_ASSERT(aTopLevelWorkerPrivate && !aTopLevelWorkerPrivate->GetWindow());
 
-    mImpl->AsyncOpen(aTopLevelWorkerPrivate->GetPrincipal(), 0, nullptr,
-                     EmptyCString(), mRv);
+    mErrorCode =
+      mImpl->AsyncOpen(aTopLevelWorkerPrivate->GetPrincipal(), 0, nullptr,
+                       EmptyCString());
     return true;
   }
 
@@ -1196,7 +1207,7 @@ private:
   // Raw pointer. This worker runs synchronously.
   WebSocketImpl* mImpl;
 
-  ErrorResult& mRv;
+  nsresult mErrorCode;
 };
 
 } // namespace
@@ -1271,9 +1282,10 @@ WebSocket::ConstructorCommon(const GlobalObject& aGlobal,
   bool connectionFailed = true;
 
   if (NS_IsMainThread()) {
-    webSocketImpl->Init(aGlobal.Context(), principal, !!aTransportProvider,
-                        aUrl, protocolArray, EmptyCString(),
-                        0, 0, aRv, &connectionFailed);
+    aRv =
+      webSocketImpl->Init(aGlobal.Context(), principal, !!aTransportProvider,
+                          aUrl, protocolArray, EmptyCString(), 0, 0,
+                          &connectionFailed);
   } else {
     // In workers we have to keep the worker alive using a workerHolder in order
     // to dispatch messages correctly.
@@ -1292,8 +1304,13 @@ WebSocket::ConstructorCommon(const GlobalObject& aGlobal,
     RefPtr<InitRunnable> runnable =
       new InitRunnable(webSocketImpl, !!aTransportProvider, aUrl,
                        protocolArray, nsDependentCString(file.get()), lineno,
-                       column, aRv, &connectionFailed);
+                       column, &connectionFailed);
     runnable->Dispatch(aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+
+    aRv = runnable->ErrorCode();
   }
 
   if (NS_WARN_IF(aRv.Failed())) {
@@ -1370,14 +1387,19 @@ WebSocket::ConstructorCommon(const GlobalObject& aGlobal,
       windowID = topInner->WindowID();
     }
 
-    webSocket->mImpl->AsyncOpen(principal, windowID, aTransportProvider,
-                                aNegotiatedExtensions, aRv);
+    aRv = webSocket->mImpl->AsyncOpen(principal, windowID, aTransportProvider,
+                                      aNegotiatedExtensions);
   } else {
     MOZ_ASSERT(!aTransportProvider && aNegotiatedExtensions.IsEmpty(),
                "not yet implemented");
     RefPtr<AsyncOpenRunnable> runnable =
-      new AsyncOpenRunnable(webSocket->mImpl, aRv);
+      new AsyncOpenRunnable(webSocket->mImpl);
     runnable->Dispatch(aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+
+    aRv = runnable->ErrorCode();
   }
 
   if (NS_WARN_IF(aRv.Failed())) {
@@ -1468,7 +1490,7 @@ WebSocket::DisconnectFromOwner()
 // WebSocketImpl:: initialization
 //-----------------------------------------------------------------------------
 
-void
+nsresult
 WebSocketImpl::Init(JSContext* aCx,
                     nsIPrincipal* aPrincipal,
                     bool aIsServerSide,
@@ -1477,7 +1499,6 @@ WebSocketImpl::Init(JSContext* aCx,
                     const nsACString& aScriptFile,
                     uint32_t aScriptLine,
                     uint32_t aScriptColumn,
-                    ErrorResult& aRv,
                     bool* aConnectionFailed)
 {
   AssertIsOnMainThread();
@@ -1490,29 +1511,22 @@ WebSocketImpl::Init(JSContext* aCx,
   RefPtr<WebSocketImpl> kungfuDeathGrip = this;
 
   // Attempt to kill "ghost" websocket: but usually too early for check to fail
-  aRv = mWebSocket->CheckInnerWindowCorrectness();
-  if (NS_WARN_IF(aRv.Failed())) {
-    return;
-  }
+  nsresult rv = mWebSocket->CheckInnerWindowCorrectness();
+  NS_ENSURE_SUCCESS(rv, rv);
 
   // Shut down websocket if window is frozen or destroyed (only needed for
   // "ghost" websockets--see bug 696085)
   if (!mWorkerPrivate) {
     nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
     if (NS_WARN_IF(!os)) {
-      aRv.Throw(NS_ERROR_FAILURE);
-      return;
+      return NS_ERROR_FAILURE;
     }
 
-    aRv = os->AddObserver(this, DOM_WINDOW_DESTROYED_TOPIC, true);
-    if (NS_WARN_IF(aRv.Failed())) {
-      return;
-    }
+    rv = os->AddObserver(this, DOM_WINDOW_DESTROYED_TOPIC, true);
+    NS_ENSURE_SUCCESS(rv, rv);
 
-    aRv = os->AddObserver(this, DOM_WINDOW_FROZEN_TOPIC, true);
-    if (NS_WARN_IF(aRv.Failed())) {
-      return;
-    }
+    rv = os->AddObserver(this, DOM_WINDOW_FROZEN_TOPIC, true);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
 
   if (mWorkerPrivate) {
@@ -1541,18 +1555,13 @@ WebSocketImpl::Init(JSContext* aCx,
   }
 
   // parses the url
-  aRv = ParseURL(PromiseFlatString(aURL));
-  if (NS_WARN_IF(aRv.Failed())) {
-    return;
-  }
+  rv = ParseURL(PromiseFlatString(aURL));
+  NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr<nsIDocument> originDoc = mWebSocket->GetDocumentIfCurrent();
   if (!originDoc) {
-    nsresult rv = mWebSocket->CheckInnerWindowCorrectness();
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      aRv.Throw(rv);
-      return;
-    }
+    rv = mWebSocket->CheckInnerWindowCorrectness();
+    NS_ENSURE_SUCCESS(rv, rv);
   }
   mOriginDocument = do_GetWeakReference(originDoc);
 
@@ -1575,24 +1584,20 @@ WebSocketImpl::Init(JSContext* aCx,
     // Please note that websockets can't follow redirects, hence there is no
     // need to perform a CSP check after redirects.
     int16_t shouldLoad = nsIContentPolicy::ACCEPT;
-    aRv = NS_CheckContentLoadPolicy(nsIContentPolicy::TYPE_WEBSOCKET,
-                                    uri,
-                                    aPrincipal,
-                                    originDoc,
-                                    EmptyCString(),
-                                    nullptr,
-                                    &shouldLoad,
-                                    nsContentUtils::GetContentPolicy(),
-                                    nsContentUtils::GetSecurityManager());
-
-    if (NS_WARN_IF(aRv.Failed())) {
-      return;
-    }
+    rv = NS_CheckContentLoadPolicy(nsIContentPolicy::TYPE_WEBSOCKET,
+                                   uri,
+                                   aPrincipal,
+                                   originDoc,
+                                   EmptyCString(),
+                                   nullptr,
+                                   &shouldLoad,
+                                   nsContentUtils::GetContentPolicy(),
+                                   nsContentUtils::GetSecurityManager());
+    NS_ENSURE_SUCCESS(rv, rv);
 
     if (NS_CP_REJECTED(shouldLoad)) {
       // Disallowed by content policy
-      aRv.Throw(NS_ERROR_CONTENT_BLOCKED);
-      return;
+      return NS_ERROR_CONTENT_BLOCKED;
     }
   }
 
@@ -1609,7 +1614,7 @@ WebSocketImpl::Init(JSContext* aCx,
     // upgrade the request from ws:// to wss:// and mark as secure
     mURI.ReplaceSubstring("ws://", "wss://");
     if (NS_WARN_IF(mURI.Find("wss://") != 0)) {
-      return;
+      return NS_OK;
     }
     mSecure = true;
 
@@ -1657,23 +1662,20 @@ WebSocketImpl::Init(JSContext* aCx,
         if (!innerWindow) {
           innerWindow = do_QueryInterface(globalObject);
           if (NS_WARN_IF(!innerWindow)) {
-            aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-            return;
+            return NS_ERROR_DOM_SECURITY_ERR;
           }
         }
 
         nsCOMPtr<nsPIDOMWindowOuter> parentWindow =
           innerWindow->GetScriptableParent();
         if (NS_WARN_IF(!parentWindow)) {
-          aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-          return;
+          return NS_ERROR_DOM_SECURITY_ERR;
         }
 
         nsCOMPtr<nsPIDOMWindowInner> currentInnerWindow =
           parentWindow->GetCurrentInnerWindow();
         if (NS_WARN_IF(!currentInnerWindow)) {
-          aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-          return;
+          return NS_ERROR_DOM_SECURITY_ERR;
         }
 
         // We are at the top. Let's see if we have an opener window.
@@ -1683,8 +1685,7 @@ WebSocketImpl::Init(JSContext* aCx,
             nsGlobalWindow::Cast(innerWindow)->GetOpenerWindow(error);
           if (NS_WARN_IF(error.Failed())) {
             error.SuppressException();
-            aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-            return;
+            return NS_ERROR_DOM_SECURITY_ERR;
           }
 
           if (!parentWindow) {
@@ -1693,8 +1694,7 @@ WebSocketImpl::Init(JSContext* aCx,
 
           currentInnerWindow = parentWindow->GetCurrentInnerWindow();
           if (NS_WARN_IF(!currentInnerWindow)) {
-            aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-            return;
+            return NS_ERROR_DOM_SECURITY_ERR;
           }
 
           MOZ_ASSERT(currentInnerWindow != innerWindow);
@@ -1704,8 +1704,7 @@ WebSocketImpl::Init(JSContext* aCx,
 
         nsCOMPtr<nsIDocument> document = innerWindow->GetExtantDoc();
         if (NS_WARN_IF(!document)) {
-          aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-          return;
+          return NS_ERROR_DOM_SECURITY_ERR;
         }
 
         principal = document->NodePrincipal();
@@ -1718,13 +1717,11 @@ WebSocketImpl::Init(JSContext* aCx,
 
     if (originURI) {
       bool originIsHttps = false;
-      aRv = originURI->SchemeIs("https", &originIsHttps);
-      if (NS_WARN_IF(aRv.Failed())) {
-        return;
-      }
+      rv = originURI->SchemeIs("https", &originIsHttps);
+      NS_ENSURE_SUCCESS(rv, rv);
+
       if (originIsHttps) {
-        aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-        return;
+        return NS_ERROR_DOM_SECURITY_ERR;
       }
     }
   }
@@ -1734,8 +1731,7 @@ WebSocketImpl::Init(JSContext* aCx,
     for (uint32_t i = 0; i < aProtocolArray[index].Length(); ++i) {
       if (aProtocolArray[index][i] < static_cast<char16_t>(0x0021) ||
           aProtocolArray[index][i] > static_cast<char16_t>(0x007E)) {
-        aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
-        return;
+        return NS_ERROR_DOM_SYNTAX_ERR;
       }
     }
 
@@ -1754,45 +1750,44 @@ WebSocketImpl::Init(JSContext* aCx,
   } else {
     *aConnectionFailed = false;
   }
+
+  return NS_OK;
 }
 
-void
+nsresult
 WebSocketImpl::AsyncOpen(nsIPrincipal* aPrincipal, uint64_t aInnerWindowID,
                          nsITransportProvider* aTransportProvider,
-                         const nsACString& aNegotiatedExtensions,
-                         ErrorResult& aRv)
+                         const nsACString& aNegotiatedExtensions)
 {
   MOZ_ASSERT(NS_IsMainThread(), "Not running on main thread");
   MOZ_ASSERT_IF(!aTransportProvider, aNegotiatedExtensions.IsEmpty());
 
   nsCString asciiOrigin;
-  aRv = nsContentUtils::GetASCIIOrigin(aPrincipal, asciiOrigin);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return;
-  }
+  nsresult rv = nsContentUtils::GetASCIIOrigin(aPrincipal, asciiOrigin);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   if (aTransportProvider) {
-    aRv = mChannel->SetServerParameters(aTransportProvider, aNegotiatedExtensions);
-    if (NS_WARN_IF(aRv.Failed())) {
-      return;
-    }
+    rv = mChannel->SetServerParameters(aTransportProvider,
+                                       aNegotiatedExtensions);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
 
   ToLowerCase(asciiOrigin);
 
   nsCOMPtr<nsIURI> uri;
   if (!aTransportProvider) {
-    aRv = NS_NewURI(getter_AddRefs(uri), mURI);
-    MOZ_ASSERT(!aRv.Failed());
+    rv = NS_NewURI(getter_AddRefs(uri), mURI);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
 
-  aRv = mChannel->AsyncOpen(uri, asciiOrigin, aInnerWindowID, this, nullptr);
-  if (NS_WARN_IF(aRv.Failed())) {
-    aRv.Throw(NS_ERROR_CONTENT_BLOCKED);
-    return;
+  rv = mChannel->AsyncOpen(uri, asciiOrigin, aInnerWindowID, this, nullptr);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return NS_ERROR_CONTENT_BLOCKED;
   }
 
   mInnerWindowID = aInnerWindowID;
+
+  return NS_OK;
 }
 
 //-----------------------------------------------------------------------------
