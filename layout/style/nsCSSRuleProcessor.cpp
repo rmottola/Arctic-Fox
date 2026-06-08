@@ -2086,7 +2086,6 @@ static bool SelectorMatches(Element* aElement,
         }
         break;
 
-      case CSSPseudoClassType::mozDir:
       case CSSPseudoClassType::dir:
         {
           if (aDependence) {
