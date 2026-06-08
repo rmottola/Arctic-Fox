@@ -976,12 +976,13 @@ ContentChild::InitXPCOM()
   ClipboardCapabilities clipboardCaps;
   DomainPolicyClone domainPolicy;
   StructuredCloneData initialData;
+  OptionalURIParams userContentSheetURL;
 
   SendGetXPCOMProcessAttributes(&isOffline, &isConnected, &captivePortalState,
                                 &isLangRTL, &haveBidiKeyboards,
                                 &mAvailableDictionaries,
                                 &clipboardCaps, &domainPolicy, &initialData,
-                                &mFontFamilies);
+                                &mFontFamilies, &userContentSheetURL);
   RecvSetOffline(isOffline);
   RecvSetConnectivity(isConnected);
   RecvSetCaptivePortalState(captivePortalState);
@@ -1019,6 +1020,10 @@ ContentChild::InitXPCOM()
     ProcessGlobal* global = ProcessGlobal::Get();
     global->SetInitialProcessData(data);
   }
+
+  // The stylesheet cache is not ready yet. Store this URL for future use.
+  nsCOMPtr<nsIURI> ucsURL = DeserializeURI(userContentSheetURL);
+  nsLayoutStylesheetCache::SetUserContentCSSURL(ucsURL);
 
   // This will register cross-process observer.
   mozilla::dom::time::InitializeDateCacheCleaner();
