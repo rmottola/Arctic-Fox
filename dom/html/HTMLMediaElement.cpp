@@ -3580,10 +3580,7 @@ HTMLMediaElement::Play(ErrorResult& aRv)
     aRv.Throw(rv);
   }
 
-  OpenUnsupportedMediaWithExternalAppIfNeeded();
-  if (mAudioChannelWrapper) {
-    mAudioChannelWrapper->NotifyPlayStarted();
-  }
+  UpdateCustomPolicyAfterPlayed();
 }
 
 nsresult
@@ -3672,10 +3669,7 @@ NS_IMETHODIMP HTMLMediaElement::Play()
     return rv;
   }
 
-  OpenUnsupportedMediaWithExternalAppIfNeeded();
-  if (mAudioChannelWrapper) {
-    mAudioChannelWrapper->NotifyPlayStarted();
-  }
+  UpdateCustomPolicyAfterPlayed();
   return NS_OK;
 }
 
@@ -6879,6 +6873,15 @@ HTMLMediaElement::MarkAsContentSource(CallerAPI aAPI)
   LOG(LogLevel::Debug,
       ("%p Log VIDEO_AS_CONTENT_SOURCE: visibility = %u, API: '%d' and 'All'",
        this, isVisible, aAPI));
+}
+
+void
+HTMLMediaElement::UpdateCustomPolicyAfterPlayed()
+{
+  OpenUnsupportedMediaWithExternalAppIfNeeded();
+  if (mAudioChannelWrapper) {
+    mAudioChannelWrapper->NotifyPlayStarted();
+  }
 }
 
 } // namespace dom
