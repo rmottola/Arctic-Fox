@@ -595,13 +595,11 @@ struct MOZ_STACK_CLASS CreateBlobImplMetadata final
   uint64_t mLength;
   int64_t mLastModifiedDate;
   bool mHasRecursed;
-  const bool mIsSameProcessActor;
 
-  explicit CreateBlobImplMetadata(bool aIsSameProcessActor)
+  CreateBlobImplMetadata()
     : mLength(0)
     , mLastModifiedDate(0)
     , mHasRecursed(false)
-    , mIsSameProcessActor(aIsSameProcessActor)
   {
     MOZ_COUNT_CTOR(CreateBlobImplMetadata);
 
@@ -790,8 +788,7 @@ CreateBlobImpl(const nsTArray<BlobData>& aBlobDatas,
 
 already_AddRefed<BlobImpl>
 CreateBlobImpl(const ParentBlobConstructorParams& aParams,
-               const BlobData& aBlobData,
-               bool aIsSameProcessActor)
+               const BlobData& aBlobData)
 {
   MOZ_ASSERT(gProcessType == GeckoProcessType_Default);
   MOZ_ASSERT(aParams.blobParams().type() ==
@@ -799,7 +796,7 @@ CreateBlobImpl(const ParentBlobConstructorParams& aParams,
              aParams.blobParams().type() ==
                AnyBlobConstructorParams::TFileBlobConstructorParams);
 
-  CreateBlobImplMetadata metadata(aIsSameProcessActor);
+  CreateBlobImplMetadata metadata;
 
   if (aParams.blobParams().type() ==
         AnyBlobConstructorParams::TNormalBlobConstructorParams) {
@@ -4109,9 +4106,7 @@ BlobParent::CreateFromParams(ParentManagerType* aManager,
       }
 
       RefPtr<BlobImpl> blobImpl =
-        CreateBlobImpl(aParams,
-                       optionalBlobData.get_BlobData(),
-                       ActorManagerIsSameProcess(aManager));
+        CreateBlobImpl(aParams, optionalBlobData.get_BlobData());
       if (NS_WARN_IF(!blobImpl)) {
         ASSERT_UNLESS_FUZZING();
         return nullptr;
