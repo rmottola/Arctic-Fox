@@ -5124,7 +5124,12 @@ void HTMLMediaElement::PlaybackEnded()
     return;
   }
 
-  Pause();
+  FireTimeUpdate(false);
+
+  if (!mPaused) {
+    Pause();
+    AsyncRejectPendingPlayPromises(NS_ERROR_DOM_MEDIA_ABORT_ERR);
+  }
 
   if (mSrcStream) {
     // A MediaStream that goes from inactive to active shall be eligible for
@@ -5132,7 +5137,6 @@ void HTMLMediaElement::PlaybackEnded()
     mAutoplaying = true;
   }
 
-  FireTimeUpdate(false);
   DispatchAsyncEvent(NS_LITERAL_STRING("ended"));
 }
 
