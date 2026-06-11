@@ -877,7 +877,7 @@ private:
   void
   Resume()
   {
-    if (!IsSuspended() && mOwner->Paused()) {
+    if (!IsSuspended()) {
       MOZ_LOG(AudioChannelService::GetAudioChannelLog(), LogLevel::Debug,
              ("HTMLMediaElement::AudioChannelAgentCallback, ResumeFromAudioChannel, "
               "this = %p, Error : resume without suspended!\n", this));
