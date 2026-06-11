@@ -631,6 +631,7 @@ public:
     , mAudioCapturedByWindow(false)
     , mSuspended(nsISuspendedTypes::NONE_SUSPENDED)
     , mIsOwnerAudible(IsOwnerAudible())
+    , mIsShutDown(false)
   {
     MOZ_ASSERT(mOwner);
     MaybeCreateAudioChannelAgent();
@@ -639,6 +640,7 @@ public:
   void
   UpdateAudioChannelPlayingState(bool aForcePlaying = false)
   {
+    MOZ_ASSERT(!mIsShutDown);
     bool playingThroughTheAudioChannel =
       aForcePlaying || IsPlayingThroughTheAudioChannel();
 
@@ -655,6 +657,7 @@ public:
   void
   NotifyPlayStarted()
   {
+    MOZ_ASSERT(!mIsShutDown);
     // Reset the suspend type because the media element might be paused by
     // audio channel before calling play(). eg. paused by Fennec media control,
     // but resumed it from page.
@@ -730,6 +733,7 @@ public:
   void
   AudioCaptureStreamChangeIfNeeded()
   {
+    MOZ_ASSERT(!mIsShutDown);
     if (!IsPlayingStarted()) {
       return;
     }
@@ -744,6 +748,7 @@ public:
   void
   NotifyAudioPlaybackChanged(AudibleChangedReasons aReason)
   {
+    MOZ_ASSERT(!mIsShutDown);
     if (!IsPlayingStarted()) {
       return;
     }
@@ -760,6 +765,7 @@ public:
   bool
   IsPlaybackBlocked()
   {
+    MOZ_ASSERT(!mIsShutDown);
     // If the tab hasn't been activated yet, the media element in that tab can't
     // be playback now until the tab goes to foreground first time or user clicks
     // the unblocking tab icon.
@@ -773,20 +779,36 @@ public:
     return false;
   }
 
+  void
+  Shutdown()
+  {
+    MOZ_ASSERT(!mIsShutDown);
+    if (mAudioChannelAgent) {
+      mAudioChannelAgent->NotifyStoppedPlaying();
+      mAudioChannelAgent = nullptr;
+    }
+    mIsShutDown = true;
+  }
+
   float
   GetEffectiveVolume() const
   {
+    MOZ_ASSERT(!mIsShutDown);
     return mOwner->Volume() * mAudioChannelVolume;
   }
 
   SuspendTypes
   GetSuspendType() const
   {
+    MOZ_ASSERT(!mIsShutDown);
     return mSuspended;
   }
 
 private:
-  ~AudioChannelAgentCallback() {};
+  ~AudioChannelAgentCallback()
+  {
+    MOZ_ASSERT(mIsShutDown);
+  };
 
   bool
   MaybeCreateAudioChannelAgent()
@@ -1044,6 +1066,7 @@ private:
   SuspendTypes mSuspended;
   // True if media element is audible for users.
   bool mIsOwnerAudible;
+  bool mIsShutDown;
 };
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLMediaElement::AudioChannelAgentCallback)
@@ -1358,6 +1381,9 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLMediaElement, nsGenericHTMLE
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSourcePointer)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLoadBlockedDoc)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSourceLoadCandidate)
+  if (tmp->mAudioChannelWrapper) {
+    tmp->mAudioChannelWrapper->Shutdown();
+  }
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mAudioChannelWrapper)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mErrorSink->mError)
   for (uint32_t i = 0; i < tmp->mOutputStreams.Length(); ++i) {
@@ -3612,6 +3638,11 @@ HTMLMediaElement::~HTMLMediaElement()
 
   if (mChannelLoader) {
     mChannelLoader->Cancel();
+  }
+
+  if (mAudioChannelWrapper) {
+    mAudioChannelWrapper->Shutdown();
+    mAudioChannelWrapper = nullptr;
   }
 
   WakeLockRelease();
