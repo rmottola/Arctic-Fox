@@ -541,7 +541,7 @@
                     this.volumeControl.value = volumePercentage;
                 },
 
-                handleEvent : function(aEvent) {
+                handleEvent : function (aEvent) {
                     this.log("Got media event ----> " + aEvent.type);
 
                     // If the binding is detached (or has been replaced by a
@@ -710,7 +710,7 @@
                     }
                 },
 
-                terminateEventListeners : function() {
+                terminateEventListeners : function () {
                     if (this.videoEvents) {
                       for (let event of this.videoEvents) {
                           this.video.removeEventListener(event, this, {
@@ -732,7 +732,7 @@
                     this.log("--- videocontrols terminated ---");
                 },
 
-                hasError : function() {
+                hasError : function () {
                     // We either have an explicit error, or the resource selection
                     // algorithm is running and we've tried to load something and failed.
                     // Note: we don't consider the case where we've tried to load but
@@ -760,7 +760,7 @@
                     return false;
                 },
 
-                updateErrorText : function() {
+                updateErrorText : function () {
                     let error;
                     let v = this.video;
                     // It is possible to have both v.networkState == NETWORK_NO_SOURCE
@@ -814,7 +814,7 @@
                     return timeString;
                 },
 
-                initPositionDurationBox : function() {
+                initPositionDurationBox : function () {
                   if (this.videocontrols.isTouchControls) {
                     return;
                   }
@@ -845,7 +845,7 @@
                   });
                 },
 
-                showDuration : function(duration) {
+                showDuration : function (duration) {
                     let isInfinite = (duration == Infinity);
                     this.log("Duration is " + duration + "ms.\n");
 
@@ -1008,7 +1008,7 @@
                 _controlsHiddenByTimeout : false,
                 _showControlsTimeout : 0,
                 SHOW_CONTROLS_TIMEOUT_MS: 500,
-                _showControlsFn : function() {
+                _showControlsFn : function () {
                     if (Utils.video.matches("video:hover")) {
                         Utils.startFadeIn(Utils.controlBar, false);
                         Utils._showControlsTimeout = 0;
@@ -1017,7 +1017,7 @@
                 },
 
                 _hideControlsTimeout : 0,
-                _hideControlsFn : function() {
+                _hideControlsFn : function () {
                     if (!Utils.scrubber.isDragging) {
                         Utils.startFade(Utils.controlBar, false);
                         Utils._hideControlsTimeout = 0;
@@ -1025,7 +1025,7 @@
                     }
                 },
                 HIDE_CONTROLS_TIMEOUT_MS : 2000,
-                onMouseMove : function(event) {
+                onMouseMove : function (event) {
                     // Pause playing video when the mouse is dragging over the control bar.
                     if (this.scrubber.startToDrag) {
                       this.scrubber.isDragging = true;
@@ -1059,7 +1059,7 @@
                     }
                 },
 
-                onMouseInOut : function(event) {
+                onMouseInOut : function (event) {
                     // If the controls are static, don't change anything.
                     if (!this.dynamicControls)
                         return;
@@ -1103,15 +1103,15 @@
                     }
                 },
 
-                startFadeIn : function(element, immediate) {
+                startFadeIn : function (element, immediate) {
                     this.startFade(element, true, immediate);
                 },
 
-                startFadeOut : function(element, immediate) {
+                startFadeOut : function (element, immediate) {
                     this.startFade(element, false, immediate);
                 },
 
-                startFade : function(element, fadeIn, immediate) {
+                startFade : function (element, fadeIn, immediate) {
                     if (element.classList.contains("controlBar") && fadeIn) {
                         // Bug 493523, the scrubber doesn't call valueChanged while hidden,
                         // so our dependent state (eg, timestamp in the thumb) will be stale.
@@ -1146,7 +1146,7 @@
                     }
                 },
 
-                onTransitionEnd : function(event) {
+                onTransitionEnd : function (event) {
                     // Ignore events for things other than opacity changes.
                     if (event.propertyName != "opacity")
                         return;
@@ -1165,13 +1165,13 @@
 
                 _triggeredByControls: false,
 
-                startPlay : function() {
+                startPlay : function () {
                     this._triggeredByControls = true;
                     this.hideClickToPlay();
                     this.video.play();
                 },
 
-                togglePause : function() {
+                togglePause : function () {
                     if (this.video.paused || this.video.ended) {
                         this.startPlay();
                     } else {
@@ -1189,7 +1189,7 @@
                          !this.video.mozHasAudio;
                 },
 
-                toggleMute : function() {
+                toggleMute : function () {
                     if (this.isVideoWithoutAudioTrack()) {
                         return;
                     }
@@ -1203,17 +1203,17 @@
                     // controlling volume.
                 },
 
-                isVideoInFullScreen : function() {
+                isVideoInFullScreen : function () {
                     return document.mozFullScreenElement == this.video;
                 },
 
-                toggleFullscreen : function() {
+                toggleFullscreen : function () {
                     this.isVideoInFullScreen() ?
                         document.mozCancelFullScreen() :
                         this.video.mozRequestFullScreen();
                 },
 
-                setFullscreenButtonState : function() {
+                setFullscreenButtonState : function () {
                     if (this.isAudioOnly || !document.mozFullScreenEnabled) {
                         this.controlBar.setAttribute("fullscreen-unavailable", true);
                         this.adjustControlSize();
@@ -1232,7 +1232,7 @@
                         this.fullscreenButton.removeAttribute("fullscreened");
                 },
 
-                onFullscreenChange: function() {
+                onFullscreenChange: function () {
                     if (this.isVideoInFullScreen()) {
                         Utils._hideControlsTimeout = setTimeout(this._hideControlsFn, this.HIDE_CONTROLS_TIMEOUT_MS);
                     }
@@ -1258,7 +1258,7 @@
                         this.video.pause();
                     }
                 },
-                hideClickToPlay : function() {
+                hideClickToPlay : function () {
                     let videoHeight = this.video.clientHeight;
                     let videoWidth = this.video.clientWidth;
 
@@ -1428,7 +1428,7 @@
                   return Array.prototype.filter.call(this.video.textTracks, this.isSupportedTextTrack);
                 },
 
-                isClosedCaptionOn : function() {
+                isClosedCaptionOn : function () {
                   for (let tt of this.overlayableTextTracks) {
                     if (tt.mode === "showing") {
                       return true;
@@ -1438,7 +1438,7 @@
                   return false;
                 },
 
-                setClosedCaptionButtonState : function() {
+                setClosedCaptionButtonState : function () {
                   if (!this.isClosedCaptionAvailable) {
                     this.closedCaptionButton.setAttribute("hidden", "true");
                     return;
@@ -1466,7 +1466,7 @@
                   }
                 },
 
-                addNewTextTrack : function(tt) {
+                addNewTextTrack : function (tt) {
                   if (!this.isSupportedTextTrack(tt)) {
                     return;
                   }
@@ -1484,7 +1484,7 @@
                   ttBtn.classList.add("textTrackItem");
                   ttBtn.setAttribute("index", tt.index);
 
-                  ttBtn.addEventListener("click", function(event) {
+                  ttBtn.addEventListener("click", function (event) {
                     event.stopPropagation();
 
                     this.changeTextTrack(tt.index);
@@ -1499,7 +1499,7 @@
                   }
                 },
 
-                changeTextTrack : function(index) {
+                changeTextTrack : function (index) {
                   for (let tt of this.overlayableTextTracks) {
                     if (tt.index === index) {
                       tt.mode = "showing";
@@ -1519,12 +1519,12 @@
                   this.setClosedCaptionButtonState();
                 },
 
-                onControlBarTransitioned : function() {
+                onControlBarTransitioned : function () {
                   this.textTrackList.setAttribute("hidden", "true");
                   this.video.dispatchEvent(new CustomEvent("controlbarchange"));
                 },
 
-                toggleClosedCaption : function() {
+                toggleClosedCaption : function () {
                   if (this.textTrackList.hasAttribute("hidden")) {
                     this.textTrackList.removeAttribute("hidden");
                   } else {
@@ -1532,12 +1532,12 @@
                   }
                 },
 
-                onTextTrackAdd : function(trackEvent) {
+                onTextTrackAdd : function (trackEvent) {
                   this.addNewTextTrack(trackEvent.track);
                   this.setClosedCaptionButtonState();
                 },
 
-                onTextTrackRemove : function(trackEvent) {
+                onTextTrackRemove : function (trackEvent) {
                   const toRemoveIndex = trackEvent.track.index;
                   const ttItems = this.textTrackList.childNodes;
 
@@ -1563,7 +1563,7 @@
                   this.setClosedCaptionButtonState();
                 },
 
-                initTextTracks : function() {
+                initTextTracks : function () {
                   if (!this.isClosedCaptionAvailable) {
                     this.closedCaptionButton.setAttribute("hidden", "true");
                     return;
@@ -1583,8 +1583,8 @@
                   this.setClosedCaptionButtonState();
                 },
 
-                isEventWithin : function(event, parent1, parent2) {
-                    function isDescendant(node) {
+                isEventWithin : function (event, parent1, parent2) {
+                    function isDescendant (node) {
                         while (node) {
                             if (node == parent1 || node == parent2)
                                 return true;
@@ -1595,7 +1595,7 @@
                     return isDescendant(event.target) && isDescendant(event.relatedTarget);
                 },
 
-                log : function(msg) {
+                log : function (msg) {
                     if (this.debug)
                         console.log("videoctl: " + msg + "\n");
                 },
@@ -1711,7 +1711,7 @@
                   }
                 },
 
-                init : function(binding) {
+                init : function (binding) {
                     this.video = binding.parentNode;
                     this.videocontrols = binding;
 
@@ -1957,7 +1957,7 @@
                 this.videocontrols.addEventListener("transitionend", this, false);
             },
 
-            handleEvent : function(aEvent) {
+            handleEvent : function (aEvent) {
               if (aEvent.type == "transitionend") {
                 this.firstShow = false;
                 this.videocontrols.removeEventListener("transitionend", this, false);
@@ -1969,18 +1969,18 @@
 
             },
 
-            terminateEventListeners : function() {
+            terminateEventListeners : function () {
               for (var event of this.videoEvents)
                 this.Utils.video.removeEventListener(event, this, false);
             },
 
-            isVideoCasting : function() {
+            isVideoCasting : function () {
               if (this.video.mozIsCasting)
                 return true;
               return false;
             },
 
-            updateCasting : function(eventDetail) {
+            updateCasting : function (eventDetail) {
               let castingData = JSON.parse(eventDetail);
               if ("allow" in castingData) {
                 this.video.mozAllowCasting = !!castingData.allow;
@@ -1992,11 +1992,11 @@
               this.setCastButtonState();
             },
 
-            startCasting : function() {
+            startCasting : function () {
               this.videocontrols.dispatchEvent(new CustomEvent("VideoBindingCast"));
             },
 
-            setCastButtonState : function() {
+            setCastButtonState : function () {
               if (this.isAudioOnly || !this.video.mozAllowCasting) {
                 this.castingButton.hidden = true;
                 return;
@@ -2011,7 +2011,7 @@
               this.castingButton.hidden = false;
             },
 
-            init : function(binding) {
+            init : function (binding) {
               this.videocontrols = binding;
               this.video = binding.parentNode;
 
@@ -2035,7 +2035,7 @@
                 self.startCasting();
               }, false);
 
-              this.video.addEventListener("media-videoCasting", function(e) {
+              this.video.addEventListener("media-videoCasting", function (e) {
                 if (!e.isTrusted)
                   return;
                 self.updateCasting(e.detail);
@@ -2087,7 +2087,7 @@
 
   </binding>
 
-  <binding id="touchControlsGonk" extends="chrome://global/content/bindings/videocontrols.xml#touchControls">
+  <binding id="touchControlsGonk" extends="chrome://global/content/bindings/videoControls.xml#touchControls">
     <implementation>
       <constructor>
           this.isGonk = true;
@@ -2119,7 +2119,7 @@
             videoEvents : ["play",
                            "playing"],
             controlListeners: [],
-            terminateEventListeners : function() {
+            terminateEventListeners : function () {
               for (let event of this.videoEvents)
                 this.video.removeEventListener(event, this, { mozSystemGroup: true });
 
@@ -2131,11 +2131,11 @@
               delete this.controlListeners;
             },
 
-            hasError : function() {
+            hasError : function () {
               return (this.video.error != null || this.video.networkState == this.video.NETWORK_NO_SOURCE);
             },
 
-            handleEvent : function(aEvent) {
+            handleEvent : function (aEvent) {
               // If the binding is detached (or has been replaced by a
               // newer instance of the binding), nuke our event-listeners.
               if (this.binding.randomID != this.randomID) {
@@ -2153,7 +2153,7 @@
               }
             },
 
-            blockedVideoHandler : function() {
+            blockedVideoHandler : function () {
               if (this.binding.randomID != this.randomID) {
                 this.terminateEventListeners();
                 return;
@@ -2164,7 +2164,7 @@
               this.noControlsOverlay.hidden = false;
             },
 
-            clickToPlayClickHandler : function(e) {
+            clickToPlayClickHandler : function (e) {
               if (this.binding.randomID != this.randomID) {
                   this.terminateEventListeners();
                   return;
@@ -2176,7 +2176,7 @@
               this.video.play();
             },
 
-            init : function(binding) {
+            init : function (binding) {
               this.binding = binding;
               this.randomID = Math.random();
               this.binding.randomID = this.randomID;
