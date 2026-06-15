@@ -2698,6 +2698,7 @@ MediaManager::OnNavigation(uint64_t aWindowID)
 void
 MediaManager::RemoveMediaDevicesCallback(uint64_t aWindowID)
 {
+  MutexAutoLock lock(mCallbackMutex);
   for (DeviceChangeCallback* observer : mDeviceChangeCallbackList)
   {
     dom::MediaDevices* mediadevices = static_cast<dom::MediaDevices *>(observer);
@@ -2706,7 +2707,7 @@ MediaManager::RemoveMediaDevicesCallback(uint64_t aWindowID)
       nsPIDOMWindowInner* window = mediadevices->GetOwner();
       MOZ_ASSERT(window);
       if (window && window->WindowID() == aWindowID) {
-        DeviceChangeCallback::RemoveDeviceChangeCallback(observer);
+        DeviceChangeCallback::RemoveDeviceChangeCallbackLocked(observer);
         return;
       }
     }
