@@ -317,21 +317,21 @@ nsSMILTimeContainer::NotifyTimeChange()
   // milestone elements. This is because any timed element with dependents and
   // with significant transitions yet to fire should have their next milestone
   // registered. Other timed elements don't matter.
-  AutoRestore<bool> saveHolding(mHoldingEntries);
-  mHoldingEntries = true;
 
   // Copy the timed elements to a separate array before calling
-  // HandleContainerTimeChange on each them in case doing so mutates
+  // HandleContainerTimeChange on each of them in case doing so mutates
   // mMilestoneEntries.
   nsTArray<RefPtr<mozilla::dom::SVGAnimationElement>> elems;
-  const MilestoneEntry* p = mMilestoneEntries.Elements();
-  while (p < mMilestoneEntries.Elements() + mMilestoneEntries.Length()) {
-    elems.AppendElement(p->mTimebase.get());
-    ++p;
-  }
 
-  p = nullptr;
-  mHoldingEntries = false;
+  {
+    AutoRestore<bool> saveHolding(mHoldingEntries);
+    mHoldingEntries = true;
+    for (const MilestoneEntry* p = mMilestoneEntries.Elements();
+        p < mMilestoneEntries.Elements() + mMilestoneEntries.Length();
+        ++p) {
+      elems.AppendElement(p->mTimebase.get());
+    }
+  }
 
   for (auto& elem : elems) {
     elem->TimedElement().HandleContainerTimeChange();
