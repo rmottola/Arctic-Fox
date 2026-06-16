@@ -1223,8 +1223,8 @@ MediaRecorder::SetOptions(const MediaRecorderOptions& aInitDict)
   // the encoder is Init()ed. This happens only after data is
   // available and thus requires dynamic changes.
   //
-  // Until dynamic changes are supported, we'll be safe and err
-  // slightly high.
+  // Until dynamic changes are supported, I prefer to be safe and err
+  // slightly high
   if (aInitDict.mBitsPerSecond.WasPassed() && !aInitDict.mVideoBitsPerSecond.WasPassed()) {
     mVideoBitsPerSecond = mBitsPerSecond;
   }
