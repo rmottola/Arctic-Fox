@@ -466,7 +466,7 @@ private:
  *
  * Transition to:
  *   SHUTDOWN if any decode error.
- *   SEEKING if any pending seek and seek is possible.
+ *   SEEKING if any seek request.
  *   DECODING when the 'loadeddata' event is fired.
  */
 class MediaDecoderStateMachine::DecodingFirstFrameState
@@ -476,13 +476,6 @@ public:
   explicit DecodingFirstFrameState(Master* aPtr) : StateObject(aPtr) {}
 
   void Enter(SeekJob aPendingSeek);
-
-  void Exit() override
-  {
-    // mPendingSeek is either moved before transition to SEEKING,
-    // or should be rejected here before transition to SHUTDOWN.
-    mPendingSeek.RejectIfExists(__func__);
-  }
 
   State GetState() const override
   {
@@ -506,8 +499,6 @@ public:
     MaybeFinishDecodeFirstFrame();
   }
 
-  RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
-
   void HandleVideoSuspendTimeout() override
   {
     // Do nothing for we need to decode the 1st video frame to get the dimensions.
@@ -523,8 +514,6 @@ private:
   // Notify FirstFrameLoaded if having decoded first frames and
   // transition to SEEKING if there is any pending seek, or DECODING otherwise.
   void MaybeFinishDecodeFirstFrame();
-
-  SeekJob mPendingSeek;
 };
 
 /**
@@ -1387,9 +1376,7 @@ MediaDecoderStateMachine::
 DecodingFirstFrameState::Enter(SeekJob aPendingSeek)
 {
   // Handle pending seek.
-  if (aPendingSeek.Exists() &&
-      (mMaster->mSentFirstFrameLoadedEvent ||
-       Reader()->ForceZeroStartTime())) {
+  if (aPendingSeek.Exists()) {
     SetState<SeekingState>(Move(aPendingSeek), EventVisibility::Observable);
     return;
   }
@@ -1402,32 +1389,8 @@ DecodingFirstFrameState::Enter(SeekJob aPendingSeek)
 
   MOZ_ASSERT(!mMaster->mVideoDecodeSuspended);
 
-  mPendingSeek = Move(aPendingSeek);
-
   // Dispatch tasks to decode first frames.
   mMaster->DispatchDecodeTasksIfNeeded();
-}
-
-RefPtr<MediaDecoder::SeekPromise>
-MediaDecoderStateMachine::
-DecodingFirstFrameState::HandleSeek(SeekTarget aTarget)
-{
-  // Should've transitioned to DECODING in Enter()
-  // if mSentFirstFrameLoadedEvent is true.
-  MOZ_ASSERT(!mMaster->mSentFirstFrameLoadedEvent);
-
-  if (!Reader()->ForceZeroStartTime()) {
-    SLOG("Not Enough Data to seek at this stage, queuing seek");
-    mPendingSeek.RejectIfExists(__func__);
-    mPendingSeek.mTarget = aTarget;
-    return mPendingSeek.mPromise.Ensure(__func__);
-  }
-
-  // Since ForceZeroStartTime() is true, we should've transitioned to SEEKING
-  // in Enter() if there is any pending seek.
-  MOZ_ASSERT(!mPendingSeek.Exists());
-
-  return StateObject::HandleSeek(aTarget);
 }
 
 void
@@ -1442,12 +1405,7 @@ DecodingFirstFrameState::MaybeFinishDecodeFirstFrame()
   }
 
   mMaster->FinishDecodeFirstFrame();
-
-  if (mPendingSeek.Exists()) {
-    SetState<SeekingState>(Move(mPendingSeek), EventVisibility::Observable);
-  } else {
-    SetState<DecodingState>();
-  }
+  SetState<DecodingState>();
 }
 
 void
