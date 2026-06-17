@@ -10582,6 +10582,13 @@
     "kind": "count",
     "description": "Tracking the total number of opened Containers."
   },
+  "SHARED_WORKER_COUNT": {
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "expires_in_version": "58",
+    "kind": "count",
+    "bug_numbers": [1295980],
+    "description": "Number of the use of SharedWorkers."
+  },
   "NUMBER_OF_PROFILES": {
     "alert_emails": ["amarchesini@mozilla.com"],
     "expires_in_version": "58",
