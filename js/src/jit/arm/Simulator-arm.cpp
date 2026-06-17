@@ -1612,7 +1612,7 @@ Simulator::writeQ(int32_t addr, uint64_t value, SimInstruction* instr, Unaligned
         return;
     }
 
-    // See the comments above in readW.
+    // See the comments below in readW.
     if (FixupFault() && wasm::IsPCInWasmCode(reinterpret_cast<void *>(get_pc()))) {
         char* ptr = reinterpret_cast<char*>(addr);
         memcpy(ptr, &value, sizeof(value));
@@ -1661,7 +1661,7 @@ Simulator::writeW(int32_t addr, int value, SimInstruction* instr, UnalignedPolic
         return;
     }
 
-    // See the comments below in readW.
+    // See the comments above in readW.
     if (FixupFault() && wasm::IsPCInWasmCode(reinterpret_cast<void *>(get_pc()))) {
         char* ptr = reinterpret_cast<char*>(addr);
         memcpy(ptr, &value, sizeof(value));

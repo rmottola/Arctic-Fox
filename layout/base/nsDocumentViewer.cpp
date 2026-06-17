@@ -1179,8 +1179,11 @@ nsDocumentViewer::PermitUnloadInternal(bool *aShouldPrompt,
     nsIDocument::PageUnloadingEventTimeStamp timestamp(mDocument);
 
     mInPermitUnload = true;
-    EventDispatcher::DispatchDOMEvent(window, nullptr, event, mPresContext,
-                                      nullptr);
+    {
+      Telemetry::AutoTimer<Telemetry::HANDLE_BEFOREUNLOAD_MS> telemetryTimer;
+      EventDispatcher::DispatchDOMEvent(window, nullptr, event, mPresContext,
+                                        nullptr);
+    }
     mInPermitUnload = false;
   }
 
@@ -1383,7 +1386,10 @@ nsDocumentViewer::PageHide(bool aIsUnload)
 
     nsIDocument::PageUnloadingEventTimeStamp timestamp(mDocument);
 
-    EventDispatcher::Dispatch(window, mPresContext, &event, nullptr, &status);
+    {
+      Telemetry::AutoTimer<Telemetry::HANDLE_UNLOAD_MS> telemetryTimer;
+      EventDispatcher::Dispatch(window, mPresContext, &event, nullptr, &status);
+    }
   }
 
 #ifdef MOZ_XUL
