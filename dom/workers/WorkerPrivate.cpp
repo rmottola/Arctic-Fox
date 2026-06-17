@@ -2763,7 +2763,6 @@ WorkerPrivateParent<Derived>::Thaw(nsPIDOMWindowInner* aWindow)
   // Execute queued runnables before waking up the worker, otherwise the worker
   // could post new messages before we run those that have been queued.
   if (!IsParentWindowPaused() && !mQueuedRunnables.IsEmpty()) {
-    AssertIsOnMainThread();
     MOZ_ASSERT(IsDedicatedWorker());
 
     nsTArray<nsCOMPtr<nsIRunnable>> runnables;
@@ -2816,7 +2815,6 @@ WorkerPrivateParent<Derived>::ParentWindowResumed()
   // Execute queued runnables before waking up, otherwise the worker could post
   // new messages before we run those that have been queued.
   if (!IsFrozen() && !mQueuedRunnables.IsEmpty()) {
-    AssertIsOnMainThread();
     MOZ_ASSERT(IsDedicatedWorker());
 
     nsTArray<nsCOMPtr<nsIRunnable>> runnables;
