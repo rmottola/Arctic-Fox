@@ -704,6 +704,7 @@ public:
 
       init.mData = messageData;
       init.mPorts = ports;
+      init.mSource.SetValue().SetAsClient() = client;
 
       ErrorResult rv;
       extendableEvent = ExtendableMessageEvent::Constructor(
@@ -712,7 +713,6 @@ public:
         rv.SuppressException();
         return false;
       }
-      extendableEvent->SetSource(client);
 
       domEvent = do_QueryObject(extendableEvent);
     } else {
