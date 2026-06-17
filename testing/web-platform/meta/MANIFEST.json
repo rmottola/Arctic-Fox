@@ -14915,6 +14915,10 @@
         "url": "/html-imports/fetching/loading-attempt.html"
       },
       {
+        "path": "cssom-view/mouseEvent.html",
+        "url": "/cssom-view/mouseEvent.html"
+      },
+      {
         "path": "html-imports/html-link-element/import-attribute.html",
         "url": "/html-imports/html-link-element/import-attribute.html"
       },
