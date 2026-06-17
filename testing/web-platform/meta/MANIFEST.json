@@ -24067,6 +24067,12 @@
             ],
             "url": "/svg/linking/reftests/href-use-element.html"
           }
+        ],
+        "workers/Worker_ErrorEvent_error.htm": [
+          {
+            "path": "workers/Worker_ErrorEvent_error.htm",
+            "url": "/workers/Worker_ErrorEvent_error.htm"
+          }
         ]
       }
     },
