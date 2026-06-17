@@ -400,6 +400,11 @@ public:
   }
 
   void
+  RequestErrorSteps(const ProgressEventType aEventType,
+                    const nsresult aOptionalException,
+                    ErrorResult& aRv);
+
+  void
   Abort() {
     ErrorResult rv;
     Abort(rv);
