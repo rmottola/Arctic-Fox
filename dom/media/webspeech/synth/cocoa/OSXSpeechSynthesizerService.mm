@@ -162,6 +162,7 @@ SpeechTaskCallback::OnDidFinishSpeaking()
 {
   mTask->DispatchEnd(GetTimeDurationFromStart(), mCurrentIndex);
   // no longer needed
+  [mSpeechSynthesizer setDelegate:nil];
   mTask = nullptr;
 }
 
