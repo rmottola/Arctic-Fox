@@ -13,6 +13,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/CheckedInt.h"
 #include "mozilla/dom/BlobSet.h"
+#include "mozilla/dom/DocGroup.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/FetchUtil.h"
 #include "mozilla/dom/FormData.h"
@@ -3094,6 +3095,15 @@ XMLHttpRequestMainThread::SetTimeout(uint32_t aTimeout, ErrorResult& aRv)
 }
 
 void
+XMLHttpRequestMainThread::SetTimerEventTarget(nsITimer* aTimer)
+{
+  if (nsCOMPtr<nsIGlobalObject> global = GetOwnerGlobal()) {
+    nsCOMPtr<nsIEventTarget> target = global->EventTargetFor(TaskCategory::Other);
+    aTimer->SetTarget(target);
+  }
+}
+
+void
 XMLHttpRequestMainThread::StartTimeoutTimer()
 {
   MOZ_ASSERT(mRequestSentTime,
@@ -3113,6 +3123,7 @@ XMLHttpRequestMainThread::StartTimeoutTimer()
 
   if (!mTimeoutTimer) {
     mTimeoutTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
+    SetTimerEventTarget(mTimeoutTimer);
   }
   uint32_t elapsed =
     (uint32_t)((PR_Now() - mRequestSentTime) / PR_USEC_PER_MSEC);
@@ -3588,6 +3599,7 @@ XMLHttpRequestMainThread::StartProgressEventTimer()
 {
   if (!mProgressNotifier) {
     mProgressNotifier = do_CreateInstance(NS_TIMER_CONTRACTID);
+    SetTimerEventTarget(mProgressNotifier);
   }
   if (mProgressNotifier) {
     mProgressTimerIsActive = true;
@@ -3614,6 +3626,7 @@ XMLHttpRequestMainThread::MaybeStartSyncTimeoutTimer()
   }
 
   mSyncTimeoutTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
+  SetTimerEventTarget(mSyncTimeoutTimer);
   if (!mSyncTimeoutTimer) {
     return eErrorOrExpired;
   }
@@ -3748,6 +3761,19 @@ XMLHttpRequestMainThread::BlobStoreCompleted(MutableBlobStorage* aBlobStorage,
   }
 
   ChangeStateToDone();
+}
+
+nsresult
+XMLHttpRequestMainThread::GetName(nsACString& aName)
+{
+  aName.AssignLiteral("XMLHttpRequest");
+  return NS_OK;
+}
+
+nsresult
+XMLHttpRequestMainThread::SetName(const char* aName)
+{
+  return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 // nsXMLHttpRequestXPCOMifier implementation
