@@ -4403,6 +4403,12 @@ XREMain::XRE_mainRun()
     }
   }
 
+#ifdef MOZ_STYLO
+    // This, along with the call to Servo_Initialize, should eventually move back
+    // to nsLayoutStatics.cpp.
+    Servo_Shutdown();
+#endif
+
   return rv;
 }
 
