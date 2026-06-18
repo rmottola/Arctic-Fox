@@ -458,7 +458,7 @@ public:
    * `remember' the old float manager, and install the new float
    * manager in the reflow input.
    */
-  nsresult
+  void
   CreateFloatManager(nsPresContext *aPresContext);
 
 protected:
