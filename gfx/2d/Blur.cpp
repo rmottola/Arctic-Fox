@@ -787,5 +787,11 @@ AlphaBoxBlur::CalculateBlurRadius(const Point& aStd)
     return size;
 }
 
+Float
+AlphaBoxBlur::CalculateBlurSigma(int32_t aBlurRadius)
+{
+  return aBlurRadius / GAUSSIAN_SCALE_FACTOR;
+}
+
 } // namespace gfx
 } // namespace mozilla
