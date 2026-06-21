@@ -382,6 +382,7 @@ PK11_GetSymKeyNickname
 PK11_GetTokenInfo
 PK11_GetTokenName
 PK11_GetTokenURI
+PK11_HasAttributeSet
 PK11_HashBuf
 PK11_HasRootCerts
 PK11_ImportCert
