@@ -545,6 +545,8 @@ nsMenuFrame::ToggleMenuState()
 void
 nsMenuFrame::PopupOpened()
 {
+  gMenuJustOpenedOrClosed = true;
+
   nsWeakFrame weakFrame(this);
   mContent->SetAttr(kNameSpaceID_None, nsGkAtoms::open,
                     NS_LITERAL_STRING("true"), true);
@@ -703,8 +705,6 @@ nsMenuFrame::OpenMenu(bool aSelectFirstItem)
 {
   if (!mContent)
     return;
-
-  gMenuJustOpenedOrClosed = true;
 
   nsXULPopupManager* pm = nsXULPopupManager::GetInstance();
   if (pm) {
