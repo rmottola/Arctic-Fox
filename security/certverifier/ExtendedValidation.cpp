@@ -1266,7 +1266,7 @@ bool
 CertIsAuthoritativeForEVPolicy(const UniqueCERTCertificate& cert,
                                const mozilla::pkix::CertPolicyId& policy)
 {
-  PR_ASSERT(cert);
+  MOZ_ASSERT(cert);
   if (!cert) {
     return false;
   }
