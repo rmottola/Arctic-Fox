@@ -14,9 +14,6 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/Casting.h"
 #include "mozilla/PodOperations.h"
-#ifdef ANDROID
-#include "nsPrintfCString.h"
-#endif
 #include "pk11pub.h"
 #include "pkix/pkixtypes.h"
 #include "prerror.h"
@@ -1215,22 +1212,6 @@ CertIsAuthoritativeForEVPolicy(const UniqueCERTCertificate& cert,
   return false;
 }
 
-#ifdef ANDROID
-static char sCrashReasonBuffer[1024];
-
-static void
-CrashWithReason(const char* messageFormat, const char* string,
-                PRErrorCode errorCode)
-{
-  nsPrintfCString assertionMessage(messageFormat, string, errorCode);
-  mozilla::PodArrayZero(sCrashReasonBuffer);
-  strncpy(sCrashReasonBuffer, assertionMessage.get(),
-          sizeof(sCrashReasonBuffer));
-  MOZ_CRASH_ANNOTATE(sCrashReasonBuffer);
-  MOZ_REALLY_CRASH();
-}
-#endif
-
 nsresult
 LoadExtendedValidationInfo()
 {
@@ -1240,18 +1221,10 @@ LoadExtendedValidationInfo()
   mozilla::ScopedAutoSECItem cabforumOIDItem;
   if (SEC_StringToOID(nullptr, &cabforumOIDItem, sCABForumOIDString, 0)
         != SECSuccess) {
-#ifdef ANDROID
-    CrashWithReason("SEC_StringToOID failed on '%s' with error '%d'",
-                    sCABForumOIDString, PR_GetError());
-#endif
     return NS_ERROR_FAILURE;
   }
   sCABForumEVOIDTag = RegisterOID(cabforumOIDItem, sCABForumOIDDescription);
   if (sCABForumEVOIDTag == SEC_OID_UNKNOWN) {
-#ifdef ANDROID
-    CrashWithReason("RegisterOID failed on '%s' with error '%d'",
-                    sCABForumOIDDescription, PR_GetError());
-#endif
     return NS_ERROR_FAILURE;
   }
 
