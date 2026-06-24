@@ -13,6 +13,7 @@
 #include "cert.h"
 #include "certdb.h"
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/Assertions.h"
 #include "mozilla/Casting.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/PublicSSL.h"
@@ -162,13 +163,13 @@ bool EnsureNSSInitialized(EnsureNSSOperator op)
     return true;
 
   case nssInitSucceeded:
-    NS_ASSERTION(loading, "Bad call to EnsureNSSInitialized(nssInitSucceeded)");
+    MOZ_ASSERT(loading, "Bad call to EnsureNSSInitialized(nssInitSucceeded)");
     loading = false;
     PR_AtomicSet(&haveLoaded, 1);
     return true;
 
   case nssInitFailed:
-    NS_ASSERTION(loading, "Bad call to EnsureNSSInitialized(nssInitFailed)");
+    MOZ_ASSERT(loading, "Bad call to EnsureNSSInitialized(nssInitFailed)");
     loading = false;
     MOZ_FALLTHROUGH;
 
@@ -201,7 +202,7 @@ bool EnsureNSSInitialized(EnsureNSSOperator op)
     }
 
   default:
-    NS_ASSERTION(false, "Bad operator to EnsureNSSInitialized");
+    MOZ_ASSERT_UNREACHABLE("Bad operator to EnsureNSSInitialized");
     return false;
   }
 }
@@ -258,7 +259,8 @@ nsNSSComponent::nsNSSComponent()
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsNSSComponent::ctor\n"));
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
-  NS_ASSERTION( (0 == mInstanceCount), "nsNSSComponent is a singleton, but instantiated multiple times!");
+  MOZ_ASSERT(mInstanceCount == 0,
+             "nsNSSComponent is a singleton, but instantiated multiple times!");
   ++mInstanceCount;
 }
 
@@ -1451,7 +1453,9 @@ StaticRefPtr<CipherSuiteChangeObserver> CipherSuiteChangeObserver::sObserver;
 nsresult
 CipherSuiteChangeObserver::StartObserve()
 {
-  NS_ASSERTION(NS_IsMainThread(), "CipherSuiteChangeObserver::StartObserve() can only be accessed in main thread");
+  MOZ_ASSERT(NS_IsMainThread(),
+             "CipherSuiteChangeObserver::StartObserve() can only be accessed "
+             "on the main thread");
   if (!sObserver) {
     RefPtr<CipherSuiteChangeObserver> observer = new CipherSuiteChangeObserver();
     nsresult rv = Preferences::AddStrongObserver(observer.get(), "security.");
@@ -1474,11 +1478,13 @@ CipherSuiteChangeObserver::StartObserve()
 }
 
 nsresult
-CipherSuiteChangeObserver::Observe(nsISupports* aSubject,
+CipherSuiteChangeObserver::Observe(nsISupports* /*aSubject*/,
                                    const char* aTopic,
                                    const char16_t* someData)
 {
-  NS_ASSERTION(NS_IsMainThread(), "CipherSuiteChangeObserver::Observe can only be accessed in main thread");
+  MOZ_ASSERT(NS_IsMainThread(),
+             "CipherSuiteChangeObserver::Observe can only be accessed on main "
+             "thread");
   if (nsCRT::strcmp(aTopic, NS_PREFBRANCH_PREFCHANGE_TOPIC_ID) == 0) {
     NS_ConvertUTF16toUTF8  prefName(someData);
     // Look through the cipher table and set according to pref setting
@@ -1866,9 +1872,6 @@ nsNSSComponent::InitializeNSS()
                                             ENABLED_0RTT_DATA_DEFAULT));
 
   if (NS_FAILED(InitializeCipherSuite())) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("Unable to initialize cipher suite settings\n"));
     return NS_ERROR_FAILURE;
   }
@@ -1881,18 +1884,6 @@ nsNSSComponent::InitializeNSS()
   // Note that this must occur before any calls to SSL_ClearSessionCache
   // (otherwise memory will leak).
   if (SSL_ConfigServerSessionIDCache(1000, 0, 0, nullptr) != SECSuccess) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
-    return NS_ERROR_FAILURE;
-  }
-
-  // ensure the CertBlocklist is initialised
-  nsCOMPtr<nsICertBlocklist> certList = do_GetService(NS_CERTBLOCKLIST_CONTRACTID);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(certList);
-#endif
-  if (!certList) {
     return NS_ERROR_FAILURE;
   }
 
@@ -2397,12 +2388,10 @@ namespace psm {
 nsresult
 InitializeCipherSuite()
 {
-  NS_ASSERTION(NS_IsMainThread(), "InitializeCipherSuite() can only be accessed in main thread");
+  MOZ_ASSERT(NS_IsMainThread(),
+             "InitializeCipherSuite() can only be accessed on the main thread");
 
   if (NSS_SetDomesticPolicy() != SECSuccess) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
     return NS_ERROR_FAILURE;
   }
 
