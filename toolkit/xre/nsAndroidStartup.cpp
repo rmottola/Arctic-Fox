@@ -60,7 +60,7 @@ GeckoStart(void *data, const nsXREAppData *appData)
     }
     targs.AppendElement(static_cast<char *>(nullptr));
 
-    int result = XRE_main(targs.Length() - 1, targs.Elements(), appData, 0);
+    int result = XRE_main(targs.Length() - 1, targs.Elements(), appData);
 
     if (result)
         LOG("XRE_main returned %d", result);
