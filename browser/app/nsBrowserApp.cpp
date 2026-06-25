@@ -210,7 +210,7 @@ void libFuzzerGetFuncs(const char* moduleName, LibFuzzerInitFunc* initFunc,
 }
 #endif
 
-static int do_main(int argc, char* argv[], char* envp[], nsIFile *xreDirectory)
+static int do_main(int argc, char* argv[], char* envp[])
 {
   nsCOMPtr<nsIFile> appini;
   nsresult rv;
@@ -262,7 +262,6 @@ static int do_main(int argc, char* argv[], char* envp[], nsIFile *xreDirectory)
   }
 
   XREAppData appData;
-  appData.xreDirectory = xreDirectory;
 
   if (appini) {
     rv = XRE_ParseAppData(appini, appData);
@@ -336,7 +335,7 @@ FileExists(const char *path)
 }
 
 static nsresult
-InitXPCOMGlue(const char *argv0, nsIFile **xreDirectory)
+InitXPCOMGlue(const char *argv0)
 {
   char exePath[MAXPATHLEN];
 
@@ -373,23 +372,7 @@ sizeof(XPCOM_DLL) - 1))
   // This will set this thread as the main thread.
   NS_LogInit();
 
-  if (xreDirectory) {
-    // chop XPCOM_DLL off exePath
-    *lastSlash = '\0';
-#ifdef XP_MACOSX
-    lastSlash = strrchr(exePath, XPCOM_FILE_PATH_SEPARATOR[0]);
-    strcpy(lastSlash + 1, kOSXResourcesFolder);
-#endif
-#ifdef XP_WIN
-    rv = NS_NewLocalFile(NS_ConvertUTF8toUTF16(exePath), false,
-                         xreDirectory);
-#else
-    rv = NS_NewNativeLocalFile(nsDependentCString(exePath), false,
-                               xreDirectory);
-#endif
-  }
-
-  return rv;
+  return NS_OK;
 }
 
 int main(int argc, char* argv[], char* envp[])
@@ -421,7 +404,7 @@ int main(int argc, char* argv[], char* envp[])
     }
 #endif
 
-    nsresult rv = InitXPCOMGlue(argv[0], nullptr);
+    nsresult rv = InitXPCOMGlue(argv[0]);
     if (NS_FAILED(rv)) {
       return 255;
     }
@@ -436,9 +419,7 @@ int main(int argc, char* argv[], char* envp[])
 #endif
 
 
-  nsCOMPtr<nsIFile> xreDirectory;
-
-  nsresult rv = InitXPCOMGlue(argv[0], getter_AddRefs(xreDirectory));
+  nsresult rv = InitXPCOMGlue(argv[0]);
   if (NS_FAILED(rv)) {
     return 255;
   }
@@ -449,9 +430,8 @@ int main(int argc, char* argv[], char* envp[])
   XRE_EnableSameExecutableForContentProc();
 #endif
 
-  int result = do_main(argc, argv, envp, xreDirectory);
+  int result = do_main(argc, argv, envp);
 
-  xreDirectory = nullptr;
   NS_LogTerm();
 
 #ifdef XP_MACOSX
