@@ -23,6 +23,8 @@ XPIDL_MODULE = 'xulapp'
 
 EXPORTS += ['nsAppRunner.h']
 
+EXPORTS.mozilla += ['Bootstrap.h']
+
 if CONFIG['MOZ_INSTRUMENT_EVENT_LOOP']:
     EXPORTS += ['EventTracer.h']
 
@@ -69,6 +71,7 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
     ]
 
 UNIFIED_SOURCES += [
+    'Bootstrap.cpp',
     'CreateAppData.cpp',
     'nsConsoleWriter.cpp',
     'nsNativeAppSupportBase.cpp',
