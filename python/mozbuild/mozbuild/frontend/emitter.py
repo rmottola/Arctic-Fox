@@ -107,7 +107,6 @@ ALLOWED_XPCOM_GLUE = {
     ('xpcshell', 'js/xpconnect/shell'),
     ('testcrasher', 'toolkit/crashreporter/test'),
     ('mediapipeline_unittest', 'media/webrtc/signaling/test'),
-    ('sdp_file_parser', 'media/webrtc/signaling/fuzztest'),
     ('signaling_unittests', 'media/webrtc/signaling/test'),
     ('TestMailCookie', 'mailnews/base/test'),
     ('calbasecomps', 'calendar/base/backend/libical/build'),
