@@ -64,6 +64,4 @@ GeckoStart(void *data, const nsXREAppData *appData)
 
     if (result)
         LOG("XRE_main returned %d", result);
-
-    mozilla::widget::GeckoAppShell::NotifyXreExit();
 }
