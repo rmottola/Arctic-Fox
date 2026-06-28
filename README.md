@@ -25,7 +25,7 @@ With enough swap, 1.2GB of RAM are the absolute minimum tested, 1.5GB is accepta
   * Requires MacOS-X 10.6 as a minimum build environment.
   * Install xcode, command line tools and macports. 
   * Install these via macports: 
-  *     sudo port -v install autoconf213 python27 libidl ccache yasm clang-3.7 (clang-3.7 is the minimum known to work). 
+  *     sudo port -v install m4 python27 libidl ccache yasm clang-3.7 (clang-3.7 is the minimum known to work). 
   * Extract source archive somewhere convenient. 
   * Add a sane .mozconfig (i've included some samples). 
   * From the source directory type: ./mach build 
