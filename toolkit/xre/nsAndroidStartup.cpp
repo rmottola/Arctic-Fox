@@ -18,8 +18,11 @@
 #include "nsAppRunner.h"
 #include "APKOpen.h"
 #include "nsExceptionHandler.h"
+#include "mozilla/Bootstrap.h"
 
 #define LOG(args...) __android_log_print(ANDROID_LOG_INFO, MOZ_APP_NAME, args)
+
+using namespace mozilla;
 
 extern "C" NS_EXPORT void
 GeckoStart(JNIEnv* env, char** argv, int argc, const StaticXREAppData& aAppData)
@@ -40,7 +43,11 @@ GeckoStart(JNIEnv* env, char** argv, int argc, const StaticXREAppData& aAppData)
         return;
     }
 
-    int result = XRE_main(argc, argv, appData, 0);
+    BootstrapConfig config;
+    config.appData = &aAppData;
+    config.appDataPath = nullptr;
+
+    int result = XRE_main(argc, argv, config);
 
     if (result)
         LOG("XRE_main returned %d", result);
