@@ -3985,6 +3985,10 @@ class IDLAttribute(IDLInterfaceMember):
             raise WebIDLError("An attribute with [SameObject] must have an "
                               "interface type as its type", [self.location])
 
+        if self.type.isPromise() and not self.readonly:
+            raise WebIDLError("Promise-returning attributes must be readonly",
+                              [self.location])
+
     def validate(self):
         def typeContainsChromeOnlyDictionaryMember(type):
             if (type.nullable() or
@@ -4089,6 +4093,10 @@ class IDLAttribute(IDLInterfaceMember):
             if not self.readonly:
                 raise WebIDLError("[PutForwards] is only allowed on readonly "
                                   "attributes", [attr.location, self.location])
+            if self.type.isPromise():
+                raise WebIDLError("[PutForwards] is not allowed on "
+                                  "Promise-typed attributes",
+                                  [attr.location, self.location])
             if self.isStatic():
                 raise WebIDLError("[PutForwards] is only allowed on non-static "
                                   "attributes", [attr.location, self.location])
@@ -4106,6 +4114,10 @@ class IDLAttribute(IDLInterfaceMember):
             if not self.readonly:
                 raise WebIDLError("[Replaceable] is only allowed on readonly "
                                   "attributes", [attr.location, self.location])
+            if self.type.isPromise():
+                raise WebIDLError("[Replaceable] is not allowed on "
+                                  "Promise-typed attributes",
+                                  [attr.location, self.location])
             if self.isStatic():
                 raise WebIDLError("[Replaceable] is only allowed on non-static "
                                   "attributes", [attr.location, self.location])
@@ -4120,6 +4132,10 @@ class IDLAttribute(IDLInterfaceMember):
             if not self.readonly:
                 raise WebIDLError("[LenientSetter] is only allowed on readonly "
                                   "attributes", [attr.location, self.location])
+            if self.type.isPromise():
+                raise WebIDLError("[LenientSetter] is not allowed on "
+                                  "Promise-typed attributes",
+                                  [attr.location, self.location])
             if self.isStatic():
                 raise WebIDLError("[LenientSetter] is only allowed on non-static "
                                   "attributes", [attr.location, self.location])
