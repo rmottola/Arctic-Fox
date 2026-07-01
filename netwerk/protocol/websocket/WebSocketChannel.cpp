@@ -1194,9 +1194,7 @@ WebSocketChannel::WebSocketChannel() :
   mDynamicOutputSize(0),
   mDynamicOutput(nullptr),
   mPrivateBrowsing(false),
-  mConnectionLogService(nullptr),
-  mAppId(NECKO_NO_APP_ID),
-  mIsInIsolatedMozBrowser(false)
+  mConnectionLogService(nullptr)
 {
   MOZ_ASSERT(NS_IsMainThread(), "not main thread");
 
@@ -1409,19 +1407,6 @@ WebSocketChannel::BeginOpenInternal()
     AbortSession(NS_ERROR_UNEXPECTED);
     return;
   }
-
-  if (localChannel) {
-    NS_GetAppInfo(localChannel, &mAppId, &mIsInIsolatedMozBrowser);
-  }
-
-#ifdef MOZ_WIDGET_GONK
-  if (mAppId != NECKO_NO_APP_ID) {
-    nsCOMPtr<nsINetworkInfo> activeNetworkInfo;
-    GetActiveNetworkInfo(activeNetworkInfo);
-    mActiveNetworkInfo =
-      new nsMainThreadPtrHolder<nsINetworkInfo>(activeNetworkInfo);
-  }
-#endif
 
   rv = NS_MaybeOpenChannelUsingAsyncOpen2(localChannel, this);
 
