@@ -139,9 +139,8 @@ class NeckoOriginAttributes : public OriginAttributes
 {
 public:
   NeckoOriginAttributes() {}
-  NeckoOriginAttributes(uint32_t aAppId, bool aInIsolatedMozBrowser)
+  explicit NeckoOriginAttributes(bool aInIsolatedMozBrowser)
   {
-    mAppId = aAppId;
     mInIsolatedMozBrowser = aInIsolatedMozBrowser;
   }
 
