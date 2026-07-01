@@ -1,0 +1,88 @@
+ 0:01.52 /usr/bin/make -f client.mk -s MOZ_PARALLEL_BUILD=4 -s
+ 0:50.16 Adding client.mk options from /Users/multix/code/Arctic-Fox/.mozconfig:
+ 0:50.16     AUTOCLOBBER=1
+ 0:50.16     export MOZ_AUTOMATION_BUILD_SYMBOLS=1
+ 0:50.16     export MOZ_AUTOMATION_L10N_CHECK=1
+ 0:50.16     export MOZ_AUTOMATION_PACKAGE=1
+ 0:50.16     export MOZ_AUTOMATION_PACKAGE_TESTS=1
+ 0:50.16     export MOZ_AUTOMATION_INSTALLER=0
+ 0:50.16     export MOZ_AUTOMATION_UPDATE_PACKAGING=0
+ 0:50.16     export MOZ_AUTOMATION_UPLOAD=1
+ 0:50.16     export MOZ_AUTOMATION_UPLOAD_SYMBOLS=0
+ 0:50.16     export MOZ_AUTOMATION_SDK=0
+ 0:50.16     MOZ_MAKE_FLAGS=-s -j4
+ 0:50.16     MOZ_OBJDIR=/Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0
+ 0:50.16     OBJDIR=/Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0
+ 0:50.16     FOUND_MOZCONFIG=/Users/multix/code/Arctic-Fox/.mozconfig
+ 0:50.16 Elapsed: 0.00s; From dist/public: Kept 0 existing; Added/updated 0; Removed 0 files and 0 directories.
+ 0:50.16 Elapsed: 0.00s; From dist/branding: Kept 5 existing; Added/updated 0; Removed 0 files and 0 directories.
+ 0:50.16 Elapsed: 0.01s; From dist/sdk: Kept 11 existing; Added/updated 0; Removed 3 files and 1 directories.
+ 0:50.16 Elapsed: 0.02s; From dist/private: Kept 0 existing; Added/updated 0; Removed 68 files and 2 directories.
+ 0:50.16 Elapsed: 0.65s; From dist/idl: Kept 1057 existing; Added/updated 0; Removed 0 files and 0 directories.
+ 0:50.16 Elapsed: 0.00s; From dist/xpi-stage: Kept 3 existing; Added/updated 0; Removed 0 files and 0 directories.
+ 0:50.16 Elapsed: 0.04s; From _tests: Kept 133 existing; Added/updated 0; Removed 0 files and 0 directories.
+ 0:50.16 Elapsed: 0.56s; From dist/bin: Kept 2134 existing; Added/updated 0; Removed 17 files and 2 directories.
+ 0:50.16 Elapsed: 1.57s; From dist/include: Kept 4821 existing; Added/updated 0; Removed 104 files and 2 directories.
+ 0:50.16 buildid.h
+ 0:50.16 source-repo.h
+ 0:50.16 application.ini
+ 0:50.16 application.ini.h
+ 0:50.16 cd include; /Applications/Xcode.app/Contents/Developer/usr/bin/make private_export
+ 0:50.16 cd mangle; /Applications/Xcode.app/Contents/Developer/usr/bin/make private_export
+ 0:50.16 Creating /Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0/dist/private/nss
+ 0:50.16 There are no private exports.
+ 0:50.16 Creating /Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0/dist/private/dbm
+ 0:50.16 cd src; /Applications/Xcode.app/Contents/Developer/usr/bin/make private_export
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 cd legacydb; /Applications/Xcode.app/Contents/Developer/usr/bin/make private_export
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 cd builtins; /Applications/Xcode.app/Contents/Developer/usr/bin/make private_export
+ 0:50.16 cd include; /Applications/Xcode.app/Contents/Developer/usr/bin/make export
+ 0:50.16 There are no private exports.
+ 0:50.16 Creating /Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0/dist/include/dbm
+ 0:50.16 There are no private exports.
+ 0:50.16 cd src; /Applications/Xcode.app/Contents/Developer/usr/bin/make export
+ 0:50.16 There are no private exports.
+ 0:50.16 cd mangle; /Applications/Xcode.app/Contents/Developer/usr/bin/make export
+ 0:50.16 Creating /Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0/dist/include/nss
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 Elapsed: 0.38s; From ../../dist/idl: Kept 1057 existing; Added/updated 0; Removed 0 files and 0 directories.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 cd legacydb; /Applications/Xcode.app/Contents/Developer/usr/bin/make export
+ 0:50.16 There are no private exports.
+ 0:50.16 cd legacydb; /Applications/Xcode.app/Contents/Developer/usr/bin/make private_export
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 cd builtins; /Applications/Xcode.app/Contents/Developer/usr/bin/make export
+ 0:50.16 cd builtins; /Applications/Xcode.app/Contents/Developer/usr/bin/make private_export
+ 0:50.16 There are no private exports.
+ 0:50.16 There are no private exports.
+ 0:50.16 libgkmedias.a.desc
+ 0:50.16 arcticfox
+ 0:50.16 cd include; /Applications/Xcode.app/Contents/Developer/usr/bin/make libs
+ 0:50.16 cd src; /Applications/Xcode.app/Contents/Developer/usr/bin/make libs
+ 0:50.16 ../../../config/nsinstall: cannot access /Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0/dist/lib/libcrmf.a: No such file or directory
+ 0:50.16 make[5]: *** [/Users/multix/code/Arctic-Fox/obj-x86_64-apple-darwin19.6.0/dist/sdk/lib/libcrmf.a] Error 1
+ 0:50.16 make[5]: *** Waiting for unfinished jobs....
+ 0:50.16 cd builtins; /Applications/Xcode.app/Contents/Developer/usr/bin/make libs
+ 0:50.16 make[4]: *** [config/external/nss/target] Error 2
+ 0:50.16 make[3]: *** [compile] Error 2
+ 0:50.16 make[2]: *** [default] Error 2
+ 0:50.16 make[1]: *** [realbuild] Error 2
+ 0:50.16 make: *** [build] Error 2
+ 0:50.21 488 compiler warnings present.
