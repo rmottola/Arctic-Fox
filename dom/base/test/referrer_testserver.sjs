@@ -158,6 +158,8 @@ function handleRequest(request, response) {
   var schemeFrom = params.get("SCHEME_FROM") || "http";
   var schemeTo = params.get("SCHEME_TO") || "http";
 
+  response.setHeader("Access-Control-Allow-Origin", "*", false);
+
   if (action === "resetState") {
     setSharedState(SHARED_KEY, "{}");
     response.write("");
@@ -311,6 +313,11 @@ function handleRequest(request, response) {
   if (action === "generate-iframe-redirect-policy-test") {
     response.write(createIframeTestPageUsingRefferer(metaPolicy, attributePolicy, newAttributePolicy, name, params,
                                                      schemeFrom, schemeTo));
+    return;
+  }
+
+  if (action === "generate-fetch-user-control-policy-test") {
+    response.write(createFetchUserControlRPTestCase(name, schemeFrom, schemeTo));
     return;
   }
 
