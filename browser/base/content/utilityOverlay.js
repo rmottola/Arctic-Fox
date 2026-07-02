@@ -96,7 +96,7 @@ function openUILink(url, event, aIgnoreButton, aIgnoreAlt, aAllowThirdPartyFixup
       allowThirdPartyFixup: aAllowThirdPartyFixup,
       postData: aPostData,
       referrerURI: aReferrerURI,
-      referrerPolicy: Components.interfaces.nsIHttpChannel.REFERRER_POLICY_DEFAULT,
+      referrerPolicy: Components.interfaces.nsIHttpChannel.REFERRER_POLICY_UNSET,
       initiatingDoc: event ? event.target.ownerDocument : null,
     };
   }
@@ -192,7 +192,7 @@ function openUILinkIn(url, where, aAllowThirdPartyFixup, aPostData, aReferrerURI
       allowThirdPartyFixup: aAllowThirdPartyFixup,
       postData: aPostData,
       referrerURI: aReferrerURI,
-      referrerPolicy: Components.interfaces.nsIHttpChannel.REFERRER_POLICY_DEFAULT,
+      referrerPolicy: Components.interfaces.nsIHttpChannel.REFERRER_POLICY_UNSET,
     };
   }
 
@@ -213,7 +213,7 @@ function openLinkIn(url, where, params) {
   var aCharset              = params.charset;
   var aReferrerURI          = params.referrerURI;
   var aReferrerPolicy       = ('referrerPolicy' in params ?
-      params.referrerPolicy : Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT);
+      params.referrerPolicy : Ci.nsIHttpChannel.REFERRER_POLICY_UNSET);
   var aRelatedToCurrent     = params.relatedToCurrent;
   var aAllowMixedContent    = params.allowMixedContent;
   var aInBackground         = params.inBackground;
