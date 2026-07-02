@@ -1324,7 +1324,7 @@ Console::MethodInternal(JSContext* aCx, MethodName aMethodName,
       MOZ_ASSERT(workerPrivate);
 
       TimeDuration duration =
-        mozilla::TimeStamp::Now() - workerPrivate->NowBaseTimeStamp();
+        mozilla::TimeStamp::Now() - workerPrivate->CreationTimeStamp();
 
       monotonicTimer = duration.ToMilliseconds();
     }
