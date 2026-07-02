@@ -1383,7 +1383,7 @@ GetExpandedPrincipal(JSContext* cx, HandleObject arrayObj,
 
             if (!options.originAttributes) {
                 const PrincipalOriginAttributes prinAttrs =
-                    BasePrincipal::Cast(principal)->OriginAttributesRef();
+                    principal->OriginAttributesRef();
                 if (attrs.isNothing()) {
                     attrs.emplace(prinAttrs);
                 } else if (prinAttrs != attrs.ref()) {

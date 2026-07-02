@@ -3585,7 +3585,7 @@ nsDocShell::CanAccessItem(nsIDocShellTreeItem* aTargetItem,
         nsCOMPtr<nsIPrincipal> accessingPrincipal = accessingDoc->NodePrincipal();
 
         accessingOA.mFirstPartyDomain =
-          BasePrincipal::Cast(accessingPrincipal)->OriginAttributesRef().mFirstPartyDomain;
+          accessingPrincipal->OriginAttributesRef().mFirstPartyDomain;
       }
     }
 
@@ -3599,7 +3599,7 @@ nsDocShell::CanAccessItem(nsIDocShellTreeItem* aTargetItem,
         nsCOMPtr<nsIPrincipal> targetPrincipal = targetDoc->NodePrincipal();
 
         targetOA.mFirstPartyDomain =
-          BasePrincipal::Cast(targetPrincipal)->OriginAttributesRef().mFirstPartyDomain;
+          targetPrincipal->OriginAttributesRef().mFirstPartyDomain;
       }
     }
   }
@@ -7995,7 +7995,7 @@ nsDocShell::CreateAboutBlankContentViewer(nsIPrincipal* aPrincipal,
   if (aPrincipal && !nsContentUtils::IsSystemPrincipal(aPrincipal) &&
       mItemType != typeChrome) {
     MOZ_ASSERT(ChromeUtils::IsOriginAttributesEqualIgnoringAddonId(
-      BasePrincipal::Cast(aPrincipal)->OriginAttributesRef(),
+      aPrincipal->OriginAttributesRef(),
       mOriginAttributes));
   }
 

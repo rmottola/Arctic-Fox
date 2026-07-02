@@ -2339,7 +2339,7 @@ nsHttpHandler::SpeculativeConnectInternal(nsIURI *aURI,
     // loadContext.
     if (aPrincipal) {
         neckoOriginAttributes.InheritFromDocToNecko(
-            BasePrincipal::Cast(aPrincipal)->OriginAttributesRef());
+            aPrincipal->OriginAttributesRef());
     } else if (loadContext) {
         DocShellOriginAttributes docshellOriginAttributes;
         loadContext->GetOriginAttributes(docshellOriginAttributes);
