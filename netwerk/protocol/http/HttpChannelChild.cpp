@@ -2898,5 +2898,12 @@ HttpChannelChild::ShouldInterceptURI(nsIURI* aURI,
   return ShouldIntercept(upgradedURI ? upgradedURI.get() : aURI);
 }
 
+mozilla::ipc::IPCResult
+HttpChannelChild::RecvSetPriority(const uint16_t& aPriority)
+{
+  mPriority = aPriority;
+  return IPC_OK();
+}
+
 } // namespace net
 } // namespace mozilla
