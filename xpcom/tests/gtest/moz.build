@@ -49,6 +49,7 @@ if CONFIG['WRAP_STL_INCLUDES'] and not CONFIG['CLANG_CL']:
 # the global namespace for other files.
 SOURCES += [
     'TestAllocReplacement.cpp',
+    'TestCOMArray.cpp',
     'TestCOMPtr.cpp', # Redefines IFoo and IBar
     'TestHashtables.cpp', # Redefines IFoo
     'TestNsRefPtr.cpp', # Redefines Foo
