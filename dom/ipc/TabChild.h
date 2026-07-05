@@ -434,7 +434,7 @@ public:
 
   virtual PDocAccessibleChild*
   AllocPDocAccessibleChild(PDocAccessibleChild*, const uint64_t&,
-                           const uint32_t&) override;
+                           const uint32_t&, const IAccessibleHolder&) override;
 
   virtual bool DeallocPDocAccessibleChild(PDocAccessibleChild*) override;
 
