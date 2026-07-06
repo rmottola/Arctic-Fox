@@ -489,6 +489,7 @@ IsMessageMouseUserActivity(EventMessage aMessage)
   return aMessage == eMouseMove ||
          aMessage == eMouseUp ||
          aMessage == eMouseDown ||
+         aMessage == eMouseAuxClick ||
          aMessage == eMouseDoubleClick ||
          aMessage == eMouseClick ||
          aMessage == eMouseActivate ||
@@ -4703,7 +4704,7 @@ EventStateManager::CheckForAndDispatchClick(WidgetMouseEvent* aEvent,
 
       if (NS_SUCCEEDED(ret) && aEvent->mClickCount == 2 &&
           mouseContent && mouseContent->IsInComposedDoc()) {
-        // fire double click
+        //fire double click
         ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseDoubleClick,
                                         presShell, mouseContent, currentTarget,
                                         notDispatchToContents);
