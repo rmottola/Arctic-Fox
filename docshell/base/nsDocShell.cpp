@@ -10593,7 +10593,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
 
   if (browserChrome3 && aCheckForPrerender) {
     nsCOMPtr<nsIRunnable> ev =
-      new InternalLoadEvent(this, aURI, aOriginalURI, aLoadReplace,
+      new InternalLoadEvent(this, aURI, aOriginalURI, aLoadReplace, aIsFromProcessingFrameAttributes,
                             aReferrer, aReferrerPolicy,
                             aTriggeringPrincipal, principalToInherit,
                             aFlags, aTypeHint, aPostData, aHeadersData,
