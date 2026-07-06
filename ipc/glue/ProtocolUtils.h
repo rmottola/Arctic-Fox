@@ -382,6 +382,9 @@ public:
     virtual already_AddRefed<nsIEventTarget>
     GetMessageEventTarget(const Message& aMsg);
 
+    already_AddRefed<nsIEventTarget>
+    GetActorEventTarget(IProtocol* aActor);
+
 protected:
     virtual already_AddRefed<nsIEventTarget>
     GetConstructedEventTarget(const Message& aMsg) { return nullptr; }
