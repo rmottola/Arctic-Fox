@@ -16,6 +16,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/Casting.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/PodOperations.h"
 #include "mozilla/PublicSSL.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
@@ -39,6 +40,7 @@
 #include "nsNSSCertificateDB.h"
 #include "nsNSSHelper.h"
 #include "nsNSSShutDown.h"
+#include "nsPrintfCString.h"
 #include "nsServiceManagerUtils.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
@@ -1699,9 +1701,6 @@ GetNSSProfilePath(nsAutoCString& aProfilePath)
 #else
   rv = profileFile->GetNativePath(aProfilePath);
 #endif
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error,
            ("Could not get native path for profile directory.\n"));
@@ -1729,9 +1728,6 @@ nsNSSComponent::InitializeNSS()
 
   MutexAutoLock lock(mutex);
 
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(!mNSSInitialized);
-#endif
   if (mNSSInitialized) {
     // We should never try to initialize NSS more than once in a process.
     MOZ_ASSERT_UNREACHABLE("Trying to initialize NSS twice");
@@ -1750,9 +1746,6 @@ nsNSSComponent::InitializeNSS()
 
   nsAutoCString profileStr;
   nsresult rv = GetNSSProfilePath(profileStr);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -1766,9 +1759,6 @@ nsNSSComponent::InitializeNSS()
   // modules will be loaded).
   if (runtime) {
     rv = runtime->GetInSafeMode(&inSafeMode);
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
     if (NS_FAILED(rv)) {
       return rv;
     }
@@ -1793,14 +1783,8 @@ nsNSSComponent::InitializeNSS()
   // pref has been set to "true", attempt to initialize with no DB.
   if (nocertdb || init_rv != SECSuccess) {
     init_rv = NSS_NoDB_Init(nullptr);
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(init_rv == SECSuccess);
-#endif
   }
   if (init_rv != SECSuccess) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("could not initialize NSS - panicking\n"));
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -1822,9 +1806,6 @@ nsNSSComponent::InitializeNSS()
   SSL_OptionSetDefault(SSL_V2_COMPATIBLE_HELLO, false);
 
   rv = setEnabledTLSVersions();
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     return NS_ERROR_UNEXPECTED;
   }
@@ -1833,9 +1814,6 @@ nsNSSComponent::InitializeNSS()
   LoadLoadableRoots();
 
   rv = LoadExtendedValidationInfo();
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("failed to load EV info"));
     return rv;
@@ -1899,9 +1877,6 @@ nsNSSComponent::InitializeNSS()
   // Initialize the site security service
   nsCOMPtr<nsISiteSecurityService> sssService =
     do_GetService(NS_SSSERVICE_CONTRACTID);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(sssService);
-#endif
   if (!sssService) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("Cannot initialize site security service\n"));
     return NS_ERROR_FAILURE;
@@ -1910,9 +1885,6 @@ nsNSSComponent::InitializeNSS()
   // Initialize the cert override service
   nsCOMPtr<nsICertOverrideService> coService =
     do_GetService(NS_CERTOVERRIDE_CONTRACTID);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(coService);
-#endif
   if (!coService) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("Cannot initialize cert override service\n"));
     return NS_ERROR_FAILURE;
@@ -1984,9 +1956,6 @@ nsNSSComponent::Init()
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("Beginning NSS initialization\n"));
 
   rv = InitializePIPNSSBundle();
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("Unable to create pipnss bundle.\n"));
     return rv;
@@ -2007,9 +1976,6 @@ nsNSSComponent::Init()
 
 
   rv = InitializeNSS();
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error,
             ("nsNSSComponent::InitializeNSS() failed\n"));
@@ -2167,9 +2133,6 @@ nsNSSComponent::RegisterObservers()
 
   nsCOMPtr<nsIObserverService> observerService(
     do_GetService("@mozilla.org/observer-service;1"));
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(observerService);
-#endif
   if (!observerService) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
             ("nsNSSComponent: couldn't get observer service\n"));
