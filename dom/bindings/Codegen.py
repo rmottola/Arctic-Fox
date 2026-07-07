@@ -3125,23 +3125,6 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
         else:
             unforgeableHolderSetup = None
 
-        if self.descriptor.name == "Promise":
-            speciesSetup = CGGeneric(fill(
-                """
-                #ifndef SPIDERMONKEY_PROMISE
-                JS::Rooted<JSObject*> promiseConstructor(aCx, *interfaceCache);
-                JS::Rooted<jsid> species(aCx,
-                  SYMBOL_TO_JSID(JS::GetWellKnownSymbol(aCx, JS::SymbolCode::species)));
-                if (!JS_DefinePropertyById(aCx, promiseConstructor, species, JS::UndefinedHandleValue,
-                                           JSPROP_SHARED, Promise::PromiseSpecies, nullptr)) {
-                  $*{failureCode}
-                }
-                #endif // SPIDERMONKEY_PROMISE
-                """,
-                failureCode=failureCode))
-        else:
-            speciesSetup = None
-
         if (self.descriptor.interface.isOnGlobalProtoChain() and
             needInterfacePrototypeObject):
             makeProtoPrototypeImmutable = CGGeneric(fill(
@@ -3167,7 +3150,7 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
         return CGList(
             [getParentProto, getConstructorProto, initIds,
              prefCache, CGGeneric(call), defineAliases, unforgeableHolderSetup,
-             speciesSetup, makeProtoPrototypeImmutable],
+             makeProtoPrototypeImmutable],
             "\n").define()
 
 
@@ -5406,7 +5389,6 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
                     $*{exceptionCode}
                   }
                   binding_detail::FastErrorResult promiseRv;
-                #ifdef SPIDERMONKEY_PROMISE
                   nsCOMPtr<nsIGlobalObject> global =
                     do_QueryInterface(promiseGlobal.GetAsSupports());
                   if (!global) {
@@ -5419,26 +5401,6 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
                   if (promiseRv.MaybeSetPendingException(cx)) {
                     $*{exceptionCode}
                   }
-                #else
-                  JS::Handle<JSObject*> promiseCtor =
-                    PromiseBinding::GetConstructorObjectHandle(cx);
-                  if (!promiseCtor) {
-                    $*{exceptionCode}
-                  }
-                  JS::Rooted<JS::Value> resolveThisv(cx, JS::ObjectValue(*promiseCtor));
-                  JS::Rooted<JS::Value> resolveResult(cx);
-                  Promise::Resolve(promiseGlobal, resolveThisv, valueToResolve,
-                                   &resolveResult, promiseRv);
-                  if (promiseRv.MaybeSetPendingException(cx)) {
-                    $*{exceptionCode}
-                  }
-                  nsresult unwrapRv = UNWRAP_OBJECT(Promise, &resolveResult.toObject(), $${declName});
-                  if (NS_FAILED(unwrapRv)) { // Quite odd
-                    promiseRv.Throw(unwrapRv);
-                    promiseRv.MaybeSetPendingException(cx);
-                    $*{exceptionCode}
-                  }
-                #endif // SPIDERMONKEY_PROMISE
                 }
                 """,
                 getPromiseGlobal=getPromiseGlobal,
