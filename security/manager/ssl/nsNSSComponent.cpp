@@ -2193,7 +2193,7 @@ setPassword(PK11SlotInfo* slot, nsIInterfaceRequestor* ctx,
 
     bool canceled;
     NS_ConvertUTF8toUTF16 tokenName(PK11_GetTokenName(slot));
-    rv = dialogs->SetPassword(ctx, tokenName.get(), &canceled);
+    rv = dialogs->SetPassword(ctx, tokenName, &canceled);
     if (NS_FAILED(rv)) {
       return rv;
     }
