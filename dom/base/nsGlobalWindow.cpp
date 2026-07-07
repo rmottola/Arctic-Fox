@@ -2777,8 +2777,7 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
           newInnerWindow->mPerformance =
             Performance::CreateForMainThread(newInnerWindow->AsInner(),
                                              currentInner->mPerformance->GetDOMTiming(),
-                                             currentInner->mPerformance->GetChannel(),
-                                             currentInner->mPerformance->GetParentPerformance());
+                                             currentInner->mPerformance->GetChannel());
         }
       }
 
@@ -3878,22 +3877,7 @@ nsPIDOMWindowInner::CreatePerformanceObjectIfNeeded()
     timedChannel = nullptr;
   }
   if (timing) {
-    // If we are dealing with an iframe, we will need the parent's performance
-    // object (so we can add the iframe as a resource of that page).
-    Performance* parentPerformance = nullptr;
-    nsCOMPtr<nsPIDOMWindowOuter> parentWindow = GetScriptableParentOrNull();
-    if (parentWindow) {
-      nsPIDOMWindowInner* parentInnerWindow = nullptr;
-      if (parentWindow) {
-        parentInnerWindow = parentWindow->GetCurrentInnerWindow();
-      }
-      if (parentInnerWindow) {
-        parentPerformance = parentInnerWindow->GetPerformance();
-      }
-    }
-    mPerformance =
-      Performance::CreateForMainThread(this, timing, timedChannel,
-                                       parentPerformance);
+    mPerformance = Performance::CreateForMainThread(this, timing, timedChannel);
   }
 }
 
