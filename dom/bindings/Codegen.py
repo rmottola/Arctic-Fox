@@ -6986,6 +6986,13 @@ def needScopeObject(returnType, arguments, extendedAttributes,
              any(typeNeedsScopeObject(a.type) for a in arguments)))
 
 
+def callerTypeGetterForDescriptor(descriptor):
+    if descriptor.interface.isExposedInAnyWorker():
+        systemCallerGetter = "nsContentUtils::ThreadsafeIsSystemCaller"
+    else:
+        systemCallerGetter = "nsContentUtils::IsSystemCaller"
+    return "%s(cx) ? CallerType::System : CallerType::NonSystem" % systemCallerGetter
+
 class CGCallGenerator(CGThing):
     """
     A class to generate an actual call to a C++ object.  Assumes that the C++
@@ -7068,11 +7075,7 @@ class CGCallGenerator(CGThing):
             args.append(CGGeneric("subjectPrincipal"))
 
         if needsCallerType:
-            if descriptor.interface.isExposedInAnyWorker():
-                systemCallerGetter = "nsContentUtils::ThreadsafeIsSystemCaller"
-            else:
-                systemCallerGetter = "nsContentUtils::IsSystemCaller"
-            args.append(CGGeneric("%s(cx) ? CallerType::System : CallerType::NonSystem" % systemCallerGetter))
+            args.append(CGGeneric(callerTypeGetterForDescriptor(descriptor)))
 
         if isFallible:
             args.append(CGGeneric("rv"))
@@ -11635,18 +11638,24 @@ class CGDOMJSProxyHandler_ownPropNames(ClassMethod):
         self.descriptor = descriptor
 
     def getBody(self):
-        # Per spec, we do indices, then named props, then everything else
+        # Per spec, we do indices, then named props, then everything else.
         if self.descriptor.supportsIndexedProperties():
-            addIndices = dedent("""
+            if self.descriptor.lengthNeedsCallerType():
+                callerType = callerTypeGetterForDescriptor(self.descriptor)
+            else:
+                callerType = ""
+            addIndices = fill(
+                """
 
-                uint32_t length = UnwrapProxy(proxy)->Length();
+                uint32_t length = UnwrapProxy(proxy)->Length(${callerType});
                 MOZ_ASSERT(int32_t(length) >= 0);
                 for (int32_t i = 0; i < int32_t(length); ++i) {
                   if (!props.append(INT_TO_JSID(i))) {
                     return false;
                   }
                 }
-                """)
+                """,
+                callerType=callerType)
         else:
             addIndices = ""
 
@@ -11987,6 +11996,11 @@ class CGDOMJSProxyHandler_getElements(ClassMethod):
         }
         get = CGProxyIndexedGetter(self.descriptor, templateValues, False, False).define()
 
+        if self.descriptor.lengthNeedsCallerType():
+            callerType = callerTypeGetterForDescriptor(self.descriptor)
+        else:
+            callerType = ""
+
         return fill(
             """
             JS::Rooted<JS::Value> temp(cx);
@@ -11994,7 +12008,7 @@ class CGDOMJSProxyHandler_getElements(ClassMethod):
                        "Should not have a XrayWrapper here");
 
             ${nativeType}* self = UnwrapProxy(proxy);
-            uint32_t length = self->Length();
+            uint32_t length = self->Length(${callerType});
             // Compute the end of the indices we'll get ourselves
             uint32_t ourEnd = std::max(begin, std::min(end, length));
 
@@ -12013,6 +12027,7 @@ class CGDOMJSProxyHandler_getElements(ClassMethod):
             return true;
             """,
             nativeType=self.descriptor.nativeType,
+            callerType=callerType,
             get=get)
 
 
