@@ -227,7 +227,7 @@ nsSiteSecurityService::Init()
 {
   // Don't access Preferences off the main thread.
   if (!NS_IsMainThread()) {
-    NS_NOTREACHED("nsSiteSecurityService initialized off main thread");
+    MOZ_ASSERT_UNREACHABLE("nsSiteSecurityService initialized off main thread");
     return NS_ERROR_NOT_SAME_THREAD;
   }
 
@@ -1379,13 +1379,12 @@ nsSiteSecurityService::SetHPKPState(const char* aHost, SiteHPKPState& entry,
 //------------------------------------------------------------
 
 NS_IMETHODIMP
-nsSiteSecurityService::Observe(nsISupports *subject,
-                               const char *topic,
-                               const char16_t *data)
+nsSiteSecurityService::Observe(nsISupports* /*subject*/, const char* topic,
+                               const char16_t* /*data*/)
 {
   // Don't access Preferences off the main thread.
   if (!NS_IsMainThread()) {
-    NS_NOTREACHED("Preferences accessed off main thread");
+    MOZ_ASSERT_UNREACHABLE("Preferences accessed off main thread");
     return NS_ERROR_NOT_SAME_THREAD;
   }
 
