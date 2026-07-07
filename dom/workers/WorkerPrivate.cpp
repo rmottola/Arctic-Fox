@@ -4461,7 +4461,7 @@ WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
       loadInfo.mFromWindow = false;
       loadInfo.mWindowID = UINT64_MAX;
       loadInfo.mStorageAllowed = true;
-      loadInfo.mOriginAttributes = PrincipalOriginAttributes();
+      loadInfo.mOriginAttributes = OriginAttributes();
     }
 
     MOZ_ASSERT(loadInfo.mPrincipal);

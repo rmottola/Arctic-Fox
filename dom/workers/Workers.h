@@ -270,7 +270,7 @@ struct WorkerLoadInfo
   bool mPrincipalIsSystem;
   bool mStorageAllowed;
   bool mServiceWorkersTestingInWindow;
-  PrincipalOriginAttributes mOriginAttributes;
+  OriginAttributes mOriginAttributes;
 
   WorkerLoadInfo();
   ~WorkerLoadInfo();

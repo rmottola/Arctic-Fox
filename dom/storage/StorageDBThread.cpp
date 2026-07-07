@@ -53,7 +53,7 @@ Scheme0Scope(StorageCacheBridge* aCache)
 
   nsCString suffix = aCache->OriginSuffix();
 
-  PrincipalOriginAttributes oa;
+  OriginAttributes oa;
   if (!suffix.IsEmpty()) {
     DebugOnly<bool> success = oa.PopulateFromSuffix(suffix);
     MOZ_ASSERT(success);
@@ -766,7 +766,7 @@ OriginAttrsPatternMatchSQLFunction::OnFunctionCall(
   rv = aFunctionArguments->GetUTF8String(0, suffix);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  PrincipalOriginAttributes oa;
+  OriginAttributes oa;
   bool success = oa.PopulateFromSuffix(suffix);
   NS_ENSURE_TRUE(success, NS_ERROR_FAILURE);
   bool result = mPattern.Matches(oa);
@@ -1206,7 +1206,7 @@ namespace {
 bool OriginPatternMatches(const nsACString& aOriginSuffix,
                           const OriginAttributesPattern& aPattern)
 {
-  PrincipalOriginAttributes oa;
+  OriginAttributes oa;
   DebugOnly<bool> rv = oa.PopulateFromSuffix(aOriginSuffix);
   MOZ_ASSERT(rv);
   return aPattern.Matches(oa);
