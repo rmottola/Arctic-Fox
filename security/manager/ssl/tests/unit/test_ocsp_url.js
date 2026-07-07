@@ -86,7 +86,7 @@ function run_test() {
 
   add_test(function() {
     clearOCSPCache();
-    let ocspResponder = start_ocsp_responder(["no-path-url"], ['']);
+    let ocspResponder = start_ocsp_responder(["no-path-url"], [""]);
     check_cert_err("no-path-url", PRErrorCodeSuccess);
     ocspResponder.stop(run_next_test);
   });
