@@ -84,6 +84,8 @@ CertificateTransparencyInfo::Reset()
 CertVerifier::CertVerifier(OcspDownloadConfig odc,
                            OcspStrictConfig osc,
                            OcspGetConfig ogc,
+                           mozilla::TimeDuration ocspTimeoutSoft,
+                           mozilla::TimeDuration ocspTimeoutHard,
                            uint32_t certShortLifetimeInDays,
                            PinningMode pinningMode,
                            SHA1Mode sha1Mode,
@@ -93,6 +95,8 @@ CertVerifier::CertVerifier(OcspDownloadConfig odc,
   : mOCSPDownloadConfig(odc)
   , mOCSPStrict(osc == ocspStrict)
   , mOCSPGETEnabled(ogc == ocspGetEnabled)
+  , mOCSPTimeoutSoft(ocspTimeoutSoft)
+  , mOCSPTimeoutHard(ocspTimeoutHard)
   , mCertShortLifetimeInDays(certShortLifetimeInDays)
   , mPinningMode(pinningMode)
   , mSHA1Mode(sha1Mode)
@@ -529,6 +533,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
       // just use trustEmail as it is the closest alternative.
       NSSCertDBTrustDomain trustDomain(trustEmail, defaultOCSPFetching,
                                        mOCSPCache, pinArg, ocspGETConfig,
+                                       mOCSPTimeoutSoft, mOCSPTimeoutHard,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
@@ -605,6 +610,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
         NSSCertDBTrustDomain
           trustDomain(trustSSL, evOCSPFetching,
                       mOCSPCache, pinArg, ocspGETConfig,
+                      mOCSPTimeoutSoft, mOCSPTimeoutHard,
                       mCertShortLifetimeInDays, mPinningMode, MIN_RSA_BITS,
                       ValidityCheckingMode::CheckForEV,
                       sha1ModeConfigurations[i], mNetscapeStepUpPolicy,
@@ -691,6 +697,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
 
           NSSCertDBTrustDomain trustDomain(trustSSL, defaultOCSPFetching,
                                            mOCSPCache, pinArg, ocspGETConfig,
+                                           mOCSPTimeoutSoft, mOCSPTimeoutHard,
                                            mCertShortLifetimeInDays,
                                            mPinningMode, keySizeOptions[i],
                                            ValidityCheckingMode::CheckingOff,
@@ -755,6 +762,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
     case certificateUsageSSLCA: {
       NSSCertDBTrustDomain trustDomain(trustSSL, defaultOCSPFetching,
                                        mOCSPCache, pinArg, ocspGETConfig,
+                                       mOCSPTimeoutSoft, mOCSPTimeoutHard,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
@@ -771,6 +779,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
     case certificateUsageEmailSigner: {
       NSSCertDBTrustDomain trustDomain(trustEmail, defaultOCSPFetching,
                                        mOCSPCache, pinArg, ocspGETConfig,
+                                       mOCSPTimeoutSoft, mOCSPTimeoutHard,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
@@ -799,6 +808,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
       // based on the result of the verification(s).
       NSSCertDBTrustDomain trustDomain(trustEmail, defaultOCSPFetching,
                                        mOCSPCache, pinArg, ocspGETConfig,
+                                       mOCSPTimeoutSoft, mOCSPTimeoutHard,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
@@ -824,6 +834,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
     case certificateUsageObjectSigner: {
       NSSCertDBTrustDomain trustDomain(trustObjectSigning, defaultOCSPFetching,
                                        mOCSPCache, pinArg, ocspGETConfig,
+                                       mOCSPTimeoutSoft, mOCSPTimeoutHard,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
@@ -858,7 +869,8 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
       }
 
       NSSCertDBTrustDomain sslTrust(trustSSL, defaultOCSPFetching, mOCSPCache,
-                                    pinArg, ocspGETConfig, mCertShortLifetimeInDays,
+                                    pinArg, ocspGETConfig, mOCSPTimeoutSoft,
+                                    mOCSPTimeoutHard, mCertShortLifetimeInDays,
                                     pinningDisabled, MIN_RSA_BITS_WEAK,
                                     ValidityCheckingMode::CheckingOff,
                                     SHA1Mode::Allowed,
@@ -871,6 +883,7 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
       if (rv == Result::ERROR_UNKNOWN_ISSUER) {
         NSSCertDBTrustDomain emailTrust(trustEmail, defaultOCSPFetching,
                                         mOCSPCache, pinArg, ocspGETConfig,
+                                        mOCSPTimeoutSoft, mOCSPTimeoutHard,
                                         mCertShortLifetimeInDays,
                                         pinningDisabled, MIN_RSA_BITS_WEAK,
                                         ValidityCheckingMode::CheckingOff,
@@ -883,8 +896,11 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                             stapledOCSPResponse);
         if (rv == Result::ERROR_UNKNOWN_ISSUER) {
           NSSCertDBTrustDomain objectSigningTrust(trustObjectSigning,
-                                                  defaultOCSPFetching, mOCSPCache,
-                                                  pinArg, ocspGETConfig,
+                                                  defaultOCSPFetching,
+                                                  mOCSPCache, pinArg,
+                                                  ocspGETConfig,
+                                                  mOCSPTimeoutSoft,
+                                                  mOCSPTimeoutHard,
                                                   mCertShortLifetimeInDays,
                                                   pinningDisabled,
                                                   MIN_RSA_BITS_WEAK,
