@@ -1105,7 +1105,7 @@ function getObjectForLocalOrSessionStorage(type) {
      * Given a url, correctly determine its protocol + hostname part.
      */
     getSchemaAndHost(url) {
-      let uri = Services.io.newURI(url, null, null);
+      let uri = Services.io.newURI(url);
       if (!uri.host) {
         return uri.spec;
       }
@@ -1145,7 +1145,7 @@ StorageActors.createActor({
   typeName: "Cache"
 }, {
   getCachesForHost: Task.async(function* (host) {
-    let uri = Services.io.newURI(host, null, null);
+    let uri = Services.io.newURI(host);
     let principal =
       Services.scriptSecurityManager.getNoAppCodebasePrincipal(uri);
 
@@ -1256,7 +1256,7 @@ StorageActors.createActor({
    * Given a url, correctly determine its protocol + hostname part.
    */
   getSchemaAndHost(url) {
-    let uri = Services.io.newURI(url, null, null);
+    let uri = Services.io.newURI(url);
     return uri.scheme + "://" + uri.hostPort;
   },
 
