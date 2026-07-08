@@ -2689,7 +2689,7 @@ public:
                      void* aClosure) const override
   {
     const JS::Value& val = aValue->unbarrieredGet();
-    if (val.isMarkable() && ValueIsGrayCCThing(val)) {
+    if (val.isGCThing() && ValueIsGrayCCThing(val)) {
       MOZ_ASSERT(!js::gc::IsInsideNursery(val.toGCThing()));
       mCollector->GetJSPurpleBuffer()->mValues.InfallibleAppend(val);
     }
