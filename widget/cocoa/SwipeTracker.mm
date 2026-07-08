@@ -7,6 +7,7 @@
 #include "SwipeTracker.h"
 
 #include "InputData.h"
+#include "mozilla/FlushType.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/TouchEvents.h"
 #include "nsAlgorithm.h"
@@ -150,7 +151,7 @@ SwipeTracker::StartAnimating(double aTargetValue)
   // unregister ourselves.
   MOZ_ASSERT(!mRegisteredWithRefreshDriver);
   if (mRefreshDriver) {
-    mRefreshDriver->AddRefreshObserver(this, Flush_Style);
+    mRefreshDriver->AddRefreshObserver(this, FlushType::Style);
     mRegisteredWithRefreshDriver = true;
   }
 }
