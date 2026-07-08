@@ -545,7 +545,7 @@ public:
       nsCOMPtr<nsIPresShell> shell = mFrame->PresContext()->PresShell();
       shell->FrameNeedsReflow(combo->mDropdownFrame, nsIPresShell::eResize,
                               NS_FRAME_IS_DIRTY);
-      shell->FlushPendingNotifications(Flush_Layout);
+      shell->FlushPendingNotifications(FlushType::Layout);
       if (mFrame.IsAlive()) {
         combo = static_cast<nsComboboxControlFrame*>(mFrame.GetFrame());
         static_cast<nsListControlFrame*>(combo->mDropdownFrame)->
@@ -1028,7 +1028,7 @@ nsComboboxControlFrame::HandleRedisplayTextEvent()
   // 289730.
   nsWeakFrame weakThis(this);
   PresContext()->Document()->
-    FlushPendingNotifications(Flush_ContentAndNotify);
+    FlushPendingNotifications(FlushType::ContentAndNotify);
   if (!weakThis.IsAlive())
     return;
 

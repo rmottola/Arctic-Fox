@@ -418,7 +418,7 @@ nsComputedDOMStyle::GetStyleContextForElement(Element* aElement,
       return nullptr;
   }
 
-  presShell->FlushPendingNotifications(Flush_Style);
+  presShell->FlushPendingNotifications(FlushType::Style);
 
   return GetStyleContextForElementNoFlush(aElement, aPseudo, presShell,
                                           aStyleType);
@@ -631,7 +631,7 @@ nsComputedDOMStyle::UpdateCurrentStyleSources(bool aNeedsLayoutFlush)
   // we're computing style in, not on the document mContent is in -- the two
   // may be different.
   document->FlushPendingNotifications(
-    aNeedsLayoutFlush ? Flush_Layout : Flush_Style);
+    aNeedsLayoutFlush ? FlushType::Layout : FlushType::Style);
 #ifdef DEBUG
   mFlushedPendingReflows = aNeedsLayoutFlush;
 #endif

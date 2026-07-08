@@ -5280,7 +5280,7 @@ nsGlobalWindow::GetOuterSize(CallerType aCallerType, ErrorResult& aError)
 
   nsGlobalWindow* rootWindow = nsGlobalWindow::Cast(GetPrivateRoot());
   if (rootWindow) {
-    rootWindow->FlushPendingNotifications(Flush_Layout);
+    rootWindow->FlushPendingNotifications(FlushType::Layout);
   }
 
   nsIntSize sizeDevPixels;
@@ -5502,7 +5502,7 @@ nsGlobalWindow::GetInnerScreenRect()
 
   nsGlobalWindow* rootWindow = nsGlobalWindow::Cast(GetPrivateRoot());
   if (rootWindow) {
-    rootWindow->FlushPendingNotifications(Flush_Layout);
+    rootWindow->FlushPendingNotifications(FlushType::Layout);
   }
 
   if (!mDocShell) {
@@ -5859,7 +5859,7 @@ nsGlobalWindow::CheckSecurityLeftAndTop(int32_t* aLeft, int32_t* aTop, bool aCal
 #endif
 
     if (nsGlobalWindow* rootWindow = nsGlobalWindow::Cast(GetPrivateRoot())) {
-      rootWindow->FlushPendingNotifications(Flush_Layout);
+      rootWindow->FlushPendingNotifications(FlushType::Layout);
     }
 
     nsCOMPtr<nsIBaseWindow> treeOwner = GetTreeOwnerWindow();
@@ -5924,7 +5924,7 @@ nsGlobalWindow::GetScrollBoundaryOuter(Side aSide)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   if (nsIScrollableFrame *sf = GetScrollFrame()) {
     return nsPresContext::
       AppUnitsToIntCSSPixels(sf->GetScrollRange().Edge(aSide));
@@ -5966,7 +5966,7 @@ nsGlobalWindow::GetScrollXY(bool aDoFlush)
   MOZ_ASSERT(IsOuterWindow());
 
   if (aDoFlush) {
-    FlushPendingNotifications(Flush_Layout);
+    FlushPendingNotifications(FlushType::Layout);
   } else {
     EnsureSizeUpToDate();
   }
@@ -6778,7 +6778,7 @@ nsGlobalWindow::EnsureReflowFlushAndPaint()
 
   // Flush pending reflows.
   if (mDoc) {
-    mDoc->FlushPendingNotifications(Flush_Layout);
+    mDoc->FlushPendingNotifications(FlushType::Layout);
   }
 
   // Unsuppress painting.
@@ -7836,7 +7836,7 @@ nsGlobalWindow::ScrollTo(double aXScroll, double aYScroll)
 void
 nsGlobalWindow::ScrollTo(const ScrollToOptions& aOptions)
 {
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
 
   if (sf) {
@@ -7862,7 +7862,7 @@ void
 nsGlobalWindow::ScrollTo(const CSSIntPoint& aScroll,
                          const ScrollOptions& aOptions)
 {
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
 
   if (sf) {
@@ -7893,7 +7893,7 @@ nsGlobalWindow::ScrollTo(const CSSIntPoint& aScroll,
 void
 nsGlobalWindow::ScrollBy(double aXScrollDif, double aYScrollDif)
 {
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
 
   if (sf) {
@@ -7910,7 +7910,7 @@ nsGlobalWindow::ScrollBy(double aXScrollDif, double aYScrollDif)
 void
 nsGlobalWindow::ScrollBy(const ScrollToOptions& aOptions)
 {
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
 
   if (sf) {
@@ -7932,7 +7932,7 @@ nsGlobalWindow::ScrollByLines(int32_t numLines,
 {
   MOZ_ASSERT(IsInnerWindow());
 
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
   if (sf) {
     // It seems like it would make more sense for ScrollByLines to use
@@ -7953,7 +7953,7 @@ nsGlobalWindow::ScrollByPages(int32_t numPages,
 {
   MOZ_ASSERT(IsInnerWindow());
 
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
   if (sf) {
     // It seems like it would make more sense for ScrollByPages to use
@@ -7973,7 +7973,7 @@ nsGlobalWindow::MozScrollSnap()
 {
   MOZ_ASSERT(IsInnerWindow());
 
-  FlushPendingNotifications(Flush_Layout);
+  FlushPendingNotifications(FlushType::Layout);
   nsIScrollableFrame *sf = GetScrollFrame();
   if (sf) {
     sf->ScrollSnap();
@@ -8343,7 +8343,7 @@ already_AddRefed<nsPIDOMWindowOuter>
 nsGlobalWindow::GetFramesOuter()
 {
   RefPtr<nsPIDOMWindowOuter> frames(AsOuter());
-  FlushPendingNotifications(Flush_ContentAndNotify);
+  FlushPendingNotifications(FlushType::ContentAndNotify);
   return frames.forget();
 }
 
@@ -10569,7 +10569,7 @@ nsGlobalWindow::GetComputedStyleHelperOuter(Element& aElt,
       return nullptr;
     }
 
-    parent->FlushPendingNotifications(Flush_Frames);
+    parent->FlushPendingNotifications(FlushType::Frames);
 
     // Might have killed mDocShell
     if (!mDocShell) {
@@ -12754,7 +12754,7 @@ nsGlobalWindow::IsPrivateBrowsing()
 }
 
 void
-nsGlobalWindow::FlushPendingNotifications(mozFlushType aType)
+nsGlobalWindow::FlushPendingNotifications(FlushType aType)
 {
   if (mDoc) {
     mDoc->FlushPendingNotifications(aType);
@@ -12771,7 +12771,7 @@ nsGlobalWindow::EnsureSizeUpToDate()
   // too.
   nsGlobalWindow *parent = nsGlobalWindow::Cast(GetPrivateParent());
   if (parent) {
-    parent->FlushPendingNotifications(Flush_Layout);
+    parent->FlushPendingNotifications(FlushType::Layout);
   }
 }
 
