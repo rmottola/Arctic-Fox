@@ -9,7 +9,7 @@ obj*/**
 
 # We ignore all these directories by default, until we get them enabled.
 # If you are enabling a directory, please add directory specific exclusions
-# below.
+# below.
 addon-sdk/**
 build/**
 caps/**
@@ -128,11 +128,8 @@ devtools/shared/*.js
 !devtools/shared/indentation.js
 !devtools/shared/loader-plugin-raw.jsm
 !devtools/shared/task.js
-devtools/shared/apps/**
 devtools/shared/client/**
 devtools/shared/discovery/**
-devtools/shared/gcli/**
-!devtools/shared/gcli/templater.js
 devtools/shared/heapsnapshot/**
 devtools/shared/layout/**
 devtools/shared/locales/**
@@ -144,12 +141,7 @@ devtools/shared/shims/**
 devtools/shared/tests/**
 !devtools/shared/tests/unit/test_csslexer.js
 devtools/shared/touch/**
-devtools/shared/transport/**
-!devtools/shared/transport/transport.js
-!devtools/shared/transport/websocket-transport.js
 devtools/shared/webconsole/test/**
-devtools/shared/worker/**
-!devtools/shared/worker/worker.js
 
 # Ignore devtools pre-processed files
 devtools/client/framework/toolbox-process-window.js
@@ -160,7 +152,7 @@ devtools/client/preferences/**
 # Ignore devtools third-party libs
 devtools/shared/jsbeautify/*
 devtools/shared/acorn/*
-devtools/client/sourceeditor/tern/*
+devtools/shared/gcli/source/*
 devtools/shared/node-properties/*
 devtools/shared/pretty-fast/*
 devtools/shared/sourcemap/*
@@ -172,6 +164,7 @@ devtools/client/shared/d3.js
 devtools/client/webaudioeditor/lib/dagre-d3.js
 devtools/client/sourceeditor/codemirror/*.js
 devtools/client/sourceeditor/codemirror/**/*.js
+devtools/client/sourceeditor/tern/*
 devtools/client/sourceeditor/test/codemirror/*
 devtools/client/inspector/markup/test/lib_*
 
