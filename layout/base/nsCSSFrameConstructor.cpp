@@ -4283,8 +4283,8 @@ nsCSSFrameConstructor::GetAnonymousContent(nsIContent* aParent,
     // if the content doesn't have an explicit style context (if it does, we
     // don't need the normal computed values).
     for (auto& info : aContent) {
-      if (!info.mStyleContext) {
-        styleSet->StyleNewSubtree(info.mContent);
+      if (!info.mStyleContext && info.mContent->IsElement()) {
+        styleSet->StyleNewSubtree(info.mContent->AsElement());
       }
     }
   }
@@ -7392,11 +7392,7 @@ nsCSSFrameConstructor::ContentAppended(nsIContent*     aContainer,
     // We need the styles for (a). In the case of (b), the Servo traversal has
     // already happened, so we don't need to do it again.
     if (!RestyleManager()->AsBase()->IsInStyleRefresh()) {
-      if (aFirstNewContent->GetNextSibling()) {
-        set->StyleNewChildren(aContainer);
-      } else {
-        set->StyleNewSubtree(aFirstNewContent);
-      }
+      set->StyleNewChildren(aContainer->AsElement());
     }
   }
 
@@ -7857,7 +7853,7 @@ nsCSSFrameConstructor::ContentRangeInserted(nsIContent*            aContainer,
     // We need the styles for (a). In the case of (b), the Servo traversal has
     // already happened, so we don't need to do it again.
     if (!RestyleManager()->AsBase()->IsInStyleRefresh()) {
-      set->StyleNewSubtree(aStartChild);
+      set->StyleNewChildren(aContainer->AsElement());
     }
   }
 
