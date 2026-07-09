@@ -1054,3 +1054,11 @@ TimeoutManager::Thaw()
     MOZ_ASSERT(!aTimeout->mTimer);
   });
 }
+
+bool
+TimeoutManager::IsTimeoutTracking(uint32_t aTimeoutId)
+{
+  return mTrackingTimeouts.ForEachAbortable([&](Timeout* aTimeout) {
+      return aTimeout->mTimeoutId == aTimeoutId;
+    });
+}
