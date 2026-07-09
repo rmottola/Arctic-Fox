@@ -8595,7 +8595,8 @@ public:
   static nsresult
   PostCloseEvent(nsGlobalWindow* aWindow, bool aIndirect) {
     nsCOMPtr<nsIRunnable> ev = new nsCloseEvent(aWindow, aIndirect);
-    nsresult rv = NS_DispatchToCurrentThread(ev);
+    nsresult rv =
+      aWindow->Dispatch("nsCloseEvent", TaskCategory::Other, ev.forget());
     if (NS_SUCCEEDED(rv))
       aWindow->MaybeForgiveSpamCount();
     return rv;
@@ -9074,7 +9075,8 @@ void
 nsGlobalWindow::NotifyWindowIDDestroyed(const char* aTopic)
 {
   nsCOMPtr<nsIRunnable> runnable = new WindowDestroyedEvent(this, mWindowID, aTopic);
-  nsresult rv = NS_DispatchToCurrentThread(runnable);
+  nsresult rv =
+    Dispatch("WindowDestroyedEvent", TaskCategory::Other, runnable.forget());
   if (NS_SUCCEEDED(rv)) {
     mNotifiedIDDestroyed = true;
   }
@@ -10350,7 +10352,7 @@ nsGlobalWindow::DispatchAsyncHashchange(nsIURI *aOldURI, nsIURI *aNewURI)
 
   nsCOMPtr<nsIRunnable> callback =
     new HashchangeCallback(oldWideSpec, newWideSpec, this);
-  return NS_DispatchToMainThread(callback);
+  return Dispatch("HashchangeCallback", TaskCategory::Other, callback.forget());
 }
 
 nsresult
@@ -10952,7 +10954,8 @@ nsGlobalWindow::NotifyIdleObserver(IdleObserverHolder* aIdleObserverHolder,
     new NotifyIdleObserverRunnable(aIdleObserverHolder->mIdleObserver,
                                    aIdleObserverHolder->mTimeInS,
                                    aCallOnidle, this);
-  if (NS_FAILED(NS_DispatchToCurrentThread(caller))) {
+  if (NS_FAILED(Dispatch("NotifyIdleObserverRunnable", TaskCategory::Other,
+                         caller.forget()))) {
     NS_WARNING("Failed to dispatch thread for idle observer notification.");
   }
 }
@@ -12155,7 +12158,9 @@ public:
   ~AutoUnblockScriptClosing()
   {
     void (nsGlobalWindow::*run)() = &nsGlobalWindow::UnblockScriptedClosing;
-    NS_DispatchToCurrentThread(NewRunnableMethod(mWin, run));
+    nsCOMPtr<nsIRunnable> caller = NewRunnableMethod(mWin, run);
+    mWin->Dispatch("nsGlobalWindow::UnblockScriptedClosing",
+                   TaskCategory::Other, caller.forget());
   }
 };
 
