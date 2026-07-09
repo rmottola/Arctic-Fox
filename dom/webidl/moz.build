@@ -48,7 +48,6 @@ WEBIDL_FILES = [
     'BarProp.webidl',
     'BaseKeyframeTypes.webidl',
     'BatteryManager.webidl',
-    'BeforeAfterKeyboardEvent.webidl',
     'BeforeUnloadEvent.webidl',
     'BiquadFilterNode.webidl',
     'Blob.webidl',
