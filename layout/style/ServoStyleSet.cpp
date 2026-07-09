@@ -276,7 +276,6 @@ ServoStyleSet::RemoveStyleSheet(SheetType aType,
                                 ServoStyleSheet* aSheet)
 {
   MOZ_ASSERT(aSheet);
-  MOZ_ASSERT(aSheet->IsApplicable());
   MOZ_ASSERT(nsStyleSet::IsCSSSheetType(aType));
 
   mSheets[aType].RemoveElement(aSheet);
@@ -359,6 +358,8 @@ nsresult
 ServoStyleSet::AddDocStyleSheet(ServoStyleSheet* aSheet,
                                 nsIDocument* aDocument)
 {
+  MOZ_ASSERT(aSheet->IsApplicable());
+
   RefPtr<StyleSheet> strong(aSheet);
 
   mSheets[SheetType::Doc].RemoveElement(aSheet);
