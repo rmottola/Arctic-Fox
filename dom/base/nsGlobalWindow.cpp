@@ -5864,7 +5864,8 @@ nsGlobalWindow::SetCSSViewportWidthAndHeight(nscoord aInnerWidth, nscoord aInner
 // NOTE: Arguments to this function should have values scaled to
 // CSS pixels, not device pixels.
 void
-nsGlobalWindow::CheckSecurityLeftAndTop(int32_t* aLeft, int32_t* aTop, bool aCallerIsChrome)
+nsGlobalWindow::CheckSecurityLeftAndTop(int32_t* aLeft, int32_t* aTop,
+                                        CallerType aCallerType)
 {
   MOZ_ASSERT(IsOuterWindow());
 
@@ -5872,7 +5873,7 @@ nsGlobalWindow::CheckSecurityLeftAndTop(int32_t* aLeft, int32_t* aTop, bool aCal
 
   // Check security state for use in determing window dimensions
 
-  if (!aCallerIsChrome) {
+  if (aCallerType != CallerType::System) {
 #ifdef MOZ_XUL
     // if attempting to move the window, hide any open popups
     nsContentUtils::HidePopupsInDocument(mDoc);
@@ -5937,13 +5938,6 @@ nsGlobalWindow::CheckSecurityLeftAndTop(int32_t* aLeft, int32_t* aTop, bool aCal
         *aTop = 0;
     }
   }
-}
-
-void
-nsGlobalWindow::CheckSecurityLeftAndTop(int32_t* aLeft, int32_t* aTop,
-                                        CallerType aCallerType)
-{
-  CheckSecurityLeftAndTop(aLeft, aTop, aCallerType == CallerType::System);
 }
 
 int32_t
@@ -7528,7 +7522,8 @@ nsGlobalWindow::Print(ErrorResult& aError)
 }
 
 void
-nsGlobalWindow::MoveToOuter(int32_t aXPos, int32_t aYPos, ErrorResult& aError, bool aCallerIsChrome)
+nsGlobalWindow::MoveToOuter(int32_t aXPos, int32_t aYPos,
+                            CallerType aCallerType, ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
   /*
@@ -7536,7 +7531,7 @@ nsGlobalWindow::MoveToOuter(int32_t aXPos, int32_t aYPos, ErrorResult& aError, b
    * prevent window.moveTo() by exiting early
    */
 
-  if (!CanMoveResizeWindows(aCallerIsChrome) || IsFrame()) {
+  if (!CanMoveResizeWindows(aCallerType == CallerType::System) || IsFrame()) {
     return;
   }
 
@@ -7564,7 +7559,7 @@ nsGlobalWindow::MoveToOuter(int32_t aXPos, int32_t aYPos, ErrorResult& aError, b
     int32_t screenLeftDeskPx, screenTopDeskPx, w, h;
     screen->GetRectDisplayPix(&screenLeftDeskPx, &screenTopDeskPx, &w, &h);
     CSSIntPoint cssPos(aXPos - screenLeftDeskPx, aYPos - screenTopDeskPx);
-    CheckSecurityLeftAndTop(&cssPos.x, &cssPos.y, aCallerIsChrome);
+    CheckSecurityLeftAndTop(&cssPos.x, &cssPos.y, aCallerType);
 
     double scale;
     screen->GetDefaultCSSScaleFactor(&scale);
@@ -7577,7 +7572,7 @@ nsGlobalWindow::MoveToOuter(int32_t aXPos, int32_t aYPos, ErrorResult& aError, b
   } else {
     // We couldn't find a screen? Just assume a 1:1 mapping.
     CSSIntPoint cssPos(aXPos, aXPos);
-    CheckSecurityLeftAndTop(&cssPos.x, &cssPos.y, aCallerIsChrome);
+    CheckSecurityLeftAndTop(&cssPos.x, &cssPos.y, aCallerType);
     LayoutDevicePoint devPos = cssPos * CSSToLayoutDeviceScale(1.0);
     aError = treeOwnerAsWin->SetPosition(devPos.x, devPos.y);
   }
@@ -7586,13 +7581,16 @@ nsGlobalWindow::MoveToOuter(int32_t aXPos, int32_t aYPos, ErrorResult& aError, b
 }
 
 void
-nsGlobalWindow::MoveTo(int32_t aXPos, int32_t aYPos, ErrorResult& aError)
+nsGlobalWindow::MoveTo(int32_t aXPos, int32_t aYPos,
+                       CallerType aCallerType, ErrorResult& aError)
 {
-  FORWARD_TO_OUTER_OR_THROW(MoveToOuter, (aXPos, aYPos, aError, nsContentUtils::IsCallerChrome()), aError, );
+  FORWARD_TO_OUTER_OR_THROW(MoveToOuter,
+                            (aXPos, aYPos, aCallerType, aError), aError, );
 }
 
 void
-nsGlobalWindow::MoveByOuter(int32_t aXDif, int32_t aYDif, ErrorResult& aError, bool aCallerIsChrome)
+nsGlobalWindow::MoveByOuter(int32_t aXDif, int32_t aYDif,
+                            CallerType aCallerType, ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
@@ -7601,7 +7599,7 @@ nsGlobalWindow::MoveByOuter(int32_t aXDif, int32_t aYDif, ErrorResult& aError, b
    * prevent window.moveBy() by exiting early
    */
 
-  if (!CanMoveResizeWindows(aCallerIsChrome) || IsFrame()) {
+  if (!CanMoveResizeWindows(aCallerType == CallerType::System) || IsFrame()) {
     return;
   }
 
@@ -7627,7 +7625,7 @@ nsGlobalWindow::MoveByOuter(int32_t aXDif, int32_t aYDif, ErrorResult& aError, b
   cssPos.width += aXDif;
   cssPos.height += aYDif;
 
-  CheckSecurityLeftAndTop(&cssPos.width, &cssPos.height, aCallerIsChrome);
+  CheckSecurityLeftAndTop(&cssPos.width, &cssPos.height, aCallerType);
 
   nsIntSize newDevPos(CSSToDevIntPixels(cssPos));
 
@@ -7637,9 +7635,11 @@ nsGlobalWindow::MoveByOuter(int32_t aXDif, int32_t aYDif, ErrorResult& aError, b
 }
 
 void
-nsGlobalWindow::MoveBy(int32_t aXDif, int32_t aYDif, ErrorResult& aError)
+nsGlobalWindow::MoveBy(int32_t aXDif, int32_t aYDif,
+                       CallerType aCallerType, ErrorResult& aError)
 {
-  FORWARD_TO_OUTER_OR_THROW(MoveByOuter, (aXDif, aYDif, aError, nsContentUtils::IsCallerChrome()), aError, );
+  FORWARD_TO_OUTER_OR_THROW(MoveByOuter,
+                            (aXDif, aYDif, aCallerType, aError), aError, );
 }
 
 nsresult
@@ -7648,7 +7648,7 @@ nsGlobalWindow::MoveBy(int32_t aXDif, int32_t aYDif)
   FORWARD_TO_OUTER(MoveBy, (aXDif, aYDif), NS_ERROR_UNEXPECTED);
 
   ErrorResult rv;
-  MoveByOuter(aXDif, aYDif, rv, /* aCallerIsChrome = */ true);
+  MoveByOuter(aXDif, aYDif, CallerType::System, rv);
 
   return rv.StealNSResult();
 }
