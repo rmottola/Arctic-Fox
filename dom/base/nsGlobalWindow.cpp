@@ -5799,12 +5799,13 @@ nsGlobalWindow::SetScreenY(JSContext* aCx, JS::Handle<JS::Value> aValue,
 // NOTE: Arguments to this function should have values scaled to
 // CSS pixels, not device pixels.
 void
-nsGlobalWindow::CheckSecurityWidthAndHeight(int32_t* aWidth, int32_t* aHeight, bool aCallerIsChrome)
+nsGlobalWindow::CheckSecurityWidthAndHeight(int32_t* aWidth, int32_t* aHeight,
+                                            CallerType aCallerType)
 {
   MOZ_ASSERT(IsOuterWindow());
 
 #ifdef MOZ_XUL
-  if (!aCallerIsChrome) {
+  if (aCallerType != CallerType::System) {
     // if attempting to resize the window, hide any open popups
     nsContentUtils::HidePopupsInDocument(mDoc);
   }
@@ -5814,7 +5815,7 @@ nsGlobalWindow::CheckSecurityWidthAndHeight(int32_t* aWidth, int32_t* aHeight, b
   if ((aWidth && *aWidth < 100) || (aHeight && *aHeight < 100)) {
     // Check security state for use in determing window dimensions
 
-    if (!nsContentUtils::IsCallerChrome()) {
+    if (aCallerType != CallerType::System) {
       //sec check failed
       if (aWidth && *aWidth < 100) {
         *aWidth = 100;
@@ -5824,14 +5825,6 @@ nsGlobalWindow::CheckSecurityWidthAndHeight(int32_t* aWidth, int32_t* aHeight, b
       }
     }
   }
-}
-
-void
-nsGlobalWindow::CheckSecurityWidthAndHeight(int32_t* aWidth, int32_t* aHeight,
-                                            CallerType aCallerType)
-{
-  return CheckSecurityWidthAndHeight(aWidth, aHeight,
-                                     aCallerType == mozilla::dom::CallerType::System);
 }
 
 // NOTE: Arguments to this function should have values in device pixels
@@ -7661,7 +7654,9 @@ nsGlobalWindow::MoveBy(int32_t aXDif, int32_t aYDif)
 }
 
 void
-nsGlobalWindow::ResizeToOuter(int32_t aWidth, int32_t aHeight, ErrorResult& aError, bool aCallerIsChrome)
+nsGlobalWindow::ResizeToOuter(int32_t aWidth, int32_t aHeight,
+                              CallerType aCallerType,
+                              ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
@@ -7683,7 +7678,7 @@ nsGlobalWindow::ResizeToOuter(int32_t aWidth, int32_t aHeight, ErrorResult& aErr
    * prevent window.resizeTo() by exiting early
    */
 
-  if (!CanMoveResizeWindows(aCallerIsChrome) || IsFrame()) {
+  if (!CanMoveResizeWindows(aCallerType == CallerType::System) || IsFrame()) {
     return;
   }
 
@@ -7694,7 +7689,7 @@ nsGlobalWindow::ResizeToOuter(int32_t aWidth, int32_t aHeight, ErrorResult& aErr
   }
 
   nsIntSize cssSize(aWidth, aHeight);
-  CheckSecurityWidthAndHeight(&cssSize.width, &cssSize.height, aCallerIsChrome);
+  CheckSecurityWidthAndHeight(&cssSize.width, &cssSize.height, aCallerType);
 
   nsIntSize devSz(CSSToDevIntPixels(cssSize));
 
@@ -7704,14 +7699,16 @@ nsGlobalWindow::ResizeToOuter(int32_t aWidth, int32_t aHeight, ErrorResult& aErr
 }
 
 void
-nsGlobalWindow::ResizeTo(int32_t aWidth, int32_t aHeight, ErrorResult& aError)
+nsGlobalWindow::ResizeTo(int32_t aWidth, int32_t aHeight,
+                         CallerType aCallerType, ErrorResult& aError)
 {
-  FORWARD_TO_OUTER_OR_THROW(ResizeToOuter, (aWidth, aHeight, aError, nsContentUtils::IsCallerChrome()), aError, );
+  FORWARD_TO_OUTER_OR_THROW(ResizeToOuter,
+                            (aWidth, aHeight, aCallerType, aError), aError, );
 }
 
 void
 nsGlobalWindow::ResizeByOuter(int32_t aWidthDif, int32_t aHeightDif,
-                              ErrorResult& aError, bool aCallerIsChrome)
+                              CallerType aCallerType, ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
@@ -7740,7 +7737,7 @@ nsGlobalWindow::ResizeByOuter(int32_t aWidthDif, int32_t aHeightDif,
    * prevent window.resizeBy() by exiting early
    */
 
-  if (!CanMoveResizeWindows(aCallerIsChrome) || IsFrame()) {
+  if (!CanMoveResizeWindows(aCallerType == CallerType::System) || IsFrame()) {
     return;
   }
 
@@ -7765,7 +7762,7 @@ nsGlobalWindow::ResizeByOuter(int32_t aWidthDif, int32_t aHeightDif,
   cssSize.width += aWidthDif;
   cssSize.height += aHeightDif;
 
-  CheckSecurityWidthAndHeight(&cssSize.width, &cssSize.height, aCallerIsChrome);
+  CheckSecurityWidthAndHeight(&cssSize.width, &cssSize.height, aCallerType);
 
   nsIntSize newDevSize(CSSToDevIntPixels(cssSize));
 
@@ -7776,13 +7773,15 @@ nsGlobalWindow::ResizeByOuter(int32_t aWidthDif, int32_t aHeightDif,
 
 void
 nsGlobalWindow::ResizeBy(int32_t aWidthDif, int32_t aHeightDif,
-                         ErrorResult& aError)
+                         CallerType aCallerType, ErrorResult& aError)
 {
-  FORWARD_TO_OUTER_OR_THROW(ResizeByOuter, (aWidthDif, aHeightDif, aError, nsContentUtils::IsCallerChrome()), aError, );
+  FORWARD_TO_OUTER_OR_THROW(ResizeByOuter,
+                            (aWidthDif, aHeightDif, aCallerType, aError),
+                            aError, );
 }
 
 void
-nsGlobalWindow::SizeToContentOuter(ErrorResult& aError, bool aCallerIsChrome)
+nsGlobalWindow::SizeToContentOuter(CallerType aCallerType, ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
@@ -7795,7 +7794,7 @@ nsGlobalWindow::SizeToContentOuter(ErrorResult& aError, bool aCallerIsChrome)
    * prevent window.sizeToContent() by exiting early
    */
 
-  if (!CanMoveResizeWindows(aCallerIsChrome) || IsFrame()) {
+  if (!CanMoveResizeWindows(aCallerType == CallerType::System) || IsFrame()) {
     return;
   }
 
@@ -7823,7 +7822,7 @@ nsGlobalWindow::SizeToContentOuter(ErrorResult& aError, bool aCallerIsChrome)
   }
 
   nsIntSize cssSize(DevToCSSIntPixels(nsIntSize(width, height)));
-  CheckSecurityWidthAndHeight(&cssSize.width, &cssSize.height, aCallerIsChrome);
+  CheckSecurityWidthAndHeight(&cssSize.width, &cssSize.height, aCallerType);
 
   nsIntSize newDevSize(CSSToDevIntPixels(cssSize));
 
@@ -7832,9 +7831,10 @@ nsGlobalWindow::SizeToContentOuter(ErrorResult& aError, bool aCallerIsChrome)
 }
 
 void
-nsGlobalWindow::SizeToContent(ErrorResult& aError)
+nsGlobalWindow::SizeToContent(CallerType aCallerType, ErrorResult& aError)
 {
-  FORWARD_TO_OUTER_OR_THROW(SizeToContentOuter, (aError, nsContentUtils::IsCallerChrome()), aError, );
+  FORWARD_TO_OUTER_OR_THROW(SizeToContentOuter, (aCallerType, aError),
+                            aError, );
 }
 
 already_AddRefed<nsPIWindowRoot>

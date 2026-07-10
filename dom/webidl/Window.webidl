@@ -156,8 +156,8 @@ partial interface Window {
   //[Throws] void resizeBy(double x, double y);
   [Throws, UnsafeInPrerendering] void moveTo(long x, long y);
   [Throws, UnsafeInPrerendering] void moveBy(long x, long y);
-  [Throws, UnsafeInPrerendering] void resizeTo(long x, long y);
-  [Throws, UnsafeInPrerendering] void resizeBy(long x, long y);
+  [Throws, UnsafeInPrerendering, NeedsCallerType] void resizeTo(long x, long y);
+  [Throws, UnsafeInPrerendering, NeedsCallerType] void resizeBy(long x, long y);
 
   // viewport
   // These are writable because we allow chrome to write them.  And they need
@@ -274,7 +274,7 @@ partial interface Window {
   /**
    * Method for sizing this window to the content in the window.
    */
-  [Throws, UnsafeInPrerendering] void             sizeToContent();
+  [Throws, UnsafeInPrerendering, NeedsCallerType] void sizeToContent();
 
   // XXX Shouldn't this be in nsIDOMChromeWindow?
   [ChromeOnly, Replaceable, Throws] readonly attribute MozControllers controllers;
