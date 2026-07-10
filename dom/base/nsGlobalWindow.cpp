@@ -4251,12 +4251,13 @@ nsGlobalWindow::GetTop()
 void
 nsGlobalWindow::GetContentOuter(JSContext* aCx,
                                 JS::MutableHandle<JSObject*> aRetval,
+                                CallerType aCallerType,
                                 ErrorResult& aError)
 {
   MOZ_RELEASE_ASSERT(IsOuterWindow());
 
   nsCOMPtr<nsPIDOMWindowOuter> content =
-    GetContentInternal(aError, !nsContentUtils::IsCallerChrome());
+    GetContentInternal(aError, aCallerType);
   if (aError.Failed()) {
     return;
   }
@@ -4279,13 +4280,15 @@ nsGlobalWindow::GetContentOuter(JSContext* aCx,
 void
 nsGlobalWindow::GetContent(JSContext* aCx,
                            JS::MutableHandle<JSObject*> aRetval,
+                           CallerType aCallerType,
                            ErrorResult& aError)
 {
-  FORWARD_TO_OUTER_OR_THROW(GetContentOuter, (aCx, aRetval, aError), aError, );
+  FORWARD_TO_OUTER_OR_THROW(GetContentOuter,
+                            (aCx, aRetval, aCallerType, aError), aError, );
 }
 
 already_AddRefed<nsPIDOMWindowOuter>
-nsGlobalWindow::GetContentInternal(ErrorResult& aError, bool aUnprivilegedCaller)
+nsGlobalWindow::GetContentInternal(ErrorResult& aError, CallerType aCallerType)
 {
   MOZ_ASSERT(IsOuterWindow());
 
@@ -4303,7 +4306,7 @@ nsGlobalWindow::GetContentInternal(ErrorResult& aError, bool aUnprivilegedCaller
   }
 
   nsCOMPtr<nsIDocShellTreeItem> primaryContent;
-  if (aUnprivilegedCaller) {
+  if (aCallerType != CallerType::System) {
     // If we're called by non-chrome code, make sure we don't return
     // the primary content window if the calling tab is hidden. In
     // such a case we return the same-type root in the hidden tab,
@@ -4353,19 +4356,6 @@ nsGlobalWindow::GetMozSelfSupport(ErrorResult& aError)
   GlobalObject global(cx, FastGetGlobalJSObject());
   mMozSelfSupport = MozSelfSupport::Constructor(global, cx, aError);
   return mMozSelfSupport;
-}
-
-nsresult
-nsGlobalWindow::GetScriptableContent(JSContext* aCx, JS::MutableHandle<JS::Value> aVal)
-{
-  ErrorResult rv;
-  JS::Rooted<JSObject*> content(aCx);
-  GetContent(aCx, &content, rv);
-  if (!rv.Failed()) {
-    aVal.setObjectOrNull(content);
-  }
-
-  return rv.StealNSResult();
 }
 
 nsresult
