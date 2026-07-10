@@ -6839,11 +6839,11 @@ nsContentUtils::IsFullScreenApiEnabled()
 
 /* static */
 bool
-nsContentUtils::IsRequestFullScreenAllowed()
+nsContentUtils::IsRequestFullScreenAllowed(CallerType aCallerType)
 {
   return !sTrustedFullScreenOnly ||
          EventStateManager::IsHandlingUserInput() ||
-         IsCallerChrome();
+         aCallerType == CallerType::System;
 }
 
 /* static */
