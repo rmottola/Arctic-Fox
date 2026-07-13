@@ -46,6 +46,7 @@
 #include "mozilla/dom/StorageManager.h"
 #include "mozilla/dom/TCPSocket.h"
 #include "mozilla/dom/VRDisplay.h"
+#include "mozilla/dom/WebAuthentication.h"
 #include "mozilla/dom/workers/RuntimeService.h"
 #include "mozilla/Hal.h"
 #include "nsISiteSpecificUserAgent.h"
@@ -206,6 +207,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPowerManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConnection)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mStorageManager)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAuthentication)
 #ifdef MOZ_AUDIO_CHANNEL_MANAGER
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAudioChannelManager)
 #endif
@@ -2175,6 +2177,15 @@ Navigator::GetPresentation(ErrorResult& aRv)
   }
 
   return mPresentation;
+}
+
+WebAuthentication*
+Navigator::Authentication()
+{
+  if (!mAuthentication) {
+    mAuthentication = new WebAuthentication(GetWindow());
+  }
+  return mAuthentication;
 }
 
 } // namespace dom
