@@ -2001,7 +2001,8 @@ nsresult
 MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
                            const MediaStreamConstraints& aConstraintsPassedIn,
                            nsIDOMGetUserMediaSuccessCallback* aOnSuccess,
-                           nsIDOMGetUserMediaErrorCallback* aOnFailure)
+                           nsIDOMGetUserMediaErrorCallback* aOnFailure,
+                           dom::CallerType aCallerType)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aWindow);
@@ -2039,7 +2040,7 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
   if (!docURI) {
     return NS_ERROR_UNEXPECTED;
   }
-  bool isChrome = nsContentUtils::IsCallerChrome();
+  bool isChrome = (aCallerType == dom::CallerType::System);
   bool privileged = isChrome ||
       Preferences::GetBool("media.navigator.permission.disabled", false);
   bool isHTTPS = false;
