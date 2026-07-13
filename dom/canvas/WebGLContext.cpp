@@ -1090,6 +1090,7 @@ WebGLContext::SetDimensions(int32_t signedWidth, int32_t signedHeight)
     MakeContextCurrent();
 
     gl->fViewport(0, 0, mWidth, mHeight);
+    mViewportX = mViewportY = 0;
     mViewportWidth = mWidth;
     mViewportHeight = mHeight;
 
