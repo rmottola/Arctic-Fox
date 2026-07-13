@@ -876,7 +876,7 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
 {
     MOZ_ASSERT(maybeIntParam || maybeFloatParam);
 
-    GLint   intParam   = maybeIntParam   ? *maybeIntParam   : GLint(*maybeFloatParam);
+    GLint   intParam   = maybeIntParam   ? *maybeIntParam   : GLint(roundf(*maybeFloatParam));
     GLfloat floatParam = maybeFloatParam ? *maybeFloatParam : GLfloat(*maybeIntParam);
 
     bool isPNameValid = false;
