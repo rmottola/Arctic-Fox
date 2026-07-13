@@ -1895,7 +1895,7 @@ protected:
 
     bool Has64BitTimestamps() const;
 
-    struct ScopedMaskWorkaround {
+    struct ScopedDrawCallWrapper final {
         WebGLContext& mWebGL;
         const bool mFakeNoAlpha;
         const bool mFakeNoDepth;
@@ -1944,9 +1944,9 @@ protected:
             return false;
         }
 
-        explicit ScopedMaskWorkaround(WebGLContext& webgl);
+        explicit ScopedDrawCallWrapper(WebGLContext& webgl);
 
-        ~ScopedMaskWorkaround();
+        ~ScopedDrawCallWrapper();
     };
 
     void LoseOldestWebGLContextIfLimitExceeded();

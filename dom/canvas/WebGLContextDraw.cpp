@@ -514,7 +514,7 @@ WebGLContext::DrawArrays(GLenum mode, GLint first, GLsizei vertCount)
         return;
 
     {
-        ScopedMaskWorkaround autoMask(*this);
+        ScopedDrawCallWrapper wrapper(*this);
         gl->fDrawArrays(mode, first, vertCount);
     }
 
@@ -553,7 +553,7 @@ WebGLContext::DrawArraysInstanced(GLenum mode, GLint first, GLsizei vertCount,
         return;
 
     {
-        ScopedMaskWorkaround autoMask(*this);
+        ScopedDrawCallWrapper wrapper(*this);
         gl->fDrawArraysInstanced(mode, first, vertCount, instanceCount);
     }
 
@@ -718,7 +718,7 @@ WebGLContext::DrawElements(GLenum mode, GLsizei vertCount, GLenum type,
         return;
 
     {
-        ScopedMaskWorkaround autoMask(*this);
+        ScopedDrawCallWrapper wrapper(*this);
         gl->fDrawElements(mode, vertCount, type,
                           reinterpret_cast<GLvoid*>(byteOffset));
     }
@@ -753,7 +753,7 @@ WebGLContext::DrawElementsInstanced(GLenum mode, GLsizei vertCount, GLenum type,
         return;
 
     {
-        ScopedMaskWorkaround autoMask(*this);
+        ScopedDrawCallWrapper wrapper(*this);
         gl->fDrawElementsInstanced(mode, vertCount, type,
                                    reinterpret_cast<GLvoid*>(byteOffset),
                                    instanceCount);
@@ -767,12 +767,6 @@ WebGLContext::DrawElementsInstanced(GLenum mode, GLsizei vertCount, GLenum type,
 void
 WebGLContext::Draw_cleanup(const char* funcName)
 {
-    if (!mBoundDrawFramebuffer) {
-        Invalidate();
-        mShouldPresent = true;
-        MOZ_ASSERT(!mBackbufferNeedsClear);
-    }
-
     if (gl->WorkAroundDriverBugs()) {
         if (gl->Renderer() == gl::GLRenderer::Tegra) {
             mDrawCallsSinceLastFlush++;
