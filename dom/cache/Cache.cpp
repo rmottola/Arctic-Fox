@@ -308,7 +308,7 @@ Cache::MatchAll(const Optional<RequestOrUSVString>& aRequest,
 
 already_AddRefed<Promise>
 Cache::Add(JSContext* aContext, const RequestOrUSVString& aRequest,
-           ErrorResult& aRv)
+           CallerType aCallerType, ErrorResult& aRv)
 {
   if (NS_WARN_IF(!mActor)) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
@@ -338,12 +338,13 @@ Cache::Add(JSContext* aContext, const RequestOrUSVString& aRequest,
   }
 
   requestList.AppendElement(Move(request));
-  return AddAll(global, Move(requestList), aRv);
+  return AddAll(global, Move(requestList), aCallerType, aRv);
 }
 
 already_AddRefed<Promise>
 Cache::AddAll(JSContext* aContext,
               const Sequence<OwningRequestOrUSVString>& aRequestList,
+              CallerType aCallerType,
               ErrorResult& aRv)
 {
   if (NS_WARN_IF(!mActor)) {
@@ -387,7 +388,7 @@ Cache::AddAll(JSContext* aContext,
     requestList.AppendElement(Move(request));
   }
 
-  return AddAll(global, Move(requestList), aRv);
+  return AddAll(global, Move(requestList), aCallerType, aRv);
 }
 
 already_AddRefed<Promise>
@@ -575,7 +576,8 @@ Cache::ExecuteOp(AutoChildOpArgs& aOpArgs, ErrorResult& aRv)
 
 already_AddRefed<Promise>
 Cache::AddAll(const GlobalObject& aGlobal,
-              nsTArray<RefPtr<Request>>&& aRequestList, ErrorResult& aRv)
+              nsTArray<RefPtr<Request>>&& aRequestList,
+              CallerType aCallerType, ErrorResult& aRv)
 {
   MOZ_DIAGNOSTIC_ASSERT(mActor);
 
@@ -601,7 +603,7 @@ Cache::AddAll(const GlobalObject& aGlobal,
     RequestOrUSVString requestOrString;
     requestOrString.SetAsRequest() = aRequestList[i];
     RefPtr<Promise> fetch = FetchRequest(mGlobal, requestOrString,
-                                           RequestInit(), aRv);
+                                         RequestInit(), aCallerType, aRv);
     if (NS_WARN_IF(aRv.Failed())) {
       return nullptr;
     }
