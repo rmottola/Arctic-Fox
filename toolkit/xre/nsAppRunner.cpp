@@ -270,8 +270,8 @@ namespace mozilla {
 LibFuzzerRunner* libFuzzerRunner = 0;
 } // namespace mozilla
 
-void XRE_LibFuzzerSetMain(int argc, char** argv, LibFuzzerMain main) {
-  mozilla::libFuzzerRunner->setParams(argc, argv, main);
+void XRE_LibFuzzerSetMain(LibFuzzerMain main) {
+  mozilla::libFuzzerRunner->setParams(main);
 }
 #endif
 
@@ -3716,7 +3716,7 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
 #ifdef LIBFUZZER
   if (PR_GetEnv("LIBFUZZER")) {
     *aExitFlag = true;
-    return mozilla::libFuzzerRunner->Run();
+    return mozilla::libFuzzerRunner->Run(gArgc, gArgv);
   }
 #endif
 
