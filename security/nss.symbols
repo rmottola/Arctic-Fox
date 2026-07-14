@@ -13,7 +13,7 @@
 PR_*
 PL_*
 #endif
-#include ../../../db/sqlite3/src/sqlite.symbols
+#include ../db/sqlite3/src/sqlite.symbols
 ATOB_AsciiToData
 ATOB_AsciiToData_Util
 ATOB_ConvertAsciiToItem
@@ -711,11 +711,18 @@ VFY_Begin
 VFY_CreateContext
 VFY_DestroyContext
 VFY_End
+VFY_EndWithSignature
 VFY_Update
 VFY_VerifyData
 VFY_VerifyDataWithAlgorithmID
 VFY_VerifyDigestDirect
 _SGN_VerifyPKCS1DigestInfo
+__PK11_SetCertificateNickname
+# These symbols are not used by Firefox itself, but are used by Java's security
+# libraries, which in turn are used by Java applets/plugins/etc.  Provide them
+# to make Java code happy.
+NSS_VersionCheck
+NSS_Initialize
 #ifdef NSS_EXTRA_SYMBOLS_FILE
 #include @NSS_EXTRA_SYMBOLS_FILE@
 #endif
