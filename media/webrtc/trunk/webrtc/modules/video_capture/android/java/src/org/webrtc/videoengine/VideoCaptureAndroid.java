@@ -97,6 +97,7 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback, AppStateL
     if (camera != null) {
       mResumeCapture = true;
       stopCapture();
+      GeckoAppShell.notifyObservers("VideoCapture:Paused", null);
     }
   }
 
@@ -105,6 +106,7 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback, AppStateL
     if (mResumeCapture) {
       startCapture(mCaptureWidth, mCaptureHeight, mCaptureMinFPS, mCaptureMaxFPS);
       mResumeCapture = false;
+      GeckoAppShell.notifyObservers("VideoCapture:Resumed", null);
     }
   }
 
