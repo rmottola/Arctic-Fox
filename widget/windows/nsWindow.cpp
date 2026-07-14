@@ -281,7 +281,7 @@ namespace mozilla {
 
 class CurrentWindowsTimeGetter {
 public:
-  CurrentWindowsTimeGetter(HWND aWnd)
+  explicit CurrentWindowsTimeGetter(HWND aWnd)
     : mWnd(aWnd)
   {
   }
