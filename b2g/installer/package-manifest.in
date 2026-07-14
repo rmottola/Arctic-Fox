@@ -203,7 +203,6 @@
 @RESPATH@/components/dom_presentation.xpt
 @RESPATH@/components/downloads.xpt
 @RESPATH@/components/editor.xpt
-@RESPATH@/components/embed_base.xpt
 @RESPATH@/components/extensions.xpt
 @RESPATH@/components/exthandler.xpt
 @RESPATH@/components/exthelper.xpt
@@ -212,7 +211,6 @@
 #ifdef MOZ_GTK
 @RESPATH@/components/filepicker.xpt
 #endif
-@RESPATH@/components/find.xpt
 @RESPATH@/components/gfx.xpt
 @RESPATH@/components/gaia_chrome.xpt
 @RESPATH@/components/hal.xpt
@@ -312,6 +310,7 @@
 #ifdef ANDROID
 @RESPATH@/components/widget_android.xpt
 #endif
+@RESPATH@/components/windowcreator.xpt
 @RESPATH@/components/windowds.xpt
 @RESPATH@/components/windowwatcher.xpt
 @RESPATH@/components/xpcom_base.xpt
