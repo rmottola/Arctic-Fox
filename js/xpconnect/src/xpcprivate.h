@@ -1495,17 +1495,8 @@ private:
 class MOZ_STACK_CLASS XPCNativeScriptableCreateInfo final
 {
 public:
-
-    explicit XPCNativeScriptableCreateInfo(const XPCNativeScriptableInfo& si)
-        : mCallback(si.GetCallback()), mFlags(si.GetFlags()) {}
-
-    XPCNativeScriptableCreateInfo(already_AddRefed<nsIXPCScriptable>&& callback,
-                                  XPCNativeScriptableFlags flags)
-        : mCallback(callback), mFlags(flags) {}
-
     XPCNativeScriptableCreateInfo()
         : mFlags(0) {}
-
 
     nsIXPCScriptable*
     GetCallback() const {return mCallback;}
@@ -1898,8 +1889,6 @@ protected:
 
     virtual ~XPCWrappedNative();
     void Destroy();
-
-    void UpdateScriptableInfo(XPCNativeScriptableInfo* si);
 
 private:
     enum {
