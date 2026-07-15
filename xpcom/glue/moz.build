@@ -17,6 +17,3 @@ EXPORTS += [
 EXPORTS.mozilla += [
     'FileUtils.h',
 ]
-
-if CONFIG['ENABLE_TESTS']:
-    DIRS += ['tests/gtest']
