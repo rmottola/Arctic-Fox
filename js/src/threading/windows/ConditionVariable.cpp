@@ -320,7 +320,7 @@ private:
   HANDLE wakeAllEvent_;
 };
 
-struct js::ConditionVariable::PlatformData
+struct js::ConditionVariableImpl::PlatformData
 {
   union
   {
@@ -329,7 +329,7 @@ struct js::ConditionVariable::PlatformData
   };
 };
 
-js::ConditionVariable::ConditionVariable()
+js::detail::ConditionVariableImpl::ConditionVariableImpl()
 {
   if (sNativeImports.supported())
     platformData()->native.initialize();
@@ -338,7 +338,7 @@ js::ConditionVariable::ConditionVariable()
 }
 
 void
-js::ConditionVariable::notify_one()
+js::detail::ConditionVariableImpl::notify_one()
 {
   if (sNativeImports.supported())
     platformData()->native.notify_one();
@@ -347,7 +347,7 @@ js::ConditionVariable::notify_one()
 }
 
 void
-js::ConditionVariable::notify_all()
+js::detail::ConditionVariableImpl::notify_all()
 {
   if (sNativeImports.supported())
     platformData()->native.notify_all();
@@ -356,9 +356,9 @@ js::ConditionVariable::notify_all()
 }
 
 void
-js::ConditionVariable::wait(UniqueLock<Mutex>& lock)
+js::detail::ConditionVariableImpl::wait(Mutex& lock)
 {
-  CRITICAL_SECTION* cs = &lock.lock.platformData()->criticalSection;
+  CRITICAL_SECTION* cs = &lock.platformData()->criticalSection;
   bool r;
   if (sNativeImports.supported())
     r = platformData()->native.wait(cs, INFINITE);
@@ -368,10 +368,10 @@ js::ConditionVariable::wait(UniqueLock<Mutex>& lock)
 }
 
 js::CVStatus
-js::ConditionVariable::wait_for(UniqueLock<Mutex>& lock,
-                                const mozilla::TimeDuration& rel_time)
+js::detail::ConditionVariableImpl::wait_for(Mutex& lock,
+                                              const mozilla::TimeDuration& rel_time)
 {
-  CRITICAL_SECTION* cs = &lock.lock.platformData()->criticalSection;
+  CRITICAL_SECTION* cs = &lock.platformData()->criticalSection;
 
   // Note that DWORD is unsigned, so we have to be careful to clamp at 0.
   // If rel_time is Forever, then ToMilliseconds is +inf, which evaluates as
@@ -394,7 +394,7 @@ js::ConditionVariable::wait_for(UniqueLock<Mutex>& lock,
   return CVStatus::Timeout;
 }
 
-js::ConditionVariable::~ConditionVariable()
+js::detail::ConditionVariableImpl::~ConditionVariableImpl()
 {
   if (sNativeImports.supported())
     platformData()->native.destroy();
@@ -402,8 +402,8 @@ js::ConditionVariable::~ConditionVariable()
     platformData()->fallback.destroy();
 }
 
-inline js::ConditionVariable::PlatformData*
-js::ConditionVariable::platformData()
+inline js::detail::ConditionVariableImpl::PlatformData*
+js::detail::ConditionVariableImpl::platformData()
 {
   static_assert(sizeof platformData_ >= sizeof(PlatformData),
                 "platformData_ is too small");
