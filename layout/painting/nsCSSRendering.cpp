@@ -4338,17 +4338,17 @@ GetDashInfo(nscoord  aBorderLength,
 }
 
 void
-nsCSSRendering::DrawTableBorderSegment(DrawTarget&              aDrawTarget,
-                                       uint8_t                  aBorderStyle,
-                                       nscolor                  aBorderColor,
-                                       const nsStyleBackground* aBGColor,
-                                       const nsRect&            aBorder,
-                                       int32_t                  aAppUnitsPerDevPixel,
-                                       int32_t                  aAppUnitsPerCSSPixel,
-                                       uint8_t                  aStartBevelSide,
-                                       nscoord                  aStartBevelOffset,
-                                       uint8_t                  aEndBevelSide,
-                                       nscoord                  aEndBevelOffset)
+nsCSSRendering::DrawTableBorderSegment(DrawTarget&   aDrawTarget,
+                                       uint8_t       aBorderStyle,
+                                       nscolor       aBorderColor,
+                                       nscolor       aBGColor,
+                                       const nsRect& aBorder,
+                                       int32_t       aAppUnitsPerDevPixel,
+                                       int32_t       aAppUnitsPerCSSPixel,
+                                       uint8_t       aStartBevelSide,
+                                       nscoord       aStartBevelOffset,
+                                       uint8_t       aEndBevelSide,
+                                       nscoord       aEndBevelOffset)
 {
   bool horizontal = ((eSideTop == aStartBevelSide) || (eSideBottom == aStartBevelSide));
   nscoord twipsPerPixel = NSIntPixelsToAppUnits(1, aAppUnitsPerCSSPixel);
@@ -4438,8 +4438,7 @@ nsCSSRendering::DrawTableBorderSegment(DrawTarget&              aDrawTarget,
       // FIXME: In theory, this should use the visited-dependent
       // background color, but I don't care.
       nscolor bevelColor = MakeBevelColor(ridgeGrooveSide, ridgeGroove,
-                                          aBGColor->mBackgroundColor,
-                                          aBorderColor);
+                                          aBGColor, aBorderColor);
       nsRect rect(aBorder);
       nscoord half;
       if (horizontal) { // top, bottom
@@ -4478,7 +4477,7 @@ nsCSSRendering::DrawTableBorderSegment(DrawTarget&              aDrawTarget,
       // FIXME: In theory, this should use the visited-dependent
       // background color, but I don't care.
       bevelColor = MakeBevelColor(ridgeGrooveSide, ridgeGroove,
-                                  aBGColor->mBackgroundColor, aBorderColor);
+                                  aBGColor, aBorderColor);
       if (horizontal) {
         rect.y = rect.y + half;
         rect.height = aBorder.height - half;
