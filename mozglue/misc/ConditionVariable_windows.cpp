@@ -11,9 +11,9 @@
 #include <stdlib.h>
 #include <windows.h>
 
-#include "threading/ConditionVariable.h"
-#include "threading/Mutex.h"
-#include "threading/windows/MutexPlatformData.h"
+#include "mozilla/PlatformConditionVariable.h"
+#include "mozilla/PlatformMutex.h"
+#include "MutexPlatformData_windows.h"
 
 // Some versions of the Windows SDK have a bug where some interlocked functions
 // are not redefined as compiler intrinsics. Fix that for the interlocked
@@ -320,8 +320,7 @@ private:
   HANDLE wakeAllEvent_;
 };
 
-struct js::ConditionVariableImpl::PlatformData
-{
+struct mozilla::detail::ConditionVariable::PlatformData{
   union
   {
     ConditionVariableNative native;
@@ -329,7 +328,7 @@ struct js::ConditionVariableImpl::PlatformData
   };
 };
 
-js::detail::ConditionVariableImpl::ConditionVariableImpl()
+mozilla::detail::ConditionVariableImpl::ConditionVariableImpl()
 {
   if (sNativeImports.supported())
     platformData()->native.initialize();
@@ -338,7 +337,7 @@ js::detail::ConditionVariableImpl::ConditionVariableImpl()
 }
 
 void
-js::detail::ConditionVariableImpl::notify_one()
+mozilla::detail::ConditionVariableImpl::notify_one()
 {
   if (sNativeImports.supported())
     platformData()->native.notify_one();
@@ -347,7 +346,7 @@ js::detail::ConditionVariableImpl::notify_one()
 }
 
 void
-js::detail::ConditionVariableImpl::notify_all()
+mozilla::detail::ConditionVariableImpl::notify_all()
 {
   if (sNativeImports.supported())
     platformData()->native.notify_all();
@@ -356,7 +355,7 @@ js::detail::ConditionVariableImpl::notify_all()
 }
 
 void
-js::detail::ConditionVariableImpl::wait(Mutex& lock)
+mozilla::detail::ConditionVariableImpl::wait(MutexImpl& lock)
 {
   CRITICAL_SECTION* cs = &lock.platformData()->criticalSection;
   bool r;
@@ -367,9 +366,9 @@ js::detail::ConditionVariableImpl::wait(Mutex& lock)
   MOZ_RELEASE_ASSERT(r);
 }
 
-js::CVStatus
-js::detail::ConditionVariableImpl::wait_for(Mutex& lock,
-                                              const mozilla::TimeDuration& rel_time)
+mozilla::detail::CVStatus
+mozilla::detail::ConditionVariableImpl::wait_for(MutexImpl& lock,
+                                                 const mozilla::TimeDuration& rel_time)
 {
   CRITICAL_SECTION* cs = &lock.platformData()->criticalSection;
 
@@ -394,7 +393,7 @@ js::detail::ConditionVariableImpl::wait_for(Mutex& lock,
   return CVStatus::Timeout;
 }
 
-js::detail::ConditionVariableImpl::~ConditionVariableImpl()
+mozilla::detail::ConditionVariableImpl::~ConditionVariableImpl()
 {
   if (sNativeImports.supported())
     platformData()->native.destroy();
@@ -402,8 +401,8 @@ js::detail::ConditionVariableImpl::~ConditionVariableImpl()
     platformData()->fallback.destroy();
 }
 
-inline js::detail::ConditionVariableImpl::PlatformData*
-js::detail::ConditionVariableImpl::platformData()
+inline mozilla::detail::ConditionVariableImpl::PlatformData*
+mozilla::detail::ConditionVariableImpl::platformData()
 {
   static_assert(sizeof platformData_ >= sizeof(PlatformData),
                 "platformData_ is too small");
