@@ -363,7 +363,7 @@ public:
   }
 
   ~GSliceInit() {
-#if MOZ_WIDGET_GTK == 2
+#if 0 // MOZ_WIDGET_GTK == 2
     if (sTop) {
       auto XRE_GlibInit = (void (*)(void)) GetSymbol(sTop->libHandle,
         "XRE_GlibInit");
