@@ -7728,6 +7728,10 @@ if (IsCSSPropertyPrefEnabled("layout.css.background-clip-text.enabled")) {
   );
 }
 
+if (IsCSSPropertyPrefEnabled("layout.css.display-flow-root.enabled")) {
+  gCSSProperties["display"].other_values.push("flow-root");
+}
+
 // Copy aliased properties' fields from their alias targets.
 for (var prop in gCSSProperties) {
   var entry = gCSSProperties[prop];
