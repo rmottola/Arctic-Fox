@@ -60,6 +60,7 @@ fails == mask-repeat-3.html mask-repeat-3-ref.html # bug 1258626
 # mask-origin test cases
 fails == mask-origin-1.html mask-origin-1-ref.html # bug 1258286
 fails == mask-origin-2.html mask-origin-2-ref.html # bug 1260094
+== mask-origin-3.html mask-origin-3-ref.html
 
 # mask-size test cases
 fails == mask-size-auto.html mask-size-auto-ref.html
