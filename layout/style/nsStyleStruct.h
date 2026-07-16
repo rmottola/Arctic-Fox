@@ -2753,7 +2753,7 @@ private:
   ReferenceBox mReferenceBox = ReferenceBox::NoBox;
 };
 
-using StyleClipPath = StyleShapeSource<StyleClipPathGeometryBox>;
+using StyleClipPath = StyleShapeSource<StyleGeometryBox>;
 using StyleShapeOutside = StyleShapeSource<StyleShapeOutsideShapeBox>;
 
 } // namespace mozilla
