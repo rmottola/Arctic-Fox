@@ -546,8 +546,10 @@ DocAccessibleParent::SetCOMProxy(const RefPtr<IAccessible>& aCOMProxy)
       }
     }
   }
-  Unused << SendParentCOMProxy(holder, reinterpret_cast<uintptr_t>(
-                               mEmulatedWindowHandle), hWndAccHolder);
+
+  Unused << SendEmulatedWindow(reinterpret_cast<uintptr_t>(mEmulatedWindowHandle),
+                               hWndAccHolder);
+  Unused << SendParentCOMProxy(holder);
 }
 
 void
