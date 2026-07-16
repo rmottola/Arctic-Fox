@@ -5892,7 +5892,8 @@ nsLayoutUtils::GetFirstLinePosition(WritingMode aWM,
            static_cast<const nsTableWrapperFrame*>(aFrame)->GetRowCount() == 0)) {
         // empty grid/flex/table container
         aResult->mBStart = 0;
-        aResult->mBaseline = aFrame->SynthesizeBaselineFromBorderBox(aWM);
+        aResult->mBaseline = aFrame->SynthesizeBaselineBOffsetFromBorderBox(aWM,
+                                       BaselineSharingGroup::eFirst);
         aResult->mBEnd = aFrame->BSize(aWM);
         return true;
       }

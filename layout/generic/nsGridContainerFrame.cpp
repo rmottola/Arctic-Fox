@@ -6744,11 +6744,8 @@ nsGridContainerFrame::SynthesizeBaseline(
     if (grid && aGridOrderItem.mIsInEdgeTrack) {
       isOrthogonal ? grid->GetIBaseline(aGroup, &baseline) :
                      grid->GetBBaseline(aGroup, &baseline);
-    } else if (!isOrthogonal && aGridOrderItem.mIsInEdgeTrack &&
-               GetBBaseline(aGroup, childWM, child, &baseline)) {
-      if (aGroup == BaselineSharingGroup::eLast) {
-        baseline = size - baseline; // convert to distance from border-box end
-      }
+    } else if (!isOrthogonal && aGridOrderItem.mIsInEdgeTrack) {
+      baseline = child->GetBaseline(childWM, aGroup, AlignmentContext::eGrid);
     } else {
       baseline = ::SynthesizeBaselineFromBorderBox(aGroup, childWM, size);
     }
