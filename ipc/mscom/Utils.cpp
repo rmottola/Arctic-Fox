@@ -16,11 +16,13 @@
 
 #include "DynamicallyLinkedFunctionPtr.h"
 
+#if defined(ACCESSIBILITY)
 #include "mozilla/mscom/Registration.h"
+#include "nsTArray.h"
+#endif
 
 #include "mozilla/mscom/Utils.h"
 #include "mozilla/RefPtr.h"
-#include "nsTArray.h"
 
 #include <objidl.h>
 
@@ -94,6 +96,7 @@ IsProxy(IUnknown* aUnknown)
   return false;
 }
 
+#ifdef ACCESSIBILITY
 static bool
 IsVtableIndexFromParentInterface(TYPEATTR* aTypeAttr,
                                  unsigned long aVtableIndex)
@@ -221,6 +224,7 @@ IsInterfaceEqualToOrInheritedFrom(REFIID aInterface, REFIID aFrom,
 
   return false;
 }
+#endif // ifdef ACCESSIBILITY
 
 } // namespace mscom
 } // namespace mozilla
