@@ -67,7 +67,6 @@ public:
       mLabel(aLabel),
       mStopped(false)
   {
-    MOZ_COUNT_CTOR(MediaStreamTrackSource);
   }
 
   /**
@@ -168,7 +167,6 @@ public:
 protected:
   virtual ~MediaStreamTrackSource()
   {
-    MOZ_COUNT_DTOR(MediaStreamTrackSource);
   }
 
   /**

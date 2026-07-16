@@ -6287,7 +6287,6 @@ public:
     , mStage(eBeforeToggle)
     , mFullscreen(aFullscreen)
   {
-    MOZ_COUNT_CTOR(FullscreenTransitionTask);
   }
 
   NS_IMETHOD Run() override;
@@ -6295,7 +6294,6 @@ public:
 private:
   ~FullscreenTransitionTask() override
   {
-    MOZ_COUNT_DTOR(FullscreenTransitionTask);
   }
 
   /**
