@@ -454,6 +454,11 @@ DocAccessibleParent::Destroy()
     iter.Remove();
   }
 
+  // The code above should have already completely cleared these, but to be
+  // extra safe make sure they are cleared here.
+  mAccessibles.Clear();
+  mChildDocs.Clear();
+
   DocManager::NotifyOfRemoteDocShutdown(this);
   ProxyDestroyed(this);
   if (DocAccessibleParent* parentDoc = ParentDoc())
