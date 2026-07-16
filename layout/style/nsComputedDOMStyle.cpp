@@ -1859,7 +1859,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetBackgroundColor()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  SetToRGBAColor(val, StyleBackground()->mBackgroundColor);
+  SetValueFromComplexColor(val, StyleBackground()->mBackgroundColor);
   return val.forget();
 }
 
