@@ -1159,8 +1159,8 @@ TabChild::DoFakeShow(const TextureFactoryIdentifier& aTextureFactoryIdentifier,
                      const uint64_t& aLayersId,
                      PRenderFrameChild* aRenderFrame, const ShowInfo& aShowInfo)
 {
-  RecvShow(ScreenIntSize(0, 0), aShowInfo, aTextureFactoryIdentifier,
-           aLayersId, aRenderFrame, mParentIsActive, nsSizeMode_Normal);
+  InitRenderingState(aTextureFactoryIdentifier, aLayersId, aRenderFrame);
+  RecvShow(ScreenIntSize(0, 0), aShowInfo, mParentIsActive, nsSizeMode_Normal);
   mDidFakeShow = true;
 }
 
@@ -1216,13 +1216,9 @@ TabChild::ApplyShowInfo(const ShowInfo& aInfo)
 mozilla::ipc::IPCResult
 TabChild::RecvShow(const ScreenIntSize& aSize,
                    const ShowInfo& aInfo,
-                   const TextureFactoryIdentifier& aTextureFactoryIdentifier,
-                   const uint64_t& aLayersId,
-                   PRenderFrameChild* aRenderFrame,
                    const bool& aParentIsActive,
                    const nsSizeMode& aSizeMode)
 {
-  MOZ_ASSERT((!mDidFakeShow && aRenderFrame) || (mDidFakeShow && !aRenderFrame));
   bool res = true;
 
   mPuppetWidget->SetSizeMode(aSizeMode);
@@ -1232,8 +1228,6 @@ TabChild::RecvShow(const ScreenIntSize& aSize,
         NS_ERROR("WebNavigation() doesn't QI to nsIBaseWindow");
         return IPC_FAIL_NO_REASON(this);
     }
-
-    InitRenderingState(aTextureFactoryIdentifier, aLayersId, aRenderFrame);
 
     baseWindow->SetVisibility(true);
     res = InitTabChildGlobal();
@@ -1245,6 +1239,17 @@ TabChild::RecvShow(const ScreenIntSize& aSize,
   if (!res) {
     return IPC_FAIL_NO_REASON(this);
   }
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+TabChild::RecvInitRendering(const TextureFactoryIdentifier& aTextureFactoryIdentifier,
+                            const uint64_t& aLayersId,
+                            PRenderFrameChild* aRenderFrame)
+{
+  MOZ_ASSERT((!mDidFakeShow && aRenderFrame) || (mDidFakeShow && !aRenderFrame));
+
+  InitRenderingState(aTextureFactoryIdentifier, aLayersId, aRenderFrame);
   return IPC_OK();
 }
 
