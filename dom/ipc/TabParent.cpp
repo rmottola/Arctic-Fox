@@ -639,6 +639,7 @@ TabParent::InitRenderFrame()
     // child side will create RenderFrame.
     MOZ_ASSERT(!GetRenderFrame());
     RefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
+    MOZ_ASSERT(frameLoader);
     if (frameLoader) {
       bool success;
       RenderFrameParent* renderFrame = new RenderFrameParent(frameLoader, &success);
@@ -661,8 +662,7 @@ TabParent::Show(const ScreenIntSize& size, bool aParentIsActive)
         return;
     }
 
-    InitRenderFrame();
-
+    MOZ_ASSERT(GetRenderFrame());
     RenderFrameParent* renderFrame = IsInitedByParent() ? GetRenderFrame() : nullptr;
     uint64_t layersId = renderFrame ? renderFrame->GetLayersId() : 0;
     TextureFactoryIdentifier textureFactoryIdentifier;
