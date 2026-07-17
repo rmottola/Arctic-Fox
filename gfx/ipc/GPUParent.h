@@ -39,6 +39,7 @@ public:
       Endpoint<PCompositorBridgeParent>&& aEndpoint,
       const CSSToLayoutDeviceScale& aScale,
       const TimeDuration& aVsyncRate,
+      const CompositorOptions& aOptions,
       const bool& aUseExternalSurface,
       const IntSize& aSurfaceSize) override;
   mozilla::ipc::IPCResult RecvNewContentCompositorBridge(Endpoint<PCompositorBridgeParent>&& aEndpoint) override;
