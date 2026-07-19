@@ -2059,6 +2059,7 @@ TabChild::RecvAsyncMessage(const nsString& aMessage,
                            const IPC::Principal& aPrincipal,
                            const ClonedMessageData& aData)
 {
+  CrossProcessCpowHolder cpows(Manager(), aCpows);
   if (!mTabChildGlobal) {
     return IPC_OK();
   }
@@ -2076,7 +2077,6 @@ TabChild::RecvAsyncMessage(const nsString& aMessage,
   UnpackClonedMessageDataForChild(aData, data);
   RefPtr<nsFrameMessageManager> mm =
     static_cast<nsFrameMessageManager*>(mTabChildGlobal->mMessageManager.get());
-  CrossProcessCpowHolder cpows(Manager(), aCpows);
   mm->ReceiveMessage(static_cast<EventTarget*>(mTabChildGlobal), nullptr,
                      aMessage, false, &data, &cpows, aPrincipal, nullptr);
   return IPC_OK();
