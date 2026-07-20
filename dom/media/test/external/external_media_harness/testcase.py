@@ -199,19 +199,6 @@ class NetworkBandwidthTestsMixin(object):
         self.run_videos(timeout=120)
 
 
-reset_adobe_gmp_script = """
-navigator.requestMediaKeySystemAccess('com.adobe.primetime',
-[{initDataTypes: ['cenc']}]).then(
-    function(access) {
-        marionetteScriptFinished('success');
-    },
-    function(ex) {
-        marionetteScriptFinished(ex);
-    }
-);
-"""
-
-
 reset_widevine_gmp_script = """
 navigator.requestMediaKeySystemAccess('com.widevine.alpha',
 [{initDataTypes: ['cenc']}]).then(
@@ -228,7 +215,7 @@ navigator.requestMediaKeySystemAccess('com.widevine.alpha',
 class EMESetupMixin(object):
 
     """
-    An object that needs to use the Adobe or Widevine GMP system must inherit
+    An object that needs to use the Widevine GMP system must inherit
     from this class, and then call check_eme_system() to insure that everything
     is setup correctly.
     """
@@ -237,7 +224,7 @@ class EMESetupMixin(object):
 
     def check_eme_system(self):
         """
-        Download the most current version of the Adobe and Widevine GMP
+        Download the most current version of the Widevine GMP
         Plugins. Verify that all MSE and EME prefs are set correctly. Raises
         if things are not OK.
         """
@@ -255,20 +242,12 @@ class EMESetupMixin(object):
     def reset_GMP_version(self):
         if EMESetupMixin.version_needs_reset:
             with self.marionette.using_context(Marionette.CONTEXT_CHROME):
-                if self.prefs.get_pref('media.gmp-eme-adobe.version'):
-                    self.prefs.reset_pref('media.gmp-eme-adobe.version')
                 if self.prefs.get_pref('media.gmp-widevinecdm.version'):
                     self.prefs.reset_pref('media.gmp-widevinecdm.version')
             with self.marionette.using_context(Marionette.CONTEXT_CONTENT):
-                adobe_result = self.marionette.execute_async_script(
-                    reset_adobe_gmp_script,
-                    script_timeout=60000)
                 widevine_result = self.marionette.execute_async_script(
                     reset_widevine_gmp_script,
                     script_timeout=60000)
-                if not adobe_result == 'success':
-                    raise VideoException(
-                        'ERROR: Resetting Adobe GMP failed % s' % adobe_result)
                 if not widevine_result == 'success':
                     raise VideoException(
                         'ERROR: Resetting Widevine GMP failed % s'
@@ -348,10 +327,6 @@ class EMESetupMixin(object):
                     'media.eme.enabled', True),
                 self.check_and_log_boolean_pref(
                     'media.mediasource.mp4.enabled', True),
-                self.check_and_log_boolean_pref(
-                    'media.gmp-eme-adobe.enabled', True),
-                self.check_and_log_integer_pref(
-                    'media.gmp-eme-adobe.version', 1),
                 self.check_and_log_boolean_pref(
                     'media.gmp-widevinecdm.enabled', True),
                 self.chceck_and_log_version_string_pref(
