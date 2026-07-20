@@ -1863,8 +1863,7 @@ CompositorBridgeParent::ResetCompositorImpl(const nsTArray<LayersBackend>& aBack
 }
 
 PWebRenderBridgeParent*
-CompositorBridgeParent::AllocPWebRenderBridgeParent(const uint64_t& aPipelineId,
-                                                    const nsString& aResourcePath)
+CompositorBridgeParent::AllocPWebRenderBridgeParent(const uint64_t& aPipelineId)
 {
 #ifndef MOZ_ENABLE_WEBRENDER
   // Extra guard since this in the parent process and we don't want a malicious
@@ -1876,7 +1875,7 @@ CompositorBridgeParent::AllocPWebRenderBridgeParent(const uint64_t& aPipelineId,
   RefPtr<gl::GLContext> glc(gl::GLContextProvider::CreateForCompositorWidget(mWidget, true));
   RefPtr<Compositor> compositor = new WebRenderCompositorOGL(glc.get());
   WebRenderBridgeParent* parent = new WebRenderBridgeParent(aPipelineId,
-        &aResourcePath, mWidget, glc.get(), nullptr, compositor.get());
+        mWidget, glc.get(), nullptr, compositor.get());
   parent->AddRef(); // IPDL reference
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
   MOZ_ASSERT(sIndirectLayerTrees[aPipelineId].mWRBridge == nullptr);

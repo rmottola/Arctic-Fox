@@ -224,10 +224,6 @@ browser/chrome/devtools/modules/devtools/shared/acorn/acorn_loose.js
 browser/chrome/devtools/modules/devtools/acorn/acorn.js
 browser/chrome/devtools/modules/devtools/shared/acorn/acorn.js
 
-webrender/ps_clear.glsl
-webrender/ps_gradient.glsl
-webrender/ps_gradient_clip.glsl
-
 # added for current AcrticFox compatibility - Riccardo Mottola - check in the future
 # (I think several of these are real duplicates that need to be fixed)
 browser/chrome/browser/skin/classic/browser/Push-16.png
