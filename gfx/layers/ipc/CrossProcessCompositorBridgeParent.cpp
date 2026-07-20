@@ -21,6 +21,7 @@
 #include "mozilla/layers/LayerTreeOwnerTracker.h"
 #include "mozilla/layers/PLayerTransactionParent.h"
 #include "mozilla/layers/RemoteContentController.h"
+#include "mozilla/layers/WebRenderBridgeParent.h"
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "nsDebug.h"                    // for NS_ASSERTION, etc
 #include "nsTArray.h"                   // for nsTArray
@@ -191,6 +192,54 @@ CrossProcessCompositorBridgeParent::DeallocPAPZParent(PAPZParent* aActor)
 {
   RemoteContentController* controller = static_cast<RemoteContentController*>(aActor);
   controller->Release();
+  return true;
+}
+
+PWebRenderBridgeParent*
+CrossProcessCompositorBridgeParent::AllocPWebRenderBridgeParent(const uint64_t& aPipelineId)
+{
+#ifndef MOZ_ENABLE_WEBRENDER
+  // Extra guard since this in the parent process and we don't want a malicious
+  // child process invoking this codepath before it's ready
+  MOZ_RELEASE_ASSERT(false);
+#endif
+  // Check to see if this child process has access to this layer tree.
+  if (!LayerTreeOwnerTracker::Get()->IsMapped(aPipelineId, OtherPid())) {
+    NS_ERROR("Unexpected layers id in AllocPAPZCTreeManagerParent; dropping message...");
+    return nullptr;
+  }
+
+  MonitorAutoLock lock(*sIndirectLayerTreesLock);
+  MOZ_ASSERT(sIndirectLayerTrees.find(aPipelineId) != sIndirectLayerTrees.end());
+  MOZ_ASSERT(sIndirectLayerTrees[aPipelineId].mWRBridge == nullptr);
+  CompositorBridgeParent* cbp = sIndirectLayerTrees[aPipelineId].mParent;
+  WebRenderBridgeParent* root = sIndirectLayerTrees[cbp->RootLayerTreeId()].mWRBridge.get();
+
+  WebRenderBridgeParent* parent = new WebRenderBridgeParent(
+    aPipelineId, nullptr, root->GLContext(), root->WindowState());
+  parent->AddRef(); // IPDL reference
+  sIndirectLayerTrees[aPipelineId].mWRBridge = parent;
+
+  return parent;
+}
+
+bool
+CrossProcessCompositorBridgeParent::DeallocPWebRenderBridgeParent(PWebRenderBridgeParent* aActor)
+{
+#ifndef MOZ_ENABLE_WEBRENDER
+  // Extra guard since this in the parent process and we don't want a malicious
+  // child process invoking this codepath before it's ready
+  MOZ_RELEASE_ASSERT(false);
+#endif
+  WebRenderBridgeParent* parent = static_cast<WebRenderBridgeParent*>(aActor);
+  {
+    MonitorAutoLock lock(*sIndirectLayerTreesLock);
+    auto it = sIndirectLayerTrees.find(parent->PipelineId());
+    if (it != sIndirectLayerTrees.end()) {
+      it->second.mWRBridge = nullptr;
+    }
+  }
+  parent->Release(); // IPDL reference
   return true;
 }
 
