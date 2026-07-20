@@ -148,12 +148,6 @@ WidevineAdapter::GMPShutdown()
   }
 }
 
-void
-WidevineAdapter::GMPSetNodeId(const char* aNodeId, uint32_t aLength)
-{
-
-}
-
 /* static */
 bool
 WidevineAdapter::Supports(int32_t aModuleVersion,
