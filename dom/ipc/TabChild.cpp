@@ -36,6 +36,7 @@
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layers/ShadowLayers.h"
+#include "mozilla/layers/WebRenderLayerManager.h"
 #include "mozilla/layout/RenderFrameChild.h"
 #include "mozilla/layout/RenderFrameParent.h"
 #include "mozilla/LookAndFeel.h"
@@ -2325,8 +2326,8 @@ TabChild::RecvSetDocShellIsActive(const bool& aIsActive,
 
   MOZ_ASSERT(mPuppetWidget);
   MOZ_ASSERT(mPuppetWidget->GetLayerManager());
-  MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() ==
-             LayersBackend::LAYERS_CLIENT);
+  MOZ_ASSERT(mPuppetWidget->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_CLIENT
+          || mPuppetWidget->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_WR);
 
   auto clearForcePaint = MakeScopeExit([&] {
     // We might force a paint, or we might already have painted and this is a
@@ -2526,9 +2527,11 @@ TabChild::InitRenderingState(const TextureFactoryIdentifier& aTextureFactoryIden
         mPuppetWidget->GetLayerManager(
             nullptr, mTextureFactoryIdentifier.mParentBackend)
                 ->AsShadowForwarder();
-    // As long as we are creating a ClientLayerManager for the puppet widget,
-    // lf must be non-null here.
-    MOZ_ASSERT(lf);
+
+    LayerManager* lm = mPuppetWidget->GetLayerManager();
+    if (lm->AsWebRenderLayerManager()) {
+      lm->AsWebRenderLayerManager()->Initialize(compositorChild, aLayersId);
+    }
 
     if (lf) {
       nsTArray<LayersBackend> backends;
