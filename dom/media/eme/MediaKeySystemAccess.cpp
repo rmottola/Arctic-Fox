@@ -134,23 +134,6 @@ MediaKeySystemAccess::GetKeySystemStatus(const nsAString& aKeySystem,
     return EnsureCDMInstalled(aKeySystem, aOutMessage);
   }
 
-  if (Preferences::GetBool("media.gmp-eme-adobe.visible", false)) {
-    if (IsPrimetimeKeySystem(aKeySystem)) {
-      if (!Preferences::GetBool("media.gmp-eme-adobe.enabled", false)) {
-        aOutMessage = NS_LITERAL_CSTRING("Adobe EME disabled");
-        return MediaKeySystemStatus::Cdm_disabled;
-      }
-#ifdef XP_WIN
-      // Win Vista and later only.
-      if (!IsVistaOrLater()) {
-        aOutMessage = NS_LITERAL_CSTRING("Minimum Windows version (Vista) not met for Adobe EME");
-        return MediaKeySystemStatus::Cdm_not_supported;
-      }
-#endif
-      return EnsureCDMInstalled(aKeySystem, aOutMessage);
-    }
-  }
-
   if (IsWidevineKeySystem(aKeySystem)) {
     if (Preferences::GetBool("media.gmp-widevinecdm.visible", false)) {
 #ifdef XP_WIN
@@ -338,9 +321,8 @@ GetSupportedKeySystems()
 #if defined(XP_WIN)
       // Widevine CDM doesn't include an AAC decoder. So if WMF can't
       // decode AAC, and a codec wasn't specified, be conservative
-      // and reject the MediaKeys request, since our policy is to prevent
-      //  the Adobe GMP's unencrypted AAC decoding path being used to
-      // decode content decrypted by the Widevine CDM.
+      // and reject the MediaKeys request, since we assume Widevine
+      // will be used with AAC.
       if (WMFDecoderModule::HasAAC()) {
         widevine.mMP4.SetCanDecrypt(EME_CODEC_AAC);
       }
@@ -467,9 +449,8 @@ CanDecryptAndDecode(const nsString& aKeySystem,
 #if defined(XP_WIN)
     // Widevine CDM doesn't include an AAC decoder. So if WMF can't
     // decode AAC, and a codec wasn't specified, be conservative
-    // and reject the MediaKeys request, since our policy is to prevent
-    //  the Adobe GMP's unencrypted AAC decoding path being used to
-    // decode content decrypted by the Widevine CDM.
+    // and reject the MediaKeys request, since we assume Widevine
+    // will be used with AAC.
     if (codec == EME_CODEC_AAC &&
         IsWidevineKeySystem(aKeySystem) &&
         !WMFDecoderModule::HasAAC()) {
