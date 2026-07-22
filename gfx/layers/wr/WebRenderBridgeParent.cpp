@@ -370,6 +370,10 @@ WebRenderBridgeParent::CompositeToTarget(gfx::DrawTarget* aTarget, const gfx::In
   wr_composite_window(mWRWindowState);
   mGLContext->SwapBuffers();
   mWidget->PostRender(&widgetContext);
+
+  // Calls for TextureHosts recycling
+  mCompositor->EndFrame()
+  mCompositor->FlushPendingNotifyNotUsed();
 }
 
 WebRenderBridgeParent::~WebRenderBridgeParent()
