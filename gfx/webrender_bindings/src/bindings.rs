@@ -426,6 +426,8 @@ pub extern fn wr_pop_dl_builder(state: &mut WrState, bounds: WrRect, overflow: W
 #[no_mangle]
 pub fn wr_composite_window(window: &mut WrWindowState) {
     assert!( unsafe { is_in_compositor_thread() });
+    window.api.flush();
+    wait_for_flush_notification(&window.flush_notifier_lock);
     gl::clear(gl::COLOR_BUFFER_BIT);
     window.renderer.update();
     window.renderer.render(window.size);
