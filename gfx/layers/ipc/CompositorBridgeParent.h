@@ -125,6 +125,8 @@ public:
 
   virtual void ObserveLayerUpdate(uint64_t aLayersId, uint64_t aEpoch, bool aActive) = 0;
 
+  virtual void NotifyDidComposite(uint64_t aTransactionId, TimeStamp& aCompositeStart, TimeStamp& aCompositeEnd) {}
+
   // HostIPCAllocator
   virtual base::ProcessId GetChildProcessId() override;
   virtual void NotifyNotUsed(PTextureParent* aTexture, uint64_t aTransactionId) override;
@@ -553,6 +555,8 @@ protected:
   bool CanComposite();
 
   void DidComposite(TimeStamp& aCompositeStart, TimeStamp& aCompositeEnd);
+
+  virtual void NotifyDidComposite(uint64_t aTransactionId, TimeStamp& aCompositeStart, TimeStamp& aCompositeEnd) override;
 
   // The indirect layer tree lock must be held before calling this function.
   // Callback should take (LayerTreeState* aState, const uint64_t& aLayersId)
