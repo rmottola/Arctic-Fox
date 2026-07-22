@@ -87,7 +87,6 @@ WebRenderBridgeParent::WebRenderBridgeParent(CompositorBridgeParentBase* aCompos
   }
   if (mWidget) {
     mCompositorScheduler = new CompositorVsyncScheduler(this, mWidget);
-    mCompositor->AsWebRenderCompositorOGL()->SetVsyncScheduler(mCompositorScheduler);
   }
 }
 
