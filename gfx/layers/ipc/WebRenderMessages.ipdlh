@@ -44,11 +44,11 @@ struct OpDPPushImage {
   WRImageKey key;
 };
 
-struct OpDPPushCompositable {
+struct OpDPPushExternalImageId {
   WRRect bounds;
   WRRect clip;
   MaybeImageMask mask;
-  PCompositable compositable;
+  uint64_t externalImageId;
 };
 
 struct OpDPPushIframe {
@@ -62,7 +62,7 @@ union WebRenderCommand {
   OpPopDLBuilder;
   OpDPPushRect;
   OpDPPushImage;
-  OpDPPushCompositable;
+  OpDPPushExternalImageId;
   OpDPPushIframe;
   CompositableOperation;
 };
