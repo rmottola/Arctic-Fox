@@ -110,6 +110,15 @@ public:
 
   virtual bool NeedsWidgetInvalidation() override { return true; }
 
+  virtual void SetLayerObserverEpoch(uint64_t aLayerObserverEpoch) override;
+
+  virtual void DidComposite(uint64_t aTransactionId,
+                            const mozilla::TimeStamp& aCompositeStart,
+                            const mozilla::TimeStamp& aCompositeEnd) override;
+
+  virtual void ClearCachedResources(Layer* aSubtree = nullptr) override;
+
+
   DrawPaintedLayerCallback GetPaintedLayerCallback() const
   { return mPaintedLayerCallback; }
 
