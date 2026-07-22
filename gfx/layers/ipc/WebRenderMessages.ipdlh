@@ -44,6 +44,13 @@ struct OpDPPushImage {
   WRImageKey key;
 };
 
+struct OpDPPushCompositable {
+  WRRect bounds;
+  WRRect clip;
+  MaybeImageMask mask;
+  PCompositable compositable;
+};
+
 struct OpDPPushIframe {
   WRRect bounds;
   WRRect clip;
@@ -55,7 +62,9 @@ union WebRenderCommand {
   OpPopDLBuilder;
   OpDPPushRect;
   OpDPPushImage;
+  OpDPPushCompositable;
   OpDPPushIframe;
+  CompositableOperation;
 };
 
 } // namespace
