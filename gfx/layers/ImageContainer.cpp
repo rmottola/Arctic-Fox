@@ -98,6 +98,32 @@ BufferRecycleBin::ClearRecycledBuffers()
   mRecycledBufferSize = 0;
 }
 
+ImageContainerListener::ImageContainerListener(ImageContainer* aImageContainer)
+  : mLock("mozilla.layers.ImageContainerListener.mLock")
+  , mImageContainer(aImageContainer)
+{
+}
+
+ImageContainerListener::~ImageContainerListener()
+{
+}
+
+void
+ImageContainerListener::NotifyComposite(const ImageCompositeNotification& aNotification)
+{
+  MutexAutoLock lock(mLock);
+  if (mImageContainer) {
+    mImageContainer->NotifyComposite(aNotification);
+  }
+}
+
+void
+ImageContainerListener::ClearImageContainer()
+{
+  MutexAutoLock lock(mLock);
+  mImageContainer = nullptr;
+}
+
 void
 ImageContainer::EnsureImageClient(bool aCreate)
 {
@@ -112,6 +138,7 @@ ImageContainer::EnsureImageClient(bool aCreate)
     mImageClient = imageBridge->CreateImageClient(CompositableType::IMAGE, this);
     if (mImageClient) {
       mAsyncContainerID = mImageClient->GetAsyncID();
+      mNotifyCompositeListener = new ImageContainerListener(this);
     }
   }
 }
@@ -147,6 +174,9 @@ ImageContainer::ImageContainer(uint64_t aAsyncContainerID)
 
 ImageContainer::~ImageContainer()
 {
+  if (mNotifyCompositeListener) {
+    mNotifyCompositeListener->ClearImageContainer();
+  }
   if (mAsyncContainerID) {
     if (RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton()) {
       imageBridge->ForgetImageContainer(mAsyncContainerID);
