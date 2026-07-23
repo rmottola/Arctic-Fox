@@ -147,6 +147,11 @@ ImageContainer::ImageContainer(uint64_t aAsyncContainerID)
 
 ImageContainer::~ImageContainer()
 {
+  if (mAsyncContainerID) {
+    if (RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton()) {
+      imageBridge->ForgetImageContainer(mAsyncContainerID);
+    }
+  }
 }
 
 RefPtr<PlanarYCbCrImage>
