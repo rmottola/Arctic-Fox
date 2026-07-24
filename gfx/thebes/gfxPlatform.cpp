@@ -2225,6 +2225,11 @@ gfxPlatform::InitGPUProcessPrefs()
     return;
   }
 
+  // XXX disable GPU proces when webrender is enabled for now.
+  if (gfxPrefs::WebRenderEnabled()) {
+    return;
+  }
+
   FeatureState& gpuProc = gfxConfig::GetFeature(Feature::GPU_PROCESS);
 
   gpuProc.SetDefaultFromPref(
