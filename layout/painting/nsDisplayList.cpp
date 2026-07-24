@@ -4174,7 +4174,7 @@ nsDisplayBorder::GetLayerState(nsDisplayListBuilder* aBuilder,
   }
 
   mRect = ViewAs<LayerPixel>(br->mOuterRect);
-  return LAYER_INACTIVE;
+  return LAYER_ACTIVE;
 }
 
 already_AddRefed<Layer>
