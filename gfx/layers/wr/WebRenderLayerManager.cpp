@@ -466,5 +466,11 @@ WebRenderLayerManager::CreateRefLayer()
   return MakeAndAddRef<WebRenderRefLayer>(this);
 }
 
+already_AddRefed<TextLayer>
+WebRenderLayerManager::CreateTextLayer()
+{
+  return nullptr;
+}
+
 } // namespace layers
 } // namespace mozilla
