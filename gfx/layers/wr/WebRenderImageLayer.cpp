@@ -28,7 +28,7 @@ WebRenderImageLayer::~WebRenderImageLayer()
 {
   MOZ_COUNT_DTOR(WebRenderImageLayer);
   if (mExternalImageId) {
-    WRBridge()->DeallocExternalImageId(mExternalImageId);
+    WrBridge()->DeallocExternalImageId(mExternalImageId);
   }
 }
 
@@ -69,7 +69,7 @@ WebRenderImageLayer::RenderLayer()
 
   if (!mImageClient) {
     mImageClient = ImageClient::CreateImageClient(CompositableType::IMAGE,
-                                                  WRBridge(),
+                                                  WrBridge(),
                                                   TextureFlags::DEFAULT);
     if (!mImageClient) {
       return;
@@ -81,12 +81,12 @@ WebRenderImageLayer::RenderLayer()
 
   // XXX update async ImageContainer rendering path
   //if (mContainer->IsAsync() && !mImageId) {
-  //  mExternalImageId = WRBridge()->AllocExternalImageId(mContainer->GetAsyncContainerID());
+  //  mExternalImageId = WrBridge()->AllocExternalImageId(mContainer->GetAsyncContainerID());
   //  MOZ_ASSERT(mImageId);
   //}
 
   if (!mExternalImageId) {
-    mExternalImageId = WRBridge()->AllocExternalImageIdForCompositable(mImageClient);
+    mExternalImageId = WrBridge()->AllocExternalImageIdForCompositable(mImageClient);
     MOZ_ASSERT(mExternalImageId);
   }
 
@@ -121,7 +121,7 @@ WebRenderImageLayer::RenderLayer()
     return;
   }
 
-  WRScrollFrameStackingContextGenerator scrollFrames(this);
+  WrScrollFrameStackingContextGenerator scrollFrames(this);
 
   Rect rect(0, 0, size.width, size.height);
 
@@ -140,10 +140,10 @@ WebRenderImageLayer::RenderLayer()
   Maybe<WrImageMask> mask = buildMaskLayer();
   WrTextureFilter filter = (mSamplingFilter == gfx::SamplingFilter::POINT) ? WrTextureFilter::Point : WrTextureFilter::Linear;
 
-  WRBridge()->AddWebRenderCommand(
+  WrBridge()->AddWebRenderCommand(
     OpDPPushStackingContext(wr::ToWrRect(relBounds), wr::ToWrRect(overflow), mask, transform, FrameMetrics::NULL_SCROLL_ID));
-  WRBridge()->AddWebRenderCommand(OpDPPushExternalImageId(LayerIntRegion(), wr::ToWrRect(rect), wr::ToWrRect(clip), Nothing(), filter, mExternalImageId));
-  WRBridge()->AddWebRenderCommand(OpDPPopStackingContext());
+  WrBridge()->AddWebRenderCommand(OpDPPushExternalImageId(LayerIntRegion(), wr::ToWrRect(rect), wr::ToWrRect(clip), Nothing(), filter, mExternalImageId));
+  WrBridge()->AddWebRenderCommand(OpDPPopStackingContext());
 
   if (gfxPrefs::LayersDump()) printf_stderr("ImageLayer %p using %s as bounds/overflow, %s for transform\n", this, Stringify(relBounds).c_str(), Stringify(transform).c_str());
 
