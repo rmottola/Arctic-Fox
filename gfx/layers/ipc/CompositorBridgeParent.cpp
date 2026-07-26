@@ -462,7 +462,6 @@ CompositorBridgeParent::StopAndClearResources()
     mCompositionManager = nullptr;
   }
 
-#ifdef MOZ_ENABLE_WEBRENDER
   if (mWRBridge) {
     MonitorAutoLock lock(*sIndirectLayerTreesLock);
     ForEachIndirectLayerTree([this] (LayerTreeState* lts, uint64_t) -> void {
@@ -475,7 +474,6 @@ CompositorBridgeParent::StopAndClearResources()
     mWRBridge->Destroy();
     mWRBridge = nullptr;
   }
-#endif
 
   if (mCompositor) {
     mCompositor->DetachWidget();
