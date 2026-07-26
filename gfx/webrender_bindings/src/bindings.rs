@@ -77,7 +77,6 @@ pub unsafe extern fn wr_renderer_readback(width: u32, height: u32,
                                 slice);
 }
 
-
 #[no_mangle]
 pub extern fn wr_renderer_set_profiler_enabled(renderer: &mut Renderer, enabled: bool) {
     renderer.set_profiler_enabled(enabled);
@@ -627,6 +626,11 @@ pub extern fn wr_dp_push_border(state: &mut WrState, rect: WrRect, clip: WrRect,
                                     right.to_border_side(),
                                     bottom.to_border_side(),
                                     radius);
+}
+
+#[no_mangle]
+pub extern fn wr_api_set_root_pipeline(api: &mut RenderApi, pipeline_id: u64) {
+    api.set_root_pipeline(u64_to_pipeline_id(pipeline_id));
 }
 
 #[no_mangle]
