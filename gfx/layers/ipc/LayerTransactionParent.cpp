@@ -564,7 +564,7 @@ LayerTransactionParent::RecvUpdate(const TransactionInfo& aInfo,
     }
     case Edit::TOpAttachCompositable: {
       const OpAttachCompositable& op = edit.get_OpAttachCompositable();
-      CompositableHost* host = CompositableHost::FromIPDLActor(op.compositableParent());
+      RefPtr<CompositableHost> host = FindCompositable(op.compositable());
       if (mPendingCompositorUpdates) {
         // Do not attach compositables from old layer trees. Return true since
         // content cannot handle errors.
@@ -589,7 +589,7 @@ LayerTransactionParent::RecvUpdate(const TransactionInfo& aInfo,
       if (!imageBridge) {
         return IPC_FAIL_NO_REASON(this);
       }
-      CompositableHost* host = imageBridge->FindCompositable(op.compositable());
+      RefPtr<CompositableHost> host = imageBridge->FindCompositable(op.compositable());
       if (!host) {
         NS_ERROR("CompositableHost not found in the map");
         return IPC_FAIL_NO_REASON(this);
@@ -933,18 +933,6 @@ LayerTransactionParent::RecvForceComposite()
   return IPC_OK();
 }
 
-PCompositableParent*
-LayerTransactionParent::AllocPCompositableParent(const TextureInfo& aInfo)
-{
-  return CompositableHost::CreateIPDLActor(this, aInfo);
-}
-
-bool
-LayerTransactionParent::DeallocPCompositableParent(PCompositableParent* aActor)
-{
-  return CompositableHost::DestroyIPDLActor(aActor);
-}
-
 void
 LayerTransactionParent::ActorDestroy(ActorDestroyReason why)
 {
@@ -1032,6 +1020,15 @@ LayerTransactionParent::AsLayer(const LayerHandle& aHandle)
 }
 
 mozilla::ipc::IPCResult
+LayerTransactionParent::RecvNewCompositable(const CompositableHandle& aHandle, const TextureInfo& aInfo)
+{
+  if (!AddCompositable(aHandle, aInfo)) {
+    return IPC_FAIL_NO_REASON(this);
+  }
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
 LayerTransactionParent::RecvReleaseLayer(const LayerHandle& aHandle)
 {
   if (!aHandle || !mLayerMap.Contains(aHandle.Value())) {
@@ -1043,6 +1040,13 @@ LayerTransactionParent::RecvReleaseLayer(const LayerHandle& aHandle)
     (*maybeLayer)->Disconnect();
   }
 
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+LayerTransactionParent::RecvReleaseCompositable(const CompositableHandle& aHandle)
+{
+  ReleaseCompositable(aHandle);
   return IPC_OK();
 }
 

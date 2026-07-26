@@ -15,7 +15,7 @@ namespace layers {
 
 async protocol PCompositable
 {
-    manager PImageBridge or PLayerTransaction or PWebRenderBridge;
+    manager PWebRenderBridge;
 child:
     async __delete__();
 parent:
