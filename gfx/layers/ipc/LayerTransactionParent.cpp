@@ -69,6 +69,16 @@ LayerTransactionParent::~LayerTransactionParent()
 {
 }
 
+void
+LayerTransactionParent::SetLayerManager(HostLayerManager* aLayerManager)
+{
+  mLayerManager = aLayerManager;
+  for (auto iter = mLayerMap.Iter(); !iter.Done(); iter.Next()) {
+    auto layer = iter.Data();
+    layer->AsHostLayer()->SetLayerManager(aLayerManager);
+  }
+}
+
 mozilla::ipc::IPCResult
 LayerTransactionParent::RecvShutdown()
 {
