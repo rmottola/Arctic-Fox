@@ -698,9 +698,9 @@ var WebBrowserChrome = {
   },
 
   // Check whether this URI should load in the current process
-  shouldLoadURI: function(aDocShell, aURI, aReferrer) {
+  shouldLoadURI(aDocShell, aURI, aReferrer, aTriggeringPrincipal) {
     if (!E10SUtils.shouldLoadURI(aDocShell, aURI, aReferrer)) {
-      E10SUtils.redirectLoad(aDocShell, aURI, aReferrer);
+      E10SUtils.redirectLoad(aDocShell, aURI, aReferrer, aTriggeringPrincipal, false);
       return false;
     }
 
@@ -712,8 +712,8 @@ var WebBrowserChrome = {
   },
 
   // Try to reload the currently active or currently loading page in a new process.
-  reloadInFreshProcess: function(aDocShell, aURI, aReferrer) {
-    E10SUtils.redirectLoad(aDocShell, aURI, aReferrer, true);
+  reloadInFreshProcess(aDocShell, aURI, aReferrer, aTriggeringPrincipal) {
+    E10SUtils.redirectLoad(aDocShell, aURI, aReferrer, aTriggeringPrincipal, true);
     return true;
   },
 
