@@ -6,7 +6,8 @@ const TEST_URI = "http://example.com/browser/dom/tests/browser/test_largeAllocat
 
 function expectProcessCreated() {
   let os = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
-  return new Promise(resolve => {
+  let kill; // A kill function which will disable the promise.
+  let promise = new Promise((resolve, reject) => {
     let topic = "ipc:content-created";
     function observer() {
       os.removeObserver(observer, topic);
@@ -14,7 +15,14 @@ function expectProcessCreated() {
       resolve();
     }
     os.addObserver(observer, topic, /* weak = */ false);
+    kill = () => {
+      os.removeObserver(observer, topic);
+      ok(true, "Expect process created killed");
+      reject();
+    };
   });
+  promise.kill = kill;
+  return promise;
 }
 
 function expectNoProcess() {
@@ -37,6 +45,19 @@ function getPID(aBrowser) {
   });
 }
 
+function getIsFreshProcess(aBrowser) {
+  return ContentTask.spawn(aBrowser, null, () => {
+    try {
+      return docShell.QueryInterface(Ci.nsIInterfaceRequestor)
+                     .getInterface(Ci.nsITabChild)
+                     .isInFreshProcess;
+    } catch (e) {
+      // This must be a non-remote browser, which means it is not fresh
+      return false;
+    }
+  });
+}
+
 add_task(function*() {
   // I'm terrible and put this set of tests into a single file, so I need a longer timeout
   requestLongerTimeout(2);
@@ -51,6 +72,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
     ok(true, "Starting test 0");
     let pid1 = yield getPID(aBrowser);
+    is(false, yield getIsFreshProcess(aBrowser));
 
     let epc = expectProcessCreated();
     yield ContentTask.spawn(aBrowser, TEST_URI, TEST_URI => {
@@ -63,6 +85,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     isnot(pid1, pid2, "The pids should be different between the initial load and the new load");
+    is(true, yield getIsFreshProcess(aBrowser));
   });
 
   // When a Large-Allocation document is loaded in an iframe, the header should
@@ -70,6 +93,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
     ok(true, "Starting test 1");
     let pid1 = yield getPID(aBrowser);
+    is(false, yield getIsFreshProcess(aBrowser));
 
     // Fail the test if we create a process
     let stopExpectNoProcess = expectNoProcess();
@@ -88,6 +112,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     is(pid1, pid2, "The PID should not have changed");
+    is(false, yield getIsFreshProcess(aBrowser));
 
     stopExpectNoProcess();
   });
@@ -96,6 +121,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("http://example.com", function*(aBrowser) {
     ok(true, "Starting test 2");
     let pid1 = yield getPID(aBrowser);
+    is(false, yield getIsFreshProcess(aBrowser));
 
     // Fail the test if we create a process
     let stopExpectNoProcess = expectNoProcess();
@@ -122,6 +148,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     is(pid1, pid2, "The PID should not have changed");
+    is(false, yield getIsFreshProcess(aBrowser));
 
     stopExpectNoProcess();
   });
@@ -130,6 +157,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
     ok(true, "Starting test 3");
     let pid1 = yield getPID(aBrowser);
+    is(false, yield getIsFreshProcess(aBrowser));
 
     let epc = expectProcessCreated();
 
@@ -142,8 +170,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     isnot(pid1, pid2);
-
-    epc = expectProcessCreated();
+    is(true, yield getIsFreshProcess(aBrowser));
 
     yield BrowserTestUtils.browserLoaded(aBrowser);
 
@@ -154,8 +181,10 @@ add_task(function*() {
     let pid3 = yield getPID(aBrowser);
 
     // We should have been kicked out of the large-allocation process by the
-    // load, meaning we're back in the first process.
-    is(pid1, pid3); // XXX: This may be flakey in multiple content process e10s?
+    // load, meaning we're back in a non-fresh process
+    is(false, yield getIsFreshProcess(aBrowser));
+
+    epc = expectProcessCreated();
 
     yield ContentTask.spawn(aBrowser, TEST_URI, TEST_URI => {
       content.document.location = TEST_URI;
@@ -185,8 +214,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     isnot(pid1, pid2, "PIDs 1 and 2 should not match");
-
-    let stopExpectNoProcess = expectNoProcess();
+    is(true, yield getIsFreshProcess(aBrowser));
 
     yield BrowserTestUtils.browserLoaded(aBrowser);
 
@@ -200,10 +228,8 @@ add_task(function*() {
     let pid3 = yield getPID(aBrowser);
 
     // We should have been kicked out of the large-allocation process by the
-    // load, meaning we're back in the first process.
-    is(pid1, pid3, "PIDs 1 and 3 should match");
-
-    stopExpectNoProcess();
+    // load, meaning we're back in a non-large-allocation process.
+    is(false, yield getIsFreshProcess(aBrowser));
 
     epc = expectProcessCreated();
 
