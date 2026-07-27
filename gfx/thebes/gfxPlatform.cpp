@@ -2228,7 +2228,7 @@ gfxPlatform::InitGPUProcessPrefs()
 {
   // We want to hide this from about:support, so only set a default if the
   // pref is known to be true.
-  if (!gfxPrefs::GPUProcessDevEnabled() && !gfxPrefs::GPUProcessDevForceEnabled()) {
+  if (!gfxPrefs::GPUProcessEnabled() && !gfxPrefs::GPUProcessForceEnabled()) {
     return;
   }
 
@@ -2240,11 +2240,11 @@ gfxPlatform::InitGPUProcessPrefs()
   FeatureState& gpuProc = gfxConfig::GetFeature(Feature::GPU_PROCESS);
 
   gpuProc.SetDefaultFromPref(
-    gfxPrefs::GetGPUProcessDevEnabledPrefName(),
+    gfxPrefs::GetGPUProcessEnabledPrefName(),
     true,
-    gfxPrefs::GetGPUProcessDevEnabledPrefDefault());
+    gfxPrefs::GetGPUProcessEnabledPrefDefault());
 
-  if (gfxPrefs::GPUProcessDevForceEnabled()) {
+  if (gfxPrefs::GPUProcessForceEnabled()) {
     gpuProc.UserForceEnable("User force-enabled via pref");
   }
 
