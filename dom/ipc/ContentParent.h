@@ -463,6 +463,8 @@ public:
                                                             const bool& aIsAudio,
                                                             const bool& aIsVideo) override;
 
+  virtual mozilla::ipc::IPCResult RecvGetGfxInfoFeatureStatus(nsTArray<mozilla::dom::GfxInfoFeatureStatus>* aFS) override;
+
   bool CycleCollectWithLogs(bool aDumpAllTraces,
                             nsICycleCollectorLogSink* aSink,
                             nsIDumpGCAndCCLogsCallback* aCallback);
@@ -1016,11 +1018,6 @@ private:
                                                           uint64_t* aId) override;
 
   virtual mozilla::ipc::IPCResult RecvDeallocateLayerTreeId(const uint64_t& aId) override;
-
-  virtual mozilla::ipc::IPCResult RecvGetGraphicsFeatureStatus(const int32_t& aFeature,
-                                                               int32_t* aStatus,
-                                                               nsCString* aFailureId,
-                                                               bool* aSuccess) override;
 
   virtual mozilla::ipc::IPCResult RecvGraphicsError(const nsCString& aError) override;
 
