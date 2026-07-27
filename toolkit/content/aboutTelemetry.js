@@ -306,6 +306,10 @@ var PingPicker = {
             .addEventListener("click", () => this._movePingIndex(1), false);
     document.getElementById("choose-payload")
             .addEventListener("change", () => displayPingData(gPingData), false);
+    document.getElementById("scalars-processes")
+            .addEventListener("change", () => displayPingData(gPingData), false);
+    document.getElementById("keyed-scalars-processes")
+            .addEventListener("change", () => displayPingData(gPingData), false);
     document.getElementById("histograms-processes")
             .addEventListener("change", () => displayPingData(gPingData), false);
     document.getElementById("keyed-histograms-processes")
@@ -1650,13 +1654,18 @@ var Scalars = {
     let scalarsSection = document.getElementById("scalars");
     removeAllChildNodes(scalarsSection);
 
-    if (!aPayload.processes || !aPayload.processes.parent) {
+    let processesSelect = document.getElementById("scalars-processes");
+    let selectedProcess = processesSelect.selectedOptions.item(0).getAttribute("value");
+
+    if (!aPayload.processes ||
+        !selectedProcess ||
+        !(selectedProcess in aPayload.processes)) {
       return;
     }
 
-    let scalars = aPayload.processes.parent.scalars;
+    let scalars = aPayload.processes[selectedProcess].scalars;
     const hasData = scalars && Object.keys(scalars).length > 0;
-    setHasData("scalars-section", hasData);
+    setHasData("scalars-section", hasData || processesSelect.options.length);
     if (!hasData) {
       return;
     }
@@ -1711,13 +1720,18 @@ var KeyedScalars = {
     let scalarsSection = document.getElementById("keyed-scalars");
     removeAllChildNodes(scalarsSection);
 
-    if (!aPayload.processes || !aPayload.processes.parent) {
+    let processesSelect = document.getElementById("keyed-scalars-processes");
+    let selectedProcess = processesSelect.selectedOptions.item(0).getAttribute("value");
+
+    if (!aPayload.processes ||
+        !selectedProcess ||
+        !(selectedProcess in aPayload.processes)) {
       return;
     }
 
-    let keyedScalars = aPayload.processes.parent.keyedScalars;
+    let keyedScalars = aPayload.processes[selectedProcess].keyedScalars;
     const hasData = keyedScalars && Object.keys(keyedScalars).length > 0;
-    setHasData("keyed-scalars-section", hasData);
+    setHasData("keyed-scalars-section", hasData || processesSelect.options.length);
     if (!hasData) {
       return;
     }
@@ -1969,7 +1983,7 @@ function renderProcessList(ping, selectEl) {
   removeAllChildNodes(selectEl);
   let option = document.createElement("option");
   option.appendChild(document.createTextNode("parent"));
-  option.setAttribute("value", "");
+  option.setAttribute("value", "parent");
   option.selected = true;
   selectEl.appendChild(option);
 
@@ -1981,7 +1995,7 @@ function renderProcessList(ping, selectEl) {
 
   for (let process of Object.keys(ping.payload.processes)) {
     // TODO: parent hgrams are on root payload, not in payload.processes.parent
-    // When/If that gets moved, you'll need to remove this:
+    // When/If that gets moved, you'll need to remove this
     if (process === "parent") {
       continue;
     }
@@ -2063,6 +2077,8 @@ function displayPingData(ping, updatePayloadList = false) {
   // Update the payload list and process lists
   if (updatePayloadList) {
     renderPayloadList(ping);
+    renderProcessList(ping, document.getElementById("scalars-processes"));
+    renderProcessList(ping, document.getElementById("keyed-scalars-processes"));
     renderProcessList(ping, document.getElementById("histograms-processes"));
     renderProcessList(ping, document.getElementById("keyed-histograms-processes"));
   }
@@ -2149,6 +2165,10 @@ function displayPingData(ping, updatePayloadList = false) {
   let hgramsSelect = document.getElementById("histograms-processes");
   let hgramsOption = hgramsSelect.selectedOptions.item(0);
   let hgramsProcess = hgramsOption.getAttribute("value");
+  // "parent" histograms/keyedHistograms aren't under "parent". Fix that up.
+  if (hgramsProcess === "parent") {
+    hgramsProcess = "";
+  }
   if (hgramsProcess &&
       "processes" in ping.payload &&
       hgramsProcess in ping.payload.processes) {
@@ -2181,6 +2201,10 @@ function displayPingData(ping, updatePayloadList = false) {
   let keyedHgramsSelect = document.getElementById("keyed-histograms-processes");
   let keyedHgramsOption = keyedHgramsSelect.selectedOptions.item(0);
   let keyedHgramsProcess = keyedHgramsOption.getAttribute("value");
+  // "parent" histograms/keyedHistograms aren't under "parent". Fix that up.
+  if (keyedHgramsProcess === "parent") {
+    keyedHgramsProcess = "";
+  }
   if (keyedHgramsProcess &&
       "processes" in ping.payload &&
       keyedHgramsProcess in ping.payload.processes) {
