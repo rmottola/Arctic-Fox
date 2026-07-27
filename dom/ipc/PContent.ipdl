@@ -343,8 +343,6 @@ nested(upto inside_cpow) sync protocol PContent
 {
     parent spawns PPluginModule;
 
-    child opens PBackground;
-
     manages PBlob;
     manages PBrowser;
     manages PContentPermissionRequest;
@@ -644,6 +642,8 @@ child:
     async GMPsChanged(GMPCapabilityData[] capabilities);
 
 parent:
+    async InitBackground(Endpoint<PBackgroundParent> aEndpoint);
+
     /**
      * Tell the content process some attributes of itself.  This is
      * among the first information queried by content processes after
