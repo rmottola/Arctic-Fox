@@ -45,12 +45,10 @@ function getPID(aBrowser) {
   });
 }
 
-function getIsFreshProcess(aBrowser) {
+function getInLAProc(aBrowser) {
   return ContentTask.spawn(aBrowser, null, () => {
     try {
-      return docShell.QueryInterface(Ci.nsIInterfaceRequestor)
-                     .getInterface(Ci.nsITabChild)
-                     .isInFreshProcess;
+      return docShell.inLargeAllocProcess;
     } catch (e) {
       // This must be a non-remote browser, which means it is not fresh
       return false;
@@ -72,7 +70,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
     ok(true, "Starting test 0");
     let pid1 = yield getPID(aBrowser);
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     let epc = expectProcessCreated();
     yield ContentTask.spawn(aBrowser, TEST_URI, TEST_URI => {
@@ -85,7 +83,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     isnot(pid1, pid2, "The pids should be different between the initial load and the new load");
-    is(true, yield getIsFreshProcess(aBrowser));
+    is(true, yield getInLAProc(aBrowser));
   });
 
   // When a Large-Allocation document is loaded in an iframe, the header should
@@ -93,7 +91,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
     ok(true, "Starting test 1");
     let pid1 = yield getPID(aBrowser);
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     // Fail the test if we create a process
     let stopExpectNoProcess = expectNoProcess();
@@ -112,7 +110,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     is(pid1, pid2, "The PID should not have changed");
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     stopExpectNoProcess();
   });
@@ -121,7 +119,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("http://example.com", function*(aBrowser) {
     ok(true, "Starting test 2");
     let pid1 = yield getPID(aBrowser);
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     // Fail the test if we create a process
     let stopExpectNoProcess = expectNoProcess();
@@ -148,7 +146,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     is(pid1, pid2, "The PID should not have changed");
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     stopExpectNoProcess();
   });
@@ -157,7 +155,7 @@ add_task(function*() {
   yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
     ok(true, "Starting test 3");
     let pid1 = yield getPID(aBrowser);
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     let epc = expectProcessCreated();
 
@@ -170,7 +168,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     isnot(pid1, pid2);
-    is(true, yield getIsFreshProcess(aBrowser));
+    is(true, yield getInLAProc(aBrowser));
 
     yield BrowserTestUtils.browserLoaded(aBrowser);
 
@@ -182,7 +180,7 @@ add_task(function*() {
 
     // We should have been kicked out of the large-allocation process by the
     // load, meaning we're back in a non-fresh process
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     epc = expectProcessCreated();
 
@@ -214,7 +212,7 @@ add_task(function*() {
     let pid2 = yield getPID(aBrowser);
 
     isnot(pid1, pid2, "PIDs 1 and 2 should not match");
-    is(true, yield getIsFreshProcess(aBrowser));
+    is(true, yield getInLAProc(aBrowser));
 
     yield BrowserTestUtils.browserLoaded(aBrowser);
 
@@ -229,7 +227,7 @@ add_task(function*() {
 
     // We should have been kicked out of the large-allocation process by the
     // load, meaning we're back in a non-large-allocation process.
-    is(false, yield getIsFreshProcess(aBrowser));
+    is(false, yield getInLAProc(aBrowser));
 
     epc = expectProcessCreated();
 
@@ -246,5 +244,46 @@ add_task(function*() {
     isnot(pid1, pid4, "PID 4 shouldn't match PID 1");
     isnot(pid2, pid4, "PID 4 shouldn't match PID 2");
 
+  });
+
+  yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
+    info("Starting test 7");
+    yield SpecialPowers.pushPrefEnv({
+      set: [
+        ["dom.ipc.processCount.webLargeAllocation", 1]
+      ],
+    });
+
+    // Loading the first Large-Allocation tab should succeed as normal
+    let pid1 = yield getPID(aBrowser);
+    is(false, yield getInLAProc(aBrowser));
+
+    let ready = Promise.all([expectProcessCreated(),
+                             BrowserTestUtils.browserLoaded(aBrowser)]);
+
+    yield ContentTask.spawn(aBrowser, TEST_URI, TEST_URI => {
+      content.document.location = TEST_URI;
+    });
+
+    yield ready;
+
+    let pid2 = yield getPID(aBrowser);
+
+    isnot(pid1, pid2, "PIDs 1 and 2 should not match");
+    is(true, yield getInLAProc(aBrowser));
+
+    yield BrowserTestUtils.withNewTab("about:blank", function*(aBrowser) {
+      // The second one should load in a non-LA proc because the
+      // webLargeAllocation processes have been exhausted.
+      is(false, yield getInLAProc(aBrowser));
+
+      let ready = Promise.all([BrowserTestUtils.browserLoaded(aBrowser)]);
+      yield ContentTask.spawn(aBrowser, TEST_URI, TEST_URI => {
+        content.document.location = TEST_URI;
+      });
+      yield ready;
+
+      is(false, yield getInLAProc(aBrowser));
+    });
   });
 });
