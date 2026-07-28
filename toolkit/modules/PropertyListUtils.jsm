@@ -109,15 +109,13 @@ this.PropertyListUtils = Object.freeze({
               throw new Error("Could not read file contents: " + fileReader.error);
 
             root = this._readFromArrayBufferSync(fileReader.result);
-          }
-          finally {
+          } finally {
             aCallback(root);
           }
         }.bind(this);
         fileReader.addEventListener("loadend", onLoadEnd);
         fileReader.readAsArrayBuffer(file);
-      }
-      catch (ex) {
+      } catch (ex) {
         aCallback(null);
         throw ex;
       }
@@ -141,8 +139,7 @@ this.PropertyListUtils = Object.freeze({
       let doc = domParser.parseFromBuffer(bytesView, bytesView.length,
                                           "application/xml");
       return new XMLPropertyListReader(doc).root;
-    }
-    catch (ex) {
+    } catch (ex) {
       throw new Error("aBuffer cannot be parsed as a DOM document: " + ex);
     }
   },
