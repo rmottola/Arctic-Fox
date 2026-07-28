@@ -131,9 +131,9 @@ function promiseNewTabLoadEvent(aUrl, aEventType = "load")
             e.target != iframe) {
           return;
         }
-        iframe.removeEventListener("load", frameLoad, false);
+        iframe.removeEventListener("load", frameLoad);
         deferred.resolve(iframe);
-      }, false);
+      });
     }, true);
   return deferred.promise;
 }

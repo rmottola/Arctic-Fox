@@ -145,7 +145,7 @@ XPInstallConfirm.init = function()
       document.removeEventListener("focus", myfocus, true);
       document.removeEventListener("blur", myblur, true);
     }
-    window.removeEventListener("unload", myUnload, false);
+    window.removeEventListener("unload", myUnload);
 
     for (let install of args.installs)
       install.removeListener(installListener);
@@ -164,7 +164,7 @@ XPInstallConfirm.init = function()
     }
   }
 
-  window.addEventListener("unload", myUnload, false);
+  window.addEventListener("unload", myUnload);
 
   if (_installCountdownLength > 0) {
     document.addEventListener("focus", myfocus, true);

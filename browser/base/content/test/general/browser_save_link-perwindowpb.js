@@ -27,7 +27,7 @@ function triggerSave(aWindow, aCallback) {
 
     waitForFocus(function () {
       info("register to handle popupshown");
-      aWindow.document.addEventListener("popupshown", contextMenuOpened, false);
+      aWindow.document.addEventListener("popupshown", contextMenuOpened);
 
       var link = testBrowser.contentDocument.getElementById("fff");
       info("link: " + link);

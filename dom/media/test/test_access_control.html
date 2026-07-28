@@ -34,7 +34,7 @@ addLoadEvent(function() {
 SimpleTest.waitForExplicitFinish();
 
 
-window.addEventListener("message", receiveMessage, false);
+window.addEventListener("message", receiveMessage);
 
 function receiveMessage(event)
 {

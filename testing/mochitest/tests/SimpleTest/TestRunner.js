@@ -774,7 +774,7 @@ TestRunner.testFinished = function(tests) {
              }
              TestRunner.updateUI([{ result: false }]);
            }
-        } , false);
+        });
         TestRunner._makeIframe(interstitialURL, 0);
     }
 

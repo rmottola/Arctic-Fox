@@ -23,7 +23,7 @@ function task(ids) {
     removeEventListener("load", tabLoad, true);
 
     gDoc = content.document;
-    gDoc.addEventListener("DOMFormHasPassword", unexpectedContentEvent, false);
+    gDoc.addEventListener("DOMFormHasPassword", unexpectedContentEvent);
     gDoc.defaultView.setTimeout(test_inputAdd, 0);
   }
 
@@ -70,7 +70,7 @@ function task(ids) {
   }
 
   function finish() {
-    gDoc.removeEventListener("DOMFormHasPassword", unexpectedContentEvent, false);
+    gDoc.removeEventListener("DOMFormHasPassword", unexpectedContentEvent);
     resolve();
   }
 

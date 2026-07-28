@@ -873,9 +873,8 @@ var gApplicationsPane = {
 
   // Initialization & Destruction
 
-  init: function() {
-    function setEventListener(aId, aEventType, aCallback)
-    {
+  init() {
+    function setEventListener(aId, aEventType, aCallback) {
       document.getElementById(aId)
               .addEventListener(aEventType, aCallback.bind(gApplicationsPane));
     }
@@ -916,7 +915,7 @@ var gApplicationsPane = {
     setEventListener("actionColumn", "click", gApplicationsPane.sort);
 
     // Listen for window unload so we can remove our preference observers.
-    window.addEventListener("unload", this, false);
+    window.addEventListener("unload", this);
 
     // Figure out how we should be sorting the list.  We persist sort settings
     // across sessions, so we can't assume the default sort column/direction.
@@ -928,8 +927,7 @@ var gApplicationsPane = {
       // from the xul file was used.  If we are sorting on the other
       // column, we should remove it.
       document.getElementById("typeColumn").removeAttribute("sortDirection");
-    }
-    else
+    } else
       this._sortColumn = document.getElementById("typeColumn");
 
     // Load the data and build the list of handlers.
@@ -952,8 +950,8 @@ var gApplicationsPane = {
     setTimeout(_delayedPaneLoad, 0, this);
   },
 
-  destroy: function() {
-    window.removeEventListener("unload", this, false);
+  destroy() {
+    window.removeEventListener("unload", this);
     this._prefSvc.removeObserver(PREF_SHOW_PLUGINS_IN_LIST, this);
     this._prefSvc.removeObserver(PREF_HIDE_PLUGINS_WITHOUT_EXTENSIONS, this);
     this._prefSvc.removeObserver(PREF_FEED_SELECTED_APP, this);
@@ -975,7 +973,7 @@ var gApplicationsPane = {
 
   // nsISupports
 
-  QueryInterface: function(aIID) {
+  QueryInterface(aIID) {
     if (aIID.equals(Ci.nsIObserver) ||
         aIID.equals(Ci.nsIDOMEventListener ||
         aIID.equals(Ci.nsISupports)))
@@ -987,7 +985,7 @@ var gApplicationsPane = {
 
   // nsIObserver
 
-  observe: function (aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     // Rebuild the list when there are changes to preferences that influence
     // whether or not to show certain entries in the list.
     if (aTopic == "nsPref:changed" && !this._storingAction) {
@@ -1008,7 +1006,7 @@ var gApplicationsPane = {
 
   // nsIDOMEventListener
 
-  handleEvent: function(aEvent) {
+  handleEvent(aEvent) {
     if (aEvent.type == "unload") {
       this.destroy();
     }
@@ -1017,14 +1015,14 @@ var gApplicationsPane = {
 
   // Composed Model Construction
 
-  _loadData: function() {
+  _loadData() {
     this._loadFeedHandler();
     this._loadInternalHandlers();
     this._loadPluginHandlers();
     this._loadApplicationHandlers();
   },
 
-  _loadFeedHandler: function() {
+  _loadFeedHandler() {
     this._handledTypes[TYPE_MAYBE_FEED] = feedHandlerInfo;
     feedHandlerInfo.handledOnlyByPlugin = false;
 
@@ -1039,7 +1037,7 @@ var gApplicationsPane = {
    * Load higher level internal handlers so they can be turned on/off in the
    * applications menu.
    */
-  _loadInternalHandlers: function() {
+  _loadInternalHandlers() {
     var internalHandlers = [pdfHandlerInfo];
     for (let internalHandler of internalHandlers) {
       if (internalHandler.enabled) {
@@ -1066,7 +1064,7 @@ var gApplicationsPane = {
    * enabledPlugin to get the plugin that would be used, we'd still need to
    * check the pref ourselves to find out if it's enabled.
    */
-  _loadPluginHandlers: function() {
+  _loadPluginHandlers() {
     "use strict";
 
     let mimeTypes = navigator.mimeTypes;
@@ -1089,7 +1087,7 @@ var gApplicationsPane = {
   /**
    * Load the set of handlers defined by the application datastore.
    */
-  _loadApplicationHandlers: function() {
+  _loadApplicationHandlers() {
     var wrappedHandlerInfos = this._handlerSvc.enumerate();
     while (wrappedHandlerInfos.hasMoreElements()) {
       let wrappedHandlerInfo =
@@ -1111,7 +1109,7 @@ var gApplicationsPane = {
 
   // View Construction
 
-  _rebuildVisibleTypes: function() {
+  _rebuildVisibleTypes() {
     // Reset the list of visible types and the visible type description counts.
     this._visibleTypes = [];
     this._visibleTypeDescriptionCount = {};
@@ -1150,7 +1148,7 @@ var gApplicationsPane = {
     }
   },
 
-  _rebuildView: function() {
+  _rebuildView() {
     // Clear the list of entries.
     while (this._list.childNodes.length > 1)
       this._list.removeChild(this._list.lastChild);
@@ -1181,7 +1179,7 @@ var gApplicationsPane = {
     this._selectLastSelectedType();
   },
 
-  _matchesFilter: function(aType) {
+  _matchesFilter(aType) {
     var filterValue = this._filter.value.toLowerCase();
     return this._describeType(aType).toLowerCase().indexOf(filterValue) != -1 ||
            this._describePreferredAction(aType).toLowerCase().indexOf(filterValue) != -1;

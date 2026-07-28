@@ -617,23 +617,22 @@ var LightWeightThemeWebInstaller = {
       return;
 
     this._resetPreview();
-    gBrowser.tabContainer.addEventListener("TabSelect", this, false);
+    gBrowser.tabContainer.addEventListener("TabSelect", this);
     this._manager.previewTheme(data);
   },
 
-  _resetPreview: function (baseURI) {
+  _resetPreview(baseURI) {
     if (baseURI && !this._isAllowed(baseURI))
       return;
-    gBrowser.tabContainer.removeEventListener("TabSelect", this, false);
+    gBrowser.tabContainer.removeEventListener("TabSelect", this);
     this._manager.resetPreview();
   },
 
-  _isAllowed: function (srcURIString) {
+  _isAllowed(srcURIString) {
     let uri;
     try {
       uri = makeURI(srcURIString);
-    }
-    catch (e) {
+    } catch (e) {
       // makeURI fails if srcURIString is a nonsense URI
       return false;
     }

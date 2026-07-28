@@ -314,4 +314,4 @@ window.messageManager.addMessageListener("EMEVideo:ContentMediaKeysRequest", gEM
 window.addEventListener("unload", function() {
   window.messageManager.removeMessageListener("EMEVideo:ContentMediaKeysRequest", gEMEHandler);
   window.messageManager.removeMessageListener("DecoderDoctor:Notification", gDecoderDoctorHandler);
-}, false);
+});

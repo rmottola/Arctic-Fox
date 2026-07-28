@@ -953,7 +953,7 @@ const CustomizableWidgets = [
     populateList: function(aDocument, aContainerId, aSection) {
       let containerElem = aDocument.getElementById(aContainerId);
 
-      containerElem.addEventListener("command", this.onCommand, false);
+      containerElem.addEventListener("command", this.onCommand);
 
       let list = this.charsetInfo[aSection];
 

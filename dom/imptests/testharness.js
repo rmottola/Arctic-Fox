@@ -647,7 +647,7 @@ policies and contribution forms [3].
 
     function on_event(object, event, callback)
     {
-        object.addEventListener(event, callback, false);
+        object.addEventListener(event, callback);
     }
 
     expose(test, 'test');

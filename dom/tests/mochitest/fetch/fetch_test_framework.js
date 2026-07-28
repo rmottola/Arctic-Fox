@@ -82,7 +82,7 @@ function testScript(script) {
           } else if (event.data.type == 'status') {
             ok(event.data.status, event.data.context + ": " + event.data.msg);
           }
-        }, false);
+        });
 
         worker.onerror = reject;
 

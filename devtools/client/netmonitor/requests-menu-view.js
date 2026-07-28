@@ -96,15 +96,15 @@ RequestsMenuView.prototype = {
     this.toggleRawHeadersEvent = this.toggleRawHeaders.bind(this);
 
     $("#toggle-raw-headers")
-      .addEventListener("click", this.toggleRawHeadersEvent, false);
+      .addEventListener("click", this.toggleRawHeadersEvent);
 
     this._summary = $("#requests-menu-network-summary-button");
     this._summary.setAttribute("label", L10N.getStr("networkMenu.empty"));
 
     this.onResize = this.onResize.bind(this);
     this._splitter = $("#network-inspector-view-splitter");
-    this._splitter.addEventListener("mouseup", this.onResize, false);
-    window.addEventListener("resize", this.onResize, false);
+    this._splitter.addEventListener("mouseup", this.onResize);
+    window.addEventListener("resize", this.onResize);
 
     this.tooltip = new HTMLTooltip(NetMonitorController._toolbox.doc, { type: "arrow" });
 
@@ -120,17 +120,17 @@ RequestsMenuView.prototype = {
   _onConnect() {
     if (NetMonitorController.supportsCustomRequest) {
       $("#custom-request-send-button")
-        .addEventListener("click", this.sendCustomRequestEvent, false);
+        .addEventListener("click", this.sendCustomRequestEvent);
       $("#custom-request-close-button")
-        .addEventListener("click", this.closeCustomRequestEvent, false);
+        .addEventListener("click", this.closeCustomRequestEvent);
       $("#headers-summary-resend")
-        .addEventListener("click", this.cloneSelectedRequestEvent, false);
+        .addEventListener("click", this.cloneSelectedRequestEvent);
     } else {
       $("#headers-summary-resend").hidden = true;
     }
 
     $("#network-statistics-back-button")
-      .addEventListener("command", this._onContextPerfCommand, false);
+      .addEventListener("command", this._onContextPerfCommand);
   },
 
   /**
@@ -144,18 +144,18 @@ RequestsMenuView.prototype = {
     // this.flushRequestsTask.disarm();
 
     $("#network-statistics-back-button")
-      .removeEventListener("command", this._onContextPerfCommand, false);
+      .removeEventListener("command", this._onContextPerfCommand);
     $("#custom-request-send-button")
-      .removeEventListener("click", this.sendCustomRequestEvent, false);
+      .removeEventListener("click", this.sendCustomRequestEvent);
     $("#custom-request-close-button")
-      .removeEventListener("click", this.closeCustomRequestEvent, false);
+      .removeEventListener("click", this.closeCustomRequestEvent);
     $("#headers-summary-resend")
-      .removeEventListener("click", this.cloneSelectedRequestEvent, false);
+      .removeEventListener("click", this.cloneSelectedRequestEvent);
     $("#toggle-raw-headers")
-      .removeEventListener("click", this.toggleRawHeadersEvent, false);
+      .removeEventListener("click", this.toggleRawHeadersEvent);
 
-    this._splitter.removeEventListener("mouseup", this.onResize, false);
-    window.removeEventListener("resize", this.onResize, false);
+    this._splitter.removeEventListener("mouseup", this.onResize);
+    window.removeEventListener("resize", this.onResize);
 
     this.tooltip.destroy();
 

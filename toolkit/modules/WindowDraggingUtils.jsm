@@ -15,7 +15,7 @@ this.WindowDraggingElement = function WindowDraggingElement(elem) {
     return;
   }
 
-  this._elem.addEventListener("mousedown", this, false);
+  this._elem.addEventListener("mousedown", this);
 };
 
 WindowDraggingElement.prototype = {
@@ -78,8 +78,8 @@ WindowDraggingElement.prototype = {
           this._deltaY = aEvent.screenY - this._window.screenY;
         }
         this._draggingWindow = true;
-        this._window.addEventListener("mousemove", this, false);
-        this._window.addEventListener("mouseup", this, false);
+        this._window.addEventListener("mousemove", this);
+        this._window.addEventListener("mouseup", this);
         break;
       case "mousemove":
         if (this._draggingWindow) {
@@ -90,8 +90,8 @@ WindowDraggingElement.prototype = {
       case "mouseup":
         if (this._draggingWindow) {
           this._draggingWindow = false;
-          this._window.removeEventListener("mousemove", this, false);
-          this._window.removeEventListener("mouseup", this, false);
+          this._window.removeEventListener("mousemove", this);
+          this._window.removeEventListener("mouseup", this);
         }
         break;
     }

@@ -51,8 +51,7 @@ var gDisplay = document.getElementById('display');
   'transitionend' ]
   .forEach(event =>
              gDisplay.addEventListener(event,
-                                       event => gEventsReceived.push(event),
-                                       false));
+                                       event => gEventsReceived.push(event)));
 
 function checkEventOrder(...args) {
   // Argument format:

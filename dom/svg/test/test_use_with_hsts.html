@@ -90,7 +90,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1247733
     // capture test screenshots.
 
     // Register a postMessage handler, so that iframe can report its location:
-    window.addEventListener("message", receiveMessage, false);
+    window.addEventListener("message", receiveMessage);
 
     // Point iframe at secure (HTTPS) version of testcase, & wait for callback:
     iframe.onload = captureSecureSnapshot;

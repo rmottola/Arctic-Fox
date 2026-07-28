@@ -26,7 +26,7 @@
                     : eventRect;
     onpaint();
   }
-  window.addEventListener("MozAfterPaint", paintListener, false);
+  window.addEventListener("MozAfterPaint", paintListener);
 
   function waitForPaints(callback, subdoc, flushMode) {
     // Wait until paint suppression has ended

@@ -545,7 +545,7 @@ Cookies.prototype = {
   _readCookieFile(aFile, aCallback) {
     let fileReader = new FileReader();
     let onLoadEnd = () => {
-      fileReader.removeEventListener("loadend", onLoadEnd, false);
+      fileReader.removeEventListener("loadend", onLoadEnd);
 
       if (fileReader.readyState != fileReader.DONE) {
         Cu.reportError("Could not read cookie contents: " + fileReader.error);
@@ -563,7 +563,7 @@ Cookies.prototype = {
         aCallback(success);
       }
     };
-    fileReader.addEventListener("loadend", onLoadEnd, false);
+    fileReader.addEventListener("loadend", onLoadEnd);
     fileReader.readAsText(File.createFromNsIFile(aFile));
   },
 

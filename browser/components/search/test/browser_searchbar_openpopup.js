@@ -87,9 +87,9 @@ function add_no_popup_task(task) {
     }
 
     info("Entering test " + task.name);
-    searchPopup.addEventListener("popupshowing", listener, false);
+    searchPopup.addEventListener("popupshowing", listener);
     yield Task.spawn(task);
-    searchPopup.removeEventListener("popupshowing", listener, false);
+    searchPopup.removeEventListener("popupshowing", listener);
     ok(!sawPopup, "Shouldn't have seen the suggestions popup");
     info("Leaving test " + task.name);
   });
@@ -352,7 +352,7 @@ add_task(function* refocus_window_doesnt_open_popup_mouse() {
   function listener() {
     ok(false, "Should not have shown the popup.");
   }
-  searchPopup.addEventListener("popupshowing", listener, false);
+  searchPopup.addEventListener("popupshowing", listener);
 
   promise = promiseEvent(searchbar, "focus");
   newWin.close();
@@ -363,7 +363,7 @@ add_task(function* refocus_window_doesnt_open_popup_mouse() {
   yield new Promise(resolve => executeSoon(resolve));
   yield new Promise(resolve => executeSoon(resolve));
 
-  searchPopup.removeEventListener("popupshowing", listener, false);
+  searchPopup.removeEventListener("popupshowing", listener);
   textbox.value = "";
 });
 
@@ -389,7 +389,7 @@ add_task(function* refocus_window_doesnt_open_popup_keyboard() {
   function listener() {
     ok(false, "Should not have shown the popup.");
   }
-  searchPopup.addEventListener("popupshowing", listener, false);
+  searchPopup.addEventListener("popupshowing", listener);
 
   promise = promiseEvent(searchbar, "focus");
   newWin.close();
@@ -400,7 +400,7 @@ add_task(function* refocus_window_doesnt_open_popup_keyboard() {
   yield new Promise(resolve => executeSoon(resolve));
   yield new Promise(resolve => executeSoon(resolve));
 
-  searchPopup.removeEventListener("popupshowing", listener, false);
+  searchPopup.removeEventListener("popupshowing", listener);
   textbox.value = "";
 });
 

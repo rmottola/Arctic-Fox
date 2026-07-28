@@ -317,8 +317,8 @@ function SetClickAndHoldHandlers() {
     // Prevent the menupopup from opening immediately
     aEvent.currentTarget.firstChild.hidden = true;
 
-    aEvent.currentTarget.addEventListener("mouseout", mouseoutHandler, false);
-    aEvent.currentTarget.addEventListener("mouseup", mouseupHandler, false);
+    aEvent.currentTarget.addEventListener("mouseout", mouseoutHandler);
+    aEvent.currentTarget.addEventListener("mouseup", mouseupHandler);
     timer = setTimeout(openMenu, 500, aEvent.currentTarget);
   }
 
@@ -386,8 +386,7 @@ function SetClickAndHoldHandlers() {
 };
 
 const gSessionHistoryObserver = {
-  observe: function(subject, topic, data)
-  {
+  observe(subject, topic, data) {
     if (topic != "browser:purge-session-history")
       return;
 
@@ -986,8 +985,8 @@ addEventListener("DOMContentLoaded", function onDCL() {
 var gBrowserInit = {
   delayedStartupFinished: false,
 
-  onLoad: function() {
-    gBrowser.addEventListener("DOMUpdatePageReport", gPopupBlockerObserver, false);
+  onLoad() {
+    gBrowser.addEventListener("DOMUpdatePageReport", gPopupBlockerObserver);
 
     Services.obs.addObserver(gPluginHandler.NPAPIPluginCrashed, "plugin-crashed", false);
 
@@ -1392,8 +1391,8 @@ var gBrowserInit = {
     if (AppConstants.platform != "macosx") {
       updateEditUIVisibility();
       let placesContext = document.getElementById("placesContext");
-      placesContext.addEventListener("popupshowing", updateEditUIVisibility, false);
-      placesContext.addEventListener("popuphiding", updateEditUIVisibility, false);
+      placesContext.addEventListener("popupshowing", updateEditUIVisibility);
+      placesContext.addEventListener("popuphiding", updateEditUIVisibility);
     }
 
     gBrowser.mPanelContainer.addEventListener("InstallBrowserTheme", LightWeightThemeWebInstaller, false, true);
@@ -1460,17 +1459,17 @@ var gBrowserInit = {
       appMenuButton.addEventListener("mousedown", function(event) {
         if (event.button == 0)
           appMenuOpening = new Date();
-      }, false);
+      });
       appMenuPopup.addEventListener("popupshown", function(event) {
         if (event.target != appMenuPopup || !appMenuOpening)
           return;
         let duration = new Date() - appMenuOpening;
         appMenuOpening = null;
-      }, false);
+      });
     }
 
-    window.addEventListener("mousemove", MousePosTracker, false);
-    window.addEventListener("dragover", MousePosTracker, false);
+    window.addEventListener("mousemove", MousePosTracker);
+    window.addEventListener("dragover", MousePosTracker);
 
     gNavToolbox.addEventListener("customizationstarting", CustomizationHandler);
     gNavToolbox.addEventListener("customizationchange", CustomizationHandler);
@@ -2018,12 +2017,11 @@ function openLocation() {
       // If there's an open browser window, it should handle this command
       win.focus()
       win.openLocation();
-    }
-    else {
+    } else {
       // If there are no open browser windows, open a new one
       win = window.openDialog("chrome://browser/content/", "_blank",
                               "chrome,all,dialog=no", BROWSER_NEW_TAB_URL);
-      win.addEventListener("load", openLocationCallback, false);
+      win.addEventListener("load", openLocationCallback);
     }
     return;
   }
@@ -2594,14 +2592,12 @@ function setUrlAndSearchBarWidthForConditionalForwardButton() {
   searchbarContainer.style.width = searchbarWidth + "px";
 }
 
-function UpdatePageProxyState()
-{
+function UpdatePageProxyState() {
   if (gURLBar && gURLBar.value != gLastValidURLStr)
     SetPageProxyState("invalid");
 }
 
-function SetPageProxyState(aState)
-{
+function SetPageProxyState(aState) {
   if (!gURLBar)
     return;
 
@@ -2611,9 +2607,9 @@ function SetPageProxyState(aState)
   // gets called when we switch tabs.
   if (aState == "valid") {
     gLastValidURLStr = gURLBar.value;
-    gURLBar.addEventListener("input", UpdatePageProxyState, false);
+    gURLBar.addEventListener("input", UpdatePageProxyState);
   } else if (aState == "invalid") {
-    gURLBar.removeEventListener("input", UpdatePageProxyState, false);
+    gURLBar.removeEventListener("input", UpdatePageProxyState);
   }
 }
 
@@ -3240,8 +3236,7 @@ function populateMirrorTabMenu(popup) {
   });
 }
 
-function getWebNavigation()
-{
+function getWebNavigation() {
   return gBrowser.webNavigation;
 }
 
@@ -3910,10 +3905,10 @@ function FillHistoryMenu(aParent) {
       // Only the current page should have the checked attribute, so skip it
       if (!aEvent.target.hasAttribute("checked"))
         XULBrowserWindow.setOverLink(aEvent.target.getAttribute("uri"));
-    }, false);
+    });
     aParent.addEventListener("DOMMenuItemInactive", function() {
       XULBrowserWindow.setOverLink("");
-    }, false);
+    });
 
     aParent.hasStatusListener = true;
   }
@@ -4165,9 +4160,9 @@ function BrowserCustomizeToolbar() {
     // that the user doesn't see a white flash.
     panel.style.visibility = "hidden";
     gNavToolbox.addEventListener("beforecustomization", function onBeforeCustomization() {
-      gNavToolbox.removeEventListener("beforecustomization", onBeforeCustomization, false);
+      gNavToolbox.removeEventListener("beforecustomization", onBeforeCustomization);
       panel.style.removeProperty("visibility");
-    }, false);
+    });
 
     sheetFrame.setAttribute("src", customizeURL);
 
@@ -4971,7 +4966,7 @@ var LinkTargetDisplay = {
     return XULBrowserWindow.statusTextField.label != "";
   },
 
-  update: function() {
+  update() {
     clearTimeout(this._timer);
     window.removeEventListener("mousemove", this, true);
 
@@ -4992,7 +4987,7 @@ var LinkTargetDisplay = {
     }
   },
 
-  handleEvent: function(event) {
+  handleEvent(event) {
     switch (event.type) {
       case "mousemove":
         // Restart the delay since the mouse was moved
@@ -5002,7 +4997,7 @@ var LinkTargetDisplay = {
     }
   },
 
-  _showDelayed: function() {
+  _showDelayed() {
     this._timer = setTimeout(function(self) {
       XULBrowserWindow.updateStatusField();
       window.removeEventListener("mousemove", self, true);
@@ -5017,7 +5012,7 @@ var LinkTargetDisplay = {
 };
 
 var CombinedStopReload = {
-  init: function() {
+  init() {
     if (this._initialized)
       return;
 
@@ -5042,30 +5037,30 @@ var CombinedStopReload = {
     this._initialized = true;
     if (XULBrowserWindow.stopCommand.getAttribute("disabled") != "true")
       reload.setAttribute("displaystop", "true");
-    stop.addEventListener("click", this, false);
+    stop.addEventListener("click", this);
     this.reload = reload;
     this.stop = stop;
   },
 
-  uninit: function() {
+  uninit() {
     if (!this._initialized)
       return;
 
     this._cancelTransition();
     this._initialized = false;
-    this.stop.removeEventListener("click", this, false);
+    this.stop.removeEventListener("click", this);
     this.reload = null;
     this.stop = null;
   },
 
-  handleEvent: function(event) {
+  handleEvent(event) {
     // the only event we listen to is "click" on the stop button
     if (event.button == 0 &&
         !this.stop.disabled)
       this._stopClicked = true;
   },
 
-  switchToStop: function() {
+  switchToStop() {
     if (!this._initialized)
       return;
 
@@ -5073,7 +5068,7 @@ var CombinedStopReload = {
     this.reload.setAttribute("displaystop", "true");
   },
 
-  switchToReload: function(aDelay) {
+  switchToReload(aDelay) {
     if (!this._initialized)
       return;
 
@@ -5100,7 +5095,7 @@ var CombinedStopReload = {
     }, 650, this);
   },
 
-  _cancelTransition: function() {
+  _cancelTransition() {
     if (this._timer) {
       clearTimeout(this._timer);
       this._timer = 0;
@@ -5113,7 +5108,7 @@ var TabsProgressListener = {
   // we won't see STATE_START events for pre-rendered tabs.
   _startedLoadTimer: new WeakSet(),
 
-  onStateChange: function(aBrowser, aWebProgress, aRequest, aStateFlags, aStatus) {
+  onStateChange(aBrowser, aWebProgress, aRequest, aStateFlags, aStatus) {
     // Collect telemetry data about tab load times.
     if (aWebProgress.isTopLevel && (!aRequest.originalURI || aRequest.originalURI.spec.scheme != "about")) {
       if (aStateFlags & Ci.nsIWebProgressListener.STATE_IS_WINDOW) {
@@ -5167,7 +5162,7 @@ var TabsProgressListener = {
     }
   },
 
-  onLocationChange: function(aBrowser, aWebProgress, aRequest, aLocationURI,
+  onLocationChange(aBrowser, aWebProgress, aRequest, aLocationURI,
                              aFlags) {
     // Filter out location changes caused by anchor navigation
     // or history.push/pop/replaceState.
@@ -5405,7 +5400,7 @@ function onViewToolbarsPopupShowing(aEvent, aInsertPoint) {
 
     popup.insertBefore(menuItem, firstMenuItem);
 
-    menuItem.addEventListener("command", onViewToolbarCommand, false);
+    menuItem.addEventListener("command", onViewToolbarCommand);
   }
 
 
@@ -7599,7 +7594,7 @@ var gIdentityHandler = {
     this._identityPopup.addEventListener("popuphidden", function onPopupHidden(e) {
       e.currentTarget.removeEventListener("popuphidden", onPopupHidden, false);
       self._identityBox.removeAttribute("open");
-    }, false);
+    });
 
     // Now open the popup, anchored off the primary chrome element
     this._identityPopup.openPopup(this._identityIcon, "bottomcenter topleft");
@@ -8031,8 +8026,8 @@ var TabContextMenu = {
     this.contextTab.toggleMuteMenuItem = toggleMute;
     this._updateToggleMuteMenuItem(this.contextTab);
 
-    this.contextTab.addEventListener("TabAttrModified", this, false);
-    aPopupMenu.addEventListener("popuphiding", this, false);
+    this.contextTab.addEventListener("TabAttrModified", this);
+    aPopupMenu.addEventListener("popuphiding", this);
   },
   handleEvent(aEvent) {
     switch (aEvent.type) {
@@ -8208,7 +8203,7 @@ function BrowserOpenNewTabOrWindow(event) {
 }
 
 var ToolbarIconColor = {
-  init: function() {
+  init() {
     this._initialized = true;
 
     window.addEventListener("activate", this);

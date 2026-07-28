@@ -69,8 +69,8 @@ function startTest(test) {
     Log(e.target.name, "got " + e.type);
   }
   events.forEach(function(e) {
-    v.addEventListener(e, logEvent, false);
-    vout.addEventListener(e, logEvent, false);
+    v.addEventListener(e, logEvent);
+    vout.addEventListener(e, logEvent);
   });
 
 }

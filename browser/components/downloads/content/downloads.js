@@ -140,7 +140,7 @@ const DownloadsPanel = {
     }
     this._state = this.kStateHidden;
 
-    window.addEventListener("unload", this.onWindowUnload, false);
+    window.addEventListener("unload", this.onWindowUnload);
 
     // Load and resume active downloads if required.  If there are downloads to
     // be shown in the panel, they will be loaded asynchronously.
@@ -175,7 +175,7 @@ const DownloadsPanel = {
       return;
     }
 
-    window.removeEventListener("unload", this.onWindowUnload, false);
+    window.removeEventListener("unload", this.onWindowUnload);
 
     // Ensure that the panel is closed before shutting down.
     this.hidePanel();
@@ -192,8 +192,7 @@ const DownloadsPanel = {
     DownloadsCommon.log("DownloadsPanel terminated.");
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  //// Panel interface
+  // Panel interface
 
   /**
    * Main panel element in the browser window, or null if the panel overlay
@@ -382,8 +381,7 @@ const DownloadsPanel = {
     BrowserDownloadsUI();
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  //// Internal functions
+  // Internal functions
 
   /**
    * Attach event listeners to a panel element. These listeners should be
@@ -392,10 +390,10 @@ const DownloadsPanel = {
    */
   _attachEventListeners() {
     // Handle keydown to support accel-V.
-    this.panel.addEventListener("keydown", this, false);
+    this.panel.addEventListener("keydown", this);
     // Handle keypress to be able to preventDefault() events before they reach
     // the richlistbox, for keyboard navigation.
-    this.panel.addEventListener("keypress", this, false);
+    this.panel.addEventListener("keypress", this);
   },
 
   /**
@@ -403,8 +401,8 @@ const DownloadsPanel = {
    * is called automatically on panel termination.
    */
   _unattachEventListeners() {
-    this.panel.removeEventListener("keydown", this, false);
-    this.panel.removeEventListener("keypress", this, false);
+    this.panel.removeEventListener("keydown", this);
+    this.panel.removeEventListener("keypress", this);
   },
 
   _onKeyPress(aEvent) {

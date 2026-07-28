@@ -327,7 +327,7 @@ Submitter.prototype = {
            this.cleanup();
         }
       }
-    }, false);
+    });
 
     if (this.recordSubmission) {
       manager.addSubmissionAttempt(this.id, submissionID, new Date());

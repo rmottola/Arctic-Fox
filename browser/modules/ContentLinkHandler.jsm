@@ -30,10 +30,10 @@ this.ContentLinkHandler = {
   init: function(chromeGlobal) {
     chromeGlobal.addEventListener("DOMLinkAdded", (event) => {
       this.onLinkEvent(event, chromeGlobal);
-    }, false);
+    });
     chromeGlobal.addEventListener("DOMLinkChanged", (event) => {
       this.onLinkEvent(event, chromeGlobal);
-    }, false);
+    });
   },
 
   onLinkEvent: function(event, chromeGlobal) {
