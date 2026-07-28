@@ -47,6 +47,12 @@ const HISTOGRAM_SUFFIXES = {
   GPU: "#gpu",
 }
 
+const INTERNAL_PROCESSES_NAMES = {
+  PARENT: "default",
+  CONTENT: "tab",
+  GPU: "gpu",
+}
+
 const ENVIRONMENT_CHANGE_LISTENER = "TelemetrySession::onEnvironmentChange";
 
 const MS_IN_ONE_HOUR  = 60 * 60 * 1000;
@@ -979,7 +985,9 @@ var Impl = {
    * @param {subsession} If true, then we collect the data for a subsession.
    * @param {clearSubsession} If true, we  need to clear the subsession.
    * @param {keyed} Take a snapshot of keyed or non keyed scalars.
-   * @return {Object} The scalar data as a Javascript object.
+   * @return {Object} The scalar data as a Javascript object, including the
+   *         data from child processes, in the following format:
+   *            {'content': { 'scalarName': ... }, 'gpu': { ... } }
    */
   getScalars: function(subsession, clearSubsession, keyed) {
     this._log.trace("getScalars - subsession: " + subsession + ", clearSubsession: " +
@@ -997,11 +1005,17 @@ var Impl = {
 
     // Don't return the test scalars.
     let ret = {};
-    for (let name in scalarsSnapshot) {
-      if (name.startsWith('telemetry.test') && this._testing == false) {
-        this._log.trace("getScalars - Skipping test scalar: " + name);
-      } else {
-        ret[name] = scalarsSnapshot[name];
+    for (let processName in scalarsSnapshot) {
+      for (let name in scalarsSnapshot[processName]) {
+        if (name.startsWith('telemetry.test') && this._testing == false) {
+          this._log.trace("getScalars - Skipping test scalar: " + name);
+          continue;
+        }
+        // Finally arrange the data in the returned object.
+        if (!(processName in ret)) {
+          ret[processName] = {};
+        }
+        ret[processName][name] = scalarsSnapshot[processName][name];
       }
     }
 
@@ -1292,15 +1306,20 @@ var Impl = {
     // Additional payload for chrome process.
     let histograms = protect(() => this.getHistograms(isSubsession, clearSubsession), {});
     let keyedHistograms = protect(() => this.getKeyedHistograms(isSubsession, clearSubsession), {});
+    let scalars = protect(() => this.getScalars(isSubsession, clearSubsession), {});
+    let keyedScalars = protect(() => this.getScalars(isSubsession, clearSubsession, true), {});
+
     payloadObj.histograms = histograms[HISTOGRAM_SUFFIXES.PARENT] || {};
     payloadObj.keyedHistograms = keyedHistograms[HISTOGRAM_SUFFIXES.PARENT] || {};
     payloadObj.processes = {
       parent: {
-        scalars: protect(() => this.getScalars(isSubsession, clearSubsession)),
-        keyedScalars: protect(() => this.getScalars(isSubsession, clearSubsession, true)),
+        scalars: scalars[INTERNAL_PROCESSES_NAMES.PARENT] || {},
+        keyedScalars: keyedScalars[INTERNAL_PROCESSES_NAMES.PARENT] || {},
         events: protect(() => this.getEvents(isSubsession, clearSubsession)),
       },
       content: {
+        scalars: scalars[INTERNAL_PROCESSES_NAMES.CONTENT],
+        keyedScalars: keyedScalars[INTERNAL_PROCESSES_NAMES.CONTENT],
         histograms: histograms[HISTOGRAM_SUFFIXES.CONTENT],
         keyedHistograms: keyedHistograms[HISTOGRAM_SUFFIXES.CONTENT],
       },
