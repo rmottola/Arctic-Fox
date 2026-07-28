@@ -20,25 +20,21 @@ ac_add_options --disable-necko-wifi
 ac_add_options --disable-gamepad
 ac_add_options --disable-dbus
 ac_add_options --disable-gio
-#ac_add_options --disable-gconf
-ac_add_options --disable-pulseaudio
+ac_add_options --disable-gconf
 ac_add_options --enable-strip
 ac_add_options --enable-install-strip
 ac_add_options --enable-application=browser
 ac_add_options --with-branding=browser/branding/arcticfox
 
-#ac_add_options --enable-optimize
-
-# only for gcc >= 6 and only if binaries are unstable, should be inserted automatically by configure if gcc >= 6
-ac_add_options --enable-optimize="-g0 -O2 -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
+ac_add_options --enable-optimize
 
 # gtk3 now supported and default, but gtk2 just looks better
 ac_add_options --enable-default-toolkit=cairo-gtk2
 
-# Issue 162
+# Issue 162 - not generally needed, but pops up in certain configurations
 #ac_add_options --disable-precompiled-startupcache
 
-# For convenience, if needed
+# System libraries
 #ac_add_options --with-system-nspr
 #ac_add_options --with-system-nss
 #ac_add_options --with-system-icu
@@ -47,4 +43,5 @@ ac_add_options --enable-default-toolkit=cairo-gtk2
 #ac_add_options --enable-system-hunspell
 #ac_add_options --enable-system-sqlite
 #ac_add_options --enable-system-ffi
+#ac_add_options --enable-system-cairo
 #ac_add_options --enable-system-pixman
