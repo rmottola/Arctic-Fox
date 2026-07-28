@@ -41,10 +41,10 @@ partial interface File {
   readonly attribute DOMString mozFullPath;
 
   [ChromeOnly, Throws, NeedsCallerType]
-  static File createFromNsIFile(nsIFile file,
-                                optional ChromeFilePropertyBag options);
+  static Promise<File> createFromNsIFile(nsIFile file,
+                                         optional ChromeFilePropertyBag options);
 
   [ChromeOnly, Throws, NeedsCallerType]
-  static File createFromFileName(USVString fileName,
-                                 optional ChromeFilePropertyBag options);
+  static Promise<File> createFromFileName(USVString fileName,
+                                          optional ChromeFilePropertyBag options);
 };
