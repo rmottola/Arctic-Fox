@@ -7820,7 +7820,7 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
               continue;
             }
 
-            blobImpl = new BlobImplFile(file, false);
+            blobImpl = new BlobImplFile(file);
             ErrorResult rv;
             // Ensure that file data is cached no that the content process
             // has this data available to it when passed over:

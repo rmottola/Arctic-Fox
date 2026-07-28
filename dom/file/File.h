@@ -185,7 +185,7 @@ public:
   // Would be nice if we try to avoid to use this method outside the
   // main-thread to avoid extra runnables.
   static already_AddRefed<File>
-  CreateFromFile(nsISupports* aParent, nsIFile* aFile, bool aTemporary = false);
+  CreateFromFile(nsISupports* aParent, nsIFile* aFile);
 
   static already_AddRefed<File>
   CreateFromFile(nsISupports* aParent, nsIFile* aFile, const nsAString& aName,
@@ -678,11 +678,10 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
 
   // Create as a file
-  explicit BlobImplFile(nsIFile* aFile, bool aTemporary = false)
+  explicit BlobImplFile(nsIFile* aFile)
     : BlobImplBase(EmptyString(), EmptyString(), UINT64_MAX, INT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
-    , mIsTemporary(aTemporary)
   {
     MOZ_ASSERT(mFile, "must have file");
     // Lazily get the content type and size
@@ -696,7 +695,6 @@ public:
     : BlobImplBase(aName, aContentType, aLength, UINT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
-    , mIsTemporary(false)
   {
     MOZ_ASSERT(mFile, "must have file");
   }
@@ -707,7 +705,6 @@ public:
     : BlobImplBase(aName, aContentType, aLength, aLastModificationDate)
     , mFile(aFile)
     , mWholeFile(true)
-    , mIsTemporary(false)
   {
     MOZ_ASSERT(mFile, "must have file");
   }
@@ -718,7 +715,6 @@ public:
     : BlobImplBase(aName, aContentType, UINT64_MAX, INT64_MAX)
     , mFile(aFile)
     , mWholeFile(true)
-    , mIsTemporary(false)
   {
     MOZ_ASSERT(mFile, "must have file");
     if (aContentType.IsEmpty()) {
@@ -744,19 +740,7 @@ public:
   virtual bool IsDateUnknown() const override { return false; }
 
 protected:
-  virtual ~BlobImplFile() {
-    if (mFile && mIsTemporary) {
-      NS_WARNING("In temporary ~BlobImplFile");
-      // Ignore errors if any, not much we can do. Clean-up will be done by
-      // https://mxr.mozilla.org/mozilla-central/source/xpcom/io/nsAnonymousTemporaryFile.cpp?rev=6c1c7e45c902#127
-#ifdef DEBUG
-      nsresult rv =
-#endif
-      mFile->Remove(false);
-      NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
-                           "Failed to remove temporary DOMFile.");
-    }
-  }
+  virtual ~BlobImplFile() = default;
 
 private:
   // Create slice
@@ -765,7 +749,6 @@ private:
     : BlobImplBase(aContentType, aOther->mStart + aStart, aLength)
     , mFile(aOther->mFile)
     , mWholeFile(false)
-    , mIsTemporary(false)
   {
     MOZ_ASSERT(mFile, "must have file");
     mImmutable = aOther->mImmutable;
@@ -777,7 +760,6 @@ private:
 
   nsCOMPtr<nsIFile> mFile;
   bool mWholeFile;
-  bool mIsTemporary;
 };
 
 class EmptyBlobImpl final : public BlobImplBase
