@@ -20,6 +20,7 @@
 #include "mozilla/layers/PLayerTransactionChild.h"
 #include "mozilla/layers/TextureClient.h"// for TextureClient
 #include "mozilla/layers/TextureClientPool.h"// for TextureClientPool
+#include "mozilla/layers/WebRenderBridgeChild.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/gfx/Logging.h"
@@ -144,6 +145,14 @@ CompositorBridgeChild::Destroy()
     layers->Destroy();
   }
 
+  AutoTArray<PWebRenderBridgeChild*, 16> wRBridges;
+  ManagedPWebRenderBridgeChild(wRBridges);
+  for (int i = wRBridges.Length() - 1; i >= 0; --i) {
+    RefPtr<WebRenderBridgeChild> wRBridge =
+      static_cast<WebRenderBridgeChild*>(wRBridges[i]);
+    wRBridge->Destroy();
+  }
+
   const ManagedContainer<PTextureChild>& textures = ManagedPTextureChild();
   for (auto iter = textures.ConstIter(); !iter.Done(); iter.Next()) {
     RefPtr<TextureClient> texture = TextureClient::AsTextureClient(iter.Get()->GetKey());
@@ -234,7 +243,7 @@ CompositorBridgeParent*
 CompositorBridgeChild::InitSameProcess(widget::CompositorWidget* aWidget,
                                        const uint64_t& aLayerTreeId,
                                        CSSToLayoutDeviceScale aScale,
-                                       bool aUseAPZ,
+                                       const CompositorOptions& aOptions,
                                        bool aUseExternalSurface,
                                        const gfx::IntSize& aSurfaceSize)
 {
@@ -242,7 +251,7 @@ CompositorBridgeChild::InitSameProcess(widget::CompositorWidget* aWidget,
     gfxPlatform::GetPlatform()->GetHardwareVsync()->GetGlobalDisplay().GetVsyncRate();
 
   mCompositorBridgeParent =
-    new CompositorBridgeParent(aScale, vsyncRate, aUseExternalSurface, aSurfaceSize);
+    new CompositorBridgeParent(aScale, vsyncRate, aOptions, aUseExternalSurface, aSurfaceSize);
 
   bool ok = Open(mCompositorBridgeParent->GetIPCChannel(),
                  CompositorThreadHolder::Loop(),
@@ -250,7 +259,7 @@ CompositorBridgeChild::InitSameProcess(widget::CompositorWidget* aWidget,
   MOZ_RELEASE_ASSERT(ok);
 
   InitIPDL();
-  mCompositorBridgeParent->InitSameProcess(aWidget, aLayerTreeId, aUseAPZ);
+  mCompositorBridgeParent->InitSameProcess(aWidget, aLayerTreeId);
   return mCompositorBridgeParent;
 }
 
@@ -565,8 +574,10 @@ CompositorBridgeChild::RecvDidComposite(const uint64_t& aId, const uint64_t& aTr
 {
   if (mLayerManager) {
     MOZ_ASSERT(aId == 0);
-    RefPtr<ClientLayerManager> m = mLayerManager->AsClientLayerManager();
-    MOZ_ASSERT(m);
+    MOZ_ASSERT(mLayerManager->GetBackendType() == LayersBackend::LAYERS_CLIENT ||
+               mLayerManager->GetBackendType() == LayersBackend::LAYERS_WR);
+    // Hold a reference to keep LayerManager alive. See Bug 1242668.
+    RefPtr<LayerManager> m = mLayerManager;
     m->DidComposite(aTransactionId, aCompositeStart, aCompositeEnd);
   } else if (aId != 0) {
     RefPtr<dom::TabChild> child = dom::TabChild::GetFrom(aId);
@@ -1092,14 +1103,6 @@ CompositorBridgeChild::DeallocPCompositorWidgetChild(PCompositorWidgetChild* aAc
 #endif
 }
 
-bool
-CompositorBridgeChild::GetAPZEnabled(uint64_t aLayerTreeId)
-{
-  bool result = false;
-  Unused << SendAsyncPanZoomEnabled(aLayerTreeId, &result);
-  return result;
-}
-
 PAPZCTreeManagerChild*
 CompositorBridgeChild::AllocPAPZCTreeManagerChild(const uint64_t& aLayersId)
 {
@@ -1149,6 +1152,22 @@ void
 CompositorBridgeChild::HandleFatalError(const char* aName, const char* aMsg) const
 {
   dom::ContentChild::FatalErrorIfNotUsingGPUProcess(aName, aMsg, OtherPid());
+}
+
+PWebRenderBridgeChild*
+CompositorBridgeChild::AllocPWebRenderBridgeChild(const wr::PipelineId& aPipelineId, TextureFactoryIdentifier*)
+{
+  WebRenderBridgeChild* child = new WebRenderBridgeChild(aPipelineId);
+  child->AddIPDLReference();
+  return child;
+}
+
+bool
+CompositorBridgeChild::DeallocPWebRenderBridgeChild(PWebRenderBridgeChild* aActor)
+{
+  WebRenderBridgeChild* child = static_cast<WebRenderBridgeChild*>(aActor);
+  child->ReleaseIPDLReference();
+  return true;
 }
 
 } // namespace layers

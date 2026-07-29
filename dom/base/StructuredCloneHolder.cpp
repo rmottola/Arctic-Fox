@@ -692,8 +692,7 @@ ReadDirectoryInternal(JSStructuredCloneReader* aReader,
   }
 
   nsCOMPtr<nsIFile> file;
-  nsresult rv = NS_NewNativeLocalFile(NS_ConvertUTF16toUTF8(path), true,
-                                      getter_AddRefs(file));
+  nsresult rv = NS_NewLocalFile(path, true, getter_AddRefs(file));
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return nullptr;
   }
@@ -1296,7 +1295,7 @@ StructuredCloneHolder::CustomWriteTransferHandler(JSContext* aCx,
         *aExtraData = 0;
         *aTag = SCTAG_DOM_IMAGEBITMAP;
         *aOwnership = JS::SCTAG_TMO_CUSTOM;
-        *aContent = bitmap->ToCloneData();
+        *aContent = bitmap->ToCloneData().release();
         MOZ_ASSERT(*aContent);
         bitmap->Close();
 

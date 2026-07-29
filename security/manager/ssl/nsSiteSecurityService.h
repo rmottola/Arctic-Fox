@@ -128,24 +128,29 @@ protected:
 
 private:
   nsresult GetHost(nsIURI *aURI, nsACString &aResult);
-  nsresult SetHSTSState(uint32_t aType, nsIURI* aSourceURI, int64_t maxage,
+  nsresult SetHSTSState(uint32_t aType, const char* aHost, int64_t maxage,
                         bool includeSubdomains, uint32_t flags,
-                        SecurityPropertyState aHSTSState);
+                        SecurityPropertyState aHSTSState, bool aIsPreload);
   nsresult ProcessHeaderInternal(uint32_t aType, nsIURI* aSourceURI,
-                                 const char* aHeader, nsISSLStatus* aSSLStatus,
+                                 const nsCString& aHeader,
+                                 nsISSLStatus* aSSLStatus,
                                  uint32_t aFlags, uint64_t* aMaxAge,
                                  bool* aIncludeSubdomains,
                                  uint32_t* aFailureResult);
-  nsresult ProcessSTSHeader(nsIURI* aSourceURI, const char* aHeader,
+  nsresult ProcessSTSHeader(nsIURI* aSourceURI, const nsCString& aHeader,
                             uint32_t flags, uint64_t* aMaxAge,
                             bool* aIncludeSubdomains, uint32_t* aFailureResult);
-  nsresult ProcessPKPHeader(nsIURI* aSourceURI, const char* aHeader,
+  nsresult ProcessPKPHeader(nsIURI* aSourceURI, const nsCString& aHeader,
                             nsISSLStatus* aSSLStatus, uint32_t flags,
                             uint64_t* aMaxAge, bool* aIncludeSubdomains,
                             uint32_t* aFailureResult);
   nsresult SetHPKPState(const char* aHost, SiteHPKPState& entry, uint32_t flags,
                         bool aIsPreload);
-
+  nsresult RemoveStateInternal(uint32_t aType, const nsAutoCString& aHost,
+                               uint32_t aFlags, bool aIsPreload);
+  bool HostHasHSTSEntry(const nsAutoCString& aHost,
+                        bool aRequireIncludeSubdomains, uint32_t aFlags,
+                        bool* aResult, bool* aCached);
   const nsSTSPreload *GetPreloadListEntry(const char *aHost);
 
   uint64_t mMaxMaxAge;

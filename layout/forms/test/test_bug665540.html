@@ -61,7 +61,7 @@ function openSelect() {
 
 function checkPosition() {
     optiona = win.document.getElementById("optiona");
-    optiona.addEventListener(eventType, eventReceived, false);
+    optiona.addEventListener(eventType, eventReceived);
 
     // If the select dropdown is opened in the position where
     // getBoundingClientRect() predicts, then optiona will receive the event.
@@ -73,7 +73,7 @@ function checkPosition() {
 
 function eventReceived(event) {
     clearTimeout(timeoutID);
-    optiona.removeEventListener(eventType, eventReceived, false);
+    optiona.removeEventListener(eventType, eventReceived);
 
     var rect = optiona.getBoundingClientRect();
 

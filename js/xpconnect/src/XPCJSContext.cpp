@@ -604,13 +604,8 @@ bool XPCJSContext::UsefulToMergeZones() const
 
 void XPCJSContext::TraceNativeBlackRoots(JSTracer* trc)
 {
-    // Skip this part if XPConnect is shutting down. We get into
-    // bad locking problems with the thread iteration otherwise.
-    if (!nsXPConnect::XPConnect()->IsShuttingDown()) {
-        // Trace those AutoMarkingPtr lists!
-        if (AutoMarkingPtr* roots = Get()->mAutoRoots)
-            roots->TraceJSAll(trc);
-    }
+    if (AutoMarkingPtr* roots = Get()->mAutoRoots)
+        roots->TraceJSAll(trc);
 
     // XPCJSObjectHolders don't participate in cycle collection, so always
     // trace them here.
@@ -786,14 +781,8 @@ XPCJSContext::FinalizeCallback(JSFreeOp* fop,
             MOZ_ASSERT(!self->mGCIsRunning, "bad state");
             self->mGCIsRunning = true;
 
-            // Skip this part if XPConnect is shutting down. We get into
-            // bad locking problems with the thread iteration otherwise.
-            if (!nsXPConnect::XPConnect()->IsShuttingDown()) {
-
-                // Mark those AutoMarkingPtr lists!
-                if (AutoMarkingPtr* roots = Get()->mAutoRoots)
-                    roots->MarkAfterJSFinalizeAll();
-            }
+            if (AutoMarkingPtr* roots = Get()->mAutoRoots)
+                roots->MarkAfterJSFinalizeAll();
 
             // Now we are going to recycle any unused WrappedNativeTearoffs.
             // We do this by iterating all the live callcontexts
@@ -807,29 +796,22 @@ XPCJSContext::FinalizeCallback(JSFreeOp* fop,
             //
             // XXX We may decide to not do this on *every* gc cycle.
 
-            // Skip this part if XPConnect is shutting down. We get into
-            // bad locking problems with the thread iteration otherwise.
-            if (!nsXPConnect::XPConnect()->IsShuttingDown()) {
-                // Do the marking...
-
-                XPCCallContext* ccxp = XPCJSContext::Get()->GetCallContext();
-                while (ccxp) {
-                    // Deal with the strictness of callcontext that
-                    // complains if you ask for a tearoff when
-                    // it is in a state where the tearoff could not
-                    // possibly be valid.
-                    if (ccxp->CanGetTearOff()) {
-                        XPCWrappedNativeTearOff* to =
-                            ccxp->GetTearOff();
-                        if (to)
-                            to->Mark();
-                    }
-                    ccxp = ccxp->GetPrevCallContext();
+            XPCCallContext* ccxp = XPCJSContext::Get()->GetCallContext();
+            while (ccxp) {
+                // Deal with the strictness of callcontext that
+                // complains if you ask for a tearoff when
+                // it is in a state where the tearoff could not
+                // possibly be valid.
+                if (ccxp->CanGetTearOff()) {
+                    XPCWrappedNativeTearOff* to =
+                        ccxp->GetTearOff();
+                    if (to)
+                        to->Mark();
                 }
-
-                // Do the sweeping...
-                XPCWrappedNativeScope::SweepAllWrappedNativeTearOffs();
+                ccxp = ccxp->GetPrevCallContext();
             }
+
+            XPCWrappedNativeScope::SweepAllWrappedNativeTearOffs();
 
             // Now we need to kill the 'Dying' XPCWrappedNativeProtos.
             // We transfered these native objects to this table when their
@@ -1290,7 +1272,7 @@ XPCJSContext::InterruptCallback(JSContext* cx)
     // returning to the event loop. See how long it's been, and what the limit
     // is.
     TimeDuration duration = TimeStamp::NowLoRes() - self->mSlowScriptCheckpoint;
-    bool chrome = nsContentUtils::IsCallerChrome();
+    bool chrome = nsContentUtils::IsSystemCaller(cx);
     const char* prefName = chrome ? PREF_MAX_SCRIPT_RUN_TIME_CHROME
                                   : PREF_MAX_SCRIPT_RUN_TIME_CONTENT;
     int32_t limit = Preferences::GetInt(prefName, chrome ? 20 : 10);
@@ -1337,7 +1319,13 @@ XPCJSContext::InterruptCallback(JSContext* cx)
         return true;
     }
 
-    MOZ_ASSERT(!win->IsDying());
+    if (win->IsDying()) {
+        // The window is being torn down. When that happens we try to prevent
+        // the dispatch of new runnables, so it also makes sense to kill any
+        // long-running script. The user is primarily interested in this page
+        // going away.
+        return false;
+    }
 
     if (win->GetIsPrerendered()) {
         // We cannot display a dialog if the page is being prerendered, so
@@ -1563,9 +1551,6 @@ XPCJSContext::~XPCJSContext()
 
     delete mThisTranslatorMap;
     mThisTranslatorMap = nullptr;
-
-    delete mNativeScriptableSharedMap;
-    mNativeScriptableSharedMap = nullptr;
 
     delete mDyingWrappedNativeProtoMap;
     mDyingWrappedNativeProtoMap = nullptr;
@@ -3224,7 +3209,7 @@ class XPCJSSourceHook: public js::SourceHook {
         *src = nullptr;
         *length = 0;
 
-        if (!nsContentUtils::IsCallerChrome())
+        if (!nsContentUtils::IsSystemCaller(cx))
             return true;
 
         if (!filename)
@@ -3256,7 +3241,6 @@ XPCJSContext::XPCJSContext()
    mClassInfo2NativeSetMap(ClassInfo2NativeSetMap::newMap(XPC_NATIVE_SET_MAP_LENGTH)),
    mNativeSetMap(NativeSetMap::newMap(XPC_NATIVE_SET_MAP_LENGTH)),
    mThisTranslatorMap(IID2ThisTranslatorMap::newMap(XPC_THIS_TRANSLATOR_MAP_LENGTH)),
-   mNativeScriptableSharedMap(XPCNativeScriptableSharedMap::newMap(XPC_NATIVE_JSCLASS_MAP_LENGTH)),
    mDyingWrappedNativeProtoMap(XPCWrappedNativeProtoMap::newMap(XPC_DYING_NATIVE_PROTO_MAP_LENGTH)),
    mGCIsRunning(false),
    mNativesToReleaseArray(),
@@ -3396,6 +3380,12 @@ XPCJSContext::Initialize()
                                                               : 120 * 1024;  //win32
     // The following two configurations are linux-only. Given the numbers above,
     // we use 50k and 100k trusted buffers on 32-bit and 64-bit respectively.
+#elif defined(ANDROID)
+    // Android appears to have 1MB stacks. Allow the use of 3/4 of that size
+    // (768KB on 32-bit), since otherwise we can crash with a stack overflow
+    // when nearing the 1MB limit.
+    const size_t kStackQuota = kDefaultStackQuota + kDefaultStackQuota / 2;
+    const size_t kTrustedScriptBuffer = sizeof(size_t) * 12800;
 #elif defined(DEBUG)
     // Bug 803182: account for the 4x difference in the size of js::Interpret
     // between optimized and debug builds.
@@ -3496,7 +3486,6 @@ XPCJSContext::newXPCJSContext()
         self->GetClassInfo2NativeSetMap()       &&
         self->GetNativeSetMap()                 &&
         self->GetThisTranslatorMap()            &&
-        self->GetNativeScriptableSharedMap()    &&
         self->GetDyingWrappedNativeProtoMap()   &&
         self->mWatchdogManager) {
         return self;
@@ -3538,7 +3527,6 @@ bool
 XPCJSContext::DescribeCustomObjects(JSObject* obj, const js::Class* clasp,
                                     char (&name)[72]) const
 {
-    XPCNativeScriptableInfo* si = nullptr;
 
     if (!IS_PROTO_CLASS(clasp)) {
         return false;
@@ -3546,13 +3534,13 @@ XPCJSContext::DescribeCustomObjects(JSObject* obj, const js::Class* clasp,
 
     XPCWrappedNativeProto* p =
         static_cast<XPCWrappedNativeProto*>(xpc_GetJSPrivate(obj));
-    si = p->GetScriptableInfo();
-
-    if (!si) {
+    nsCOMPtr<nsIXPCScriptable> scr = p->GetScriptable();
+    if (!scr) {
         return false;
     }
 
-    SprintfLiteral(name, "JS Object (%s - %s)", clasp->name, si->GetJSClass()->name);
+    SprintfLiteral(name, "JS Object (%s - %s)",
+                   clasp->name, scr->GetJSClass()->name);
     return true;
 }
 
@@ -3634,11 +3622,11 @@ XPCJSContext::DebugDump(int16_t depth)
 {
 #ifdef DEBUG
     depth--;
-    XPC_LOG_ALWAYS(("XPCJSContext @ %x", this));
+    XPC_LOG_ALWAYS(("XPCJSContext @ %p", this));
         XPC_LOG_INDENT();
-        XPC_LOG_ALWAYS(("mJSContext @ %x", Context()));
+        XPC_LOG_ALWAYS(("mJSContext @ %p", Context()));
 
-        XPC_LOG_ALWAYS(("mWrappedJSClassMap @ %x with %d wrapperclasses(s)",
+        XPC_LOG_ALWAYS(("mWrappedJSClassMap @ %p with %d wrapperclasses(s)",
                         mWrappedJSClassMap, mWrappedJSClassMap->Count()));
         // iterate wrappersclasses...
         if (depth && mWrappedJSClassMap->Count()) {
@@ -3651,7 +3639,7 @@ XPCJSContext::DebugDump(int16_t depth)
         }
 
         // iterate wrappers...
-        XPC_LOG_ALWAYS(("mWrappedJSMap @ %x with %d wrappers(s)",
+        XPC_LOG_ALWAYS(("mWrappedJSMap @ %p with %d wrappers(s)",
                         mWrappedJSMap, mWrappedJSMap->Count()));
         if (depth && mWrappedJSMap->Count()) {
             XPC_LOG_INDENT();
@@ -3659,18 +3647,18 @@ XPCJSContext::DebugDump(int16_t depth)
             XPC_LOG_OUTDENT();
         }
 
-        XPC_LOG_ALWAYS(("mIID2NativeInterfaceMap @ %x with %d interface(s)",
+        XPC_LOG_ALWAYS(("mIID2NativeInterfaceMap @ %p with %d interface(s)",
                         mIID2NativeInterfaceMap,
                         mIID2NativeInterfaceMap->Count()));
 
-        XPC_LOG_ALWAYS(("mClassInfo2NativeSetMap @ %x with %d sets(s)",
+        XPC_LOG_ALWAYS(("mClassInfo2NativeSetMap @ %p with %d sets(s)",
                         mClassInfo2NativeSetMap,
                         mClassInfo2NativeSetMap->Count()));
 
-        XPC_LOG_ALWAYS(("mThisTranslatorMap @ %x with %d translator(s)",
+        XPC_LOG_ALWAYS(("mThisTranslatorMap @ %p with %d translator(s)",
                         mThisTranslatorMap, mThisTranslatorMap->Count()));
 
-        XPC_LOG_ALWAYS(("mNativeSetMap @ %x with %d sets(s)",
+        XPC_LOG_ALWAYS(("mNativeSetMap @ %p with %d sets(s)",
                         mNativeSetMap, mNativeSetMap->Count()));
 
         // iterate sets...
@@ -3683,7 +3671,7 @@ XPCJSContext::DebugDump(int16_t depth)
             XPC_LOG_OUTDENT();
         }
 
-        XPC_LOG_ALWAYS(("mPendingResult of %x", mPendingResult));
+        XPC_LOG_ALWAYS(("mPendingResult of %" PRIx32, static_cast<uint32_t>(mPendingResult)));
 
         XPC_LOG_OUTDENT();
 #endif

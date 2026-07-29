@@ -424,7 +424,6 @@ public:
     , mSelectedVideoTrackID(TRACK_NONE)
   {
     MOZ_ASSERT(NS_IsMainThread());
-    MOZ_COUNT_CTOR(MediaRecorder::Session);
 
     uint32_t maxMem = Preferences::GetUint("media.recorder.max_memory",
                                            MAX_ALLOW_MEMORY_BUFFER);
@@ -589,7 +588,6 @@ private:
   // Only DestroyRunnable is allowed to delete Session object.
   virtual ~Session()
   {
-    MOZ_COUNT_DTOR(MediaRecorder::Session);
     LOG(LogLevel::Debug, ("Session.~Session (%p)", this));
     CleanupStreams();
     if (mReadThread) {
@@ -1223,8 +1221,8 @@ MediaRecorder::SetOptions(const MediaRecorderOptions& aInitDict)
   // the encoder is Init()ed. This happens only after data is
   // available and thus requires dynamic changes.
   //
-  // Until dynamic changes are supported, we'll be safe and err
-  // slightly high.
+  // Until dynamic changes are supported, I prefer to be safe and err
+  // slightly high
   if (aInitDict.mBitsPerSecond.WasPassed() && !aInitDict.mVideoBitsPerSecond.WasPassed()) {
     mVideoBitsPerSecond = mBitsPerSecond;
   }

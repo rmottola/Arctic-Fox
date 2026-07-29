@@ -555,7 +555,7 @@ nsXULPopupManager::GetPopupFrameForContent(nsIContent* aContent, bool aShouldFlu
     if (document) {
       nsCOMPtr<nsIPresShell> presShell = document->GetShell();
       if (presShell)
-        presShell->FlushPendingNotifications(Flush_Layout);
+        presShell->FlushPendingNotifications(FlushType::Layout);
     }
   }
 
@@ -910,8 +910,8 @@ nsXULPopupManager::ShowPopupCallback(nsIContent* aPopup,
   aPopup->GetAttr(kNameSpaceID_None, nsGkAtoms::ignorekeys, ignorekeys);
   if (ignorekeys.EqualsLiteral("true")) {
     item->SetIgnoreKeys(eIgnoreKeys_True);
-  } else if (ignorekeys.EqualsLiteral("handled")) {
-    item->SetIgnoreKeys(eIgnoreKeys_Handled);
+  } else if (ignorekeys.EqualsLiteral("shortcuts")) {
+    item->SetIgnoreKeys(eIgnoreKeys_Shortcuts);
   }
 
   if (ismenu) {
@@ -945,7 +945,7 @@ nsXULPopupManager::ShowPopupCallback(nsIContent* aPopup,
   }
 
   if (aSelectFirstItem) {
-    nsMenuFrame* next = GetNextMenuItem(aPopupFrame, nullptr, true);
+    nsMenuFrame* next = GetNextMenuItem(aPopupFrame, nullptr, true, false);
     aPopupFrame->SetCurrentMenuItem(next);
   }
 
@@ -1597,7 +1597,7 @@ nsXULPopupManager::FirePopupHidingEvent(nsIContent* aPopup,
 
         if (!animate.EqualsLiteral("false") &&
             (!animate.EqualsLiteral("cancel") || aIsCancel)) {
-          presShell->FlushPendingNotifications(Flush_Layout);
+          presShell->FlushPendingNotifications(FlushType::Layout);
 
           // Get the frame again in case the flush caused it to go away
           popupFrame = do_QueryFrame(aPopup->GetPrimaryFrame());
@@ -2207,8 +2207,8 @@ nsXULPopupManager::HandleKeyboardNavigation(uint32_t aKeyCode)
   
     if (NS_DIRECTION_IS_INLINE(theDirection)) {
       nsMenuFrame* nextItem = (theDirection == eNavigationDirection_End) ?
-                              GetNextMenuItem(mActiveMenuBar, currentMenu, false) : 
-                              GetPreviousMenuItem(mActiveMenuBar, currentMenu, false);
+                              GetNextMenuItem(mActiveMenuBar, currentMenu, false, true) : 
+                              GetPreviousMenuItem(mActiveMenuBar, currentMenu, false, true);
       mActiveMenuBar->ChangeMenuItem(nextItem, true, true);
       return true;
     }
@@ -2243,7 +2243,7 @@ nsXULPopupManager::HandleKeyboardNavigationInPopup(nsMenuChainItem* item,
     // We've been opened, but we haven't had anything selected.
     // We can handle End, but our parent handles Start.
     if (aDir == eNavigationDirection_End) {
-      nsMenuFrame* nextItem = GetNextMenuItem(aFrame, nullptr, true);
+      nsMenuFrame* nextItem = GetNextMenuItem(aFrame, nullptr, true, false);
       if (nextItem) {
         aFrame->ChangeMenuItem(nextItem, false, true);
         return true;
@@ -2277,14 +2277,28 @@ nsXULPopupManager::HandleKeyboardNavigationInPopup(nsMenuChainItem* item,
       NS_DIRECTION_IS_BLOCK_TO_EDGE(aDir)) {
     nsMenuFrame* nextItem;
 
-    if (aDir == eNavigationDirection_Before)
-      nextItem = GetPreviousMenuItem(aFrame, currentMenu, true);
-    else if (aDir == eNavigationDirection_After)
-      nextItem = GetNextMenuItem(aFrame, currentMenu, true);
-    else if (aDir == eNavigationDirection_First)
-      nextItem = GetNextMenuItem(aFrame, nullptr, true);
-    else
-      nextItem = GetPreviousMenuItem(aFrame, nullptr, true);
+    if (aDir == eNavigationDirection_Before ||
+        aDir == eNavigationDirection_After) {
+      // Cursor navigation does not wrap on Mac or for menulists on Windows.
+      bool wrap =
+#ifdef XP_WIN
+        aFrame->IsMenuList() ? false : true;
+#elif defined XP_MACOSX
+        false;
+#else
+        true;
+#endif
+
+      if (aDir == eNavigationDirection_Before) {
+        nextItem = GetPreviousMenuItem(aFrame, currentMenu, true, wrap);
+      } else {
+        nextItem = GetNextMenuItem(aFrame, currentMenu, true, wrap);
+      }
+    } else if (aDir == eNavigationDirection_First) {
+      nextItem = GetNextMenuItem(aFrame, nullptr, true, false);
+    } else {
+      nextItem = GetPreviousMenuItem(aFrame, nullptr, true, false);
+    }
 
     if (nextItem) {
       aFrame->ChangeMenuItem(nextItem, false, true);
@@ -2406,7 +2420,8 @@ nsXULPopupManager::HandleKeyboardEventWithKeyCode(
 nsMenuFrame*
 nsXULPopupManager::GetNextMenuItem(nsContainerFrame* aParent,
                                    nsMenuFrame* aStart,
-                                   bool aIsPopup)
+                                   bool aIsPopup,
+                                   bool aWrap)
 {
   nsPresContext* presContext = aParent->PresContext();
   auto insertion = presContext->PresShell()->
@@ -2441,6 +2456,10 @@ nsXULPopupManager::GetNextMenuItem(nsContainerFrame* aParent,
       currFrame = currFrame->GetNextSibling();
   }
 
+  if (!aWrap) {
+    return aStart;
+  }
+
   currFrame = immediateParent->PrincipalChildList().FirstChild();
 
   // Still don't have anything. Try cycling from the beginning.
@@ -2467,7 +2486,8 @@ nsXULPopupManager::GetNextMenuItem(nsContainerFrame* aParent,
 nsMenuFrame*
 nsXULPopupManager::GetPreviousMenuItem(nsContainerFrame* aParent,
                                        nsMenuFrame* aStart,
-                                       bool aIsPopup)
+                                       bool aIsPopup,
+                                       bool aWrap)
 {
   nsPresContext* presContext = aParent->PresContext();
   auto insertion = presContext->PresShell()->
@@ -2504,6 +2524,10 @@ nsXULPopupManager::GetPreviousMenuItem(nsContainerFrame* aParent,
       currFrame = currFrame->GetParent()->GetPrevSibling();
     else
       currFrame = currFrame->GetPrevSibling();
+  }
+
+  if (!aWrap) {
+    return aStart;
   }
 
   currFrame = frames.LastChild();
@@ -2543,8 +2567,10 @@ nsXULPopupManager::IsValidMenuItem(nsIContent* aContent, bool aOnPopup)
     return false;
   }
 
+  nsMenuFrame* menuFrame = do_QueryFrame(aContent->GetPrimaryFrame());
+
   bool skipNavigatingDisabledMenuItem = true;
-  if (aOnPopup) {
+  if (aOnPopup && (!menuFrame || menuFrame->GetParentMenuListType() == eNotMenuList)) {
     skipNavigatingDisabledMenuItem =
       LookAndFeel::GetInt(LookAndFeel::eIntID_SkipNavigatingDisabledMenuItem,
                           0) != 0;
@@ -2594,7 +2620,7 @@ nsXULPopupManager::KeyUp(nsIDOMKeyEvent* aKeyEvent)
     if (!item || item->PopupType() != ePopupTypeMenu)
       return NS_OK;
 
-    if (item->IgnoreKeys() == eIgnoreKeys_Handled) {
+    if (item->IgnoreKeys() == eIgnoreKeys_Shortcuts) {
       aKeyEvent->AsEvent()->StopCrossProcessForwarding();
       return NS_OK;
     }
@@ -2624,7 +2650,7 @@ nsXULPopupManager::KeyDown(nsIDOMKeyEvent* aKeyEvent)
 
   // Since a menu was open, stop propagation of the event to keep other event
   // listeners from becoming confused.
-  if (!item || item->IgnoreKeys() != eIgnoreKeys_Handled) {
+  if (!item || item->IgnoreKeys() != eIgnoreKeys_Shortcuts) {
     aKeyEvent->AsEvent()->StopPropagation();
   }
 
@@ -2689,15 +2715,21 @@ nsXULPopupManager::KeyPress(nsIDOMKeyEvent* aKeyEvent)
   // if a menu is open or a menubar is active, it consumes the key event
   bool consume = (mPopups || mActiveMenuBar);
 
-  // When ignorekeys="handled" is used, we don't call preventDefault on the key
-  // event, which allows another listener to handle keys that the popup hasn't
-  // already handled. For instance, this allows global shortcuts to still apply
-  // while a menu is open.
-  bool onlyHandled = item && item->IgnoreKeys() == eIgnoreKeys_Handled;
-  bool handled = HandleShortcutNavigation(keyEvent, nullptr);
+  WidgetInputEvent* evt = aKeyEvent->AsEvent()->WidgetEventPtr()->AsInputEvent();
+  bool isAccel = evt && evt->IsAccel();
+
+  // When ignorekeys="shortcuts" is used, we don't call preventDefault on the
+  // key event when the accelerator key is pressed. This allows another
+  // listener to handle keys. For instance, this allows global shortcuts to
+  // still apply while a menu is open.
+  if (item && item->IgnoreKeys() == eIgnoreKeys_Shortcuts && isAccel) {
+    consume = false;
+  }
+
+  HandleShortcutNavigation(keyEvent, nullptr);
 
   aKeyEvent->AsEvent()->StopCrossProcessForwarding();
-  if (handled || (consume && !onlyHandled)) {
+  if (consume) {
     aKeyEvent->AsEvent()->StopPropagation();
     aKeyEvent->AsEvent()->PreventDefault();
   }

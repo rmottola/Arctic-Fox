@@ -209,7 +209,11 @@ EventTargetIsOnCurrentThread(nsIEventTarget* aEventTarget)
   }
 
   bool current;
-  MOZ_ALWAYS_SUCCEEDS(aEventTarget->IsOnCurrentThread(&current));
+
+  // If this fails, we are probably shutting down.
+  if (NS_WARN_IF(NS_FAILED(aEventTarget->IsOnCurrentThread(&current)))) {
+    return true;
+  }
 
   return current;
 }
@@ -591,13 +595,11 @@ struct MOZ_STACK_CLASS CreateBlobImplMetadata final
   uint64_t mLength;
   int64_t mLastModifiedDate;
   bool mHasRecursed;
-  const bool mIsSameProcessActor;
 
-  explicit CreateBlobImplMetadata(bool aIsSameProcessActor)
+  CreateBlobImplMetadata()
     : mLength(0)
     , mLastModifiedDate(0)
     , mHasRecursed(false)
-    , mIsSameProcessActor(aIsSameProcessActor)
   {
     MOZ_COUNT_CTOR(CreateBlobImplMetadata);
 
@@ -738,13 +740,10 @@ CreateBlobImpl(const nsTArray<BlobData>& aBlobDatas,
     return blobImpl.forget();
   }
 
-  FallibleTArray<RefPtr<BlobImpl>> fallibleBlobImpls;
-  if (NS_WARN_IF(!fallibleBlobImpls.SetLength(aBlobDatas.Length(), fallible))) {
+  nsTArray<RefPtr<BlobImpl>> blobImpls;
+  if (NS_WARN_IF(!blobImpls.SetLength(aBlobDatas.Length(), fallible))) {
     return nullptr;
   }
-
-  nsTArray<RefPtr<BlobImpl>> blobImpls;
-  fallibleBlobImpls.SwapElements(blobImpls);
 
   const bool hasRecursed = aMetadata.mHasRecursed;
   aMetadata.mHasRecursed = true;
@@ -786,8 +785,7 @@ CreateBlobImpl(const nsTArray<BlobData>& aBlobDatas,
 
 already_AddRefed<BlobImpl>
 CreateBlobImpl(const ParentBlobConstructorParams& aParams,
-               const BlobData& aBlobData,
-               bool aIsSameProcessActor)
+               const BlobData& aBlobData)
 {
   MOZ_ASSERT(gProcessType == GeckoProcessType_Default);
   MOZ_ASSERT(aParams.blobParams().type() ==
@@ -795,7 +793,7 @@ CreateBlobImpl(const ParentBlobConstructorParams& aParams,
              aParams.blobParams().type() ==
                AnyBlobConstructorParams::TFileBlobConstructorParams);
 
-  CreateBlobImplMetadata metadata(aIsSameProcessActor);
+  CreateBlobImplMetadata metadata;
 
   if (aParams.blobParams().type() ==
         AnyBlobConstructorParams::TNormalBlobConstructorParams) {
@@ -2073,10 +2071,10 @@ public:
   GetName(nsAString& aName) const override;
 
   void
-  GetPath(nsAString& aPath) const override;
+  GetDOMPath(nsAString& aPath) const override;
 
   void
-  SetPath(const nsAString& aPath) override;
+  SetDOMPath(const nsAString& aPath) override;
 
   int64_t
   GetLastModified(ErrorResult& aRv) override;
@@ -2085,7 +2083,8 @@ public:
   SetLastModified(int64_t aLastModified) override;
 
   void
-  GetMozFullPath(nsAString& aName, ErrorResult& aRv) const override;
+  GetMozFullPath(nsAString& aName, SystemCallerGuarantee aGuarantee,
+                 ErrorResult& aRv) const override;
 
   void
   GetMozFullPathInternal(nsAString& aFileName, ErrorResult& aRv) const override;
@@ -2176,7 +2175,7 @@ RemoteBlobImpl::RemoteBlobImpl(BlobChild* aActor,
                                BlobImpl* aRemoteBlobImpl,
                                const nsAString& aName,
                                const nsAString& aContentType,
-                               const nsAString& aPath,
+                               const nsAString& aDOMPath,
                                uint64_t aLength,
                                int64_t aModDate,
                                BlobImplIsDirectory aIsDirectory,
@@ -2186,7 +2185,7 @@ RemoteBlobImpl::RemoteBlobImpl(BlobChild* aActor,
   , mMutex("BlobChild::RemoteBlobImpl::mMutex")
   , mIsSlice(false), mIsDirectory(aIsDirectory == eDirectory)
 {
-  SetPath(aPath);
+  SetDOMPath(aDOMPath);
 
   if (aIsSameProcessBlob) {
     MOZ_ASSERT(aRemoteBlobImpl);
@@ -2844,16 +2843,16 @@ RemoteBlobImpl::GetName(nsAString& aName) const
 
 void
 BlobParent::
-RemoteBlobImpl::GetPath(nsAString& aPath) const
+RemoteBlobImpl::GetDOMPath(nsAString& aPath) const
 {
-  mBlobImpl->GetPath(aPath);
+  mBlobImpl->GetDOMPath(aPath);
 }
 
 void
 BlobParent::
-RemoteBlobImpl::SetPath(const nsAString& aPath)
+RemoteBlobImpl::SetDOMPath(const nsAString& aPath)
 {
-  mBlobImpl->SetPath(aPath);
+  mBlobImpl->SetDOMPath(aPath);
 }
 
 int64_t
@@ -2872,9 +2871,11 @@ RemoteBlobImpl::SetLastModified(int64_t aLastModified)
 
 void
 BlobParent::
-RemoteBlobImpl::GetMozFullPath(nsAString& aName, ErrorResult& aRv) const
+RemoteBlobImpl::GetMozFullPath(nsAString& aName,
+                               SystemCallerGuarantee aGuarantee,
+                               ErrorResult& aRv) const
 {
-  mBlobImpl->GetMozFullPath(aName, aRv);
+  mBlobImpl->GetMozFullPath(aName, aGuarantee, aRv);
 }
 
 void
@@ -3195,8 +3196,8 @@ BlobChild::CommonInit(BlobChild* aOther, BlobImpl* aBlobImpl)
     nsAutoString name;
     otherImpl->GetName(name);
 
-    nsAutoString path;
-    otherImpl->GetPath(path);
+    nsAutoString domPath;
+    otherImpl->GetDOMPath(domPath);
 
     int64_t modDate = otherImpl->GetLastModified(rv);
     MOZ_ASSERT(!rv.Failed());
@@ -3206,7 +3207,7 @@ BlobChild::CommonInit(BlobChild* aOther, BlobImpl* aBlobImpl)
       RemoteBlobImpl::BlobImplIsDirectory::eNotDirectory;
 
     remoteBlob =
-      new RemoteBlobImpl(this, otherImpl, name, contentType, path,
+      new RemoteBlobImpl(this, otherImpl, name, contentType, domPath,
                          length, modDate, directory,
                          false /* SameProcessBlobImpl */);
   } else {
@@ -3290,8 +3291,8 @@ BlobChild::CommonInit(const ChildBlobConstructorParams& aParams)
         nsAutoString name;
         blobImpl->GetName(name);
 
-        nsAutoString path;
-        blobImpl->GetPath(path);
+        nsAutoString domPath;
+        blobImpl->GetDOMPath(domPath);
 
         int64_t lastModifiedDate = blobImpl->GetLastModified(rv);
         MOZ_ASSERT(!rv.Failed());
@@ -3306,7 +3307,7 @@ BlobChild::CommonInit(const ChildBlobConstructorParams& aParams)
                              blobImpl,
                              name,
                              contentType,
-                             path,
+                             domPath,
                              size,
                              lastModifiedDate,
                              directory,
@@ -3489,14 +3490,14 @@ BlobChild::GetOrCreateFromImpl(ChildManagerType* aManager,
       nsAutoString name;
       aBlobImpl->GetName(name);
 
-      nsAutoString path;
-      aBlobImpl->GetPath(path);
+      nsAutoString domPath;
+      aBlobImpl->GetDOMPath(domPath);
 
       int64_t modDate = aBlobImpl->GetLastModified(rv);
       MOZ_ASSERT(!rv.Failed());
 
       blobParams =
-        FileBlobConstructorParams(name, contentType, path, length, modDate,
+        FileBlobConstructorParams(name, contentType, domPath, length, modDate,
                                   aBlobImpl->IsDirectory(), blobData);
     } else {
       blobParams = NormalBlobConstructorParams(contentType, length, blobData);
@@ -4042,14 +4043,14 @@ BlobParent::GetOrCreateFromImpl(ParentManagerType* aManager,
         nsAutoString name;
         aBlobImpl->GetName(name);
 
-        nsAutoString path;
-        aBlobImpl->GetPath(path);
+        nsAutoString domPath;
+        aBlobImpl->GetDOMPath(domPath);
 
         int64_t modDate = aBlobImpl->GetLastModified(rv);
         MOZ_ASSERT(!rv.Failed());
 
         blobParams =
-          FileBlobConstructorParams(name, contentType, path, length, modDate,
+          FileBlobConstructorParams(name, contentType, domPath, length, modDate,
                                     aBlobImpl->IsDirectory(), void_t());
       } else {
         blobParams = NormalBlobConstructorParams(contentType, length, void_t());
@@ -4105,9 +4106,7 @@ BlobParent::CreateFromParams(ParentManagerType* aManager,
       }
 
       RefPtr<BlobImpl> blobImpl =
-        CreateBlobImpl(aParams,
-                       optionalBlobData.get_BlobData(),
-                       ActorManagerIsSameProcess(aManager));
+        CreateBlobImpl(aParams, optionalBlobData.get_BlobData());
       if (NS_WARN_IF(!blobImpl)) {
         ASSERT_UNLESS_FUZZING();
         return nullptr;

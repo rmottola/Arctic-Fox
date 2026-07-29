@@ -30,7 +30,7 @@
 #include "mozilla/ReflowOutput.h"
 #include "ImageContainer.h"
 #include "gfx2DGlue.h"
-
+#include "nsStyleConsts.h"
 #include <limits>
 #include <algorithm>
 
@@ -152,6 +152,7 @@ public:
   typedef mozilla::CSSRect CSSRect;
   typedef mozilla::ScreenMargin ScreenMargin;
   typedef mozilla::LayoutDeviceIntSize LayoutDeviceIntSize;
+  typedef mozilla::StyleGeometryBox StyleGeometryBox;
 
   /**
    * Finds previously assigned ViewID for the given content element, if any.
@@ -825,7 +826,7 @@ public:
    * frames under the area of a rectangle that receives a mouse event,
    * or nullptr if there is no such frame.
    * @param aRect the rect, relative to the frame origin
-   * @param aOutFrames an array to append all the frames found
+   * @param aOutFrames an array to add all the frames found
    * @param aFlags some combination of FrameForPointFlags
    */
   static nsresult GetFramesForArea(nsIFrame* aFrame, const nsRect& aRect,
@@ -2874,6 +2875,9 @@ public:
    *                          next line exists, null otherwise.
    */
   static bool IsInvisibleBreak(nsINode* aNode, nsIFrame** aNextLineFrame = nullptr);
+
+  static nsRect ComputeGeometryBox(nsIFrame* aFrame,
+                                   StyleGeometryBox aGeometryBox);
 
 private:
   static uint32_t sFontSizeInflationEmPerLine;

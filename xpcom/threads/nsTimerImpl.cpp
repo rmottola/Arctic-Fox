@@ -143,7 +143,6 @@ nsTimerImpl::nsTimerImpl(nsITimer* aTimer) :
   mDelay(0),
   mITimer(aTimer)
 {
-  MOZ_COUNT_CTOR(nsTimerImpl);
   // XXXbsmedberg: shouldn't this be in Init()?
   mEventTarget = static_cast<nsIEventTarget*>(NS_GetCurrentThread());
 
@@ -152,7 +151,6 @@ nsTimerImpl::nsTimerImpl(nsITimer* aTimer) :
 
 nsTimerImpl::~nsTimerImpl()
 {
-  MOZ_COUNT_DTOR(nsTimerImpl);
   ReleaseCallback();
 }
 
@@ -245,7 +243,7 @@ nsTimerImpl::InitWithFuncCallbackCommon(nsTimerCallbackFunc aFunc,
   return InitCommon(aDelay, aType);
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::InitWithFuncCallback(nsTimerCallbackFunc aFunc,
                                   void* aClosure,
                                   uint32_t aDelay,
@@ -255,7 +253,7 @@ nsTimerImpl::InitWithFuncCallback(nsTimerCallbackFunc aFunc,
   return InitWithFuncCallbackCommon(aFunc, aClosure, aDelay, aType, name);
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::InitWithNamedFuncCallback(nsTimerCallbackFunc aFunc,
                                        void* aClosure,
                                        uint32_t aDelay,
@@ -266,7 +264,7 @@ nsTimerImpl::InitWithNamedFuncCallback(nsTimerCallbackFunc aFunc,
   return InitWithFuncCallbackCommon(aFunc, aClosure, aDelay, aType, name);
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::InitWithNameableFuncCallback(nsTimerCallbackFunc aFunc,
                                           void* aClosure,
                                           uint32_t aDelay,
@@ -277,7 +275,7 @@ nsTimerImpl::InitWithNameableFuncCallback(nsTimerCallbackFunc aFunc,
   return InitWithFuncCallbackCommon(aFunc, aClosure, aDelay, aType, name);
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::InitWithCallback(nsITimerCallback* aCallback,
                               uint32_t aDelay,
                               uint32_t aType)
@@ -294,7 +292,7 @@ nsTimerImpl::InitWithCallback(nsITimerCallback* aCallback,
   return InitCommon(aDelay, aType);
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::Init(nsIObserver* aObserver, uint32_t aDelay, uint32_t aType)
 {
   if (NS_WARN_IF(!aObserver)) {
@@ -309,7 +307,7 @@ nsTimerImpl::Init(nsIObserver* aObserver, uint32_t aDelay, uint32_t aType)
   return InitCommon(aDelay, aType);
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::Cancel()
 {
 
@@ -336,7 +334,7 @@ nsTimerImpl::Neuter()
   ++mGeneration;
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::SetDelay(uint32_t aDelay)
 {
   if (mCallbackType == CallbackType::Unknown && mType == nsITimer::TYPE_ONE_SHOT) {
@@ -361,14 +359,14 @@ nsTimerImpl::SetDelay(uint32_t aDelay)
   return NS_OK;
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::GetDelay(uint32_t* aDelay)
 {
   *aDelay = mDelay;
   return NS_OK;
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::SetType(uint32_t aType)
 {
   mType = (uint8_t)aType;
@@ -378,7 +376,7 @@ nsTimerImpl::SetType(uint32_t aType)
   return NS_OK;
 }
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::GetType(uint32_t* aType)
 {
   *aType = mType;
@@ -386,7 +384,7 @@ nsTimerImpl::GetType(uint32_t* aType)
 }
 
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::GetClosure(void** aClosure)
 {
   *aClosure = mClosure;
@@ -394,7 +392,7 @@ nsTimerImpl::GetClosure(void** aClosure)
 }
 
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::GetCallback(nsITimerCallback** aCallback)
 {
   if (mCallbackType == CallbackType::Interface) {
@@ -407,7 +405,7 @@ nsTimerImpl::GetCallback(nsITimerCallback** aCallback)
 }
 
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::GetTarget(nsIEventTarget** aTarget)
 {
   NS_IF_ADDREF(*aTarget = mEventTarget);
@@ -415,7 +413,7 @@ nsTimerImpl::GetTarget(nsIEventTarget** aTarget)
 }
 
 
-NS_IMETHODIMP
+nsresult
 nsTimerImpl::SetTarget(nsIEventTarget* aTarget)
 {
   if (NS_WARN_IF(mCallbackType != CallbackType::Unknown)) {

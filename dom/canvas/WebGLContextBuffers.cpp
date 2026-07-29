@@ -103,7 +103,7 @@ WebGLContext::ValidateIndexedBufferSlot(const char* funcName, GLenum target, GLu
     }
 
     if (index >= bindings->size()) {
-        ErrorInvalidOperation("%s: `index` >= %s.", funcName, maxIndexEnum);
+        ErrorInvalidValue("%s: `index` >= %s.", funcName, maxIndexEnum);
         return nullptr;
     }
 
@@ -247,6 +247,11 @@ WebGLContext::BindBufferRange(GLenum target, GLuint index, WebGLBuffer* buffer,
 
     if (buffer && !buffer->ValidateCanBindToTarget(funcName, target))
         return;
+
+    if (buffer && !size) {
+        ErrorInvalidValue("%s: size must be non-zero for non-null buffer.", funcName);
+        return;
+    }
 
     ////
 
@@ -501,10 +506,8 @@ WebGLContext::DeleteBuffer(WebGLBuffer* buffer)
         }
     }
 
-    for (int32_t i = 0; i < mGLMaxVertexAttribs; i++) {
-        if (mBoundVertexArray->HasAttrib(i)) {
-            fnClearIfBuffer(mBoundVertexArray->mAttribs[i].mBuf);
-        }
+    for (auto& cur : mBoundVertexArray->mAttribs) {
+        fnClearIfBuffer(cur.mBuf);
     }
 
     ////

@@ -104,7 +104,7 @@ GetFindFlagName(DWORD aFindFlag)
 class GetACPFromPointFlagName : public nsAutoCString
 {
 public:
-  GetACPFromPointFlagName(DWORD aFlags)
+  explicit GetACPFromPointFlagName(DWORD aFlags)
   {
     if (!aFlags) {
       AppendLiteral("no flags (0)");
@@ -648,7 +648,7 @@ GetModifiersName(Modifiers aModifiers)
 class GetWritingModeName : public nsAutoCString
 {
 public:
-  GetWritingModeName(const WritingMode& aWritingMode)
+  explicit GetWritingModeName(const WritingMode& aWritingMode)
   {
     if (!aWritingMode.IsVertical()) {
       AssignLiteral("Horizontal");
@@ -700,7 +700,7 @@ class InputScopeImpl final : public ITfInputScope
   ~InputScopeImpl() {}
 
 public:
-  InputScopeImpl(const nsTArray<InputScope>& aList)
+  explicit InputScopeImpl(const nsTArray<InputScope>& aList)
     : mInputScopes(aList)
   {
     MOZ_LOG(sTextStoreLog, LogLevel::Info,
@@ -1659,7 +1659,7 @@ TSFTextStore::FlushPendingActions()
     return;
   }
 
-  RefPtr<nsWindowBase> kungFuDeathGrip(mWidget);
+  RefPtr<nsWindowBase> widget(mWidget);
   nsresult rv = mDispatcher->BeginNativeInputTransaction();
   if (NS_WARN_IF(NS_FAILED(rv))) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
@@ -1688,8 +1688,8 @@ TSFTextStore::FlushPendingActions()
 
         if (action.mAdjustSelection) {
           // Select composition range so the new composition replaces the range
-          WidgetSelectionEvent selectionSet(true, eSetSelection, mWidget);
-          mWidget->InitEvent(selectionSet);
+          WidgetSelectionEvent selectionSet(true, eSetSelection, widget);
+          widget->InitEvent(selectionSet);
           selectionSet.mOffset = static_cast<uint32_t>(action.mSelectionStart);
           selectionSet.mLength = static_cast<uint32_t>(action.mSelectionLength);
           selectionSet.mReversed = false;
@@ -1710,7 +1710,7 @@ TSFTextStore::FlushPendingActions()
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
           ("0x%p   TSFTextStore::FlushPendingActions() "
            "dispatching compositionstart event...", this));
-        WidgetEventTime eventTime = mWidget->CurrentMessageWidgetEventTime();
+        WidgetEventTime eventTime = widget->CurrentMessageWidgetEventTime();
         nsEventStatus status;
         rv = mDispatcher->StartComposition(status, &eventTime);
         if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -1721,7 +1721,7 @@ TSFTextStore::FlushPendingActions()
              this, GetBoolName(!IsComposingInContent())));
           mDeferClearingContentForTSF = !IsComposingInContent();
         }
-        if (!mWidget || mWidget->Destroyed()) {
+        if (!widget || widget->Destroyed()) {
           break;
         }
         break;
@@ -1754,7 +1754,7 @@ TSFTextStore::FlushPendingActions()
           MOZ_LOG(sTextStoreLog, LogLevel::Debug,
             ("0x%p   TSFTextStore::FlushPendingActions() "
              "dispatching compositionchange event...", this));
-          WidgetEventTime eventTime = mWidget->CurrentMessageWidgetEventTime();
+          WidgetEventTime eventTime = widget->CurrentMessageWidgetEventTime();
           nsEventStatus status;
           rv = mDispatcher->FlushPendingComposition(status, &eventTime);
           if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -1784,7 +1784,7 @@ TSFTextStore::FlushPendingActions()
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
           ("0x%p   TSFTextStore::FlushPendingActions(), "
            "dispatching compositioncommit event...", this));
-        WidgetEventTime eventTime = mWidget->CurrentMessageWidgetEventTime();
+        WidgetEventTime eventTime = widget->CurrentMessageWidgetEventTime();
         nsEventStatus status;
         rv = mDispatcher->CommitComposition(status, &action.mData, &eventTime);
         if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -1815,8 +1815,8 @@ TSFTextStore::FlushPendingActions()
           break;
         }
 
-        WidgetSelectionEvent selectionSet(true, eSetSelection, mWidget);
-        selectionSet.mOffset = 
+        WidgetSelectionEvent selectionSet(true, eSetSelection, widget);
+        selectionSet.mOffset =
           static_cast<uint32_t>(action.mSelectionStart);
         selectionSet.mLength =
           static_cast<uint32_t>(action.mSelectionLength);
@@ -1827,7 +1827,7 @@ TSFTextStore::FlushPendingActions()
         MOZ_CRASH("unexpected action type");
     }
 
-    if (mWidget && !mWidget->Destroyed()) {
+    if (widget && !widget->Destroyed()) {
       continue;
     }
 
@@ -4633,7 +4633,17 @@ TSFTextStore::CreateAndSetFocus(nsWindowBase* aFocusedWidget,
       MarkContextAsKeyboardDisabled(topContext);
     }
   }
-  HRESULT hr = sThreadMgr->SetFocus(textStore->mDocumentMgr);
+
+  HRESULT hr;
+  {
+    // Windows 10's softwware keyboard requires that SetSelection must be
+    // always successful into SetFocus.  If returning error, it might crash
+    // into TextInputFramework.dll.
+    AutoSetTemporarySelection setSelection(textStore->SelectionForTSFRef());
+
+    hr = sThreadMgr->SetFocus(textStore->mDocumentMgr);
+  }
+
   if (NS_WARN_IF(FAILED(hr))) {
     MOZ_LOG(sTextStoreLog, LogLevel::Error,
       ("  TSFTextStore::CreateAndSetFocus() FAILED due to "

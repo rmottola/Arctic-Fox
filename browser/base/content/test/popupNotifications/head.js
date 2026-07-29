@@ -233,7 +233,7 @@ XPCOMUtils.defineLazyGetter(this, "gActiveListeners", () => {
   let listeners = new Map();
   registerCleanupFunction(() => {
     for (let [listener, eventName] of listeners) {
-      PopupNotifications.panel.removeEventListener(eventName, listener, false);
+      PopupNotifications.panel.removeEventListener(eventName, listener);
     }
   });
   return listeners;
@@ -244,12 +244,12 @@ function onPopupEvent(eventName, callback, condition) {
     if (event.target != PopupNotifications.panel ||
         (condition && !condition()))
       return;
-    PopupNotifications.panel.removeEventListener(eventName, listener, false);
+    PopupNotifications.panel.removeEventListener(eventName, listener);
     gActiveListeners.delete(listener);
     executeSoon(() => callback.call(PopupNotifications.panel));
   }
   gActiveListeners.set(listener, eventName);
-  PopupNotifications.panel.addEventListener(eventName, listener, false);
+  PopupNotifications.panel.addEventListener(eventName, listener);
 }
 
 function triggerMainCommand(popup) {
@@ -273,7 +273,7 @@ function triggerSecondaryCommand(popup, index) {
   notification.button.focus();
 
   popup.addEventListener("popupshown", function handle() {
-    popup.removeEventListener("popupshown", handle, false);
+    popup.removeEventListener("popupshown", handle);
     info("Command popup open for notification " + notification.id);
     // Press down until the desired command is selected
     for (let i = 0; i <= index; i++) {
@@ -281,7 +281,7 @@ function triggerSecondaryCommand(popup, index) {
     }
     // Activate
     EventUtils.synthesizeKey("VK_RETURN", {});
-  }, false);
+  });
 
   // One down event to open the popup
   info("Open the popup to trigger secondary command for notification " + notification.id);

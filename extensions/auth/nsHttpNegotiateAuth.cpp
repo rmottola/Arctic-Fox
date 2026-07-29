@@ -32,7 +32,6 @@
 #include "nsNetCID.h"
 #include "plbase64.h"
 #include "plstr.h"
-#include "prprf.h"
 #include "mozilla/Logging.h"
 #include "prmem.h"
 #include "prnetdb.h"
@@ -321,7 +320,7 @@ NS_IMPL_ISUPPORTS(GetNextTokenCompleteEvent, nsIRunnable, nsICancelable)
 //
 class GetNextTokenRunnable final : public mozilla::Runnable
 {
-    virtual ~GetNextTokenRunnable() {}
+    ~GetNextTokenRunnable() override = default;
     public:
         GetNextTokenRunnable(nsIHttpAuthenticableChannel *authChannel,
                              const char *challenge,

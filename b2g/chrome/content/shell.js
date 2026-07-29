@@ -14,7 +14,6 @@ Cu.import('resource://gre/modules/AlertsHelper.jsm');
 Cu.import('resource://gre/modules/SystemUpdateService.jsm');
 
 if (isGonk) {
-  Cu.import('resource://gre/modules/NetworkStatsService.jsm');
   Cu.import('resource://gre/modules/ResourceStatsService.jsm');
 }
 
@@ -81,9 +80,9 @@ const once = event => {
   let target = shell.contentBrowser;
   return new Promise((resolve, reject) => {
     target.addEventListener(event, function gotEvent(evt) {
-      target.removeEventListener(event, gotEvent, false);
+      target.removeEventListener(event, gotEvent);
       resolve(evt);
-    }, false);
+    });
   });
 }
 
@@ -809,7 +808,7 @@ var CustomEventManager = {
     window.addEventListener("ContentStart", (function(evt) {
       let content = shell.contentBrowser.contentWindow;
       content.addEventListener("mozContentEvent", this, false, true);
-    }).bind(this), false);
+    }).bind(this));
   },
 
   handleEvent: function custevt_handleEvent(evt) {

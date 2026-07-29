@@ -38,10 +38,16 @@
 #include "nsContentSecurityManager.h"
 #include "nsIDeprecationWarner.h"
 #include "nsICompressConvStats.h"
+#include "nsIDocument.h"
+#include "nsIDOMWindowUtils.h"
 #include "nsStreamUtils.h"
 
 #ifdef OS_POSIX
 #include "chrome/common/file_descriptor_set_posix.h"
+#endif
+
+#ifdef MOZ_TASK_TRACER
+#include "GeckoTaskTracer.h"
 #endif
 
 using namespace mozilla::dom;
@@ -1489,6 +1495,13 @@ HttpChannelChild::RecvNotifyTrackingProtectionDisabled()
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult
+HttpChannelChild::RecvNotifyTrackingResource()
+{
+  SetIsTrackingResource();
+  return IPC_OK();
+}
+
 void
 HttpChannelChild::FlushedForDiversion()
 {
@@ -1686,7 +1699,7 @@ HttpChannelChild::OnRedirectVerifyCallback(nsresult result)
   nsresult rv;
   OptionalURIParams redirectURI;
 
-  uint32_t referrerPolicy = REFERRER_POLICY_NO_REFERRER_WHEN_DOWNGRADE;
+  uint32_t referrerPolicy = REFERRER_POLICY_UNSET;
   OptionalURIParams referrerURI;
   SerializeURI(nullptr, referrerURI);
 
@@ -1917,6 +1930,14 @@ HttpChannelChild::AsyncOpen(nsIStreamListener *listener, nsISupports *aContext)
   NS_ENSURE_TRUE(!mWasOpened, NS_ERROR_ALREADY_OPENED);
 
   mAsyncOpenTime = TimeStamp::Now();
+#ifdef MOZ_TASK_TRACER
+  nsCOMPtr<nsIURI> uri;
+  GetURI(getter_AddRefs(uri));
+  nsAutoCString urispec;
+  uri->GetSpec(urispec);
+  tasktracer::AddLabel("HttpChannelChild::AsyncOpen %s", urispec.get());
+#endif
+  
 
   // Port checked in parent, but duplicate here so we can return with error
   // immediately
@@ -2027,6 +2048,18 @@ HttpChannelChild::ContinueAsyncOpen()
     return NS_ERROR_ILLEGAL_VALUE;
   }
 
+  // This id identifies the inner window's top-level document,
+  // which changes on every new load or navigation.
+  uint64_t contentWindowId = 0;
+  if (tabChild) {
+    MOZ_ASSERT(tabChild->WebNavigation());
+    nsCOMPtr<nsIDocument> document = tabChild->GetDocument();
+    if (document) {
+      contentWindowId = document->InnerWindowID();
+    }
+  }
+  SetTopLevelContentWindowId(contentWindowId);
+
   HttpChannelOpenArgs openArgs;
   // No access to HttpChannelOpenArgs members, but they each have a
   // function with the struct name that returns a ref.
@@ -2120,6 +2153,8 @@ HttpChannelChild::ContinueAsyncOpen()
   char chid[NSID_LENGTH];
   mChannelId.ToProvidedString(chid);
   openArgs.channelId().AssignASCII(chid);
+
+  openArgs.contentWindowId() = contentWindowId;
 
   if (tabChild && !tabChild->IPCOpen()) {
     return NS_ERROR_FAILURE;
@@ -2861,6 +2896,13 @@ HttpChannelChild::ShouldInterceptURI(nsIURI* aURI,
   }
 
   return ShouldIntercept(upgradedURI ? upgradedURI.get() : aURI);
+}
+
+mozilla::ipc::IPCResult
+HttpChannelChild::RecvSetPriority(const uint16_t& aPriority)
+{
+  mPriority = aPriority;
+  return IPC_OK();
 }
 
 } // namespace net

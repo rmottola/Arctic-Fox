@@ -1643,9 +1643,10 @@ nsDisplayImage::BuildLayer(nsDisplayListBuilder* aBuilder,
                            LayerManager* aManager,
                            const ContainerLayerParameters& aParameters)
 {
-  uint32_t flags = aBuilder->ShouldSyncDecodeImages()
-                 ? imgIContainer::FLAG_SYNC_DECODE
-                 : imgIContainer::FLAG_NONE;
+  uint32_t flags = imgIContainer::FLAG_ASYNC_NOTIFY;
+  if (aBuilder->ShouldSyncDecodeImages()) {
+    flags |= imgIContainer::FLAG_SYNC_DECODE;
+  }
 
   RefPtr<ImageContainer> container =
     mImage->GetImageContainer(aManager, flags);
@@ -2209,7 +2210,7 @@ nsImageFrame::LoadIcon(const nsAString& aSpec,
                                        relevant for cookies, so does not
                                        apply to icons. */
                        nullptr,      /* referrer (not relevant for icons) */
-                       mozilla::net::RP_Default,
+                       mozilla::net::RP_Unset,
                        nullptr,      /* principal (not relevant for icons) */
                        loadGroup,
                        gIconLoad,

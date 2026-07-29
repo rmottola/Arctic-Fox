@@ -143,7 +143,7 @@ FTPChannelParent::DoAsyncOpen(const URIParams& aURI,
     return SendFailedAsyncOpen(rv);
   }
 
-  NeckoOriginAttributes attrs;
+  OriginAttributes attrs;
   rv = loadInfo->GetOriginAttributes(&attrs);
   if (NS_FAILED(rv)) {
     return SendFailedAsyncOpen(rv);
@@ -558,6 +558,13 @@ FTPChannelParent::SetParentListener(HttpChannelParentListener* aListener)
 
 NS_IMETHODIMP
 FTPChannelParent::NotifyTrackingProtectionDisabled()
+{
+  // One day, this should probably be filled in.
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+FTPChannelParent::NotifyTrackingResource()
 {
   // One day, this should probably be filled in.
   return NS_OK;

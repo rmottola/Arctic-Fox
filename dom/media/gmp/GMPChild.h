@@ -10,7 +10,6 @@
 #include "GMPTimerChild.h"
 #include "GMPStorageChild.h"
 #include "GMPLoader.h"
-#include "gmp-async-shutdown.h"
 #include "gmp-entrypoints.h"
 #include "prlink.h"
 
@@ -20,14 +19,12 @@ namespace gmp {
 class GMPContentChild;
 
 class GMPChild : public PGMPChild
-               , public GMPAsyncShutdownHost
 {
 public:
   GMPChild();
   virtual ~GMPChild();
 
   bool Init(const nsAString& aPluginPath,
-            const nsAString& aVoucherPath,
             base::ProcessId aParentPid,
             MessageLoop* aIOLoop,
             IPC::Channel* aChannel);
@@ -37,18 +34,12 @@ public:
   GMPTimerChild* GetGMPTimers();
   GMPStorageChild* GetGMPStorage();
 
-  // GMPAsyncShutdownHost
-  void ShutdownComplete() override;
-
 #if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
   bool SetMacSandboxInfo(MacSandboxPluginType aPluginType);
 #endif
 
 private:
   friend class GMPContentChild;
-
-  bool PreLoadPluginVoucher();
-  void PreLoadSandboxVoucher();
 
   bool GetUTF8LibPath(nsACString& aOutLibPath);
 
@@ -65,13 +56,12 @@ private:
   PGMPStorageChild* AllocPGMPStorageChild() override;
   bool DeallocPGMPStorageChild(PGMPStorageChild* aActor) override;
 
-  PGMPContentChild* AllocPGMPContentChild(Transport* aTransport,
-                                          ProcessId aOtherPid) override;
   void GMPContentChildActorDestroy(GMPContentChild* aGMPContentChild);
 
   mozilla::ipc::IPCResult RecvCrashPluginNow() override;
-  mozilla::ipc::IPCResult RecvBeginAsyncShutdown() override;
   mozilla::ipc::IPCResult RecvCloseActive() override;
+
+  mozilla::ipc::IPCResult RecvInitGMPContentChild(Endpoint<PGMPContentChild>&& aEndpoint) override;
 
   void ActorDestroy(ActorDestroyReason aWhy) override;
   void ProcessingError(Result aCode, const char* aReason) override;
@@ -80,17 +70,13 @@ private:
 
   nsTArray<UniquePtr<GMPContentChild>> mGMPContentChildren;
 
-  GMPAsyncShutdown* mAsyncShutdown;
   RefPtr<GMPTimerChild> mTimerChild;
   RefPtr<GMPStorageChild> mStorage;
 
   MessageLoop* mGMPMessageLoop;
   nsString mPluginPath;
-  nsString mSandboxVoucherPath;
   nsCString mNodeId;
-  GMPLoader* mGMPLoader;
-  nsTArray<uint8_t> mPluginVoucher;
-  nsTArray<uint8_t> mSandboxVoucher;
+  UniquePtr<GMPLoader> mGMPLoader;
 };
 
 } // namespace gmp

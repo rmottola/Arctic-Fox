@@ -26,7 +26,7 @@ loader.lazyGetter(this, "prefBranch", function () {
 
 loader.lazyRequireGetter(this, "gcliInit", "devtools/shared/gcli/commands/index");
 loader.lazyRequireGetter(this, "util", "gcli/util/util");
-loader.lazyRequireGetter(this, "ConsoleServiceListener", "devtools/server/actors/utils/webconsole-utils", true);
+loader.lazyRequireGetter(this, "ConsoleServiceListener", "devtools/server/actors/utils/webconsole-listeners", true);
 loader.lazyRequireGetter(this, "gDevTools", "devtools/client/framework/devtools", true);
 loader.lazyRequireGetter(this, "gDevToolsBrowser", "devtools/client/framework/devtools-browser", true);
 loader.lazyRequireGetter(this, "nodeConstants", "devtools/shared/dom-node-constants");
@@ -505,8 +505,8 @@ DeveloperToolbar.prototype.show = function (focus) {
     this.onOutput.add(this.outputPanel._outputChanged, this.outputPanel);
 
     let tabbrowser = this._chromeWindow.gBrowser;
-    tabbrowser.tabContainer.addEventListener("TabSelect", this, false);
-    tabbrowser.tabContainer.addEventListener("TabClose", this, false);
+    tabbrowser.tabContainer.addEventListener("TabSelect", this);
+    tabbrowser.tabContainer.addEventListener("TabClose", this);
     tabbrowser.addEventListener("load", this, true);
     tabbrowser.addEventListener("beforeunload", this, true);
 
@@ -645,8 +645,8 @@ DeveloperToolbar.prototype.destroy = function () {
   }
 
   let tabbrowser = this._chromeWindow.gBrowser;
-  tabbrowser.tabContainer.removeEventListener("TabSelect", this, false);
-  tabbrowser.tabContainer.removeEventListener("TabClose", this, false);
+  tabbrowser.tabContainer.removeEventListener("TabSelect", this);
+  tabbrowser.tabContainer.removeEventListener("TabClose", this);
   tabbrowser.removeEventListener("load", this, true);
   tabbrowser.removeEventListener("beforeunload", this, true);
 

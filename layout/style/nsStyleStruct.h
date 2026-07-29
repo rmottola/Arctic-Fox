@@ -784,6 +784,8 @@ struct nsStyleImageLayers {
   struct Layer;
   friend struct Layer;
   struct Layer {
+    typedef mozilla::StyleGeometryBox StyleGeometryBox;
+
     nsStyleImage  mImage;         // [reset]
     RefPtr<mozilla::css::URLValueData> mSourceURI;  // [reset]
                                   // mask-only property
@@ -795,9 +797,9 @@ struct nsStyleImageLayers {
                                   // or an ImageValue.)
     mozilla::Position mPosition;  // [reset]
     Size          mSize;          // [reset]
-    uint8_t       mClip;          // [reset] See nsStyleConsts.h
+    StyleGeometryBox  mClip;      // [reset] See nsStyleConsts.h
     MOZ_INIT_OUTSIDE_CTOR
-      uint8_t     mOrigin;        // [reset] See nsStyleConsts.h
+      StyleGeometryBox mOrigin;   // [reset] See nsStyleConsts.h
     uint8_t       mAttachment;    // [reset] See nsStyleConsts.h
                                   // background-only property
                                   // This property is used for background layer
@@ -937,8 +939,13 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleBackground {
     return nsChangeHint(0);
   }
 
+  // Return the background color as nscolor.
+  nscolor BackgroundColor(const nsIFrame* aFrame) const;
+  nscolor BackgroundColor(nsStyleContext* aContext) const;
+
   // True if this background is completely transparent.
-  bool IsTransparent() const;
+  bool IsTransparent(const nsIFrame* aFrame) const;
+  bool IsTransparent(nsStyleContext* aContext) const;
 
   // We have to take slower codepaths for fixed background attachment,
   // but we don't want to do that when there's no image.
@@ -953,7 +960,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleBackground {
   const nsStyleImageLayers::Layer& BottomLayer() const { return mImage.BottomLayer(); }
 
   nsStyleImageLayers mImage;
-  nscolor mBackgroundColor;       // [reset]
+  mozilla::StyleComplexColor mBackgroundColor;       // [reset]
 };
 
 #define NS_SPACING_MARGIN   0
@@ -1141,7 +1148,6 @@ public:
   explicit nsCSSShadowArray(uint32_t aArrayLen) :
     mLength(aArrayLen)
   {
-    MOZ_COUNT_CTOR(nsCSSShadowArray);
     for (uint32_t i = 1; i < mLength; ++i) {
       // Make sure we call the constructors of each nsCSSShadowItem
       // (the first one is called for us because we declared it under private)
@@ -1152,7 +1158,6 @@ public:
 private:
   // Private destructor, to discourage deletion outside of Release():
   ~nsCSSShadowArray() {
-    MOZ_COUNT_DTOR(nsCSSShadowArray);
     for (uint32_t i = 1; i < mLength; ++i) {
       mArray[i].~nsCSSShadowItem();
     }
@@ -2753,7 +2758,7 @@ private:
   ReferenceBox mReferenceBox = ReferenceBox::NoBox;
 };
 
-using StyleClipPath = StyleShapeSource<StyleClipPathGeometryBox>;
+using StyleClipPath = StyleShapeSource<StyleGeometryBox>;
 using StyleShapeOutside = StyleShapeSource<StyleShapeOutsideShapeBox>;
 
 } // namespace mozilla
@@ -2885,7 +2890,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay
     return mozilla::StyleDisplay::Block == mDisplay ||
            mozilla::StyleDisplay::ListItem == mDisplay ||
            mozilla::StyleDisplay::InlineBlock == mDisplay ||
-           mozilla::StyleDisplay::TableCaption == mDisplay;
+           mozilla::StyleDisplay::TableCaption == mDisplay ||
+           mozilla::StyleDisplay::FlowRoot == mDisplay;
     // Should TABLE_CELL be included here?  They have
     // block frames nested inside of them.
     // (But please audit all callers before changing.)
@@ -2897,7 +2903,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay
            mozilla::StyleDisplay::WebkitBox == mDisplay ||
            mozilla::StyleDisplay::Grid == mDisplay ||
            mozilla::StyleDisplay::ListItem == mDisplay ||
-           mozilla::StyleDisplay::Table == mDisplay;
+           mozilla::StyleDisplay::Table == mDisplay ||
+           mozilla::StyleDisplay::FlowRoot == mDisplay;
   }
 
   static bool IsDisplayTypeInlineOutside(mozilla::StyleDisplay aDisplay) {

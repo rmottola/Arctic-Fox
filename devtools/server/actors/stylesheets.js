@@ -326,12 +326,12 @@ var StyleSheetActor = protocol.ActorClassWithSpec(styleSheetSpec, {
     let deferred = promise.defer();
 
     let onSheetLoaded = (event) => {
-      this.ownerNode.removeEventListener("load", onSheetLoaded, false);
+      this.ownerNode.removeEventListener("load", onSheetLoaded);
 
       deferred.resolve(this.rawSheet.cssRules);
     };
 
-    this.ownerNode.addEventListener("load", onSheetLoaded, false);
+    this.ownerNode.addEventListener("load", onSheetLoaded);
 
     // cache so we don't add many listeners if this is called multiple times.
     this._cssRules = deferred.promise;
@@ -960,7 +960,7 @@ exports.StyleSheetsActor = StyleSheetsActor;
  * Normalize multiple relative paths towards the base paths on the right.
  */
 function normalize(...aURLs) {
-  let base = Services.io.newURI(aURLs.pop(), null, null);
+  let base = Services.io.newURI(aURLs.pop());
   let url;
   while ((url = aURLs.pop())) {
     base = Services.io.newURI(url, null, base);
@@ -970,5 +970,5 @@ function normalize(...aURLs) {
 
 function dirname(aPath) {
   return Services.io.newURI(
-    ".", null, Services.io.newURI(aPath, null, null)).spec;
+    ".", null, Services.io.newURI(aPath)).spec;
 }

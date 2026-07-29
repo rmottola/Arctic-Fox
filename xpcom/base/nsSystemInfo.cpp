@@ -9,7 +9,6 @@
 #include "nsSystemInfo.h"
 #include "prsystem.h"
 #include "prio.h"
-#include "prprf.h"
 #include "mozilla/SSE.h"
 #include "mozilla/arm.h"
 #include "mozilla/Sprintf.h"
@@ -50,12 +49,6 @@
 #include "mozilla/dom/ContentChild.h"
 #endif
 
-#ifdef MOZ_WIDGET_GONK
-#include <sys/system_properties.h>
-#include "mozilla/Preferences.h"
-#include "nsPrintfCString.h"
-#endif
-
 #ifdef ANDROID
 extern "C" {
 NS_EXPORT int android_sdk_version;
@@ -76,6 +69,8 @@ NS_EXPORT int android_sdk_version;
 // so we must call it before going multithreaded, but nsSystemInfo::Init
 // only happens well after that point.
 uint32_t nsSystemInfo::gUserUmask = 0;
+
+using namespace mozilla::dom;
 
 #if defined (XP_LINUX) && !defined (ANDROID)
 static void
@@ -748,44 +743,6 @@ nsSystemInfo::Init()
   } else {
     GetAndroidSystemInfo(&info);
     SetupAndroidInfo(info);
-  }
-#endif
-
-#ifdef MOZ_WIDGET_GONK
-  char sdk[PROP_VALUE_MAX];
-  if (__system_property_get("ro.build.version.sdk", sdk)) {
-    android_sdk_version = atoi(sdk);
-    SetPropertyAsInt32(NS_LITERAL_STRING("sdk_version"), android_sdk_version);
-
-    SetPropertyAsACString(NS_LITERAL_STRING("secondaryLibrary"),
-                          nsPrintfCString("SDK %u", android_sdk_version));
-  }
-
-  char characteristics[PROP_VALUE_MAX];
-  if (__system_property_get("ro.build.characteristics", characteristics)) {
-    if (!strcmp(characteristics, "tablet")) {
-      SetPropertyAsBool(NS_LITERAL_STRING("tablet"), true);
-    } else if (!strcmp(characteristics, "tv")) {
-      SetPropertyAsBool(NS_LITERAL_STRING("tv"), true);
-    }
-  }
-
-  nsAutoString str;
-  rv = GetPropertyAsAString(NS_LITERAL_STRING("version"), str);
-  if (NS_SUCCEEDED(rv)) {
-    SetPropertyAsAString(NS_LITERAL_STRING("kernel_version"), str);
-  }
-
-  const nsAdoptingString& b2g_os_name =
-    mozilla::Preferences::GetString("b2g.osName");
-  if (b2g_os_name) {
-    SetPropertyAsAString(NS_LITERAL_STRING("name"), b2g_os_name);
-  }
-
-  const nsAdoptingString& b2g_version =
-    mozilla::Preferences::GetString("b2g.version");
-  if (b2g_version) {
-    SetPropertyAsAString(NS_LITERAL_STRING("version"), b2g_version);
   }
 #endif
 

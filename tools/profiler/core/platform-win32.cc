@@ -37,9 +37,7 @@
 // Memory profile
 #include "nsMemoryReporterManager.h"
 
-#ifdef MOZ_STACKWALKING
 #include "mozilla/StackWalk_windows.h"
-#endif
 
 
 class PlatformData {
@@ -49,7 +47,8 @@ class PlatformData {
   // going to use it in the sampler thread. Using GetThreadHandle() will
   // not work in this case. We're using OpenThread because DuplicateHandle
   // for some reason doesn't work in Chrome's sandbox.
-  PlatformData(int aThreadId) : profiled_thread_(OpenThread(THREAD_GET_CONTEXT |
+  explicit PlatformData(int aThreadId) : profiled_thread_(OpenThread(
+                                               THREAD_GET_CONTEXT |
                                                THREAD_SUSPEND_RESUME |
                                                THREAD_QUERY_INFORMATION,
                                                false,
@@ -209,7 +208,6 @@ class SamplerThread : public Thread {
       return;
     }
 
-#ifdef MOZ_STACKWALKING
     // Threads that may invoke JS require extra attention. Since, on windows,
     // the jits also need to modify the same dynamic function table that we need
     // to get a stack trace, we have to be wary of that to avoid deadlock.
@@ -232,7 +230,6 @@ class SamplerThread : public Thread {
       // we cannot deadlock with them, and should let them run as they please.
       ReleaseStackWalkWorkaroundLock();
     }
-#endif
 
 #if V8_HOST_ARCH_X64
     sample->pc = reinterpret_cast<Address>(context.Rip);

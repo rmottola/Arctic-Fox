@@ -17,10 +17,7 @@
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/layers/TextureClient.h"
 #include "nsContentUtils.h"
-
-#ifdef MOZ_GAMEPAD
 #include "mozilla/dom/GamepadManager.h"
-#endif
 
 using layers::TextureClient;
 
@@ -47,7 +44,6 @@ VRManagerChild::VRManagerChild()
   , mFrameRequestCallbackCounter(0)
   , mBackend(layers::LayersBackend::LAYERS_NONE)
 {
-  MOZ_COUNT_CTOR(VRManagerChild);
   MOZ_ASSERT(NS_IsMainThread());
 
   mStartTimeStamp = TimeStamp::Now();
@@ -56,7 +52,6 @@ VRManagerChild::VRManagerChild()
 VRManagerChild::~VRManagerChild()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_COUNT_DTOR(VRManagerChild);
 }
 
 /*static*/ void
@@ -481,7 +476,6 @@ VRManagerChild::RecvNotifyVRVSync(const uint32_t& aDisplayID)
 mozilla::ipc::IPCResult
 VRManagerChild::RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent)
 {
-#ifdef MOZ_GAMEPAD
   // VRManagerChild could be at other processes, but GamepadManager
   // only exists at the content process or the same process
   // in non-e10s mode.
@@ -491,7 +485,6 @@ VRManagerChild::RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent)
   if (gamepadManager) {
     gamepadManager->Update(aGamepadEvent);
   }
-#endif
 
   return IPC_OK();
 }

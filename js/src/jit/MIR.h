@@ -2841,12 +2841,10 @@ class MTableSwitch final
 {
     // The successors of the tableswitch
     // - First successor = the default case
-    // - Successor 2 and higher = the cases sorted on case index.
+    // - Successors 2 and higher = the cases
     Vector<MBasicBlock*, 0, JitAllocPolicy> successors_;
+    // Index into successors_ sorted on case index
     Vector<size_t, 0, JitAllocPolicy> cases_;
-
-    // Contains the blocks/cases that still need to get build
-    Vector<MBasicBlock*, 0, JitAllocPolicy> blocks_;
 
     MUse operand_;
     int32_t low_;
@@ -2861,7 +2859,6 @@ class MTableSwitch final
                  int32_t low, int32_t high)
       : successors_(alloc),
         cases_(alloc),
-        blocks_(alloc),
         low_(low),
         high_(high)
     {
@@ -2904,14 +2901,6 @@ class MTableSwitch final
         successors_[i] = successor;
     }
 
-    MBasicBlock** blocks() {
-        return &blocks_[0];
-    }
-
-    size_t numBlocks() const {
-        return blocks_.length();
-    }
-
     int32_t low() const {
         return low_;
     }
@@ -2928,10 +2917,6 @@ class MTableSwitch final
         return getSuccessor(cases_[i]);
     }
 
-    size_t numCases() const {
-        return high() - low() + 1;
-    }
-
     MOZ_MUST_USE bool addDefault(MBasicBlock* block, size_t* index = nullptr) {
         MOZ_ASSERT(successors_.empty());
         if (index)
@@ -2943,13 +2928,8 @@ class MTableSwitch final
         return cases_.append(successorIndex);
     }
 
-    MBasicBlock* getBlock(size_t i) const {
-        MOZ_ASSERT(i < numBlocks());
-        return blocks_[i];
-    }
-
-    MOZ_MUST_USE bool addBlock(MBasicBlock* block) {
-        return blocks_.append(block);
+    size_t numCases() const {
+        return high() - low() + 1;
     }
 
     MDefinition* getOperand(size_t index) const override {
@@ -5439,8 +5419,7 @@ class MWasmTruncateToInt64
         trapOffset_(trapOffset)
     {
         setResultType(MIRType::Int64);
-        setGuard(); // not removable because of possible side-effects.
-        setMovable();
+        setGuard(); // neither removable nor movable because of possible side-effects.
     }
 
   public:
@@ -5472,8 +5451,7 @@ class MWasmTruncateToInt32
       : MUnaryInstruction(def), isUnsigned_(isUnsigned), trapOffset_(trapOffset)
     {
         setResultType(MIRType::Int32);
-        setGuard(); // not removable because of possible side-effects.
-        setMovable();
+        setGuard(); // neither removable nor movable because of possible side-effects.
     }
 
   public:
@@ -7032,8 +7010,10 @@ class MDiv : public MBinaryArithInstruction
         div->unsigned_ = unsignd;
         div->trapOnError_ = trapOnError;
         div->trapOffset_ = trapOffset;
-        if (trapOnError)
+        if (trapOnError) {
             div->setGuard(); // not removable because of possible side-effects.
+            div->setNotMovable();
+        }
         div->setMustPreserveNaN(mustPreserveNaN);
         if (type == MIRType::Int32)
             div->setTruncateKind(Truncate);
@@ -7166,8 +7146,10 @@ class MMod : public MBinaryArithInstruction
         mod->unsigned_ = unsignd;
         mod->trapOnError_ = trapOnError;
         mod->trapOffset_ = trapOffset;
-        if (trapOnError)
+        if (trapOnError) {
             mod->setGuard(); // not removable because of possible side-effects.
+            mod->setNotMovable();
+        }
         if (type == MIRType::Int32)
             mod->setTruncateKind(Truncate);
         return mod;
@@ -8469,6 +8451,34 @@ class MLambdaArrow
     }
     bool appendRoots(MRootList& roots) const override {
         return info_.appendRoots(roots);
+    }
+};
+
+class MSetFunName
+  : public MAryInstruction<2>,
+    public MixPolicy<ObjectPolicy<0>, BoxPolicy<1> >::Data
+{
+    uint8_t prefixKind_;
+
+    explicit MSetFunName(MDefinition* fun, MDefinition* name, uint8_t prefixKind)
+      : prefixKind_(prefixKind)
+    {
+        initOperand(0, fun);
+        initOperand(1, name);
+        setResultType(MIRType::None);
+    }
+
+  public:
+    INSTRUCTION_HEADER(SetFunName)
+    TRIVIAL_NEW_WRAPPERS
+    NAMED_OPERANDS((0, fun), (1, name))
+
+    uint8_t prefixKind() const {
+        return prefixKind_;
+    }
+
+    bool possiblyCalls() const override {
+        return true;
     }
 };
 

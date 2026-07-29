@@ -7,13 +7,14 @@
 #ifndef mozilla_dom_CustomElementRegistry_h
 #define mozilla_dom_CustomElementRegistry_h
 
+#include "js/GCHashTable.h"
 #include "js/TypeDecls.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/dom/BindingDeclarations.h"
+#include "mozilla/dom/FunctionBinding.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsWrapperCache.h"
-#include "mozilla/dom/FunctionBinding.h"
 
 class nsDocument;
 
@@ -127,6 +128,10 @@ struct CustomElementDefinition
 
   // The document custom element order.
   uint32_t mDocOrder;
+
+  bool IsCustomBuiltIn() {
+    return mType != mLocalName;
+  }
 };
 
 class CustomElementRegistry final : public nsISupports,
@@ -140,7 +145,8 @@ public:
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(CustomElementRegistry)
 
 public:
-  static bool IsCustomElementEnabled(JSContext* aCx, JSObject* aObject);
+  static bool IsCustomElementEnabled(JSContext* aCx = nullptr,
+                                     JSObject* aObject = nullptr);
   static already_AddRefed<CustomElementRegistry> Create(nsPIDOMWindowInner* aWindow);
   static void ProcessTopElementQueue();
 
@@ -152,6 +158,9 @@ public:
    */
   CustomElementDefinition* LookupCustomElementDefinition(
     const nsAString& aLocalName, const nsAString* aIs = nullptr) const;
+
+  CustomElementDefinition* LookupCustomElementDefinition(
+    JSContext* aCx, JSObject *aConstructor) const;
 
   /**
    * Enqueue created callback or register upgrade candidate for
@@ -172,6 +181,8 @@ private:
   explicit CustomElementRegistry(nsPIDOMWindowInner* aWindow);
   ~CustomElementRegistry();
 
+  bool Init();
+
   /**
    * Registers an unresolved custom element that is a candidate for
    * upgrade when the definition is registered via registerElement.
@@ -191,15 +202,25 @@ private:
     DefinitionMap;
   typedef nsClassHashtable<nsISupportsHashKey, nsTArray<nsWeakPtr>>
     CandidateMap;
+  typedef JS::GCHashMap<JS::Heap<JSObject*>,
+                        nsCOMPtr<nsIAtom>,
+                        js::MovableCellHasher<JS::Heap<JSObject*>>,
+                        js::SystemAllocPolicy> ConstructorMap;
 
   // Hashtable for custom element definitions in web components.
   // Custom prototypes are stored in the compartment where
   // registerElement was called.
   DefinitionMap mCustomDefinitions;
 
+  // Hashtable for looking up definitions by using constructor as key.
+  // Custom elements' name are stored here and we need to lookup
+  // mCustomDefinitions again to get definitions.
+  ConstructorMap mConstructors;
+
   typedef nsRefPtrHashtable<nsISupportsHashKey, Promise>
     WhenDefinedPromiseMap;
   WhenDefinedPromiseMap mWhenDefinedPromiseMap;
+
   // The "upgrade candidates map" from the web components spec. Maps from a
   // namespace id and local name to a list of elements to upgrade if that
   // element is registered as a custom element.

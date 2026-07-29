@@ -35,7 +35,7 @@ interface nsIDOMNodeList;
 interface nsIDOMElement;
 interface nsIDOMHTMLCanvasElement;
 interface nsIDOMEvent;
-interface nsIDOMStyleSheet;
+interface nsIPreloadedStyleSheet;
 interface nsITransferable;
 interface nsIQueryContentEventResult;
 interface nsIDOMWindow;
@@ -1739,7 +1739,7 @@ interface nsIDOMWindowUtils : nsISupports {
    *
    * Sheets added via this API take effect immediately on the document.
    */
-  void addSheet(in nsIDOMStyleSheet sheet, in unsigned long type);
+  void addSheet(in nsIPreloadedStyleSheet sheet, in unsigned long type);
 
   /**
    * Remove the document style sheet at |sheetURI| from the list of additional 
@@ -1973,6 +1973,18 @@ interface nsIDOMWindowUtils : nsISupports {
     */
   readonly attribute int32_t gpuProcessPid;
 
+  /**
+   * Returns true if the given timeout ID is in the list of tracking
+   * timeouts.
+   */
+  boolean isTimeoutTracking(in unsigned long timeoutId);
+
+  // Match WidgetMouseEventBase::buttonType.
+  const long MOUSE_BUTTON_LEFT_BUTTON   = 0;
+  const long MOUSE_BUTTON_MIDDLE_BUTTON = 1;
+  const long MOUSE_BUTTON_RIGHT_BUTTON  = 2;
+
+  // Match WidgetMouseEventBase::buttonsFlag.
   const long MOUSE_BUTTONS_NO_BUTTON = 0x00;
   const long MOUSE_BUTTONS_LEFT_BUTTON = 0x01;
   const long MOUSE_BUTTONS_RIGHT_BUTTON = 0x02;

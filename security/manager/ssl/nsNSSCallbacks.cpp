@@ -15,7 +15,6 @@
 #include "mozilla/Casting.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Telemetry.h"
-#include "mozilla/TimeStamp.h"
 #include "mozilla/Unused.h"
 #include "nsContentUtils.h"
 #include "nsICertOverrideService.h"
@@ -117,8 +116,8 @@ nsHTTPDownloadEvent::Run()
   // For OCSP requests, only the first party domain aspect of origin attributes
   // is used. This means that OCSP requests are shared across different
   // containers.
-  if (mRequestSession->mOriginAttributes != NeckoOriginAttributes()) {
-    NeckoOriginAttributes attrs;
+  if (mRequestSession->mOriginAttributes != OriginAttributes()) {
+    OriginAttributes attrs;
     attrs.mFirstPartyDomain =
       mRequestSession->mOriginAttributes.mFirstPartyDomain;
 
@@ -233,8 +232,8 @@ nsNSSHttpRequestSession::createFcn(const nsNSSHttpServerSession* session,
                                    const char* http_protocol_variant,
                                    const char* path_and_query_string,
                                    const char* http_request_method,
-                                   const NeckoOriginAttributes& origin_attributes,
-                                   const PRIntervalTime timeout,
+                                   const OriginAttributes& origin_attributes,
+                                   const TimeDuration timeout,
                            /*out*/ nsNSSHttpRequestSession** pRequest)
 {
   if (!session || !http_protocol_variant || !path_and_query_string ||
@@ -247,14 +246,7 @@ nsNSSHttpRequestSession::createFcn(const nsNSSHttpServerSession* session,
     return Result::FATAL_ERROR_NO_MEMORY;
   }
 
-  rs->mTimeoutInterval = timeout;
-
-  // Use a maximum timeout value of 10 seconds because of bug 404059.
-  // FIXME: Use a better approach once 406120 is ready.
-  uint32_t maxBug404059Timeout = PR_TicksPerSecond() * 10;
-  if (timeout > maxBug404059Timeout) {
-    rs->mTimeoutInterval = maxBug404059Timeout;
-  }
+  rs->mTimeout = timeout;
 
   rs->mURL.Assign(http_protocol_variant);
   rs->mURL.AppendLiteral("://");
@@ -426,7 +418,7 @@ nsNSSHttpRequestSession::internal_send_receive_attempt(bool &retryable_error,
   {
     MutexAutoLock locker(waitLock);
 
-    const PRIntervalTime start_time = PR_IntervalNow();
+    const TimeStamp startTime = TimeStamp::NowLoRes();
     PRIntervalTime wait_interval;
 
     bool running_on_main_thread = NS_IsMainThread();
@@ -464,15 +456,13 @@ nsNSSHttpRequestSession::internal_send_receive_attempt(bool &retryable_error,
       }
 
       waitCondition.Wait(wait_interval);
-      
+
       if (!waitFlag)
         break;
 
       if (!request_canceled)
       {
-        bool timeout = 
-          (PRIntervalTime)(PR_IntervalNow() - start_time) > mTimeoutInterval;
- 
+        bool timeout = (TimeStamp::NowLoRes() - startTime) > mTimeout;
         if (timeout)
         {
           request_canceled = true;
@@ -555,10 +545,10 @@ nsNSSHttpRequestSession::internal_send_receive_attempt(bool &retryable_error,
 }
 
 nsNSSHttpRequestSession::nsNSSHttpRequestSession()
-: mRefCount(1),
-  mHasPostData(false),
-  mTimeoutInterval(0),
-  mListener(new nsHTTPListener)
+  : mRefCount(1)
+  , mHasPostData(false)
+  , mTimeout(0)
+  , mListener(new nsHTTPListener)
 {
 }
 
@@ -603,8 +593,8 @@ nsHTTPListener::FreeLoadGroup(bool aCancelLoad)
 
   if (mLoadGroup) {
     if (mLoadGroupOwnerThread != PR_GetCurrentThread()) {
-      NS_ASSERTION(false,
-                   "attempt to access nsHTTPDownloadEvent::mLoadGroup on multiple threads, leaking it!");
+      MOZ_ASSERT_UNREACHABLE(
+        "Attempt to access mLoadGroup on multiple threads, leaking it!");
     }
     else {
       lg = mLoadGroup;

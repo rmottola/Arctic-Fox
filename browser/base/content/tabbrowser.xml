@@ -1519,6 +1519,7 @@
         <parameter name="aPostData"/>
         <parameter name="aLoadInBackground"/>
         <parameter name="aAllowThirdPartyFixup"/>
+        <parameter name="aIsPrerendered"/>
         <body>
           <![CDATA[
             var aReferrerPolicy;
@@ -1553,6 +1554,7 @@
               aRelatedBrowser       = params.relatedBrowser;
               aOriginPrincipal      = params.originPrincipal;
               aOpener               = params.opener;
+              aIsPrerendered        = params.isPrerendered;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
@@ -1575,7 +1577,8 @@
                                   userContextId: aUserContextId,
                                   originPrincipal: aOriginPrincipal,
                                   relatedBrowser: aRelatedBrowser,
-                                  opener: aOpener });
+                                  opener: aOpener,
+                                  isPrerendered: aIsPrerendered });
             if (!bgLoad)
               this.selectedTab = tab;
 
@@ -1688,38 +1691,38 @@
       <method name="updateBrowserRemoteness">
         <parameter name="aBrowser"/>
         <parameter name="aShouldBeRemote"/>
-        <parameter name="aNewRemoteType"/>
-        <parameter name="aOpener"/>
-        <parameter name="aFreshProcess"/>
+        <parameter name="aOptions"/>
         <body>
           <![CDATA[
+            aOptions = aOptions || {};
+            let isRemote = aBrowser.getAttribute("remote") == "true";
+
             if (!gMultiProcessBrowser && aShouldBeRemote) {
               throw new Error("Cannot switch to remote browser in a window " +
                               "without the remote tabs load context.");
             }
 
-            let isRemote = aBrowser.getAttribute("remote") == "true";
-
-            // If going remote and no aNewRemoteType then use default.
-            if (aShouldBeRemote && !aNewRemoteType) {
-              aNewRemoteType = E10SUtils.DEFAULT_REMOTE_TYPE;
+            // Default values for remoteType
+            if (!aOptions.remoteType) {
+              aOptions.remoteType = aShouldBeRemote ? E10SUtils.DEFAULT_REMOTE_TYPE : E10SUtils.NOT_REMOTE;
             }
 
             // If we are passed an opener, we must be making the browser non-remote, and
             // if the browser is _currently_ non-remote, we need the openers to match,
             // because it is already too late to change it.
-            if (aOpener) {
+            if (aOptions.opener) {
               if (aShouldBeRemote) {
                 throw new Error("Cannot set an opener on a browser which should be remote!");
               }
-              if (!isRemote && aBrowser.contentWindow.opener != aOpener) {
+              if (!isRemote && aBrowser.contentWindow.opener != aOptions.opener) {
                 throw new Error("Cannot change opener on an already non-remote browser!");
               }
             }
 
             // Abort if we're not going to change anything
-            if (isRemote == aShouldBeRemote && !aFreshProcess &&
-                (!isRemote || aBrowser.getAttribute("remoteType") == aNewRemoteType)) {
+            if (isRemote == aShouldBeRemote && !aOptions.newFrameloader && !aOptions.freshProcess &&
+                (!isRemote || aBrowser.getAttribute("remoteType") == aOptions.remoteType) &&
+                !aBrowser.frameLoader.isFreshProcess) {
               return false;
             }
 
@@ -1758,7 +1761,7 @@
             parent.removeChild(aBrowser);
             if (aShouldBeRemote) {
               aBrowser.setAttribute("remote", "true");
-              aBrowser.setAttribute("remoteType", aNewRemoteType);
+              aBrowser.setAttribute("remoteType", aOptions.remoteType);
             } else {
               aBrowser.setAttribute("remote", "false");
               aBrowser.removeAttribute("remoteType");
@@ -1768,13 +1771,15 @@
             // turns this normal property into a field.
             aBrowser.relatedBrowser = relatedBrowser;
 
-            // Set the opener window on the browser, such that when the frame
-            // loader is created the opener is set correctly.
-            aBrowser.presetOpenerWindow(aOpener);
+            if (aOptions.opener) {
+              // Set the opener window on the browser, such that when the frame
+              // loader is created the opener is set correctly.
+              aBrowser.presetOpenerWindow(aOptions.opener);
+            }
 
             // Set the freshProcess attribute so that the frameloader knows to
             // create a new process
-            if (aFreshProcess) {
+            if (aOptions.freshProcess) {
               aBrowser.setAttribute("freshProcess", "true");
             }
 
@@ -1856,24 +1861,25 @@
       <method name="updateBrowserRemotenessByURL">
         <parameter name="aBrowser"/>
         <parameter name="aURL"/>
-        <parameter name="aFreshProcess"/>
+        <parameter name="aOptions"/>
         <body>
           <![CDATA[
+            aOptions = aOptions || {};
+
             if (!gMultiProcessBrowser)
               return this.updateBrowserRemoteness(aBrowser, false);
 
             // If this URL can't load in the current browser then flip it to the
             // correct type.
             let currentRemoteType = aBrowser.remoteType;
-            let requiredRemoteType =
+            aOptions.remoteType =
               E10SUtils.getRemoteTypeForURI(aURL, gMultiProcessBrowser,
                                             currentRemoteType);
-            if (currentRemoteType != requiredRemoteType || aFreshProcess) {
-              return this.updateBrowserRemoteness(aBrowser,
-                                                  !!requiredRemoteType,
-                                                  requiredRemoteType,
-                                                  /* aOpener */ null,
-                                                  aFreshProcess);
+            if (currentRemoteType != aOptions.remoteType ||
+                aOptions.freshProcess || aOptions.newFrameloader ||
+                aBrowser.frameLoader.isFreshProcess) {
+              let remote = aOptions.remoteType != E10SUtils.NOT_REMOTE;
+              return this.updateBrowserRemoteness(aBrowser, remote, aOptions);
             }
 
             return false;
@@ -1959,7 +1965,7 @@
           <![CDATA[
             // Supported parameters:
             // userContextId, remote, remoteType, isPreloadBrowser,
-            // uriIsAboutBlank, permanentKey
+            // uriIsAboutBlank, permanentKey, isPrerendered
 
             const NS_XUL = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
@@ -1970,6 +1976,10 @@
             b.setAttribute("messagemanagergroup", "browsers");
             b.setAttribute("contextmenu", this.getAttribute("contentcontextmenu"));
             b.setAttribute("tooltip", this.getAttribute("contenttooltip"));
+
+            if (aParams.isPrerendered) {
+              b.setAttribute("prerendered", "true");
+            }
 
             if (aParams.userContextId) {
               b.setAttribute("usercontextid", aParams.userContextId);
@@ -2059,7 +2069,7 @@
             "use strict";
 
             // Supported parameters:
-            // forceNotRemote, preferredRemoteType, userContextId
+            // forceNotRemote, preferredRemoteType, userContextId, isPrerendered
 
             let uriIsAboutBlank = !aURI || aURI == "about:blank";
 
@@ -2092,7 +2102,8 @@
                                              uriIsAboutBlank: uriIsAboutBlank,
                                              userContextId: aParams.userContextId,
                                              relatedBrowser: aParams.relatedBrowser,
-                                             opener: aParams.opener});
+                                             opener: aParams.opener,
+                                             isPrerendered: aParams.isPrerendered});
             }
 
             let notificationbox = this.getNotificationBox(browser);
@@ -2152,6 +2163,7 @@
         <parameter name="aPostData"/>
         <parameter name="aOwner"/>
         <parameter name="aAllowThirdPartyFixup"/>
+        <parameter name="aIsPrerendered"/>
         <body>
           <![CDATA[
             "use strict";
@@ -2194,6 +2206,7 @@
               aOriginPrincipal          = params.originPrincipal;
               aDisallowInheritPrincipal = params.disallowInheritPrincipal;
               aOpener                   = params.opener;
+              aIsPrerendered            = params.isPrerendered;
             }
 
             // if we're adding tabs, we're past interrupt mode, ditch the owner
@@ -2209,6 +2222,10 @@
             } else if (aURI.toLowerCase().startsWith("javascript:")) {
               // This can go away when bug 672618 or bug 55696 are fixed.
               t.setAttribute("label", aURI);
+            }
+
+            if (aIsPrerendered) {
+              t.setAttribute("hidden", "true");
             }
 
             if (aUserContextId) {
@@ -2265,6 +2282,7 @@
               userContextId:  aUserContextId,
               relatedBrowser: aRelatedBrowser,
               opener: aOpener,
+              isPrerendered: aIsPrerendered,
             };
             let { usingPreloadedContent } = this._linkBrowserToTab(t, aURI, browserParams);
             let b = t.linkedBrowser;
@@ -2948,11 +2966,29 @@
 
       <method name="swapBrowsers">
         <parameter name="aOurTab"/>
-        <parameter name="aOtherBrowser"/>
+        <parameter name="aOtherTab"/>
         <parameter name="aFlags"/>
         <body>
           <![CDATA[
-            this._swapBrowserDocShells(aOurTab, aOtherBrowser, aFlags);
+            let otherBrowser = aOtherTab.linkedBrowser;
+            let otherTabBrowser = otherBrowser.getTabBrowser();
+
+            // We aren't closing the other tab so, we also need to swap its tablisteners.
+            let filter = otherTabBrowser._tabFilters.get(aOtherTab);
+            let tabListener = otherTabBrowser._tabListeners.get(aOtherTab);
+            otherBrowser.webProgress.removeProgressListener(filter);
+            filter.removeProgressListener(tabListener);
+
+            // Perform the docshell swap through the common mechanism.
+            this._swapBrowserDocShells(aOurTab, otherBrowser, aFlags);
+
+            // Restore the listeners for the swapped in tab.
+            tabListener = otherTabBrowser.mTabProgressListener(aOtherTab, otherBrowser, false, false);
+            otherTabBrowser._tabListeners.set(aOtherTab, tabListener);
+
+            const notifyAll = Ci.nsIWebProgress.NOTIFY_ALL;
+            filter.addProgressListener(tabListener, notifyAll);
+            otherBrowser.webProgress.addProgressListener(filter, notifyAll);
           ]]>
         </body>
       </method>
@@ -4856,6 +4892,74 @@
               break;
             }
 
+            case "Prerender:Request": {
+              let sendCancelPrerendering = () => {
+                browser.frameloader.messageManager.
+                  sendAsyncMessage("Prerender:Canceled", { id: data.id });
+              };
+
+              let tab = this.getTabForBrowser(browser);
+              if (!tab) {
+                // No tab?
+                sendCancelPrerendering();
+                break;
+              }
+
+              if (tab.hidden) {
+                // Skip prerender on hidden tab.
+                sendCancelPrerendering();
+                break;
+              }
+
+              if (browser.canGoForward) {
+                // Skip prerender on history navigation as we don't support it
+                // yet. Remove this check once bug 1323650 is implemented.
+                sendCancelPrerendering();
+                break;
+              }
+
+              if (!data.href) {
+                // If we don't have data.href, loadOneTab will load about:blank
+                // which is meaningless for prerendering.
+                sendCancelPrerendering();
+                break;
+              }
+
+              let groupedSHistory = browser.frameLoader.ensureGroupedSHistory();
+
+              let newTab = this.loadOneTab(data.href, {
+                referrerURI: (data.referrer ? makeURI(data.referrer) : null),
+                referrerPolicy: Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT,
+                postData: null,
+                allowThirdPartyFixup: true,
+                relatedToCurrent: true,
+                isPrerendered: true,
+              });
+              let partialSHistory = newTab.linkedBrowser.frameLoader.partialSessionHistory;
+              groupedSHistory.addPrerenderingPartialSHistory(partialSHistory, data.id);
+              break;
+            }
+
+            case "Prerender:Cancel": {
+              let groupedSHistory = browser.frameLoader.groupedSessionHistory;
+              if (groupedSHistory) {
+                groupedSHistory.cancelPrerendering(data.id);
+              }
+              break;
+            }
+
+            case "Prerender:Swap": {
+              let frameloader = browser.frameLoader;
+              let groupedSHistory = browser.frameLoader.groupedSessionHistory;
+              if (groupedSHistory) {
+                groupedSHistory.activatePrerendering(data.id).then(
+                  () => frameloader.messageManager.sendAsyncMessage("Prerender:Swapped", data),
+                  () => frameloader.messageManager.sendAsyncMessage("Prerender:Canceled", data),
+                );
+              }
+              break;
+            }
+
           }
           return undefined;
         ]]></body>
@@ -4915,7 +5019,7 @@
           if (this.AppConstants.platform == "macosx") {
             els.addSystemEventListener(document, "keypress", this, false);
           }
-          window.addEventListener("sizemodechange", this, false);
+          window.addEventListener("sizemodechange", this);
 
           var uniqueId = this._generateUniquePanelID();
           this.mPanelContainer.childNodes[0].id = uniqueId;
@@ -4980,6 +5084,11 @@
           this._findAsYouType = Services.prefs.getBoolPref("accessibility.typeaheadfind");
           Services.prefs.addObserver("accessibility.typeaheadfind", this, false);
           messageManager.addMessageListener("Findbar:Keypress", this);
+
+          // Add listeners for prerender messages
+          messageManager.addMessageListener("Prerender:Request", this);
+          messageManager.addMessageListener("Prerender:Cancel", this);
+          messageManager.addMessageListener("Prerender:Swap", this);
         ]]>
       </constructor>
 
@@ -5030,7 +5139,7 @@
           if (this.AppConstants.platform == "macosx") {
             els.removeSystemEventListener(document, "keypress", this, false);
           }
-          window.removeEventListener("sizemodechange", this, false);
+          window.removeEventListener("sizemodechange", this);
 
           if (gMultiProcessBrowser) {
             let messageManager = window.getGroupMessageManager("browsers");
@@ -5414,8 +5523,8 @@
           tab.setAttribute("crop", "end");
           tab.setAttribute("onerror", "this.removeAttribute('image');");
 
-          window.addEventListener("resize", this, false);
-          window.addEventListener("load", this, false);
+          window.addEventListener("resize", this);
+          window.addEventListener("load", this);
 
           try {
             this._tabAnimationLoggingEnabled = Services.prefs.getBoolPref("browser.tabs.animationLogging.enabled");
@@ -5687,8 +5796,8 @@
               }
             }
             this._hasTabTempMaxWidth = true;
-            this.tabbrowser.addEventListener("mousemove", this, false);
-            window.addEventListener("mouseout", this, false);
+            this.tabbrowser.addEventListener("mousemove", this);
+            window.addEventListener("mouseout", this);
           }
         ]]></body>
       </method>
@@ -5699,15 +5808,15 @@
           let spacer = this._closingTabsSpacer;
           spacer.style.width = parseFloat(spacer.style.width) + pixels + "px";
           this.setAttribute("using-closing-tabs-spacer", "true");
-          this.tabbrowser.addEventListener("mousemove", this, false);
-          window.addEventListener("mouseout", this, false);
+          this.tabbrowser.addEventListener("mousemove", this);
+          window.addEventListener("mouseout", this);
         ]]></body>
       </method>
 
       <method name="_unlockTabSizing">
         <body><![CDATA[
-          this.tabbrowser.removeEventListener("mousemove", this, false);
-          window.removeEventListener("mouseout", this, false);
+          this.tabbrowser.removeEventListener("mousemove", this);
+          window.removeEventListener("mouseout", this);
 
           if (this._hasTabTempMaxWidth) {
             this._hasTabTempMaxWidth = false;
@@ -7222,9 +7331,9 @@
           }
         }
         var tabcontainer = gBrowser.tabContainer;
-        tabcontainer.mTabstrip.removeEventListener("scroll", this, false);
-        tabcontainer.removeEventListener("TabAttrModified", this, false);
-        tabcontainer.removeEventListener("TabClose", this, false);
+        tabcontainer.mTabstrip.removeEventListener("scroll", this);
+        tabcontainer.removeEventListener("TabAttrModified", this);
+        tabcontainer.removeEventListener("TabClose", this);
       ]]></handler>
 
       <handler event="DOMMenuItemActive">
@@ -7265,11 +7374,11 @@
 
     <implementation implements="nsIDOMEventListener">
       <constructor><![CDATA[
-        window.addEventListener("resize", this, false);
+        window.addEventListener("resize", this);
       ]]></constructor>
 
       <destructor><![CDATA[
-        window.removeEventListener("resize", this, false);
+        window.removeEventListener("resize", this);
         MousePosTracker.removeListener(this);
       ]]></destructor>
 

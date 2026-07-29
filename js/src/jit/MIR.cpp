@@ -3112,6 +3112,11 @@ MBinaryArithInstruction::constantDoubleResult(TempAllocator& alloc)
 MDefinition*
 MRsh::foldsTo(TempAllocator& alloc)
 {
+    MDefinition* f = MBinaryBitwiseInstruction::foldsTo(alloc);
+
+    if (f != this)
+        return f;
+
     MDefinition* lhs = getOperand(0);
     MDefinition* rhs = getOperand(1);
 
@@ -4136,7 +4141,10 @@ MResumePoint::dump(GenericPrinter& out) const
 
     switch (mode()) {
       case MResumePoint::ResumeAt:
-        out.printf("At");
+        if (instruction_)
+            out.printf("At(%d)", instruction_->id());
+        else
+            out.printf("At");
         break;
       case MResumePoint::ResumeAfter:
         out.printf("After");

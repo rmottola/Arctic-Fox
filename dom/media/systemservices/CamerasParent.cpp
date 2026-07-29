@@ -13,6 +13,7 @@
 #include "mozilla/Services.h"
 #include "mozilla/Logging.h"
 #include "mozilla/ipc/BackgroundParent.h"
+#include "mozilla/ipc/PBackgroundParent.h"
 #include "mozilla/Preferences.h"
 #include "nsIPermissionManager.h"
 #include "nsThreadUtils.h"
@@ -727,7 +728,7 @@ static nsresult
 GetPrincipalFromOrigin(const nsACString& aOrigin, nsIPrincipal** aPrincipal)
 {
   nsAutoCString originNoSuffix;
-  mozilla::PrincipalOriginAttributes attrs;
+  mozilla::OriginAttributes attrs;
   if (!attrs.PopulateFromOrigin(aOrigin, originNoSuffix)) {
     return NS_ERROR_FAILURE;
   }
@@ -1013,8 +1014,9 @@ CamerasParent::RecvAllDone()
   LOG((__PRETTY_FUNCTION__));
   // Don't try to send anything to the child now
   mChildIsAlive = false;
+  IProtocol* mgr = Manager();
   if (!Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -1075,15 +1077,12 @@ CamerasParent::CamerasParent()
       return NS_OK;
     });
   NS_DispatchToMainThread(threadStart);
-
-  MOZ_COUNT_CTOR(CamerasParent);
 }
 
 CamerasParent::~CamerasParent()
 {
   LOG(("~CamerasParent: %p", this));
 
-  MOZ_COUNT_DTOR(CamerasParent);
 #ifdef DEBUG
   // Verify we have shut down the webrtc engines, this is
   // supposed to happen in ActorDestroy.

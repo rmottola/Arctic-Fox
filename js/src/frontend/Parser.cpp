@@ -326,10 +326,14 @@ ParseContext::init()
         if (fun->isNamedLambda()) {
             if (!namedLambdaScope_->init(this))
                 return false;
-            AddDeclaredNamePtr p = namedLambdaScope_->lookupDeclaredNameForAdd(fun->name());
+            AddDeclaredNamePtr p =
+                namedLambdaScope_->lookupDeclaredNameForAdd(fun->explicitName());
             MOZ_ASSERT(!p);
-            if (!namedLambdaScope_->addDeclaredName(this, p, fun->name(), DeclarationKind::Const))
+            if (!namedLambdaScope_->addDeclaredName(this, p, fun->explicitName(),
+                                                    DeclarationKind::Const))
+            {
                 return false;
+            }
         }
 
         if (!functionScope_->init(this))
@@ -367,7 +371,7 @@ ParseContext::removeInnerFunctionBoxesForAnnexB(JSAtom* name)
 {
     for (uint32_t i = 0; i < innerFunctionBoxesForAnnexB_->length(); i++) {
         if (FunctionBox* funbox = innerFunctionBoxesForAnnexB_[i]) {
-            if (funbox->function()->name() == name)
+            if (funbox->function()->explicitName() == name)
                 innerFunctionBoxesForAnnexB_[i] = nullptr;
         }
     }
@@ -465,6 +469,8 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, LifoAlloc& alloc, ObjectBox* trac
     usesApply(false),
     usesThis(false),
     usesReturn(false),
+    hasRest_(false),
+    isExprBody_(false),
     funCxFlags()
 {
     // Functions created at parse time may be set singleton after parsing and
@@ -477,7 +483,6 @@ void
 FunctionBox::initFromLazyFunction()
 {
     JSFunction* fun = function();
-    length = fun->nargs() - fun->hasRest();
     if (fun->lazyScript()->isDerivedClassConstructor())
         setDerivedClassConstructor();
     if (fun->lazyScript()->needsHomeObject())
@@ -492,8 +497,6 @@ FunctionBox::initStandaloneFunction(Scope* enclosingScope)
     // Standalone functions are Function or Generator constructors and are
     // always scoped to the global.
     MOZ_ASSERT(enclosingScope->is<GlobalScope>());
-    JSFunction* fun = function();
-    length = fun->nargs() - fun->hasRest();
     enclosingScope_ = enclosingScope;
     allowNewTarget_ = true;
     thisBinding_ = ThisBinding::Function;
@@ -856,7 +859,7 @@ Parser<ParseHandler>::trace(JSTracer* trc)
 }
 
 void
-MarkParser(JSTracer* trc, AutoGCRooter* parser)
+TraceParser(JSTracer* trc, AutoGCRooter* parser)
 {
     static_cast<Parser<FullParseHandler>*>(parser)->trace(trc);
 }
@@ -2160,7 +2163,7 @@ Parser<ParseHandler>::declareDotGeneratorName()
 
 template <typename ParseHandler>
 bool
-Parser<ParseHandler>::finishFunctionScopes()
+Parser<ParseHandler>::finishFunctionScopes(bool isStandaloneFunction)
 {
     FunctionBox* funbox = pc->functionBox();
 
@@ -2169,7 +2172,7 @@ Parser<ParseHandler>::finishFunctionScopes()
             return false;
     }
 
-    if (funbox->function()->isNamedLambda()) {
+    if (funbox->function()->isNamedLambda() && !isStandaloneFunction) {
         if (!propagateFreeNamesAndMarkClosedOverBindings(pc->namedLambdaScope()))
             return false;
     }
@@ -2179,9 +2182,9 @@ Parser<ParseHandler>::finishFunctionScopes()
 
 template <>
 bool
-Parser<FullParseHandler>::finishFunction()
+Parser<FullParseHandler>::finishFunction(bool isStandaloneFunction /* = false */)
 {
-    if (!finishFunctionScopes())
+    if (!finishFunctionScopes(isStandaloneFunction))
         return false;
 
     FunctionBox* funbox = pc->functionBox();
@@ -2202,7 +2205,7 @@ Parser<FullParseHandler>::finishFunction()
         funbox->functionScopeBindings().set(*bindings);
     }
 
-    if (funbox->function()->isNamedLambda()) {
+    if (funbox->function()->isNamedLambda() && !isStandaloneFunction) {
         Maybe<LexicalScope::Data*> bindings = newLexicalScopeData(pc->namedLambdaScope());
         if (!bindings)
             return false;
@@ -2214,14 +2217,14 @@ Parser<FullParseHandler>::finishFunction()
 
 template <>
 bool
-Parser<SyntaxParseHandler>::finishFunction()
+Parser<SyntaxParseHandler>::finishFunction(bool isStandaloneFunction /* = false */)
 {
     // The LazyScript for a lazily parsed function needs to know its set of
     // free variables and inner functions so that when it is fully parsed, we
     // can skip over any already syntax parsed inner functions and still
     // retain correct scope information.
 
-    if (!finishFunctionScopes())
+    if (!finishFunctionScopes(isStandaloneFunction))
         return false;
 
     // There are too many bindings or inner functions to be saved into the
@@ -2248,6 +2251,10 @@ Parser<SyntaxParseHandler>::finishFunction()
         lazy->setStrict();
     lazy->setGeneratorKind(funbox->generatorKind());
     lazy->setAsyncKind(funbox->asyncKind());
+    if (funbox->hasRest())
+        lazy->setHasRest();
+    if (funbox->isExprBody())
+        lazy->setIsExprBody();
     if (funbox->isLikelyConstructorWrapper())
         lazy->setLikelyConstructorWrapper();
     if (funbox->isDerivedClassConstructor())
@@ -2279,13 +2286,13 @@ GetYieldHandling(GeneratorKind generatorKind, FunctionAsyncKind asyncKind)
 
 template <>
 ParseNode*
-Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun,
-                                                 HandleScope enclosingScope,
-                                                 Handle<PropertyNameVector> formals,
-                                                 GeneratorKind generatorKind,
-                                                 FunctionAsyncKind asyncKind,
-                                                 Directives inheritedDirectives,
-                                                 Directives* newDirectives)
+Parser<FullParseHandler>::standaloneFunction(HandleFunction fun,
+                                             HandleScope enclosingScope,
+                                             Maybe<uint32_t> parameterListEnd,
+                                             GeneratorKind generatorKind,
+                                             FunctionAsyncKind asyncKind,
+                                             Directives inheritedDirectives,
+                                             Directives* newDirectives)
 {
     MOZ_ASSERT(checkOptionsCalled);
 
@@ -2308,25 +2315,14 @@ Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun,
     if (!funpc.init())
         return null();
     funpc.setIsStandaloneFunctionBody();
-    funpc.functionScope().useAsVarScope(&funpc);
-
-    if (formals.length() >= ARGNO_LIMIT) {
-        error(JSMSG_TOO_MANY_FUN_ARGS);
-        return null();
-    }
-
-    bool duplicatedParam = false;
-    for (uint32_t i = 0; i < formals.length(); i++) {
-        if (!notePositionalFormalParameter(fn, formals[i], false, &duplicatedParam))
-            return null();
-    }
-    funbox->hasDuplicateParameters = duplicatedParam;
 
     YieldHandling yieldHandling = GetYieldHandling(generatorKind, asyncKind);
     AutoAwaitIsKeyword awaitIsKeyword(&tokenStream, asyncKind == AsyncFunction);
-    ParseNode* pn = functionBody(InAllowed, yieldHandling, Statement, StatementListBody);
-    if (!pn)
+    if (!functionFormalParametersAndBody(InAllowed, yieldHandling, fn, Statement,
+                                         parameterListEnd, /* isStandaloneFunction = */ true))
+    {
         return null();
+    }
 
     TokenKind tt;
     if (!tokenStream.getToken(&tt, TokenStream::Operand))
@@ -2336,15 +2332,7 @@ Parser<FullParseHandler>::standaloneFunctionBody(HandleFunction fun,
         return null();
     }
 
-    if (!FoldConstants(context, &pn, this))
-        return null();
-
-    fn->pn_pos.end = pos().end;
-
-    MOZ_ASSERT(fn->pn_body->isKind(PNK_PARAMSBODY));
-    fn->pn_body->append(pn);
-
-    if (!finishFunction())
+    if (!FoldConstants(context, &fn, this))
         return null();
 
     return fn;
@@ -2830,7 +2818,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
                 }
 
                 hasRest = true;
-                funbox->function()->setHasRest();
+                funbox->setHasRest();
 
                 if (!tokenStream.getToken(&tt))
                     return false;
@@ -3008,6 +2996,8 @@ Parser<FullParseHandler>::skipLazyInnerFunction(ParseNode* pn, FunctionSyntaxKin
     LazyScript* lazy = fun->lazyScript();
     if (lazy->needsHomeObject())
         funbox->setNeedsHomeObject();
+    if (lazy->isExprBody())
+        funbox->setIsExprBody();
 
     PropagateTransitiveParseFlags(lazy, pc->sc());
 
@@ -3020,10 +3010,15 @@ Parser<FullParseHandler>::skipLazyInnerFunction(ParseNode* pn, FunctionSyntaxKin
     if (!tokenStream.advance(fun->lazyScript()->end() - userbufBase))
         return false;
 
-    if (kind == Statement && fun->isExprBody()) {
+#if JS_HAS_EXPR_CLOSURES
+    // Only expression closure can be Statement kind.
+    // If we remove expression closure, we can remove isExprBody flag from
+    // LazyScript and JSScript.
+    if (kind == Statement && funbox->isExprBody()) {
         if (!matchOrInsertSemicolonAfterExpression())
             return false;
     }
+#endif
 
     return true;
 }
@@ -3396,7 +3391,9 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
                                                       YieldHandling yieldHandling,
-                                                      Node pn, FunctionSyntaxKind kind)
+                                                      Node pn, FunctionSyntaxKind kind,
+                                                      Maybe<uint32_t> parameterListEnd /* = Nothing() */,
+                                                      bool isStandaloneFunction /* = false */)
 {
     // Given a properly initialized parse context, try to parse an actual
     // function without concern for conversion to strict mode, use of lazy
@@ -3428,6 +3425,13 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
         }
     }
 
+    // When parsing something for new Function() we have to make sure to
+    // only treat a certain part of the source as a parameter list.
+    if (parameterListEnd.isSome() && parameterListEnd.value() != pos().begin) {
+        error(JSMSG_UNEXPECTED_PARAMLIST_END);
+        return false;
+    }
+
     // Parse the function body.
     FunctionBodyType bodyType = StatementListBody;
     TokenKind tt;
@@ -3454,9 +3458,7 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
 
         tokenStream.ungetToken();
         bodyType = ExpressionBody;
-#if JS_HAS_EXPR_CLOSURES
-        fun->setIsExprBody();
-#endif
+        funbox->setIsExprBody();
     }
 
     // Arrow function parameters inherit yieldHandling from the enclosing
@@ -3469,8 +3471,8 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
     if (!body)
         return false;
 
-    if ((kind != Method && !IsConstructorKind(kind)) && fun->name()) {
-        RootedPropertyName propertyName(context, fun->name()->asPropertyName());
+    if ((kind != Method && !IsConstructorKind(kind)) && fun->explicitName()) {
+        RootedPropertyName propertyName(context, fun->explicitName()->asPropertyName());
         if (!checkStrictBinding(propertyName, handler.getPosition(pn)))
             return false;
     }
@@ -3483,7 +3485,7 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
             error(JSMSG_CURLY_AFTER_BODY);
             return false;
         }
-        funbox->bufEnd = pos().begin + 1;
+        funbox->bufEnd = pos().end;
     } else {
 #if !JS_HAS_EXPR_CLOSURES
         MOZ_ASSERT(kind == Arrow);
@@ -3498,7 +3500,7 @@ Parser<ParseHandler>::functionFormalParametersAndBody(InHandling inHandling,
     if (IsMethodDefinitionKind(kind) && pc->superScopeNeedsHomeObject())
         funbox->setNeedsHomeObject();
 
-    if (!finishFunction())
+    if (!finishFunction(isStandaloneFunction))
         return false;
 
     handler.setEndPosition(body, pos().begin);
@@ -4056,22 +4058,23 @@ Parser<FullParseHandler>::checkDestructuringName(ParseNode* expr, Maybe<Declarat
     }
 
     // Otherwise this is an expression in destructuring outside a declaration.
-    if (!reportIfNotValidSimpleAssignmentTarget(expr, KeyedDestructuringAssignment))
-        return false;
-
-    MOZ_ASSERT(!handler.isFunctionCall(expr),
-               "function calls shouldn't be considered valid targets in "
-               "destructuring patterns");
-
     if (handler.isNameAnyParentheses(expr)) {
-        // The arguments/eval identifiers are simple in non-strict mode code.
-        // Warn to discourage their use nonetheless.
-        return reportIfArgumentsEvalTarget(expr);
+        if (const char* chars = handler.nameIsArgumentsEvalAnyParentheses(expr, context)) {
+            if (!reportWithNode(ParseStrictError, pc->sc()->strict(), expr,
+                                JSMSG_BAD_STRICT_ASSIGN, chars))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
-    // Nothing further to do for property accesses.
-    MOZ_ASSERT(handler.isPropertyAccess(expr));
-    return true;
+    if (handler.isPropertyAccess(expr))
+        return true;
+
+    reportWithNode(ParseError, pc->sc()->strict(), expr, JSMSG_BAD_DESTRUCT_TARGET);
+    return false;
 }
 
 template <>
@@ -4338,6 +4341,8 @@ Parser<ParseHandler>::declarationPattern(Node decl, DeclarationKind declKind, To
     if (!init)
         return null();
 
+    handler.checkAndSetIsDirectRHSAnonFunction(init);
+
     if (forHeadKind) {
         // For for(;;) declarations, consistency with |for (;| parsing requires
         // that the ';' first be examined as Operand, even though absence of a
@@ -4370,6 +4375,8 @@ Parser<ParseHandler>::initializerInNameDeclaration(Node decl, Node binding,
                                   yieldHandling, TripledotProhibited);
     if (!initializer)
         return false;
+
+    handler.checkAndSetIsDirectRHSAnonFunction(initializer);
 
     if (forHeadKind) {
         if (initialDeclaration) {
@@ -5059,7 +5066,7 @@ Parser<FullParseHandler>::exportDeclaration()
         if (!kid)
             return null();
 
-        if (!checkExportedName(kid->pn_funbox->function()->name()))
+        if (!checkExportedName(kid->pn_funbox->function()->explicitName()))
             return null();
         break;
 
@@ -6092,7 +6099,7 @@ Parser<ParseHandler>::yieldExpression(InHandling inHandling)
 
         if (pc->funHasReturnExpr
 #if JS_HAS_EXPR_CLOSURES
-            || pc->functionBox()->function()->isExprBody()
+            || pc->functionBox()->isExprBody()
 #endif
             )
         {
@@ -6670,8 +6677,6 @@ Parser<ParseHandler>::classDefinition(YieldHandling yieldHandling,
             return null();
         }
 
-        // FIXME: Implement ES6 function "name" property semantics
-        // (bug 883377).
         RootedAtom funName(context);
         switch (propType) {
           case PropertyType::GetterNoExpressionClosure:
@@ -6693,6 +6698,8 @@ Parser<ParseHandler>::classDefinition(YieldHandling yieldHandling,
         Node fn = methodDefinition(propType, funName);
         if (!fn)
             return null();
+
+        handler.checkAndSetIsDirectRHSAnonFunction(fn);
 
         JSOp op = JSOpFromPropertyType(propType);
         if (!handler.addClassMethodDefinition(classMethods, propName, fn, op, isStatic))
@@ -7748,6 +7755,9 @@ Parser<ParseHandler>::assignExpr(InHandling inHandling, YieldHandling yieldHandl
             return null();
     }
 
+    if (kind == PNK_ASSIGN)
+        handler.checkAndSetIsDirectRHSAnonFunction(rhs);
+
     return handler.newAssignment(kind, lhs, rhs, op);
 }
 
@@ -7780,90 +7790,28 @@ Parser<ParseHandler>::isValidSimpleAssignmentTarget(Node node,
 
 template <typename ParseHandler>
 bool
-Parser<ParseHandler>::reportIfArgumentsEvalTarget(Node nameNode)
+Parser<ParseHandler>::checkIncDecOperand(Node operand, uint32_t operandOffset)
 {
-    const char* chars = handler.nameIsArgumentsEvalAnyParentheses(nameNode, context);
-    if (!chars)
-        return true;
-
-    bool strict = pc->sc()->strict();
-    if (!reportWithNode(ParseStrictError, strict, nameNode, JSMSG_BAD_STRICT_ASSIGN, chars))
-        return false;
-
-    MOZ_ASSERT(!strict,
-               "an error should have been reported if this was strict mode "
-               "code");
-    return true;
-}
-
-template <typename ParseHandler>
-bool
-Parser<ParseHandler>::reportIfNotValidSimpleAssignmentTarget(Node target, AssignmentFlavor flavor)
-{
-    FunctionCallBehavior behavior = flavor == KeyedDestructuringAssignment
-                                    ? ForbidAssignmentToFunctionCalls
-                                    : PermitAssignmentToFunctionCalls;
-    if (isValidSimpleAssignmentTarget(target, behavior))
-        return true;
-
-    if (handler.isNameAnyParentheses(target)) {
-        // Use a special error if the target is arguments/eval.  This ensures
-        // targeting these names is consistently a SyntaxError (which error numbers
-        // below don't guarantee) while giving us a nicer error message.
-        if (!reportIfArgumentsEvalTarget(target))
-            return false;
-    }
-
-    unsigned errnum = 0;
-    const char* extra = nullptr;
-
-    switch (flavor) {
-      case IncrementAssignment:
-        errnum = JSMSG_BAD_OPERAND;
-        extra = "increment";
-        break;
-
-      case DecrementAssignment:
-        errnum = JSMSG_BAD_OPERAND;
-        extra = "decrement";
-        break;
-
-      case KeyedDestructuringAssignment:
-        errnum = JSMSG_BAD_DESTRUCT_TARGET;
-        break;
-    }
-
-    reportWithNode(ParseError, pc->sc()->strict(), target, errnum, extra);
-    return false;
-}
-
-template <typename ParseHandler>
-bool
-Parser<ParseHandler>::checkAndMarkAsIncOperand(Node target)
-{
-    if (handler.isNameAnyParentheses(target)) {
-        if (const char* chars = handler.nameIsArgumentsEvalAnyParentheses(target, context)) {
-            if (!reportWithNode(ParseStrictError, pc->sc()->strict(), target,
-                                JSMSG_BAD_STRICT_ASSIGN, chars))
-            {
+    if (handler.isNameAnyParentheses(operand)) {
+        if (const char* chars = handler.nameIsArgumentsEvalAnyParentheses(operand, context)) {
+            if (!strictModeErrorAt(operandOffset, JSMSG_BAD_STRICT_ASSIGN, chars))
                 return false;
-            }
         }
-    } else if (handler.isPropertyAccess(target)) {
+    } else if (handler.isPropertyAccess(operand)) {
         // Permitted: no additional testing/fixup needed.
-    } else if (handler.isFunctionCall(target)) {
+    } else if (handler.isFunctionCall(operand)) {
         // Assignment to function calls is forbidden in ES6.  We're still
         // somewhat concerned about sites using this in dead code, so forbid it
         // only in strict mode code (or if the werror option has been set), and
         // otherwise warn.
-        if (!reportWithNode(ParseStrictError, pc->sc()->strict(), target, JSMSG_BAD_INCOP_OPERAND))
+        if (!strictModeErrorAt(operandOffset, JSMSG_BAD_INCOP_OPERAND))
             return false;
     } else {
-        reportWithNode(ParseError, pc->sc()->strict(), target, JSMSG_BAD_INCOP_OPERAND);
+        errorAt(operandOffset, JSMSG_BAD_INCOP_OPERAND);
         return false;
     }
 
-    MOZ_ASSERT(isValidSimpleAssignmentTarget(target, PermitAssignmentToFunctionCalls),
+    MOZ_ASSERT(isValidSimpleAssignmentTarget(operand, PermitAssignmentToFunctionCalls),
                "inconsistent increment/decrement operand validation");
     return true;
 }
@@ -7928,14 +7876,14 @@ Parser<ParseHandler>::unaryExpr(YieldHandling yieldHandling, TripledotHandling t
         TokenKind tt2;
         if (!tokenStream.getToken(&tt2, TokenStream::Operand))
             return null();
-        Node pn2 = memberExpr(yieldHandling, TripledotProhibited, tt2);
-        if (!pn2)
+
+        uint32_t operandOffset = pos().begin;
+        Node operand = memberExpr(yieldHandling, TripledotProhibited, tt2);
+        if (!operand || !checkIncDecOperand(operand, operandOffset))
             return null();
-        if (!checkAndMarkAsIncOperand(pn2))
-            return null();
+
         return handler.newUpdate((tt == TOK_INC) ? PNK_PREINCREMENT : PNK_PREDECREMENT,
-                                 begin,
-                                 pn2);
+                                 begin, operand);
       }
 
       case TOK_DELETE: {
@@ -7982,23 +7930,23 @@ Parser<ParseHandler>::unaryExpr(YieldHandling yieldHandling, TripledotHandling t
       }
 
       default: {
-        Node pn = memberExpr(yieldHandling, tripledotHandling, tt, /* allowCallSyntax = */ true,
-                             possibleError, invoked);
-        if (!pn)
+        Node expr = memberExpr(yieldHandling, tripledotHandling, tt, /* allowCallSyntax = */ true,
+                               possibleError, invoked);
+        if (!expr)
             return null();
 
         /* Don't look across a newline boundary for a postfix incop. */
         if (!tokenStream.peekTokenSameLine(&tt))
             return null();
-        if (tt == TOK_INC || tt == TOK_DEC) {
-            tokenStream.consumeKnownToken(tt);
-            if (!checkAndMarkAsIncOperand(pn))
-                return null();
-            return handler.newUpdate((tt == TOK_INC) ? PNK_POSTINCREMENT : PNK_POSTDECREMENT,
-                                     begin,
-                                     pn);
-        }
-        return pn;
+
+        if (tt != TOK_INC && tt != TOK_DEC)
+            return expr;
+
+        tokenStream.consumeKnownToken(tt);
+        if (!checkIncDecOperand(expr, begin))
+            return null();
+        return handler.newUpdate((tt == TOK_INC) ? PNK_POSTINCREMENT : PNK_POSTDECREMENT,
+                                 begin, expr);
       }
     }
 }
@@ -9142,6 +9090,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
             if (!propExpr)
                 return null();
 
+            handler.checkAndSetIsDirectRHSAnonFunction(propExpr);
+
             if (foldConstants && !FoldConstants(context, &propExpr, this))
                 return null();
 
@@ -9254,6 +9204,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
                     return null();
             }
 
+            handler.checkAndSetIsDirectRHSAnonFunction(rhs);
+
             Node propExpr = handler.newAssignment(PNK_ASSIGN, lhs, rhs, JSOP_NOP);
             if (!propExpr)
                 return null();
@@ -9264,8 +9216,6 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
             if (!abortIfSyntaxParser())
                 return null();
         } else {
-            // FIXME: Implement ES6 function "name" property semantics
-            // (bug 883377).
             RootedAtom funName(context);
             if (!tokenStream.isCurrentTokenType(TOK_RB)) {
                 funName = propAtom;
@@ -9280,6 +9230,8 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
             Node fn = methodDefinition(propType, funName);
             if (!fn)
                 return null();
+
+            handler.checkAndSetIsDirectRHSAnonFunction(fn);
 
             JSOp op = JSOpFromPropertyType(propType);
             if (!handler.addObjectMethodDefinition(literal, propName, fn, op))

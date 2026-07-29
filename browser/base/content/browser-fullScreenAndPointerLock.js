@@ -297,8 +297,8 @@ var FullScreen = {
 
     if (!this._fullScrToggler) {
       this._fullScrToggler = document.getElementById("fullscr-toggler");
-      this._fullScrToggler.addEventListener("mouseover", this._expandCallback, false);
-      this._fullScrToggler.addEventListener("dragenter", this._expandCallback, false);
+      this._fullScrToggler.addEventListener("mouseover", this._expandCallback);
+      this._fullScrToggler.addEventListener("dragenter", this._expandCallback);
     }
 
     if (enterFS) {
@@ -316,9 +316,9 @@ var FullScreen = {
       this._updateToolbars(enterFS);
 
     if (enterFS) {
-      document.addEventListener("keypress", this._keyToggleCallback, false);
-      document.addEventListener("popupshown", this._setPopupOpen, false);
-      document.addEventListener("popuphidden", this._setPopupOpen, false);
+      document.addEventListener("keypress", this._keyToggleCallback);
+      document.addEventListener("popupshown", this._setPopupOpen);
+      document.addEventListener("popuphidden", this._setPopupOpen);
       // In DOM fullscreen mode, we hide toolbars with CSS
       if (!document.fullscreenElement)
         this.hideNavToolbox(true);
@@ -459,9 +459,9 @@ var FullScreen = {
   cleanup: function () {
     if (!window.fullScreen) {
       MousePosTracker.removeListener(this);
-      document.removeEventListener("keypress", this._keyToggleCallback, false);
-      document.removeEventListener("popupshown", this._setPopupOpen, false);
-      document.removeEventListener("popuphidden", this._setPopupOpen, false);
+      document.removeEventListener("keypress", this._keyToggleCallback);
+      document.removeEventListener("popupshown", this._setPopupOpen);
+      document.removeEventListener("popuphidden", this._setPopupOpen);
     }
   },
 

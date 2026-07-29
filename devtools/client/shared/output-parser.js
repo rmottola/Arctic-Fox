@@ -339,7 +339,7 @@ OutputParser.prototype = {
         class: options.angleSwatchClass
       });
       this.angleSwatches.set(swatch, angleObj);
-      swatch.addEventListener("mousedown", this._onAngleSwatchMouseDown, false);
+      swatch.addEventListener("mousedown", this._onAngleSwatchMouseDown);
 
       // Add click listener to stop event propagation when shift key is pressed
       // in order to prevent the value input to be focused.
@@ -349,7 +349,7 @@ OutputParser.prototype = {
         if (event.shiftKey) {
           event.stopPropagation();
         }
-      }, false);
+      });
       EventEmitter.decorate(swatch);
       container.appendChild(swatch);
     }
@@ -407,8 +407,7 @@ OutputParser.prototype = {
           style: "background-color:" + color
         });
         this.colorSwatches.set(swatch, colorObj);
-        swatch.addEventListener("mousedown", this._onColorSwatchMouseDown,
-                                false);
+        swatch.addEventListener("mousedown", this._onColorSwatchMouseDown);
         EventEmitter.decorate(swatch);
         container.appendChild(swatch);
       }

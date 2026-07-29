@@ -154,21 +154,27 @@ NS_NewDOMDocument(nsIDOMDocument** aInstancePtrResult,
   doc->SetDocumentCharacterSet(NS_LITERAL_CSTRING("UTF-8"));
   
   if (aDoctype) {
-    nsCOMPtr<nsIDOMNode> tmpNode;
-    rv = doc->AppendChild(aDoctype, getter_AddRefs(tmpNode));
-    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsINode> doctypeAsNode = do_QueryInterface(aDoctype);
+    ErrorResult result;
+    d->AppendChild(*doctypeAsNode, result);
+    if (NS_WARN_IF(result.Failed())) {
+      return result.StealNSResult();
+    }
   }
   
   if (!aQualifiedName.IsEmpty()) {
-    nsCOMPtr<nsIDOMElement> root;
-    rv = doc->CreateElementNS(aNamespaceURI, aQualifiedName,
-                              getter_AddRefs(root));
-    NS_ENSURE_SUCCESS(rv, rv);
+    ErrorResult result;
+    nsCOMPtr<Element> root =
+      doc->CreateElementNS(aNamespaceURI, aQualifiedName,
+                           ElementCreationOptions(), result);
+    if (NS_WARN_IF(result.Failed())) {
+      return result.StealNSResult();
+    }
 
-    nsCOMPtr<nsIDOMNode> tmpNode;
-
-    rv = doc->AppendChild(root, getter_AddRefs(tmpNode));
-    NS_ENSURE_SUCCESS(rv, rv);
+    d->AppendChild(*root, result);
+    if (NS_WARN_IF(result.Failed())) {
+      return result.StealNSResult();
+    }
   }
 
   *aInstancePtrResult = doc;
@@ -223,11 +229,13 @@ namespace dom {
 
 XMLDocument::XMLDocument(const char* aContentType)
   : nsDocument(aContentType),
-    mAsync(true)
+    mChannelIsPending(false),
+    mAsync(true),
+    mLoopingForSyncLoad(false),
+    mIsPlainDocument(false),
+    mSuppressParserErrorElement(false),
+    mSuppressParserErrorConsoleMessages(false)
 {
-  // NOTE! nsDocument::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
-
   mType = eGenericXML;
 }
 
@@ -269,7 +277,8 @@ XMLDocument::ResetToURI(nsIURI *aURI, nsILoadGroup *aLoadGroup,
 }
 
 bool
-XMLDocument::Load(const nsAString& aUrl, ErrorResult& aRv)
+XMLDocument::Load(const nsAString& aUrl, CallerType aCallerType,
+                  ErrorResult& aRv)
 {
   bool hasHadScriptObject = true;
   nsIScriptGlobalObject* scriptObject =
@@ -293,10 +302,17 @@ XMLDocument::Load(const nsAString& aUrl, ErrorResult& aRv)
     return false;
   }
 
-  if (nsContentUtils::IsCallerChrome()) {
-    WarnOnceAbout(nsIDocument::eChromeUseOfDOM3LoadMethod);
+  // Reporting a warning on ourselves is rather pointless, because we probably
+  // have no window id (and hence the warning won't show up in any web console)
+  // and probably aren't considered a "content document" because we're not
+  // loaded in a docshell, so won't accumulate telemetry for use counters.  Try
+  // warning on our entry document, if any, since that should have things like
+  // window ids and associated docshells.
+  nsIDocument* docForWarning = callingDoc ? callingDoc.get() : this;
+  if (aCallerType == CallerType::System) {
+    docForWarning->WarnOnceAbout(nsIDocument::eChromeUseOfDOM3LoadMethod);
   } else {
-    WarnOnceAbout(nsIDocument::eUseOfDOM3LoadMethod);
+    docForWarning->WarnOnceAbout(nsIDocument::eUseOfDOM3LoadMethod);
   } 
 
   nsIURI *baseURI = mDocumentURI;

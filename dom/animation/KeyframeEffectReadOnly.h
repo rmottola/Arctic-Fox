@@ -48,8 +48,8 @@ class GlobalObject;
 class OwningElementOrCSSPseudoElement;
 class UnrestrictedDoubleOrKeyframeAnimationOptions;
 class UnrestrictedDoubleOrKeyframeEffectOptions;
-enum class IterationCompositeOperation : uint32_t;
-enum class CompositeOperation : uint32_t;
+enum class IterationCompositeOperation : uint8_t;
+enum class CompositeOperation : uint8_t;
 struct AnimationPropertyDetails;
 }
 
@@ -317,6 +317,11 @@ public:
   bool ShouldBlockAsyncTransformAnimations(
     const nsIFrame* aFrame,
     AnimationPerformanceWarning::Type& aPerformanceWarning) const;
+  bool HasGeometricProperties() const;
+  bool AffectsGeometry() const override
+  {
+    return GetTarget() && HasGeometricProperties();
+  }
 
   nsIDocument* GetRenderedDocument() const;
   nsPresContext* GetPresContext() const;

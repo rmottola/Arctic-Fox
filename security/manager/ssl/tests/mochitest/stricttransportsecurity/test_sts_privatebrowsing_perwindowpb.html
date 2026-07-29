@@ -35,26 +35,22 @@
   SpecialPowers.Services.prefs.setIntPref("browser.startup.page", 0);
 
   var testframes = {
-    'samedom':
-      {'url':     "http://example.com" + STSPATH + "/verify.sjs",
-        'expected': {'plain': 'SECURE',
-                     'subdom': 'SECURE',
-                     'nosts': 'INSECURE'}},
-    'subdom':
-      {'url':     "http://test1.example.com" + STSPATH + "/verify.sjs",
-        'expected': {'plain': 'INSECURE',
-                     'subdom': 'SECURE',
-                     'nosts': 'INSECURE'}},
-    'otherdom':
-      {'url':     "http://example.org" + STSPATH + "/verify.sjs",
-        'expected': {'plain': 'INSECURE',
-                     'subdom': 'INSECURE',
-                     'nosts': 'INSECURE'}},
-    'alreadysecure':
-      {'url':     "https://test2.example.com" + STSPATH + "/verify.sjs",
-        'expected': {'plain': 'SECURE',
-                     'subdom': 'SECURE',
-                     'nosts': 'SECURE'}},
+    samedom: {
+      url: `http://example.com/${STSPATH}/verify.sjs`,
+      expected: {plain: "SECURE", subdom: "SECURE", nosts: "INSECURE"}
+    },
+    subdom: {
+      url: `http://test1.example.com/${STSPATH}/verify.sjs`,
+      expected: {plain: "INSECURE", subdom: "SECURE", nosts: "INSECURE"}
+    },
+    otherdom: {
+      url: `http://example.org/${STSPATH}/verify.sjs`,
+      expected: {plain: "INSECURE", subdom: "INSECURE", nosts: "INSECURE"}
+    },
+    alreadysecure: {
+      url: `https://test2.example.com/${STSPATH}/verify.sjs`,
+      expected: {plain: "SECURE", subdom: "SECURE", nosts: "SECURE"}
+    },
   };
 
   function whenDelayedStartupFinished(aWindow, aCallback) {
@@ -175,7 +171,7 @@
     testOnWindow(false, function(win) {
       SimpleTest.info("In public window");
       dump_STSState(false);
-      startRound(win, false, 'plain');
+      startRound(win, false, "plain");
     });
   }
 
@@ -183,7 +179,7 @@
     testOnWindow(true, function(win) {
       SimpleTest.info("In private window");
       dump_STSState(true);
-      startRound(win, true, 'subdom');
+      startRound(win, true, "subdom");
     });
   }
 
@@ -191,7 +187,7 @@
     testOnWindow(false, function(win) {
       SimpleTest.info("In a new public window");
       dump_STSState(false);
-      startRound(win, false, 'nosts');
+      startRound(win, false, "nosts");
     });
   }
 
@@ -233,7 +229,7 @@
   function nextTest() {
     SimpleTest.executeSoon(tests.length ? tests.shift() : finish);
   }
-  window.addEventListener('load', nextTest, false);
+  window.addEventListener("load", nextTest);
   </script>
 </head>
 

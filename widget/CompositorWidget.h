@@ -9,6 +9,7 @@
 #include "mozilla/RefPtr.h"
 #include "Units.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/layers/CompositorOptions.h"
 #include "mozilla/layers/LayersTypes.h"
 
 class nsIWidget;
@@ -16,8 +17,12 @@ class nsBaseWidget;
 
 namespace mozilla {
 class VsyncObserver;
+namespace gl {
+class GLContext;
+} // namespace gl
 namespace layers {
 class Compositor;
+class LayerManager;
 class LayerManagerComposite;
 class Compositor;
 class Composer2D;
@@ -57,8 +62,11 @@ class WidgetRenderingContext
 {
 public:
 #if defined(XP_MACOSX)
-  WidgetRenderingContext() : mLayerManager(nullptr) {}
+  WidgetRenderingContext()
+    : mLayerManager(nullptr)
+    , mGL(nullptr) {}
   layers::LayerManagerComposite* mLayerManager;
+  gl::GLContext* mGL;
 #elif defined(MOZ_WIDGET_ANDROID)
   WidgetRenderingContext() : mCompositor(nullptr) {}
   layers::Compositor* mCompositor;
@@ -71,13 +79,15 @@ public:
 class CompositorWidget
 {
 public:
-  NS_INLINE_DECL_REFCOUNTING(mozilla::widget::CompositorWidget)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(mozilla::widget::CompositorWidget)
 
   /**
    * Create an in-process compositor widget. aWidget may be ignored if the
    * platform does not require it.
    */
-  static RefPtr<CompositorWidget> CreateLocal(const CompositorWidgetInitData& aInitData, nsIWidget* aWidget);
+  static RefPtr<CompositorWidget> CreateLocal(const CompositorWidgetInitData& aInitData,
+                                              const layers::CompositorOptions& aOptions,
+                                              nsIWidget* aWidget);
 
   /**
    * Called before rendering using OMTC. Returns false when the widget is
@@ -252,6 +262,14 @@ public:
   virtual void ObserveVsync(VsyncObserver* aObserver) = 0;
 
   /**
+   * Get the compositor options for the compositor associated with this
+   * CompositorWidget.
+   */
+  const layers::CompositorOptions& GetCompositorOptions() {
+    return mOptions;
+  }
+
+  /**
    * This is only used by out-of-process compositors.
    */
   virtual RefPtr<VsyncObserver> GetVsyncObserver() const;
@@ -274,10 +292,13 @@ public:
   }
 
 protected:
+  explicit CompositorWidget(const layers::CompositorOptions& aOptions);
   virtual ~CompositorWidget();
 
   // Back buffer of BasicCompositor
   RefPtr<gfx::DrawTarget> mLastBackBuffer;
+
+  layers::CompositorOptions mOptions;
 };
 
 } // namespace widget

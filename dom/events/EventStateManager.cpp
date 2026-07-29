@@ -489,6 +489,7 @@ IsMessageMouseUserActivity(EventMessage aMessage)
   return aMessage == eMouseMove ||
          aMessage == eMouseUp ||
          aMessage == eMouseDown ||
+         aMessage == eMouseAuxClick ||
          aMessage == eMouseDoubleClick ||
          aMessage == eMouseClick ||
          aMessage == eMouseActivate ||
@@ -498,13 +499,9 @@ IsMessageMouseUserActivity(EventMessage aMessage)
 static bool
 IsMessageGamepadUserActivity(EventMessage aMessage)
 {
-#ifndef MOZ_GAMEPAD
-  return false;
-#else
   return aMessage == eGamepadButtonDown ||
          aMessage == eGamepadButtonUp ||
          aMessage == eGamepadAxisMove;
-#endif
 }
 
 nsresult
@@ -722,7 +719,8 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     break;
   case eDragOver:
-    // Send the enter/exit events before eDrop.
+    // eDrop is fired before eLegacyDragDrop so send the enter/exit events
+    // before eDrop.
     GenerateDragDropEnterExit(aPresContext, aEvent->AsDragEvent());
     break;
 
@@ -760,12 +758,8 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     }
     // then fall through...
     MOZ_FALLTHROUGH;
-  case eBeforeKeyDown:
   case eKeyDown:
-  case eAfterKeyDown:
-  case eBeforeKeyUp:
   case eKeyUp:
-  case eAfterKeyUp:
     {
       nsIContent* content = GetFocusedContent();
       if (content)
@@ -1795,7 +1789,9 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
       // Set the current target to the content for the mouse down
       mCurrentTargetContent = targetContent;
 
-      // Dispatch the dragstart event to the DOM.
+      // Dispatch both the dragstart and draggesture events to the DOM. For
+      // elements in an editor, only fire the draggesture event so that the
+      // editor code can handle it but content doesn't see a dragstart.
       nsEventStatus status = nsEventStatus_eIgnore;
       EventDispatcher::Dispatch(targetContent, aPresContext, &startEvent,
                                 nullptr, &status);
@@ -1812,7 +1808,7 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
       }
 
       // now that the dataTransfer has been updated in the dragstart and
-      // draggesture events, make it read only so that the data doesn't
+      // draggesture events, make it readonly so that the data doesn't
       // change during the drag.
       dataTransfer->SetReadOnly();
 
@@ -1824,6 +1820,10 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
           aEvent->StopPropagation();
         }
       }
+
+      // Note that frame event handling doesn't care about eLegacyDragGesture,
+      // which is just as well since we don't really know which frame to
+      // send it to
 
       // Reset mCurretTargetContent to what it was
       mCurrentTargetContent = targetBeforeEvent;
@@ -1929,7 +1929,7 @@ EventStateManager::DoDefaultDragStart(nsPresContext* aPresContext,
   if (!dragService)
     return false;
 
-  // Default handling for the dragstart event.
+  // Default handling for the draggesture/dragstart event.
   //
   // First, check if a drag session already exists. This means that the drag
   // service was called directly within a draggesture handler. In this case,
@@ -2839,8 +2839,7 @@ EventStateManager::PostHandleKeyboardEvent(WidgetKeyboardEvent* aKeyboardEvent,
                                            nsEventStatus& aStatus,
                                            bool dispatchedToContentProcess)
 {
-  if (aStatus == nsEventStatus_eConsumeNoDefault ||
-      aKeyboardEvent->mInputMethodAppState == WidgetKeyboardEvent::eHandling) {
+  if (aStatus == nsEventStatus_eConsumeNoDefault) {
     return;
   }
 
@@ -2906,11 +2905,13 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
   NS_ENSURE_ARG(aPresContext);
   NS_ENSURE_ARG_POINTER(aStatus);
 
-  bool dispatchedToContentProcess = HandleCrossProcessEvent(aEvent,
-                                                            aStatus);
-
   mCurrentTarget = aTargetFrame;
   mCurrentTargetContent = nullptr;
+
+  bool dispatchedToContentProcess = HandleCrossProcessEvent(aEvent, aStatus);
+  // NOTE: the above call may have destroyed aTargetFrame, please use
+  // mCurrentTarget henceforth.  This is to avoid using it accidentally:
+  aTargetFrame = nullptr;
 
   // Most of the events we handle below require a frame.
   // Add special cases here.
@@ -3168,7 +3169,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       ScrollbarsForWheel::MayInactivate();
       WidgetWheelEvent* wheelEvent = aEvent->AsWheelEvent();
       nsIScrollableFrame* scrollTarget =
-        do_QueryFrame(ComputeScrollTarget(aTargetFrame, wheelEvent,
+        do_QueryFrame(ComputeScrollTarget(mCurrentTarget, wheelEvent,
                                           COMPUTE_DEFAULT_ACTION_TARGET));
       if (scrollTarget) {
         scrollTarget->ScrollSnap();
@@ -3191,7 +3192,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
       // because if the scroll target is a plugin, the default action should be
       // chosen by the plugin rather than by our prefs.
       nsIFrame* frameToScroll =
-        ComputeScrollTarget(aTargetFrame, wheelEvent,
+        ComputeScrollTarget(mCurrentTarget, wheelEvent,
                             COMPUTE_DEFAULT_ACTION_TARGET);
       nsPluginFrame* pluginFrame = do_QueryFrame(frameToScroll);
 
@@ -3211,7 +3212,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
           // For scrolling of default action, we should honor the mouse wheel
           // transaction.
 
-          ScrollbarsForWheel::PrepareToScrollText(this, aTargetFrame, wheelEvent);
+          ScrollbarsForWheel::PrepareToScrollText(this, mCurrentTarget, wheelEvent);
 
           if (aEvent->mMessage != eWheel ||
               (!wheelEvent->mDeltaX && !wheelEvent->mDeltaY)) {
@@ -3221,8 +3222,8 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
           nsIScrollableFrame* scrollTarget = do_QueryFrame(frameToScroll);
           ScrollbarsForWheel::SetActiveScrollTarget(scrollTarget);
 
-          nsIFrame* rootScrollFrame = !aTargetFrame ? nullptr :
-            aTargetFrame->PresContext()->PresShell()->GetRootScrollFrame();
+          nsIFrame* rootScrollFrame = !mCurrentTarget ? nullptr :
+            mCurrentTarget->PresContext()->PresShell()->GetRootScrollFrame();
           nsIScrollableFrame* rootScrollableFrame = nullptr;
           if (rootScrollFrame) {
             rootScrollableFrame = do_QueryFrame(rootScrollFrame);
@@ -3259,7 +3260,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
           if (!intDelta) {
             break;
           }
-          DoScrollZoom(aTargetFrame, intDelta);
+          DoScrollZoom(mCurrentTarget, intDelta);
           break;
         }
         case WheelPrefs::ACTION_SEND_TO_PLUGIN:
@@ -3289,7 +3290,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
               // by looking at the scroll overflow values on mCanTriggerSwipe
               // events after they have been processed.
               allDeltaOverflown =
-                !ComputeScrollTarget(aTargetFrame, wheelEvent,
+                !ComputeScrollTarget(mCurrentTarget, wheelEvent,
                                      COMPUTE_DEFAULT_ACTION_TARGET);
             }
           } else {
@@ -3447,9 +3448,7 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     GenerateDragDropEnterExit(presContext, aEvent->AsDragEvent());
     break;
 
-  case eBeforeKeyUp:
   case eKeyUp:
-  case eAfterKeyUp:
     break;
 
   case eKeyPress:
@@ -4694,7 +4693,7 @@ EventStateManager::CheckForAndDispatchClick(WidgetMouseEvent* aEvent,
 
       if (NS_SUCCEEDED(ret) && aEvent->mClickCount == 2 &&
           mouseContent && mouseContent->IsInComposedDoc()) {
-        // fire double click
+        //fire double click
         ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseDoubleClick,
                                         presShell, mouseContent, currentTarget,
                                         notDispatchToContents);
@@ -5143,7 +5142,7 @@ EventStateManager::FlushPendingEvents(nsPresContext* aPresContext)
   NS_PRECONDITION(nullptr != aPresContext, "nullptr ptr");
   nsIPresShell *shell = aPresContext->GetPresShell();
   if (shell) {
-    shell->FlushPendingNotifications(Flush_InterruptibleLayout);
+    shell->FlushPendingNotifications(FlushType::InterruptibleLayout);
   }
 }
 

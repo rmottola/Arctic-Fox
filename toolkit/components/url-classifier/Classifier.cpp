@@ -468,50 +468,41 @@ Classifier::Check(const nsACString& aSpec,
 
     for (uint32_t i = 0; i < cacheArray.Length(); i++) {
       LookupCache *cache = cacheArray[i];
-      bool has, complete;
+      bool has, fromCache;
+      uint32_t matchLength;
 
-      if (LookupCache::Cast<LookupCacheV4>(cache)) {
-        // TODO Bug 1312339 Return length in LookupCache.Has and support
-        // VariableLengthPrefix in LookupResultArray
-        rv = cache->Has(lookupHash, &has, &complete);
-        if (NS_FAILED(rv)) {
-          LOG(("Failed to lookup fragment %s V4", fragments[i].get()));
-        }
-        if (has) {
-          matchingStatistics |= PrefixMatch::eMatchV4Prefix;
-          // TODO: Bug 1311935 - Implement Safe Browsing v4 caching
-          // Should check cache expired
-        }
-        continue;
-      }
-
-      rv = cache->Has(lookupHash, &has, &complete);
+      rv = cache->Has(lookupHash, &has, &matchLength, &fromCache);
       NS_ENSURE_SUCCESS(rv, rv);
       if (has) {
         LookupResult *result = aResults.AppendElement();
         if (!result)
           return NS_ERROR_OUT_OF_MEMORY;
 
-        int64_t age;
-        bool found = mTableFreshness.Get(cache->TableName(), &age);
-        if (!found) {
-          age = 24 * 60 * 60; // just a large number
-        } else {
-          int64_t now = (PR_Now() / PR_USEC_PER_SEC);
-          age = now - age;
+        // For V2, there is no TTL for caching, so we use table freshness to
+        // decide if matching a completion should trigger a gethash request or not.
+        // For V4, this is done by Positive Caching & Negative Caching mechanism.
+        bool confirmed = false;
+        if (fromCache) {
+          cache->IsHashEntryConfirmed(lookupHash, mTableFreshness,
+                                      aFreshnessGuarantee, &confirmed);
         }
 
-        LOG(("Found a result in %s: %s (Age: %Lds)",
+        LOG(("Found a result in %s: %s",
              cache->TableName().get(),
-             complete ? "complete." : "Not complete.",
-             age));
+             confirmed ? "confirmed." : "Not confirmed."));
 
         result->hash.complete = lookupHash;
-        result->mComplete = complete;
-        result->mFresh = (age < aFreshnessGuarantee);
+        result->mConfirmed = confirmed;
         result->mTableName.Assign(cache->TableName());
+        result->mPartialHashLength = confirmed ? COMPLETE_SIZE : matchLength;
 
-        matchingStatistics |= PrefixMatch::eMatchV2Prefix;
+        if (LookupCache::Cast<LookupCacheV4>(cache)) {
+          matchingStatistics |= PrefixMatch::eMatchV4Prefix;
+          result->mProtocolV2 = false;
+        } else {
+          matchingStatistics |= PrefixMatch::eMatchV2Prefix;
+          result->mProtocolV2 = true;
+        }
       }
     }
 
@@ -525,7 +516,19 @@ Classifier::Check(const nsACString& aSpec,
 nsresult
 Classifier::ApplyUpdates(nsTArray<TableUpdate*>* aUpdates)
 {
-  Telemetry::AutoTimer<Telemetry::URLCLASSIFIER_CL_UPDATE_TIME> timer;
+  if (!aUpdates || aUpdates->Length() == 0) {
+    return NS_OK;
+  }
+
+  nsCOMPtr<nsIUrlClassifierUtils> urlUtil =
+    do_GetService(NS_URLCLASSIFIERUTILS_CONTRACTID);
+
+  nsCString provider;
+  // Assume all TableUpdate objects should have the same provider.
+  urlUtil->GetTelemetryProvider((*aUpdates)[0]->TableName(), provider);
+
+  Telemetry::AutoTimer<Telemetry::URLCLASSIFIER_CL_KEYED_UPDATE_TIME>
+    keyedTimer(provider);
 
   PRIntervalTime clockStart = 0;
   if (LOG_ENABLED()) {
@@ -1199,7 +1202,8 @@ Classifier::ReadNoiseEntries(const Prefix& aPrefix,
                              PrefixArray* aNoiseEntries)
 {
   // TODO : Bug 1297962, support adding noise for v4
-  LookupCacheV2 *cache = static_cast<LookupCacheV2*>(GetLookupCache(aTableName));
+  LookupCacheV2 *cache =
+    LookupCache::Cast<LookupCacheV2>(GetLookupCache(aTableName));
   if (!cache) {
     return NS_ERROR_FAILURE;
   }

@@ -45,6 +45,26 @@ struct nsFlowAreaRect {
 
 #define NS_FLOAT_MANAGER_CACHE_SIZE 4
 
+/**
+ * nsFloatManager is responsible for implementing CSS's rules for
+ * positioning floats. An nsFloatManager object is created during reflow for
+ * any block with NS_BLOCK_FLOAT_MGR. During reflow, the float manager for
+ * the nearest such ancestor block is found in ReflowInput::mFloatManager.
+ *
+ * According to the line-relative mappings in CSS Writing Modes spec [1],
+ * line-right and line-left are calculated with respect to the writing mode
+ * of the containing block of the floats. All the writing modes passed to
+ * nsFloatManager methods should be the containing block's writing mode.
+ *
+ * However, according to the abstract-to-physical mappings table [2], the
+ * 'direction' property of the containing block doesn't affect the
+ * interpretation of line-right and line-left. We actually implement this by
+ * passing in the writing mode of the block formatting context (BFC), i.e.
+ * the of BlockReflowInput's writing mode.
+ *
+ * [1] https://drafts.csswg.org/css-writing-modes/#line-mappings
+ * [2] https://drafts.csswg.org/css-writing-modes/#logical-to-physical
+ */
 class nsFloatManager {
 public:
   explicit nsFloatManager(nsIPresShell* aPresShell, mozilla::WritingMode aWM);
@@ -335,10 +355,10 @@ private:
     // aBStart and aBEnd are the starting and ending coordinate of a band.
     // LineLeft() and LineRight() return the innermost line-left extent and
     // line-right extent within the given band, respectively.
-    nscoord LineLeft(ShapeType aShapeType, const nscoord aBStart,
-                     const nscoord aBEnd) const;
-    nscoord LineRight(ShapeType aShapeType, const nscoord aBStart,
-                     const nscoord aBEnd) const;
+    nscoord LineLeft(mozilla::WritingMode aWM, ShapeType aShapeType,
+                     const nscoord aBStart, const nscoord aBEnd) const;
+    nscoord LineRight(mozilla::WritingMode aWM, ShapeType aShapeType,
+                      const nscoord aBStart, const nscoord aBEnd) const;
 
     nscoord BStart(ShapeType aShapeType) const
     {
@@ -349,18 +369,19 @@ private:
       return aShapeType == ShapeType::Margin ? BEnd() : ShapeBoxRect().YMost();
     }
 
-    // Compute the minimum x-axis difference between the bounding shape box
-    // and its rounded corner within the given band (y-axis region). This is
-    // used as a helper function to compute the LineRight() and LineLeft().
-    // See the picture in the implementation for an example.
+    // Compute the minimum line-axis difference between the bounding shape
+    // box and its rounded corner within the given band (block-axis region).
+    // This is used as a helper function to compute the LineRight() and
+    // LineLeft(). See the picture in the implementation for an example.
+    // RadiusL and RadiusB stand for radius on the line-axis and block-axis.
     //
-    // Returns the x-axis diff, or 0 if there's no rounded corner within
-    // the given band.
-    static nscoord ComputeEllipseXInterceptDiff(
-      const nscoord aShapeBoxY, const nscoord aShapeBoxYMost,
-      const nscoord aTopCornerRadiusX, const nscoord aTopCornerRadiusY,
-      const nscoord aBottomCornerRadiusX, const nscoord aBottomCornerRadiusY,
-      const nscoord aBandY, const nscoord aBandYMost);
+    // Returns radius-x diff on the line-axis, or 0 if there's no rounded
+    // corner within the given band.
+    static nscoord ComputeEllipseLineInterceptDiff(
+      const nscoord aShapeBoxBStart, const nscoord aShapeBoxBEnd,
+      const nscoord aBStartCornerRadiusL, const nscoord aBStartCornerRadiusB,
+      const nscoord aBEndCornerRadiusL, const nscoord aBEndCornerRadiusB,
+      const nscoord aBandBStart, const nscoord aBandBEnd);
 
     static nscoord XInterceptAtY(const nscoord aY, const nscoord aRadiusX,
                                  const nscoord aRadiusY);
@@ -384,6 +405,8 @@ private:
   };
 
 #ifdef DEBUG
+  // Store the writing mode from the block frame which establishes the block
+  // formatting context (BFC) when the nsFloatManager is created.
   mozilla::WritingMode mWritingMode;
 #endif
 
@@ -435,7 +458,7 @@ public:
    * `remember' the old float manager, and install the new float
    * manager in the reflow input.
    */
-  nsresult
+  void
   CreateFloatManager(nsPresContext *aPresContext);
 
 protected:

@@ -45,6 +45,11 @@
 #include "mozilla/net/ChannelEventQueue.h"
 #include "nsIThrottledInputChannel.h"
 
+#define HTTP_BASE_CHANNEL_IID \
+{ 0x9d5cde03, 0xe6e9, 0x4612, \
+    { 0xbf, 0xef, 0xbb, 0x66, 0xf3, 0xbb, 0x74, 0x46 } }
+
+
 class nsISecurityConsoleMessage;
 class nsIPrincipal;
 
@@ -93,6 +98,8 @@ public:
   NS_DECL_NSITRACEABLECHANNEL
   NS_DECL_NSITIMEDCHANNEL
   NS_DECL_NSITHROTTLEDINPUTCHANNEL
+
+  NS_DECLARE_STATIC_IID_ACCESSOR(HTTP_BASE_CHANNEL_IID)
 
   HttpBaseChannel();
 
@@ -188,6 +195,9 @@ public:
   NS_IMETHOD GetProtocolVersion(nsACString & aProtocolVersion) override;
   NS_IMETHOD GetChannelId(nsACString& aChannelId) override;
   NS_IMETHOD SetChannelId(const nsACString& aChannelId) override;
+  NS_IMETHOD GetTopLevelContentWindowId(uint64_t *aContentWindowId) override;
+  NS_IMETHOD SetTopLevelContentWindowId(uint64_t aContentWindowId) override;
+  NS_IMETHOD GetIsTrackingResource(bool* aIsTrackingResource) override;
 
   // nsIHttpChannelInternal
   NS_IMETHOD GetDocumentURI(nsIURI **aDocumentURI) override;
@@ -238,6 +248,7 @@ public:
   NS_IMETHOD GetConnectionInfoHashKey(nsACString& aConnectionInfoHashKey) override;
   NS_IMETHOD GetIntegrityMetadata(nsAString& aIntegrityMetadata) override;
   NS_IMETHOD SetIntegrityMetadata(const nsAString& aIntegrityMetadata) override;
+  virtual mozilla::net::nsHttpChannel * QueryHttpChannelImpl(void) override;
 
   inline void CleanRedirectCacheChainIfNecessary()
   {
@@ -329,6 +340,11 @@ public: /* Necko internal use only... */
     // Callback on main thread when NS_AsyncCopy() is finished populating
     // the new mUploadStream.
     void EnsureUploadStreamIsCloneableComplete(nsresult aStatus);
+
+    void SetIsTrackingResource()
+    {
+      mIsTrackingResource = true;
+    }
 
 protected:
   nsCOMArray<nsISecurityConsoleMessage> mSecurityConsoleMessages;
@@ -549,6 +565,10 @@ protected:
   nsID mRequestContextID;
   bool EnsureRequestContextID();
 
+  // ID of the top-level document's inner window this channel is being
+  // originated from.
+  uint64_t mContentWindowId;
+
   bool                              mRequireCORSPreflight;
   nsTArray<nsCString>               mUnsafeHeaders;
 
@@ -560,11 +580,14 @@ protected:
   nsCString mAvailableCachedAltDataType;
 
   bool mForceMainDocumentChannel;
+  bool mIsTrackingResource;
 
   nsID mChannelId;
 
   nsString mIntegrityMetadata;
 };
+
+NS_DEFINE_STATIC_IID_ACCESSOR(HttpBaseChannel, HTTP_BASE_CHANNEL_IID)
 
 // Share some code while working around C++'s absurd inability to handle casting
 // of member functions between base/derived types.

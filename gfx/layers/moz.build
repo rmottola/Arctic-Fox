@@ -4,6 +4,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files('**'):
+    BUG_COMPONENT = ('Core', 'Graphics: Layers')
+
 with Files('apz/**'):
     BUG_COMPONENT = ('Core', 'Panning and Zooming')
 
@@ -21,7 +24,6 @@ EXPORTS += [
     'composite/CompositableHost.h',
     'composite/ImageHost.h',
     'CompositorTypes.h',
-    'CopyableCanvasLayer.h',
     'D3D9SurfaceImage.h',
     'FrameMetrics.h',
     'GLImages.h',
@@ -130,7 +132,6 @@ EXPORTS.mozilla.layers += [
     'BSPTree.h',
     'BufferTexture.h',
     'client/CanvasClient.h',
-    'client/CompositableChild.h',
     'client/CompositableClient.h',
     'client/ContentClient.h',
     'client/GPUVideoTextureClient.h',
@@ -173,8 +174,6 @@ EXPORTS.mozilla.layers += [
     'ipc/CrossProcessCompositorBridgeParent.h',
     'ipc/ImageBridgeChild.h',
     'ipc/ImageBridgeParent.h',
-    'ipc/ImageContainerChild.h',
-    'ipc/ImageContainerParent.h',
     'ipc/ISurfaceAllocator.h',
     'ipc/KnowsCompositor.h',
     'ipc/LayerAnimationUtils.h',
@@ -182,12 +181,13 @@ EXPORTS.mozilla.layers += [
     'ipc/LayerTransactionParent.h',
     'ipc/LayerTreeOwnerTracker.h',
     'ipc/RemoteContentController.h',
-    'ipc/ShadowLayerChild.h',
     'ipc/ShadowLayers.h',
     'ipc/SharedPlanarYCbCrImage.h',
     'ipc/SharedRGBImage.h',
     'ipc/SynchronousTask.h',
     'ipc/TextureForwarder.h',
+    'ipc/UiCompositorControllerChild.h',
+    'ipc/UiCompositorControllerParent.h',
     'ipc/VideoBridgeChild.h',
     'ipc/VideoBridgeParent.h',
     'LayerMetricsWrapper.h',
@@ -202,6 +202,11 @@ EXPORTS.mozilla.layers += [
     'RenderTrace.h',
     'TextureWrapperImage.h',
     'TransactionIdAllocator.h',
+    'wr/WebRenderBridgeChild.h',
+    'wr/WebRenderBridgeParent.h',
+    'wr/WebRenderCompositorOGL.h',
+    'wr/WebRenderLayerManager.h',
+    'wr/WebRenderMessageUtils.h',
 ]
 
 if CONFIG['MOZ_X11']:
@@ -298,7 +303,6 @@ UNIFIED_SOURCES += [
     'client/ClientPaintedLayer.cpp',
     'client/ClientTextLayer.cpp',
     'client/ClientTiledPaintedLayer.cpp',
-    'client/CompositableChild.cpp',
     'client/CompositableClient.cpp',
     'client/ContentClient.cpp',
     'client/GPUVideoTextureClient.cpp',
@@ -335,7 +339,6 @@ UNIFIED_SOURCES += [
     'ipc/APZChild.cpp',
     'ipc/APZCTreeManagerChild.cpp',
     'ipc/APZCTreeManagerParent.cpp',
-    'ipc/CompositableForwarder.cpp',
     'ipc/CompositableTransactionParent.cpp',
     'ipc/CompositorBench.cpp',
     'ipc/CompositorBridgeChild.cpp',
@@ -345,19 +348,17 @@ UNIFIED_SOURCES += [
     'ipc/CrossProcessCompositorBridgeParent.cpp',
     'ipc/ImageBridgeChild.cpp',
     'ipc/ImageBridgeParent.cpp',
-    'ipc/ImageContainerChild.cpp',
-    'ipc/ImageContainerParent.cpp',
     'ipc/ISurfaceAllocator.cpp',
     'ipc/LayerAnimationUtils.cpp',
     'ipc/LayerTransactionChild.cpp',
     'ipc/LayerTransactionParent.cpp',
     'ipc/LayerTreeOwnerTracker.cpp',
     'ipc/RemoteContentController.cpp',
-    'ipc/ShadowLayerChild.cpp',
-    'ipc/ShadowLayerParent.cpp',
     'ipc/ShadowLayers.cpp',
     'ipc/SharedPlanarYCbCrImage.cpp',
     'ipc/SharedRGBImage.cpp',
+    'ipc/UiCompositorControllerChild.cpp',
+    'ipc/UiCompositorControllerParent.cpp',
     'ipc/VideoBridgeChild.cpp',
     'ipc/VideoBridgeParent.cpp',
     'LayerScope.cpp',
@@ -375,7 +376,19 @@ UNIFIED_SOURCES += [
     'ReadbackProcessor.cpp',
     'RenderTrace.cpp',
     'RotatedBuffer.cpp',
+    'ShareableCanvasLayer.cpp',
     'TextureWrapperImage.cpp',
+    'wr/WebRenderBorderLayer.cpp',
+    'wr/WebRenderBridgeChild.cpp',
+    'wr/WebRenderBridgeParent.cpp',
+    'wr/WebRenderCanvasLayer.cpp',
+    'wr/WebRenderColorLayer.cpp',
+    'wr/WebRenderCompositorOGL.cpp',
+    'wr/WebRenderContainerLayer.cpp',
+    'wr/WebRenderImageLayer.cpp',
+    'wr/WebRenderLayerManager.cpp',
+    'wr/WebRenderPaintedLayer.cpp',
+    'wr/WebRenderTextLayer.cpp',
 ]
 
 SOURCES += [
@@ -404,19 +417,19 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
         'opengl/MacIOSurfaceTextureHostOGL.cpp',
     ]
 
-IPDL_SOURCES = [
+IPDL_SOURCES += [
     'ipc/LayersMessages.ipdlh',
     'ipc/LayersSurfaces.ipdlh',
     'ipc/PAPZ.ipdl',
     'ipc/PAPZCTreeManager.ipdl',
-    'ipc/PCompositable.ipdl',
     'ipc/PCompositorBridge.ipdl',
     'ipc/PImageBridge.ipdl',
-    'ipc/PImageContainer.ipdl',
-    'ipc/PLayer.ipdl',
     'ipc/PLayerTransaction.ipdl',
     'ipc/PTexture.ipdl',
+    'ipc/PUiCompositorController.ipdl',
     'ipc/PVideoBridge.ipdl',
+    'ipc/PWebRenderBridge.ipdl',
+    'ipc/WebRenderMessages.ipdlh',
 ]
 
 include('/ipc/chromium/chromium-config.mozbuild')

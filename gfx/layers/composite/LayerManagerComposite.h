@@ -65,6 +65,11 @@ class PaintCounter;
 
 static const int kVisualWarningDuration = 150; // ms
 
+struct ImageCompositeNotificationInfo {
+  base::ProcessId mImageBridgeProcessId;
+  ImageCompositeNotification mNotification;
+};
+
 // An implementation of LayerManager that acts as a pair with ClientLayerManager
 // and is mirrored across IPDL. This gets managed/updated by LayerTransactionParent.
 class HostLayerManager : public LayerManager
@@ -104,8 +109,6 @@ public:
   {
     MOZ_CRASH("GFX: Shouldn't be called for composited layer manager");
   }
-  virtual TextureFactoryIdentifier GetTextureFactoryIdentifier() = 0;
-
 
   virtual void ForcePresent() = 0;
   virtual void AddInvalidRegion(const nsIntRegion& aRegion) = 0;
@@ -128,7 +131,7 @@ public:
   // layer or texture updates against the old compositor.
   virtual void ChangeCompositor(Compositor* aNewCompositor) = 0;
 
-  void ExtractImageCompositeNotifications(nsTArray<ImageCompositeNotification>* aNotifications)
+  void ExtractImageCompositeNotifications(nsTArray<ImageCompositeNotificationInfo>* aNotifications)
   {
     aNotifications->AppendElements(Move(mImageCompositeNotifications));
   }
@@ -165,7 +168,7 @@ public:
 
 protected:
   bool mDebugOverlayWantsNextFrame;
-  nsTArray<ImageCompositeNotification> mImageCompositeNotifications;
+  nsTArray<ImageCompositeNotificationInfo> mImageCompositeNotifications;
   // Testing property. If hardware composer is supported, this will return
   // true if the last frame was deemed 'too complicated' to be rendered.
   float mWarningLevel;
@@ -346,7 +349,8 @@ public:
 
   bool AsyncPanZoomEnabled() const override;
 
-  void AppendImageCompositeNotification(const ImageCompositeNotification& aNotification)
+public:
+  void AppendImageCompositeNotification(const ImageCompositeNotificationInfo& aNotification)
   {
     // Only send composite notifications when we're drawing to the screen,
     // because that's what they mean.
@@ -357,6 +361,8 @@ public:
       mImageCompositeNotifications.AppendElement(aNotification);
     }
   }
+
+public:
   virtual TextureFactoryIdentifier GetTextureFactoryIdentifier() override
   {
     return mCompositor->GetTextureFactoryIdentifier();
@@ -528,7 +534,7 @@ public:
   gfx::Matrix4x4 GetShadowTransform();
   bool GetShadowTransformSetByAnimation() { return mShadowTransformSetByAnimation; }
   bool GetShadowOpacitySetByAnimation() { return mShadowOpacitySetByAnimation; }
-  
+
   /**
    * Return true if a checkerboarding background color needs to be drawn
    * for this layer.
@@ -582,6 +588,7 @@ public:
    * concrete class destructor
    */
   virtual void Destroy();
+  virtual void Cleanup() {}
 
   /**
    * Perform a first pass over the layer tree to render all of the intermediate
@@ -592,7 +599,8 @@ public:
   virtual void Prepare(const RenderTargetIntRect& aClipRect) {}
 
   // TODO: This should also take RenderTargetIntRect like Prepare.
-  virtual void RenderLayer(const gfx::IntRect& aClipRect) = 0;
+  virtual void RenderLayer(const gfx::IntRect& aClipRect,
+                           const Maybe<gfx::Polygon>& aGeometry) = 0;
 
   virtual bool SetCompositableHost(CompositableHost*)
   {

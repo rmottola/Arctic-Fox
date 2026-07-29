@@ -10,9 +10,9 @@ var LightweightThemeManager = tempScope.LightweightThemeManager;
 
 function wait_for_notification(aCallback) {
   PopupNotifications.panel.addEventListener("popupshown", function() {
-    PopupNotifications.panel.removeEventListener("popupshown", arguments.callee, false);
+    PopupNotifications.panel.removeEventListener("popupshown", arguments.callee);
     aCallback(PopupNotifications.panel);
-  }, false);
+  });
 }
 
 var TESTS = [
@@ -27,7 +27,7 @@ function test_install_http() {
     if (gBrowser.contentDocument.location.href == "about:blank")
       return;
 
-    gBrowser.selectedBrowser.removeEventListener("pageshow", arguments.callee, false);
+    gBrowser.selectedBrowser.removeEventListener("pageshow", arguments.callee);
 
     executeSoon(function() {
       BrowserTestUtils.synthesizeMouse("#theme-install", 2, 2, {}, gBrowser.selectedBrowser);
@@ -40,7 +40,7 @@ function test_install_http() {
 
       runNextTest();
     });
-  }, false);
+  });
 },
 
 function test_install_lwtheme() {
@@ -54,7 +54,7 @@ function test_install_lwtheme() {
     if (gBrowser.contentDocument.location.href == "about:blank")
       return;
 
-    gBrowser.selectedBrowser.removeEventListener("pageshow", arguments.callee, false);
+    gBrowser.selectedBrowser.removeEventListener("pageshow", arguments.callee);
 
     BrowserTestUtils.synthesizeMouse("#theme-install", 2, 2, {}, gBrowser.selectedBrowser);
     let notification;
@@ -71,7 +71,7 @@ function test_install_lwtheme() {
         runNextTest();
       }
     );
-  }, false);
+  });
 },
 
 function test_lwtheme_switch_theme() {
@@ -90,7 +90,7 @@ function test_lwtheme_switch_theme() {
       if (gBrowser.contentDocument.location.href == "about:blank")
         return;
 
-      gBrowser.selectedBrowser.removeEventListener("pageshow", arguments.callee, false);
+      gBrowser.selectedBrowser.removeEventListener("pageshow", arguments.callee);
 
       executeSoon(function() {
         wait_for_notification(function(aPanel) {
@@ -112,7 +112,7 @@ function test_lwtheme_switch_theme() {
         });
         BrowserTestUtils.synthesizeMouse("#theme-install", 2, 2, {}, gBrowser.selectedBrowser);
       });
-    }, false);
+    });
   });
 }
 ];

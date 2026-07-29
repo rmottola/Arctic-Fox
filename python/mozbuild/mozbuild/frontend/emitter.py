@@ -63,8 +63,8 @@ from .data import (
     PreprocessedWebIDLFile,
     Program,
     RustLibrary,
+    HostRustLibrary,
     RustProgram,
-    SdkFiles,
     SharedLibrary,
     SimpleProgram,
     Sources,
@@ -101,36 +101,6 @@ from .context import (
 )
 
 from mozbuild.base import ExecutionSummary
-
-
-ALLOWED_XPCOM_GLUE = {
-    ('TestStreamConv', 'netwerk/streamconv/test'),
-    ('PropertiesTest', 'netwerk/test'),
-    ('ReadNTLM', 'netwerk/test'),
-    ('TestBlockingSocket', 'netwerk/test'),
-    ('TestDNS', 'netwerk/test'),
-    ('TestIncrementalDownload', 'netwerk/test'),
-    ('TestNamedPipeService', 'netwerk/test'),
-    ('TestOpen', 'netwerk/test'),
-    ('TestProtocols', 'netwerk/test'),
-    ('TestServ', 'netwerk/test'),
-    ('TestStreamLoader', 'netwerk/test'),
-    ('TestUpload', 'netwerk/test'),
-    ('TestURLParser', 'netwerk/test'),
-    ('urltest', 'netwerk/test'),
-    ('TestBind', 'netwerk/test'),
-    ('TestCookie', 'netwerk/test'),
-    ('TestUDPSocket', 'netwerk/test'),
-    ('xpcshell', 'js/xpconnect/shell'),
-    ('testcrasher', 'toolkit/crashreporter/test'),
-    ('mediaconduit_unittests', 'media/webrtc/signaling/test'),
-    ('mediapipeline_unittest', 'media/webrtc/signaling/test'),
-    ('sdp_file_parser', 'media/webrtc/signaling/fuzztest'),
-    ('signaling_unittests', 'media/webrtc/signaling/test'),
-    ('TestMailCookie', 'mailnews/base/test'),
-    ('calbasecomps', 'calendar/base/backend/libical/build'),
-    ('purplexpcom', 'extensions/purple/purplexpcom/src'),
-}
 
 
 class TreeMetadataEmitter(LoggingMixin):
@@ -186,13 +156,14 @@ class TreeMetadataEmitter(LoggingMixin):
             execution_time=self._emitter_time,
             object_count=self._object_count)
 
-    def emit(self, output):
+    def emit(self, output, emitfn=None):
         """Convert the BuildReader output into data structures.
 
         The return value from BuildReader.read_topsrcdir() (a generator) is
         typically fed into this function.
         """
         contexts = {}
+        emitfn = emitfn or self.emit_from_context
 
         def emit_objs(objs):
             for o in objs:
@@ -211,7 +182,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
                 start = time.time()
                 # We need to expand the generator for the timings to work.
-                objs = list(self.emit_from_context(out))
+                objs = list(emitfn(out))
                 self._emitter_time += time.time() - start
 
                 for o in emit_objs(objs): yield o
@@ -306,15 +277,11 @@ class TreeMetadataEmitter(LoggingMixin):
         """Add linkage declarations to a given object."""
         assert isinstance(obj, Linkable)
 
-        use_xpcom = False
-
         for path in context.get(variable, []):
             force_static = path.startswith('static:') and obj.KIND == 'target'
             if force_static:
                 path = path[7:]
             name = mozpath.basename(path)
-            if name in ('xpcomglue', 'xpcomglue_s'):
-                use_xpcom = True
             dir = mozpath.dirname(path)
             candidates = [l for l in self._libs[name] if l.KIND == obj.KIND]
             if dir:
@@ -401,36 +368,6 @@ class TreeMetadataEmitter(LoggingMixin):
         for lib in context.get(variable.replace('USE', 'OS'), []):
             obj.link_system_library(lib)
 
-        key = (obj.name, obj.relativedir)
-        substs = context.config.substs
-        extra_allowed = []
-        moz_build_app = substs.get('MOZ_BUILD_APP')
-        if moz_build_app is not None: # None during some test_emitter.py tests.
-            if moz_build_app.startswith('../'):
-                # For comm-central builds, where topsrcdir is not the root
-                # source dir.
-                moz_build_app = moz_build_app[3:]
-            extra_allowed = [
-                (substs.get('MOZ_APP_NAME'), '%s/app' % moz_build_app),
-                ('%s-bin' % substs.get('MOZ_APP_NAME'), '%s/app' % moz_build_app),
-            ]
-        if substs.get('MOZ_WIDGET_TOOLKIT') != 'android':
-            extra_allowed.append((substs.get('MOZ_CHILD_PROCESS_NAME'), 'ipc/app'))
-
-        if key in ALLOWED_XPCOM_GLUE or key in extra_allowed:
-            if not use_xpcom:
-                raise SandboxValidationError(
-                    "%s is in the exception list for XPCOM glue dependency but "
-                    "doesn't depend on the XPCOM glue. Please adjust the list "
-                    "in %s." % (obj.name, __file__), context
-                )
-        elif use_xpcom:
-            raise SandboxValidationError(
-                "%s depends on the XPCOM glue. "
-                "No new dependency on the XPCOM glue is allowed."
-                % obj.name, context
-            )
-
     @memoize
     def _get_external_library(self, dir, name, force_static):
         # Create ExternalStaticLibrary or ExternalSharedLibrary object with a
@@ -480,7 +417,7 @@ class TreeMetadataEmitter(LoggingMixin):
                     '%s %s of crate %s refers to a non-existent path' % (description, dep_crate_name, crate_name),
                     context)
 
-    def _rust_library(self, context, libname, static_args):
+    def _rust_library(self, context, libname, static_args, cls=RustLibrary):
         # We need to note any Rust library for linking purposes.
         config, cargo_file = self._parse_cargo_file(context)
         crate_name = config['package']['name']
@@ -532,15 +469,16 @@ class TreeMetadataEmitter(LoggingMixin):
 
         dependencies = set(config.get('dependencies', {}).iterkeys())
 
-        features = context.get('RUST_LIBRARY_FEATURES', [])
+        features = context.get(cls.FEATURES_VAR, [])
         unique_features = set(features)
         if len(features) != len(unique_features):
             raise SandboxValidationError(
                 'features for %s should not contain duplicates: %s' % (libname, features),
                 context)
 
-        return RustLibrary(context, libname, cargo_file, crate_type,
-                           dependencies, features, **static_args)
+        return cls(context, libname, cargo_file, crate_type, dependencies,
+                   features, **static_args)
+
 
     def _handle_linkables(self, context, passthru, generated_files):
         linkables = []
@@ -620,7 +558,12 @@ class TreeMetadataEmitter(LoggingMixin):
             if host_libname == libname:
                 raise SandboxValidationError('LIBRARY_NAME and '
                     'HOST_LIBRARY_NAME must have a different value', context)
-            lib = HostLibrary(context, host_libname)
+
+            is_rust_library = context.get('IS_RUST_LIBRARY')
+            if is_rust_library:
+                lib = self._rust_library(context, host_libname, {}, cls=HostRustLibrary)
+            else:
+                lib = HostLibrary(context, host_libname)
             self._libs[host_libname].append(lib)
             self._linkage.append((context, lib, 'HOST_USE_LIBS'))
             host_linkables.append(lib)
@@ -705,14 +648,6 @@ class TreeMetadataEmitter(LoggingMixin):
                     raise SandboxValidationError(
                         'SONAME requires FORCE_SHARED_LIB', context)
                 shared_args['soname'] = soname
-
-            # If both a shared and a static library are created, only the
-            # shared library is meant to be a SDK library.
-            if context.get('SDK_LIBRARY'):
-                if shared_lib:
-                    shared_args['is_sdk'] = True
-                elif static_lib:
-                    static_args['is_sdk'] = True
 
             if context.get('NO_EXPAND_LIBS'):
                 if not static_lib:
@@ -1073,7 +1008,6 @@ class TreeMetadataEmitter(LoggingMixin):
             ('FINAL_TARGET_PP_FILES', FinalTargetPreprocessedFiles),
             ('OBJDIR_FILES', ObjdirFiles),
             ('OBJDIR_PP_FILES', ObjdirPreprocessedFiles),
-            ('SDK_FILES', SdkFiles),
             ('TEST_HARNESS_FILES', TestHarnessFiles),
         ):
             all_files = context.get(var)
@@ -1440,12 +1374,12 @@ class TreeMetadataEmitter(LoggingMixin):
                            install_prefix="web-platform/")
 
 
-        for path, tests in manifest:
+        for test_type, path, tests in manifest:
             path = mozpath.join(tests_root, path)
-            for test in tests:
-                if test.item_type not in ["testharness", "reftest"]:
-                    continue
+            if test_type not in ["testharness", "reftest", "wdspec"]:
+                continue
 
+            for test in tests:
                 obj.tests.append({
                     'path': path,
                     'here': mozpath.dirname(path),

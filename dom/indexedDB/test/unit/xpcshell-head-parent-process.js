@@ -348,6 +348,31 @@ function installPackagedProfile(packageName)
   zipReader.close();
 }
 
+function getChromeFilesDir()
+{
+  let dirService = Cc["@mozilla.org/file/directory_service;1"]
+                   .getService(Ci.nsIProperties);
+
+  let profileDir = dirService.get("ProfD", Ci.nsIFile);
+
+  let idbDir = profileDir.clone();
+  idbDir.append("storage");
+  idbDir.append("permanent");
+  idbDir.append("chrome");
+  idbDir.append("idb");
+
+  let idbEntries = idbDir.directoryEntries;
+  while (idbEntries.hasMoreElements()) {
+    let entry = idbEntries.getNext();
+    let file = entry.QueryInterface(Ci.nsIFile);
+    if (file.isDirectory()) {
+      return file;
+    }
+  }
+
+  throw new Error("files directory doesn't exist!");
+}
+
 function getView(size)
 {
   let buffer = new ArrayBuffer(size);
@@ -622,6 +647,7 @@ var SpecialPowers = {
       this._createdFiles = new Array;
     }
     let createdFiles = this._createdFiles;
+    let promises = [];
     requests.forEach(function(request) {
       const filePerms = 0o666;
       let testFile = dirSvc.get("ProfD", Ci.nsIFile);
@@ -630,20 +656,24 @@ var SpecialPowers = {
       } else {
         testFile.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, filePerms);
       }
-        let outStream = Cc["@mozilla.org/network/file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
-        outStream.init(testFile, 0x02 | 0x08 | 0x20, // PR_WRONLY | PR_CREATE_FILE | PR_TRUNCATE
-                       filePerms, 0);
-        if (request.data) {
-          outStream.write(request.data, request.data.length);
-          outStream.close();
-        }
-        filePaths.push(File.createFromFileName(testFile.path, request.options));
-        createdFiles.push(testFile);
+      let outStream = Cc["@mozilla.org/network/file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
+      outStream.init(testFile, 0x02 | 0x08 | 0x20, // PR_WRONLY | PR_CREATE_FILE | PR_TRUNCATE
+                     filePerms, 0);
+      if (request.data) {
+        outStream.write(request.data, request.data.length);
+        outStream.close();
+      }
+      promises.push(File.createFromFileName(testFile.path, request.options).then(function(file) {
+        filePaths.push(file);
+      }));
+      createdFiles.push(testFile);
     });
 
-    setTimeout(function () {
-      callback(filePaths);
-    }, 0);
+    Promise.all(promises).then(function() {
+      setTimeout(function () {
+        callback(filePaths);
+      }, 0);
+    });
   },
 
   removeFiles: function() {

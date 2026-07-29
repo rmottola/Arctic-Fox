@@ -12,6 +12,11 @@
 #include "gfxPrefs.h"
 #include "GPUProcessHost.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Telemetry.h"
+#include "mozilla/TimeStamp.h"
+#include "mozilla/dom/MemoryReportRequest.h"
+#include "mozilla/dom/VideoDecoderManagerChild.h"
+#include "mozilla/dom/VideoDecoderManagerParent.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/ipc/CrashReporterClient.h"
@@ -19,11 +24,10 @@
 #include "mozilla/layers/APZThreadUtils.h"
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/layers/CompositorBridgeParent.h"
-#include "mozilla/dom/VideoDecoderManagerParent.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ImageBridgeParent.h"
-#include "mozilla/dom/VideoDecoderManagerChild.h"
 #include "mozilla/layers/LayerTreeOwnerTracker.h"
+#include "mozilla/layers/UiCompositorControllerParent.h"
 #include "nsDebugImpl.h"
 #include "nsExceptionHandler.h"
 #include "nsThreadManager.h"
@@ -35,6 +39,7 @@
 #if defined(XP_WIN)
 # include "DeviceManagerD3D9.h"
 # include "mozilla/gfx/DeviceManagerDx.h"
+# include <process.h>
 #endif
 #ifdef MOZ_WIDGET_GTK
 # include <gtk/gtk.h>
@@ -49,6 +54,7 @@ using namespace layers;
 static GPUParent* sGPUParent;
 
 GPUParent::GPUParent()
+  : mLaunchTime(TimeStamp::Now())
 {
   sGPUParent = this;
 }
@@ -191,6 +197,7 @@ GPUParent::RecvInit(nsTArray<GfxPrefSetting>&& prefs,
   RecvGetDeviceStatus(&data);
   Unused << SendInitComplete(data);
 
+  Telemetry::AccumulateTimeDelta(Telemetry::GPU_PROCESS_INITIALIZATION_TIME_MS, mLaunchTime);
   return IPC_OK();
 }
 
@@ -212,6 +219,13 @@ mozilla::ipc::IPCResult
 GPUParent::RecvInitVRManager(Endpoint<PVRManagerParent>&& aEndpoint)
 {
   VRManagerParent::CreateForGPUProcess(Move(aEndpoint));
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+GPUParent::RecvInitUiCompositorController(Endpoint<PUiCompositorControllerParent>&& aEndpoint)
+{
+  UiCompositorControllerParent::Start(Move(aEndpoint));
   return IPC_OK();
 }
 
@@ -284,11 +298,12 @@ mozilla::ipc::IPCResult
 GPUParent::RecvNewWidgetCompositor(Endpoint<layers::PCompositorBridgeParent>&& aEndpoint,
                                    const CSSToLayoutDeviceScale& aScale,
                                    const TimeDuration& aVsyncRate,
+                                   const CompositorOptions& aOptions,
                                    const bool& aUseExternalSurfaceSize,
                                    const IntSize& aSurfaceSize)
 {
   RefPtr<CompositorBridgeParent> cbp =
-    new CompositorBridgeParent(aScale, aVsyncRate, aUseExternalSurfaceSize, aSurfaceSize);
+    new CompositorBridgeParent(aScale, aVsyncRate, aOptions, aUseExternalSurfaceSize, aSurfaceSize);
 
   MessageLoop* loop = CompositorThreadHolder::Loop();
   loop->PostTask(NewRunnableFunction(OpenParent, cbp, Move(aEndpoint)));
@@ -356,6 +371,19 @@ GPUParent::RecvNotifyGpuObservers(const nsCString& aTopic)
   if (obsSvc) {
     obsSvc->NotifyObservers(nullptr, aTopic.get(), nullptr);
   }
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+GPUParent::RecvRequestMemoryReport(const uint32_t& aGeneration,
+                                   const bool& aAnonymize,
+                                   const bool& aMinimizeMemoryUsage,
+                                   const MaybeFileDesc& aDMDFile)
+{
+  nsPrintfCString processName("GPU (pid %u)", (unsigned)getpid());
+
+  mozilla::dom::MemoryReportRequestClient::Start(
+    aGeneration, aAnonymize, aMinimizeMemoryUsage, aDMDFile, processName);
   return IPC_OK();
 }
 

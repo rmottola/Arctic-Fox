@@ -123,7 +123,7 @@ function tests() {
   yield undefined;
   compareSnapshots_(normalButtonCanvas, currentSnapshot, true, "Removing the label should have unpressed the button.");
   sendMouseEvent("mouseup", label);
-  window.removeEventListener("MozAfterPaint", paintListener, false);
+  window.removeEventListener("MozAfterPaint", paintListener);
   window.opener.finishTests();
  }
 

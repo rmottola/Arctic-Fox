@@ -501,6 +501,7 @@ WebGLContext::InitAndValidateGL(FailureReason* const out_failReason)
     mDitherEnabled = true;
     mRasterizerDiscardEnabled = false;
     mScissorTestEnabled = false;
+    mGenerateMipmapHint = LOCAL_GL_DONT_CARE;
 
     // Bindings, etc.
     mActiveTexture = 0;
@@ -532,7 +533,7 @@ WebGLContext::InitAndValidateGL(FailureReason* const out_failReason)
     if (MinCapabilityMode())
         mGLMaxVertexAttribs = MINVALUE_GL_MAX_VERTEX_ATTRIBS;
     else
-        gl->fGetIntegerv(LOCAL_GL_MAX_VERTEX_ATTRIBS, &mGLMaxVertexAttribs);
+        gl->GetUIntegerv(LOCAL_GL_MAX_VERTEX_ATTRIBS, &mGLMaxVertexAttribs);
 
     if (mGLMaxVertexAttribs < 8) {
         const nsPrintfCString reason("GL_MAX_VERTEX_ATTRIBS: %d is < 8!",
@@ -561,6 +562,8 @@ WebGLContext::InitAndValidateGL(FailureReason* const out_failReason)
     mBound3DTextures.SetLength(mGLMaxTextureUnits);
     mBound2DArrayTextures.SetLength(mGLMaxTextureUnits);
     mBoundSamplers.SetLength(mGLMaxTextureUnits);
+
+    gl->fGetIntegerv(LOCAL_GL_MAX_VIEWPORT_DIMS, (GLint*)mImplMaxViewportDims);
 
     ////////////////
 
@@ -729,13 +732,6 @@ WebGLContext::InitAndValidateGL(FailureReason* const out_failReason)
         return false;
     }
 
-    // Default value for all disabled vertex attributes is [0, 0, 0, 1]
-    mVertexAttribType = MakeUnique<GLenum[]>(mGLMaxVertexAttribs);
-    for (int32_t index = 0; index < mGLMaxVertexAttribs; ++index) {
-        mVertexAttribType[index] = LOCAL_GL_FLOAT;
-        VertexAttrib4f(index, 0, 0, 0, 1);
-    }
-
     mDefaultVertexArray = WebGLVertexArray::Create(this);
     mDefaultVertexArray->mAttribs.SetLength(mGLMaxVertexAttribs);
     mBoundVertexArray = mDefaultVertexArray;
@@ -772,6 +768,15 @@ WebGLContext::InitAndValidateGL(FailureReason* const out_failReason)
 
     mPrimRestartTypeBytes = 0;
 
+    mGenericVertexAttribTypes.reset(new GLenum[mGLMaxVertexAttribs]);
+    std::fill_n(mGenericVertexAttribTypes.get(), mGLMaxVertexAttribs, LOCAL_GL_FLOAT);
+
+    static const float kDefaultGenericVertexAttribData[4] = { 0, 0, 0, 1 };
+    memcpy(mGenericVertexAttrib0Data, kDefaultGenericVertexAttribData,
+           sizeof(mGenericVertexAttrib0Data));
+
+    mFakeVertexAttrib0BufferObject = 0;
+
     return true;
 }
 
@@ -798,8 +803,7 @@ WebGLContext::ValidateFramebufferTarget(GLenum target,
         return true;
     }
 
-    ErrorInvalidEnum("%s: Invalid target: %s (0x%04x).", info, EnumName(target),
-                     target);
+    ErrorInvalidEnumArg(info, "target", target);
     return false;
 }
 

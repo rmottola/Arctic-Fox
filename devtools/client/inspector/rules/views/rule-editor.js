@@ -137,7 +137,7 @@ RuleEditor.prototype = {
       this.selectorText.addEventListener("click", event => {
         // Clicks within the selector shouldn't propagate any further.
         event.stopPropagation();
-      }, false);
+      });
 
       editableField({
         element: this.selectorText,
@@ -197,11 +197,11 @@ RuleEditor.prototype = {
         }
         // Cleanup the _ruleViewIsEditing flag
         this._ruleViewIsEditing = false;
-      }, false);
+      });
 
       this.element.addEventListener("mousedown", () => {
         this.doc.defaultView.focus();
-      }, false);
+      });
 
       // Create a property editor when the close brace is clicked.
       editableItem({ element: this.closeBrace }, () => {
@@ -452,7 +452,7 @@ RuleEditor.prototype = {
 
     // Auto-close the input if multiple rules get pasted into new property.
     this.editor.input.addEventListener("paste",
-      blurOnMultipleProperties(this.rule.cssProperties), false);
+      blurOnMultipleProperties(this.rule.cssProperties));
   },
 
   /**

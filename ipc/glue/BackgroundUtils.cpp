@@ -83,7 +83,7 @@ PrincipalInfoToPrincipal(const PrincipalInfo& aPrincipalInfo,
         return nullptr;
       }
 
-      PrincipalOriginAttributes attrs;
+      OriginAttributes attrs;
       if (info.attrs().mAppId != nsIScriptSecurityManager::UNKNOWN_APP_ID) {
         attrs = info.attrs();
       }
@@ -154,8 +154,7 @@ PrincipalToPrincipalInfo(nsIPrincipal* aPrincipal,
     }
 
     *aPrincipalInfo =
-      NullPrincipalInfo(BasePrincipal::Cast(aPrincipal)->OriginAttributesRef(),
-                        spec);
+      NullPrincipalInfo(aPrincipal->OriginAttributesRef(), spec);
     return NS_OK;
   }
 
@@ -198,7 +197,7 @@ PrincipalToPrincipalInfo(nsIPrincipal* aPrincipal,
     }
 
     *aPrincipalInfo =
-      ExpandedPrincipalInfo(BasePrincipal::Cast(aPrincipal)->OriginAttributesRef(),
+      ExpandedPrincipalInfo(aPrincipal->OriginAttributesRef(),
                             Move(whitelistInfo));
     return NS_OK;
   }
@@ -221,7 +220,7 @@ PrincipalToPrincipalInfo(nsIPrincipal* aPrincipal,
     return rv;
   }
 
-  *aPrincipalInfo = ContentPrincipalInfo(BasePrincipal::Cast(aPrincipal)->OriginAttributesRef(),
+  *aPrincipalInfo = ContentPrincipalInfo(aPrincipal->OriginAttributesRef(),
                                          spec);
   return NS_OK;
 }

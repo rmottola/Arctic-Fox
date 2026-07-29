@@ -6,6 +6,7 @@
 
 #include "DataStorage.h"
 
+#include "mozilla/Assertions.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/dom/PContent.h"
 #include "mozilla/dom/ContentChild.h"
@@ -21,7 +22,6 @@
 #include "nsNetUtil.h"
 #include "nsStreamUtils.h"
 #include "nsThreadUtils.h"
-#include "prprf.h"
 
 // NB: Read DataStorage.h first.
 
@@ -91,7 +91,7 @@ DataStorage::Init(bool& aDataWillPersist)
 {
   // Don't access the observer service or preferences off the main thread.
   if (!NS_IsMainThread()) {
-    NS_NOTREACHED("DataStorage::Init called off main thread");
+    MOZ_ASSERT_UNREACHABLE("DataStorage::Init called off main thread");
     return NS_ERROR_NOT_SAME_THREAD;
   }
 
@@ -812,7 +812,7 @@ DataStorage::NotifyObservers(const char* aTopic)
 {
   // Don't access the observer service off the main thread.
   if (!NS_IsMainThread()) {
-    NS_NOTREACHED("DataStorage::NotifyObservers called off main thread");
+    MOZ_ASSERT_UNREACHABLE("DataStorage::NotifyObservers called off main thread");
     return;
   }
 
@@ -852,12 +852,12 @@ DataStorage::ShutdownTimer()
 //------------------------------------------------------------
 
 NS_IMETHODIMP
-DataStorage::Observe(nsISupports* aSubject, const char* aTopic,
-                     const char16_t* aData)
+DataStorage::Observe(nsISupports* /*aSubject*/, const char* aTopic,
+                     const char16_t* /*aData*/)
 {
   // Don't access preferences off the main thread.
   if (!NS_IsMainThread()) {
-    NS_NOTREACHED("DataStorage::Observe called off main thread");
+    MOZ_ASSERT_UNREACHABLE("DataStorage::Observe called off main thread");
     return NS_ERROR_NOT_SAME_THREAD;
   }
 

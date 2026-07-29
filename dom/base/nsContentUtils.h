@@ -28,6 +28,7 @@
 #include "nsTArrayForwardDeclare.h"
 #include "Units.h"
 #include "mozilla/dom/AutocompleteInfoBinding.h"
+#include "mozilla/dom/BindingDeclarations.h" // For CallerType
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/net/ReferrerPolicy.h"
@@ -205,7 +206,7 @@ public:
   // two situations at the moment:
   //
   // 1) Functions used in WebIDL Func annotations.
-  // 2) Bindings code.
+  // 2) Bindings code or other code called directly from the JS engine.
   //
   // Use pretty much anywhere else is almost certainly wrong and should be
   // replaced with [NeedsCallerType] annotations in bindings.
@@ -804,13 +805,13 @@ public:
   /**
    * Returns origin attributes of the document.
    **/
-  static mozilla::PrincipalOriginAttributes
+  static mozilla::OriginAttributes
   GetOriginAttributes(nsIDocument* aDoc);
 
   /**
    * Returns origin attributes of the load group.
    **/
-  static mozilla::PrincipalOriginAttributes
+  static mozilla::OriginAttributes
   GetOriginAttributes(nsILoadGroup* aLoadGroup);
 
   /**
@@ -2009,7 +2010,7 @@ public:
    * a mouse-click or key press), unless this check has been disabled by
    * setting the pref "full-screen-api.allow-trusted-requests-only" to false.
    */
-  static bool IsRequestFullScreenAllowed();
+  static bool IsRequestFullScreenAllowed(mozilla::dom::CallerType aCallerType);
 
   /**
    * Returns true if calling execCommand with 'cut' or 'copy' arguments
@@ -2022,10 +2023,10 @@ public:
 
   /**
    * Returns true if calling execCommand with 'cut' or 'copy' arguments is
-   * allowed in the current context. These are only allowed if the user initiated
-   * them (like with a mouse-click or key press).
+   * allowed for the given subject principal. These are only allowed if the user
+   * initiated them (like with a mouse-click or key press).
    */
-  static bool IsCutCopyAllowed();
+  static bool IsCutCopyAllowed(nsIPrincipal* aSubjectPrincipal);
 
   /*
    * Returns true if the performance timing APIs are enabled.
@@ -2082,13 +2083,14 @@ public:
   }
 
   /*
-   * Returns true if the browser should attempt to prevent content scripts
+   * Returns true if the browser should attempt to prevent the given caller type
    * from collecting distinctive information about the browser that could
    * be used to "fingerprint" and track the user across websites.
    */
-  static bool ResistFingerprinting()
+  static bool ResistFingerprinting(mozilla::dom::CallerType aCallerType)
   {
-    return sPrivacyResistFingerprinting;
+    return aCallerType != mozilla::dom::CallerType::System &&
+           sPrivacyResistFingerprinting;
   }
 
   /**

@@ -2753,7 +2753,7 @@ nsStyleImageLayers::Size::operator==(const Size& aOther) const
 }
 
 nsStyleImageLayers::Layer::Layer()
-  : mClip(NS_STYLE_IMAGELAYER_CLIP_BORDER)
+  : mClip(StyleGeometryBox::Border)
   , mAttachment(NS_STYLE_IMAGELAYER_ATTACHMENT_SCROLL)
   , mBlendMode(NS_STYLE_BLEND_NORMAL)
   , mComposite(NS_STYLE_MASK_COMPOSITE_ADD)
@@ -2775,10 +2775,10 @@ nsStyleImageLayers::Layer::Initialize(nsStyleImageLayers::LayerType aType)
   mPosition.SetInitialPercentValues(0.0f);
 
   if (aType == LayerType::Background) {
-    mOrigin = NS_STYLE_IMAGELAYER_ORIGIN_PADDING;
+    mOrigin = StyleGeometryBox::Padding;
   } else {
     MOZ_ASSERT(aType == LayerType::Mask, "unsupported layer type.");
-    mOrigin = NS_STYLE_IMAGELAYER_ORIGIN_BORDER;
+    mOrigin = StyleGeometryBox::Border;
   }
 }
 
@@ -2880,7 +2880,7 @@ nsStyleImageLayers::Layer::CalcDifference(const nsStyleImageLayers::Layer& aNewL
 
 nsStyleBackground::nsStyleBackground(StyleStructContext aContext)
   : mImage(nsStyleImageLayers::LayerType::Background)
-  , mBackgroundColor(NS_RGBA(0, 0, 0, 0))
+  , mBackgroundColor(StyleComplexColor::FromColor(NS_RGBA(0, 0, 0, 0)))
 {
   MOZ_COUNT_CTOR(nsStyleBackground);
 }
@@ -2942,12 +2942,34 @@ nsStyleBackground::HasFixedBackground(nsIFrame* aFrame) const
   return false;
 }
 
+nscolor
+nsStyleBackground::BackgroundColor(const nsIFrame* aFrame) const
+{
+  return BackgroundColor(aFrame->StyleContext());
+}
+
+nscolor
+nsStyleBackground::BackgroundColor(nsStyleContext* aContext) const
+{
+  // In majority of cases, background-color should just be a numeric color.
+  // In that case, we can skip resolving StyleColor().
+  return mBackgroundColor.IsNumericColor()
+    ? mBackgroundColor.mColor
+    : aContext->StyleColor()->CalcComplexColor(mBackgroundColor);
+}
+
 bool
-nsStyleBackground::IsTransparent() const
+nsStyleBackground::IsTransparent(const nsIFrame* aFrame) const
+{
+  return IsTransparent(aFrame->StyleContext());
+}
+
+bool
+nsStyleBackground::IsTransparent(nsStyleContext* aContext) const
 {
   return BottomLayer().mImage.IsEmpty() &&
          mImage.mImageCount == 1 &&
-         NS_GET_A(mBackgroundColor) == 0;
+         NS_GET_A(BackgroundColor(aContext)) == 0;
 }
 
 void

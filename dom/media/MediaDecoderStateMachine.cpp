@@ -352,6 +352,7 @@ private:
  * Purpose: wait for the CDM to start decoding.
  *
  * Transition to other states when CDM is ready:
+ *   SEEKING if any pending seek request.
  *   DECODING_FIRSTFRAME otherwise.
  */
 class MediaDecoderStateMachine::WaitForCDMState
@@ -466,7 +467,7 @@ private:
  *
  * Transition to:
  *   SHUTDOWN if any decode error.
- *   SEEKING if any pending seek and seek is possible.
+ *   SEEKING if any seek request.
  *   DECODING when the 'loadeddata' event is fired.
  */
 class MediaDecoderStateMachine::DecodingFirstFrameState
@@ -475,14 +476,7 @@ class MediaDecoderStateMachine::DecodingFirstFrameState
 public:
   explicit DecodingFirstFrameState(Master* aPtr) : StateObject(aPtr) {}
 
-  void Enter(SeekJob aPendingSeek);
-
-  void Exit() override
-  {
-    // mPendingSeek is either moved before transition to SEEKING,
-    // or should be rejected here before transition to SHUTDOWN.
-    mPendingSeek.RejectIfExists(__func__);
-  }
+  void Enter();
 
   State GetState() const override
   {
@@ -506,8 +500,6 @@ public:
     MaybeFinishDecodeFirstFrame();
   }
 
-  RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget) override;
-
   void HandleVideoSuspendTimeout() override
   {
     // Do nothing for we need to decode the 1st video frame to get the dimensions.
@@ -523,8 +515,6 @@ private:
   // Notify FirstFrameLoaded if having decoded first frames and
   // transition to SEEKING if there is any pending seek, or DECODING otherwise.
   void MaybeFinishDecodeFirstFrame();
-
-  SeekJob mPendingSeek;
 };
 
 /**
@@ -770,7 +760,6 @@ public:
                                           EventVisibility aVisibility)
   {
     mSeekJob = Move(aSeekJob);
-    mVisibility = aVisibility;
 
     // Always switch off the blank decoder otherwise we might become visible
     // in the middle of seeking and won't have a valid video frame to show
@@ -803,7 +792,7 @@ public:
 
     mMaster->UpdatePlaybackPositionInternal(mSeekJob.mTarget.GetTime().ToMicroseconds());
 
-    if (mVisibility == EventVisibility::Observable) {
+    if (aVisibility == EventVisibility::Observable) {
       mMaster->mOnPlaybackEvent.Notify(MediaEventType::SeekStarted);
       // We want dormant actions to be transparent to the user.
       // So we only notify the change when the seek request is from the user.
@@ -931,7 +920,6 @@ private:
   void SeekCompleted();
 
   SeekJob mSeekJob;
-  EventVisibility mVisibility = EventVisibility::Observable;
   MozPromiseRequestHolder<SeekTask::SeekTaskPromise> mSeekTaskRequest;
   RefPtr<SeekTask> mSeekTask;
 };
@@ -1343,6 +1331,11 @@ DecodeMetadataState::OnMetadataRead(MetadataHolder* aMetadata)
     mMaster->RecomputeDuration();
   }
 
+  // If we don't know the duration by this point, we assume infinity, per spec.
+  if (mMaster->mDuration.Ref().isNothing()) {
+    mMaster->mDuration = Some(TimeUnit::FromInfinity());
+  }
+
   if (mMaster->HasVideo()) {
     SLOG("Video decode isAsync=%d HWAccel=%d videoQueueSize=%d",
          Reader()->IsAsync(),
@@ -1359,7 +1352,7 @@ DecodeMetadataState::OnMetadataRead(MetadataHolder* aMetadata)
     // to become available so that we can build the correct decryptor/decoder.
     SetState<WaitForCDMState>();
   } else {
-    SetState<DecodingFirstFrameState>(SeekJob{});
+    SetState<DecodingFirstFrameState>();
   }
 }
 
@@ -1379,21 +1372,17 @@ void
 MediaDecoderStateMachine::
 WaitForCDMState::HandleCDMProxyReady()
 {
-  SetState<DecodingFirstFrameState>(Move(mPendingSeek));
+  if (mPendingSeek.Exists()) {
+    SetState<SeekingState>(Move(mPendingSeek), EventVisibility::Observable);
+  } else {
+    SetState<DecodingFirstFrameState>();
+  }
 }
 
 void
 MediaDecoderStateMachine::
-DecodingFirstFrameState::Enter(SeekJob aPendingSeek)
+DecodingFirstFrameState::Enter()
 {
-  // Handle pending seek.
-  if (aPendingSeek.Exists() &&
-      (mMaster->mSentFirstFrameLoadedEvent ||
-       Reader()->ForceZeroStartTime())) {
-    SetState<SeekingState>(Move(aPendingSeek), EventVisibility::Observable);
-    return;
-  }
-
   // Transition to DECODING if we've decoded first frames.
   if (mMaster->mSentFirstFrameLoadedEvent) {
     SetState<DecodingState>();
@@ -1402,32 +1391,8 @@ DecodingFirstFrameState::Enter(SeekJob aPendingSeek)
 
   MOZ_ASSERT(!mMaster->mVideoDecodeSuspended);
 
-  mPendingSeek = Move(aPendingSeek);
-
   // Dispatch tasks to decode first frames.
   mMaster->DispatchDecodeTasksIfNeeded();
-}
-
-RefPtr<MediaDecoder::SeekPromise>
-MediaDecoderStateMachine::
-DecodingFirstFrameState::HandleSeek(SeekTarget aTarget)
-{
-  // Should've transitioned to DECODING in Enter()
-  // if mSentFirstFrameLoadedEvent is true.
-  MOZ_ASSERT(!mMaster->mSentFirstFrameLoadedEvent);
-
-  if (!Reader()->ForceZeroStartTime()) {
-    SLOG("Not Enough Data to seek at this stage, queuing seek");
-    mPendingSeek.RejectIfExists(__func__);
-    mPendingSeek.mTarget = aTarget;
-    return mPendingSeek.mPromise.Ensure(__func__);
-  }
-
-  // Since ForceZeroStartTime() is true, we should've transitioned to SEEKING
-  // in Enter() if there is any pending seek.
-  MOZ_ASSERT(!mPendingSeek.Exists());
-
-  return StateObject::HandleSeek(aTarget);
 }
 
 void
@@ -1442,12 +1407,7 @@ DecodingFirstFrameState::MaybeFinishDecodeFirstFrame()
   }
 
   mMaster->FinishDecodeFirstFrame();
-
-  if (mPendingSeek.Exists()) {
-    SetState<SeekingState>(Move(mPendingSeek), EventVisibility::Observable);
-  } else {
-    SetState<DecodingState>();
-  }
+  SetState<DecodingState>();
 }
 
 void
@@ -1560,8 +1520,6 @@ SeekingState::SeekCompleted()
   // Notify FirstFrameLoaded now if we haven't since we've decoded some data
   // for readyState to transition to HAVE_CURRENT_DATA and fire 'loadeddata'.
   if (!mMaster->mSentFirstFrameLoadedEvent) {
-    // Only MSE can start seeking before finishing decoding first frames.
-    MOZ_ASSERT(Reader()->ForceZeroStartTime());
     mMaster->FinishDecodeFirstFrame();
   }
 
@@ -2779,11 +2737,6 @@ MediaDecoderStateMachine::FinishDecodeFirstFrame()
   DECODER_LOG("FinishDecodeFirstFrame");
 
   mMediaSink->Redraw(Info().mVideo);
-
-  // If we don't know the duration by this point, we assume infinity, per spec.
-  if (mDuration.Ref().isNothing()) {
-    mDuration = Some(TimeUnit::FromInfinity());
-  }
 
   DECODER_LOG("Media duration %lld, "
               "transportSeekable=%d, mediaSeekable=%d",

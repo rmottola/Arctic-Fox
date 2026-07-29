@@ -606,7 +606,6 @@ public:
   nsGlyphTableList()
     : mUnicodeTable(NS_LITERAL_STRING("Unicode"))
   {
-    MOZ_COUNT_CTOR(nsGlyphTableList);
   }
 
   nsresult Initialize();
@@ -623,7 +622,6 @@ public:
 private:
   ~nsGlyphTableList()
   {
-    MOZ_COUNT_DTOR(nsGlyphTableList);
   }
 
   nsPropertiesTable* PropertiesTableAt(int32_t aIndex) {
@@ -1988,9 +1986,9 @@ nsMathMLChar::Display(nsDisplayListBuilder*   aBuilder,
       nsDisplayMathMLSelectionRect(aBuilder, aForFrame, *aSelectedRect));
   }
   else if (mRect.width && mRect.height) {
-    const nsStyleBackground* backg = styleContext->StyleBackground();
     if (styleContext != parentContext &&
-        NS_GET_A(backg->mBackgroundColor) > 0) {
+        NS_GET_A(styleContext->StyleBackground()->
+                 BackgroundColor(styleContext)) > 0) {
       nsDisplayBackgroundImage::AppendBackgroundItemsToTop(
         aBuilder, aForFrame, mRect, aLists.BorderBackground(),
         /* aAllowWillPaintBorderOptimization */ true, styleContext);

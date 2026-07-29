@@ -41,7 +41,7 @@ function trackScratchpadWindows() {
       if (topic == "domwindowopened") {
         let win = subject.QueryInterface(Ci.nsIDOMWindow);
         win.addEventListener("load", function onLoad() {
-          win.removeEventListener("load", onLoad, false);
+          win.removeEventListener("load", onLoad);
 
           if (win.Scratchpad) {
             win.Scratchpad.addObserver({
@@ -61,7 +61,7 @@ function trackScratchpadWindows() {
               },
             });
           }
-        }, false);
+        });
       }
     });
   });

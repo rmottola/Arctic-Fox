@@ -38,7 +38,8 @@ namespace webgl {
 struct AttribInfo final
 {
     const RefPtr<WebGLActiveInfo> mActiveInfo;
-    uint32_t mLoc;
+    const uint32_t mLoc;
+    const GLenum mBaseType;
 };
 
 struct UniformInfo final
@@ -105,23 +106,13 @@ struct LinkedProgramInfo final
     explicit LinkedProgramInfo(WebGLProgram* prog);
     ~LinkedProgramInfo();
 
-    bool FindAttrib(const nsCString& baseUserName, const AttribInfo** const out) const;
-    bool FindUniform(const nsCString& baseUserName, UniformInfo** const out) const;
-    bool FindUniformBlock(const nsCString& baseUserName,
-                          const UniformBlockInfo** const out) const;
-
-    bool
-    FindFragData(const nsCString& baseUserName,
-                 nsCString* const out_baseMappedName) const
-    {
-        const auto itr = fragDataMap.find(baseUserName);
-        if (itr == fragDataMap.end()) {
-            return false;
-        }
-
-        *out_baseMappedName = itr->second;
-        return true;
-    }
+    bool FindAttrib(const nsCString& userName, const AttribInfo** const out_info) const;
+    bool FindUniform(const nsCString& userName, nsCString* const out_mappedName,
+                     size_t* const out_arrayIndex, UniformInfo** const out_info) const;
+    bool MapUniformBlockName(const nsCString& userName,
+                             nsCString* const out_mappedName) const;
+    bool MapFragDataName(const nsCString& userName,
+                         nsCString* const out_mappedName) const;
 };
 
 } // namespace webgl
@@ -132,6 +123,7 @@ class WebGLProgram final
     , public LinkedListElement<WebGLProgram>
 {
     friend class WebGLTransformFeedback;
+    friend struct webgl::LinkedProgramInfo;
 
 public:
     NS_INLINE_DECL_CYCLE_COLLECTING_NATIVE_REFCOUNTING(WebGLProgram)

@@ -44,7 +44,7 @@
 #include "nsAttrName.h"
 #include "nsTArray.h"
 #include "nsContentUtils.h"
-#include "nsIMediaList.h"
+#include "nsMediaList.h"
 #include "nsCSSRules.h"
 #include "nsStyleSet.h"
 #include "mozilla/dom/Element.h"
@@ -2086,7 +2086,6 @@ static bool SelectorMatches(Element* aElement,
         }
         break;
 
-      case CSSPseudoClassType::mozDir:
       case CSSPseudoClassType::dir:
         {
           if (aDependence) {

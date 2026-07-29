@@ -351,7 +351,7 @@ OptionsPanel.prototype = {
           this._origJavascriptEnabled = !response.javascriptEnabled;
           this.disableJSNode.checked = this._origJavascriptEnabled;
           this.disableJSNode.addEventListener("click",
-            this._disableJSClicked, false);
+            this._disableJSClicked);
         });
     }
     this.disableJSNode.hidden = true;

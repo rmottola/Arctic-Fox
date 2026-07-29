@@ -350,7 +350,7 @@ DOMParser::Init(nsIPrincipal* principal, nsIURI* documentURI,
                                     0,
                                     documentURI);
 
-    PrincipalOriginAttributes attrs;
+    OriginAttributes attrs;
     mPrincipal = BasePrincipal::CreateCodebasePrincipal(mDocumentURI, attrs);
     NS_ENSURE_TRUE(mPrincipal, NS_ERROR_FAILURE);
     mOriginalPrincipal = mPrincipal;
@@ -384,7 +384,7 @@ DOMParser::Constructor(const GlobalObject& aOwner,
                        nsIPrincipal* aPrincipal, nsIURI* aDocumentURI,
                        nsIURI* aBaseURI, ErrorResult& rv)
 {
-  if (!nsContentUtils::IsCallerChrome()) {
+  if (aOwner.CallerType() != CallerType::System) {
     rv.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return nullptr;
   }

@@ -47,6 +47,7 @@ using namespace mozilla;
 using mozilla::MutexAutoLock;
 
 nsTArray<GfxDriverInfo>* GfxInfoBase::mDriverInfo;
+nsTArray<dom::GfxInfoFeatureStatus>* GfxInfoBase::mFeatureStatus;
 bool GfxInfoBase::mDriverInfoObserverInitialized;
 bool GfxInfoBase::mShutdownOccurred;
 
@@ -67,6 +68,9 @@ public:
 
     delete GfxInfoBase::mDriverInfo;
     GfxInfoBase::mDriverInfo = nullptr;
+
+    delete GfxInfoBase::mFeatureStatus;
+    GfxInfoBase::mFeatureStatus = nullptr;
 
     for (uint32_t i = 0; i < DeviceFamilyMax; i++)
       delete GfxDriverInfo::mDeviceFamilies[i];
@@ -605,13 +609,18 @@ GfxInfoBase::GetFeatureStatus(int32_t aFeature, nsACString& aFailureId, int32_t*
   }
 
   if (XRE_IsContentProcess()) {
-      // Delegate to the parent process.
-      mozilla::dom::ContentChild* cc = mozilla::dom::ContentChild::GetSingleton();
-      bool success;
-      nsCString remoteFailureId;
-      cc->SendGetGraphicsFeatureStatus(aFeature, aStatus, &remoteFailureId, &success);
-      aFailureId = remoteFailureId;
-      return success ? NS_OK : NS_ERROR_FAILURE;
+    // Use the cached data received from the parent process.
+    MOZ_ASSERT(mFeatureStatus);
+    bool success = false;
+    for (const auto& fs : *mFeatureStatus) {
+      if (fs.feature() == aFeature) {
+        aFailureId = fs.failureId();
+        *aStatus = fs.status();
+        success = true;
+        break;
+      }
+    }
+    return success ? NS_OK : NS_ERROR_FAILURE;
   }
 
   nsString version;
@@ -843,6 +852,13 @@ GfxInfoBase::FindBlocklistedDeviceInList(const nsTArray<GfxDriverInfo>& info,
 #endif
 
   return status;
+}
+
+void
+GfxInfoBase::SetFeatureStatus(const nsTArray<dom::GfxInfoFeatureStatus>& aFS)
+{
+  MOZ_ASSERT(!mFeatureStatus);
+  mFeatureStatus = new nsTArray<dom::GfxInfoFeatureStatus>(aFS);
 }
 
 nsresult
@@ -1176,6 +1192,8 @@ GetLayersBackendName(layers::LayersBackend aBackend)
       return "d3d11";
     case layers::LayersBackend::LAYERS_CLIENT:
       return "client";
+    case layers::LayersBackend::LAYERS_WR:
+      return "webrender";
     case layers::LayersBackend::LAYERS_BASIC:
       return "basic";
     default:
@@ -1452,6 +1470,26 @@ GfxInfoBase::GetUsingGPUProcess(bool *aOutValue)
   }
 
   *aOutValue = !!gpu->GetGPUChild();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+GfxInfoBase::ControlGPUProcessForXPCShell(bool aEnable, bool *_retval)
+{
+  gfxPlatform::GetPlatform();
+
+  GPUProcessManager* gpm = GPUProcessManager::Get();
+  if (aEnable) {
+    if (!gfxConfig::IsEnabled(Feature::GPU_PROCESS)) {
+      gfxConfig::UserForceEnable(Feature::GPU_PROCESS, "xpcshell-test");
+    }
+    gpm->LaunchGPUProcess();
+    gpm->EnsureGPUReady();
+  } else {
+    gpm->KillProcess();
+  }
+
+  *_retval = true;
   return NS_OK;
 }
 

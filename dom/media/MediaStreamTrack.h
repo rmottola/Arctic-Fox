@@ -40,6 +40,7 @@ namespace dom {
 class AudioStreamTrack;
 class VideoStreamTrack;
 class MediaStreamError;
+enum class CallerType : uint32_t;
 
 /**
  * Common interface through which a MediaStreamTrack can communicate with its
@@ -66,7 +67,6 @@ public:
       mLabel(aLabel),
       mStopped(false)
   {
-    MOZ_COUNT_CTOR(MediaStreamTrackSource);
   }
 
   /**
@@ -124,7 +124,8 @@ public:
    */
   virtual already_AddRefed<PledgeVoid>
   ApplyConstraints(nsPIDOMWindowInner* aWindow,
-                   const dom::MediaTrackConstraints& aConstraints);
+                   const dom::MediaTrackConstraints& aConstraints,
+                   CallerType aCallerType);
 
   /**
    * Same for GetSettings (no-op).
@@ -166,7 +167,6 @@ public:
 protected:
   virtual ~MediaStreamTrackSource()
   {
-    MOZ_COUNT_DTOR(MediaStreamTrackSource);
   }
 
   /**
@@ -290,7 +290,8 @@ public:
   void GetSettings(dom::MediaTrackSettings& aResult);
 
   already_AddRefed<Promise>
-  ApplyConstraints(const dom::MediaTrackConstraints& aConstraints, ErrorResult &aRv);
+  ApplyConstraints(const dom::MediaTrackConstraints& aConstraints,
+                   CallerType aCallerType, ErrorResult &aRv);
   already_AddRefed<MediaStreamTrack> Clone();
   MediaStreamTrackState ReadyState() { return mReadyState; }
 

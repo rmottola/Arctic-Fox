@@ -12,8 +12,16 @@
 #include "nsAccUtils.h"
 #include "nsCoreUtils.h"
 
+#if defined(XP_WIN)
+#include "AccessibleWrap.h"
+#include "Compatibility.h"
+#include "nsWinUtils.h"
+#include "RootAccessible.h"
+#endif
+
 namespace mozilla {
 namespace a11y {
+uint64_t DocAccessibleParent::sMaxDocID = 0;
 
 mozilla::ipc::IPCResult
 DocAccessibleParent::RecvShowEvent(const ShowEventData& aData,
@@ -22,7 +30,7 @@ DocAccessibleParent::RecvShowEvent(const ShowEventData& aData,
   if (mShutdown)
     return IPC_OK();
 
-  MOZ_DIAGNOSTIC_ASSERT(CheckDocTree());
+  MOZ_ASSERT(CheckDocTree());
 
   if (aData.NewTree().IsEmpty()) {
     NS_ERROR("no children being added");
@@ -60,7 +68,7 @@ DocAccessibleParent::RecvShowEvent(const ShowEventData& aData,
   }
 #endif
 
-  MOZ_DIAGNOSTIC_ASSERT(CheckDocTree());
+  MOZ_ASSERT(CheckDocTree());
 
   ProxyAccessible* target = parent->ChildAt(newChildIdx);
   ProxyShowHideEvent(target, parent, true, aFromUser);
@@ -179,7 +187,7 @@ DocAccessibleParent::RecvHideEvent(const uint64_t& aRootID,
   parent->RemoveChild(root);
   root->Shutdown();
 
-  MOZ_DIAGNOSTIC_ASSERT(CheckDocTree());
+  MOZ_ASSERT(CheckDocTree());
 
   if (event) {
     nsCoreUtils::DispatchAccEvent(Move(event));
@@ -350,30 +358,36 @@ DocAccessibleParent::RecvBindChildDoc(PDocAccessibleParent* aChildDoc, const uin
   // We should always have at least an outer doc accessible in between.
   MOZ_ASSERT(aID);
   if (!aID)
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL(this, "ID is 0!");
 
-  MOZ_DIAGNOSTIC_ASSERT(CheckDocTree());
+  MOZ_ASSERT(CheckDocTree());
 
   auto childDoc = static_cast<DocAccessibleParent*>(aChildDoc);
   childDoc->Unbind();
-  bool result = AddChildDoc(childDoc, aID, false);
+  ipc::IPCResult result = AddChildDoc(childDoc, aID, false);
   MOZ_ASSERT(result);
-  MOZ_DIAGNOSTIC_ASSERT(CheckDocTree());
+  MOZ_ASSERT(CheckDocTree());
+#ifdef DEBUG
   if (!result) {
-    return IPC_FAIL_NO_REASON(this);
+    return result;
   }
-  return IPC_OK();
+#else
+  result = IPC_OK();
+#endif
+
+  return result;
 }
 
-bool
+ipc::IPCResult
 DocAccessibleParent::AddChildDoc(DocAccessibleParent* aChildDoc,
                                  uint64_t aParentID, bool aCreating)
 {
   // We do not use GetAccessible here because we want to be sure to not get the
   // document it self.
   ProxyEntry* e = mAccessibles.GetEntry(aParentID);
-  if (!e)
-    return false;
+  if (!e) {
+    return IPC_FAIL(this, "binding to nonexistant proxy!");
+  }
 
   ProxyAccessible* outerDoc = e->mProxy;
   MOZ_ASSERT(outerDoc);
@@ -383,19 +397,19 @@ DocAccessibleParent::AddChildDoc(DocAccessibleParent* aChildDoc,
   // here.
   if (outerDoc->ChildrenCount() > 1 ||
       (outerDoc->ChildrenCount() == 1 && !outerDoc->ChildAt(0)->IsDoc())) {
-    return false;
+    return IPC_FAIL(this, "binding to proxy that can't be a outerDoc!");
   }
 
-  aChildDoc->mParent = outerDoc;
+  aChildDoc->SetParent(outerDoc);
   outerDoc->SetChildDoc(aChildDoc);
-  mChildDocs.AppendElement(aChildDoc);
-  aChildDoc->mParentDoc = this;
+  mChildDocs.AppendElement(aChildDoc->mActorID);
+  aChildDoc->mParentDoc = mActorID;
 
   if (aCreating) {
     ProxyCreated(aChildDoc, Interfaces::DOCUMENT | Interfaces::HYPERTEXT);
   }
 
-  return true;
+  return IPC_OK();
 }
 
 mozilla::ipc::IPCResult
@@ -403,9 +417,10 @@ DocAccessibleParent::RecvShutdown()
 {
   Destroy();
 
-  if (!static_cast<dom::TabParent*>(Manager())->IsDestroyed()) {
+  auto mgr = static_cast<dom::TabParent*>(Manager());
+  if (!mgr->IsDestroyed()) {
     if (!PDocAccessibleParent::Send__delete__(this)) {
-      return IPC_FAIL_NO_REASON(this);
+      return IPC_FAIL_NO_REASON(mgr);
     }
   }
 
@@ -415,14 +430,34 @@ DocAccessibleParent::RecvShutdown()
 void
 DocAccessibleParent::Destroy()
 {
-  NS_ASSERTION(mChildDocs.IsEmpty(),
-               "why weren't the child docs destroyed already?");
-  MOZ_ASSERT(!mShutdown);
+  // If we are already shutdown that is because our containing tab parent is
+  // shutting down in which case we don't need to do anything.
+  if (mShutdown) {
+    return;
+  }
+
   mShutdown = true;
 
+  MOZ_DIAGNOSTIC_ASSERT(LiveDocs().Contains(mActorID));
   uint32_t childDocCount = mChildDocs.Length();
-  for (uint32_t i = childDocCount - 1; i < childDocCount; i--)
-    mChildDocs[i]->Destroy();
+  for (uint32_t i = 0; i < childDocCount; i++) {
+    for (uint32_t j = i + 1; j < childDocCount; j++) {
+      MOZ_DIAGNOSTIC_ASSERT(mChildDocs[i] != mChildDocs[j]);
+    }
+  }
+
+  // XXX This indirection through the hash map of live documents shouldn't be
+  // needed, but be paranoid for now.
+  int32_t actorID = mActorID;
+  for (uint32_t i = childDocCount - 1; i < childDocCount; i--) {
+    DocAccessibleParent* thisDoc = LiveDocs().Get(actorID);
+    MOZ_ASSERT(thisDoc);
+    if (!thisDoc) {
+      return;
+    }
+
+    thisDoc->ChildDocAt(i)->Destroy();
+  }
 
   for (auto iter = mAccessibles.Iter(); !iter.Done(); iter.Next()) {
     MOZ_ASSERT(iter.Get()->mProxy != this);
@@ -430,12 +465,45 @@ DocAccessibleParent::Destroy()
     iter.Remove();
   }
 
-  DocManager::NotifyOfRemoteDocShutdown(this);
-  ProxyDestroyed(this);
-  if (mParentDoc)
-    mParentDoc->RemoveChildDoc(this);
+  DocAccessibleParent* thisDoc = LiveDocs().Get(actorID);
+  MOZ_ASSERT(thisDoc);
+  if (!thisDoc) {
+    return;
+  }
+
+  // The code above should have already completely cleared these, but to be
+  // extra safe make sure they are cleared here.
+  thisDoc->mAccessibles.Clear();
+  thisDoc->mChildDocs.Clear();
+
+  DocManager::NotifyOfRemoteDocShutdown(thisDoc);
+  thisDoc = LiveDocs().Get(actorID);
+  MOZ_ASSERT(thisDoc);
+  if (!thisDoc) {
+    return;
+  }
+
+  ProxyDestroyed(thisDoc);
+  thisDoc = LiveDocs().Get(actorID);
+  MOZ_ASSERT(thisDoc);
+  if (!thisDoc) {
+    return;
+  }
+
+  if (DocAccessibleParent* parentDoc = thisDoc->ParentDoc())
+    parentDoc->RemoveChildDoc(thisDoc);
   else if (IsTopLevel())
     GetAccService()->RemoteDocShutdown(this);
+}
+
+DocAccessibleParent*
+DocAccessibleParent::ParentDoc() const
+{
+  if (mParentDoc == kNoParentDoc) {
+    return nullptr;
+  }
+
+  return LiveDocs().Get(mParentDoc);
 }
 
 bool
@@ -443,10 +511,11 @@ DocAccessibleParent::CheckDocTree() const
 {
   size_t childDocs = mChildDocs.Length();
   for (size_t i = 0; i < childDocs; i++) {
-    if (!mChildDocs[i] || mChildDocs[i]->mParentDoc != this)
+    const DocAccessibleParent* childDoc = ChildDocAt(i);
+    if (!childDoc || childDoc->ParentDoc() != this)
       return false;
 
-    if (!mChildDocs[i]->CheckDocTree()) {
+    if (!childDoc->CheckDocTree()) {
       return false;
     }
   }
@@ -464,27 +533,99 @@ DocAccessibleParent::GetXPCAccessible(ProxyAccessible* aProxy)
 }
 
 #if defined(XP_WIN)
-/**
- * @param aCOMProxy COM Proxy to the document in the content process.
- * @param aParentCOMProxy COM Proxy to the OuterDocAccessible that is
- *        the parent of the document. The content process will use this
- *        proxy when traversing up across the content/chrome boundary.
- */
-mozilla::ipc::IPCResult
-DocAccessibleParent::RecvCOMProxy(const IAccessibleHolder& aCOMProxy,
-                                  IAccessibleHolder* aParentCOMProxy)
+void
+DocAccessibleParent::MaybeInitWindowEmulation()
 {
-  RefPtr<IAccessible> ptr(aCOMProxy.Get());
-  SetCOMInterface(ptr);
-
-  Accessible* outerDoc = OuterDocOfRemoteBrowser();
-  IAccessible* rawNative = nullptr;
-  if (outerDoc) {
-    outerDoc->GetNativeInterface((void**) &rawNative);
+  if (!nsWinUtils::IsWindowEmulationStarted()) {
+    return;
   }
 
-  aParentCOMProxy->Set(IAccessibleHolder::COMPtrType(rawNative));
-  return IPC_OK();
+  // XXX get the bounds from the tabParent instead of poking at accessibles
+  // which might not exist yet.
+  Accessible* outerDoc = OuterDocOfRemoteBrowser();
+  if (!outerDoc) {
+    return;
+  }
+
+  RootAccessible* rootDocument = outerDoc->RootAccessible();
+  MOZ_ASSERT(rootDocument);
+
+  bool isActive = true;
+  nsIntRect rect(CW_USEDEFAULT, CW_USEDEFAULT, 0, 0);
+  if (Compatibility::IsDolphin()) {
+    rect = Bounds();
+    nsIntRect rootRect = rootDocument->Bounds();
+    rect.x = rootRect.x - rect.x;
+    rect.y -= rootRect.y;
+
+    auto tab = static_cast<dom::TabParent*>(Manager());
+    tab->GetDocShellIsActive(&isActive);
+  }
+
+  nsWinUtils::NativeWindowCreateProc onCreate([this](HWND aHwnd) -> void {
+    IAccessibleHolder hWndAccHolder;
+
+    ::SetPropW(aHwnd, kPropNameDocAccParent, reinterpret_cast<HANDLE>(this));
+
+    SetEmulatedWindowHandle(aHwnd);
+
+    IAccessible* rawHWNDAcc = nullptr;
+    if (SUCCEEDED(::AccessibleObjectFromWindow(aHwnd, OBJID_WINDOW,
+                                               IID_IAccessible,
+                                               (void**)&rawHWNDAcc))) {
+      hWndAccHolder.Set(IAccessibleHolder::COMPtrType(rawHWNDAcc));
+    }
+
+    Unused << SendEmulatedWindow(reinterpret_cast<uintptr_t>(mEmulatedWindowHandle),
+                                 hWndAccHolder);
+  });
+
+  HWND parentWnd = reinterpret_cast<HWND>(rootDocument->GetNativeWindow());
+  DebugOnly<HWND> hWnd = nsWinUtils::CreateNativeWindow(kClassNameTabContent,
+                                                        parentWnd,
+                                                        rect.x, rect.y,
+                                                        rect.width, rect.height,
+                                                        isActive, &onCreate);
+  MOZ_ASSERT(hWnd);
+}
+
+/**
+ * @param aCOMProxy COM Proxy to the document in the content process.
+ */
+void
+DocAccessibleParent::SetCOMProxy(const RefPtr<IAccessible>& aCOMProxy)
+{
+  SetCOMInterface(aCOMProxy);
+  MaybeInitWindowEmulation();
+
+  // Make sure that we're not racing with a tab shutdown
+  auto tab = static_cast<dom::TabParent*>(Manager());
+  MOZ_ASSERT(tab);
+  if (tab->IsDestroyed()) {
+    return;
+  }
+
+  Accessible* outerDoc = OuterDocOfRemoteBrowser();
+  if (!outerDoc) {
+    return;
+  }
+
+  IAccessible* rawNative = nullptr;
+  outerDoc->GetNativeInterface((void**) &rawNative);
+  MOZ_ASSERT(rawNative);
+
+  IAccessibleHolder::COMPtrType ptr(rawNative);
+  IAccessibleHolder holder(Move(ptr));
+  Unused << SendParentCOMProxy(holder);
+}
+
+void
+DocAccessibleParent::SetEmulatedWindowHandle(HWND aWindowHandle)
+{
+  if (!aWindowHandle && mEmulatedWindowHandle && IsTopLevel()) {
+    ::DestroyWindow(mEmulatedWindowHandle);
+  }
+  mEmulatedWindowHandle = aWindowHandle;
 }
 
 mozilla::ipc::IPCResult

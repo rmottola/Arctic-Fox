@@ -203,7 +203,6 @@
 @RESPATH@/components/dom_presentation.xpt
 @RESPATH@/components/downloads.xpt
 @RESPATH@/components/editor.xpt
-@RESPATH@/components/embed_base.xpt
 @RESPATH@/components/extensions.xpt
 @RESPATH@/components/exthandler.xpt
 @RESPATH@/components/exthelper.xpt
@@ -212,7 +211,6 @@
 #ifdef MOZ_GTK
 @RESPATH@/components/filepicker.xpt
 #endif
-@RESPATH@/components/find.xpt
 @RESPATH@/components/gfx.xpt
 @RESPATH@/components/gaia_chrome.xpt
 @RESPATH@/components/hal.xpt
@@ -312,6 +310,7 @@
 #ifdef ANDROID
 @RESPATH@/components/widget_android.xpt
 #endif
+@RESPATH@/components/windowcreator.xpt
 @RESPATH@/components/windowds.xpt
 @RESPATH@/components/windowwatcher.xpt
 @RESPATH@/components/xpcom_base.xpt
@@ -398,7 +397,7 @@
 @RESPATH@/components/UiccConnector.manifest
 #endif
 
-; WiFi, NetworkManager, NetworkStats
+; WiFi, NetworkManager
 #ifdef MOZ_WIDGET_GONK
 @RESPATH@/components/DOMWifiManager.js
 @RESPATH@/components/DOMWifiManager.manifest
@@ -412,13 +411,8 @@
 @RESPATH@/components/NetworkManager.manifest
 @RESPATH@/components/NetworkService.js
 @RESPATH@/components/NetworkService.manifest
-@RESPATH@/components/NetworkStatsManager.js
-@RESPATH@/components/NetworkStatsManager.manifest
 @RESPATH@/components/TetheringService.js
 @RESPATH@/components/TetheringService.manifest
-@RESPATH@/components/NetworkStatsServiceProxy.js
-@RESPATH@/components/NetworkStatsServiceProxy.manifest
-
 @RESPATH@/components/WifiWorker.js
 @RESPATH@/components/WifiWorker.manifest
 #endif // MOZ_WIDGET_GONK
@@ -565,13 +559,6 @@
 
 @RESPATH@/components/DownloadsAPI.js
 @RESPATH@/components/DownloadsAPI.manifest
-
-; InputMethod API
-@RESPATH@/components/MozKeyboard.js
-@RESPATH@/components/InputMethod.manifest
-#ifdef MOZ_B2G
-@RESPATH@/components/inputmethod.xpt
-#endif
 
 @RESPATH@/components/SystemUpdate.manifest
 @RESPATH@/components/SystemUpdateManager.js

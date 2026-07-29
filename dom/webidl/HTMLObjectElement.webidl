@@ -13,7 +13,7 @@
  */
 
 // http://www.whatwg.org/specs/web-apps/current-work/#the-object-element
-[NeedResolve, UnsafeInPrerendering]
+[HTMLConstructor, NeedResolve, UnsafeInPrerendering]
 interface HTMLObjectElement : HTMLElement {
   [Pure, SetterThrows]
            attribute DOMString data;
@@ -167,7 +167,7 @@ interface MozObjectLoadingContent {
    * This method will play a plugin that has been stopped by the click-to-play
    * feature.
    */
-  [ChromeOnly, Throws]
+  [ChromeOnly, Throws, NeedsCallerType]
   void playPlugin();
 
   /**
@@ -207,7 +207,7 @@ interface MozObjectLoadingContent {
   [ChromeOnly]
   readonly attribute boolean hasRunningPlugin;
 
-  [ChromeOnly, Throws]
+  [ChromeOnly, Throws, NeedsCallerType]
   readonly attribute unsigned long runID;
 };
 

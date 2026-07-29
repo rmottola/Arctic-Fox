@@ -50,10 +50,11 @@ function PushRecord(props) {
 
 PushRecord.prototype = {
   setQuota(suggestedQuota) {
-    if (this.quotaApplies() && !isNaN(suggestedQuota) && suggestedQuota >= 0) {
-      this.quota = suggestedQuota;
+    if (this.quotaApplies()) {
+      let quota = +suggestedQuota;
+      this.quota = quota >= 0 ? quota : prefs.get("maxQuotaPerSubscription");
     } else {
-      this.resetQuota();
+      this.quota = Infinity;
     }
   },
 
@@ -76,8 +77,10 @@ PushRecord.prototype = {
     }
     if (lastVisit > this.lastPush) {
       // If the user visited the site since the last time we received a
-      // notification, reset the quota.
-      let daysElapsed = (Date.now() - lastVisit) / 24 / 60 / 60 / 1000;
+      // notification, reset the quota. `Math.max(0, ...)` ensures the
+      // last visit date isn't in the future.
+      let daysElapsed =
+        Math.max(0, (Date.now() - lastVisit) / 24 / 60 / 60 / 1000);
       this.quota = Math.min(
         Math.round(8 * Math.pow(daysElapsed, -0.8)),
         prefs.get("maxQuotaPerSubscription")
@@ -293,12 +296,12 @@ Object.defineProperties(PushRecord.prototype, {
       }
       let principal = principals.get(this);
       if (!principal) {
-        let url = this.scope;
-        if (this.originAttributes) {
-          // Allow tests to omit origin attributes.
-          url += this.originAttributes;
-        }
-        principal = Services.scriptSecurityManager.createCodebasePrincipalFromOrigin(url);
+        let uri = Services.io.newURI(this.scope, null, null);
+        // Allow tests to omit origin attributes.
+        let originSuffix = this.originAttributes || "";
+        let originAttributes =
+        principal = Services.scriptSecurityManager.createCodebasePrincipal(uri,
+          ChromeUtils.createOriginAttributesFromOrigin(originSuffix));
         principals.set(this, principal);
       }
       return principal;

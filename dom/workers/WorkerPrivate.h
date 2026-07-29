@@ -168,7 +168,6 @@ protected:
 
   SharedMutex mMutex;
   mozilla::CondVar mCondVar;
-  mozilla::CondVar mMemoryReportCondVar;
 
   // Protected by mMutex.
   RefPtr<EventTarget> mEventTarget;
@@ -217,8 +216,6 @@ private:
   WorkerType mWorkerType;
   TimeStamp mCreationTimeStamp;
   DOMHighResTimeStamp mCreationTimeHighRes;
-  TimeStamp mNowBaseTimeStamp;
-  DOMHighResTimeStamp mNowBaseTimeHighRes;
 
 protected:
   // The worker is owned by its thread, which is represented here.  This is set
@@ -253,8 +250,6 @@ private:
   void
   PostMessageInternal(JSContext* aCx, JS::Handle<JS::Value> aMessage,
                       const Optional<Sequence<JS::Value>>& aTransferable,
-                      UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
-                      PromiseNativeHandler* aHandler,
                       ErrorResult& aRv);
 
   nsresult
@@ -369,13 +364,6 @@ public:
               ErrorResult& aRv);
 
   void
-  PostMessageToServiceWorker(JSContext* aCx, JS::Handle<JS::Value> aMessage,
-                             const Optional<Sequence<JS::Value>>& aTransferable,
-                             UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
-                             PromiseNativeHandler* aHandler,
-                             ErrorResult& aRv);
-
-  void
   UpdateContextOptions(const JS::ContextOptions& aContextOptions);
 
   void
@@ -422,7 +410,7 @@ public:
   void
   QueueRunnable(nsIRunnable* aRunnable)
   {
-    AssertIsOnMainThread();
+    AssertIsOnParentThread();
     mQueuedRunnables.AppendElement(aRunnable);
   }
 
@@ -584,14 +572,11 @@ public:
     return mCreationTimeHighRes;
   }
 
-  TimeStamp NowBaseTimeStamp() const
+  DOMHighResTimeStamp TimeStampToDOMHighRes(const TimeStamp& aTimeStamp) const
   {
-    return mNowBaseTimeStamp;
-  }
-
-  DOMHighResTimeStamp NowBaseTime() const
-  {
-    return mNowBaseTimeHighRes;
+    MOZ_ASSERT(!aTimeStamp.IsNull());
+    TimeDuration duration = aTimeStamp - mCreationTimeStamp;
+    return duration.ToMilliseconds();
   }
 
   nsIPrincipal*
@@ -798,7 +783,7 @@ public:
     return mLoadInfo.mStorageAllowed;
   }
 
-  const PrincipalOriginAttributes&
+  const OriginAttributes&
   GetOriginAttributes() const
   {
     return mLoadInfo.mOriginAttributes;
@@ -984,12 +969,11 @@ class WorkerPrivate : public WorkerPrivateParent<WorkerPrivate>
   bool mTimerRunning;
   bool mRunningExpiredTimeouts;
   bool mPendingEventQueueClearing;
-  bool mMemoryReporterRunning;
-  bool mBlockedForMemoryReporter;
   bool mCancelAllPendingRunnables;
   bool mPeriodicGCTimerRunning;
   bool mIdleGCTimerRunning;
   bool mWorkerScriptExecutedSuccessfully;
+  bool mFetchHandlerWasAdded;
   bool mPreferences[WORKERPREF_COUNT];
   bool mOnLine;
 
@@ -1208,7 +1192,7 @@ public:
   ScheduleDeletion(WorkerRanOrNot aRanOrNot);
 
   bool
-  BlockAndCollectRuntimeStats(JS::RuntimeStats* aRtStats, bool aAnonymize);
+  CollectRuntimeStats(JS::RuntimeStats* aRtStats, bool aAnonymize);
 
 #ifdef JS_GC_ZEAL
   void
@@ -1227,6 +1211,22 @@ public:
 
   void
   MemoryPressureInternal();
+
+  void
+  SetFetchHandlerWasAdded()
+  {
+    MOZ_ASSERT(IsServiceWorker());
+    AssertIsOnWorkerThread();
+    mFetchHandlerWasAdded = true;
+  }
+
+  bool
+  FetchHandlerWasAdded() const
+  {
+    MOZ_ASSERT(IsServiceWorker());
+    AssertIsOnWorkerThread();
+    return mFetchHandlerWasAdded;
+  }
 
   JSContext*
   GetJSContext() const
@@ -1454,8 +1454,11 @@ private:
     memcpy(aPreferences, mPreferences, WORKERPREF_COUNT * sizeof(bool));
   }
 
+  // If the worker shutdown status is equal or greater then aFailStatus, this
+  // operation will fail and nullptr will be returned. See WorkerHolder.h for
+  // more information about the correct value to use.
   already_AddRefed<nsIEventTarget>
-  CreateNewSyncLoop();
+  CreateNewSyncLoop(Status aFailStatus);
 
   bool
   RunCurrentSyncLoop();
@@ -1530,9 +1533,11 @@ class AutoSyncLoopHolder
   uint32_t mIndex;
 
 public:
-  explicit AutoSyncLoopHolder(WorkerPrivate* aWorkerPrivate)
+  // See CreateNewSyncLoop() for more information about the correct value to use
+  // for aFailStatus.
+  AutoSyncLoopHolder(WorkerPrivate* aWorkerPrivate, Status aFailStatus)
   : mWorkerPrivate(aWorkerPrivate)
-  , mTarget(aWorkerPrivate->CreateNewSyncLoop())
+  , mTarget(aWorkerPrivate->CreateNewSyncLoop(aFailStatus))
   , mIndex(aWorkerPrivate->mSyncLoopStack.Length() - 1)
   {
     aWorkerPrivate->AssertIsOnWorkerThread();
@@ -1540,7 +1545,7 @@ public:
 
   ~AutoSyncLoopHolder()
   {
-    if (mWorkerPrivate) {
+    if (mWorkerPrivate && mTarget) {
       mWorkerPrivate->AssertIsOnWorkerThread();
       mWorkerPrivate->StopSyncLoop(mTarget, false);
       mWorkerPrivate->DestroySyncLoop(mIndex);
@@ -1559,8 +1564,9 @@ public:
   }
 
   nsIEventTarget*
-  EventTarget() const
+  GetEventTarget() const
   {
+    // This can be null if CreateNewSyncLoop() fails.
     return mTarget;
   }
 };

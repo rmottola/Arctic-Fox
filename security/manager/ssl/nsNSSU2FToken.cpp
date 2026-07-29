@@ -7,6 +7,7 @@
 #include "nsNSSU2FToken.h"
 
 #include "CryptoBuffer.h"
+#include "mozilla/Base64.h"
 #include "mozilla/Casting.h"
 #include "nsNSSComponent.h"
 #include "pk11pub.h"
@@ -350,7 +351,7 @@ GetAttestationCertificate(const UniquePK11SlotInfo& aSlot,
 
 // Set up the context for the soft U2F Token. This is called by NSS
 // initialization.
-NS_IMETHODIMP
+nsresult
 nsNSSU2FToken::Init()
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -721,6 +722,18 @@ nsNSSU2FToken::Sign(uint8_t* aApplication, uint32_t aApplicationLen,
   signedDataBuf.AppendElement(0x01, mozilla::fallible);
   signedDataBuf.AppendSECItem(counterItem);
   signedDataBuf.AppendElements(aChallenge, aChallengeLen, mozilla::fallible);
+
+  if (MOZ_LOG_TEST(gNSSTokenLog, LogLevel::Debug)) {
+    nsAutoCString base64;
+    nsresult rv = Base64URLEncode(signedDataBuf.Length(), signedDataBuf.Elements(),
+                                  Base64URLEncodePaddingPolicy::Omit, base64);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return NS_ERROR_FAILURE;
+    }
+
+    MOZ_LOG(gNSSTokenLog, LogLevel::Debug,
+            ("U2F Token signing bytes (base64): %s", base64.get()));
+  }
 
   ScopedAutoSECItem signatureItem;
   SECStatus srv = SEC_SignData(&signatureItem, signedDataBuf.Elements(),

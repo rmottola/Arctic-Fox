@@ -22,7 +22,6 @@
 
 #include "mozilla/Logging.h"
 #include "prtime.h"
-#include "prprf.h"
 #include "prmem.h"
 
 #include "nsNativeCharsetUtils.h"
@@ -62,7 +61,7 @@ protected:
 
   class SoundReleaser: public mozilla::Runnable {
   public:
-    SoundReleaser(nsSound* aSound) :
+    explicit SoundReleaser(nsSound* aSound) :
       mSound(aSound)
     {
     }

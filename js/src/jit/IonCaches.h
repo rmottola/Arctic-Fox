@@ -844,6 +844,10 @@ bool IsCacheableGetPropReadSlotForIonOrCacheIR(JSObject* obj, JSObject* holder, 
 
 bool IsCacheableGetPropCallScripted(JSObject* obj, JSObject* holder, Shape* shape,
                                     bool* isTemporarilyUnoptimizable = nullptr);
+bool IsCacheableGetPropCallNative(JSObject* obj, JSObject* holder, Shape* shape);
+
+bool ValueToNameOrSymbolId(JSContext* cx, HandleValue idval, MutableHandleId id,
+                           bool* nameOrSymbol);
 
 } // namespace jit
 } // namespace js

@@ -422,7 +422,7 @@ add_test(function() {
     gBrowser.addEventListener("pageshow", function(event) {
       if (event.target.location != "http://example.com/")
         return;
-      gBrowser.removeEventListener("pageshow", arguments.callee, false);
+      gBrowser.removeEventListener("pageshow", arguments.callee);
       info("Part 2");
 
       executeSoon(function() {
@@ -434,7 +434,7 @@ add_test(function() {
         gBrowser.addEventListener("pageshow", function(event) {
           if (event.target.location != "about:addons")
             return;
-          gBrowser.removeEventListener("pageshow", arguments.callee, false);
+          gBrowser.removeEventListener("pageshow", arguments.callee);
 
           wait_for_view_load(gBrowser.contentWindow.wrappedJSObject, function(aManager) {
             info("Part 3");
@@ -444,7 +444,7 @@ add_test(function() {
             gBrowser.addEventListener("pageshow", function(event) {
               if (event.target.location != "http://example.com/")
                 return;
-              gBrowser.removeEventListener("pageshow", arguments.callee, false);
+              gBrowser.removeEventListener("pageshow", arguments.callee);
               info("Part 4");
 
               executeSoon(function() {
@@ -456,20 +456,20 @@ add_test(function() {
                 gBrowser.addEventListener("pageshow", function(event) {
                   if (event.target.location != "about:addons")
                     return;
-                  gBrowser.removeEventListener("pageshow", arguments.callee, false);
+                  gBrowser.removeEventListener("pageshow", arguments.callee);
                   wait_for_view_load(gBrowser.contentWindow.wrappedJSObject, function(aManager) {
                     info("Part 5");
                     is_in_list(aManager, "addons://list/plugin", false, true);
 
                     close_manager(aManager, run_next_test);
                   });
-                }, false);
+                });
               });
-            }, false);
+            });
           });
-        }, false);
+        });
       });
-    }, false);
+    });
   });
 });
 
@@ -568,7 +568,7 @@ add_test(function() {
         gBrowser.addEventListener("pageshow", function(event) {
           if (event.target.location != "http://example.com/")
             return;
-          gBrowser.removeEventListener("pageshow", arguments.callee, false);
+          gBrowser.removeEventListener("pageshow", arguments.callee);
 
           info("Part 4");
           executeSoon(function() {
@@ -579,7 +579,7 @@ add_test(function() {
             gBrowser.addEventListener("pageshow", function(event) {
                 if (event.target.location != "about:addons")
                 return;
-              gBrowser.removeEventListener("pageshow", arguments.callee, false);
+              gBrowser.removeEventListener("pageshow", arguments.callee);
 
               wait_for_view_load(gBrowser.contentWindow.wrappedJSObject, function(aManager) {
                 info("Part 5");
@@ -594,9 +594,9 @@ add_test(function() {
                   close_manager(aManager, run_next_test);
                 });
               });
-            }, false);
+            });
           });
-        }, false);
+        });
       });
     });
   });
@@ -624,7 +624,7 @@ add_test(function() {
       gBrowser.addEventListener("pageshow", function(event) {
         if (event.target.location != "about:addons")
           return;
-        gBrowser.removeEventListener("pageshow", arguments.callee, false);
+        gBrowser.removeEventListener("pageshow", arguments.callee);
 
         wait_for_view_load(gBrowser.contentWindow.wrappedJSObject, function(aManager) {
           info("Part 3");
@@ -638,7 +638,7 @@ add_test(function() {
             close_manager(aManager, run_next_test);
           });
         });
-      }, false);
+      });
     });
   });
 });
@@ -665,7 +665,7 @@ add_test(function() {
       gBrowser.addEventListener("pageshow", function(event) {
         if (event.target.location != "about:addons")
           return;
-        gBrowser.removeEventListener("pageshow", arguments.callee, false);
+        gBrowser.removeEventListener("pageshow", arguments.callee);
 
         wait_for_view_load(gBrowser.contentWindow.wrappedJSObject, function(aManager) {
           info("Part 3");
@@ -679,7 +679,7 @@ add_test(function() {
             close_manager(aManager, run_next_test);
           });
         });
-      }, false);
+      });
     });
   });
 });

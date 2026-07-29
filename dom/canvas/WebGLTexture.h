@@ -25,6 +25,7 @@
 namespace mozilla {
 class ErrorResult;
 class WebGLContext;
+struct FloatOrInt;
 struct TexImageSource;
 
 namespace dom {
@@ -104,17 +105,19 @@ public:
     // And in turn, it needs these forwards:
 protected:
     // We need to forward these.
-    void SetImageInfo(ImageInfo* target, const ImageInfo& newInfo);
-    void SetImageInfosAtLevel(uint32_t level, const ImageInfo& newInfo);
+    void SetImageInfo(const char* funcName, ImageInfo* target, const ImageInfo& newInfo);
+    void SetImageInfosAtLevel(const char* funcName, uint32_t level,
+                              const ImageInfo& newInfo);
 
 public:
     // We store information about the various images that are part of this
     // texture. (cubemap faces, mipmap levels)
     class ImageInfo
     {
-        friend void WebGLTexture::SetImageInfo(ImageInfo* target,
+        friend void WebGLTexture::SetImageInfo(const char* funcName, ImageInfo* target,
                                                const ImageInfo& newInfo);
-        friend void WebGLTexture::SetImageInfosAtLevel(uint32_t level,
+        friend void WebGLTexture::SetImageInfosAtLevel(const char* funcName,
+                                                       uint32_t level,
                                                        const ImageInfo& newInfo);
 
     public:
@@ -154,15 +157,14 @@ public:
             MOZ_ASSERT(mFormat);
         }
 
-        void Clear();
+        void Clear(const char* funcName);
 
         ~ImageInfo() {
-            if (!IsDefined())
-                Clear();
+            MOZ_ASSERT(!mAttachPoints.size());
         }
 
     protected:
-        ImageInfo& operator =(const ImageInfo& a);
+        void Set(const char* funcName, const ImageInfo& a);
 
     public:
         uint32_t PossibleMipmapLevels() const {
@@ -176,7 +178,7 @@ public:
 
         void AddAttachPoint(WebGLFBAttachPoint* attachPoint);
         void RemoveAttachPoint(WebGLFBAttachPoint* attachPoint);
-        void OnRespecify() const;
+        void OnRespecify(const char* funcName) const;
 
         size_t MemoryUsage() const;
 
@@ -226,8 +228,7 @@ public:
     void GenerateMipmap(TexTarget texTarget);
     JS::Value GetTexParameter(TexTarget texTarget, GLenum pname);
     bool IsTexture() const;
-    void TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntParam,
-                      GLfloat* maybeFloatParam);
+    void TexParameter(TexTarget texTarget, GLenum pname, const FloatOrInt& param);
 
     ////////////////////////////////////
     // WebGLTextureUpload.cpp
@@ -289,7 +290,7 @@ public:
 protected:
     void ClampLevelBaseAndMax();
 
-    void PopulateMipChain(uint32_t baseLevel, uint32_t maxLevel);
+    void PopulateMipChain(const char* funcName, uint32_t baseLevel, uint32_t maxLevel);
 
     bool MaxEffectiveMipmapLevel(uint32_t texUnit, uint32_t* const out) const;
 
@@ -330,11 +331,11 @@ public:
         return const_cast<WebGLTexture*>(this)->ImageInfoAt(texImageTarget, level);
     }
 
-    void SetImageInfoAt(TexImageTarget texImageTarget, GLint level,
+    void SetImageInfoAt(const char* funcName, TexImageTarget texImageTarget, GLint level,
                         const ImageInfo& val)
     {
         ImageInfo* target = &ImageInfoAt(texImageTarget, level);
-        SetImageInfo(target, val);
+        SetImageInfo(funcName, target, val);
     }
 
     const ImageInfo& BaseImageInfo() const {

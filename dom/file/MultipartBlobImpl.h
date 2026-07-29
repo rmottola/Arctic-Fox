@@ -12,6 +12,7 @@
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Move.h"
 #include "mozilla/dom/File.h"
+#include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/FileBinding.h"
 #include <algorithm>
@@ -60,20 +61,12 @@ public:
                       bool aNativeEOL,
                       ErrorResult& aRv);
 
-  void InitializeChromeFile(Blob& aData,
-                            const ChromeFilePropertyBag& aBag,
-                            ErrorResult& aRv);
-
-  void InitializeChromeFile(nsPIDOMWindowInner* aWindow,
-                            const nsAString& aData,
-                            const ChromeFilePropertyBag& aBag,
-                            ErrorResult& aRv);
-
-  void InitializeChromeFile(nsPIDOMWindowInner* aWindow,
-                            nsIFile* aData,
-                            const ChromeFilePropertyBag& aBag,
-                            bool aIsFromNsIFile,
-                            ErrorResult& aRv);
+  nsresult InitializeChromeFile(nsIFile* aData,
+                                const nsAString& aType,
+                                const nsAString& aName,
+                                bool aLastModifiedPassed,
+                                int64_t aLastModified,
+                                bool aIsFromNsIFile);
 
   virtual already_AddRefed<BlobImpl>
   CreateSlice(uint64_t aStart, uint64_t aLength,

@@ -331,7 +331,7 @@ MacroAssembler::subFromStackPtr(Imm32 imm32)
         // On windows, we cannot skip very far down the stack without touching the
         // memory pages in-between.  This is a corner-case code for situations where the
         // Ion frame data for a piece of code is very large.  To handle this special case,
-        // for frames over 1k in size we allocate memory on the stack incrementally, touching
+        // for frames over 4k in size we allocate memory on the stack incrementally, touching
         // it as we go.
         //
         // When the amount is quite large, which it can be, we emit an actual loop, in order
@@ -525,8 +525,8 @@ MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
                                 const Value& rhs, Label* label)
 {
     MOZ_ASSERT(cond == Equal || cond == NotEqual);
-    if (rhs.isMarkable())
-        cmpPtr(lhs.payloadReg(), ImmGCPtr(rhs.toMarkablePointer()));
+    if (rhs.isGCThing())
+        cmpPtr(lhs.payloadReg(), ImmGCPtr(rhs.toGCThing()));
     else
         cmpPtr(lhs.payloadReg(), ImmWord(rhs.toNunboxPayload()));
 

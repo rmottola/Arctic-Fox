@@ -649,7 +649,9 @@ function loadMemoryReportsFromFile(aFilename, aTitleNote, aFn)
 
     // If it doesn't have a .gz suffix, read it as a (legacy) ungzipped file.
     if (!aFilename.endsWith(".gz")) {
-      reader.readAsText(File.createFromFileName(aFilename));
+      File.createFromFileName(aFilename).then(file => {
+        reader.readAsText(file);
+      });
       return;
     }
 
@@ -1476,7 +1478,7 @@ function appendProcessAboutMemoryElements(aP, aN, aProcess, aTrees,
       document.documentElement.scrollTop =
         document.querySelector(event.target.href).offsetTop;
       event.preventDefault();
-    }, false);
+    });
 
     // This gives nice spacing when we copy and paste.
     appendElementWithText(aP, "span", "", "\n");

@@ -3827,7 +3827,8 @@ TypeNewScript::maybeAnalyze(JSContext* cx, ObjectGroup* group, bool* regenerate,
     Vector<Initializer> initializerVector(cx);
 
     RootedPlainObject templateRoot(cx, templateObject());
-    if (!jit::AnalyzeNewScriptDefiniteProperties(cx, function(), group, templateRoot, &initializerVector))
+    RootedFunction fun(cx, function());
+    if (!jit::AnalyzeNewScriptDefiniteProperties(cx, fun, group, templateRoot, &initializerVector))
         return false;
 
     if (!group->newScript())
@@ -4559,7 +4560,7 @@ TypeScript::printTypes(JSContext* cx, HandleScript script) const
             uintptr_t(script.get()), script->filename(), script->lineno());
 
     if (script->functionNonDelazifying()) {
-        if (JSAtom* name = script->functionNonDelazifying()->name())
+        if (JSAtom* name = script->functionNonDelazifying()->explicitName())
             name->dumpCharsNoNewline();
     }
 

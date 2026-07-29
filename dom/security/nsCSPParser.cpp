@@ -658,6 +658,31 @@ nsCSPParser::schemeSource()
   return new nsCSPSchemeSrc(scheme);
 }
 
+bool IsValidBase64Value(const char16_t* cur, const char16_t* end)
+{
+  // May end with one or two =
+  if (end > cur && *(end-1) == EQUALS) end--;
+  if (end > cur && *(end-1) == EQUALS) end--;
+
+  // Must have at least one character aside from any =
+  if (end == cur) {
+    return false;
+  }
+
+  // Rest is all A-Za-z0-9+/-_
+  for (; cur < end; ++cur) {
+    if (!((*cur >= 'a' && *cur <= 'z') ||
+          (*cur >= 'A' && *cur <= 'Z') ||
+          (*cur >= '0' && *cur <= '9') ||
+          *cur == PLUS || *cur == SLASH ||
+          *cur == DASH || *cur == UNDERLINE)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // nonce-source = "'nonce-" nonce-value "'"
 nsCSPNonceSrc*
 nsCSPParser::nonceSource()
@@ -680,6 +705,10 @@ nsCSPParser::nonceSource()
   if (dashIndex < 0) {
     return nullptr;
   }
+  if (!IsValidBase64Value(expr.BeginReading() + dashIndex + 1, expr.EndReading())) {
+    return nullptr;
+  }
+
   // cache if encountering hash or nonce to invalidate unsafe-inline
   mHasHashOrNonce = true;
   return new nsCSPNonceSrc(Substring(expr,
@@ -706,6 +735,10 @@ nsCSPParser::hashSource()
 
   int32_t dashIndex = expr.FindChar(DASH);
   if (dashIndex < 0) {
+    return nullptr;
+  }
+
+  if (!IsValidBase64Value(expr.BeginReading() + dashIndex + 1, expr.EndReading())) {
     return nullptr;
   }
 
@@ -884,7 +917,17 @@ nsCSPParser::referrerDirectiveValue(nsCSPDirective* aDir)
     return;
   }
 
+  //referrer-directive deprecation warning
+  const char16_t* params[] = { mCurDir[1].get() };
+  logWarningErrorToConsole(nsIScriptError::warningFlag, "deprecatedReferrerDirective",
+                             params, ArrayLength(params));
+
   // the referrer policy is valid, so go ahead and use it.
+  nsWeakPtr ctx = mCSPContext->GetLoadingContext();
+  nsCOMPtr<nsIDocument> doc = do_QueryReferent(ctx);
+  if (doc) {
+    doc->SetHasReferrerPolicyCSP(true);
+  }
   mPolicy->setReferrerPolicy(&mCurDir[1]);
   mPolicy->addDirective(aDir);
 }

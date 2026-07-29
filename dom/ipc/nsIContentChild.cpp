@@ -73,6 +73,31 @@ nsIContentChild::DeallocPBrowserChild(PBrowserChild* aIframe)
   return true;
 }
 
+mozilla::ipc::IPCResult
+nsIContentChild::RecvPBrowserConstructor(PBrowserChild* aActor,
+                                         const TabId& aTabId,
+                                         const IPCTabContext& aContext,
+                                         const uint32_t& aChromeFlags,
+                                         const ContentParentId& aCpID,
+                                         const bool& aIsForBrowser)
+{
+  // This runs after AllocPBrowserChild() returns and the IPC machinery for this
+  // PBrowserChild has been set up.
+
+  auto tabChild = static_cast<TabChild*>(static_cast<TabChild*>(aActor));
+
+  if (NS_WARN_IF(NS_FAILED(tabChild->Init()))) {
+    return IPC_FAIL(tabChild, "TabChild::Init failed");
+  }
+
+  nsCOMPtr<nsIObserverService> os = services::GetObserverService();
+  if (os) {
+    os->NotifyObservers(static_cast<nsITabChild*>(tabChild), "tab-child-created", nullptr);
+  }
+
+  return IPC_OK();
+}
+
 PBlobChild*
 nsIContentChild::AllocPBlobChild(const BlobConstructorParams& aParams)
 {
@@ -142,12 +167,12 @@ nsIContentChild::RecvAsyncMessage(const nsString& aMsg,
                                   const IPC::Principal& aPrincipal,
                                   const ClonedMessageData& aData)
 {
+  CrossProcessCpowHolder cpows(this, aCpows);
   RefPtr<nsFrameMessageManager> cpm = nsFrameMessageManager::GetChildProcessManager();
   if (cpm) {
     ipc::StructuredCloneData data;
     ipc::UnpackClonedMessageDataForChild(aData, data);
 
-    CrossProcessCpowHolder cpows(this, aCpows);
     cpm->ReceiveMessage(static_cast<nsIContentFrameMessageManager*>(cpm.get()), nullptr,
                         aMsg, false, &data, &cpows, aPrincipal, nullptr);
   }

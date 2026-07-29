@@ -24,15 +24,26 @@ class MainThreadHandoff final : public IInterceptorSink
                               , public ICallFrameWalker
 {
 public:
-  static HRESULT Create(IInterceptorSink** aOutput);
+  static HRESULT Create(IHandlerProvider* aHandlerProvider,
+                        IInterceptorSink** aOutput);
 
   template <typename Interface>
   static HRESULT WrapInterface(STAUniquePtr<Interface> aTargetInterface,
                                Interface** aOutInterface)
   {
+    return WrapInterface<Interface>(Move(aTargetInterface), nullptr,
+                                    aOutInterface);
+  }
+
+  template <typename Interface>
+  static HRESULT WrapInterface(STAUniquePtr<Interface> aTargetInterface,
+                               IHandlerProvider* aHandlerProvider,
+                               Interface** aOutInterface)
+  {
     MOZ_ASSERT(!IsProxy(aTargetInterface.get()));
     RefPtr<IInterceptorSink> handoff;
-    HRESULT hr = MainThreadHandoff::Create(getter_AddRefs(handoff));
+    HRESULT hr = MainThreadHandoff::Create(aHandlerProvider,
+                                           getter_AddRefs(handoff));
     if (FAILED(hr)) {
       return hr;
     }
@@ -49,20 +60,26 @@ public:
 
   // IInterceptorSink
   STDMETHODIMP SetInterceptor(IWeakReference* aInterceptor) override;
+  STDMETHODIMP GetHandler(CLSID* aHandlerClsid) override;
+  STDMETHODIMP GetHandlerPayloadSize(DWORD* aOutPayloadSize) override;
+  STDMETHODIMP WriteHandlerPayload(IStream* aStream) override;
+  STDMETHODIMP_(REFIID) MarshalAs(REFIID aIid) override;
 
   // ICallFrameWalker
   STDMETHODIMP OnWalkInterface(REFIID aIid, PVOID* aInterface, BOOL aIsInParam,
                                BOOL aIsOutParam) override;
 
 private:
-  MainThreadHandoff();
+  explicit MainThreadHandoff(IHandlerProvider* aHandlerProvider);
   ~MainThreadHandoff();
   HRESULT FixArrayElements(ICallFrame* aFrame,
                            const ArrayData& aArrayData);
+  HRESULT FixIServiceProvider(ICallFrame* aFrame);
 
 private:
-  ULONG                   mRefCnt;
-  RefPtr<IWeakReference>  mInterceptor;
+  ULONG                     mRefCnt;
+  RefPtr<IWeakReference>    mInterceptor;
+  RefPtr<IHandlerProvider>  mHandlerProvider;
 };
 
 } // namespace mscom

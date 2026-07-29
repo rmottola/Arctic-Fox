@@ -959,6 +959,13 @@ VARIABLES = {
         RustLibrary template instead.
         """),
 
+    'HOST_RUST_LIBRARY_FEATURES': (List, list,
+        """Cargo features to activate for this host library.
+
+        This variable should not be used directly; you should be using the
+        HostRustLibrary template instead.
+        """),
+
     'UNIFIED_SOURCES': (ContextDerivedTypedList(SourcePath, StrictOrderingOnAppendList), list,
         """Source code files that can be compiled together.
 
@@ -1298,26 +1305,6 @@ VARIABLES = {
 
            BRANDING_FILES += ['foo.png']
            BRANDING_FILES.images.subdir += ['bar.png']
-        """),
-
-    'SDK_FILES': (ContextDerivedTypedHierarchicalStringList(Path), list,
-        """List of files to be installed into the sdk directory.
-
-        ``SDK_FILES`` will copy (or symlink, if the platform supports it)
-        the contents of its files to the ``dist/sdk`` directory. Files that
-        are destined for a subdirectory can be specified by accessing a field.
-        For example, to export ``foo.py`` to the top-level directory and
-        ``bar.py`` to the directory ``subdir``, append to
-        ``SDK_FILES`` like so::
-
-           SDK_FILES += ['foo.py']
-           SDK_FILES.subdir += ['bar.py']
-        """),
-
-    'SDK_LIBRARY': (bool, bool,
-        """Whether the library built in the directory is part of the SDK.
-
-        The library will be copied into ``SDK_LIB_DIR`` (``$DIST/sdk/lib``).
         """),
 
     'SIMPLE_PROGRAMS': (StrictOrderingOnAppendList, list,

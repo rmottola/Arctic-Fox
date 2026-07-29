@@ -103,6 +103,7 @@ NS_IMPL_CYCLE_COLLECTION_CLASS(CustomElementRegistry)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(CustomElementRegistry)
   tmp->mCustomDefinitions.Clear();
+  tmp->mConstructors.clear();
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mWhenDefinedPromiseMap)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mWindow)
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
@@ -138,7 +139,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(CustomElementRegistry)
   }
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWhenDefinedPromiseMap)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWindow)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(CustomElementRegistry)
@@ -148,6 +148,12 @@ NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(CustomElementRegistry)
                      aClosure);
     aCallbacks.Trace(&iter.UserData()->mPrototype,
                      "mCustomDefinitions prototype",
+                     aClosure);
+  }
+
+  for (ConstructorMap::Enum iter(tmp->mConstructors); !iter.empty(); iter.popFront()) {
+    aCallbacks.Trace(&iter.front().mutableKey(),
+                     "mConstructors key",
                      aClosure);
   }
   NS_IMPL_CYCLE_COLLECTION_TRACE_PRESERVED_WRAPPER
@@ -164,13 +170,8 @@ NS_INTERFACE_MAP_END
 /* static */ bool
 CustomElementRegistry::IsCustomElementEnabled(JSContext* aCx, JSObject* aObject)
 {
-  JS::Rooted<JSObject*> obj(aCx, aObject);
-  if (Preferences::GetBool("dom.webcomponents.customelements.enabled") ||
-      Preferences::GetBool("dom.webcomponents.enabled")) {
-    return true;
-  }
-
-  return false;
+  return Preferences::GetBool("dom.webcomponents.customelements.enabled") ||
+         Preferences::GetBool("dom.webcomponents.enabled");
 }
 
 /* static */ already_AddRefed<CustomElementRegistry>
@@ -183,13 +184,17 @@ CustomElementRegistry::Create(nsPIDOMWindowInner* aWindow)
     return nullptr;
   }
 
-  if (!Preferences::GetBool("dom.webcomponents.customelements.enabled") &&
-      !Preferences::GetBool("dom.webcomponents.enabled")) {
+  if (!IsCustomElementEnabled()) {
     return nullptr;
   }
 
   RefPtr<CustomElementRegistry> customElementRegistry =
     new CustomElementRegistry(aWindow);
+
+  if (!customElementRegistry->Init()) {
+    return nullptr;
+  }
+
   return customElementRegistry.forget();
 }
 
@@ -248,6 +253,12 @@ CustomElementRegistry::~CustomElementRegistry()
   mozilla::DropJSObjects(this);
 }
 
+bool
+CustomElementRegistry::Init()
+{
+  return mConstructors.init();
+}
+
 CustomElementDefinition*
 CustomElementRegistry::LookupCustomElementDefinition(const nsAString& aLocalName,
                                                      const nsAString* aIs) const
@@ -261,6 +272,23 @@ CustomElementRegistry::LookupCustomElementDefinition(const nsAString& aLocalName
   }
 
   return nullptr;
+}
+
+CustomElementDefinition*
+CustomElementRegistry::LookupCustomElementDefinition(JSContext* aCx,
+                                                     JSObject* aConstructor) const
+{
+  JS::Rooted<JSObject*> constructor(aCx, js::CheckedUnwrap(aConstructor));
+
+  const auto& ptr = mConstructors.lookup(constructor);
+  if (!ptr) {
+    return nullptr;
+  }
+
+  CustomElementDefinition* definition = mCustomDefinitions.Get(ptr->value());
+  MOZ_ASSERT(definition, "Definition must be found in mCustomDefinitions");
+
+  return definition;
 }
 
 void
@@ -616,9 +644,13 @@ CustomElementRegistry::Define(const nsAString& aName,
    * 4. If this CustomElementRegistry contains an entry with constructor constructor,
    *    then throw a "NotSupportedError" DOMException and abort these steps.
    */
-  // TODO: Step 3 of HTMLConstructor also needs a way to look up definition by
-  // using constructor. So I plans to figure out a solution to support both of
-  // them in bug 1274159.
+  const auto& ptr = mConstructors.lookup(constructorUnwrapped);
+  if (ptr) {
+    MOZ_ASSERT(mCustomDefinitions.Get(ptr->value()),
+               "Definition must be found in mCustomDefinitions");
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return;
+  }
 
   /**
    * 5. Let localName be name.
@@ -774,7 +806,15 @@ CustomElementRegistry::Define(const nsAString& aName,
   /**
    * 12. Add definition to this CustomElementRegistry.
    */
+  if (!mConstructors.put(constructorUnwrapped, nameAtom)) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return;
+  }
+
   mCustomDefinitions.Put(nameAtom, definition);
+
+  MOZ_ASSERT(mCustomDefinitions.Count() == mConstructors.count(),
+             "Number of entries should be the same");
 
   /**
    * 13. 14. 15. Upgrade candidates

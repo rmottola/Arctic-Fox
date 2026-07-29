@@ -47,6 +47,8 @@ function checkBasicAttributes(token) {
 function checkPasswordFeaturesAndResetPassword(token, initialPW) {
   ok(!token.needsUserInit,
      "Token should not need user init after setting a password");
+  ok(token.hasPassword,
+     "Token should have a password after setting a password");
 
   equal(token.minimumPasswordLength, 0,
         "Actual and expected min password length should match");
@@ -72,8 +74,8 @@ function checkPasswordFeaturesAndResetPassword(token, initialPW) {
      "password was given");
 
   token.reset();
-  ok(token.needsUserInit,
-     "Token should need password init after reset");
+  ok(token.needsUserInit, "Token should need password init after reset");
+  ok(!token.hasPassword, "Token should not have a password after reset");
   ok(!token.isLoggedIn(), "Token should be logged out of after reset");
 }
 
@@ -90,6 +92,8 @@ function run_test() {
   // does not result in an error.
   token.logoutSimple();
   ok(!token.isLoggedIn(), "Token should still not be logged into");
+  ok(!token.hasPassword,
+     "Token should not have a password before it has been set");
 
   let initialPW = "foo 1234567890`~!@#$%^&*()-_=+{[}]|\\:;'\",<.>/? 一二三";
   token.initPassword(initialPW);

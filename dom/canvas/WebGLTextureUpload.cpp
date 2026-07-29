@@ -13,6 +13,7 @@
 #include "GLContext.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/dom/HTMLVideoElement.h"
+#include "mozilla/dom/ImageBitmap.h"
 #include "mozilla/dom/ImageData.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/Scoped.h"
@@ -211,6 +212,35 @@ FromPboOffset(WebGLContext* webgl, const char* funcName, TexImageTarget target,
 }
 
 static UniquePtr<webgl::TexUnpackBlob>
+FromImageBitmap(WebGLContext* webgl, const char* funcName, TexImageTarget target,
+              uint32_t width, uint32_t height, uint32_t depth,
+              const dom::ImageBitmap& imageBitmap)
+{
+    UniquePtr<dom::ImageBitmapCloneData> cloneData = Move(imageBitmap.ToCloneData());
+    const RefPtr<gfx::DataSourceSurface> surf = cloneData->mSurface;
+
+    ////
+
+    if (!width) {
+        width = surf->GetSize().width;
+    }
+
+    if (!height) {
+        height = surf->GetSize().height;
+    }
+
+    ////
+
+
+    // WhatWG "HTML Living Standard" (30 October 2015):
+    // "The getImageData(sx, sy, sw, sh) method [...] Pixels must be returned as
+    //  non-premultiplied alpha values."
+    const bool isAlphaPremult = cloneData->mIsPremultipliedAlpha;
+    return MakeUnique<webgl::TexUnpackSurface>(webgl, target, width, height, depth, surf,
+                                               isAlphaPremult);
+}
+
+static UniquePtr<webgl::TexUnpackBlob>
 FromImageData(WebGLContext* webgl, const char* funcName, TexImageTarget target,
               uint32_t width, uint32_t height, uint32_t depth,
               const dom::ImageData& imageData, dom::Uint8ClampedArray* scopedArr)
@@ -378,6 +408,11 @@ WebGLContext::From(const char* funcName, TexImageTarget target, GLsizei rawWidth
     if (mBoundPixelUnpackBuffer) {
         ErrorInvalidOperation("%s: PIXEL_UNPACK_BUFFER must be null.", funcName);
         return nullptr;
+    }
+
+    if (src.mImageBitmap) {
+        return FromImageBitmap(this, funcName, target, width, height, depth,
+                               *(src.mImageBitmap));
     }
 
     if (src.mImageData) {
@@ -1133,9 +1168,9 @@ WebGLTexture::TexStorage(const char* funcName, TexTarget target, GLsizei levels,
     const bool isDataInitialized = false;
     const WebGLTexture::ImageInfo newInfo(dstUsage, width, height, depth,
                                           isDataInitialized);
-    SetImageInfosAtLevel(0, newInfo);
+    SetImageInfosAtLevel(funcName, 0, newInfo);
 
-    PopulateMipChain(0, levels-1);
+    PopulateMipChain(funcName, 0, levels-1);
 
     mImmutable = true;
     mImmutableLevelCount = levels;
@@ -1265,7 +1300,7 @@ WebGLTexture::TexImage(const char* funcName, TexImageTarget target, GLint level,
     ////////////////////////////////////
     // Update our specification data.
 
-    SetImageInfo(imageInfo, newImageInfo);
+    SetImageInfo(funcName, imageInfo, newImageInfo);
 }
 
 void
@@ -1471,7 +1506,7 @@ WebGLTexture::CompressedTexImage(const char* funcName, TexImageTarget target, GL
     const bool isDataInitialized = true;
     const ImageInfo newImageInfo(usage, blob->mWidth, blob->mHeight, blob->mDepth,
                                  isDataInitialized);
-    SetImageInfo(imageInfo, newImageInfo);
+    SetImageInfo(funcName, imageInfo, newImageInfo);
 }
 
 static inline bool
@@ -2059,7 +2094,7 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
 
     const bool isDataInitialized = true;
     const ImageInfo newImageInfo(dstUsage, width, height, depth, isDataInitialized);
-    SetImageInfo(imageInfo, newImageInfo);
+    SetImageInfo(funcName, imageInfo, newImageInfo);
 }
 
 void

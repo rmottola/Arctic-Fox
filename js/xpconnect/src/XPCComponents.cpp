@@ -7,6 +7,7 @@
 /* The "Components" xpcom objects for JavaScript. */
 
 #include "xpcprivate.h"
+#include "xpc_make_class.h"
 #include "xpcIJSModuleLoader.h"
 #include "XPCJSWeakReference.h"
 #include "WrapperFactory.h"
@@ -3543,6 +3544,7 @@ NS_IMPL_CI_INTERFACE_GETTER(nsXPCComponents, nsIXPCComponents)
 #define XPC_MAP_CLASSNAME           ComponentsSH
 #define XPC_MAP_QUOTED_CLASSNAME   "nsXPCComponents"
 #define                             XPC_MAP_WANT_PRECREATE
+#define XPC_MAP_FLAGS               0
 #include "xpc_map_end.h" /* This will #undef the above */
 
 NS_IMETHODIMP

@@ -166,7 +166,6 @@ GCRuntime::tryNewTenuredThing(ExclusiveContext* cx, AllocKind kind, size_t thing
             // all-compartments, non-incremental, shrinking GC and wait for
             // sweeping to finish.
             JS::PrepareForFullGC(cx->asJSContext());
-            AutoKeepAtoms keepAtoms(cx->perThreadData);
             cx->asJSContext()->gc.gc(GC_SHRINK, JS::gcreason::LAST_DITCH);
             cx->asJSContext()->gc.waitBackgroundSweepOrAllocEnd();
 
@@ -191,12 +190,15 @@ GCRuntime::checkAllocatorState(JSContext* cx, AllocKind kind)
     }
 
 #if defined(JS_GC_ZEAL) || defined(DEBUG)
-    MOZ_ASSERT_IF(rt->isAtomsCompartment(cx->compartment()),
-                  kind == AllocKind::STRING ||
-                  kind == AllocKind::FAT_INLINE_STRING ||
+    MOZ_ASSERT_IF(cx->compartment()->isAtomsCompartment(),
+                  kind == AllocKind::ATOM ||
+                  kind == AllocKind::FAT_INLINE_ATOM ||
                   kind == AllocKind::SYMBOL ||
                   kind == AllocKind::JITCODE ||
                   kind == AllocKind::SCOPE);
+    MOZ_ASSERT_IF(!cx->compartment()->isAtomsCompartment(),
+                  kind != AllocKind::ATOM &&
+                  kind != AllocKind::FAT_INLINE_ATOM);
     MOZ_ASSERT(!rt->isHeapBusy());
     MOZ_ASSERT(isAllocAllowed());
 #endif
@@ -237,7 +239,6 @@ GCRuntime::gcIfNeededPerAllocation(JSContext* cx)
         cx->zone()->usage.gcBytes() > cx->zone()->threshold.gcTriggerBytes())
     {
         PrepareZoneForGC(cx->zone());
-        AutoKeepAtoms keepAtoms(cx->perThreadData);
         gc(GC_NORMAL, JS::gcreason::INCREMENTAL_TOO_SLOW);
     }
 

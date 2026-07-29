@@ -103,14 +103,12 @@ NS_IMPL_RELEASE_INHERITED(Performance, DOMEventTargetHelper)
 /* static */ already_AddRefed<Performance>
 Performance::CreateForMainThread(nsPIDOMWindowInner* aWindow,
                                  nsDOMNavigationTiming* aDOMTiming,
-                                 nsITimedChannel* aChannel,
-                                 Performance* aParentPerformance)
+                                 nsITimedChannel* aChannel)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
   RefPtr<Performance> performance =
-    new PerformanceMainThread(aWindow, aDOMTiming, aChannel,
-                              aParentPerformance);
+    new PerformanceMainThread(aWindow, aDOMTiming, aChannel);
   return performance.forget();
 }
 
@@ -141,6 +139,13 @@ Performance::Performance(nsPIDOMWindowInner* aWindow)
 
 Performance::~Performance()
 {}
+
+DOMHighResTimeStamp
+Performance::Now() const
+{
+  TimeDuration duration = TimeStamp::Now() - CreationTimeStamp();
+  return RoundTime(duration.ToMilliseconds());
+}
 
 DOMHighResTimeStamp
 Performance::TimeOrigin()

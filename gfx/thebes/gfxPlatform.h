@@ -39,6 +39,7 @@ class nsIAtom;
 class nsIObserver;
 class SRGBOverrideObserver;
 class gfxTextPerfMetrics;
+typedef struct FT_LibraryRec_ *FT_Library;
 
 namespace mozilla {
 namespace gl {
@@ -299,6 +300,11 @@ public:
     // GetContentBackendFor() should be called instead.
     mozilla::gfx::BackendType GetDefaultContentBackend() {
       return mContentBackend;
+    }
+
+    /// Return the software backend to use by default.
+    mozilla::gfx::BackendType GetSoftwareBackend() {
+        return mSoftwareBackend;
     }
 
     // Return the best content backend available that is compatible with the
@@ -698,6 +704,10 @@ public:
      */
     virtual void ImportGPUDeviceData(const mozilla::gfx::GPUDeviceData& aData);
 
+    virtual FT_Library GetFTLibrary() {
+      return nullptr;
+    }
+
 protected:
     gfxPlatform();
     virtual ~gfxPlatform();
@@ -837,6 +847,8 @@ private:
     mozilla::gfx::BackendType mFallbackCanvasBackend;
     // The backend to use for content
     mozilla::gfx::BackendType mContentBackend;
+    // The backend to use when we need it not to be accelerated.
+    mozilla::gfx::BackendType mSoftwareBackend;
     // Bitmask of backend types we can use to render content
     uint32_t mContentBackendBitmask;
 

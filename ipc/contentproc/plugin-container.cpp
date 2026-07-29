@@ -7,6 +7,7 @@
 #include "nsXPCOM.h"
 #include "nsXULAppAPI.h"
 #include "nsAutoPtr.h"
+#include "mozilla/Bootstrap.h"
 
 #ifdef XP_WIN
 #include <windows.h>
@@ -20,58 +21,13 @@
 #include <unistd.h>
 #endif
 
-#include "GMPLoader.h"
-
 #if defined(XP_WIN) && defined(MOZ_SANDBOX)
 #include "mozilla/sandboxing/SandboxInitialization.h"
 #include "mozilla/sandboxing/sandboxLogging.h"
 #endif
 
-#if defined(XP_WIN) && defined(MOZ_SANDBOX)
-class WinSandboxStarter : public mozilla::gmp::SandboxStarter {
-public:
-    virtual bool Start(const char *aLibPath) override {
-        if (IsSandboxedProcess()) {
-            mozilla::sandboxing::LowerSandbox();
-        }
-        return true;
-    }
-};
-#endif
-
-#if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
-class MacSandboxStarter : public mozilla::gmp::SandboxStarter {
-public:
-    virtual bool Start(const char *aLibPath) override {
-      std::string err;
-      bool rv = mozilla::StartMacSandbox(mInfo, err);
-      if (!rv) {
-        fprintf(stderr, "sandbox_init() failed! Error \"%s\"\n", err.c_str());
-      }
-      return rv;
-    }
-    virtual void SetSandboxInfo(MacSandboxInfo* aSandboxInfo) override {
-      mInfo = *aSandboxInfo;
-    }
-private:
-  MacSandboxInfo mInfo;
-};
-#endif
-
-mozilla::gmp::SandboxStarter*
-MakeSandboxStarter()
-{
-#if defined(XP_WIN) && defined(MOZ_SANDBOX)
-    return new WinSandboxStarter();
-#elif defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
-    return new MacSandboxStarter();
-#else
-    return nullptr;
-#endif
-}
-
 int
-content_process_main(int argc, char* argv[])
+content_process_main(mozilla::Bootstrap* bootstrap, int argc, char* argv[])
 {
     // Check for the absolute minimum number of args we need to move
     // forward here. We expect the last arg to be the child process type.
@@ -93,27 +49,18 @@ content_process_main(int argc, char* argv[])
     }
 #endif
 
-    XRE_SetProcessType(argv[--argc]);
+    bootstrap->XRE_SetProcessType(argv[--argc]);
 
 #ifdef XP_WIN
     // For plugins, this is done in PluginProcessChild::Init, as we need to
     // avoid it for unsupported plugins.  See PluginProcessChild::Init for
     // the details.
-    if (XRE_GetProcessType() != GeckoProcessType_Plugin) {
+    if (bootstrap->XRE_GetProcessType() != GeckoProcessType_Plugin) {
         mozilla::SanitizeEnvironmentVariables();
         SetDllDirectoryW(L"");
     }
 #endif
-#if !defined(XP_LINUX) && defined(MOZ_PLUGIN_CONTAINER)
-    // On Windows and MacOS, the GMPLoader lives in plugin-container, so that its
-    // code can be covered by an EME/GMP vendor's voucher.
-    nsAutoPtr<mozilla::gmp::SandboxStarter> starter(MakeSandboxStarter());
-    if (XRE_GetProcessType() == GeckoProcessType_GMPlugin) {
-        childData.gmpLoader = mozilla::gmp::CreateGMPLoader(starter);
-    }
-#endif
-    nsresult rv = XRE_InitChildProcess(argc, argv, &childData);
-    NS_ENSURE_SUCCESS(rv, 1);
 
-    return 0;
+    nsresult rv = bootstrap->XRE_InitChildProcess(argc, argv, &childData);
+    return NS_FAILED(rv);
 }

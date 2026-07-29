@@ -79,7 +79,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Location)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mInnerWindow)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(Location)
@@ -110,7 +109,7 @@ Location::CheckURL(nsIURI* aURI, nsIDocShellLoadInfo** aLoadInfo)
 
   nsCOMPtr<nsIPrincipal> triggeringPrincipal;
   nsCOMPtr<nsIURI> sourceURI;
-  net::ReferrerPolicy referrerPolicy = net::RP_Default;
+  net::ReferrerPolicy referrerPolicy = net::RP_Unset;
 
   if (JSContext *cx = nsContentUtils::GetCurrentJSContext()) {
     // No cx means that there's no JS running, or at least no JS that
@@ -593,7 +592,7 @@ Location::GetPathname(nsAString& aPathname)
 
   result = GetURI(getter_AddRefs(uri));
 
-  nsCOMPtr<nsIURL> url(do_QueryInterface(uri));
+  nsCOMPtr<nsIURIWithQuery> url(do_QueryInterface(uri));
   if (url) {
     nsAutoCString file;
 
@@ -616,12 +615,12 @@ Location::SetPathname(const nsAString& aPathname)
     return rv;
   }
 
-  rv = uri->SetPath(NS_ConvertUTF16toUTF8(aPathname));
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
+  nsCOMPtr<nsIURIWithQuery> url(do_QueryInterface(uri));
+  if (url && NS_SUCCEEDED(url->SetFilePath(NS_ConvertUTF16toUTF8(aPathname)))) {
+    return SetURI(uri);
   }
 
-  return SetURI(uri);
+  return NS_OK;
 }
 
 NS_IMETHODIMP

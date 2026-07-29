@@ -568,15 +568,20 @@ WorkerMainThreadRunnable::WorkerMainThreadRunnable(WorkerPrivate* aWorkerPrivate
 }
 
 void
-WorkerMainThreadRunnable::Dispatch(ErrorResult& aRv)
+WorkerMainThreadRunnable::Dispatch(Status aFailStatus, ErrorResult& aRv)
 {
   mWorkerPrivate->AssertIsOnWorkerThread();
 
   TimeStamp startTime = TimeStamp::NowLoRes();
 
-  AutoSyncLoopHolder syncLoop(mWorkerPrivate);
+  AutoSyncLoopHolder syncLoop(mWorkerPrivate, aFailStatus);
 
-  mSyncLoopTarget = syncLoop.EventTarget();
+  mSyncLoopTarget = syncLoop.GetEventTarget();
+  if (!mSyncLoopTarget) {
+    // SyncLoop creation can fail if the worker is shutting down.
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return;
+  }
 
   DebugOnly<nsresult> rv = mWorkerPrivate->DispatchToMainThread(this);
   MOZ_ASSERT(NS_SUCCEEDED(rv),
@@ -586,10 +591,9 @@ WorkerMainThreadRunnable::Dispatch(ErrorResult& aRv)
     aRv.ThrowUncatchableException();
   }
 
-  // Telemetry is apparently not threadsafe
-  // Telemetry::Accumulate(Telemetry::SYNC_WORKER_OPERATION, mTelemetryKey,
-  //                       static_cast<uint32_t>((TimeStamp::NowLoRes() - startTime)
-  //                                               .ToMilliseconds()));
+  Telemetry::Accumulate(Telemetry::SYNC_WORKER_OPERATION, mTelemetryKey,
+                        static_cast<uint32_t>((TimeStamp::NowLoRes() - startTime)
+                                                .ToMilliseconds()));
   Unused << startTime; // Shut the compiler up.
 }
 
@@ -622,7 +626,7 @@ bool
 WorkerCheckAPIExposureOnMainThreadRunnable::Dispatch()
 {
   ErrorResult rv;
-  WorkerMainThreadRunnable::Dispatch(rv);
+  WorkerMainThreadRunnable::Dispatch(Terminating, rv);
   bool ok = !rv.Failed();
   rv.SuppressException();
   return ok;
@@ -708,12 +712,12 @@ WorkerProxyToMainThreadRunnable::PostDispatchOnMainThread()
       MOZ_ASSERT(aRunnable);
     }
 
-    // We must call RunBackOnWorkerThread() also if the runnable is cancelled.
+    // We must call RunBackOnWorkerThread() also if the runnable is canceled.
     nsresult
     Cancel() override
     {
       WorkerRun(nullptr, mWorkerPrivate);
-      return NS_OK;
+      return MainThreadWorkerControlRunnable::Cancel();
     }
 
     virtual bool
@@ -722,10 +726,14 @@ WorkerProxyToMainThreadRunnable::PostDispatchOnMainThread()
       MOZ_ASSERT(aWorkerPrivate);
       aWorkerPrivate->AssertIsOnWorkerThread();
 
-      mRunnable->RunBackOnWorkerThread();
+      if (mRunnable) {
+        mRunnable->RunBackOnWorkerThread();
 
-      // Let's release the worker thread.
-      mRunnable->ReleaseWorker();
+        // Let's release the worker thread.
+        mRunnable->ReleaseWorker();
+        mRunnable = nullptr;
+      }
+
       return true;
     }
 

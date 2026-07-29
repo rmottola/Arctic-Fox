@@ -21,6 +21,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/Compression.h"
 #include "mozilla/MathAlgorithms.h"
+#include "mozilla/Maybe.h"
 
 #include "jsmath.h"
 #include "jsprf.h"
@@ -36,11 +37,12 @@
 #include "vm/StringBuffer.h"
 #include "vm/Time.h"
 #include "vm/TypedArrayObject.h"
-#include "wasm/WasmBinaryFormat.h"
+#include "wasm/WasmCompile.h"
 #include "wasm/WasmGenerator.h"
 #include "wasm/WasmInstance.h"
 #include "wasm/WasmJS.h"
 #include "wasm/WasmSerialize.h"
+#include "wasm/WasmValidate.h"
 
 #include "jsobjinlines.h"
 
@@ -678,7 +680,7 @@ FunctionObject(ParseNode* fn)
 static inline PropertyName*
 FunctionName(ParseNode* fn)
 {
-    if (JSAtom* name = FunctionObject(fn)->name())
+    if (JSAtom* name = FunctionObject(fn)->explicitName())
         return name->asPropertyName();
     return nullptr;
 }
@@ -1658,7 +1660,6 @@ class MOZ_STACK_CLASS ModuleValidator
 
     // State used to build the AsmJSModule in finish():
     ModuleGenerator       mg_;
-    ExportVector          exports_;
     MutableAsmJSMetadata  asmJSMetadata_;
 
     // Error reporting:
@@ -1736,7 +1737,6 @@ class MOZ_STACK_CLASS ModuleValidator
         arrayViews_(cx),
         atomicsPresent_(false),
         simdPresent_(false),
-        mg_(ImportVector()),
         errorString_(nullptr),
         errorOffset_(UINT32_MAX),
         errorOverRecursed_(false)
@@ -1841,20 +1841,20 @@ class MOZ_STACK_CLASS ModuleValidator
         if (!args.initFromContext(cx_, Move(scriptedCaller)))
             return false;
 
-        auto genData = MakeUnique<ModuleGeneratorData>(ModuleKind::AsmJS);
-        if (!genData ||
-            !genData->sigs.resize(MaxSigs) ||
-            !genData->funcSigs.resize(MaxFuncs) ||
-            !genData->funcImportGlobalDataOffsets.resize(AsmJSMaxImports) ||
-            !genData->tables.resize(MaxTables) ||
-            !genData->asmJSSigToTableIndex.resize(MaxSigs))
+        auto env = MakeUnique<ModuleEnvironment>(ModuleKind::AsmJS);
+        if (!env ||
+            !env->sigs.resize(MaxSigs) ||
+            !env->funcSigs.resize(MaxFuncs) ||
+            !env->funcImportGlobalDataOffsets.resize(AsmJSMaxImports) ||
+            !env->tables.resize(MaxTables) ||
+            !env->asmJSSigToTableIndex.resize(MaxSigs))
         {
             return false;
         }
 
-        genData->minMemoryLength = RoundUpToNextValidAsmJSHeapLength(0);
+        env->minMemoryLength = RoundUpToNextValidAsmJSHeapLength(0);
 
-        if (!mg_.init(Move(genData), args, asmJSMetadata_.get()))
+        if (!mg_.init(Move(env), args, asmJSMetadata_.get()))
             return false;
 
         return true;
@@ -2142,7 +2142,7 @@ class MOZ_STACK_CLASS ModuleValidator
 
         // Declare which function is exported which gives us an index into the
         // module ExportVector.
-        if (!exports_.emplaceBack(Move(fieldChars), func.index(), DefinitionKind::Function))
+        if (!mg_.addExport(Move(fieldChars), func.index()))
             return false;
 
         // The exported function might have already been exported in which case
@@ -2357,9 +2357,6 @@ class MOZ_STACK_CLASS ModuleValidator
         if (!arrayViews_.empty())
             mg_.initMemoryUsage(atomicsPresent_ ? MemoryUsage::Shared : MemoryUsage::Unshared);
 
-        if (!mg_.setExports(Move(exports_)))
-            return nullptr;
-
         asmJSMetadata_->usesSimd = simdPresent_;
 
         MOZ_ASSERT(asmJSMetadata_->asmJSFuncNames.empty());
@@ -2383,7 +2380,9 @@ class MOZ_STACK_CLASS ModuleValidator
         if (!bytes)
             return nullptr;
 
-        return mg_.finish(*bytes);
+        return mg_.finish(*bytes,
+                          DataSegmentVector(),
+                          NameInBytecodeVector());
     }
 };
 
@@ -3251,10 +3250,9 @@ CheckModuleLevelName(ModuleValidator& m, ParseNode* usepn, PropertyName* name)
 static bool
 CheckFunctionHead(ModuleValidator& m, ParseNode* fn)
 {
-    JSFunction* fun = FunctionObject(fn);
-    if (fun->hasRest())
+    if (fn->pn_funbox->hasRest())
         return m.fail(fn, "rest args not allowed");
-    if (fun->isExprBody())
+    if (fn->pn_funbox->isExprBody())
         return m.fail(fn, "expression closures not allowed");
     if (fn->pn_funbox->hasDestructuringArgs)
         return m.fail(fn, "destructuring args not allowed");
@@ -8037,25 +8035,10 @@ TryInstantiate(JSContext* cx, CallArgs args, Module& module, const AsmJSMetadata
     return true;
 }
 
-static MOZ_MUST_USE bool
-MaybeAppendUTF8Name(JSContext* cx, const char* utf8Chars, MutableHandle<PropertyNameVector> names)
-{
-    if (!utf8Chars)
-        return true;
-
-    UTF8Chars utf8(utf8Chars, strlen(utf8Chars));
-
-    JSAtom* atom = AtomizeUTF8Chars(cx, utf8Chars, strlen(utf8Chars));
-    if (!atom)
-        return false;
-
-    return names.append(atom->asPropertyName());
-}
-
 static bool
 HandleInstantiationFailure(JSContext* cx, CallArgs args, const AsmJSMetadata& metadata)
 {
-    RootedAtom name(cx, args.callee().as<JSFunction>().name());
+    RootedAtom name(cx, args.callee().as<JSFunction>().explicitName());
 
     if (cx->isExceptionPending())
         return false;
@@ -8072,8 +8055,8 @@ HandleInstantiationFailure(JSContext* cx, CallArgs args, const AsmJSMetadata& me
         return false;
     }
 
-    uint32_t begin = metadata.srcBodyStart;  // starts right after 'use asm'
-    uint32_t end = metadata.srcEndBeforeCurly();
+    uint32_t begin = metadata.srcStart;
+    uint32_t end = metadata.srcEndAfterCurly();
     Rooted<JSFlatString*> src(cx, source->substringDontDeflate(cx, begin, end));
     if (!src)
         return false;
@@ -8084,18 +8067,11 @@ HandleInstantiationFailure(JSContext* cx, CallArgs args, const AsmJSMetadata& me
     if (!fun)
         return false;
 
-    Rooted<PropertyNameVector> formals(cx, PropertyNameVector(cx));
-    if (!MaybeAppendUTF8Name(cx, metadata.globalArgumentName.get(), &formals))
-        return false;
-    if (!MaybeAppendUTF8Name(cx, metadata.importArgumentName.get(), &formals))
-        return false;
-    if (!MaybeAppendUTF8Name(cx, metadata.bufferArgumentName.get(), &formals))
-        return false;
-
     CompileOptions options(cx);
     options.setMutedErrors(source->mutedErrors())
            .setFile(source->filename())
            .setNoScriptRval(false);
+    options.asmJSOption = AsmJSOption::Disabled;
 
     // The exported function inherits an implicit strict context if the module
     // also inherited it somehow.
@@ -8110,8 +8086,8 @@ HandleInstantiationFailure(JSContext* cx, CallArgs args, const AsmJSMetadata& me
     SourceBufferHolder::Ownership ownership = stableChars.maybeGiveOwnershipToCaller()
                                               ? SourceBufferHolder::GiveOwnership
                                               : SourceBufferHolder::NoOwnership;
-    SourceBufferHolder srcBuf(chars, end - begin, ownership);
-    if (!frontend::CompileFunctionBody(cx, &fun, options, formals, srcBuf))
+    SourceBufferHolder srcBuf(chars, stableChars.twoByteRange().length(), ownership);
+    if (!frontend::CompileStandaloneFunction(cx, &fun, options, srcBuf, Nothing()))
         return false;
 
     // Call the function we just recompiled.
@@ -8153,7 +8129,7 @@ InstantiateAsmJS(JSContext* cx, unsigned argc, JS::Value* vp)
 static JSFunction*
 NewAsmJSModuleFunction(ExclusiveContext* cx, JSFunction* origFun, HandleObject moduleObj)
 {
-    RootedAtom name(cx, origFun->name());
+    RootedAtom name(cx, origFun->explicitName());
 
     JSFunction::Flags flags = origFun->isLambda() ? JSFunction::ASMJS_LAMBDA_CTOR
                                                   : JSFunction::ASMJS_CTOR;
@@ -8523,11 +8499,14 @@ LookupAsmJSModuleInCache(ExclusiveContext* cx, AsmJSParser& parser, bool* loaded
     if (!open(cx->global(), begin, limit, &entry.serializedSize, &entry.memory, &entry.handle))
         return true;
 
+    size_t remain = entry.serializedSize;
     const uint8_t* cursor = entry.memory;
 
     uint32_t bytecodeSize, compiledSize;
-    cursor = ReadScalar<uint32_t>(cursor, &bytecodeSize);
-    cursor = ReadScalar<uint32_t>(cursor, &compiledSize);
+    (cursor = ReadScalarChecked<uint32_t>(cursor, &remain, &bytecodeSize)) &&
+    (cursor = ReadScalarChecked<uint32_t>(cursor, &remain, &compiledSize));
+    if (!cursor)
+        return true;
 
     const uint8_t* compiledBegin = cursor;
     const uint8_t* bytecodeBegin = compiledBegin + compiledSize;
@@ -8536,7 +8515,7 @@ LookupAsmJSModuleInCache(ExclusiveContext* cx, AsmJSParser& parser, bool* loaded
     if (!assumptions.initBuildIdFromContext(cx))
         return false;
 
-    if (!Module::assumptionsMatch(assumptions, compiledBegin))
+    if (!Module::assumptionsMatch(assumptions, compiledBegin, remain))
         return true;
 
     MutableAsmJSMetadata asmJSMetadata = cx->new_<AsmJSMetadata>();
@@ -8852,23 +8831,6 @@ js::IsAsmJSModuleLoadedFromCache(JSContext* cx, unsigned argc, Value* vp)
 /*****************************************************************************/
 // asm.js toString/toSource support
 
-static MOZ_MUST_USE bool
-MaybeAppendUTF8Chars(JSContext* cx, const char* sep, const char* utf8Chars, StringBuffer* sb)
-{
-    if (!utf8Chars)
-        return true;
-
-    UTF8Chars utf8(utf8Chars, strlen(utf8Chars));
-
-    size_t length;
-    UniqueTwoByteChars twoByteChars(UTF8CharsToNewTwoByteCharsZ(cx, utf8, &length).get());
-    if (!twoByteChars)
-        return false;
-
-    return sb->append(sep, strlen(sep)) &&
-           sb->append(twoByteChars.get(), length);
-}
-
 JSString*
 js::AsmJSModuleToString(JSContext* cx, HandleFunction fun, bool addParenToLambda)
 {
@@ -8887,7 +8849,7 @@ js::AsmJSModuleToString(JSContext* cx, HandleFunction fun, bool addParenToLambda
     if (!out.append("function "))
         return nullptr;
 
-    if (fun->name() && !out.append(fun->name()))
+    if (fun->explicitName() && !out.append(fun->explicitName()))
         return nullptr;
 
     bool haveSource = source->hasSourceData();
@@ -8898,32 +8860,11 @@ js::AsmJSModuleToString(JSContext* cx, HandleFunction fun, bool addParenToLambda
         if (!out.append("() {\n    [sourceless code]\n}"))
             return nullptr;
     } else {
-        // Whether the function has been created with a Function ctor
-        bool funCtor = begin == 0 && end == source->length() && source->argumentsNotIncluded();
-        if (funCtor) {
-            // Functions created with the function constructor don't have arguments in their source.
-            if (!out.append("("))
-                return nullptr;
-
-            if (!MaybeAppendUTF8Chars(cx, "", metadata.globalArgumentName.get(), &out))
-                return nullptr;
-            if (!MaybeAppendUTF8Chars(cx, ", ", metadata.importArgumentName.get(), &out))
-                return nullptr;
-            if (!MaybeAppendUTF8Chars(cx, ", ", metadata.bufferArgumentName.get(), &out))
-                return nullptr;
-
-            if (!out.append(") {\n"))
-                return nullptr;
-        }
-
         Rooted<JSFlatString*> src(cx, source->substring(cx, begin, end));
         if (!src)
             return nullptr;
 
         if (!out.append(src))
-            return nullptr;
-
-        if (funCtor && !out.append("\n}"))
             return nullptr;
     }
 
@@ -8956,16 +8897,12 @@ js::AsmJSFunctionToString(JSContext* cx, HandleFunction fun)
 
     if (!haveSource) {
         // asm.js functions can't be anonymous
-        MOZ_ASSERT(fun->name());
-        if (!out.append(fun->name()))
+        MOZ_ASSERT(fun->explicitName());
+        if (!out.append(fun->explicitName()))
             return nullptr;
         if (!out.append("() {\n    [sourceless code]\n}"))
             return nullptr;
     } else {
-        // asm.js functions cannot have been created with a Function constructor
-        // as they belong within a module.
-        MOZ_ASSERT(!(begin == 0 && end == source->length() && source->argumentsNotIncluded()));
-
         Rooted<JSFlatString*> src(cx, source->substring(cx, begin, end));
         if (!src)
             return nullptr;

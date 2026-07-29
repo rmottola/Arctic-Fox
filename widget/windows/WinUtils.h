@@ -40,7 +40,7 @@
 /**
  * NS_INLINE_DECL_IUNKNOWN_REFCOUNTING should be used for defining and
  * implementing AddRef() and Release() of IUnknown interface.
- * This depends on xpcom/glue/nsISupportsImpl.h.
+ * This depends on xpcom/base/nsISupportsImpl.h.
  */
 
 #define NS_INLINE_DECL_IUNKNOWN_REFCOUNTING(_class)                           \
@@ -589,7 +589,7 @@ public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIRUNNABLE
 
-  AsyncDeleteIconFromDisk(const nsAString &aIconPath);
+  explicit AsyncDeleteIconFromDisk(const nsAString &aIconPath);
 
 private:
   virtual ~AsyncDeleteIconFromDisk();
@@ -603,7 +603,7 @@ public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIRUNNABLE
 
-  AsyncDeleteAllFaviconsFromDisk(bool aIgnoreRecent = false);
+  explicit AsyncDeleteAllFaviconsFromDisk(bool aIgnoreRecent = false);
 
 private:
   virtual ~AsyncDeleteAllFaviconsFromDisk();

@@ -413,11 +413,11 @@ XPCNativeInterface::DebugDump(int16_t depth)
 {
 #ifdef DEBUG
     depth--;
-    XPC_LOG_ALWAYS(("XPCNativeInterface @ %x", this));
+    XPC_LOG_ALWAYS(("XPCNativeInterface @ %p", this));
         XPC_LOG_INDENT();
         XPC_LOG_ALWAYS(("name is %s", GetNameString()));
         XPC_LOG_ALWAYS(("mMemberCount is %d", mMemberCount));
-        XPC_LOG_ALWAYS(("mInfo @ %x", mInfo.get()));
+        XPC_LOG_ALWAYS(("mInfo @ %p", mInfo.get()));
         XPC_LOG_OUTDENT();
 #endif
 }
@@ -786,7 +786,7 @@ XPCNativeSet::DebugDump(int16_t depth)
 {
 #ifdef DEBUG
     depth--;
-    XPC_LOG_ALWAYS(("XPCNativeSet @ %x", this));
+    XPC_LOG_ALWAYS(("XPCNativeSet @ %p", this));
         XPC_LOG_INDENT();
 
         XPC_LOG_ALWAYS(("mInterfaceCount of %d", mInterfaceCount));

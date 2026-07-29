@@ -86,7 +86,7 @@ XPCOMUtils.defineLazyGetter(gStrings, "appVersion", function() {
 });
 
 document.addEventListener("load", initialize, true);
-window.addEventListener("unload", shutdown, false);
+window.addEventListener("unload", shutdown);
 
 class MessageDispatcher {
   constructor(target) {
@@ -547,7 +547,7 @@ var gEventManager = {
       // Hide the separator if there are no visible menu items before it
       menuSep.hidden = (countMenuItemsBeforeSep == 0);
 
-    }, false);
+    });
 
     let addonTooltip = document.getElementById("addonitem-tooltip");
     addonTooltip.addEventListener("popupshowing", function() {
@@ -571,7 +571,7 @@ var gEventManager = {
       }
 
       addonTooltip.label = tiptext;
-    }, false);
+    });
   },
 
   shutdown: function() {
@@ -726,8 +726,7 @@ var gViewController = {
 
     window.addEventListener("popstate", function(e) {
                               gViewController.updateState(e.state);
-                            },
-                            false);
+                            });
   },
 
   shutdown: function() {
@@ -1845,7 +1844,7 @@ var gCategories = {
     this.node.addEventListener("select", () => {
       this.maybeHideSearch();
       gViewController.loadView(this.node.selectedItem.value);
-    }, false);
+    });
 
     this.node.addEventListener("click", (aEvent) => {
       var selectedItem = this.node.selectedItem;
@@ -1859,7 +1858,7 @@ var gCategories = {
 
         gViewController.loadView(viewId);
       }
-    }, false);
+    });
   },
 
   shutdown: function() {
@@ -2057,7 +2056,7 @@ var gHeader = {
         return;
 
       gViewController.loadView("addons://search/" + encodeURIComponent(query));
-    }, false);
+    });
 
     function updateNavButtonVisibility() {
       var shouldShow = gHeader.shouldShowNavButtons;
@@ -2068,7 +2067,7 @@ var gHeader = {
     window.addEventListener("focus", function(aEvent) {
       if (aEvent.target == window)
         updateNavButtonVisibility();
-    }, false);
+    });
 
     updateNavButtonVisibility();
   },
@@ -2422,9 +2421,9 @@ var gSearchView = {
         if (item)
           item.showInDetailView();
       }
-    }, false);
+    });
 
-    this._filter.addEventListener("command", () => this.updateView(), false);
+    this._filter.addEventListener("command", () => this.updateView());
   },
 
   shutdown: function() {
@@ -2737,7 +2736,7 @@ var gListView = {
         if (item)
           item.showInDetailView();
       }
-    }, false);
+    });
 
     document.getElementById("signing-learn-more").setAttribute("href",
       Services.urlFormatter.formatURLPref("app.support.baseURL") + "unsigned-addons");
@@ -3669,7 +3668,7 @@ var gUpdatesView = {
     this._updateSelected = document.getElementById("update-selected-btn");
     this._updateSelected.addEventListener("command", function() {
       gUpdatesView.installSelected();
-    }, false);
+    });
 
     this.updateAvailableCount(true);
 
@@ -3757,7 +3756,7 @@ var gUpdatesView = {
         item.setAttribute("upgrade", true);
         item.addEventListener("IncludeUpdateChanged", () => {
           this.maybeDisableUpdateSelected();
-        }, false);
+        });
         elements.push(item);
       }
 

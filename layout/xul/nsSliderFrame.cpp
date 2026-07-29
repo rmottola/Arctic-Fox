@@ -81,6 +81,7 @@ NS_QUERYFRAME_TAIL_INHERITING(nsBoxFrame)
 
 nsSliderFrame::nsSliderFrame(nsStyleContext* aContext):
   nsBoxFrame(aContext),
+  mRatio(0.0f),
   mCurPos(0),
   mChange(0),
   mDragFinished(true),
@@ -1270,6 +1271,10 @@ nsSliderFrame::HandlePress(nsPresContext* aPresContext,
   if (!GetEventPoint(aEvent, eventPoint)) {
     return NS_OK;
   }
+
+  mozilla::Telemetry::Accumulate(mozilla::Telemetry::SCROLL_INPUT_METHODS,
+      (uint32_t) ScrollInputMethod::MainThreadScrollbarTrackClick);
+
   if (IsXULHorizontal() ? eventPoint.x < thumbRect.x 
                         : eventPoint.y < thumbRect.y)
     change = -1;

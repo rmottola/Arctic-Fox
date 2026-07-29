@@ -11,6 +11,7 @@
 #include "jsapi.h"
 
 #include "mozilla/FloatingPoint.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/Sprintf.h"
 
@@ -107,6 +108,7 @@ using namespace js::gc;
 using mozilla::Maybe;
 using mozilla::PodCopy;
 using mozilla::PodZero;
+using mozilla::Some;
 
 using JS::AutoGCRooter;
 using JS::ToInt32;
@@ -2082,7 +2084,7 @@ DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue val
         getter != JS_PropertyStub && setter != JS_StrictPropertyStub)
     {
         if (getter && !(attrs & JSPROP_GETTER)) {
-            RootedAtom atom(cx, IdToFunctionName(cx, id, "get"));
+            RootedAtom atom(cx, IdToFunctionName(cx, id, FunctionPrefixKind::Get));
             if (!atom)
                 return false;
             JSFunction* getobj = NewNativeFunction(cx, (Native) getter, 0, atom);
@@ -2098,7 +2100,7 @@ DefinePropertyById(JSContext* cx, HandleObject obj, HandleId id, HandleValue val
         if (setter && !(attrs & JSPROP_SETTER)) {
             // Root just the getter, since the setter is not yet a JSObject.
             AutoRooterGetterSetter getRoot(cx, JSPROP_GETTER, &getter, nullptr);
-            RootedAtom atom(cx, IdToFunctionName(cx, id, "set"));
+            RootedAtom atom(cx, IdToFunctionName(cx, id, FunctionPrefixKind::Set));
             if (!atom)
                 return false;
             JSFunction* setobj = NewNativeFunction(cx, (Native) setter, 1, atom);
@@ -3246,8 +3248,8 @@ JS_NewArrayObject(JSContext* cx, size_t length)
     return NewDenseFullyAllocatedArray(cx, length);
 }
 
-JS_PUBLIC_API(bool)
-JS_IsArrayObject(JSContext* cx, JS::HandleObject obj, bool* isArray)
+inline bool
+IsGivenTypeObject(JSContext* cx, JS::HandleObject obj, const ESClass& typeClass, bool* isType)
 {
     assertSameCompartment(cx, obj);
 
@@ -3255,8 +3257,14 @@ JS_IsArrayObject(JSContext* cx, JS::HandleObject obj, bool* isArray)
     if (!GetBuiltinClass(cx, obj, &cls))
         return false;
 
-    *isArray = cls == ESClass::Array;
+    *isType = cls == typeClass;
     return true;
+}
+
+JS_PUBLIC_API(bool)
+JS_IsArrayObject(JSContext* cx, JS::HandleObject obj, bool* isArray)
+{
+    return IsGivenTypeObject(cx, obj, ESClass::Array, isArray);
 }
 
 JS_PUBLIC_API(bool)
@@ -3287,6 +3295,18 @@ JS_SetArrayLength(JSContext* cx, HandleObject obj, uint32_t length)
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
     return SetLengthProperty(cx, obj, length);
+}
+
+JS_PUBLIC_API(bool)
+JS::IsMapObject(JSContext* cx, JS::HandleObject obj, bool* isMap)
+{
+    return IsGivenTypeObject(cx, obj, ESClass::Map, isMap);
+}
+
+JS_PUBLIC_API(bool)
+JS::IsSetObject(JSContext* cx, JS::HandleObject obj, bool* isSet)
+{
+    return IsGivenTypeObject(cx, obj, ESClass::Set, isSet);
 }
 
 JS_PUBLIC_API(void)
@@ -3404,10 +3424,7 @@ JS::NewFunctionFromSpec(JSContext* cx, const JSFunctionSpec* fs, HandleId id)
         {
             return nullptr;
         }
-        JSFunction* fun = &funVal.toObject().as<JSFunction>();
-        if (fs->flags & JSFUN_HAS_REST)
-            fun->setHasRest();
-        return fun;
+        return &funVal.toObject().as<JSFunction>();
     }
 
     RootedAtom atom(cx, IdToFunctionName(cx, id));
@@ -3509,7 +3526,7 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject env, Handle
     RootedFunction fun(cx, &funobj->as<JSFunction>());
     if (fun->isInterpretedLazy()) {
         AutoCompartment ac(cx, funobj);
-        if (!fun->getOrCreateScript(cx))
+        if (!JSFunction::getOrCreateScript(cx, fun))
             return nullptr;
     }
 
@@ -3541,7 +3558,7 @@ CloneFunctionObject(JSContext* cx, HandleObject funobj, HandleObject env, Handle
         // Fail here if we OOM during debug asserting.
         // CloneFunctionReuseScript will delazify the script anyways, so we
         // are not creating an extra failure condition for DEBUG builds.
-        if (!fun->getOrCreateScript(cx))
+        if (!JSFunction::getOrCreateScript(cx, fun))
             return nullptr;
         MOZ_ASSERT(scope->as<GlobalScope>().isSyntactic() ||
                    fun->nonLazyScript()->hasNonSyntacticScope());
@@ -3587,7 +3604,7 @@ JS_GetFunctionObject(JSFunction* fun)
 JS_PUBLIC_API(JSString*)
 JS_GetFunctionId(JSFunction* fun)
 {
-    return fun->name();
+    return fun->explicitName();
 }
 
 JS_PUBLIC_API(JSString*)
@@ -3775,6 +3792,7 @@ JS::TransitiveCompileOptions::copyPODTransitiveOptions(const TransitiveCompileOp
     canLazilyParse = rhs.canLazilyParse;
     strictOption = rhs.strictOption;
     extraWarningsOption = rhs.extraWarningsOption;
+    forEachStatementOption = rhs.forEachStatementOption;
     werrorOption = rhs.werrorOption;
     asmJSOption = rhs.asmJSOption;
     throwOnAsmJSValidationFailureOption = rhs.throwOnAsmJSValidationFailureOption;
@@ -3896,6 +3914,7 @@ JS::CompileOptions::CompileOptions(JSContext* cx, JSVersion version)
 
     strictOption = cx->options().strictMode();
     extraWarningsOption = cx->compartment()->behaviors().extraWarnings(cx);
+    forEachStatementOption = cx->options().forEachStatement();
     werrorOption = cx->options().werror();
     if (!cx->options().asmJS())
         asmJSOption = AsmJSOption::Disabled;
@@ -4194,7 +4213,7 @@ JS_GetFunctionScript(JSContext* cx, HandleFunction fun)
         return nullptr;
     if (fun->isInterpretedLazy()) {
         AutoCompartment funCompartment(cx, fun);
-        JSScript* script = fun->getOrCreateScript(cx);
+        JSScript* script = JSFunction::getOrCreateScript(cx, fun);
         if (!script)
             MOZ_CRASH();
         return script;
@@ -4203,15 +4222,15 @@ JS_GetFunctionScript(JSContext* cx, HandleFunction fun)
 }
 
 /*
- * enclosingScope is a static enclosing scope, if any (e.g. a WithScope).  If
- * the enclosing scope is the global scope, this must be null.
+ * enclosingScope is a scope, if any (e.g. a WithScope).  If the scope is the
+ * global scope, this must be null.
  *
- * enclosingDynamicScope is a dynamic scope to use, if it's not the global.
+ * enclosingEnv is an environment to use, if it's not the global.
  */
 static bool
 CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
-                const char* name, unsigned nargs, const char* const* argnames,
-                SourceBufferHolder& srcBuf,
+                const char* name,
+                SourceBufferHolder& srcBuf, uint32_t parameterListEnd,
                 HandleObject enclosingEnv, HandleScope enclosingScope,
                 MutableHandleFunction fun)
 {
@@ -4227,13 +4246,6 @@ CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
             return false;
     }
 
-    Rooted<PropertyNameVector> formals(cx, PropertyNameVector(cx));
-    for (unsigned i = 0; i < nargs; i++) {
-        RootedAtom argAtom(cx, Atomize(cx, argnames[i], strlen(argnames[i])));
-        if (!argAtom || !formals.append(argAtom->asPropertyName()))
-            return false;
-    }
-
     fun.set(NewScriptedFunction(cx, 0, JSFunction::INTERPRETED_NORMAL, funAtom,
                                 /* proto = */ nullptr,
                                 gc::AllocKind::FUNCTION, TenuredObject,
@@ -4246,7 +4258,45 @@ CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
     MOZ_ASSERT_IF(!IsGlobalLexicalEnvironment(enclosingEnv),
                   enclosingScope->hasOnChain(ScopeKind::NonSyntactic));
 
-    if (!frontend::CompileFunctionBody(cx, fun, optionsArg, formals, srcBuf, enclosingScope))
+    if (!frontend::CompileStandaloneFunction(cx, fun, optionsArg, srcBuf,
+                                             Some(parameterListEnd), enclosingScope))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+static MOZ_MUST_USE bool
+BuildFunctionString(unsigned nargs, const char* const* argnames,
+                    const SourceBufferHolder& srcBuf, StringBuffer* out,
+                    uint32_t* parameterListEnd)
+{
+    MOZ_ASSERT(out);
+    MOZ_ASSERT(parameterListEnd);
+
+    if (!out->ensureTwoByteChars())
+        return false;
+    if (!out->append("("))
+        return false;
+    for (unsigned i = 0; i < nargs; i++) {
+        if (i != 0) {
+            if (!out->append(", "))
+                return false;
+        }
+        if (!out->append(argnames[i], strlen(argnames[i])))
+            return false;
+    }
+
+    // Remember the position of ")".
+    *parameterListEnd = out->length();
+    MOZ_ASSERT(FunctionConstructorMedialSigils[0] == ')');
+
+    if (!out->append(FunctionConstructorMedialSigils))
+        return false;
+    if (!out->append(srcBuf.get(), srcBuf.length()))
+        return false;
+    if (!out->append(FunctionConstructorFinalBrace))
         return false;
 
     return true;
@@ -4262,7 +4312,16 @@ JS::CompileFunction(JSContext* cx, AutoObjectVector& envChain,
     RootedScope scope(cx);
     if (!CreateNonSyntacticEnvironmentChain(cx, envChain, &env, &scope))
         return false;
-    return CompileFunction(cx, options, name, nargs, argnames, srcBuf, env, scope, fun);
+
+    uint32_t parameterListEnd;
+    StringBuffer funStr(cx);
+    if (!BuildFunctionString(nargs, argnames, srcBuf, &funStr, &parameterListEnd))
+        return false;
+
+    size_t newLen = funStr.length();
+    SourceBufferHolder newSrcBuf(funStr.stealChars(), newLen, SourceBufferHolder::GiveOwnership);
+
+    return CompileFunction(cx, options, name, newSrcBuf, parameterListEnd, env, scope, fun);
 }
 
 JS_PUBLIC_API(bool)

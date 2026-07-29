@@ -80,6 +80,10 @@
 using namespace mozilla;
 using namespace mozilla::net;
 
+#define DEFAULT_USER_CONTROL_RP 3
+
+static uint32_t sUserControlRp = DEFAULT_USER_CONTROL_RP;
+
 nsresult /*NS_NewChannelWithNodeAndTriggeringPrincipal */
 NS_NewChannelWithTriggeringPrincipal(nsIChannel           **outChannel,
                                      nsIURI                *aUri,
@@ -572,8 +576,7 @@ NS_LoadGroupMatchesPrincipal(nsILoadGroup *aLoadGroup,
     nsresult rv = loadContext->GetIsInIsolatedMozBrowserElement(&contextInIsolatedBrowser);
     NS_ENSURE_SUCCESS(rv, false);
 
-    return nsIScriptSecurityManager::NO_APP_ID == aPrincipal->GetAppId() &&
-           contextInIsolatedBrowser == aPrincipal->GetIsInIsolatedMozBrowserElement();
+    return contextInIsolatedBrowser == aPrincipal->GetIsInIsolatedMozBrowserElement();
 }
 
 nsresult
@@ -1246,7 +1249,7 @@ NS_UsePrivateBrowsing(nsIChannel *channel)
 
 bool
 NS_GetOriginAttributes(nsIChannel *aChannel,
-                       mozilla::NeckoOriginAttributes &aAttributes)
+                       mozilla::OriginAttributes &aAttributes)
 {
     nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
     if (!loadInfo) {
@@ -1259,38 +1262,15 @@ NS_GetOriginAttributes(nsIChannel *aChannel,
 }
 
 bool
-NS_GetAppInfo(nsIChannel *aChannel,
-              uint32_t *aAppID,
-              bool *aIsInIsolatedMozBrowserElement)
-{
-    NeckoOriginAttributes attrs;
-
-    if (!NS_GetOriginAttributes(aChannel, attrs)) {
-      return false;
-    }
-
-    *aAppID = attrs.mAppId;
-    *aIsInIsolatedMozBrowserElement = attrs.mInIsolatedMozBrowser;
-
-    return true;
-}
-
-bool
 NS_HasBeenCrossOrigin(nsIChannel* aChannel, bool aReport)
 {
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
   MOZ_RELEASE_ASSERT(loadInfo, "Origin tracking only works for channels created with a loadinfo");
 
-#ifdef DEBUG
-  // Don't enforce TYPE_DOCUMENT assertions for loads
-  // initiated by javascript tests.
-  bool skipContentTypeCheck = false;
-  skipContentTypeCheck = Preferences::GetBool("network.loadinfo.skip_type_assertion");
-#endif
-
-  MOZ_ASSERT(skipContentTypeCheck ||
-             loadInfo->GetExternalContentPolicyType() != nsIContentPolicy::TYPE_DOCUMENT,
-             "calling NS_HasBeenCrossOrigin on a top level load");
+  // TYPE_DOCUMENT loads have a null LoadingPrincipal and can not be cross origin.
+  if (!loadInfo->LoadingPrincipal()) {
+    return false;
+  }
 
   // Always treat tainted channels as cross-origin.
   if (loadInfo->GetTainting() != LoadTainting::Basic) {
@@ -2179,8 +2159,10 @@ NS_IsSrcdocChannel(nsIChannel *aChannel)
   }
   nsCOMPtr<nsIViewSourceChannel> vsc = do_QueryInterface(aChannel);
   if (vsc) {
-    vsc->GetIsSrcdocChannel(&isSrcdoc);
-    return isSrcdoc;
+    nsresult rv = vsc->GetIsSrcdocChannel(&isSrcdoc);
+    if (NS_SUCCEEDED(rv)) {
+      return isSrcdoc;
+    }
   }
   return false;
 }
@@ -2365,14 +2347,13 @@ NS_CompareLoadInfoAndLoadContext(nsIChannel *aChannel)
   }
 
   OriginAttributes originAttrsLoadInfo = loadInfo->GetOriginAttributes();
-  DocShellOriginAttributes originAttrsLoadContext;
+  OriginAttributes originAttrsLoadContext;
   loadContext->GetOriginAttributes(originAttrsLoadContext);
 
-  LOG(("NS_CompareLoadInfoAndLoadContext - loadInfo: %d, %d, %d, %d; "
+  LOG(("NS_CompareLoadInfoAndLoadContext - loadInfo: %d, %d, %d; "
        "loadContext: %d %d, %d. [channel=%p]",
-       originAttrsLoadInfo.mAppId, originAttrsLoadInfo.mInIsolatedMozBrowser,
-       originAttrsLoadInfo.mUserContextId, originAttrsLoadInfo.mPrivateBrowsingId,
-       loadContextIsInBE,
+       originAttrsLoadInfo.mInIsolatedMozBrowser, originAttrsLoadInfo.mUserContextId,
+       originAttrsLoadInfo.mPrivateBrowsingId, loadContextIsInBE,
        originAttrsLoadContext.mUserContextId, originAttrsLoadContext.mPrivateBrowsingId,
        aChannel));
 
@@ -2392,6 +2373,30 @@ NS_CompareLoadInfoAndLoadContext(nsIChannel *aChannel)
              "loadInfo are not the same!");
 
   return NS_OK;
+}
+
+uint32_t
+NS_GetDefaultReferrerPolicy()
+{
+  static bool preferencesInitialized = false;
+
+  if (!preferencesInitialized) {
+    mozilla::Preferences::AddUintVarCache(&sUserControlRp,
+                                          "network.http.referer.userControlPolicy",
+                                          DEFAULT_USER_CONTROL_RP);
+    preferencesInitialized = true;
+  }
+
+  switch (sUserControlRp) {
+    case 0:
+      return nsIHttpChannel::REFERRER_POLICY_NO_REFERRER;
+    case 1:
+      return nsIHttpChannel::REFERRER_POLICY_SAME_ORIGIN;
+    case 2:
+      return nsIHttpChannel::REFERRER_POLICY_STRICT_ORIGIN_WHEN_XORIGIN;
+  }
+
+  return nsIHttpChannel::REFERRER_POLICY_NO_REFERRER_WHEN_DOWNGRADE;
 }
 
 namespace mozilla {

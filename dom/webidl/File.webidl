@@ -26,7 +26,6 @@ dictionary FilePropertyBag {
 
 dictionary ChromeFilePropertyBag : FilePropertyBag {
   DOMString name = "";
-  boolean temporary = false;
 };
 
 // Mozilla extensions
@@ -34,17 +33,17 @@ partial interface File {
   [GetterThrows, Deprecated="FileLastModifiedDate"]
   readonly attribute Date lastModifiedDate;
 
-  [BinaryName="path", Func="mozilla::dom::Directory::WebkitBlinkDirectoryPickerEnabled"]
+  [BinaryName="relativePath", Func="mozilla::dom::Directory::WebkitBlinkDirectoryPickerEnabled"]
   readonly attribute USVString webkitRelativePath;
 
-  [GetterThrows, ChromeOnly]
+  [GetterThrows, ChromeOnly, NeedsCallerType]
   readonly attribute DOMString mozFullPath;
 
-  [ChromeOnly, Throws]
-  static File createFromNsIFile(nsIFile file,
-                                optional ChromeFilePropertyBag options);
+  [ChromeOnly, Throws, NeedsCallerType]
+  static Promise<File> createFromNsIFile(nsIFile file,
+                                         optional ChromeFilePropertyBag options);
 
-  [ChromeOnly, Throws]
-  static File createFromFileName(USVString fileName,
-                                 optional ChromeFilePropertyBag options);
+  [ChromeOnly, Throws, NeedsCallerType]
+  static Promise<File> createFromFileName(USVString fileName,
+                                          optional ChromeFilePropertyBag options);
 };

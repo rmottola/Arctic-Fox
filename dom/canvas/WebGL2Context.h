@@ -66,6 +66,8 @@ public:
     virtual JS::Value GetFramebufferAttachmentParameter(JSContext* cx, GLenum target,
                                                         GLenum attachment, GLenum pname,
                                                         ErrorResult& rv) override;
+    // Make the inline version from the superclass visible here.
+    using WebGLContext::GetFramebufferAttachmentParameter;
 
     void InvalidateFramebuffer(GLenum target, const dom::Sequence<GLenum>& attachments,
                                ErrorResult& rv);
@@ -241,8 +243,10 @@ public:
     ////////////////
 
     // GL 3.0 & ES 3.0
-    void VertexAttribI4i(GLuint index, GLint x, GLint y, GLint z, GLint w);
-    void VertexAttribI4ui(GLuint index, GLuint x, GLuint y, GLuint z, GLuint w);
+    void VertexAttribI4i(GLuint index, GLint x, GLint y, GLint z, GLint w,
+                         const char* funcName = nullptr);
+    void VertexAttribI4ui(GLuint index, GLuint x, GLuint y, GLuint z, GLuint w,
+                          const char* funcName = nullptr);
 
     void VertexAttribI4iv(GLuint index, const Int32ListU& list) {
         const auto& arr = Int32Arr::From(list);
@@ -281,7 +285,7 @@ public:
 
 private:
     bool ValidateClearBuffer(const char* funcName, GLenum buffer, GLint drawBuffer,
-                             size_t availElemCount, GLuint elemOffset);
+                             size_t availElemCount, GLuint elemOffset, GLenum funcType);
 
     void ClearBufferfv(GLenum buffer, GLint drawBuffer, const Float32Arr& src,
                        GLuint srcElemOffset);
@@ -360,6 +364,8 @@ public:
     void BindBufferRange(GLenum target, GLuint index, WebGLBuffer* buffer, GLintptr offset, GLsizeiptr size);
 */
     virtual JS::Value GetParameter(JSContext* cx, GLenum pname, ErrorResult& rv) override;
+    // Make the inline version from the superclass visible here.
+    using WebGLContext::GetParameter;
     void GetIndexedParameter(JSContext* cx, GLenum target, GLuint index,
                              JS::MutableHandleValue retval, ErrorResult& rv);
     void GetUniformIndices(const WebGLProgram& program,

@@ -4,7 +4,7 @@
 "use strict";
 
 const { console, ConsoleAPI } = require("resource://gre/modules/Console.jsm");
-const { ConsoleAPIListener } = require("devtools/server/actors/utils/webconsole-utils");
+const { ConsoleAPIListener } = require("devtools/server/actors/utils/webconsole-listeners");
 const Services = require("Services");
 
 var seenMessages = 0;
@@ -31,7 +31,7 @@ var callback = {
 };
 
 function createFakeAddonWindow({addonId} = {}) {
-  let baseURI = Services.io.newURI("about:blank", null, null);
+  let baseURI = Services.io.newURI("about:blank");
   let originAttributes = {addonId};
   let principal = Services.scriptSecurityManager
         .createCodebasePrincipal(baseURI, originAttributes);

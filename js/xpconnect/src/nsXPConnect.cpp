@@ -833,11 +833,11 @@ nsXPConnect::GetWrappedNativePrototype(JSContext* aJSContext,
     if (!scope)
         return UnexpectedFailure(NS_ERROR_FAILURE);
 
-    XPCNativeScriptableCreateInfo sciProto;
-    XPCWrappedNative::GatherProtoScriptableCreateInfo(aClassInfo, sciProto);
+    nsCOMPtr<nsIXPCScriptable> scrProto =
+        XPCWrappedNative::GatherProtoScriptable(aClassInfo);
 
     AutoMarkingWrappedNativeProtoPtr proto(aJSContext);
-    proto = XPCWrappedNativeProto::GetNewOrUsed(scope, aClassInfo, &sciProto);
+    proto = XPCWrappedNativeProto::GetNewOrUsed(scope, aClassInfo, scrProto);
     if (!proto)
         return UnexpectedFailure(NS_ERROR_FAILURE);
 
@@ -855,15 +855,15 @@ nsXPConnect::DebugDump(int16_t depth)
 {
 #ifdef DEBUG
     depth-- ;
-    XPC_LOG_ALWAYS(("nsXPConnect @ %x with mRefCnt = %d", this, mRefCnt.get()));
+    XPC_LOG_ALWAYS(("nsXPConnect @ %p with mRefCnt = %" PRIuPTR, this, mRefCnt.get()));
     XPC_LOG_INDENT();
-        XPC_LOG_ALWAYS(("gSelf @ %x", gSelf));
+        XPC_LOG_ALWAYS(("gSelf @ %p", gSelf));
         XPC_LOG_ALWAYS(("gOnceAliveNowDead is %d", (int)gOnceAliveNowDead));
         if (mContext) {
             if (depth)
                 mContext->DebugDump(depth);
             else
-                XPC_LOG_ALWAYS(("XPCJSContext @ %x", mContext));
+                XPC_LOG_ALWAYS(("XPCJSContext @ %p", mContext));
         } else
             XPC_LOG_ALWAYS(("mContext is null"));
         XPCWrappedNativeScope::DebugDumpAllScopes(depth);
@@ -905,7 +905,7 @@ nsXPConnect::DebugDumpObject(nsISupports* p, int16_t depth)
         XPC_LOG_ALWAYS(("Dumping a nsIXPConnectWrappedJS..."));
         wjs->DebugDump(depth);
     } else {
-        XPC_LOG_ALWAYS(("*** Could not dump the nsISupports @ %x", p));
+        XPC_LOG_ALWAYS(("*** Could not dump the nsISupports @ %p", p));
     }
 #endif
     return NS_OK;
@@ -1132,7 +1132,7 @@ ReadScriptOrFunction(nsIObjectInputStream* stream, JSContext* cx,
     // We don't serialize mutedError-ness of scripts, which is fine as long as
     // we only serialize system and XUL-y things. We can detect this by checking
     // where the caller wants us to deserialize.
-    MOZ_RELEASE_ASSERT(nsContentUtils::IsCallerChrome() ||
+    MOZ_RELEASE_ASSERT(nsContentUtils::IsSystemCaller(cx) ||
                        CurrentGlobalOrNull(cx) == xpc::CompilationScope());
 
     uint32_t size;

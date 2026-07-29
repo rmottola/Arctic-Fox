@@ -75,7 +75,7 @@
 #include "nsJSProtocolHandler.h"
 #include "nsScriptNameSpaceManager.h"
 #include "nsIControllerContext.h"
-#include "DOMStorageManager.h"
+#include "StorageManager.h"
 #include "nsJSON.h"
 #include "nsZipArchive.h"
 #include "mozilla/Attributes.h"
@@ -211,11 +211,6 @@ static void Shutdown();
 #include "mozilla/dom/PresentationTCPSessionTransport.h"
 
 #include "mozilla/TextInputProcessor.h"
-
-#ifdef MOZ_B2G
-#include "nsIHardwareKeyHandler.h"
-#include "mozilla/HardwareKeyHandler.h"
-#endif
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -606,11 +601,6 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(OSFileConstantsService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(UDPSocketChild)
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(GeckoMediaPluginService, GeckoMediaPluginService::GetGeckoMediaPluginService)
-
-#ifdef MOZ_B2G
-NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIHardwareKeyHandler,
-                                         HardwareKeyHandler::GetInstance)
-#endif
 
 #ifdef ACCESSIBILITY
 #include "xpcAccessibilityService.h"
@@ -1062,9 +1052,6 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kPRESENTATION_DEVICE_MANAGER_CID, false, nullptr, PresentationDeviceManagerConstructor },
   { &kPRESENTATION_TCP_SESSION_TRANSPORT_CID, false, nullptr, PresentationTCPSessionTransportConstructor },
   { &kTEXT_INPUT_PROCESSOR_CID, false, nullptr, TextInputProcessorConstructor },
-#ifdef MOZ_B2G
-  { &kNS_HARDWARE_KEY_HANDLER_CID, false, nullptr, nsIHardwareKeyHandlerConstructor },
-#endif
   { nullptr }
 };
 

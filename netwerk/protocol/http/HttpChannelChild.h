@@ -106,6 +106,7 @@ public:
   bool IsSuspended();
 
   mozilla::ipc::IPCResult RecvNotifyTrackingProtectionDisabled() override;
+  mozilla::ipc::IPCResult RecvNotifyTrackingResource() override;
   void FlushedForDiversion();
 
 protected:
@@ -153,6 +154,8 @@ protected:
 
   mozilla::ipc::IPCResult RecvIssueDeprecationWarning(const uint32_t& warning,
                                                       const bool& asError) override;
+
+  mozilla::ipc::IPCResult RecvSetPriority(const uint16_t& aPriority) override;
 
   bool GetAssociatedContentSecurity(nsIAssociatedContentSecurity** res = nullptr);
   virtual void DoNotifyListenerCleanup() override;

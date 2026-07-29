@@ -18,6 +18,7 @@
 #include "nsISupportsPriority.h"
 #include "nsIURI.h"
 #include "nsNSSComponent.h"
+#include "nsPromiseFlatString.h"
 #include "nsSecurityHeaderParser.h"
 #include "nsStreamUtils.h"
 #include "nsWhitespaceTokenizer.h"
@@ -157,7 +158,7 @@ ContentSignatureVerifier::CreateContextInternal(const nsACString& aData,
   }
 
   CERTCertListNode* node = CERT_LIST_HEAD(certCertList.get());
-  if (!node || !node->cert) {
+  if (!node || CERT_LIST_END(node, certCertList.get()) || !node->cert) {
     return NS_ERROR_FAILURE;
   }
 
@@ -433,7 +434,8 @@ ContentSignatureVerifier::ParseContentSignatureHeader(
   NS_NAMED_LITERAL_CSTRING(signature_var, "p384ecdsa");
   NS_NAMED_LITERAL_CSTRING(certChainURL_var, "x5u");
 
-  nsSecurityHeaderParser parser(aContentSignatureHeader.BeginReading());
+  const nsCString& flatHeader = PromiseFlatCString(aContentSignatureHeader);
+  nsSecurityHeaderParser parser(flatHeader);
   nsresult rv = parser.Parse();
   if (NS_FAILED(rv)) {
     CSVerifier_LOG(("CSVerifier: could not parse ContentSignature header\n"));

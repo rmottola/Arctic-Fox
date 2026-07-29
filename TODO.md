@@ -30,7 +30,6 @@
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
 - Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
 - Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
-- Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 
 
 impacting download and shutdown:
@@ -43,17 +42,6 @@ Check: 1448762
 
 ### FIXME / TODO
 - Reapply Bug 486262 - Part 2 with removal of tabbrowser.dtd - breaks browser currently
-
-
-### Further ToDo which would help portability:
-
-- from nsContextMenu.js : remove unremotePrincipal again
-
-- in nsGlobalWindow remove from Open calls aCalleePrincipal and aJSCallerContext
-- add PrincipalToInherit to LoadInfo
-- LoadFrame needs TriggerPrincipal & OriginalSrc
-- complete 1487964 port
-- check bugs: bug 1352874, bug 1440824 as prerequisites for Bug 529808
 
 
 ### Further Further ToDo:

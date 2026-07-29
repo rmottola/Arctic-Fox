@@ -85,19 +85,15 @@ IsMatchForCompositor(const KeyframeEffectReadOnly& aEffect,
     return MatchForCompositor::No;
   }
 
-  bool isPlaying = animation->IsPlaying();
-
-  // If we are finding animations for transform, check if there are other
-  // animations that should block the transform animation. e.g. geometric
-  // properties' animation. This check should be done regardless of whether
-  // the effect has the target property |aProperty| or not.
   AnimationPerformanceWarning::Type warningType;
-  if (aProperty == eCSSProperty_transform &&
-      isPlaying &&
-      aEffect.ShouldBlockAsyncTransformAnimations(aFrame, warningType)) {
+  if (animation->ShouldBeSynchronizedWithMainThread(aProperty, aFrame,
+                                                    warningType)) {
     EffectCompositor::SetPerformanceWarning(
       aFrame, aProperty,
       AnimationPerformanceWarning(warningType));
+    // For a given |aFrame|, we don't want some animations of |aProperty| to
+    // run on the compositor and others to run on the main thread, so if any
+    // need to be synchronized with the main thread, run them all there.
     return MatchForCompositor::NoAndBlockThisProperty;
   }
 
@@ -105,7 +101,9 @@ IsMatchForCompositor(const KeyframeEffectReadOnly& aEffect,
     return MatchForCompositor::No;
   }
 
-  return isPlaying ? MatchForCompositor::Yes : MatchForCompositor::IfNeeded;
+  return animation->IsPlaying()
+         ? MatchForCompositor::Yes
+         : MatchForCompositor::IfNeeded;
 }
 
 // Helper function to factor out the common logic from
@@ -127,6 +125,18 @@ FindAnimationsForCompositor(const nsIFrame* aFrame,
     return false;
   }
 
+  // First check for newly-started transform animations that should be
+  // synchronized with geometric animations. We need to do this before any
+  // other early returns (the one above is ok) since we can only check this
+  // state when the animation is newly-started.
+  if (aProperty == eCSSProperty_transform) {
+    PendingAnimationTracker* tracker =
+      aFrame->PresContext()->Document()->GetPendingAnimationTracker();
+    if (tracker) {
+      tracker->MarkAnimationsThatMightNeedSynchronization();
+    }
+  }
+
   // If the property will be added to the animations level of the cascade but
   // there is an !important rule for that property in the cascade then the
   // animation will not be applied since the !important rule overrides it.
@@ -136,6 +146,11 @@ FindAnimationsForCompositor(const nsIFrame* aFrame,
   }
 
   if (aFrame->RefusedAsyncAnimation()) {
+    return false;
+  }
+
+  if (aFrame->StyleContext()->StyleSource().IsServoComputedValues()) {
+    NS_ERROR("stylo: cannot handle compositor-driven animations yet");
     return false;
   }
 
@@ -185,6 +200,9 @@ FindAnimationsForCompositor(const nsIFrame* aFrame,
       IsMatchForCompositor(*effect, aProperty, aFrame);
 
     if (matchResult == MatchForCompositor::NoAndBlockThisProperty) {
+      // For a given |aFrame|, we don't want some animations of |aProperty| to
+      // run on the compositor and others to run on the main thread, so if any
+      // need to be synchronized with the main thread, run them all there.
       if (aMatches) {
         aMatches->Clear();
       }
@@ -256,9 +274,11 @@ EffectCompositor::RequestRestyle(dom::Element* aElement,
 
   if (aRestyleType == RestyleType::Layer) {
     // Prompt layers to re-sync their animations.
-    MOZ_ASSERT(mPresContext->RestyleManager()->IsGecko(),
-               "stylo: Servo-backed style system should not be using "
+    if (mPresContext->RestyleManager()->IsServo()) {
+      NS_ERROR("stylo: Servo-backed style system should not be using "
                "EffectCompositor");
+      return;
+    }
     mPresContext->RestyleManager()->AsGecko()->IncrementAnimationGeneration();
     EffectSet* effectSet =
       EffectSet::GetEffectSet(aElement, aPseudoType);
@@ -674,7 +694,7 @@ EffectCompositor::ComposeAnimationRule(dom::Element* aElement,
   // priority except properties in propertiesToSkip.
   const nsCSSPropertyIDSet& propertiesToSkip =
     aCascadeLevel == CascadeLevel::Animations
-    ? nsCSSPropertyIDSet()
+    ? effects->PropertiesForAnimationsLevel().Invert()
     : effects->PropertiesForAnimationsLevel();
   for (KeyframeEffectReadOnly* effect : sortedEffectList) {
     effect->GetAnimation()->ComposeStyle(animationRule, propertiesToSkip);
@@ -903,6 +923,25 @@ EffectCompositor::GetBaseStyle(nsCSSPropertyID aProperty,
   effectSet->PutBaseStyle(aProperty, result);
 
   return result;
+}
+
+/* static */ StyleAnimationValue
+EffectCompositor::GetBaseStyle(nsCSSPropertyID aProperty,
+                               const nsIFrame* aFrame)
+{
+  MOZ_ASSERT(aFrame->StyleContext(),
+             "The frame should have a valid style context");
+
+  Maybe<NonOwningAnimationTarget> pseudoElement =
+    EffectCompositor::GetAnimationElementAndPseudoForFrame(aFrame);
+
+  MOZ_ASSERT(pseudoElement && pseudoElement->mElement,
+             "The frame should have an associated element");
+
+  return EffectCompositor::GetBaseStyle(aProperty,
+                                        aFrame->StyleContext(),
+                                        *pseudoElement->mElement,
+                                        pseudoElement->mPseudoType);
 }
 
 /* static */ void

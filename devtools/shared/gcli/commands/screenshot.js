@@ -9,7 +9,6 @@ const l10n = require("gcli/l10n");
 const Services = require("Services");
 const { NetUtil } = require("resource://gre/modules/NetUtil.jsm");
 const { getRect } = require("devtools/shared/layout/utils");
-const promise = require("promise");
 const defer = require("devtools/shared/defer");
 const { Task } = require("devtools/shared/task");
 
@@ -18,11 +17,6 @@ loader.lazyImporter(this, "OS", "resource://gre/modules/osfile.jsm");
 loader.lazyImporter(this, "FileUtils", "resource://gre/modules/FileUtils.jsm");
 loader.lazyImporter(this, "PrivateBrowsingUtils",
                           "resource://gre/modules/PrivateBrowsingUtils.jsm");
-
-const BRAND_SHORT_NAME = Cc["@mozilla.org/intl/stringbundle;1"]
-                           .getService(Ci.nsIStringBundleService)
-                           .createBundle("chrome://branding/locale/brand.properties")
-                           .GetStringFromName("brandShortName");
 
 // String used as an indication to generate default file name in the following
 // format: "Screen Shot yyyy-mm-dd at HH.MM.SS.png"
@@ -121,7 +115,7 @@ exports.items = [
     item: "converter",
     from: "imageSummary",
     to: "dom",
-    exec: function(imageSummary, context) {
+    exec: function (imageSummary, context) {
       const document = context.document;
       const root = document.createElement("div");
 
@@ -135,7 +129,8 @@ exports.items = [
       // Add the thumbnail image
       if (imageSummary.data != null) {
         const image = context.document.createElement("div");
-        const previewHeight = parseInt(256 * imageSummary.height / imageSummary.width);
+        const previewHeight = parseInt(256 * imageSummary.height / imageSummary.width,
+                                       10);
         const style = "" +
             "width: 256px;" +
             "height: " + previewHeight + "px;" +
@@ -231,9 +226,7 @@ function captureScreenshot(args, document) {
       }, args.delay * 1000);
     });
   }
-  else {
-    return createScreenshotData(document, args);
-  }
+  return createScreenshotData(document, args);
 }
 
 /**
@@ -251,8 +244,8 @@ function saveScreenshot(args, context, reply) {
 
   return Promise.all([
     args.clipboard ? saveToClipboard(context, reply) : SKIP,
-    args.imgur     ? uploadToImgur(reply)            : SKIP,
-    fileNeeded     ? saveToFile(context, reply)      : SKIP,
+    args.imgur ? uploadToImgur(reply) : SKIP,
+    fileNeeded ? saveToFile(context, reply) : SKIP,
   ]).then(() => reply);
 }
 
@@ -274,15 +267,13 @@ function createScreenshotData(document, args) {
   if (args.fullpage) {
     // Bug 961832: GCLI screenshot shows fixed position element in wrong
     // position if we don't scroll to top
-    window.scrollTo(0,0);
+    window.scrollTo(0, 0);
     width = window.innerWidth + window.scrollMaxX - window.scrollMinX;
     height = window.innerHeight + window.scrollMaxY - window.scrollMinY;
     filename = filename.replace(".png", "-fullpage.png");
-  }
-  else if (args.selector) {
+  } else if (args.selector) {
     ({ top, left, width, height } = getRect(window, args.selector, window));
-  }
-  else {
+  } else {
     left = window.scrollX;
     top = window.scrollY;
     width = window.innerWidth;
@@ -338,7 +329,7 @@ function getFilename(defaultName) {
   const date = new Date();
   let dateString = date.getFullYear() + "-" + (date.getMonth() + 1) +
                   "-" + date.getDate();
-  dateString = dateString.split("-").map(function(part) {
+  dateString = dateString.split("-").map(function (part) {
     if (part.length == 1) {
       part = "0" + part;
     }
@@ -390,8 +381,7 @@ function saveToClipboard(context, reply) {
     clip.setData(trans, null, Ci.nsIClipboard.kGlobalClipboard);
 
     reply.destinations.push(l10n.lookup("screenshotCopied"));
-  }
-  catch (ex) {
+  } catch (ex) {
     console.error(ex);
     reply.destinations.push(l10n.lookup("screenshotErrorCopying"));
   }
@@ -413,14 +403,15 @@ function uploadToImgur(reply) {
     fd.append("title", reply.filename);
 
     const postURL = Services.prefs.getCharPref("devtools.gcli.imgurUploadURL");
-    const clientID = "Client-ID " + Services.prefs.getCharPref("devtools.gcli.imgurClientID");
+    const clientID = "Client-ID " +
+                     Services.prefs.getCharPref("devtools.gcli.imgurClientID");
 
     xhr.open("POST", postURL);
     xhr.setRequestHeader("Authorization", clientID);
     xhr.send(fd);
     xhr.responseType = "json";
 
-    xhr.onreadystatechange = function() {
+    xhr.onreadystatechange = function () {
       if (xhr.readyState == 4) {
         if (xhr.status == 200) {
           reply.href = xhr.response.data.link;
@@ -468,7 +459,7 @@ function DownloadListener(win, transfer) {
 }
 
 DownloadListener.prototype = {
-  QueryInterface: function(iid) {
+  QueryInterface: function (iid) {
     if (iid.equals(Ci.nsIInterfaceRequestor) ||
         iid.equals(Ci.nsIWebProgressListener) ||
         iid.equals(Ci.nsIWebProgressListener2) ||
@@ -478,7 +469,7 @@ DownloadListener.prototype = {
     throw Cr.NS_ERROR_NO_INTERFACE;
   },
 
-  getInterface: function(iid) {
+  getInterface: function (iid) {
     if (iid.equals(Ci.nsIAuthPrompt) ||
         iid.equals(Ci.nsIAuthPrompt2)) {
       let ww = Cc["@mozilla.org/embedcomp/window-watcher;1"]
@@ -489,7 +480,7 @@ DownloadListener.prototype = {
     throw Cr.NS_ERROR_NO_INTERFACE;
   },
 
-  onStateChange: function(webProgress, request, state, status) {
+  onStateChange: function (webProgress, request, state, status) {
     // Check if the download has completed
     if ((state & Ci.nsIWebProgressListener.STATE_STOP) &&
         (state & Ci.nsIWebProgressListener.STATE_IS_NETWORK)) {
@@ -508,7 +499,7 @@ DownloadListener.prototype = {
  * Save the screenshot data to disk, returning a promise which is resolved on
  * completion.
  */
-var saveToFile = Task.async(function*(context, reply) {
+var saveToFile = Task.async(function* (context, reply) {
   let document = context.environment.chromeDocument;
   let window = context.environment.chromeWindow;
 
@@ -525,7 +516,7 @@ var saveToFile = Task.async(function*(context, reply) {
     reply.filename = OS.Path.join(downloadsDir, reply.filename);
   }
 
-  let sourceURI = Services.io.newURI(reply.data, null, null);
+  let sourceURI = Services.io.newURI(reply.data);
   let targetFile = new FileUtils.File(reply.filename);
   let targetFileURI = Services.io.newFileURI(targetFile);
 
@@ -559,8 +550,7 @@ var saveToFile = Task.async(function*(context, reply) {
   persist.savePrivacyAwareURI(sourceURI,
                               null,
                               document.documentURIObject,
-                              Ci.nsIHttpChannel
-                                .REFERRER_POLICY_NO_REFERRER_WHEN_DOWNGRADE,
+                              Ci.nsIHttpChannel.REFERRER_POLICY_UNSET,
                               null,
                               null,
                               targetFileURI,

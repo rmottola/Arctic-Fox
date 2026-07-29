@@ -96,7 +96,6 @@
 #include "mozAutoDocUpdate.h"
 #include "nsCCUncollectableMarker.h"
 #include "nsHtml5Module.h"
-#include "prprf.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/Preferences.h"
 #include "nsMimeTypes.h"
@@ -169,15 +168,19 @@ NS_NewHTMLDocument(nsIDocument** aInstancePtrResult, bool aLoadedAsData)
   return NS_OK;
 }
 
-  // NOTE! nsDocument::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
-
 nsHTMLDocument::nsHTMLDocument()
   : nsDocument("text/html")
+  , mNumForms(0)
+  , mWriteLevel(0)
+  , mLoadFlags(0)
+  , mTooDeepWriteRecursion(false)
+  , mDisableDocWrite(false)
+  , mWarnedWidthHeight(false)
+  , mContentEditableCount(0)
+  , mEditingState(EditingState::eOff)
+  , mDisableCookieAccess(false)
+  , mPendingMaybeEditingStateChanged(false)
 {
-  // NOTE! nsDocument::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
-
   mType = eHTML;
   mDefaultElementType = kNameSpaceID_XHTML;
   mCompatMode = eCompatibility_NavQuirks;
@@ -1808,7 +1811,7 @@ nsHTMLDocument::Close(ErrorResult& rv)
   //
   // XXXhsivonen keeping this around for bug 577508 / 253951 still :-(
   if (GetShell()) {
-    FlushPendingNotifications(Flush_Layout);
+    FlushPendingNotifications(FlushType::Layout);
   }
 
   // Removing the wyciwygChannel here is wrong when document.close() is
@@ -2663,7 +2666,7 @@ nsHTMLDocument::EditingStateChanged()
   // Flush out style changes on our _parent_ document, if any, so that
   // our check for a presshell won't get stale information.
   if (mParentDocument) {
-    mParentDocument->FlushPendingNotifications(Flush_Style);
+    mParentDocument->FlushPendingNotifications(FlushType::Style);
   }
 
   // get editing session, make sure this is a strong reference so the
@@ -2826,7 +2829,12 @@ nsHTMLDocument::EditingStateChanged()
     // restricted one.
     ErrorResult errorResult;
     Unused << ExecCommand(NS_LITERAL_STRING("insertBrOnReturn"), false,
-                          NS_LITERAL_STRING("false"), CallerType::NonSystem,
+                          NS_LITERAL_STRING("false"),
+                          // Principal doesn't matter here, because the
+                          // insertBrOnReturn command doesn't use it.   Still
+                          // it's too bad we can't easily grab a nullprincipal
+                          // from somewhere without allocating one..
+                          *NodePrincipal(),
                           errorResult);
 
     if (errorResult.Failed()) {
@@ -3155,7 +3163,7 @@ bool
 nsHTMLDocument::ExecCommand(const nsAString& commandID,
                             bool doShowUI,
                             const nsAString& value,
-                            CallerType aCallerType,
+                            nsIPrincipal& aSubjectPrincipal,
                             ErrorResult& rv)
 {
   //  for optional parameters see dom/src/base/nsHistory.cpp: HistoryImpl::Go()
@@ -3190,8 +3198,8 @@ nsHTMLDocument::ExecCommand(const nsAString& commandID,
       rv = NS_ERROR_DOM_SECURITY_ERR;
       return false;
     }
-    
-    if (!nsContentUtils::IsCutCopyAllowed()) {
+
+    if (!nsContentUtils::IsCutCopyAllowed(&aSubjectPrincipal)) {
       // We have rejected the event due to it not being performed in an
       // input-driven context therefore, we report the error to the console.
       nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
@@ -3221,7 +3229,7 @@ nsHTMLDocument::ExecCommand(const nsAString& commandID,
   }
 
   bool restricted = commandID.LowerCaseEqualsLiteral("paste");
-  if (restricted && aCallerType != CallerType::System) {
+  if (restricted && !nsContentUtils::IsSystemPrincipal(&aSubjectPrincipal)) {
     return false;
   }
 
@@ -3287,7 +3295,7 @@ nsHTMLDocument::ExecCommand(const nsAString& commandID,
 
 bool
 nsHTMLDocument::QueryCommandEnabled(const nsAString& commandID,
-                                    CallerType aCallerType,
+                                    nsIPrincipal& aSubjectPrincipal,
                                     ErrorResult& rv)
 {
   nsAutoCString cmdToDispatch;
@@ -3299,12 +3307,12 @@ nsHTMLDocument::QueryCommandEnabled(const nsAString& commandID,
   bool isCutCopy = commandID.LowerCaseEqualsLiteral("cut") ||
                    commandID.LowerCaseEqualsLiteral("copy");
   if (isCutCopy) {
-    return nsContentUtils::IsCutCopyAllowed();
+    return nsContentUtils::IsCutCopyAllowed(&aSubjectPrincipal);
   }
 
   // Report false for restricted commands
   bool restricted = commandID.LowerCaseEqualsLiteral("paste");
-  if (restricted && aCallerType != CallerType::System) {
+  if (restricted && !nsContentUtils::IsSystemPrincipal(&aSubjectPrincipal)) {
     return false;
   }
 
@@ -3487,6 +3495,9 @@ nsHTMLDocument::QueryCommandSupported(const nsAString& commandID,
       return false;
     }
     if (nsContentUtils::IsCutCopyRestricted()) {
+      // XXXbz should we worry about correctly reporting "true" in the
+      // "restricted, but we're an addon with clipboardWrite permissions" case?
+      // See also nsContentUtils::IsCutCopyAllowed.
       if (commandID.LowerCaseEqualsLiteral("cut") ||
           commandID.LowerCaseEqualsLiteral("copy")) {
         return false;
@@ -3610,7 +3621,7 @@ nsHTMLDocument::IsEditingOnAfterFlush()
   if (doc) {
     // Make sure frames are up to date, since that can affect whether
     // we're editable.
-    doc->FlushPendingNotifications(Flush_Frames);
+    doc->FlushPendingNotifications(FlushType::Frames);
   }
 
   return IsEditingOn();

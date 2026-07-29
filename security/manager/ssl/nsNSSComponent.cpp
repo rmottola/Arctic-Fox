@@ -13,13 +13,16 @@
 #include "cert.h"
 #include "certdb.h"
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/Assertions.h"
 #include "mozilla/Casting.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/PodOperations.h"
 #include "mozilla/PublicSSL.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/SyncRunnable.h"
 #include "mozilla/Telemetry.h"
+#include "mozilla/TimeStamp.h"
 #include "mozilla/Unused.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsCRT.h"
@@ -38,6 +41,7 @@
 #include "nsNSSCertificateDB.h"
 #include "nsNSSHelper.h"
 #include "nsNSSShutDown.h"
+#include "nsPrintfCString.h"
 #include "nsServiceManagerUtils.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
@@ -76,18 +80,8 @@ int nsNSSComponent::mInstanceCount = 0;
 // to ensure that NSS is initialized.
 bool EnsureNSSInitializedChromeOrContent()
 {
-  nsresult rv;
-  if (XRE_IsParentProcess()) {
-    nsCOMPtr<nsISupports> nss = do_GetService(PSM_COMPONENT_CONTRACTID, &rv);
-    if (NS_FAILED(rv)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  // If this is a content process and not the main thread (i.e. probably a
-  // worker) then forward this call to the main thread.
+  // If this is not the main thread (i.e. probably a worker) then forward this
+  // call to the main thread.
   if (!NS_IsMainThread()) {
     static Atomic<bool> initialized(false);
 
@@ -112,6 +106,14 @@ bool EnsureNSSInitializedChromeOrContent()
     return initialized;
   }
 
+  if (XRE_IsParentProcess()) {
+    nsCOMPtr<nsISupports> nss = do_GetService(PSM_COMPONENT_CONTRACTID);
+    if (!nss) {
+      return false;
+    }
+    return true;
+  }
+
   if (NSS_IsInitialized()) {
     return true;
   }
@@ -128,89 +130,18 @@ bool EnsureNSSInitializedChromeOrContent()
   return true;
 }
 
-// We must ensure that the nsNSSComponent has been loaded before
-// creating any other components.
-bool EnsureNSSInitialized(EnsureNSSOperator op)
-{
-  if (GeckoProcessType_Default != XRE_GetProcessType())
-  {
-    if (op == nssEnsureOnChromeOnly)
-    {
-      // If the component needs PSM/NSS initialized only on the chrome process,
-      // pretend we successfully initiated it but in reality we bypass it.
-      // It's up to the programmer to check for process type in such components
-      // and take care not to call anything that needs NSS/PSM initiated.
-      return true;
-    }
-
-    NS_ERROR("Trying to initialize PSM/NSS in a non-chrome process!");
-    return false;
-  }
-
-  static bool loading = false;
-  static int32_t haveLoaded = 0;
-
-  switch (op)
-  {
-    // In following 4 cases we are protected by monitor of XPCOM component
-    // manager - we are inside of do_GetService call for nss component, so it is
-    // safe to move with the flags here.
-  case nssLoadingComponent:
-    if (loading)
-      return false; // We are reentered during nss component creation
-    loading = true;
-    return true;
-
-  case nssInitSucceeded:
-    NS_ASSERTION(loading, "Bad call to EnsureNSSInitialized(nssInitSucceeded)");
-    loading = false;
-    PR_AtomicSet(&haveLoaded, 1);
-    return true;
-
-  case nssInitFailed:
-    NS_ASSERTION(loading, "Bad call to EnsureNSSInitialized(nssInitFailed)");
-    loading = false;
-    MOZ_FALLTHROUGH;
-
-  case nssShutdown:
-    PR_AtomicSet(&haveLoaded, 0);
-    return false;
-
-    // In this case we are called from a component to ensure nss initilization.
-    // If the component has not yet been loaded and is not currently loading
-    // call do_GetService for nss component to ensure it.
-  case nssEnsure:
-  case nssEnsureOnChromeOnly:
-  case nssEnsureChromeOrContent:
-    // We are reentered during nss component creation or nss component is already up
-    if (PR_AtomicAdd(&haveLoaded, 0) || loading)
-      return true;
-
-    {
-    nsCOMPtr<nsINSSComponent> nssComponent
-      = do_GetService(PSM_COMPONENT_CONTRACTID);
-
-    // Nss component failed to initialize, inform the caller of that fact.
-    // Flags are appropriately set by component constructor itself.
-    if (!nssComponent)
-      return false;
-
-    bool isInitialized;
-    nsresult rv = nssComponent->IsNSSInitialized(&isInitialized);
-    return NS_SUCCEEDED(rv) && isInitialized;
-    }
-
-  default:
-    NS_ASSERTION(false, "Bad operator to EnsureNSSInitialized");
-    return false;
-  }
-}
+static const uint32_t OCSP_TIMEOUT_MILLISECONDS_SOFT_DEFAULT = 2000;
+static const uint32_t OCSP_TIMEOUT_MILLISECONDS_SOFT_MAX = 5000;
+static const uint32_t OCSP_TIMEOUT_MILLISECONDS_HARD_DEFAULT = 10000;
+static const uint32_t OCSP_TIMEOUT_MILLISECONDS_HARD_MAX = 20000;
 
 static void
 GetRevocationBehaviorFromPrefs(/*out*/ CertVerifier::OcspDownloadConfig* odc,
                                /*out*/ CertVerifier::OcspStrictConfig* osc,
                                /*out*/ CertVerifier::OcspGetConfig* ogc,
                                /*out*/ uint32_t* certShortLifetimeInDays,
+                               /*out*/ TimeDuration& softTimeout,
+                               /*out*/ TimeDuration& hardTimeout,
                                const MutexAutoLock& /*proofOfLock*/)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -245,6 +176,20 @@ GetRevocationBehaviorFromPrefs(/*out*/ CertVerifier::OcspDownloadConfig* odc,
     Preferences::GetUint("security.pki.cert_short_lifetime_in_days",
                          static_cast<uint32_t>(0));
 
+  uint32_t softTimeoutMillis =
+    Preferences::GetUint("security.OCSP.timeoutMilliseconds.soft",
+                         OCSP_TIMEOUT_MILLISECONDS_SOFT_DEFAULT);
+  softTimeoutMillis = std::min(softTimeoutMillis,
+                               OCSP_TIMEOUT_MILLISECONDS_SOFT_MAX);
+  softTimeout = TimeDuration::FromMilliseconds(softTimeoutMillis);
+
+  uint32_t hardTimeoutMillis =
+    Preferences::GetUint("security.OCSP.timeoutMilliseconds.hard",
+                         OCSP_TIMEOUT_MILLISECONDS_HARD_DEFAULT);
+  hardTimeoutMillis = std::min(hardTimeoutMillis,
+                               OCSP_TIMEOUT_MILLISECONDS_HARD_MAX);
+  hardTimeout = TimeDuration::FromMilliseconds(hardTimeoutMillis);
+
   SSL_ClearSessionCache();
 }
 
@@ -258,7 +203,8 @@ nsNSSComponent::nsNSSComponent()
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsNSSComponent::ctor\n"));
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
-  NS_ASSERTION( (0 == mInstanceCount), "nsNSSComponent is a singleton, but instantiated multiple times!");
+  MOZ_ASSERT(mInstanceCount == 0,
+             "nsNSSComponent is a singleton, but instantiated multiple times!");
   ++mInstanceCount;
 }
 
@@ -273,11 +219,6 @@ nsNSSComponent::~nsNSSComponent()
   SharedSSLState::GlobalCleanup();
   RememberCertErrorsTable::Cleanup();
   --mInstanceCount;
-  nsNSSShutDownList::shutdown();
-
-  // We are being freed, drop the haveLoaded flag to re-enable
-  // potential nss initialization later.
-  EnsureNSSInitialized(nssShutdown);
 
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsNSSComponent::dtor finished\n"));
 }
@@ -1205,9 +1146,7 @@ nsNSSComponent::LoadLoadableRoots()
     }
 
     NS_ConvertUTF16toUTF8 modNameUTF8(modName);
-    if (mozilla::psm::LoadLoadableRoots(
-            libDir.Length() > 0 ? libDir.get() : nullptr,
-            modNameUTF8.get()) == SECSuccess) {
+    if (mozilla::psm::LoadLoadableRoots(libDir, modNameUTF8)) {
       break;
     }
   }
@@ -1453,7 +1392,9 @@ StaticRefPtr<CipherSuiteChangeObserver> CipherSuiteChangeObserver::sObserver;
 nsresult
 CipherSuiteChangeObserver::StartObserve()
 {
-  NS_ASSERTION(NS_IsMainThread(), "CipherSuiteChangeObserver::StartObserve() can only be accessed in main thread");
+  MOZ_ASSERT(NS_IsMainThread(),
+             "CipherSuiteChangeObserver::StartObserve() can only be accessed "
+             "on the main thread");
   if (!sObserver) {
     RefPtr<CipherSuiteChangeObserver> observer = new CipherSuiteChangeObserver();
     nsresult rv = Preferences::AddStrongObserver(observer.get(), "security.");
@@ -1476,11 +1417,13 @@ CipherSuiteChangeObserver::StartObserve()
 }
 
 nsresult
-CipherSuiteChangeObserver::Observe(nsISupports* aSubject,
+CipherSuiteChangeObserver::Observe(nsISupports* /*aSubject*/,
                                    const char* aTopic,
                                    const char16_t* someData)
 {
-  NS_ASSERTION(NS_IsMainThread(), "CipherSuiteChangeObserver::Observe can only be accessed in main thread");
+  MOZ_ASSERT(NS_IsMainThread(),
+             "CipherSuiteChangeObserver::Observe can only be accessed on main "
+             "thread");
   if (nsCRT::strcmp(aTopic, NS_PREFBRANCH_PREFCHANGE_TOPIC_ID) == 0) {
     NS_ConvertUTF16toUTF8  prefName(someData);
     // Look through the cipher table and set according to pref setting
@@ -1618,10 +1561,13 @@ void nsNSSComponent::setValidationOptions(bool isInitialSetting,
   CertVerifier::OcspStrictConfig osc;
   CertVerifier::OcspGetConfig ogc;
   uint32_t certShortLifetimeInDays;
+  TimeDuration softTimeout;
+  TimeDuration hardTimeout;
 
   GetRevocationBehaviorFromPrefs(&odc, &osc, &ogc, &certShortLifetimeInDays,
-                                 lock);
-  mDefaultCertVerifier = new SharedCertVerifier(odc, osc, ogc,
+                                 softTimeout, hardTimeout, lock);
+  mDefaultCertVerifier = new SharedCertVerifier(odc, osc, ogc, softTimeout,
+                                                hardTimeout,
                                                 certShortLifetimeInDays,
                                                 pinningMode, sha1Mode,
                                                 nameMatchingMode,
@@ -1695,9 +1641,6 @@ GetNSSProfilePath(nsAutoCString& aProfilePath)
 #else
   rv = profileFile->GetNativePath(aProfilePath);
 #endif
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error,
            ("Could not get native path for profile directory.\n"));
@@ -1712,9 +1655,6 @@ GetNSSProfilePath(nsAutoCString& aProfilePath)
 nsresult
 nsNSSComponent::InitializeNSS()
 {
-  // Can be called both during init and profile change.
-  // Needs mutex protection.
-
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsNSSComponent::InitializeNSS\n"));
 
   static_assert(nsINSSErrorsService::NSS_SEC_ERROR_BASE == SEC_ERROR_BASE &&
@@ -1724,15 +1664,6 @@ nsNSSComponent::InitializeNSS()
                 "You must update the values in nsINSSErrorsService.idl");
 
   MutexAutoLock lock(mutex);
-
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(!mNSSInitialized);
-#endif
-  if (mNSSInitialized) {
-    // We should never try to initialize NSS more than once in a process.
-    MOZ_ASSERT_UNREACHABLE("Trying to initialize NSS twice");
-    return NS_ERROR_FAILURE;
-  }
 
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("NSS Initialization beginning\n"));
 
@@ -1746,9 +1677,6 @@ nsNSSComponent::InitializeNSS()
 
   nsAutoCString profileStr;
   nsresult rv = GetNSSProfilePath(profileStr);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -1762,9 +1690,6 @@ nsNSSComponent::InitializeNSS()
   // modules will be loaded).
   if (runtime) {
     rv = runtime->GetInSafeMode(&inSafeMode);
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
     if (NS_FAILED(rv)) {
       return rv;
     }
@@ -1789,14 +1714,8 @@ nsNSSComponent::InitializeNSS()
   // pref has been set to "true", attempt to initialize with no DB.
   if (nocertdb || init_rv != SECSuccess) {
     init_rv = NSS_NoDB_Init(nullptr);
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(init_rv == SECSuccess);
-#endif
   }
   if (init_rv != SECSuccess) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("could not initialize NSS - panicking\n"));
     return NS_ERROR_NOT_AVAILABLE;
   }
@@ -1804,8 +1723,6 @@ nsNSSComponent::InitializeNSS()
   // ensure we have an initial value for the content signer root
   mContentSigningRootHash =
     Preferences::GetString("security.content.signature.root_hash");
-
-  mNSSInitialized = true;
 
   PK11_SetPasswordFunc(PK11PasswordPrompt);
 
@@ -1818,9 +1735,6 @@ nsNSSComponent::InitializeNSS()
   SSL_OptionSetDefault(SSL_V2_COMPATIBLE_HELLO, false);
 
   rv = setEnabledTLSVersions();
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     return NS_ERROR_UNEXPECTED;
   }
@@ -1829,9 +1743,6 @@ nsNSSComponent::InitializeNSS()
   LoadLoadableRoots();
 
   rv = LoadExtendedValidationInfo();
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("failed to load EV info"));
     return rv;
@@ -1868,9 +1779,6 @@ nsNSSComponent::InitializeNSS()
                                             ENABLED_0RTT_DATA_DEFAULT));
 
   if (NS_FAILED(InitializeCipherSuite())) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("Unable to initialize cipher suite settings\n"));
     return NS_ERROR_FAILURE;
   }
@@ -1883,18 +1791,6 @@ nsNSSComponent::InitializeNSS()
   // Note that this must occur before any calls to SSL_ClearSessionCache
   // (otherwise memory will leak).
   if (SSL_ConfigServerSessionIDCache(1000, 0, 0, nullptr) != SECSuccess) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
-    return NS_ERROR_FAILURE;
-  }
-
-  // ensure the CertBlocklist is initialised
-  nsCOMPtr<nsICertBlocklist> certList = do_GetService(NS_CERTBLOCKLIST_CONTRACTID);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(certList);
-#endif
-  if (!certList) {
     return NS_ERROR_FAILURE;
   }
 
@@ -1907,41 +1803,18 @@ nsNSSComponent::InitializeNSS()
 
   mozilla::pkix::RegisterErrorTable();
 
-  // Initialize the site security service
-  nsCOMPtr<nsISiteSecurityService> sssService =
-    do_GetService(NS_SSSERVICE_CONTRACTID);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(sssService);
-#endif
-  if (!sssService) {
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("Cannot initialize site security service\n"));
-    return NS_ERROR_FAILURE;
-  }
-
-  // Initialize the cert override service
-  nsCOMPtr<nsICertOverrideService> coService =
-    do_GetService(NS_CERTOVERRIDE_CONTRACTID);
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(coService);
-#endif
-  if (!coService) {
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("Cannot initialize cert override service\n"));
-    return NS_ERROR_FAILURE;
-  }
-
   if (PK11_IsFIPS()) {
     Telemetry::Accumulate(Telemetry::FIPS_ENABLED, true);
   }
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("NSS Initialization done\n"));
+  mNSSInitialized = true;
+
   return NS_OK;
 }
 
 void
 nsNSSComponent::ShutdownNSS()
 {
-  // Can be called both during init and profile change,
-  // needs mutex protection.
-
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsNSSComponent::ShutdownNSS\n"));
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
 
@@ -1968,12 +1841,11 @@ nsNSSComponent::ShutdownNSS()
     Unused << SSL_ShutdownServerSessionIDCache();
 
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("evaporating psm resources"));
-    if (NS_FAILED(nsNSSShutDownList::evaporateAllNSSResources())) {
+    if (NS_FAILED(nsNSSShutDownList::evaporateAllNSSResourcesAndShutDown())) {
       MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("failed to evaporate resources"));
       return;
     }
     UnloadLoadableRoots();
-    EnsureNSSInitialized(nssShutdown);
     if (SECSuccess != ::NSS_Shutdown()) {
       MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("NSS SHUTDOWN FAILURE"));
     } else {
@@ -1990,14 +1862,14 @@ nsNSSComponent::Init()
     return NS_ERROR_NOT_SAME_THREAD;
   }
 
-  nsresult rv = NS_OK;
+  MOZ_ASSERT(XRE_IsParentProcess());
+  if (!XRE_IsParentProcess()) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
 
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("Beginning NSS initialization\n"));
 
-  rv = InitializePIPNSSBundle();
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
+  nsresult rv = InitializePIPNSSBundle();
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error, ("Unable to create pipnss bundle.\n"));
     return rv;
@@ -2018,9 +1890,6 @@ nsNSSComponent::Init()
 
 
   rv = InitializeNSS();
-#ifdef ANDROID
-  MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
-#endif
   if (NS_FAILED(rv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Error,
             ("nsNSSComponent::InitializeNSS() failed\n"));
@@ -2045,7 +1914,7 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
 {
   if (nsCRT::strcmp(aTopic, PROFILE_BEFORE_CHANGE_TOPIC) == 0) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("receiving profile change topic\n"));
-    DoProfileBeforeChange();
+    ShutdownNSS();
   } else if (nsCRT::strcmp(aTopic, NS_PREFBRANCH_PREFCHANGE_TOPIC_ID) == 0) {
     nsNSSShutDownPreventionLock locker;
     bool clearSessionCache = true;
@@ -2083,7 +1952,9 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
                prefName.EqualsLiteral("security.cert_pinning.enforcement_level") ||
                prefName.EqualsLiteral("security.pki.sha1_enforcement_level") ||
                prefName.EqualsLiteral("security.pki.name_matching_mode") ||
-               prefName.EqualsLiteral("security.pki.netscape_step_up_policy")) {
+               prefName.EqualsLiteral("security.pki.netscape_step_up_policy") ||
+               prefName.EqualsLiteral("security.OCSP.timeoutMilliseconds.soft") ||
+               prefName.EqualsLiteral("security.OCSP.timeoutMilliseconds.hard")) {
       MutexAutoLock lock(mutex);
       setValidationOptions(false, lock);
 #ifdef DEBUG
@@ -2178,9 +2049,6 @@ nsNSSComponent::RegisterObservers()
 
   nsCOMPtr<nsIObserverService> observerService(
     do_GetService("@mozilla.org/observer-service;1"));
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(observerService);
-#endif
   if (!observerService) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
             ("nsNSSComponent: couldn't get observer service\n"));
@@ -2193,35 +2061,6 @@ nsNSSComponent::RegisterObservers()
   // least as long as the observer service.
   observerService->AddObserver(this, PROFILE_BEFORE_CHANGE_TOPIC, false);
 
-  return NS_OK;
-}
-
-void
-nsNSSComponent::DoProfileBeforeChange()
-{
-  bool needsCleanup = true;
-
-  {
-    MutexAutoLock lock(mutex);
-
-    if (!mNSSInitialized) {
-      // Make sure we don't try to cleanup if we have already done so.
-      // This makes sure we behave safely, in case we are notified
-      // multiple times.
-      needsCleanup = false;
-    }
-  }
-
-  if (needsCleanup) {
-    ShutdownNSS();
-  }
-}
-
-NS_IMETHODIMP
-nsNSSComponent::IsNSSInitialized(bool* initialized)
-{
-  MutexAutoLock lock(mutex);
-  *initialized = mNSSInitialized;
   return NS_OK;
 }
 
@@ -2380,7 +2219,7 @@ setPassword(PK11SlotInfo* slot, nsIInterfaceRequestor* ctx,
 
     bool canceled;
     NS_ConvertUTF8toUTF16 tokenName(PK11_GetTokenName(slot));
-    rv = dialogs->SetPassword(ctx, tokenName.get(), &canceled);
+    rv = dialogs->SetPassword(ctx, tokenName, &canceled);
     if (NS_FAILED(rv)) {
       return rv;
     }
@@ -2399,12 +2238,10 @@ namespace psm {
 nsresult
 InitializeCipherSuite()
 {
-  NS_ASSERTION(NS_IsMainThread(), "InitializeCipherSuite() can only be accessed in main thread");
+  MOZ_ASSERT(NS_IsMainThread(),
+             "InitializeCipherSuite() can only be accessed on the main thread");
 
   if (NSS_SetDomesticPolicy() != SECSuccess) {
-#ifdef ANDROID
-    MOZ_RELEASE_ASSERT(false);
-#endif
     return NS_ERROR_FAILURE;
   }
 

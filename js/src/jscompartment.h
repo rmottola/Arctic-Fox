@@ -337,6 +337,13 @@ struct JSCompartment
         isSystem_ = isSystem;
     }
 
+    bool isAtomsCompartment() const {
+        return isAtomsCompartment_;
+    }
+    void setIsAtomsCompartment() {
+        isAtomsCompartment_ = true;
+    }
+
     // Used to approximate non-content code when reporting telemetry.
     inline bool isProbablySystemOrAddonCode() const {
         if (creationOptions_.addonIdOrNull())
@@ -347,11 +354,14 @@ struct JSCompartment
   private:
     JSPrincipals*                principals_;
     bool                         isSystem_;
+    bool                         isAtomsCompartment_;
+
   public:
     bool                         isSelfHosting;
     bool                         marked;
     bool                         warnedAboutExprClosure;
     bool                         warnedAboutForEach;
+    uint32_t                     warnedAboutStringGenericsMethods;
 
 #ifdef DEBUG
     bool                         firedOnNewGlobalObject;

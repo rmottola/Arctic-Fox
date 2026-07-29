@@ -108,7 +108,6 @@ UNIFIED_SOURCES += [
     'nsNSSCertHelper.cpp',
     'nsNSSCertificate.cpp',
     'nsNSSCertificateDB.cpp',
-    'nsNSSCertificateFakeTransport.cpp',
     'nsNSSCertTrust.cpp',
     'nsNSSCertValidity.cpp',
     'nsNSSComponent.cpp',
@@ -182,9 +181,10 @@ for var in ('DLL_PREFIX', 'DLL_SUFFIX'):
 
 DEFINES['CERT_AddTempCertToPerm'] = '__CERT_AddTempCertToPerm'
 
-USE_LIBS += [
-    'crmf',
-]
+if not CONFIG['MOZ_SYSTEM_NSS']:
+    USE_LIBS += [
+        'crmf',
+    ]
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

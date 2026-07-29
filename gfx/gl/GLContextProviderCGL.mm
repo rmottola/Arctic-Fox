@@ -197,6 +197,15 @@ static const NSOpenGLPixelFormatAttribute kAttribs_doubleBuffered_accel[] = {
     0
 };
 
+static const NSOpenGLPixelFormatAttribute kAttribs_doubleBuffered_accel_webrender[] = {
+    NSOpenGLPFAAccelerated,
+    NSOpenGLPFAAllowOfflineRenderers,
+    NSOpenGLPFADoubleBuffer,
+    NSOpenGLPFAOpenGLProfile,
+    NSOpenGLProfileVersion3_2Core,
+    0
+};
+
 static const NSOpenGLPixelFormatAttribute kAttribs_offscreen[] = {
     0
 };
@@ -258,7 +267,11 @@ GLContextProviderCGL::CreateForWindow(nsIWidget* aWidget, bool aForceAccelerated
 
     const NSOpenGLPixelFormatAttribute* attribs;
     if (sCGLLibrary.UseDoubleBufferedWindows()) {
-        attribs = aForceAccelerated ? kAttribs_doubleBuffered_accel : kAttribs_doubleBuffered;
+        if (gfxPrefs::WebRenderEnabled()) {
+            attribs = aForceAccelerated ? kAttribs_doubleBuffered_accel_webrender : kAttribs_doubleBuffered;
+        } else {
+            attribs = aForceAccelerated ? kAttribs_doubleBuffered_accel : kAttribs_doubleBuffered;
+        }
     } else {
         attribs = aForceAccelerated ? kAttribs_singleBuffered_accel : kAttribs_singleBuffered;
     }

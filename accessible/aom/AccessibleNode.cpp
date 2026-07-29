@@ -6,6 +6,7 @@
 #include "AccessibleNode.h"
 #include "mozilla/dom/AccessibleNodeBinding.h"
 #include "mozilla/dom/BindingDeclarations.h"
+#include "mozilla/dom/DOMStringList.h"
 
 #include "Accessible-inl.h"
 #include "nsAccessibilityService.h"
@@ -59,6 +60,47 @@ AccessibleNode::GetRole(nsAString& aRole)
   }
 
   aRole.AssignLiteral("unknown");
+}
+
+void
+AccessibleNode::GetStates(nsTArray<nsString>& aStates)
+{
+  if (mIntl) {
+    if (!mStates) {
+      mStates = GetOrCreateAccService()->GetStringStates(mIntl->State());
+    }
+    aStates = mStates->StringArray();
+    return;
+  }
+
+  aStates.AppendElement(NS_LITERAL_STRING("defunct"));
+}
+
+bool
+AccessibleNode::Is(const Sequence<nsString>& aFlavors)
+{
+  if (!mIntl) {
+    for (const auto& flavor : aFlavors) {
+      if (!flavor.EqualsLiteral("unknown") && !flavor.EqualsLiteral("defunct")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  nsAutoString role;
+  GetOrCreateAccService()->GetStringRole(mIntl->Role(), role);
+
+  if (!mStates) {
+    mStates = GetOrCreateAccService()->GetStringStates(mIntl->State());
+  }
+
+  for (const auto& flavor : aFlavors) {
+    if (!flavor.Equals(role) && !mStates->Contains(flavor)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 nsINode*

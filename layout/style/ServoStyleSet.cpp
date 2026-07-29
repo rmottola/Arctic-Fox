@@ -276,7 +276,6 @@ ServoStyleSet::RemoveStyleSheet(SheetType aType,
                                 ServoStyleSheet* aSheet)
 {
   MOZ_ASSERT(aSheet);
-  MOZ_ASSERT(aSheet->IsApplicable());
   MOZ_ASSERT(nsStyleSet::IsCSSSheetType(aType));
 
   mSheets[aType].RemoveElement(aSheet);
@@ -359,6 +358,8 @@ nsresult
 ServoStyleSet::AddDocStyleSheet(ServoStyleSheet* aSheet,
                                 nsIDocument* aDocument)
 {
+  MOZ_ASSERT(aSheet->IsApplicable());
+
   RefPtr<StyleSheet> strong(aSheet);
 
   mSheets[SheetType::Doc].RemoveElement(aSheet);
@@ -455,24 +456,29 @@ ServoStyleSet::StyleDocument()
   DocumentStyleRootIterator iter(mPresContext->Document());
   while (Element* root = iter.GetNextStyleRoot()) {
     if (root->ShouldTraverseForServo()) {
-      Servo_TraverseSubtree(root, mRawSet.get(), SkipRootBehavior::DontSkip);
+      Servo_TraverseSubtree(root, mRawSet.get(), TraversalRootBehavior::Normal);
     }
   }
 }
 
 void
-ServoStyleSet::StyleNewSubtree(nsIContent* aContent)
+ServoStyleSet::StyleNewSubtree(Element* aRoot)
 {
-  if (aContent->IsElement()) {
-    Servo_TraverseSubtree(aContent->AsElement(), mRawSet.get(), SkipRootBehavior::DontSkip);
-  }
+  MOZ_ASSERT(!aRoot->HasServoData());
+  Servo_TraverseSubtree(aRoot, mRawSet.get(), TraversalRootBehavior::Normal);
 }
 
 void
-ServoStyleSet::StyleNewChildren(nsIContent* aParent)
+ServoStyleSet::StyleNewChildren(Element* aParent)
 {
-  MOZ_ASSERT(aParent->IsElement());
-  Servo_TraverseSubtree(aParent->AsElement(), mRawSet.get(), SkipRootBehavior::Skip);
+  Servo_TraverseSubtree(aParent, mRawSet.get(),
+                        TraversalRootBehavior::UnstyledChildrenOnly);
+}
+
+void
+ServoStyleSet::NoteStyleSheetsChanged()
+{
+  Servo_StyleSet_NoteStyleSheetsChanged(mRawSet.get());
 }
 
 #ifdef DEBUG

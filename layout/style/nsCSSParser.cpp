@@ -41,7 +41,7 @@
 #include "nsNameSpaceManager.h"
 #include "nsXMLNameSpaceMap.h"
 #include "nsError.h"
-#include "nsIMediaList.h"
+#include "nsMediaList.h"
 #include "nsStyleUtil.h"
 #include "nsIPrincipal.h"
 #include "nsICSSUnprefixingService.h"
@@ -202,15 +202,13 @@ public:
   void ParseMediaList(const nsSubstring& aBuffer,
                       nsIURI* aURL, // for error reporting
                       uint32_t aLineNumber, // for error reporting
-                      nsMediaList* aMediaList,
-                      bool aHTMLMode);
+                      nsMediaList* aMediaList);
 
   bool ParseSourceSizeList(const nsAString& aBuffer,
                            nsIURI* aURI, // for error reporting
                            uint32_t aLineNumber, // for error reporting
                            InfallibleTArray< nsAutoPtr<nsMediaQuery> >& aQueries,
-                           InfallibleTArray<nsCSSValue>& aValues,
-                           bool aHTMLMode);
+                           InfallibleTArray<nsCSSValue>& aValues);
 
   void ParseVariable(const nsAString& aVariableName,
                      const nsAString& aPropValue,
@@ -1488,10 +1486,6 @@ protected:
   // True if viewport units should be allowed.
   bool mViewportUnitsEnabled : 1;
 
-  // True for parsing media lists for HTML attributes, where we have to
-  // ignore CSS comments.
-  bool mHTMLMediaMode : 1;
-
   // This flag is set when parsing a non-box shorthand; it's used to not apply
   // some quirks during shorthand parsing
   bool          mParsingCompoundProperty : 1;
@@ -1613,7 +1607,6 @@ CSSParserImpl::CSSParserImpl()
     mParsingMode(css::eAuthorSheetFeatures),
     mIsChrome(false),
     mViewportUnitsEnabled(true),
-    mHTMLMediaMode(false),
     mParsingCompoundProperty(false),
     mInSupportsCondition(false),
     mInFailingSupportsRule(false),
@@ -1687,7 +1680,6 @@ CSSParserImpl::InitScanner(nsCSSScanner& aScanner,
                            nsIURI* aSheetURI, nsIURI* aBaseURI,
                            nsIPrincipal* aSheetPrincipal)
 {
-  NS_PRECONDITION(!mHTMLMediaMode, "Bad initial state");
   NS_PRECONDITION(!mParsingCompoundProperty, "Bad initial state");
   NS_PRECONDITION(!mScanner, "already have scanner");
 
@@ -2132,8 +2124,7 @@ void
 CSSParserImpl::ParseMediaList(const nsSubstring& aBuffer,
                               nsIURI* aURI, // for error reporting
                               uint32_t aLineNumber, // for error reporting
-                              nsMediaList* aMediaList,
-                              bool aHTMLMode)
+                              nsMediaList* aMediaList)
 {
   // XXX Are there cases where the caller wants to keep what it already
   // has in case of parser error?  If GatherMedia ever changes to return
@@ -2145,27 +2136,12 @@ CSSParserImpl::ParseMediaList(const nsSubstring& aBuffer,
   css::ErrorReporter reporter(scanner, mSheet, mChildLoader, aURI);
   InitScanner(scanner, reporter, aURI, aURI, nullptr);
 
-  mHTMLMediaMode = aHTMLMode;
-
-    // XXXldb We need to make the scanner not skip CSS comments!  (Or
-    // should we?)
-
-  // For aHTMLMode, we used to follow the parsing rules in
-  // http://www.w3.org/TR/1999/REC-html401-19991224/types.html#type-media-descriptors
-  // which wouldn't work for media queries since they remove all but the
-  // first word.  However, they're changed in
-  // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-document.html#media2
-  // (as of 2008-05-29) which says that the media attribute just points
-  // to a media query.  (The main substative difference is the relative
-  // precedence of commas and paretheses.)
-
   DebugOnly<bool> parsedOK = GatherMedia(aMediaList, false);
   NS_ASSERTION(parsedOK, "GatherMedia returned false; we probably want to avoid "
                          "trashing aMediaList");
 
   CLEAR_ERROR();
   ReleaseScanner();
-  mHTMLMediaMode = false;
 }
 
 //  <source-size-list> = <source-size>#?
@@ -2175,8 +2151,7 @@ CSSParserImpl::ParseSourceSizeList(const nsAString& aBuffer,
                                    nsIURI* aURI, // for error reporting
                                    uint32_t aLineNumber, // for error reporting
                                    InfallibleTArray< nsAutoPtr<nsMediaQuery> >& aQueries,
-                                   InfallibleTArray<nsCSSValue>& aValues,
-                                   bool aHTMLMode)
+                                   InfallibleTArray<nsCSSValue>& aValues)
 {
   aQueries.Clear();
   aValues.Clear();
@@ -2185,9 +2160,6 @@ CSSParserImpl::ParseSourceSizeList(const nsAString& aBuffer,
   nsCSSScanner scanner(aBuffer, aLineNumber);
   css::ErrorReporter reporter(scanner, mSheet, mChildLoader, aURI);
   InitScanner(scanner, reporter, aURI, aURI, nullptr);
-
-  // See ParseMediaList comment about HTML mode
-  mHTMLMediaMode = aHTMLMode;
 
   // https://html.spec.whatwg.org/multipage/embedded-content.html#parse-a-sizes-attribute
   bool hitEnd = false;
@@ -2257,7 +2229,6 @@ CSSParserImpl::ParseSourceSizeList(const nsAString& aBuffer,
 
   CLEAR_ERROR();
   ReleaseScanner();
-  mHTMLMediaMode = false;
 
   return !aQueries.IsEmpty();
 }
@@ -3825,8 +3796,8 @@ CSSParserImpl::ProcessImport(const nsString& aURLSpec,
                              uint32_t aColumnNumber)
 {
   RefPtr<css::ImportRule> rule = new css::ImportRule(aMedia, aURLSpec,
-                                                       aLineNumber,
-                                                       aColumnNumber);
+                                                     aLineNumber,
+                                                     aColumnNumber);
   (*aAppendFunc)(rule, aData);
 
   // Diagnose bad URIs even if we don't have a child loader.
@@ -3844,7 +3815,9 @@ CSSParserImpl::ProcessImport(const nsString& aURLSpec,
   }
 
   if (mChildLoader) {
-    mChildLoader->LoadChildSheet(mSheet, url, aMedia, rule, mReusableSheets);
+    mChildLoader->LoadChildSheet(mSheet, url, aMedia, rule,
+                                 /* aServoParentRule = */ nullptr,
+                                 mReusableSheets);
   }
 }
 
@@ -6356,7 +6329,6 @@ CSSParserImpl::ParsePseudoClassWithIdentArg(nsCSSSelector& aSelector,
   // only 'ltr' and 'rtl' (case-insensitively) will match anything, any
   // other identifier is still valid.
   if (aType == CSSPseudoClassType::mozLocaleDir ||
-      aType == CSSPseudoClassType::mozDir ||
       aType == CSSPseudoClassType::dir) {
     nsContentUtils::ASCIIToLower(mToken.mIdent); // case insensitive
   }
@@ -12433,7 +12405,7 @@ CSSParserImpl::ParseImageLayersItem(
   aState.mImage->mValue.SetNoneValue();
   aState.mAttachment->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ATTACHMENT_SCROLL,
                                          eCSSUnit_Enumerated);
-  aState.mClip->mValue.SetIntValue(NS_STYLE_IMAGELAYER_CLIP_BORDER,
+  aState.mClip->mValue.SetIntValue(StyleGeometryBox::Border,
                                    eCSSUnit_Enumerated);
 
   aState.mRepeat->mXValue.SetIntValue(NS_STYLE_IMAGELAYER_REPEAT_REPEAT,
@@ -12446,10 +12418,10 @@ CSSParserImpl::ParseImageLayersItem(
   aState.mPositionY->mValue.SetArrayValue(positionYArr, eCSSUnit_Array);
 
   if (eCSSProperty_mask == aTable[nsStyleImageLayers::shorthand]) {
-    aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_BORDER,
+    aState.mOrigin->mValue.SetIntValue(StyleGeometryBox::Border,
                                        eCSSUnit_Enumerated);
   } else {
-    aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_PADDING,
+    aState.mOrigin->mValue.SetIntValue(StyleGeometryBox::Padding,
                                        eCSSUnit_Enumerated);
   }
   positionXArr->Item(1).SetPercentValue(0.0f);
@@ -12471,6 +12443,7 @@ CSSParserImpl::ParseImageLayersItem(
        haveMode = false,
        haveSomething = false;
 
+  const KTableEntry* originTable = nsCSSProps::kKeywordTableTable[aTable[nsStyleImageLayers::origin]];
   while (GetToken(true)) {
     nsCSSTokenType tt = mToken.mType;
     UngetToken(); // ...but we'll still cheat and use mToken
@@ -12540,8 +12513,7 @@ CSSParserImpl::ParseImageLayersItem(
           aState.mSize->mXValue = scratch.mXValue;
           aState.mSize->mYValue = scratch.mYValue;
         }
-      } else if (nsCSSProps::FindKeyword(keyword,
-                   nsCSSProps::kImageLayerOriginKTable, dummy)) {
+      } else if (nsCSSProps::FindKeyword(keyword, originTable, dummy)) {
         if (haveOrigin)
           return false;
         haveOrigin = true;
@@ -12556,23 +12528,14 @@ CSSParserImpl::ParseImageLayersItem(
         // immediately following the first one (for background-origin).
 
 #ifdef DEBUG
-        for (size_t i = 0; nsCSSProps::kImageLayerOriginKTable[i].mValue != -1; i++) {
+        const KTableEntry* clipTable = nsCSSProps::kKeywordTableTable[aTable[nsStyleImageLayers::clip]];
+        for (size_t i = 0; originTable[i].mValue != -1; i++) {
           // For each keyword & value in kOriginKTable, ensure that
           // kBackgroundKTable has a matching entry at the same position.
-          MOZ_ASSERT(nsCSSProps::kImageLayerOriginKTable[i].mKeyword ==
-                     nsCSSProps::kBackgroundClipKTable[i].mKeyword);
-          MOZ_ASSERT(nsCSSProps::kImageLayerOriginKTable[i].mValue ==
-                     nsCSSProps::kBackgroundClipKTable[i].mValue);
+          MOZ_ASSERT(originTable[i].mKeyword == clipTable[i].mKeyword);
+          MOZ_ASSERT(originTable[i].mValue == clipTable[i].mValue);
         }
 #endif
-        static_assert(NS_STYLE_IMAGELAYER_CLIP_BORDER ==
-                      NS_STYLE_IMAGELAYER_ORIGIN_BORDER &&
-                      NS_STYLE_IMAGELAYER_CLIP_PADDING ==
-                      NS_STYLE_IMAGELAYER_ORIGIN_PADDING &&
-                      NS_STYLE_IMAGELAYER_CLIP_CONTENT ==
-                      NS_STYLE_IMAGELAYER_ORIGIN_CONTENT,
-                      "bg-clip and bg-origin style constants must agree");
-
         CSSParseResult result =
           ParseSingleValueProperty(aState.mClip->mValue,
                                    aTable[nsStyleImageLayers::clip]);
@@ -18226,11 +18189,10 @@ void
 nsCSSParser::ParseMediaList(const nsSubstring& aBuffer,
                             nsIURI*            aURI,
                             uint32_t           aLineNumber,
-                            nsMediaList*       aMediaList,
-                            bool               aHTMLMode)
+                            nsMediaList*       aMediaList)
 {
   static_cast<CSSParserImpl*>(mImpl)->
-    ParseMediaList(aBuffer, aURI, aLineNumber, aMediaList, aHTMLMode);
+    ParseMediaList(aBuffer, aURI, aLineNumber, aMediaList);
 }
 
 bool
@@ -18238,12 +18200,10 @@ nsCSSParser::ParseSourceSizeList(const nsAString& aBuffer,
                                  nsIURI* aURI,
                                  uint32_t aLineNumber,
                                  InfallibleTArray< nsAutoPtr<nsMediaQuery> >& aQueries,
-                                 InfallibleTArray<nsCSSValue>& aValues,
-                                 bool aHTMLMode)
+                                 InfallibleTArray<nsCSSValue>& aValues)
 {
   return static_cast<CSSParserImpl*>(mImpl)->
-    ParseSourceSizeList(aBuffer, aURI, aLineNumber, aQueries, aValues,
-                        aHTMLMode);
+    ParseSourceSizeList(aBuffer, aURI, aLineNumber, aQueries, aValues);
 }
 
 bool

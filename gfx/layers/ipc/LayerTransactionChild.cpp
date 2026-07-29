@@ -7,10 +7,6 @@
 
 #include "LayerTransactionChild.h"
 #include "mozilla/gfx/Logging.h"
-#include "mozilla/layers/CompositableChild.h"
-#include "mozilla/layers/PCompositableChild.h"  // for PCompositableChild
-#include "mozilla/layers/PLayerChild.h"  // for PLayerChild
-#include "mozilla/layers/PImageContainerChild.h"
 #include "mozilla/layers/ShadowLayers.h"  // for ShadowLayerForwarder
 #include "mozilla/mozalloc.h"           // for operator delete, etc
 #include "nsDebug.h"                    // for NS_RUNTIMEABORT, etc
@@ -36,36 +32,6 @@ LayerTransactionChild::Destroy()
   mDestroyed = true;
 
   SendShutdown();
-}
-
-
-PLayerChild*
-LayerTransactionChild::AllocPLayerChild()
-{
-  // we always use the "power-user" ctor
-  MOZ_CRASH("not reached");
-  return nullptr;
-}
-
-bool
-LayerTransactionChild::DeallocPLayerChild(PLayerChild* actor)
-{
-  delete actor;
-  return true;
-}
-
-PCompositableChild*
-LayerTransactionChild::AllocPCompositableChild(const TextureInfo& aInfo)
-{
-  MOZ_ASSERT(!mDestroyed);
-  return CompositableChild::CreateActor();
-}
-
-bool
-LayerTransactionChild::DeallocPCompositableChild(PCompositableChild* actor)
-{
-  CompositableChild::DestroyActor(actor);
-  return true;
 }
 
 void

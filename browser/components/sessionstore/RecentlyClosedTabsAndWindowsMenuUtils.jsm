@@ -36,8 +36,8 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
   *          Which localizable string to use for the 'restore all tabs' item.
   * @returns A document fragment with UI items for each recently closed tab.
   */
-  getTabsFragment: function(aWindow, aTagName, aPrefixRestoreAll=false,
-                            aRestoreAllLabel="menuRestoreAllTabs.label") {
+  getTabsFragment(aWindow, aTagName, aPrefixRestoreAll = false,
+                  aRestoreAllLabel = "menuRestoreAllTabs.label") {
     let doc = aWindow.document;
     let fragment = doc.createDocumentFragment();
     if (ss.getClosedTabCount(aWindow) != 0) {
@@ -97,8 +97,8 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
   *          Which localizable string to use for the 'restore all windows' item.
   * @returns A document fragment with UI items for each recently closed window.
   */
-  getWindowsFragment: function(aWindow, aTagName, aPrefixRestoreAll=false,
-                            aRestoreAllLabel="menuRestoreAllWindows.label") {
+  getWindowsFragment(aWindow, aTagName, aPrefixRestoreAll = false,
+                     aRestoreAllLabel = "menuRestoreAllWindows.label") {
     let closedWindowData = JSON.parse(ss.getClosedWindowData());
     let fragment = aWindow.document.createDocumentFragment();
     if (closedWindowData.length != 0) {
@@ -159,7 +159,7 @@ this.RecentlyClosedTabsAndWindowsMenuUtils = {
     * @param aEvent
     *        The event when the user clicks the menu item
     */
-  _undoCloseMiddleClick: function(aEvent) {
+  _undoCloseMiddleClick(aEvent) {
     if (aEvent.button != 1)
       return;
 

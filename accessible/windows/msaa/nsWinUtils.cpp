@@ -12,6 +12,7 @@
 #include "nsAccessibilityService.h"
 #include "nsCoreUtils.h"
 
+#include "mozilla/a11y/DocAccessibleParent.h"
 #include "mozilla/Preferences.h"
 #include "nsArrayUtils.h"
 #include "nsIArray.h"
@@ -20,6 +21,7 @@
 #include "nsIDocShellTreeItem.h"
 #include "mozilla/dom/Element.h"
 #include "nsXULAppAPI.h"
+#include "ProxyWrappers.h"
 
 using namespace mozilla;
 using namespace mozilla::a11y;
@@ -108,21 +110,17 @@ nsWinUtils::RegisterNativeWindow(LPCWSTR aWindowClass)
 HWND
 nsWinUtils::CreateNativeWindow(LPCWSTR aWindowClass, HWND aParentWnd,
                                int aX, int aY, int aWidth, int aHeight,
-                               bool aIsActive)
+                               bool aIsActive,
+                               NativeWindowCreateProc* aOnCreateProc)
 {
-  HWND hwnd = ::CreateWindowExW(WS_EX_TRANSPARENT, aWindowClass,
-                                L"NetscapeDispatchWnd",
-                                WS_CHILD | (aIsActive ? WS_VISIBLE : 0),
-                                aX, aY, aWidth, aHeight,
-                                aParentWnd,
-                                nullptr,
-                                GetModuleHandle(nullptr),
-                                nullptr);
-  if (hwnd) {
-    // Mark this window so that ipc related code can identify it.
-    ::SetPropW(hwnd, kPropNameTabContent, (HANDLE)1);
-  }
-  return hwnd;
+  return ::CreateWindowExW(WS_EX_TRANSPARENT, aWindowClass,
+                           L"NetscapeDispatchWnd",
+                           WS_CHILD | (aIsActive ? WS_VISIBLE : 0),
+                           aX, aY, aWidth, aHeight,
+                           aParentWnd,
+                           nullptr,
+                           GetModuleHandle(nullptr),
+                           aOnCreateProc);
 }
 
 void
@@ -147,23 +145,45 @@ WindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
   // message semantics.
 
   switch (msg) {
+    case WM_CREATE:
+    {
+      // Mark this window so that ipc related code can identify it.
+      ::SetPropW(hWnd, kPropNameTabContent, reinterpret_cast<HANDLE>(1));
+
+      auto createStruct = reinterpret_cast<CREATESTRUCT*>(lParam);
+      auto createProc = reinterpret_cast<nsWinUtils::NativeWindowCreateProc*>(
+        createStruct->lpCreateParams);
+
+      if (createProc && *createProc) {
+        (*createProc)(hWnd);
+      }
+
+      return 0;
+    }
     case WM_GETOBJECT:
     {
       // Do explicit casting to make it working on 64bit systems (see bug 649236
       // for details).
       int32_t objId = static_cast<DWORD>(lParam);
       if (objId == OBJID_CLIENT) {
+        IAccessible* msaaAccessible = nullptr;
         DocAccessible* document =
           reinterpret_cast<DocAccessible*>(::GetPropW(hWnd, kPropNameDocAcc));
         if (document) {
-          IAccessible* msaaAccessible = nullptr;
           document->GetNativeInterface((void**)&msaaAccessible); // does an addref
-          if (msaaAccessible) {
-            LRESULT result = ::LresultFromObject(IID_IAccessible, wParam,
-                                                 msaaAccessible); // does an addref
-            msaaAccessible->Release(); // release extra addref
-            return result;
+        } else {
+          DocAccessibleParent* docParent = static_cast<DocAccessibleParent*>(
+            ::GetPropW(hWnd, kPropNameDocAccParent));
+          if (docParent) {
+            auto wrapper = WrapperFor(docParent);
+            wrapper->GetNativeInterface((void**)&msaaAccessible); // does an addref
           }
+        }
+        if (msaaAccessible) {
+          LRESULT result = ::LresultFromObject(IID_IAccessible, wParam,
+                                               msaaAccessible); // does an addref
+          msaaAccessible->Release(); // release extra addref
+          return result;
         }
       }
       return 0;

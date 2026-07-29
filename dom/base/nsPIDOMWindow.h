@@ -49,7 +49,9 @@ class Element;
 class Performance;
 class ServiceWorkerRegistration;
 class Timeout;
+class TimeoutManager;
 class CustomElementRegistry;
+enum class CallerType : uint32_t;
 } // namespace dom
 } // namespace mozilla
 
@@ -85,6 +87,29 @@ enum class FullscreenReason
   ForForceExitFullscreen
 };
 
+namespace mozilla {
+namespace dom {
+// The states in this enum represent the different possible outcomes which the
+// window could be experiencing of loading a document with the
+// Large-Allocation header. The NONE case represents the case where no
+// Large-Allocation header was set.
+enum class LargeAllocStatus : uint8_t
+{
+  // These are the OK states, NONE means that no large allocation status message
+  // should be printed, while SUCCESS means that the success message should be
+  // printed.
+  NONE,
+  SUCCESS,
+
+  // These are the ERROR states. If a window is in one of these states, then the
+  // next document loaded in that window should have an error message reported
+  // to it.
+  NON_GET,
+  NON_E10S,
+  NOT_ONLY_TOPLEVEL_IN_TABGROUP
+};
+} // namespace dom
+} // namespace mozilla
 
 // nsPIDOMWindowInner and nsPIDOMWindowOuter are identical in all respects
 // except for the type name. They *must* remain identical so that we can
@@ -558,7 +583,6 @@ public:
                               nsISupports* aExtraArgument,
                               nsPIDOMWindowOuter** _retval) = 0;
 
-  virtual nsresult GetDevicePixelRatio(float* aRatio) = 0;
   virtual nsresult GetInnerWidth(int32_t* aWidth) = 0;
   virtual nsresult GetInnerHeight(int32_t* aHeight) = 0;
   virtual already_AddRefed<nsICSSDeclaration>
@@ -619,6 +643,8 @@ protected:
 
   // mPerformance is only used on inner windows.
   RefPtr<mozilla::dom::Performance> mPerformance;
+  // mTimeoutManager is only useed on inner windows.
+  mozilla::UniquePtr<mozilla::dom::TimeoutManager> mTimeoutManager;
 
   typedef nsRefPtrHashtable<nsStringHashKey,
                             mozilla::dom::ServiceWorkerRegistration>
@@ -628,8 +654,6 @@ protected:
   uint32_t               mModalStateDepth;
 
   // These variables are only used on inner windows.
-  mozilla::dom::Timeout *mRunningTimeout;
-
   uint32_t               mMutationBits;
 
   bool                   mIsDocumentLoaded;
@@ -709,6 +733,8 @@ protected:
   // Let the service workers plumbing know that some feature are enabled while
   // testing.
   bool mServiceWorkersTestingEnabled;
+
+  mozilla::dom::LargeAllocStatus mLargeAllocStatus; // Outer window only
 };
 
 #define NS_PIDOMWINDOWINNER_IID \
@@ -850,6 +876,10 @@ public:
   // window.
   void SyncStateFromParentWindow();
 
+  bool HasAudioContexts() const;
+
+  mozilla::dom::TimeoutManager& TimeoutManager();
+
 protected:
   void CreatePerformanceObjectIfNeeded();
 };
@@ -931,6 +961,10 @@ public:
 
   void SetServiceWorkersTestingEnabled(bool aEnabled);
   bool GetServiceWorkersTestingEnabled();
+
+  float GetDevicePixelRatio(mozilla::dom::CallerType aCallerType);
+
+  void SetLargeAllocStatus(mozilla::dom::LargeAllocStatus aStatus);
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsPIDOMWindowOuter, NS_PIDOMWINDOWOUTER_IID)

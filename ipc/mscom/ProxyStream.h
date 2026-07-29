@@ -16,7 +16,7 @@
 namespace mozilla {
 namespace mscom {
 
-class ProxyStream
+class ProxyStream final
 {
 public:
   ProxyStream();
@@ -34,11 +34,10 @@ public:
 
   inline bool IsValid() const
   {
-    // This check must be exclusive OR
-    return (mStream && !mUnmarshaledProxy) || (mUnmarshaledProxy && !mStream);
+    return !(mStream && mUnmarshaledProxy);
   }
 
-  bool GetInterface(REFIID aIID, void** aOutInterface) const;
+  bool GetInterface(void** aOutInterface);
   const BYTE* GetBuffer(int& aReturnedBufSize) const;
 
   bool operator==(const ProxyStream& aOther) const
@@ -47,8 +46,8 @@ public:
   }
 
 private:
-  already_AddRefed<IStream> InitStream(const BYTE* aInitBuf,
-                                       const UINT aInitBufSize);
+  static already_AddRefed<IStream> InitStream(const BYTE* aInitBuf,
+                                              const UINT aInitBufSize);
 
 private:
   RefPtr<IStream> mStream;

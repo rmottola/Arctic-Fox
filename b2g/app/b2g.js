@@ -442,9 +442,7 @@ pref("dom.phonenumber.substringmatching.VE", 7);
 pref("dom.phonenumber.substringmatching.CL", 8);
 pref("dom.phonenumber.substringmatching.PE", 7);
 
-// NetworkStats
 #ifdef MOZ_WIDGET_GONK
-pref("dom.mozNetworkStats.enabled", true);
 pref("dom.webapps.firstRunWithSIM", true);
 #endif
 
@@ -735,9 +733,6 @@ pref("dom.ipc.systemMessageCPULockTimeoutSec", 30);
 // Ignore the "dialog=1" feature in window.open.
 pref("dom.disable_window_open_dialog_feature", true);
 
-// Enable before keyboard events and after keyboard events.
-pref("dom.beforeAfterKeyboardEvent.enabled", true);
-
 // Screen reader support
 pref("accessibility.accessfu.activate", 2);
 pref("accessibility.accessfu.quicknav_modes", "Link,Heading,FormElement,Landmark,ListItem");
@@ -862,9 +857,6 @@ pref("network.sntp.timeout", 30); // In seconds.
 // (only applies when marionette is disabled)
 // 0 disables the timer.
 pref("b2g.adb.timeout-hours", 12);
-
-// InputMethod so we can do soft keyboards
-pref("dom.mozInputMethod.enabled", true);
 
 // Absolute path to the devtool unix domain socket file used
 // to communicate with a usb cable via adb forward

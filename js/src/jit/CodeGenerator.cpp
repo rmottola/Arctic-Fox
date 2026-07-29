@@ -1179,6 +1179,16 @@ PrepareAndExecuteRegExp(JSContext* cx, MacroAssembler& masm, Register regexp, Re
     if (regexp.volatile_())
         volatileRegs.add(regexp);
 
+#ifdef JS_TRACE_LOGGING
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    if (TraceLogTextIdEnabled(TraceLogger_IrregexpExecute)) {
+        masm.push(temp1);
+        masm.movePtr(ImmPtr(logger), temp1);
+        masm.tracelogStartId(temp1, TraceLogger_IrregexpExecute);
+        masm.pop(temp1);
+    }
+#endif
+
     // Execute the RegExp.
     masm.computeEffectiveAddress(Address(masm.getStackPointer(), inputOutputDataStartOffset), temp2);
     masm.PushRegsInMask(volatileRegs);
@@ -1186,6 +1196,13 @@ PrepareAndExecuteRegExp(JSContext* cx, MacroAssembler& masm, Register regexp, Re
     masm.passABIArg(temp2);
     masm.callWithABI(codePointer);
     masm.PopRegsInMask(volatileRegs);
+
+#ifdef JS_TRACE_LOGGING
+    if (TraceLogTextIdEnabled(TraceLogger_IrregexpExecute)) {
+        masm.movePtr(ImmPtr(logger), temp1);
+        masm.tracelogStopId(temp1, TraceLogger_IrregexpExecute);
+    }
+#endif
 
     Label success;
     masm.branch32(Assembler::Equal, matchResultAddress,
@@ -2562,6 +2579,20 @@ CodeGenerator::emitLambdaInit(Register output, Register envChain,
                   Address(output, JSFunction::offsetOfNativeOrScript()));
     masm.storePtr(envChain, Address(output, JSFunction::offsetOfEnvironment()));
     masm.storePtr(ImmGCPtr(info.fun->displayAtom()), Address(output, JSFunction::offsetOfAtom()));
+}
+
+typedef bool (*SetFunNameFn)(JSContext*, HandleFunction, HandleValue, FunctionPrefixKind);
+static const VMFunction SetFunNameInfo =
+    FunctionInfo<SetFunNameFn>(js::SetFunctionNameIfNoOwnName, "SetFunName");
+
+void
+CodeGenerator::visitSetFunName(LSetFunName* lir)
+{
+    pushArg(Imm32(lir->mir()->prefixKind()));
+    pushArg(ToValue(lir, LSetFunName::NameValue));
+    pushArg(ToRegister(lir->fun()));
+
+    callVM(SetFunNameInfo, lir);
 }
 
 void
@@ -8306,7 +8337,7 @@ CodeGenerator::visitStoreElementHoleV(LStoreElementHoleV* lir)
     emitStoreElementHoleV(lir);
 }
 
-typedef bool (*ThrowReadOnlyFn)(JSContext*, HandleObject);
+typedef bool (*ThrowReadOnlyFn)(JSContext*, int32_t);
 static const VMFunction ThrowReadOnlyInfo =
     FunctionInfo<ThrowReadOnlyFn>(ThrowReadOnlyError, "ThrowReadOnlyError");
 
@@ -8321,9 +8352,12 @@ CodeGenerator::visitFallibleStoreElementT(LFallibleStoreElementT* lir)
     if (!lir->mir()->strict()) {
         masm.branchTest32(Assembler::NonZero, flags, Imm32(ObjectElements::FROZEN), &isFrozen);
     } else {
-        Register object = ToRegister(lir->object());
-        OutOfLineCode* ool = oolCallVM(ThrowReadOnlyInfo, lir,
-                ArgList(object), StoreNothing());
+        const LAllocation* index = lir->index();
+        OutOfLineCode* ool;
+        if (index->isConstant())
+            ool = oolCallVM(ThrowReadOnlyInfo, lir, ArgList(Imm32(ToInt32(index))), StoreNothing());
+        else
+            ool = oolCallVM(ThrowReadOnlyInfo, lir, ArgList(ToRegister(index)), StoreNothing());
         masm.branchTest32(Assembler::NonZero, flags, Imm32(ObjectElements::FROZEN), ool->entry());
         // This OOL code should have thrown an exception, so will never return.
         // So, do not bind ool->rejoin() anywhere, so that it implicitly (and without the cost
@@ -8346,9 +8380,12 @@ CodeGenerator::visitFallibleStoreElementV(LFallibleStoreElementV* lir)
     if (!lir->mir()->strict()) {
         masm.branchTest32(Assembler::NonZero, flags, Imm32(ObjectElements::FROZEN), &isFrozen);
     } else {
-        Register object = ToRegister(lir->object());
-        OutOfLineCode* ool = oolCallVM(ThrowReadOnlyInfo, lir,
-                ArgList(object), StoreNothing());
+        const LAllocation* index = lir->index();
+        OutOfLineCode* ool;
+        if (index->isConstant())
+            ool = oolCallVM(ThrowReadOnlyInfo, lir, ArgList(Imm32(ToInt32(index))), StoreNothing());
+        else
+            ool = oolCallVM(ThrowReadOnlyInfo, lir, ArgList(ToRegister(index)), StoreNothing());
         masm.branchTest32(Assembler::NonZero, flags, Imm32(ObjectElements::FROZEN), ool->entry());
         // This OOL code should have thrown an exception, so will never return.
         // So, do not bind ool->rejoin() anywhere, so that it implicitly (and without the cost
@@ -8520,8 +8557,8 @@ StoreUnboxedPointer(MacroAssembler& masm, T address, MIRType type, const LAlloca
         masm.patchableCallPreBarrier(address, type);
     if (value->isConstant()) {
         Value v = value->toConstant()->toJSValue();
-        if (v.isMarkable()) {
-            masm.storePtr(ImmGCPtr(v.toMarkablePointer()), address);
+        if (v.isGCThing()) {
+            masm.storePtr(ImmGCPtr(v.toGCThing()), address);
         } else {
             MOZ_ASSERT(v.isNull());
             masm.storePtr(ImmWord(0), address);

@@ -639,23 +639,24 @@ VerifyCertificate(CERTCertificate* signerCert, void* voidContext, void* pinArg)
     *static_cast<const VerifyCertificateContext*>(voidContext);
 
   AppTrustDomain trustDomain(context.builtChain, pinArg);
-  if (trustDomain.SetTrustedRoot(context.trustedRoot) != SECSuccess) {
-    return MapSECStatus(SECFailure);
+  nsresult rv = trustDomain.SetTrustedRoot(context.trustedRoot);
+  if (NS_FAILED(rv)) {
+    return rv;
   }
   Input certDER;
-  mozilla::pkix::Result rv = certDER.Init(signerCert->derCert.data,
-                                          signerCert->derCert.len);
-  if (rv != Success) {
-    return mozilla::psm::GetXPCOMFromNSSError(MapResultToPRErrorCode(rv));
+  mozilla::pkix::Result result = certDER.Init(signerCert->derCert.data,
+                                              signerCert->derCert.len);
+  if (result != Success) {
+    return mozilla::psm::GetXPCOMFromNSSError(MapResultToPRErrorCode(result));
   }
 
-  rv = BuildCertChain(trustDomain, certDER, Now(),
-                      EndEntityOrCA::MustBeEndEntity,
-                      KeyUsage::digitalSignature,
-                      KeyPurposeId::id_kp_codeSigning,
-                      CertPolicyId::anyPolicy,
-                      nullptr/*stapledOCSPResponse*/);
-  if (rv == mozilla::pkix::Result::ERROR_EXPIRED_CERTIFICATE) {
+  result = BuildCertChain(trustDomain, certDER, Now(),
+                          EndEntityOrCA::MustBeEndEntity,
+                          KeyUsage::digitalSignature,
+                          KeyPurposeId::id_kp_codeSigning,
+                          CertPolicyId::anyPolicy,
+                          nullptr /*stapledOCSPResponse*/);
+  if (result == mozilla::pkix::Result::ERROR_EXPIRED_CERTIFICATE) {
     // For code-signing you normally need trusted 3rd-party timestamps to
     // handle expiration properly. The signer could always mess with their
     // system clock so you can't trust the certificate was un-expired when
@@ -674,10 +675,10 @@ VerifyCertificate(CERTCertificate* signerCert, void* voidContext, void* pinArg)
     //  * mozilla::pkix returns "expired" when there are "worse" problems
     //    with the certificate or chain.
     // (see bug 1267318)
-    rv = Success;
+    result = Success;
   }
-  if (rv != Success) {
-    return mozilla::psm::GetXPCOMFromNSSError(MapResultToPRErrorCode(rv));
+  if (result != Success) {
+    return mozilla::psm::GetXPCOMFromNSSError(MapResultToPRErrorCode(result));
   }
 
   return NS_OK;
@@ -863,9 +864,13 @@ OpenSignedAppFile(AppTrustedRoot aTrustedRoot, nsIFile* aJarFile,
   // Return the signer's certificate to the reader if they want it.
   // XXX: We should return an nsIX509CertList with the whole validated chain.
   if (aSignerCert) {
-    MOZ_ASSERT(CERT_LIST_HEAD(builtChain));
+    CERTCertListNode* signerCertNode = CERT_LIST_HEAD(builtChain);
+    if (!signerCertNode || CERT_LIST_END(signerCertNode, builtChain) ||
+        !signerCertNode->cert) {
+      return NS_ERROR_FAILURE;
+    }
     nsCOMPtr<nsIX509Cert> signerCert =
-      nsNSSCertificate::Create(CERT_LIST_HEAD(builtChain)->cert);
+      nsNSSCertificate::Create(signerCertNode->cert);
     NS_ENSURE_TRUE(signerCert, NS_ERROR_OUT_OF_MEMORY);
     signerCert.forget(aSignerCert);
   }
@@ -937,9 +942,13 @@ VerifySignedManifest(AppTrustedRoot aTrustedRoot,
 
   // Return the signer's certificate to the reader if they want it.
   if (aSignerCert) {
-    MOZ_ASSERT(CERT_LIST_HEAD(builtChain));
+    CERTCertListNode* signerCertNode = CERT_LIST_HEAD(builtChain);
+    if (!signerCertNode || CERT_LIST_END(signerCertNode, builtChain) ||
+        !signerCertNode->cert) {
+      return NS_ERROR_FAILURE;
+    }
     nsCOMPtr<nsIX509Cert> signerCert =
-      nsNSSCertificate::Create(CERT_LIST_HEAD(builtChain)->cert);
+      nsNSSCertificate::Create(signerCertNode->cert);
     if (NS_WARN_IF(!signerCert)) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -1490,9 +1499,13 @@ VerifySignedDirectory(AppTrustedRoot aTrustedRoot,
   // Return the signer's certificate to the reader if they want it.
   // XXX: We should return an nsIX509CertList with the whole validated chain.
   if (aSignerCert) {
-    MOZ_ASSERT(CERT_LIST_HEAD(builtChain));
+    CERTCertListNode* signerCertNode = CERT_LIST_HEAD(builtChain);
+    if (!signerCertNode || CERT_LIST_END(signerCertNode, builtChain) ||
+        !signerCertNode->cert) {
+      return NS_ERROR_FAILURE;
+    }
     nsCOMPtr<nsIX509Cert> signerCert =
-      nsNSSCertificate::Create(CERT_LIST_HEAD(builtChain)->cert);
+      nsNSSCertificate::Create(signerCertNode->cert);
     NS_ENSURE_TRUE(signerCert, NS_ERROR_OUT_OF_MEMORY);
     signerCert.forget(aSignerCert);
   }

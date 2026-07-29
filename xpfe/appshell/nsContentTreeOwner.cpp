@@ -172,12 +172,10 @@ NS_IMETHODIMP nsContentTreeOwner::GetInterface(const nsIID& aIID, void** aSink)
 
 NS_IMETHODIMP
 nsContentTreeOwner::ContentShellAdded(nsIDocShellTreeItem* aContentShell,
-                                      bool aPrimary, bool aTargetable,
-                                      const nsAString& aID)
+                                      bool aPrimary, const nsAString& aID)
 {
   NS_ENSURE_STATE(mXULWindow);
-  return mXULWindow->ContentShellAdded(aContentShell, aPrimary, aTargetable,
-                                       aID);
+  return mXULWindow->ContentShellAdded(aContentShell, aPrimary, aID);
 }
 
 NS_IMETHODIMP
@@ -350,10 +348,13 @@ nsContentTreeOwner::GetPersistence(bool* aPersistPosition,
 }
 
 NS_IMETHODIMP
-nsContentTreeOwner::GetTargetableShellCount(uint32_t* aResult)
+nsContentTreeOwner::GetTabCount(uint32_t* aResult)
 {
-  NS_ENSURE_STATE(mXULWindow);
-  *aResult = mXULWindow->mTargetableShells.Count();
+  if (mXULWindow) {
+    return mXULWindow->GetTabCount(aResult);
+  }
+
+  *aResult = 0;
   return NS_OK;
 }
 
@@ -390,6 +391,7 @@ NS_IMETHODIMP nsContentTreeOwner::OnBeforeLinkTraversal(const nsAString &origina
 NS_IMETHODIMP nsContentTreeOwner::ShouldLoadURI(nsIDocShell *aDocShell,
                                                 nsIURI *aURI,
                                                 nsIURI *aReferrer,
+                                                nsIPrincipal* aTriggeringPrincipal,
                                                 bool *_retval)
 {
   NS_ENSURE_STATE(mXULWindow);
@@ -398,7 +400,8 @@ NS_IMETHODIMP nsContentTreeOwner::ShouldLoadURI(nsIDocShell *aDocShell,
   mXULWindow->GetXULBrowserWindow(getter_AddRefs(xulBrowserWindow));
 
   if (xulBrowserWindow)
-    return xulBrowserWindow->ShouldLoadURI(aDocShell, aURI, aReferrer, _retval);
+    return xulBrowserWindow->ShouldLoadURI(aDocShell, aURI, aReferrer,
+                                           aTriggeringPrincipal, _retval);
 
   *_retval = true;
   return NS_OK;
@@ -415,10 +418,29 @@ NS_IMETHODIMP nsContentTreeOwner::ShouldLoadURIInThisProcess(nsIURI* aURI,
 NS_IMETHODIMP nsContentTreeOwner::ReloadInFreshProcess(nsIDocShell* aDocShell,
                                                        nsIURI* aURI,
                                                        nsIURI* aReferrer,
+                                                       nsIPrincipal* aTriggeringPrincipal,
                                                        bool* aRetVal)
 {
   NS_WARNING("Cannot reload in fresh process from a nsContentTreeOwner!");
   *aRetVal = false;
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsContentTreeOwner::StartPrerenderingDocument(nsIURI* aHref,
+                                                            nsIURI* aReferrer)
+{
+  NS_WARNING("Cannot prerender a document in the parent process");
+  return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP nsContentTreeOwner::ShouldSwitchToPrerenderedDocument(nsIURI* aHref,
+                                                                    nsIURI* aReferrer,
+                                                                    nsIRunnable* aSuccess,
+                                                                    nsIRunnable* aFailure,
+                                                                    bool* aRetval)
+{
+  NS_WARNING("Cannot switch to prerendered document in the parent process");
+  *aRetval = false;
   return NS_OK;
 }
 

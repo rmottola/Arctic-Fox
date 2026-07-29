@@ -23,6 +23,7 @@
 #include "nsPrincipal.h"
 #include "WrapperFactory.h"
 #include "xpcprivate.h"
+#include "xpc_make_class.h"
 #include "XPCWrapper.h"
 #include "XrayWrapper.h"
 #include "Crypto.h"
@@ -48,6 +49,7 @@
 #include "mozilla/dom/URLBinding.h"
 #include "mozilla/dom/URLSearchParamsBinding.h"
 #include "mozilla/dom/XMLHttpRequest.h"
+#include "mozilla/DeferredFinalize.h"
 
 using namespace mozilla;
 using namespace JS;
@@ -64,7 +66,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(SandboxPrivate)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(SandboxPrivate)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
   tmp->TraverseHostObjectURIs(cb);
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
@@ -287,9 +288,12 @@ SandboxFetch(JSContext* cx, JS::HandleObject scope, const CallArgs& args)
     if (!global) {
         return false;
     }
+    dom::CallerType callerType = nsContentUtils::IsSystemCaller(cx) ?
+        dom::CallerType::System : dom::CallerType::NonSystem;
     ErrorResult rv;
     RefPtr<dom::Promise> response =
-        FetchRequest(global, Constify(request), Constify(options), rv);
+        FetchRequest(global, Constify(request), Constify(options),
+                     callerType, rv);
     if (rv.MaybeSetPendingException(cx)) {
         return false;
     }
@@ -411,8 +415,8 @@ sandbox_finalize(js::FreeOp* fop, JSObject* obj)
     }
 
     static_cast<SandboxPrivate*>(sop)->ForgetGlobalObject();
-    NS_RELEASE(sop);
     DestroyProtoAndIfaceCache(obj);
+    DeferredFinalize(sop);
 }
 
 static void
@@ -1205,13 +1209,6 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
 
         if (!options.globalProperties.DefineInSandbox(cx, sandbox))
             return NS_ERROR_XPC_UNEXPECTED;
-
-#ifndef SPIDERMONKEY_PROMISE
-        // Promise is supposed to be part of ES, and therefore should appear on
-        // every global.
-        if (!dom::PromiseBinding::GetConstructorObject(cx))
-            return NS_ERROR_XPC_UNEXPECTED;
-#endif // SPIDERMONKEY_PROMISE
     }
 
     // We handle the case where the context isn't in a compartment for the
@@ -1252,7 +1249,7 @@ nsXPCComponents_utils_Sandbox::Construct(nsIXPConnectWrappedNative* wrapper, JSC
  * we use the related Codebase Principal for the sandbox.
  */
 bool
-ParsePrincipal(JSContext* cx, HandleString codebase, const PrincipalOriginAttributes& aAttrs,
+ParsePrincipal(JSContext* cx, HandleString codebase, const OriginAttributes& aAttrs,
                nsIPrincipal** principal)
 {
     MOZ_ASSERT(principal);
@@ -1336,7 +1333,7 @@ GetExpandedPrincipal(JSContext* cx, HandleObject arrayObj,
     // strings, then we will use a default OriginAttribute.
     // Otherwise, we will use the origin attributes of the passed object(s). If
     // more than one object is specified, we ensure that the OAs match.
-    Maybe<PrincipalOriginAttributes> attrs;
+    Maybe<OriginAttributes> attrs;
     if (options.originAttributes) {
         attrs.emplace();
         JS::RootedValue val(cx, JS::ObjectValue(*options.originAttributes));
@@ -1381,8 +1378,8 @@ GetExpandedPrincipal(JSContext* cx, HandleObject arrayObj,
             NS_ENSURE_TRUE(principal, false);
 
             if (!options.originAttributes) {
-                const PrincipalOriginAttributes prinAttrs =
-                    BasePrincipal::Cast(principal)->OriginAttributesRef();
+                const OriginAttributes prinAttrs =
+                    principal->OriginAttributesRef();
                 if (attrs.isNothing()) {
                     attrs.emplace(prinAttrs);
                 } else if (prinAttrs != attrs.ref()) {
@@ -1756,7 +1753,7 @@ nsXPCComponents_utils_Sandbox::CallOrConstruct(nsIXPConnectWrappedNative* wrappe
 
     if (args[0].isString()) {
         RootedString str(cx, args[0].toString());
-        PrincipalOriginAttributes attrs;
+        OriginAttributes attrs;
         if (options.originAttributes) {
             JS::RootedValue val(cx, JS::ObjectValue(*options.originAttributes));
             if (!attrs.Init(cx, val)) {

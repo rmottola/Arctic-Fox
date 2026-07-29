@@ -31,6 +31,7 @@ struct SubstitutionMapping;
 struct OverrideMapping;
 class nsIDomainPolicy;
 class nsIURIClassifierCallback;
+struct LookAndFeelInt;
 
 namespace mozilla {
 class RemoteSpellcheckEngineChild;
@@ -48,6 +49,7 @@ class PStorageChild;
 class ClonedMessageData;
 class TabChild;
 class GetFilesHelperChild;
+class FileCreatorHelper;
 
 class ContentChild final : public PContentChild
                          , public nsIWindowProvider
@@ -95,9 +97,12 @@ public:
 
   bool Init(MessageLoop* aIOLoop,
             base::ProcessId aParentPid,
-            IPC::Channel* aChannel);
+            IPC::Channel* aChannel,
+            uint64_t aChildID,
+            bool aIsForBrowser);
 
-  void InitXPCOM();
+  void InitXPCOM(const XPCOMInitData& aXPCOMInit,
+                 const mozilla::dom::ipc::StructuredCloneData& aInitialData);
 
   void InitGraphicsDeviceData();
 
@@ -157,12 +162,14 @@ public:
   AllocPContentBridgeChild(mozilla::ipc::Transport* transport,
                            base::ProcessId otherProcess) override;
 
-  PGMPServiceChild*
-  AllocPGMPServiceChild(mozilla::ipc::Transport* transport,
-                        base::ProcessId otherProcess) override;
+  mozilla::ipc::IPCResult
+  RecvInitGMPService(Endpoint<PGMPServiceChild>&& aGMPService) override;
 
   mozilla::ipc::IPCResult
   RecvGMPsChanged(nsTArray<GMPCapabilityData>&& capabilities) override;
+
+  mozilla::ipc::IPCResult
+  RecvInitProcessHangMonitor(Endpoint<PProcessHangMonitorChild>&& aHangMonitor) override;
 
   mozilla::ipc::IPCResult
   RecvInitRendering(
@@ -178,15 +185,7 @@ public:
     Endpoint<PVRManagerChild>&& aVRBridge,
     Endpoint<PVideoDecoderManagerChild>&& aVideoManager) override;
 
-  PProcessHangMonitorChild*
-  AllocPProcessHangMonitorChild(Transport* aTransport,
-                                ProcessId aOtherProcess) override;
-
   virtual mozilla::ipc::IPCResult RecvSetProcessSandbox(const MaybeFileDesc& aBroker) override;
-
-  PBackgroundChild*
-  AllocPBackgroundChild(Transport* aTransport, ProcessId aOtherProcess)
-                        override;
 
   virtual PBrowserChild* AllocPBrowserChild(const TabId& aTabId,
                                             const IPCTabContext& aContext,
@@ -222,22 +221,6 @@ public:
 
   virtual bool
   DeallocPHeapSnapshotTempFileHelperChild(PHeapSnapshotTempFileHelperChild*) override;
-
-  virtual PMemoryReportRequestChild*
-  AllocPMemoryReportRequestChild(const uint32_t& aGeneration,
-                                 const bool& aAnonymize,
-                                 const bool& aMinimizeMemoryUsage,
-                                 const MaybeFileDesc& aDMDFile) override;
-
-  virtual bool
-  DeallocPMemoryReportRequestChild(PMemoryReportRequestChild* actor) override;
-
-  virtual mozilla::ipc::IPCResult
-  RecvPMemoryReportRequestConstructor(PMemoryReportRequestChild* aChild,
-                                      const uint32_t& aGeneration,
-                                      const bool& aAnonymize,
-                                      const bool &aMinimizeMemoryUsage,
-                                      const MaybeFileDesc &aDMDFile) override;
 
   virtual PCycleCollectWithLogsChild*
   AllocPCycleCollectWithLogsChild(const bool& aDumpAllTraces,
@@ -604,6 +587,22 @@ public:
   virtual mozilla::ipc::IPCResult
   RecvBlobURLUnregistration(const nsCString& aURI) override;
 
+  virtual mozilla::ipc::IPCResult
+  RecvFileCreationResponse(const nsID& aUUID,
+                           const FileCreationResult& aResult) override;
+
+  mozilla::ipc::IPCResult
+  RecvRequestMemoryReport(
+          const uint32_t& generation,
+          const bool& anonymize,
+          const bool& minimizeMemoryUsage,
+          const MaybeFileDesc& DMDFile) override;
+
+  virtual mozilla::ipc::IPCResult
+  RecvSetXPCOMProcessAttributes(const XPCOMInitData& aXPCOMInit,
+                                const StructuredCloneData& aInitialData,
+                                nsTArray<LookAndFeelInt>&& aLookAndFeelIntCache) override;
+
 #if defined(XP_WIN) && defined(ACCESSIBILITY)
   bool
   SendGetA11yContentId();
@@ -623,6 +622,11 @@ public:
   virtual bool
   DeallocPURLClassifierChild(PURLClassifierChild* aActor) override;
 
+  nsTArray<LookAndFeelInt>&
+  LookAndFeelCache() {
+    return mLookAndFeelCache;
+  }
+
   /**
    * Helper function for protocols that use the GPU process when available.
    * Overrides FatalError to just be a warning when communicating with the
@@ -633,6 +637,14 @@ public:
                                              const char* const aErrorMsg,
                                              base::ProcessId aOtherPid);
 
+  // This method is used by FileCreatorHelper for the creation of a BlobImpl.
+  void
+  FileCreationRequest(nsID& aUUID, FileCreatorHelper* aHelper,
+                      const nsAString& aFullPath, const nsAString& aType,
+                      const nsAString& aName,
+                      const Optional<int64_t>& aLastModified,
+                      bool aIsFromNsIFile);
+
 private:
   static void ForceKillTimerCallback(nsITimer* aTimer, void* aClosure);
   void StartForceKillTimer();
@@ -640,6 +652,9 @@ private:
   virtual void ActorDestroy(ActorDestroyReason why) override;
 
   virtual void ProcessingError(Result aCode, const char* aReason) override;
+
+  virtual already_AddRefed<nsIEventTarget>
+  GetConstructedEventTarget(const Message& aMsg) override;
 
   InfallibleTArray<nsAutoPtr<AlertObserver> > mAlertObservers;
   RefPtr<ConsoleListener> mConsoleListener;
@@ -652,6 +667,8 @@ private:
   // parent process and used to initialize gfx in the child. Currently used
   // only on MacOSX.
   InfallibleTArray<mozilla::dom::FontFamilyListEntry> mFontFamilies;
+  // Temporary storage for nsXPLookAndFeel flags.
+  nsTArray<LookAndFeelInt> mLookAndFeelCache;
 
   /**
    * An ID unique to the process containing our corresponding
@@ -691,6 +708,10 @@ private:
   // This GetFilesHelperChild objects are removed when RecvGetFilesResponse is
   // received.
   nsRefPtrHashtable<nsIDHashKey, GetFilesHelperChild> mGetFilesPendingRequests;
+
+  // Hashtable to keep track of the pending file creation.
+  // These items are removed when RecvFileCreationResponse is received.
+  nsRefPtrHashtable<nsIDHashKey, FileCreatorHelper> mFileCreationPending;
 
   bool mShuttingDown;
 

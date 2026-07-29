@@ -969,7 +969,7 @@ class Parser final : private JS::AutoGCRooter, public StrictModeGetter
         traceListHead = m.traceListHead;
     }
 
-    friend void js::frontend::MarkParser(JSTracer* trc, JS::AutoGCRooter* parser);
+    friend void js::frontend::TraceParser(JSTracer* trc, JS::AutoGCRooter* parser);
 
     const char* getFilename() const { return tokenStream.getFilename(); }
     JSVersion versionNumber() const { return tokenStream.versionNumber(); }
@@ -1050,12 +1050,12 @@ class Parser final : private JS::AutoGCRooter, public StrictModeGetter
     // Parse a module.
     Node moduleBody(ModuleSharedContext* modulesc);
 
-    // Parse a function, given only its body. Used for the Function and
-    // Generator constructors.
-    Node standaloneFunctionBody(HandleFunction fun, HandleScope enclosingScope,
-                                Handle<PropertyNameVector> formals,
-                                GeneratorKind generatorKind, FunctionAsyncKind asyncKind,
-                                Directives inheritedDirectives, Directives* newDirectives);
+    // Parse a function, used for the Function, GeneratorFunction, and
+    // AsyncFunction constructors.
+    Node standaloneFunction(HandleFunction fun, HandleScope enclosingScope,
+                            mozilla::Maybe<uint32_t> parameterListEnd,
+                            GeneratorKind generatorKind, FunctionAsyncKind asyncKind,
+                            Directives inheritedDirectives, Directives* newDirectives);
 
     // Parse a function, given only its arguments and body. Used for lazily
     // parsed functions.
@@ -1071,7 +1071,9 @@ class Parser final : private JS::AutoGCRooter, public StrictModeGetter
     // Parse a function's formal parameters and its body assuming its function
     // ParseContext is already on the stack.
     bool functionFormalParametersAndBody(InHandling inHandling, YieldHandling yieldHandling,
-                                         Node pn, FunctionSyntaxKind kind);
+                                         Node pn, FunctionSyntaxKind kind,
+                                         mozilla::Maybe<uint32_t> parameterListEnd = mozilla::Nothing(),
+                                         bool isStandaloneFunction = false);
 
     // Determine whether |yield| is a valid name in the current context, or
     // whether it's prohibited due to strictness, JS version, or occurrence
@@ -1321,15 +1323,9 @@ class Parser final : private JS::AutoGCRooter, public StrictModeGetter
 #if !JS_HAS_FOR_EACH_IN
         return false;
 #else
-        return versionNumber() >= JSVERSION_1_6;
+        return options().forEachStatementOption && versionNumber() >= JSVERSION_1_6;
 #endif
     }
-
-    enum AssignmentFlavor {
-        KeyedDestructuringAssignment,
-        IncrementAssignment,
-        DecrementAssignment,
-    };
 
     bool matchInOrOf(bool* isForInp, bool* isForOfp);
 
@@ -1352,8 +1348,8 @@ class Parser final : private JS::AutoGCRooter, public StrictModeGetter
                                      GeneratorKind generatorKind, FunctionAsyncKind asyncKind,
                                      bool tryAnnexB,
                                      Directives inheritedDirectives, Directives* newDirectives);
-    bool finishFunctionScopes();
-    bool finishFunction();
+    bool finishFunctionScopes(bool isStandaloneFunction);
+    bool finishFunction(bool isStandaloneFunction = false);
     bool leaveInnerFunction(ParseContext* outerpc);
 
     bool matchOrInsertSemicolonHelper(TokenStream::Modifier modifier);
@@ -1370,10 +1366,7 @@ class Parser final : private JS::AutoGCRooter, public StrictModeGetter
                                        FunctionCallBehavior behavior = ForbidAssignmentToFunctionCalls);
 
   private:
-    bool reportIfArgumentsEvalTarget(Node nameNode);
-    bool reportIfNotValidSimpleAssignmentTarget(Node target, AssignmentFlavor flavor);
-
-    bool checkAndMarkAsIncOperand(Node kid);
+    bool checkIncDecOperand(Node operand, uint32_t operandOffset);
     bool checkStrictAssignment(Node lhs);
     bool checkStrictBinding(PropertyName* name, TokenPos pos);
 

@@ -123,7 +123,7 @@ function waitForBrowserState(aState, aSetStateCallback) {
     if (aTopic == "domwindowopened") {
       let newWindow = aSubject.QueryInterface(Ci.nsIDOMWindow);
       newWindow.addEventListener("load", function() {
-        newWindow.removeEventListener("load", arguments.callee, false);
+        newWindow.removeEventListener("load", arguments.callee);
 
         if (++windowsOpen == expectedWindows) {
           Services.ww.unregisterNotification(windowObserver);
@@ -134,7 +134,7 @@ function waitForBrowserState(aState, aSetStateCallback) {
         windows.push(newWindow);
         // Add the progress listener
         newWindow.gBrowser.tabContainer.addEventListener("SSTabRestored", onSSTabRestored, true);
-      }, false);
+      });
     }
   }
 
@@ -327,11 +327,11 @@ function promiseBrowserUnloaded(aBrowser, aContainer) {
 
 function whenWindowLoaded(aWindow, aCallback = next) {
   aWindow.addEventListener("load", function windowLoadListener() {
-    aWindow.removeEventListener("load", windowLoadListener, false);
+    aWindow.removeEventListener("load", windowLoadListener);
     executeSoon(function executeWhenWindowLoaded() {
       aCallback(aWindow);
     });
-  }, false);
+  });
 }
 function promiseWindowLoaded(aWindow) {
   return new Promise(resolve => whenWindowLoaded(aWindow, resolve));

@@ -889,8 +889,8 @@ FeedWriter.prototype = {
                           .QueryInterface(Ci.nsIDocShell);
     let chan = docShell.currentDocumentChannel;
 
-    // We probably need to call InheritFromDocShellToDoc for this, but right now
-    // we can't call it from JS.
+    // We probably need to call Inherit() for this, but right now we can't call
+    // it from JS.
     let attrs = docShell.getOriginAttributes();
     let ssm = Services.scriptSecurityManager;
     let nullPrincipal = ssm.createNullPrincipal(attrs);
@@ -1003,9 +1003,9 @@ FeedWriter.prototype = {
 
   close() {
     this._document.getElementById("subscribeButton")
-        .removeEventListener("click", this, false);
+        .removeEventListener("click", this);
     this._document.getElementById("handlersMenuList")
-        .removeEventListener("change", this, false);
+        .removeEventListener("change", this);
     this._document = null;
     this._window = null;
     let prefs = Services.prefs;

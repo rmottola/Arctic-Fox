@@ -46,7 +46,6 @@
 #include "nsIScriptSecurityManager.h"
 #include "mozilla/dom/XBLChildrenElement.h"
 
-#include "prprf.h"
 #include "nsNodeUtils.h"
 #include "nsJSUtils.h"
 
@@ -426,7 +425,7 @@ nsXBLBinding::GenerateAnonymousContent()
   nsIPresShell* presShell = mBoundElement->OwnerDoc()->GetShell();
   ServoStyleSet* servoSet = presShell->StyleSet()->GetAsServo();
   if (servoSet) {
-    servoSet->StyleNewChildren(mBoundElement);
+    servoSet->StyleNewChildren(mBoundElement->AsElement());
   }
 }
 

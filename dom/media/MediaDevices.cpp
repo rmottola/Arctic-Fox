@@ -137,12 +137,21 @@ private:
   RefPtr<Promise> mPromise;
 };
 
+MediaDevices::~MediaDevices()
+{
+  MediaManager* mediamanager = MediaManager::GetIfExists();
+  if (mediamanager) {
+    mediamanager->RemoveDeviceChangeCallback(this);
+  }
+}
+
 NS_IMPL_ISUPPORTS(MediaDevices::GumResolver, nsIDOMGetUserMediaSuccessCallback)
 NS_IMPL_ISUPPORTS(MediaDevices::EnumDevResolver, nsIGetUserMediaDevicesSuccessCallback)
 NS_IMPL_ISUPPORTS(MediaDevices::GumRejecter, nsIDOMGetUserMediaErrorCallback)
 
 already_AddRefed<Promise>
 MediaDevices::GetUserMedia(const MediaStreamConstraints& aConstraints,
+			   CallerType aCallerType,
                            ErrorResult &aRv)
 {
   nsPIDOMWindowInner* window = GetOwner();
@@ -154,7 +163,8 @@ MediaDevices::GetUserMedia(const MediaStreamConstraints& aConstraints,
   RefPtr<GumRejecter> rejecter = new GumRejecter(p);
 
   aRv = MediaManager::Get()->GetUserMedia(window, aConstraints,
-                                          resolver, rejecter);
+                                          resolver, rejecter,
+					  aCallerType);
   return p.forget();
 }
 

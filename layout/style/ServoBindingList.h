@@ -26,9 +26,23 @@ SERVO_BINDING_FUNC(Servo_Element_ShouldTraverse, bool, RawGeckoElementBorrowed n
 SERVO_BINDING_FUNC(Servo_StyleSheet_Empty, RawServoStyleSheetStrong,
                    mozilla::css::SheetParsingMode parsing_mode)
 SERVO_BINDING_FUNC(Servo_StyleSheet_FromUTF8Bytes, RawServoStyleSheetStrong,
+                   mozilla::css::Loader* loader,
+                   mozilla::ServoStyleSheet* gecko_stylesheet,
                    const nsACString* data,
                    mozilla::css::SheetParsingMode parsing_mode,
                    const nsACString* base_url,
+                   ThreadSafeURIHolder* base,
+                   ThreadSafeURIHolder* referrer,
+                   ThreadSafePrincipalHolder* principal)
+SERVO_BINDING_FUNC(Servo_ImportRule_GetSheet,
+                   RawServoStyleSheetStrong,
+                   const RawServoImportRuleBorrowed import_rule)
+SERVO_BINDING_FUNC(Servo_StyleSheet_ClearAndUpdate,
+                   void,
+                   RawServoStyleSheetBorrowed stylesheet,
+                   mozilla::css::Loader* loader,
+                   mozilla::ServoStyleSheet* gecko_stylesheet,
+                   const nsACString* data,
                    ThreadSafeURIHolder* base,
                    ThreadSafeURIHolder* referrer,
                    ThreadSafePrincipalHolder* principal)
@@ -47,6 +61,8 @@ SERVO_BINDING_FUNC(Servo_StyleSet_RemoveStyleSheet, void,
 SERVO_BINDING_FUNC(Servo_StyleSet_InsertStyleSheetBefore, void,
                    RawServoStyleSetBorrowed set, RawServoStyleSheetBorrowed sheet,
                    RawServoStyleSheetBorrowed reference)
+SERVO_BINDING_FUNC(Servo_StyleSet_NoteStyleSheetsChanged, void,
+                   RawServoStyleSetBorrowed set)
 
 // CSSRuleList
 SERVO_BINDING_FUNC(Servo_CssRules_ListTypes, void,
@@ -159,7 +175,7 @@ SERVO_BINDING_FUNC(Servo_ResolveStyle, ServoComputedValuesStrong,
 // Restyle the given subtree.
 SERVO_BINDING_FUNC(Servo_TraverseSubtree, void,
                    RawGeckoElementBorrowed root, RawServoStyleSetBorrowed set,
-                   mozilla::SkipRootBehavior skip_root)
+                   mozilla::TraversalRootBehavior root_behavior)
 
 // Assert that the tree has no pending or unconsumed restyles.
 SERVO_BINDING_FUNC(Servo_AssertTreeIsClean, void, RawGeckoElementBorrowed root)

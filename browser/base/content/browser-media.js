@@ -14,24 +14,25 @@ var gEMEHandler = {
   },
   ensureEMEEnabled: function(browser, keySystem) {
     Services.prefs.setBoolPref("media.eme.enabled", true);
-    if (keySystem) {
-      if (keySystem.startsWith("com.adobe") &&
-          Services.prefs.getPrefType("media.gmp-eme-adobe.enabled") &&
-          !Services.prefs.getBoolPref("media.gmp-eme-adobe.enabled")) {
-        Services.prefs.setBoolPref("media.gmp-eme-adobe.enabled", true);
-      } else if (keySystem == "org.w3.clearkey" &&
-                 Services.prefs.getPrefType("media.eme.clearkey.enabled") &&
-                 !Services.prefs.getBoolPref("media.eme.clearkey.enabled")) {
-        Services.prefs.setBoolPref("media.eme.clearkey.enabled", true);
-      } else if (keySystem == "com.widevine.alpha" &&
-                 Services.prefs.getPrefType("media.gmp-widevinecdm.enabled") &&
-                 !Services.prefs.getBoolPref("media.gmp-widevinecdm.enabled")) {
-        Services.prefs.setBoolPref("media.gmp-widevinecdm.enabled", true);
-      }
+    if (keySystem &&
+        keySystem == "com.widevine.alpha" &&
+        Services.prefs.getPrefType("media.gmp-widevinecdm.enabled") &&
+        !Services.prefs.getBoolPref("media.gmp-widevinecdm.enabled")) {
+      Services.prefs.setBoolPref("media.gmp-widevinecdm.enabled", true);
     }
     browser.reload();
   },
-  getLearnMoreLink: function(msgId) {
+  isKeySystemVisible(keySystem) {
+    if (!keySystem) {
+      return false;
+    }
+    if (keySystem == "com.widevine.alpha" &&
+        Services.prefs.getPrefType("media.gmp-widevinecdm.visible")) {
+      return Services.prefs.getBoolPref("media.gmp-widevinecdm.visible");
+    }
+    return true;
+  },
+  getLearnMoreLink(msgId) {
     let text = gNavigatorBundle.getString("emeNotifications." + msgId + ".learnMoreLabel");
     let baseURL = Services.urlFormatter.formatURLPref("app.support.baseURL");
     return "<label class='text-link' href='" + baseURL + "drm-content'>" +
@@ -193,21 +194,6 @@ let gDecoderDoctorHandler = {
   },
 
   getLabelForNotificationBox(type) {
-    if (type == "adobe-cdm-not-found" &&
-        AppConstants.platform == "win") {
-      if (AppConstants.isPlatformAndVersionAtMost("win", "5.9")) {
-        // We supply our own Learn More button so we don't need to populate the message here.
-        return gNavigatorBundle.getFormattedString("emeNotifications.drmContentDisabled.message", [""]);
-      }
-      return gNavigatorBundle.getString("decoder.noCodecs.message");
-    }
-    if (type == "adobe-cdm-not-activated" &&
-        AppConstants.platform == "win") {
-      if (AppConstants.isPlatformAndVersionAtMost("win", "5.9")) {
-        return gNavigatorBundle.getString("decoder.noCodecsXP.message");
-      }
-      return gNavigatorBundle.getString("decoder.noCodecs.message");
-    }
     if (type == "platform-decoder-not-found") {
       if (AppConstants.isPlatformAndVersionAtLeast("win", "6")) {
         return gNavigatorBundle.getString("decoder.noHWAcceleration.message");
@@ -328,4 +314,4 @@ window.messageManager.addMessageListener("EMEVideo:ContentMediaKeysRequest", gEM
 window.addEventListener("unload", function() {
   window.messageManager.removeMessageListener("EMEVideo:ContentMediaKeysRequest", gEMEHandler);
   window.messageManager.removeMessageListener("DecoderDoctor:Notification", gDecoderDoctorHandler);
-}, false);
+});

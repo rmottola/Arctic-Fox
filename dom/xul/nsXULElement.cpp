@@ -1277,7 +1277,7 @@ nsXULElement::IsEventStoppedFromAnonymousScrollbar(EventMessage aMessage)
             IsAnyOfXULElements(nsGkAtoms::scrollbar, nsGkAtoms::scrollcorner) &&
             (aMessage == eMouseClick || aMessage == eMouseDoubleClick ||
              aMessage == eXULCommand || aMessage == eContextMenu ||
-             aMessage == eDragStart));
+             aMessage == eDragStart  || aMessage == eMouseAuxClick));
 }
 
 nsresult
@@ -1818,6 +1818,12 @@ nsXULElement::ClickWithInputSource(uint16_t aInputSource, bool aIsTrustedEvent)
             status = nsEventStatus_eIgnore;  // reset status
             EventDispatcher::Dispatch(static_cast<nsIContent*>(this),
                                       context, &eventClick, nullptr, &status);
+
+            // If the click has been prevented, lets skip the command call
+            // this is how a physical click works
+            if (status == nsEventStatus_eConsumeNoDefault) {
+                return NS_OK;
+            }
         }
     }
 
@@ -2184,7 +2190,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsXULPrototypeNode)
         }
         ImplCycleCollectionTraverse(cb, elem->mChildren, "mChildren");
     }
-    NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(nsXULPrototypeNode)
     if (tmp->mType == nsXULPrototypeNode::eType_Script) {

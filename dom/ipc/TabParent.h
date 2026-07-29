@@ -174,9 +174,6 @@ public:
   virtual mozilla::ipc::IPCResult RecvReplyKeyEvent(const WidgetKeyboardEvent& aEvent) override;
 
   virtual mozilla::ipc::IPCResult
-  RecvDispatchAfterKeyboardEvent(const WidgetKeyboardEvent& aEvent) override;
-
-  virtual mozilla::ipc::IPCResult
   RecvAccessKeyNotHandled(const WidgetKeyboardEvent& aEvent) override;
 
   virtual mozilla::ipc::IPCResult RecvBrowserFrameOpenWindow(PBrowserParent* aOpener,
@@ -353,7 +350,7 @@ public:
 
   virtual PDocAccessibleParent*
   AllocPDocAccessibleParent(PDocAccessibleParent*, const uint64_t&,
-                            const uint32_t&) override;
+                            const uint32_t&, const IAccessibleHolder&) override;
 
   virtual bool DeallocPDocAccessibleParent(PDocAccessibleParent*) override;
 
@@ -361,7 +358,8 @@ public:
   RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
                                 PDocAccessibleParent* aParentDoc,
                                 const uint64_t& aParentID,
-                                const uint32_t& aMsaaID) override;
+                                const uint32_t& aMsaaID,
+                                const IAccessibleHolder& aDocCOMProxy) override;
 
   /**
    * Return the top level doc accessible parent for this tab.
@@ -369,6 +367,8 @@ public:
   a11y::DocAccessibleParent* GetTopLevelDocAccessible() const;
 
   void LoadURL(nsIURI* aURI);
+
+  void InitRenderFrame();
 
   // XXX/cjones: it's not clear what we gain by hiding these
   // message-sending functions under a layer of indirection and
@@ -629,7 +629,9 @@ protected:
   virtual mozilla::ipc::IPCResult RecvAudioChannelActivityNotification(const uint32_t& aAudioChannel,
                                                                        const bool& aActive) override;
 
-  virtual mozilla::ipc::IPCResult RecvNotifySessionHistoryChange(const uint32_t& aCount) override;
+  virtual mozilla::ipc::IPCResult RecvSHistoryUpdate(const uint32_t& aCount,
+                                                     const uint32_t& aLocalIndex,
+                                                     const bool& aTruncate) override;
 
   virtual mozilla::ipc::IPCResult RecvRequestCrossBrowserNavigation(const uint32_t& aGlobalIndex) override;
 

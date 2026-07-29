@@ -9,6 +9,7 @@
 #include "NSSCertDBTrustDomain.h"
 #include "ScopedNSSTypes.h"
 #include "SharedSSLState.h"
+#include "mozilla/Assertions.h"
 #include "mozilla/Telemetry.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsCRT.h"
@@ -99,7 +100,7 @@ nsresult
 nsCertOverrideService::Init()
 {
   if (!NS_IsMainThread()) {
-    NS_NOTREACHED("nsCertOverrideService initialized off main thread");
+    MOZ_ASSERT_UNREACHABLE("nsCertOverrideService initialized off main thread");
     return NS_ERROR_NOT_SAME_THREAD;
   }
 
@@ -332,7 +333,7 @@ nsCertOverrideService::Write()
   // All went ok. Maybe except for problems in Write(), but the stream detects
   // that for us
   nsCOMPtr<nsISafeOutputStream> safeStream = do_QueryInterface(bufferedOutputStream);
-  NS_ASSERTION(safeStream, "expected a safe output stream!");
+  MOZ_ASSERT(safeStream, "Expected a safe output stream!");
   if (safeStream) {
     rv = safeStream->Finish();
     if (NS_FAILED(rv)) {
@@ -576,8 +577,11 @@ nsCertOverrideService::AddEntryToList(const nsACString &aHostName, int32_t aPort
 NS_IMETHODIMP
 nsCertOverrideService::ClearValidityOverride(const nsACString & aHostName, int32_t aPort)
 {
-  if (aPort == 0 &&
-      aHostName.EqualsLiteral("all:temporary-certificates")) {
+  if (!NS_IsMainThread()) {
+    return NS_ERROR_NOT_SAME_THREAD;
+  }
+
+  if (aPort == 0 && aHostName.EqualsLiteral("all:temporary-certificates")) {
     RemoveAllTemporaryOverrides();
     return NS_OK;
   }
@@ -589,7 +593,8 @@ nsCertOverrideService::ClearValidityOverride(const nsACString & aHostName, int32
     Write();
   }
 
-  if (EnsureNSSInitialized(nssEnsure)) {
+  nsCOMPtr<nsINSSComponent> nss(do_GetService(PSM_COMPONENT_CONTRACTID));
+  if (nss) {
     SSL_ClearSessionCache();
   } else {
     return NS_ERROR_NOT_AVAILABLE;

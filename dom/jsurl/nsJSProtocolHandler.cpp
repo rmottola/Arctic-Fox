@@ -29,7 +29,6 @@
 #include "nsPIDOMWindow.h"
 #include "nsIConsoleService.h"
 #include "nsXPIDLString.h"
-#include "prprf.h"
 #include "nsEscape.h"
 #include "nsIWebNavigation.h"
 #include "nsIDocShell.h"
@@ -183,7 +182,7 @@ nsresult nsJSThunk::EvaluateScript(nsIChannel *aChannel,
         bool allowsInlineScript = true;
         rv = csp->GetAllowsInline(nsIContentPolicy::TYPE_SCRIPT,
                                   EmptyString(), // aNonce
-                                  false,         // aParserCreated
+                                  true,         // aParserCreated
                                   EmptyString(), // aContent
                                   0,             // aLineNumber
                                   &allowsInlineScript);

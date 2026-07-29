@@ -2279,7 +2279,7 @@ CCGraphBuilder::BuildGraph(SliceBudget& aBudget)
     SetFirstChild();
 
     if (pi->mParticipant) {
-      nsresult rv = pi->mParticipant->Traverse(pi->mPointer, *this);
+      nsresult rv = pi->mParticipant->TraverseNativeAndJS(pi->mPointer, *this);
       MOZ_RELEASE_ASSERT(!NS_FAILED(rv), "Cycle collector Traverse method failed");
     }
 
@@ -2553,7 +2553,7 @@ static bool
 MayHaveChild(void* aObj, nsCycleCollectionParticipant* aCp)
 {
   ChildFinder cf;
-  aCp->Traverse(aObj, cf);
+  aCp->TraverseNativeAndJS(aObj, cf);
   return cf.MayHaveChild();
 }
 
@@ -2610,7 +2610,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(JSPurpleBuffer)
   CycleCollectionNoteChild(cb, tmp, "self");
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 #define NS_TRACE_SEGMENTED_ARRAY(_field, _type)                               \
@@ -2690,7 +2689,7 @@ public:
                      void* aClosure) const override
   {
     const JS::Value& val = aValue->unbarrieredGet();
-    if (val.isMarkable() && ValueIsGrayCCThing(val)) {
+    if (val.isGCThing() && ValueIsGrayCCThing(val)) {
       MOZ_ASSERT(!js::gc::IsInsideNursery(val.toGCThing()));
       mCollector->GetJSPurpleBuffer()->mValues.InfallibleAppend(val);
     }
@@ -2871,7 +2870,7 @@ nsCycleCollector::MarkRoots(SliceBudget& aBudget)
   JS::AutoAssertNoGC nogc;
   TimeLog timeLog;
   AutoRestore<bool> ar(mScanInProgress);
-  MOZ_ASSERT(!mScanInProgress);
+  MOZ_RELEASE_ASSERT(!mScanInProgress);
   mScanInProgress = true;
   MOZ_ASSERT(mIncrementalPhase == GraphBuildingPhase);
 
@@ -3192,7 +3191,7 @@ nsCycleCollector::ScanRoots(bool aFullySynchGraphBuild)
 {
   JS::AutoAssertNoGC nogc;
   AutoRestore<bool> ar(mScanInProgress);
-  MOZ_ASSERT(!mScanInProgress);
+  MOZ_RELEASE_ASSERT(!mScanInProgress);
   mScanInProgress = true;
   mWhiteNodeCount = 0;
   MOZ_ASSERT(mIncrementalPhase == ScanAndCollectWhitePhase);
@@ -3855,7 +3854,7 @@ nsCycleCollector::BeginCollection(ccType aCCType,
   }
 
   AutoRestore<bool> ar(mScanInProgress);
-  MOZ_ASSERT(!mScanInProgress);
+  MOZ_RELEASE_ASSERT(!mScanInProgress);
   mScanInProgress = true;
   mPurpleBuf.SelectPointers(*mBuilder);
   timeLog.Checkpoint("SelectPointers()");

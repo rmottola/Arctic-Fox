@@ -21,9 +21,6 @@ class PerformanceWorker final : public Performance
 public:
   explicit PerformanceWorker(workers::WorkerPrivate* aWorkerPrivate);
 
-  // Performance WebIDL methods
-  DOMHighResTimeStamp Now() const override;
-
   virtual PerformanceTiming* Timing() override
   {
     MOZ_CRASH("This should not be called on workers.");
@@ -59,12 +56,6 @@ public:
   }
 
   virtual nsITimedChannel* GetChannel() const override
-  {
-    MOZ_CRASH("This should not be called on workers.");
-    return nullptr;
-  }
-
-  virtual Performance* GetParentPerformance() const override
   {
     MOZ_CRASH("This should not be called on workers.");
     return nullptr;

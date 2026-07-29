@@ -348,16 +348,17 @@ WebGLContext::DeleteFramebuffer(WebGLFramebuffer* fbuf)
 void
 WebGLContext::DeleteRenderbuffer(WebGLRenderbuffer* rbuf)
 {
-    if (!ValidateDeleteObject("deleteRenderbuffer", rbuf))
+    const char funcName[] = "deleteRenderbuffer";
+    if (!ValidateDeleteObject(funcName, rbuf))
         return;
 
     if (mBoundDrawFramebuffer)
-        mBoundDrawFramebuffer->DetachRenderbuffer(rbuf);
+        mBoundDrawFramebuffer->DetachRenderbuffer(funcName, rbuf);
 
     if (mBoundReadFramebuffer)
-        mBoundReadFramebuffer->DetachRenderbuffer(rbuf);
+        mBoundReadFramebuffer->DetachRenderbuffer(funcName, rbuf);
 
-    rbuf->InvalidateStatusOfAttachedFBs();
+    rbuf->InvalidateStatusOfAttachedFBs(funcName);
 
     if (mBoundRenderbuffer == rbuf)
         BindRenderbuffer(LOCAL_GL_RENDERBUFFER, nullptr);
@@ -368,14 +369,15 @@ WebGLContext::DeleteRenderbuffer(WebGLRenderbuffer* rbuf)
 void
 WebGLContext::DeleteTexture(WebGLTexture* tex)
 {
-    if (!ValidateDeleteObject("deleteTexture", tex))
+    const char funcName[] = "deleteTexture";
+    if (!ValidateDeleteObject(funcName, tex))
         return;
 
     if (mBoundDrawFramebuffer)
-        mBoundDrawFramebuffer->DetachTexture(tex);
+        mBoundDrawFramebuffer->DetachTexture(funcName, tex);
 
     if (mBoundReadFramebuffer)
-        mBoundReadFramebuffer->DetachTexture(tex);
+        mBoundReadFramebuffer->DetachTexture(funcName, tex);
 
     GLuint activeTexture = mActiveTexture;
     for (int32_t i = 0; i < mGLMaxTextureUnits; i++) {
@@ -947,6 +949,8 @@ WebGLContext::Hint(GLenum target, GLenum mode)
 
     switch (target) {
     case LOCAL_GL_GENERATE_MIPMAP_HINT:
+        mGenerateMipmapHint = mode;
+
         // Deprecated and removed in desktop GL Core profiles.
         if (gl->IsCoreProfile())
             return;
@@ -1235,17 +1239,18 @@ GetJSScalarFromGLType(GLenum type, js::Scalar::Type* const out_scalarType)
 }
 
 bool
-WebGLContext::ReadPixels_SharedPrecheck(ErrorResult* const out_error)
+WebGLContext::ReadPixels_SharedPrecheck(CallerType aCallerType,
+                                        ErrorResult& out_error)
 {
     if (IsContextLost())
         return false;
 
     if (mCanvasElement &&
         mCanvasElement->IsWriteOnly() &&
-        !nsContentUtils::IsCallerChrome())
+        aCallerType != CallerType::System)
     {
         GenerateWarning("readPixels: Not allowed");
-        out_error->Throw(NS_ERROR_DOM_SECURITY_ERR);
+        out_error.Throw(NS_ERROR_DOM_SECURITY_ERR);
         return false;
     }
 
@@ -1298,10 +1303,11 @@ WebGLContext::ValidatePackSize(const char* funcName, uint32_t width, uint32_t he
 void
 WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format,
                          GLenum type, const dom::ArrayBufferView& dstView,
-                         GLuint dstElemOffset, ErrorResult& out_error)
+                         GLuint dstElemOffset, CallerType aCallerType,
+                         ErrorResult& out_error)
 {
     const char funcName[] = "readPixels";
-    if (!ReadPixels_SharedPrecheck(&out_error))
+    if (!ReadPixels_SharedPrecheck(aCallerType, out_error))
         return;
 
     if (mBoundPixelPackBuffer) {
@@ -1337,10 +1343,11 @@ WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum
 
 void
 WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format,
-                         GLenum type, WebGLsizeiptr offset, ErrorResult& out_error)
+                         GLenum type, WebGLsizeiptr offset,
+                         CallerType aCallerType, ErrorResult& out_error)
 {
     const char funcName[] = "readPixels";
-    if (!ReadPixels_SharedPrecheck(&out_error))
+    if (!ReadPixels_SharedPrecheck(aCallerType, out_error))
         return;
 
     const auto& buffer = ValidateBufferSelection(funcName, LOCAL_GL_PIXEL_PACK_BUFFER);
@@ -1379,71 +1386,39 @@ WebGLContext::ReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum
     ReadPixelsImpl(x, y, width, height, format, type, (void*)offset, bytesAfterOffset);
 }
 
-static bool
-ValidateReadPixelsFormatAndType(const webgl::FormatInfo* srcFormat,
-                                const webgl::PackingInfo& pi, gl::GLContext* gl,
-                                WebGLContext* webgl)
+static webgl::PackingInfo
+DefaultReadPixelPI(const webgl::FormatUsageInfo* usage)
 {
-    // Check the format and type params to assure they are an acceptable pair (as per spec)
-    GLenum mainFormat;
-    GLenum mainType;
+    MOZ_ASSERT(usage->IsRenderable());
 
-    switch (srcFormat->componentType) {
-    case webgl::ComponentType::Float:
-        mainFormat = LOCAL_GL_RGBA;
-        mainType = LOCAL_GL_FLOAT;
-        break;
-
-    case webgl::ComponentType::UInt:
-        mainFormat = LOCAL_GL_RGBA_INTEGER;
-        mainType = LOCAL_GL_UNSIGNED_INT;
-        break;
+    switch (usage->format->componentType) {
+    case webgl::ComponentType::NormUInt:
+        return { LOCAL_GL_RGBA, LOCAL_GL_UNSIGNED_BYTE };
 
     case webgl::ComponentType::Int:
-        mainFormat = LOCAL_GL_RGBA_INTEGER;
-        mainType = LOCAL_GL_INT;
-        break;
+        return { LOCAL_GL_RGBA_INTEGER, LOCAL_GL_INT };
 
-    case webgl::ComponentType::NormInt:
-    case webgl::ComponentType::NormUInt:
-        mainFormat = LOCAL_GL_RGBA;
-        mainType = LOCAL_GL_UNSIGNED_BYTE;
-        break;
+    case webgl::ComponentType::UInt:
+        return { LOCAL_GL_RGBA_INTEGER, LOCAL_GL_UNSIGNED_INT };
+
+    case webgl::ComponentType::Float:
+        return { LOCAL_GL_RGBA, LOCAL_GL_FLOAT };
 
     default:
-        gfxCriticalNote << "Unhandled srcFormat->componentType: "
-                        << (uint32_t)srcFormat->componentType;
-        webgl->ErrorInvalidOperation("readPixels: Unhandled srcFormat->componentType."
-                                     " Please file a bug!");
-        return false;
+        MOZ_CRASH();
     }
+}
 
-    if (pi.format == mainFormat && pi.type == mainType)
-        return true;
-
-    //////
-    // OpenGL ES 3.0.4 p194 - When the internal format of the rendering surface is
-    // RGB10_A2, a third combination of format RGBA and type UNSIGNED_INT_2_10_10_10_REV
-    // is accepted.
-
-    if (webgl->IsWebGL2() &&
-        srcFormat->effectiveFormat == webgl::EffectiveFormat::RGB10_A2 &&
-        pi.format == LOCAL_GL_RGBA &&
-        pi.type == LOCAL_GL_UNSIGNED_INT_2_10_10_10_REV)
-    {
-        return true;
-    }
-
-    //////
+static bool
+ArePossiblePackEnums(const WebGLContext* webgl, const webgl::PackingInfo& pi)
+{
     // OpenGL ES 2.0 $4.3.1 - IMPLEMENTATION_COLOR_READ_{TYPE/FORMAT} is a valid
     // combination for glReadPixels()...
 
     // So yeah, we are actually checking that these are valid as /unpack/ formats, instead
     // of /pack/ formats here, but it should cover the INVALID_ENUM cases.
-    if (!webgl->mFormatUsage->AreUnpackEnumsValid(pi.format, pi.type)) {
-        webgl->ErrorInvalidEnum("readPixels: Bad format and/or type.");
+    if (!webgl->mFormatUsage->AreUnpackEnumsValid(pi.format, pi.type))
         return false;
-    }
 
     // Only valid when pulled from:
     // * GLES 2.0.25 p105:
@@ -1455,30 +1430,75 @@ ValidateReadPixelsFormatAndType(const webgl::FormatInfo* srcFormat,
     case LOCAL_GL_LUMINANCE_ALPHA:
     case LOCAL_GL_DEPTH_COMPONENT:
     case LOCAL_GL_DEPTH_STENCIL:
-        webgl->ErrorInvalidEnum("readPixels: Invalid format: 0x%04x", pi.format);
         return false;
     }
 
-    if (pi.type == LOCAL_GL_UNSIGNED_INT_24_8) {
-        webgl->ErrorInvalidEnum("readPixels: Invalid type: 0x%04x", pi.type);
+    if (pi.type == LOCAL_GL_UNSIGNED_INT_24_8)
+        return false;
+
+    return true;
+}
+
+webgl::PackingInfo
+WebGLContext::ValidImplementationColorReadPI(const webgl::FormatUsageInfo* usage) const
+{
+    const auto defaultPI = DefaultReadPixelPI(usage);
+
+    // ES2_compatibility always returns RGBA/UNSIGNED_BYTE, so branch on actual IsGLES().
+    // Also OSX+NV generates an error here.
+    if (!gl->IsGLES())
+        return defaultPI;
+
+    webgl::PackingInfo implPI;
+    gl->fGetIntegerv(LOCAL_GL_IMPLEMENTATION_COLOR_READ_FORMAT, (GLint*)&implPI.format);
+    gl->fGetIntegerv(LOCAL_GL_IMPLEMENTATION_COLOR_READ_TYPE, (GLint*)&implPI.type);
+
+    if (!ArePossiblePackEnums(this, implPI))
+        return defaultPI;
+
+    return implPI;
+}
+
+static bool
+ValidateReadPixelsFormatAndType(const webgl::FormatUsageInfo* srcUsage,
+                                const webgl::PackingInfo& pi, gl::GLContext* gl,
+                                WebGLContext* webgl)
+{
+    const char funcName[] = "readPixels";
+
+    if (!ArePossiblePackEnums(webgl, pi)) {
+        webgl->ErrorInvalidEnum("%s: Unexpected format or type.", funcName);
         return false;
     }
+
+    const auto defaultPI = DefaultReadPixelPI(srcUsage);
+    if (pi == defaultPI)
+        return true;
+
+    ////
+
+    // OpenGL ES 3.0.4 p194 - When the internal format of the rendering surface is
+    // RGB10_A2, a third combination of format RGBA and type UNSIGNED_INT_2_10_10_10_REV
+    // is accepted.
+
+    if (webgl->IsWebGL2() &&
+        srcUsage->format->effectiveFormat == webgl::EffectiveFormat::RGB10_A2 &&
+        pi.format == LOCAL_GL_RGBA &&
+        pi.type == LOCAL_GL_UNSIGNED_INT_2_10_10_10_REV)
+    {
+        return true;
+    }
+
+    ////
 
     MOZ_ASSERT(gl->IsCurrent());
-    if (gl->IsSupported(gl::GLFeature::ES2_compatibility)) {
-        const auto auxFormat = gl->GetIntAs<GLenum>(LOCAL_GL_IMPLEMENTATION_COLOR_READ_FORMAT);
-        const auto auxType = gl->GetIntAs<GLenum>(LOCAL_GL_IMPLEMENTATION_COLOR_READ_TYPE);
+    const auto implPI = webgl->ValidImplementationColorReadPI(srcUsage);
+    if (pi == implPI)
+        return true;
 
-        if (auxFormat && auxType &&
-            pi.format == auxFormat && pi.type == auxType)
-        {
-            return true;
-        }
-    }
+    ////
 
-    //////
-
-    webgl->ErrorInvalidOperation("readPixels: Invalid format or type.");
+    webgl->ErrorInvalidOperation("%s: Incompatible format or type.", funcName);
     return false;
 }
 
@@ -1508,7 +1528,7 @@ WebGLContext::ReadPixelsImpl(GLint x, GLint y, GLsizei rawWidth, GLsizei rawHeig
     //////
 
     const webgl::PackingInfo pi = {packFormat, packType};
-    if (!ValidateReadPixelsFormatAndType(srcFormat->format, pi, gl, this))
+    if (!ValidateReadPixelsFormatAndType(srcFormat, pi, gl, this))
         return;
 
     uint8_t bytesPerPixel;
@@ -2047,7 +2067,7 @@ WebGLContext::UniformMatrixAxBfv(const char* funcName, uint8_t A, uint8_t B,
     const auto func = kFuncList[3*(A-2) + (B-2)];
 
     MakeContextCurrent();
-    (gl->*func)(loc->mLoc, numElementsToUpload, false, elemBytes);
+    (gl->*func)(loc->mLoc, numElementsToUpload, transpose, elemBytes);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2118,6 +2138,9 @@ WebGLContext::Viewport(GLint x, GLint y, GLsizei width, GLsizei height)
 
     if (width < 0 || height < 0)
         return ErrorInvalidValue("viewport: negative size");
+
+    width = std::min(width, (GLsizei)mImplMaxViewportDims[0]);
+    height = std::min(height, (GLsizei)mImplMaxViewportDims[1]);
 
     MakeContextCurrent();
     gl->fViewport(x, y, width, height);

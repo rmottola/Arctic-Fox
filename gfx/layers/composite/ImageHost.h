@@ -12,6 +12,7 @@
 #include "mozilla/RefPtr.h"             // for RefPtr
 #include "mozilla/gfx/MatrixFwd.h"      // for Matrix4x4
 #include "mozilla/gfx/Point.h"          // for Point
+#include "mozilla/gfx/Polygon.h"        // for Polygon
 #include "mozilla/gfx/Rect.h"           // for Rect
 #include "mozilla/gfx/Types.h"          // for SamplingFilter
 #include "mozilla/layers/CompositorTypes.h"  // for TextureInfo, etc
@@ -48,7 +49,8 @@ public:
                          const gfx::Matrix4x4& aTransform,
                          const gfx::SamplingFilter aSamplingFilter,
                          const gfx::IntRect& aClipRect,
-                         const nsIntRegion* aVisibleRegion = nullptr) override;
+                         const nsIntRegion* aVisibleRegion = nullptr,
+                         const Maybe<gfx::Polygon>& aGeometry = Nothing()) override;
 
   virtual void UseTextureHost(const nsTArray<TimedTexture>& aTextures) override;
 
@@ -64,8 +66,6 @@ public:
                       AttachFlags aFlags = NO_FLAGS) override;
 
   virtual void SetCompositor(Compositor* aCompositor) override;
-
-  virtual void SetImageContainer(ImageContainerParent* aImageContainer) override;
 
   gfx::IntSize GetImageSize() const override;
 
@@ -88,6 +88,8 @@ public:
   void SetCurrentTextureHost(TextureHost* aTexture);
 
   virtual void CleanupResources() override;
+
+  virtual void BindTextureSource() override;
 
   int32_t GetFrameID()
   {
@@ -145,8 +147,6 @@ protected:
   int ChooseImageIndex() const;
 
   nsTArray<TimedImage> mImages;
-  // Weak reference, will be null if mImageContainer has been destroyed.
-  ImageContainerParent* mImageContainer;
   int32_t mLastFrameID;
   int32_t mLastProducerID;
   /**

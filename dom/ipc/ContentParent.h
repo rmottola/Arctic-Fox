@@ -16,7 +16,9 @@
 #include "mozilla/FileUtils.h"
 #include "mozilla/HalTypes.h"
 #include "mozilla/LinkedList.h"
+#include "mozilla/MemoryReportingProcess.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/TimeStamp.h"
 #include "mozilla/UniquePtr.h"
 
 #include "nsDataHashtable.h"
@@ -60,6 +62,8 @@ class SandboxBroker;
 class SandboxBrokerPolicyFactory;
 #endif
 
+class PreallocatedProcessManagerImpl;
+
 namespace embedding {
 class PrintingParent;
 }
@@ -93,6 +97,7 @@ class MemoryReport;
 class TabContext;
 class ContentBridgeParent;
 class GetFilesHelper;
+class MemoryReportRequestHost;
 
 class ContentParent final : public PContentParent
                           , public nsIContentParent
@@ -102,6 +107,7 @@ class ContentParent final : public PContentParent
                           , public gfx::gfxVarReceiver
                           , public mozilla::LinkedListElement<ContentParent>
                           , public gfx::GPUProcessListener
+                          , public mozilla::MemoryReportingProcess
 {
   typedef mozilla::ipc::GeckoChildProcessHost GeckoChildProcessHost;
   typedef mozilla::ipc::OptionalURIParams OptionalURIParams;
@@ -111,9 +117,16 @@ class ContentParent final : public PContentParent
   typedef mozilla::ipc::PrincipalInfo PrincipalInfo;
   typedef mozilla::dom::ClonedMessageData ClonedMessageData;
 
+  friend class mozilla::PreallocatedProcessManagerImpl;
+
 public:
 
   virtual bool IsContentParent() const override { return true; }
+
+  /**
+   * Create a subprocess suitable for use later as a content process.
+   */
+  static already_AddRefed<ContentParent> PreallocateProcess();
 
   /**
    * Start up the content-process machinery.  This might include
@@ -132,6 +145,22 @@ public:
    */
   static void JoinAllSubprocesses();
 
+  static uint32_t GetPoolSize(const nsAString& aContentProcessType);
+
+  static uint32_t GetMaxProcessCount(const nsAString& aContentProcessType);
+
+  static bool IsMaxProcessCountReached(const nsAString& aContentProcessType);
+
+  /**
+   * Picks a random content parent from |aContentParents| with a given |aOpener|
+   * respecting the index limit set by |aMaxContentParents|.
+   * Returns null if non available.
+   */
+  static already_AddRefed<ContentParent>
+  RandomSelect(const nsTArray<ContentParent*>& aContentParents,
+               ContentParent* aOpener,
+               int32_t maxContentParents);
+
   /**
    * Get or create a content process for:
    * 1. browser iframe
@@ -143,7 +172,8 @@ public:
                              hal::ProcessPriority aPriority =
                              hal::ProcessPriority::PROCESS_PRIORITY_FOREGROUND,
                              ContentParent* aOpener = nullptr,
-                             bool aLargeAllocationProcess = false);
+                             bool aLargeAllocationProcess = false,
+                             bool* anew = nullptr);
 
   /**
    * Get or create a content process for the given TabContext.  aFrameElement
@@ -318,7 +348,7 @@ public:
 
   bool RequestRunToCompletion();
 
-  bool IsAlive() const;
+  bool IsAlive() const override;
 
   virtual bool IsForBrowser() const override
   {
@@ -433,6 +463,8 @@ public:
                                                             const bool& aIsAudio,
                                                             const bool& aIsVideo) override;
 
+  virtual mozilla::ipc::IPCResult RecvGetGfxInfoFeatureStatus(nsTArray<mozilla::dom::GfxInfoFeatureStatus>* aFS) override;
+
   bool CycleCollectWithLogs(bool aDumpAllTraces,
                             nsICycleCollectorLogSink* aSink,
                             nsIDumpGCAndCCLogsCallback* aCallback);
@@ -499,7 +531,7 @@ public:
                    const bool& aSizeSpecified,
                    const nsCString& aFeatures,
                    const nsCString& aBaseURI,
-                   const DocShellOriginAttributes& aOpenerOriginAttributes,
+                   const OriginAttributes& aOpenerOriginAttributes,
                    const float& aFullZoom,
                    nsresult* aResult,
                    bool* aWindowIsNew,
@@ -517,7 +549,7 @@ public:
     const URIParams& aURIToLoad,
     const nsCString& aFeatures,
     const nsCString& aBaseURI,
-    const DocShellOriginAttributes& aOpenerOriginAttributes,
+    const OriginAttributes& aOpenerOriginAttributes,
     const float& aFullZoom) override;
 
   static bool AllocateLayerTreeId(TabParent* aTabParent, uint64_t* aId);
@@ -560,6 +592,7 @@ public:
   virtual mozilla::ipc::IPCResult
   RecvClassifyLocal(const URIParams& aURI,
                     const nsCString& aTables,
+                    nsresult* aRv,
                     nsTArray<nsCString>* aResults) override;
 
   // Use the PHangMonitor channel to ask the child to repaint a tab.
@@ -611,7 +644,7 @@ private:
                      nsIURI* aURIToLoad,
                      const nsCString& aFeatures,
                      const nsCString& aBaseURI,
-                     const DocShellOriginAttributes& aOpenerOriginAttributes,
+                     const OriginAttributes& aOpenerOriginAttributes,
                      const float& aFullZoom,
                      nsresult& aResult,
                      nsCOMPtr<nsITabParent>& aNewTabParent,
@@ -700,33 +733,15 @@ private:
                                   TabParent* aTopLevel, const TabId& aTabId,
                                   uint64_t* aId);
 
-  PGMPServiceParent*
-  AllocPGMPServiceParent(mozilla::ipc::Transport* aTransport,
-                         base::ProcessId aOtherProcess) override;
+  /**
+   * Get or create the corresponding content parent array to |aContentProcessType|.
+   */
+  static nsTArray<ContentParent*>& GetOrCreatePool(const nsAString& aContentProcessType);
 
-  PBackgroundParent*
-  AllocPBackgroundParent(Transport* aTransport, ProcessId aOtherProcess)
-                         override;
+  virtual mozilla::ipc::IPCResult RecvInitBackground(Endpoint<mozilla::ipc::PBackgroundParent>&& aEndpoint) override;
 
-  PProcessHangMonitorParent*
-  AllocPProcessHangMonitorParent(Transport* aTransport,
-                                 ProcessId aOtherProcess) override;
-
-  virtual mozilla::ipc::IPCResult RecvGetProcessAttributes(ContentParentId* aCpId,
-                                                           bool* aIsForBrowser) override;
-
-  virtual mozilla::ipc::IPCResult
-  RecvGetXPCOMProcessAttributes(bool* aIsOffline,
-                                bool* aIsConnected,
-                                int32_t* aCaptivePortalState,
-                                bool* aIsLangRTL,
-                                bool* aHaveBidiKeyboards,
-                                InfallibleTArray<nsString>* dictionaries,
-                                ClipboardCapabilities* clipboardCaps,
-                                DomainPolicyClone* domainPolicy,
-                                StructuredCloneData* initialData,
-                                InfallibleTArray<FontFamilyListEntry>* fontFamilies)
-                                override;
+  mozilla::ipc::IPCResult RecvAddMemoryReport(const MemoryReport& aReport) override;
+  mozilla::ipc::IPCResult RecvFinishMemoryReport(const uint32_t& aGeneration) override;
 
   virtual bool
   DeallocPJavaScriptParent(mozilla::jsipc::PJavaScriptParent*) override;
@@ -786,15 +801,6 @@ private:
 
   virtual bool
   DeallocPHeapSnapshotTempFileHelperParent(PHeapSnapshotTempFileHelperParent*) override;
-
-  virtual PMemoryReportRequestParent*
-  AllocPMemoryReportRequestParent(const uint32_t& aGeneration,
-                                  const bool &aAnonymize,
-                                  const bool &aMinimizeMemoryUsage,
-                                  const MaybeFileDesc &aDMDFile) override;
-
-  virtual bool
-  DeallocPMemoryReportRequestParent(PMemoryReportRequestParent* actor) override;
 
   virtual PCycleCollectWithLogsParent*
   AllocPCycleCollectWithLogsParent(const bool& aDumpAllTraces,
@@ -867,7 +873,6 @@ private:
   virtual bool
   DeallocPWebBrowserPersistDocumentParent(PWebBrowserPersistDocumentParent* aActor) override;
 
-  virtual mozilla::ipc::IPCResult RecvReadPrefsArray(InfallibleTArray<PrefSetting>* aPrefs) override;
   virtual mozilla::ipc::IPCResult RecvGetGfxVars(InfallibleTArray<GfxVarUpdate>* aVars) override;
 
   virtual mozilla::ipc::IPCResult RecvReadFontList(InfallibleTArray<FontListEntry>* retValue) override;
@@ -965,14 +970,14 @@ private:
 
   virtual mozilla::ipc::IPCResult RecvPrivateDocShellsExist(const bool& aExist) override;
 
+  virtual mozilla::ipc::IPCResult RecvFirstIdle() override;
+
   virtual mozilla::ipc::IPCResult RecvAudioChannelChangeDefVolChannel(const int32_t& aChannel,
                                                                       const bool& aHidden) override;
 
   virtual mozilla::ipc::IPCResult RecvAudioChannelServiceStatus(const bool& aTelephonyChannel,
                                                                 const bool& aContentOrNormalChannel,
                                                                 const bool& aAnyChannel) override;
-
-  virtual mozilla::ipc::IPCResult RecvGetLookAndFeelCache(nsTArray<LookAndFeelInt>* aLookAndFeelIntCache) override;
 
   virtual mozilla::ipc::IPCResult RecvKeywordToURI(const nsCString& aKeyword,
                                                    nsString* aProviderName,
@@ -994,11 +999,6 @@ private:
                                                           uint64_t* aId) override;
 
   virtual mozilla::ipc::IPCResult RecvDeallocateLayerTreeId(const uint64_t& aId) override;
-
-  virtual mozilla::ipc::IPCResult RecvGetGraphicsFeatureStatus(const int32_t& aFeature,
-                                                               int32_t* aStatus,
-                                                               nsCString* aFailureId,
-                                                               bool* aSuccess) override;
 
   virtual mozilla::ipc::IPCResult RecvGraphicsError(const nsCString& aError) override;
 
@@ -1081,13 +1081,29 @@ private:
 
   virtual mozilla::ipc::IPCResult RecvDeleteGetFilesRequest(const nsID& aID) override;
 
+  virtual mozilla::ipc::IPCResult
+  RecvFileCreationRequest(const nsID& aID, const nsString& aFullPath,
+                          const nsString& aType, const nsString& aName,
+                          const bool& aLastModifiedPassed,
+                          const int64_t& aLastModified,
+                          const bool& aIsFromNsIFile) override;
+
   virtual mozilla::ipc::IPCResult RecvAccumulateChildHistogram(
     InfallibleTArray<Accumulation>&& aAccumulations) override;
   virtual mozilla::ipc::IPCResult RecvAccumulateChildKeyedHistogram(
     InfallibleTArray<KeyedAccumulation>&& aAccumulations) override;
+  virtual mozilla::ipc::IPCResult RecvUpdateChildScalars(
+    InfallibleTArray<ScalarAction>&& aScalarActions) override;
+  virtual mozilla::ipc::IPCResult RecvUpdateChildKeyedScalars(
+    InfallibleTArray<KeyedScalarAction>&& aScalarActions) override;
 public:
   void SendGetFilesResponseAndForget(const nsID& aID,
                                      const GetFilesResponseResult& aResult);
+
+  bool SendRequestMemoryReport(const uint32_t& aGeneration,
+                               const bool& aAnonymize,
+                               const bool& aMinimizeMemoryUsage,
+                               const MaybeFileDesc& aDMDFile) override;
 
 private:
 
@@ -1096,6 +1112,7 @@ private:
   // details.
 
   GeckoChildProcessHost* mSubprocess;
+  const TimeStamp mLaunchTS; // used to calculate time to start content process
   ContentParent* mOpener;
 
   nsString mRemoteType;
@@ -1152,6 +1169,7 @@ private:
   nsCString mProfile;
 
   UniquePtr<gfx::DriverCrashGuard> mDriverCrashGuard;
+  UniquePtr<MemoryReportRequestHost> mMemoryReportRequest;
 
 #if defined(XP_LINUX) && defined(MOZ_CONTENT_SANDBOX)
   mozilla::UniquePtr<SandboxBroker> mSandboxBroker;

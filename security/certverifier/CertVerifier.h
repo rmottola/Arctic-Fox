@@ -8,10 +8,12 @@
 #define CertVerifier_h
 
 #include "BRNameMatchingPolicy.h"
+#include "CTPolicyEnforcer.h"
 #include "CTVerifyResult.h"
 #include "OCSPCache.h"
 #include "ScopedNSSTypes.h"
 #include "mozilla/Telemetry.h"
+#include "mozilla/TimeStamp.h"
 #include "mozilla/UniquePtr.h"
 #include "pkix/pkixtypes.h"
 
@@ -28,10 +30,11 @@
 
 namespace mozilla { namespace ct {
 
-// Including MultiLogCTVerifier.h would bring along all of its dependent
-// headers and force us to export them in moz.build. Just forward-declare
-// the class here instead.
+// Including the headers of the classes below would bring along all of their
+// dependent headers and force us to export them in moz.build.
+// Just forward-declare the classes here instead.
 class MultiLogCTVerifier;
+class CTDiversityPolicy;
 
 } } // namespace mozilla::ct
 
@@ -78,12 +81,12 @@ class CertificateTransparencyInfo
 public:
   // Was CT enabled?
   bool enabled;
-  // Did we receive and process any binary SCT data from the supported sources?
-  bool processedSCTs;
   // Verification result of the processed SCTs.
   mozilla::ct::CTVerifyResult verifyResult;
+  // Connection compliance to the CT Policy.
+  mozilla::ct::CTPolicyCompliance policyCompliance;
 
-  void Reset() { enabled = false; processedSCTs = false; verifyResult.Reset(); }
+  void Reset();
 };
 
 class NSSCertDBTrustDomain;
@@ -120,8 +123,8 @@ public:
                     Flags flags = 0,
     /*optional in*/ const SECItem* stapledOCSPResponse = nullptr,
     /*optional in*/ const SECItem* sctsFromTLS = nullptr,
-    /*optional in*/ const NeckoOriginAttributes& originAttributes =
-                      NeckoOriginAttributes(),
+    /*optional in*/ const OriginAttributes& originAttributes =
+                      OriginAttributes(),
    /*optional out*/ SECOidTag* evOidPolicy = nullptr,
    /*optional out*/ OCSPStaplingStatus* ocspStaplingStatus = nullptr,
    /*optional out*/ KeySizeStatus* keySizeStatus = nullptr,
@@ -139,8 +142,8 @@ public:
             /*out*/ UniqueCERTCertList& builtChain,
        /*optional*/ bool saveIntermediatesInPermanentDatabase = false,
        /*optional*/ Flags flags = 0,
-       /*optional*/ const NeckoOriginAttributes& originAttributes =
-                      NeckoOriginAttributes(),
+       /*optional*/ const OriginAttributes& originAttributes =
+                      OriginAttributes(),
    /*optional out*/ SECOidTag* evOidPolicy = nullptr,
    /*optional out*/ OCSPStaplingStatus* ocspStaplingStatus = nullptr,
    /*optional out*/ KeySizeStatus* keySizeStatus = nullptr,
@@ -179,8 +182,10 @@ public:
     TelemetryOnly = 1,
   };
 
-  CertVerifier(OcspDownloadConfig odc, OcspStrictConfig osc,
-               OcspGetConfig ogc, uint32_t certShortLifetimeInDays,
+  CertVerifier(OcspDownloadConfig odc, OcspStrictConfig osc, OcspGetConfig ogc,
+               mozilla::TimeDuration ocspTimeoutSoft,
+               mozilla::TimeDuration ocspTimeoutHard,
+               uint32_t certShortLifetimeInDays,
                PinningMode pinningMode, SHA1Mode sha1Mode,
                BRNameMatchingPolicy::Mode nameMatchingMode,
                NetscapeStepUpPolicy netscapeStepUpPolicy,
@@ -192,6 +197,8 @@ public:
   const OcspDownloadConfig mOCSPDownloadConfig;
   const bool mOCSPStrict;
   const bool mOCSPGETEnabled;
+  const mozilla::TimeDuration mOCSPTimeoutSoft;
+  const mozilla::TimeDuration mOCSPTimeoutHard;
   const uint32_t mCertShortLifetimeInDays;
   const PinningMode mPinningMode;
   const SHA1Mode mSHA1Mode;
@@ -202,12 +209,13 @@ public:
 private:
   OCSPCache mOCSPCache;
 
-  // We only have a forward declaration of MultiLogCTVerifier (see above),
-  // so we keep a pointer to it and allocate dynamically.
+  // We only have a forward declarations of these classes (see above)
+  // so we must allocate dynamically.
   UniquePtr<mozilla::ct::MultiLogCTVerifier> mCTVerifier;
+  UniquePtr<mozilla::ct::CTDiversityPolicy> mCTDiversityPolicy;
 
   void LoadKnownCTLogs();
-  mozilla::pkix::Result VerifySignedCertificateTimestamps(
+  mozilla::pkix::Result VerifyCertificateTransparencyPolicy(
                      NSSCertDBTrustDomain& trustDomain,
                      const UniqueCERTCertList& builtChain,
                      mozilla::pkix::Input sctsFromTLS,

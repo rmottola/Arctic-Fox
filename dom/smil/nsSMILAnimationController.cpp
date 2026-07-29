@@ -264,7 +264,7 @@ nsSMILAnimationController::StartSampling(nsRefreshDriver* aRefreshDriver)
     // We're effectively resuming from a pause so update our current sample time
     // or else it will confuse our "average time between samples" calculations.
     mCurrentSampleTime = mozilla::TimeStamp::Now();
-    aRefreshDriver->AddRefreshObserver(this, Flush_Style);
+    aRefreshDriver->AddRefreshObserver(this, FlushType::Style);
     mRegisteredWithRefreshDriver = true;
   }
 }
@@ -277,7 +277,7 @@ nsSMILAnimationController::StopSampling(nsRefreshDriver* aRefreshDriver)
     // (and RefreshDriver), which would make GetRefreshDriver() return null.
     MOZ_ASSERT(!GetRefreshDriver() || aRefreshDriver == GetRefreshDriver(),
                "Stopping sampling with wrong refresh driver");
-    aRefreshDriver->RemoveRefreshObserver(this, Flush_Style);
+    aRefreshDriver->RemoveRefreshObserver(this, FlushType::Style);
     mRegisteredWithRefreshDriver = false;
   }
 }
@@ -321,6 +321,12 @@ nsSMILAnimationController::DoSample(bool aSkipUnchangedContainers)
 
   bool isStyleFlushNeeded = mResampleNeeded;
   mResampleNeeded = false;
+
+  if (mDocument->IsStyledByServo()) {
+    NS_ERROR("stylo: SMIL animations not supported yet");
+    return;
+  }
+
   // Set running sample flag -- do this before flushing styles so that when we
   // flush styles we don't end up requesting extra samples
   AutoRestore<bool> autoRestoreRunningSample(mRunningSample);
@@ -426,7 +432,7 @@ nsSMILAnimationController::DoSample(bool aSkipUnchangedContainers)
 
   nsCOMPtr<nsIDocument> document(mDocument);  // keeps 'this' alive too
   if (isStyleFlushNeeded) {
-    document->FlushPendingNotifications(Flush_Style);
+    document->FlushPendingNotifications(FlushType::Style);
   }
 
   // WARNING:

@@ -91,33 +91,38 @@ this.PropertyListUtils = Object.freeze({
     // We guarantee not to throw directly for any other exceptions, and always
     // call aCallback.
     Services.tm.mainThread.dispatch(function() {
-      let file = aFile;
-      try {
-        if (file instanceof Ci.nsILocalFile) {
-          if (!file.exists())
-            throw new Error("The file pointed by aFile does not exist");
-
-          file = File.createFromNsIFile(file);
-        }
-
+      let self = this;
+      function readDOMFile(aFile) {
         let fileReader = new FileReader();
         let onLoadEnd = function() {
           let root = null;
           try {
-            fileReader.removeEventListener("loadend", onLoadEnd, false);
+            fileReader.removeEventListener("loadend", onLoadEnd);
             if (fileReader.readyState != fileReader.DONE)
               throw new Error("Could not read file contents: " + fileReader.error);
 
-            root = this._readFromArrayBufferSync(fileReader.result);
-          }
-          finally {
+            root = self._readFromArrayBufferSync(fileReader.result);
+          } finally {
             aCallback(root);
           }
-        }.bind(this);
-        fileReader.addEventListener("loadend", onLoadEnd, false);
-        fileReader.readAsArrayBuffer(file);
+        }
+        fileReader.addEventListener("loadend", onLoadEnd);
+        fileReader.readAsArrayBuffer(aFile);
       }
-      catch (ex) {
+
+      try {
+        if (aFile instanceof Ci.nsILocalFile) {
+          if (!aFile.exists()) {
+            throw new Error("The file pointed by aFile does not exist");
+          }
+
+          File.createFromNsIFile(aFile).then(function(aFile) {
+            readDOMFile(aFile);
+          });
+          return;
+        }
+        readDOMFile(aFile);
+      } catch (ex) {
         aCallback(null);
         throw ex;
       }
@@ -141,8 +146,7 @@ this.PropertyListUtils = Object.freeze({
       let doc = domParser.parseFromBuffer(bytesView, bytesView.length,
                                           "application/xml");
       return new XMLPropertyListReader(doc).root;
-    }
-    catch (ex) {
+    } catch (ex) {
       throw new Error("aBuffer cannot be parsed as a DOM document: " + ex);
     }
   },

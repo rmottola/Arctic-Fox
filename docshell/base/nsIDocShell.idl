@@ -191,10 +191,11 @@ interface nsIDocShell : nsIDocShellTreeItem
                               in nsIInputStream aHeadersStream,
                               in unsigned long aLoadFlags,
                               in nsISHEntry aSHEntry,
-                              in boolean firstParty,
+                              in boolean aFirstParty,
                               in AString aSrcdoc,
                               in nsIDocShell aSourceDocShell,
                               in nsIURI aBaseURI,
+                              in boolean aCheckForPrerender,
                               out nsIDocShell aDocShell,
                               out nsIRequest aRequest);
 
@@ -531,31 +532,6 @@ interface nsIDocShell : nsIDocShellTreeItem
    */
   void historyPurged(in long numEntries);
 
-  /*
-   * @deprecated, use nsIDocShell.QueryInterface(nsIDOMStorageManager) instead.
-   *
-   * Retrieves the WebApps session storage object for the supplied principal.
-   *
-   * @param principal returns a storage for this principal
-   * @param documentURI new storage will be created with reference to this
-   *                    document.documentURI that will appear in storage event
-   * @param create If true and a session storage object doesn't
-   *               already exist, a new one will be created.
-   */
-  nsIDOMStorage getSessionStorageForPrincipal(in nsIPrincipal principal,
-                                              in DOMString documentURI,
-                                              in boolean create);
-
-  /*
-   * @deprecated, use nsIDocShell.QueryInterface(nsIDOMStorageManager) instead.
-   *
-   * Add a WebApps session storage object to the docshell.
-   *
-   * @param principal the principal the storage object is associated with
-   * @param storage the storage object to add
-   */
-  void addSessionStorage(in nsIPrincipal principal, in nsIDOMStorage storage);
-
   /**
    * Gets the channel for the currently loaded document, if any.
    * For a new document load, this will be the channel of the previous document
@@ -701,6 +677,13 @@ interface nsIDocShell : nsIDocShellTreeItem
    * @param aPrincipal the principal to use for the new document.
    */
   void createAboutBlankContentViewer(in nsIPrincipal aPrincipal);
+
+  /**
+   * Like createAboutBlankContentViewer, but don't check for permit unload.
+   * Only used by special session history operation.
+   * @param aPrincipal the principal to use for the new document.
+   */
+  [noscript] void forceCreateAboutBlankContentViewer(in nsIPrincipal aPrincipal);
 
   /**
    * Upon getting, returns the canonical encoding label of the document
@@ -1133,33 +1116,28 @@ interface nsIDocShell : nsIDocShellTreeItem
   const unsigned long TOUCHEVENTS_OVERRIDE_NONE = 2;
 
   /**
-   * A DocShell is locked to the current process if it would be
-   * content-observable for a process switch to occur before performing a
-   * navigation load. It is important to ensure that a DocShell is not process
-   * locked before perfoming process changing loads.
-   */
-  [infallible] readonly attribute unsigned long processLockReason;
-  /**
-   * The DocShell is not locked to the current process, and a navigation may
-   * proceed in a new process.
-   */
-  const unsigned long PROCESS_LOCK_NONE = 0;
-  /**
-   * The DocShell is locked to the current process because it is not a
-   * toplevel browsing context.
-   */
-  const unsigned long PROCESS_LOCK_IFRAME = 1;
-  /**
-   * The DocShell is locked to the current process because there exist other
-   * related browsing contexts which may be holding a reference.
-   */
-  const unsigned long PROCESS_LOCK_RELATED_CONTEXTS = 2;
-  /**
-   * The DocShell is locked to the current process because the current
-   * process is not a content process.
+   * This value is `true` if its corresponding unit of related browsing contexts
+   * (TabGroup) contains only 1 toplevel window, and that window is the outer
+   * window corresponding to this docshell.
    *
-   * NOTE: Some loads may not consider this a hard process lock, and may wish to
-   * ignore this reason.
+   * The value is `false` otherwise. This is the case if the docshell is an
+   * iframe, has window.opener set, or another window with window.opener
+   * referring to this window exists.
+   *
+   * If this value is `false`, it would be web content visible for a load
+   * occuring in this docshell to be performed within a different docshell.
    */
-  const unsigned long PROCESS_LOCK_NON_CONTENT = 3;
+  [infallible] readonly attribute boolean isOnlyToplevelInTabGroup;
+
+  /**
+   * Returns `true` if this docshell is loaded within a Large-Allocation
+   * process.
+   */
+  [infallible] readonly attribute boolean inLargeAllocProcess;
+
+  /**
+   * Returns `true` if this docshell was created due to a Large-Allocation
+   * header, and has not seen the initiating load yet.
+   */
+  [infallible] readonly attribute boolean awaitingLargeAlloc;
 };

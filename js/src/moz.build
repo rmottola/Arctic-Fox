@@ -198,6 +198,7 @@ UNIFIED_SOURCES += [
     'gc/Zone.cpp',
     'irregexp/NativeRegExpMacroAssembler.cpp',
     'irregexp/RegExpAST.cpp',
+    'irregexp/RegExpCharacters.cpp',
     'irregexp/RegExpEngine.cpp',
     'irregexp/RegExpInterpreter.cpp',
     'irregexp/RegExpMacroAssembler.cpp',
@@ -235,6 +236,7 @@ UNIFIED_SOURCES += [
     'jit/IonAnalysis.cpp',
     'jit/IonBuilder.cpp',
     'jit/IonCaches.cpp',
+    'jit/IonControlFlow.cpp',
     'jit/IonOptimizationLevels.cpp',
     'jit/JitcodeMap.cpp',
     'jit/JitFrames.cpp',
@@ -362,7 +364,6 @@ UNIFIED_SOURCES += [
     'vm/Xdr.cpp',
     'wasm/AsmJS.cpp',
     'wasm/WasmBaselineCompile.cpp',
-    'wasm/WasmBinaryFormat.cpp',
     'wasm/WasmBinaryIterator.cpp',
     'wasm/WasmBinaryToAST.cpp',
     'wasm/WasmBinaryToExperimentalText.cpp',
@@ -381,7 +382,8 @@ UNIFIED_SOURCES += [
     'wasm/WasmTable.cpp',
     'wasm/WasmTextToBinary.cpp',
     'wasm/WasmTextUtils.cpp',
-    'wasm/WasmTypes.cpp'
+    'wasm/WasmTypes.cpp',
+    'wasm/WasmValidate.cpp'
 ]
 
 # jsarray.cpp and jsatom.cpp cannot be built in unified mode because
@@ -581,8 +583,6 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
 if CONFIG['OS_ARCH'] == 'WINNT':
     SOURCES += [
         'jit/ExecutableAllocatorWin.cpp',
-        'threading/windows/ConditionVariable.cpp',
-        'threading/windows/MutexImpl.cpp',
         'threading/windows/Thread.cpp',
     ]
     # _CRT_RAND_S must be #defined before #including stdlib.h to get rand_s()
@@ -590,8 +590,6 @@ if CONFIG['OS_ARCH'] == 'WINNT':
 else:
     SOURCES += [
         'jit/ExecutableAllocatorPosix.cpp',
-        'threading/posix/ConditionVariable.cpp',
-        'threading/posix/MutexImpl.cpp',
         'threading/posix/Thread.cpp',
     ]
 
@@ -640,7 +638,6 @@ jsautokw.inputs += [
 if CONFIG['JS_SHARED_LIBRARY']:
     GeckoSharedLibrary('js', linkage=None)
     SHARED_LIBRARY_NAME = CONFIG['JS_LIBRARY_NAME']
-    SDK_LIBRARY = True
 else:
     Library('js')
 
@@ -764,6 +761,7 @@ selfhosted.inputs = [
     'builtin/Module.js',
     'builtin/Number.js',
     'builtin/Object.js',
+    'builtin/Promise.js',
     'builtin/Reflect.js',
     'builtin/RegExp.js',
     'builtin/RegExpGlobalReplaceOpt.h.js',
@@ -776,9 +774,6 @@ selfhosted.inputs = [
     'builtin/WeakMap.js',
     'builtin/WeakSet.js'
 ]
-
-if CONFIG['SPIDERMONKEY_PROMISE']:
-    selfhosted.inputs += ['builtin/Promise.js']
 
 if CONFIG['JS_HAS_CTYPES']:
     if CONFIG['MOZ_SYSTEM_FFI']:

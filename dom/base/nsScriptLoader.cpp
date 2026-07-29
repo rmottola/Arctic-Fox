@@ -346,7 +346,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsModuleScript)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLoader)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(nsModuleScript)
@@ -2088,6 +2087,10 @@ nsScriptLoader::FillCompileOptionsForRequest(const AutoJSAPI&jsapi,
     return rv;
   }
 
+  if (mDocument) {
+    mDocument->NoteScriptTrackingStatus(aRequest->mURL, aRequest->IsTracking());
+  }
+
   bool isScriptElement = !aRequest->IsModuleRequest() ||
                          aRequest->AsModuleRequest()->IsTopLevel();
   aOptions->setIntroductionType(isScriptElement ? "scriptElement"
@@ -2222,8 +2225,13 @@ nsScriptLoader::ProcessPendingRequestsAsync()
       !mNonAsyncExternalScriptInsertedRequests.isEmpty() ||
       !mDeferRequests.isEmpty() ||
       !mPendingChildLoaders.IsEmpty()) {
-    NS_DispatchToCurrentThread(NewRunnableMethod(this,
-                                                 &nsScriptLoader::ProcessPendingRequests));
+    nsCOMPtr<nsIRunnable> task = NewRunnableMethod(this,
+                                                   &nsScriptLoader::ProcessPendingRequests);
+    if (mDocument) {
+      mDocument->Dispatch("ScriptLoader", TaskCategory::Other, task.forget());
+    } else {
+      NS_DispatchToCurrentThread(task.forget());
+    }
   }
 }
 
@@ -2650,6 +2658,10 @@ nsScriptLoader::PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
     if (NS_SUCCEEDED(rv)) {
       aRequest->mHasSourceMapURL = true;
       aRequest->mSourceMapURL = NS_ConvertUTF8toUTF16(sourceMapURL);
+    }
+
+    if (httpChannel->GetIsTrackingResource()) {
+      aRequest->SetIsTracking();
     }
   }
 

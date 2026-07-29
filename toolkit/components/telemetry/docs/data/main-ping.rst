@@ -62,6 +62,7 @@ Structure:
       keyedHistograms: {...},
       chromeHangs: {...},
       threadHangStats: [...],
+      capturedStacks: {...},
       log: [...],
       webrtc: {...},
       gc: {...},
@@ -104,20 +105,36 @@ Structure:
       ... other processes ...
       "parent": {
         scalars: {...},
+        keyedScalars: {...},
       },
+      "content": {
+        scalars: {...},
+        keyedScalars: {...},
+        histograms: {...},
+        keyedHistograms: {...},
+      },
+      "gpu": {
+        ...
+      }
     }
 
-scalars
-~~~~~~~
-This section contains the :doc:`../collection/scalars` that are valid for the current platform. Scalars are not created nor submitted if no data was added to them, and are only reported with subsession pings. Scalar data is only currently reported for the main process. Their type and format is described by the ``Scalars.yaml`` file. Its most recent version is available `here <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Scalars.yaml>`_. The ``info.revision`` field indicates the revision of the file that describes the reported scalars.
+histograms and keyedHistograms
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This section contains histograms and keyed histograms accumulated on content processes. Histograms recorded on a content child process have different character than parent histograms. For instance, ``GC_MS`` will be much different in ``processes.content`` as it has to contend with web content, whereas the instance in ``payload.histograms`` has only to contend with browser JS. Also, some histograms may be absent if never recorded on a content child process (``EVENTLOOP_UI_ACTIVITY`` is parent-process-only).
+
+This format was adopted in Firefox 51 via bug 1218576.
+
+scalars and keyedScalars
+~~~~~~~~~~~~~~~~~~~~~~~~
+This section contains the :doc:`../collection/scalars` that are valid for the current platform. Scalars are only submitted if if data was added to them, and are only reported with subsession pings. The record scalars are described in the `Scalars.yaml <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Scalars.yaml>`_ file. The ``info.revision`` field indicates the revision of the file that describes the reported scalars.
 
 childPayloads
 -------------
-The Telemetry payloads sent by child processes, recorded on child process shutdown (event ``content-child-shutdown`` observed) and whenever ``TelemetrySession.requestChildPayloads()`` is called (currently only used in tests). They are reduced session payloads, only available with e10s. Among some other things, they don't report addon details, addon histograms or UI Telemetry.
-
-Any histogram whose Accumulate call happens on a child process will be accumulated into a childPayload's histogram, not the parent's. As such, some histograms in childPayloads will contain different data (e.g. ``GC_MS`` will be much different in childPayloads, for instance, because the child GC needs to content with content scripts and parent doesn't) and some histograms will be absent (``EVENTLOOP_UI_ACTIVITY`` is parent-process-only because it measures inter-event timings where the OS delivers the events in the parent).
+The Telemetry payloads sent by child processes, recorded on child process shutdown (event ``content-child-shutdown`` observed). They are reduced session payloads, only available with e10s. Among some other things, they don't contain histograms, keyed histograms, addon details, addon histograms, or UI Telemetry.
 
 Note: Child payloads are not collected and cleared with subsession splits, they are currently only meaningful when analysed from ``saved-session`` or ``main`` pings with ``reason`` set to ``shutdown``.
+
+Note: Before Firefox 51 and bug 1218576, content process histograms and keyedHistograms were in the individual child payloads instead of being aggregated into ``processes.content``.
 
 simpleMeasurements
 ------------------
@@ -214,7 +231,7 @@ As of Firefox 48, this section does not contain empty keyed histograms anymore.
 
 threadHangStats
 ---------------
-Contains the statistics about the hangs in main and background threads. Note that hangs in this section capture the [C++ pseudostack](https://developer.mozilla.org/en-US/docs/Mozilla/Performance/Profiling_with_the_Built-in_Profiler#Native_stack_vs._Pseudo_stack) and an incomplete JS stack, which is not 100% precise.
+Contains the statistics about the hangs in main and background threads. Note that hangs in this section capture the `C++ pseudostack <https://developer.mozilla.org/en-US/docs/Mozilla/Performance/Profiling_with_the_Built-in_Profiler#Native_stack_vs._Pseudo_stack>`_ and an incomplete JS stack, which is not 100% precise.
 
 To avoid submitting overly large payloads, some limits are applied:
 
@@ -252,6 +269,39 @@ Structure:
       },
       ... other threads ...
      ]
+
+capturedStacks
+--------------
+Contains information about stacks captured on demand via Telemetry API. This is similar to `chromeHangs`, but only stacks captured on the main thread of the parent process are reported. It reports precise C++ stacks are reported and is only available on Windows, either in Firefox Nightly or in builds using "--enable-profiling" switch.
+
+Limits for captured stacks are the same as for chromeHangs (see below). Furthermore:
+
+* the key length is limited to 50 characters,
+* keys are restricted to alpha-numeric characters and `-`.
+
+Structure:
+
+.. code-block:: js
+
+    "capturedStacks" : {
+      "memoryMap": [
+        ["wgdi32.pdb", "08A541B5942242BDB4AEABD8C87E4CFF2"],
+        ["igd10iumd32.pdb", "D36DEBF2E78149B5BE1856B772F1C3991"],
+        // ... other entries in the format ["module name", "breakpad identifier"] ...
+      ],
+      "stacks": [
+        [
+           [
+             0, // the module index or -1 for invalid module indices
+             190649 // the offset of this program counter in its module or an absolute pc
+           ],
+           [1, 2540075],
+           // ... other frames ...
+        ],
+        // ... other stacks ...
+      ],
+      "captures": [["string-key", stack-index, count], ... ]
+    }
 
 chromeHangs
 -----------
@@ -391,7 +441,7 @@ Structure:
           // Reasons include "None", "NonIncrementalRequested",
           // "AbortRequested", "KeepAtomsSet", "IncrementalDisabled",
           // "ModeChange", "MallocBytesTrigger", "GCBytesTrigger",
-          // "ZoneChange".
+          // "ZoneChange", "CompartmentRevived".
           "nonincremental_reason": "None",
           "allocated": 37, // In megabytes.
           "added_chunks": 54,

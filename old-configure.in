@@ -439,31 +439,6 @@ dnl ========================================================
 if test "$COMPILE_ENVIRONMENT"; then
 
 dnl ========================================================
-dnl = Mac OS X toolchain support
-dnl ========================================================
-
-dnl The universal machinery sets UNIVERSAL_BINARY to inform packager.mk
-dnl that a universal binary is being produced.
-AC_SUBST(UNIVERSAL_BINARY)
-
-MOZ_ARG_WITH_STRING(unify-dist,
-[  --with-unify-dist=dir   Location of the dist directory to unify with at packaging time (Mac OS X universal build only)],
-    UNIFY_DIST=$withval)
-if test -n "$UNIVERSAL_BINARY"; then
-    if test -z "$UNIFY_DIST"; then
-        AC_MSG_ERROR([You need to provide the --with-unify-dist=dir argument when performing a universal build])
-    fi
-    case "$UNIFY_DIST" in
-    /*)
-        ;;
-    *)
-        UNIFY_DIST="${MOZ_BUILD_ROOT}/${UNIFY_DIST}"
-        ;;
-    esac
-fi
-AC_SUBST(UNIFY_DIST)
-
-dnl ========================================================
 dnl = Mac OS X SDK support
 dnl ========================================================
 MACOS_SDK_DIR=
@@ -3503,60 +3478,31 @@ fi # COMPILE_ENVIRONMENT
 dnl ========================================================
 dnl Gamepad support
 dnl ========================================================
-MOZ_GAMEPAD=
 MOZ_GAMEPAD_BACKEND=stub
 
-# Gamepad DOM is built on supported platforms by default.
 case "$OS_TARGET" in
-     WINNT|Linux)
-       MOZ_GAMEPAD=1
-       ;;
-     Darwin)
-       if test -z "$MOZ_IOS"; then
-         MOZ_GAMEPAD=1
-       fi
-       ;;
-     Android)
-       if test "$MOZ_WIDGET_TOOLKIT" != "gonk"; then
-         MOZ_GAMEPAD=1
-       fi
-       ;;
-     *)
-       ;;
+Darwin)
+    if test -z "$MOZ_IOS"; then
+        MOZ_GAMEPAD_BACKEND=cocoa
+    fi
+    ;;
+WINNT)
+    MOZ_GAMEPAD_BACKEND=windows
+    ;;
+Linux)
+    MOZ_CHECK_HEADER([linux/joystick.h])
+    if test "$ac_cv_header_linux_joystick_h" != "yes"; then
+      AC_MSG_ERROR([Can't find header linux/joystick.h, needed for gamepad support. Please install Linux kernel headers.])
+    fi
+    MOZ_GAMEPAD_BACKEND=linux
+    ;;
+Android)
+    MOZ_GAMEPAD_BACKEND=android
+    ;;
+*)
+    ;;
 esac
 
-MOZ_ARG_DISABLE_BOOL(gamepad,
-[  --disable-gamepad   Disable gamepad support],
-    MOZ_GAMEPAD=,
-    MOZ_GAMEPAD=1)
-
-if test "$MOZ_GAMEPAD"; then
-    case "$OS_TARGET" in
-    Darwin)
-        if test -z "$MOZ_IOS"; then
-            MOZ_GAMEPAD_BACKEND=cocoa
-        fi
-        ;;
-    WINNT)
-        MOZ_GAMEPAD_BACKEND=windows
-        ;;
-    Linux)
-        MOZ_CHECK_HEADER([linux/joystick.h])
-        if test "$ac_cv_header_linux_joystick_h" != "yes"; then
-          AC_MSG_ERROR([Can't find header linux/joystick.h, needed for gamepad support. Please install Linux kernel headers or reconfigure with --disable-gamepad to disable gamepad support.])
-        fi
-        MOZ_GAMEPAD_BACKEND=linux
-        ;;
-    Android)
-        MOZ_GAMEPAD_BACKEND=android
-        ;;
-    *)
-        ;;
-   esac
-
-  AC_DEFINE(MOZ_GAMEPAD)
-fi
-AC_SUBST(MOZ_GAMEPAD)
 AC_SUBST(MOZ_GAMEPAD_BACKEND)
 
 dnl ========================================================
@@ -4359,33 +4305,6 @@ AC_SUBST(MOZ_FRAMEPTR_FLAGS)
 AC_SUBST(MOZ_OPTIMIZE_FLAGS)
 AC_SUBST(MOZ_OPTIMIZE_LDFLAGS)
 AC_SUBST(MOZ_PGO_OPTIMIZE_FLAGS)
-
-dnl ========================================================
-dnl = Enable NS_StackWalk.
-dnl ========================================================
-
-# On Windows, NS_StackWalk will only work correctly if we have frame pointers
-# available. That will only be true for non-optimized builds, debug builds or
-# builds with --enable-profiling in the .mozconfig (which is turned on in
-# Nightly by default.)
-case "$OS_TARGET" in
-WINNT)
-    if test -z "$MOZ_OPTIMIZE" -o -n "$MOZ_PROFILING" -o -n "$MOZ_DEBUG"; then
-        MOZ_STACKWALKING=1
-    else
-        MOZ_STACKWALKING=
-    fi
-    ;;
-*)
-    MOZ_STACKWALKING=1
-    ;;
-esac
-
-if test -n "$MOZ_STACKWALKING"; then
-    AC_DEFINE(MOZ_STACKWALKING)
-fi
-
-AC_SUBST(MOZ_STACKWALKING)
 
 dnl ========================================================
 dnl = Disable treating compiler warnings as errors

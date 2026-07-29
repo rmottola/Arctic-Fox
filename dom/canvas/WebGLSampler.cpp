@@ -55,8 +55,10 @@ WebGLSampler::WrapObject(JSContext* cx, JS::Handle<JSObject*> givenProto)
 
 static bool
 ValidateSamplerParameterParams(WebGLContext* webgl, const char* funcName, GLenum pname,
-                               GLint paramInt)
+                               const FloatOrInt& param)
 {
+    const auto& paramInt = param.i;
+
     switch (pname) {
     case LOCAL_GL_TEXTURE_MIN_FILTER:
         switch (paramInt) {
@@ -131,56 +133,56 @@ ValidateSamplerParameterParams(WebGLContext* webgl, const char* funcName, GLenum
         break;
 
     default:
-        webgl->ErrorInvalidEnum("%s: invalid pname: %s", funcName,
-                                webgl->EnumName(pname));
+        webgl->ErrorInvalidEnumArg(funcName, "pname", pname);
         return false;
     }
 
-    webgl->ErrorInvalidEnum("%s: invalid param: %s", funcName, webgl->EnumName(paramInt));
+    webgl->ErrorInvalidEnumArg(funcName, "param", paramInt);
     return false;
 }
 
 void
-WebGLSampler::SamplerParameter(const char* funcName, GLenum pname, GLint paramInt)
+WebGLSampler::SamplerParameter(const char* funcName, GLenum pname,
+                               const FloatOrInt& param)
 {
-    if (!ValidateSamplerParameterParams(mContext, funcName, pname, paramInt))
+    if (!ValidateSamplerParameterParams(mContext, funcName, pname, param))
         return;
 
     switch (pname) {
     case LOCAL_GL_TEXTURE_MIN_FILTER:
-        mMinFilter = paramInt;
+        mMinFilter = param.i;
         break;
 
     case LOCAL_GL_TEXTURE_MAG_FILTER:
-        mMagFilter = paramInt;
+        mMagFilter = param.i;
         break;
 
     case LOCAL_GL_TEXTURE_WRAP_S:
-        mWrapS = paramInt;
+        mWrapS = param.i;
         break;
 
     case LOCAL_GL_TEXTURE_WRAP_T:
-        mWrapT = paramInt;
+        mWrapT = param.i;
         break;
 
     case LOCAL_GL_TEXTURE_WRAP_R:
-        mWrapR = paramInt;
+        mWrapR = param.i;
         break;
 
     case LOCAL_GL_TEXTURE_COMPARE_MODE:
-        mCompareMode = paramInt;
+        mCompareMode = param.i;
         break;
 
     case LOCAL_GL_TEXTURE_COMPARE_FUNC:
-        mCompareFunc = paramInt;
+        mCompareFunc = param.i;
         break;
 
     case LOCAL_GL_TEXTURE_MIN_LOD:
-        mMinLod = paramInt;
+        mMinLod = param.f;
         break;
 
     case LOCAL_GL_TEXTURE_MAX_LOD:
-        mMaxLod = paramInt;
+        mMaxLod = param.f;
         break;
 
     default:
@@ -196,7 +198,11 @@ WebGLSampler::SamplerParameter(const char* funcName, GLenum pname, GLint paramIn
     ////
 
     mContext->gl->MakeCurrent();
-    mContext->gl->fSamplerParameteri(mGLName, pname, paramInt);
+    if (param.isFloat) {
+        mContext->gl->fSamplerParameterf(mGLName, pname, param.f);
+    } else {
+        mContext->gl->fSamplerParameteri(mGLName, pname, param.i);
+    }
 }
 
 ////

@@ -14915,6 +14915,10 @@
         "url": "/html-imports/fetching/loading-attempt.html"
       },
       {
+        "path": "cssom-view/mouseEvent.html",
+        "url": "/cssom-view/mouseEvent.html"
+      },
+      {
         "path": "html-imports/html-link-element/import-attribute.html",
         "url": "/html-imports/html-link-element/import-attribute.html"
       },
@@ -24062,6 +24066,12 @@
               ]
             ],
             "url": "/svg/linking/reftests/href-use-element.html"
+          }
+        ],
+        "workers/Worker_ErrorEvent_error.htm": [
+          {
+            "path": "workers/Worker_ErrorEvent_error.htm",
+            "url": "/workers/Worker_ErrorEvent_error.htm"
           }
         ]
       }

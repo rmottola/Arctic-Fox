@@ -1,0 +1,104 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: sw=2 ts=8 et :
+ */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include LayersSurfaces;
+include LayersMessages;
+include protocol PTexture;
+
+using WrBorderSide from "mozilla/webrender/webrender_ffi.h";
+using WrImageKey from "mozilla/webrender/webrender_ffi.h";
+using WrTextureFilter from "mozilla/webrender/webrender_ffi.h";
+using WrLayoutSize from "mozilla/webrender/webrender_ffi.h";
+using WrRect from "mozilla/webrender/webrender_ffi.h";
+using WrGlyphArray from "mozilla/webrender/webrender_ffi.h";
+using MaybeImageMask from "mozilla/webrender/WebRenderTypes.h";
+using mozilla::gfx::Matrix4x4 from "mozilla/gfx/Matrix.h";
+using mozilla::wr::ByteBuffer from "mozilla/webrender/WebRenderTypes.h";
+using mozilla::LayerIntRegion from "Units.h";
+
+namespace mozilla {
+namespace layers {
+
+struct OpDPPushStackingContext {
+  WrRect bounds;
+  WrRect overflow;
+  MaybeImageMask mask;
+  Matrix4x4 matrix;
+  uint64_t scrollid;
+};
+
+struct OpDPPopStackingContext { };
+
+struct OpDPPushRect {
+  WrRect bounds;
+  WrRect clip;
+  float r;
+  float g;
+  float b;
+  float a;
+};
+
+struct OpDPPushBorder {
+  WrRect bounds;
+  WrRect clip;
+  WrBorderSide top;
+  WrBorderSide right;
+  WrBorderSide bottom;
+  WrBorderSide left;
+  WrLayoutSize top_left_radius;
+  WrLayoutSize top_right_radius;
+  WrLayoutSize bottom_left_radius;
+  WrLayoutSize bottom_right_radius;
+};
+
+struct OpDPPushImage {
+  WrRect bounds;
+  WrRect clip;
+  MaybeImageMask mask;
+  WrTextureFilter filter;
+  WrImageKey key;
+};
+
+struct OpDPPushExternalImageId {
+  LayerIntRegion validBufferRegion;
+  WrRect bounds;
+  WrRect clip;
+  MaybeImageMask mask;
+  WrTextureFilter filter;
+  uint64_t externalImageId;
+};
+
+struct OpDPPushIframe {
+  WrRect bounds;
+  WrRect clip;
+  uint64_t layersid;
+};
+
+struct OpDPPushText {
+  WrRect bounds;
+  WrRect clip;
+  WrGlyphArray[] glyph_array;
+  uint32_t font_index;
+  float glyph_size;
+  ByteBuffer font_buffer;
+  uint32_t font_buffer_length;
+};
+
+union WebRenderCommand {
+  OpDPPushStackingContext;
+  OpDPPopStackingContext;
+  OpDPPushRect;
+  OpDPPushBorder;
+  OpDPPushImage;
+  OpDPPushExternalImageId;
+  OpDPPushIframe;
+  OpDPPushText;
+  CompositableOperation;
+};
+
+} // namespace
+} // namespace

@@ -14,6 +14,7 @@
 #include "mozilla/IMEStateManager.h"
 #include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/PLayerTransactionChild.h"
+#include "mozilla/layers/WebRenderLayerManager.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/TextComposition.h"
 #include "mozilla/TextEvents.h"
@@ -85,8 +86,6 @@ PuppetWidget::PuppetWidget(TabChild* aTabChild)
   , mCursorHotspotY(0)
   , mNativeKeyCommandsValid(false)
 {
-  MOZ_COUNT_CTOR(PuppetWidget);
-
   mSingleLineCommands.SetCapacity(4);
   mMultiLineCommands.SetCapacity(4);
   mRichTextCommands.SetCapacity(4);
@@ -97,8 +96,6 @@ PuppetWidget::PuppetWidget(TabChild* aTabChild)
 
 PuppetWidget::~PuppetWidget()
 {
-  MOZ_COUNT_DTOR(PuppetWidget);
-
   Destroy();
 }
 
@@ -582,7 +579,11 @@ PuppetWidget::GetLayerManager(PLayerTransactionChild* aShadowManager,
                               LayerManagerPersistence aPersistence)
 {
   if (!mLayerManager) {
-    mLayerManager = new ClientLayerManager(this);
+    if (gfxPrefs::WebRenderEnabled()) {
+      mLayerManager = new WebRenderLayerManager(this);
+    } else {
+      mLayerManager = new ClientLayerManager(this);
+    }
   }
   ShadowLayerForwarder* lf = mLayerManager->AsShadowForwarder();
   if (lf && !lf->HasShadowManager() && aShadowManager) {
@@ -594,7 +595,11 @@ PuppetWidget::GetLayerManager(PLayerTransactionChild* aShadowManager,
 LayerManager*
 PuppetWidget::RecreateLayerManager(PLayerTransactionChild* aShadowManager)
 {
-  mLayerManager = new ClientLayerManager(this);
+  if (gfxPrefs::WebRenderEnabled()) {
+    mLayerManager = new WebRenderLayerManager(this);
+  } else {
+    mLayerManager = new ClientLayerManager(this);
+  }
   if (ShadowLayerForwarder* lf = mLayerManager->AsShadowForwarder()) {
     lf->SetShadowManager(aShadowManager);
   }

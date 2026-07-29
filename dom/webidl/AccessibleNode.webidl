@@ -7,5 +7,9 @@
 [Pref="accessibility.AOM.enabled"]
 interface AccessibleNode {
   readonly attribute DOMString role;
+  [Frozen, Cached, Pure]
+  readonly attribute sequence<DOMString> states;
   readonly attribute Node? DOMNode;
+
+  boolean is(DOMString... states);
 };

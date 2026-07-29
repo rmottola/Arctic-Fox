@@ -254,11 +254,12 @@ SpecialPowersObserver.prototype.receiveMessage = function(aMessage) {
       }
       let createdFiles = this._createdFiles;
       try {
+        let promises = [];
         aMessage.data.forEach(function(request) {
           const filePerms = 0666;
           let testFile = Services.dirsvc.get("ProfD", Ci.nsIFile);
           if (request.name) {
-            testFile.append(request.name);
+            testFile.appendRelativePath(request.name);
           } else {
             testFile.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, filePerms);
           }
@@ -267,16 +268,27 @@ SpecialPowersObserver.prototype.receiveMessage = function(aMessage) {
                          filePerms, 0);
           if (request.data) {
             outStream.write(request.data, request.data.length);
-            outStream.close();
           }
-          filePaths.push(File.createFromFileName(testFile.path, request.options));
+          outStream.close();
+          promises.push(File.createFromFileName(testFile.path, request.options).then(function(file) {
+            filePaths.push(file);
+          }));
           createdFiles.push(testFile);
         });
-        aMessage.target
-                .QueryInterface(Ci.nsIFrameLoaderOwner)
-                .frameLoader
-                .messageManager
-                .sendAsyncMessage("SpecialPowers.FilesCreated", filePaths);
+
+        Promise.all(promises).then(function() {
+          aMessage.target
+                  .QueryInterface(Ci.nsIFrameLoaderOwner)
+                  .frameLoader
+                  .messageManager
+                  .sendAsyncMessage("SpecialPowers.FilesCreated", filePaths);
+        }, function(e) {
+          aMessage.target
+                  .QueryInterface(Ci.nsIFrameLoaderOwner)
+                  .frameLoader
+                  .messageManager
+                  .sendAsyncMessage("SpecialPowers.FilesError", e.toString());
+        });
       } catch (e) {
           aMessage.target
                   .QueryInterface(Ci.nsIFrameLoaderOwner)

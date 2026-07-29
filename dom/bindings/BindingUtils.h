@@ -42,6 +42,7 @@
 
 #include "nsWrapperCacheInlines.h"
 
+class nsGenericHTMLElement;
 class nsIJSID;
 
 namespace mozilla {
@@ -52,25 +53,28 @@ namespace dom {
 template<typename DataType> class MozMap;
 
 nsresult
-UnwrapArgImpl(JS::Handle<JSObject*> src, const nsIID& iid, void** ppArg);
+UnwrapArgImpl(JSContext* cx, JS::Handle<JSObject*> src, const nsIID& iid,
+              void** ppArg);
 
 nsresult
-UnwrapWindowProxyImpl(JS::Handle<JSObject*> src, nsPIDOMWindowOuter** ppArg);
+UnwrapWindowProxyImpl(JSContext* cx, JS::Handle<JSObject*> src,
+                      nsPIDOMWindowOuter** ppArg);
 
 /** Convert a jsval to an XPCOM pointer. */
 template <class Interface>
 inline nsresult
-UnwrapArg(JS::Handle<JSObject*> src, Interface** ppArg)
+UnwrapArg(JSContext* cx, JS::Handle<JSObject*> src, Interface** ppArg)
 {
-  return UnwrapArgImpl(src, NS_GET_TEMPLATE_IID(Interface),
+  return UnwrapArgImpl(cx, src, NS_GET_TEMPLATE_IID(Interface),
                        reinterpret_cast<void**>(ppArg));
 }
 
 template <>
 inline nsresult
-UnwrapArg<nsPIDOMWindowOuter>(JS::Handle<JSObject*> src, nsPIDOMWindowOuter** ppArg)
+UnwrapArg<nsPIDOMWindowOuter>(JSContext* cx, JS::Handle<JSObject*> src,
+                              nsPIDOMWindowOuter** ppArg)
 {
-  return UnwrapWindowProxyImpl(src, ppArg);
+  return UnwrapWindowProxyImpl(cx, src, ppArg);
 }
 
 bool
@@ -1851,16 +1855,6 @@ AppendNamedPropertyIds(JSContext* cx, JS::Handle<JSObject*> proxy,
                        nsTArray<nsString>& names,
                        bool shadowPrototypeProperties, JS::AutoIdVector& props);
 
-namespace binding_detail {
-
-class FastErrorResult :
-    public mozilla::binding_danger::TErrorResult<
-      mozilla::binding_danger::JustAssertCleanupPolicy>
-{
-};
-
-} // namespace binding_detail
-
 enum StringificationBehavior {
   eStringify,
   eEmpty,
@@ -3179,6 +3173,13 @@ bool GetSetlikeBackingObject(JSContext* aCx, JS::Handle<JSObject*> aObj,
 bool
 GetDesiredProto(JSContext* aCx, const JS::CallArgs& aCallArgs,
                 JS::MutableHandle<JSObject*> aDesiredProto);
+
+// This function is expected to be called from the constructor function for an
+// HTML element interface; the global/callargs need to be whatever was passed to
+// that constructor function.
+already_AddRefed<nsGenericHTMLElement>
+CreateHTMLElement(const GlobalObject& aGlobal, const JS::CallArgs& aCallArgs,
+                  ErrorResult& aRv);
 
 void
 SetDocumentAndPageUseCounter(JSContext* aCx, JSObject* aObject,

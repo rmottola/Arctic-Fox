@@ -7,11 +7,6 @@ from ply import lex, yacc
 
 from ipdl.ast import *
 
-def _getcallerpath():
-    '''Return the absolute path of the file containing the code that
-**CALLED** this function.'''
-    return os.path.abspath(sys._getframe(1).f_code.co_filename)
-
 ##-----------------------------------------------------------------------------
 
 class ParseError(Exception):
@@ -52,9 +47,8 @@ class Parser:
         self.parser = None
         self.tu = TranslationUnit(type, name)
         self.direction = None
-        self.errout = None
 
-    def parse(self, input, filename, includedirs, errout):
+    def parse(self, input, filename, includedirs):
         assert os.path.isabs(filename)
 
         if filename in Parser.parsed:
@@ -69,7 +63,6 @@ class Parser:
         self.filename = filename
         self.includedirs = includedirs
         self.tu.filename = filename
-        self.errout = errout
 
         Parser.parsed[filename] = self
         Parser.parseStack.append(Parser.current)
@@ -78,11 +71,9 @@ class Parser:
         try:
             ast = self.parser.parse(input=input, lexer=self.lexer,
                                     debug=self.debug)
-        except ParseError, p:
-            print >>errout, p
-            return None
+        finally:
+            Parser.current = Parser.parseStack.pop()
 
-        Parser.current = Parser.parseStack.pop()
         return ast
 
     def resolveIncludePath(self, filepath):
@@ -272,7 +263,7 @@ def p_IncludeStmt(p):
         raise ParseError(loc, "can't locate include file `%s'"% (
                 inc.file))
 
-    inc.tu = Parser(type, id).parse(open(path).read(), path, Parser.current.includedirs, Parser.current.errout)
+    inc.tu = Parser(type, id).parse(open(path).read(), path, Parser.current.includedirs)
     p[0] = inc
 
 def p_UsingStmt(p):

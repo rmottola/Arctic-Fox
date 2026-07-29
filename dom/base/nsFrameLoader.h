@@ -39,7 +39,7 @@ class nsIDocShellTreeOwner;
 
 namespace mozilla {
 
-class DocShellOriginAttributes;
+class OriginAttributes;
 
 namespace dom {
 class ContentParent;
@@ -308,7 +308,7 @@ private:
   void MaybeUpdatePrimaryTabParent(TabParentChange aChange);
 
   nsresult
-  PopulateUserContextIdFromAttribute(mozilla::DocShellOriginAttributes& aAttr);
+  PopulateUserContextIdFromAttribute(mozilla::OriginAttributes& aAttr);
 
   // Swap ourselves with the frameloader aOther, and notify chrome code with
   // a BrowserChangedProcess event.
@@ -351,7 +351,6 @@ private:
   mozilla::ScreenIntSize mLazySize;
 
   nsCOMPtr<nsIPartialSHistory> mPartialSessionHistory;
-  nsCOMPtr<nsIGroupedSHistory> mGroupedSessionHistory;
 
   // A stack-maintained reference to an array of promises which are blocking
   // grouped history navigation

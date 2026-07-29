@@ -90,7 +90,7 @@ WebGLContext::GenerateWarning(const char* fmt, va_list ap)
     }
 
     JSContext* cx = api.cx();
-    JS_ReportWarningASCII(cx, "WebGL: %s", buf);
+    JS_ReportWarningASCII(cx, "WebGL warning: %s", buf);
     if (!ShouldGenerateWarnings()) {
         JS_ReportWarningASCII(cx,
                               "WebGL: No further warnings will be reported for"
@@ -107,6 +107,43 @@ WebGLContext::ShouldGenerateWarnings() const
         return true;
 
     return mAlreadyGeneratedWarnings < mMaxWarnings;
+}
+
+void
+WebGLContext::GeneratePerfWarning(const char* fmt, ...) const
+{
+    if (!ShouldGeneratePerfWarnings())
+        return;
+
+    if (!mCanvasElement)
+        return;
+
+    dom::AutoJSAPI api;
+    if (!api.Init(mCanvasElement->OwnerDoc()->GetScopeObject()))
+        return;
+    JSContext* cx = api.cx();
+
+    ////
+
+    va_list ap;
+    va_start(ap, fmt);
+
+    char buf[1024];
+    PR_vsnprintf(buf, 1024, fmt, ap);
+
+    va_end(ap);
+
+    ////
+
+    JS_ReportWarningASCII(cx, "WebGL perf warning: %s", buf);
+    mNumPerfWarnings++;
+
+    if (!ShouldGeneratePerfWarnings()) {
+        JS_ReportWarningASCII(cx,
+                              "WebGL: After reporting %u, no further perf warnings will"
+                              " be reported for this WebGL context.",
+                              uint32_t(mNumPerfWarnings));
+    }
 }
 
 void
@@ -246,12 +283,13 @@ WebGLContext::ErrorName(GLenum error)
     }
 }
 
-// This version is 'fallible' and will return NULL if glenum is not recognized.
-const char*
-WebGLContext::EnumName(GLenum glenum)
+// This version is fallible and will return nullptr if unrecognized.
+static const char*
+GetEnumName(GLenum val)
 {
-    switch (glenum) {
+    switch (val) {
 #define XX(x) case LOCAL_GL_##x: return #x
+        XX(NONE);
         XX(ALPHA);
         XX(ATC_RGB);
         XX(ATC_RGBA_EXPLICIT_ALPHA);
@@ -273,6 +311,7 @@ WebGLContext::EnumName(GLenum glenum)
         XX(DRAW_FRAMEBUFFER);
         XX(ETC1_RGB8_OES);
         XX(FLOAT);
+        XX(INT);
         XX(FRAMEBUFFER);
         XX(HALF_FLOAT);
         XX(LUMINANCE);
@@ -574,16 +613,24 @@ WebGLContext::EnumName(GLenum glenum)
     return nullptr;
 }
 
-void
-WebGLContext::EnumName(GLenum glenum, nsACString* out_name)
+/*static*/ void
+WebGLContext::EnumName(GLenum val, nsCString* out_name)
 {
-    const char* name = EnumName(glenum);
+    const char* name = GetEnumName(val);
     if (name) {
-        *out_name = nsDependentCString(name);
-    } else {
-        nsPrintfCString enumAsHex("<enum 0x%04x>", glenum);
-        *out_name = enumAsHex;
+        *out_name = name;
+        return;
     }
+
+    *out_name = nsPrintfCString("<enum 0x%04x>", val);
+}
+
+void
+WebGLContext::ErrorInvalidEnumArg(const char* funcName, const char* argName, GLenum val)
+{
+    nsCString enumName;
+    EnumName(val, &enumName);
+    ErrorInvalidEnum("%s: Bad `%s`: %s", funcName, argName, enumName.BeginReading());
 }
 
 bool

@@ -1462,8 +1462,8 @@ this.AddonRepository = {
       this._request.timeout = aTimeout;
     }
 
-    this._request.addEventListener("error", aEvent => this._reportFailure(), false);
-    this._request.addEventListener("timeout", aEvent => this._reportFailure(), false);
+    this._request.addEventListener("error", aEvent => this._reportFailure());
+    this._request.addEventListener("timeout", aEvent => this._reportFailure());
     this._request.addEventListener("load", aEvent => {
       logger.debug("Got metadata search load event");
       let request = aEvent.target;
@@ -1487,7 +1487,7 @@ this.AddonRepository = {
       let compatData = this._parseAddonCompatData(compatElements);
 
       aHandleResults(elements, totalResults, compatData);
-    }, false);
+    });
     this._request.send(null);
   },
 

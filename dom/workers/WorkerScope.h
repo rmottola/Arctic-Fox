@@ -23,13 +23,14 @@ class Console;
 class Crypto;
 class Function;
 class IDBFactory;
-enum class ImageBitmapFormat : uint32_t;
+enum class ImageBitmapFormat : uint8_t;
 class Performance;
 class Promise;
 class RequestOrUSVString;
 class ServiceWorkerRegistration;
 class WorkerLocation;
 class WorkerNavigator;
+enum class CallerType : uint32_t;
 
 namespace cache {
 
@@ -155,7 +156,8 @@ public:
   Performance* GetPerformance();
 
   already_AddRefed<Promise>
-  Fetch(const RequestOrUSVString& aInput, const RequestInit& aInit, ErrorResult& aRv);
+  Fetch(const RequestOrUSVString& aInput, const RequestInit& aInit,
+        CallerType aCallerType, ErrorResult& aRv);
 
   already_AddRefed<IDBFactory>
   GetIndexedDB(ErrorResult& aErrorResult);
@@ -281,13 +283,25 @@ public:
   SkipWaiting(ErrorResult& aRv);
 
   IMPL_EVENT_HANDLER(activate)
-  IMPL_EVENT_HANDLER(fetch)
   IMPL_EVENT_HANDLER(install)
   IMPL_EVENT_HANDLER(message)
 
   IMPL_EVENT_HANDLER(push)
   IMPL_EVENT_HANDLER(pushsubscriptionchange)
 
+  EventHandlerNonNull*
+  GetOnfetch();
+
+  void
+  SetOnfetch(mozilla::dom::EventHandlerNonNull* aCallback);
+
+  using DOMEventTargetHelper::AddEventListener;
+  virtual void
+  AddEventListener(const nsAString& aType,
+                   dom::EventListener* aListener,
+                   const dom::AddEventListenerOptionsOrBoolean& aOptions,
+                   const dom::Nullable<bool>& aWantsUntrusted,
+                   ErrorResult& aRv) override;
 };
 
 class WorkerDebuggerGlobalScope final : public DOMEventTargetHelper,

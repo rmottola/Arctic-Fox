@@ -59,6 +59,7 @@
 #include "mozilla/ipc/InputStreamParams.h"
 #include "mozilla/ipc/InputStreamUtils.h"
 #include "mozilla/ipc/PBackground.h"
+#include "mozilla/ipc/PBackgroundParent.h"
 #include "mozilla/Scoped.h"
 #include "mozilla/storage/Variant.h"
 #include "nsAutoPtr.h"
@@ -78,6 +79,7 @@
 #include "nsIInterfaceRequestor.h"
 #include "nsInterfaceHashtable.h"
 #include "nsIOutputStream.h"
+#include "nsIPipe.h"
 #include "nsIPrincipal.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsISupports.h"
@@ -92,6 +94,7 @@
 #include "nsRefPtrHashtable.h"
 #include "nsStreamUtils.h"
 #include "nsString.h"
+#include "nsStringStream.h"
 #include "nsThreadPool.h"
 #include "nsThreadUtils.h"
 #include "nsXPCOMCID.h"
@@ -6628,6 +6631,36 @@ private:
   Cleanup() override;
 };
 
+/**
+ * In coordination with IDBDatabase's mFileActors weak-map on the child side, a
+ * long-lived mapping from a child process's live Blobs to their corresponding
+ * FileInfo in our owning database.  Assists in avoiding redundant IPC traffic
+ * and disk storage.  This includes both:
+ * - Blobs retrieved from this database and sent to the child that do not need
+ *   to be written to disk because they already exist on disk in this database's
+ *   files directory.
+ * - Blobs retrieved from other databases (that are therefore !IsShareable())
+ *   or from anywhere else that will need to be written to this database's files
+ *   directory.  In this case we will hold a reference to its BlobImpl in
+ *   mBlobImpl until we have successfully written the Blob to disk.
+ *
+ * Relevant Blob context: Blobs sent from the parent process to child processes
+ * are automatically linked back to their source BlobImpl when the child process
+ * references the Blob via IPC.  (This is true even when a new "KnownBlob" actor
+ * must be created because the reference is occurring on a different thread than
+ * the PBlob actor created when the blob was sent to the child.)  However, when
+ * getting an actor in the child process for sending an in-child-created Blob to
+ * the parent process, there is (currently) no Blob machinery to automatically
+ * establish and reuse a long-lived Actor.  As a result, without IDB's weak-map
+ * cleverness, a memory-backed Blob repeatedly sent from the child to the parent
+ * would appear as a different Blob each time, requiring the Blob data to be
+ * sent over IPC each time as well as potentially needing to be written to disk
+ * each time.
+ *
+ * This object remains alive as long as there is an active child actor or an
+ * ObjectStoreAddOrPutRequestOp::StoredFileInfo for a queued or active add/put
+ * op is holding a reference to us.
+ */
 class DatabaseFile final
   : public PBackgroundIDBDatabaseFileParent
 {
@@ -6647,20 +6680,54 @@ public:
     return mFileInfo;
   }
 
-  already_AddRefed<nsIInputStream>
-  GetInputStream() const
+  /**
+   * Is there a blob available to provide an input stream?  This may be called
+   * on any thread under current lifecycle constraints.
+   */
+  bool
+  HasBlobImpl() const
   {
-    AssertIsOnBackgroundThread();
-
-    nsCOMPtr<nsIInputStream> inputStream;
-    if (mBlobImpl) {
-      ErrorResult rv;
-      mBlobImpl->GetInternalStream(getter_AddRefs(inputStream), rv);
-      MOZ_ALWAYS_TRUE(!rv.Failed());
-    }
-
-    return inputStream.forget();
+    return (bool)mBlobImpl;
   }
+
+  /**
+   * If mBlobImpl is non-null (implying the contents of this file have not yet
+   * been written to disk), then return an input stream that is guaranteed to
+   * block on reads and never return NS_BASE_STREAM_WOULD_BLOCK.  If mBlobImpl
+   * is null (because the contents have been written to disk), returns null.
+   *
+   * Because this method does I/O, it should only be called on a database I/O
+   * thread, not on PBackground.  Note that we actually open the stream on this
+   * thread, where previously it was opened on PBackground.  This is safe and
+   * equally efficient because blob implementations are thread-safe and blobs in
+   * the parent are fully populated.  (This would not be efficient in the child
+   * where the open request would have to be dispatched back to the PBackground
+   * thread because of the need to potentially interact with actors.)
+   *
+   * We enforce this guarantee by wrapping the stream in a blocking pipe unless
+   * either is true:
+   * - The stream is already a blocking stream.  (AKA it's not non-blocking.)
+   *   This is the case for nsFileStreamBase-derived implementations and
+   *   appropriately configured nsPipes (but not PSendStream-generated pipes).
+   * - The stream already contains the entire contents of the Blob.  For
+   *   example, nsStringInputStreams report as non-blocking, but also have their
+   *   entire contents synchronously available, so they will never return
+   *   NS_BASE_STREAM_WOULD_BLOCK.  There is no need to wrap these in a pipe.
+   *   (It's also very common for SendStream-based Blobs to have their contents
+   *   entirely streamed into the parent process by the time this call is
+   *   issued.)
+   *
+   * This additional logic is necessary because our database operations all
+   * are written in such a way that the operation is assumed to have completed
+   * when they yield control-flow, and:
+   * - When memory-backed blobs cross a certain threshold (1MiB at the time of
+   *   writing), they will be sent up from the child via PSendStream in chunks
+   *   to a non-blocking pipe that will return NS_BASE_STREAM_WOULD_BLOCK.
+   * - Other Blob types could potentially be non-blocking.  (We're not making
+   *   any assumptions.)
+   */
+  already_AddRefed<nsIInputStream>
+  GetBlockingInputStream(ErrorResult &rv) const;
 
   void
   ClearInputStream()
@@ -6695,11 +6762,83 @@ private:
   ActorDestroy(ActorDestroyReason aWhy) override
   {
     AssertIsOnBackgroundThread();
-
-    mBlobImpl = nullptr;
-    mFileInfo = nullptr;
   }
 };
+
+already_AddRefed<nsIInputStream>
+DatabaseFile::GetBlockingInputStream(ErrorResult &rv) const
+{
+  // We should only be called from a database I/O thread, not the background
+  // thread.  The background thread should call HasBlobImpl().
+  MOZ_ASSERT(!IsOnBackgroundThread());
+
+  if (!mBlobImpl) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIInputStream> inputStream;
+  mBlobImpl->GetInternalStream(getter_AddRefs(inputStream), rv);
+  if (rv.Failed()) {
+    return nullptr;
+  }
+
+  // If it's non-blocking we may need a pipe.
+  bool pipeNeeded;
+  rv = inputStream->IsNonBlocking(&pipeNeeded);
+  if (rv.Failed()) {
+    return nullptr;
+  }
+
+  // We don't need a pipe if all the bytes might already be available.
+  if (pipeNeeded) {
+    uint64_t available;
+    rv = inputStream->Available(&available);
+    if (rv.Failed()) {
+      return nullptr;
+    }
+
+    uint64_t blobSize = mBlobImpl->GetSize(rv);
+    if (rv.Failed()) {
+      return nullptr;
+    }
+
+    if (available == blobSize) {
+      pipeNeeded = false;
+    }
+  }
+
+  if (pipeNeeded) {
+    nsCOMPtr<nsIEventTarget> target =
+      do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID);
+    if (!target) {
+      rv.Throw(NS_ERROR_UNEXPECTED);
+      return nullptr;
+    }
+
+    nsCOMPtr<nsIInputStream> pipeInputStream;
+    nsCOMPtr<nsIOutputStream> pipeOutputStream;
+
+    rv = NS_NewPipe(
+      getter_AddRefs(pipeInputStream),
+      getter_AddRefs(pipeOutputStream),
+      0, 0, // default buffering is fine;
+      false, // we absolutely want a blocking input stream
+      true); // we don't need the writer to block
+    if (rv.Failed()) {
+      return nullptr;
+    }
+
+    rv = NS_AsyncCopy(inputStream, pipeOutputStream, target);
+    if (rv.Failed()) {
+      return nullptr;
+    }
+
+    inputStream = pipeInputStream;
+  }
+
+  return inputStream.forget();
+}
+
 
 class TransactionBase
 {
@@ -8196,12 +8335,6 @@ private:
   nsresult
   RemoveOldIndexDataValues(DatabaseConnection* aConnection);
 
-  nsresult
-  CopyFileData(nsIInputStream* aInputStream,
-               nsIOutputStream* aOutputStream,
-               char* aBuffer,
-               uint32_t aBufferSize);
-
   bool
   Init(TransactionBase* aTransaction) override;
 
@@ -8219,6 +8352,8 @@ struct ObjectStoreAddOrPutRequestOp::StoredFileInfo final
 {
   RefPtr<DatabaseFile> mFileActor;
   RefPtr<FileInfo> mFileInfo;
+  // A non-Blob-backed inputstream to write to disk.  If null, mFileActor may
+  // still have a stream for us to write.
   nsCOMPtr<nsIInputStream> mInputStream;
   StructuredCloneFile::FileType mType;
   bool mCopiedSuccessfully;
@@ -8450,7 +8585,7 @@ protected:
     , mMetadata(IndexMetadataForParams(aTransaction, aParams))
   { }
 
-  
+
   ~IndexRequestOpBase() override = default;
 
 private:
@@ -8659,7 +8794,7 @@ protected:
     MOZ_ASSERT(aCursor);
   }
 
-  
+
   ~CursorOpBase() override = default;
 
   bool
@@ -9588,6 +9723,60 @@ private:
 #endif // DEBUG
 
 /*******************************************************************************
+ * Helper classes
+ ******************************************************************************/
+
+class MOZ_STACK_CLASS FileHelper final
+{
+  RefPtr<FileManager> mFileManager;
+
+  nsCOMPtr<nsIFile> mFileDirectory;
+  nsCOMPtr<nsIFile> mJournalDirectory;
+
+public:
+  explicit FileHelper(FileManager* aFileManager)
+    : mFileManager(aFileManager)
+  { }
+
+  nsresult
+  Init();
+
+  already_AddRefed<nsIFile>
+  GetFile(FileInfo* aFileInfo);
+
+  already_AddRefed<nsIFile>
+  GetCheckedFile(FileInfo* aFileInfo);
+
+  already_AddRefed<nsIFile>
+  GetJournalFile(FileInfo* aFileInfo);
+
+  nsresult
+  CreateFileFromStream(nsIFile* aFile,
+                       nsIFile* aJournalFile,
+                       nsIInputStream* aInputStream,
+                       bool aCompress);
+
+  nsresult
+  ReplaceFile(nsIFile* aFile,
+              nsIFile* aNewFile,
+              nsIFile* aNewJournalFile);
+
+  nsresult
+  RemoveFile(nsIFile* aFile,
+             nsIFile* aJournalFile);
+
+  already_AddRefed<FileInfo>
+  GetNewFileInfo();
+
+private:
+  nsresult
+  SyncCopy(nsIInputStream* aInputStream,
+           nsIOutputStream* aOutputStream,
+           char* aBuffer,
+           uint32_t aBufferSize);
+};
+
+/*******************************************************************************
  * Helper Functions
  ******************************************************************************/
 
@@ -9652,20 +9841,152 @@ DeserializeStructuredCloneFile(FileManager* aFileManager,
 }
 
 nsresult
+CheckWasmModule(FileHelper* aFileHelper,
+                StructuredCloneFile* aBytecodeFile,
+                StructuredCloneFile* aCompiledFile)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aFileHelper);
+  MOZ_ASSERT(aBytecodeFile);
+  MOZ_ASSERT(aCompiledFile);
+  MOZ_ASSERT(aBytecodeFile->mType == StructuredCloneFile::eWasmBytecode);
+  MOZ_ASSERT(aCompiledFile->mType == StructuredCloneFile::eWasmCompiled);
+
+  nsCOMPtr<nsIFile> compiledFile =
+    aFileHelper->GetCheckedFile(aCompiledFile->mFileInfo);
+  if (NS_WARN_IF(!compiledFile)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  nsresult rv;
+
+  bool match;
+  {
+    ScopedPRFileDesc compiledFileDesc;
+    rv = compiledFile->OpenNSPRFileDesc(PR_RDONLY,
+                                        0644,
+                                        &compiledFileDesc.rwget());
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    JS::BuildIdCharVector buildId;
+    bool ok = GetBuildId(&buildId);
+    if (NS_WARN_IF(!ok)) {
+      return NS_ERROR_FAILURE;
+    }
+
+    match = JS::CompiledWasmModuleAssumptionsMatch(compiledFileDesc,
+                                                   Move(buildId));
+  }
+  if (match) {
+    return NS_OK;
+  }
+
+  // Re-compile the module.  It would be preferable to do this in the child
+  // (content process) instead of here in the parent, but that would be way more
+  // complex and without significant memory allocation or security benefits.
+  // See the discussion starting from
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=1312808#c9 for more details.
+  nsCOMPtr<nsIFile> bytecodeFile =
+    aFileHelper->GetCheckedFile(aBytecodeFile->mFileInfo);
+  if (NS_WARN_IF(!bytecodeFile)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  ScopedPRFileDesc bytecodeFileDesc;
+  rv = bytecodeFile->OpenNSPRFileDesc(PR_RDONLY,
+                                      0644,
+                                      &bytecodeFileDesc.rwget());
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  JS::BuildIdCharVector buildId;
+  bool ok = GetBuildId(&buildId);
+  if (NS_WARN_IF(!ok)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  RefPtr<JS::WasmModule> module = JS::DeserializeWasmModule(bytecodeFileDesc,
+                                                            nullptr,
+                                                            Move(buildId),
+                                                            nullptr,
+                                                            0,
+                                                            0);
+  if (NS_WARN_IF(!module)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  size_t compiledSize;
+  module->serializedSize(nullptr, &compiledSize);
+
+  UniquePtr<uint8_t[]> compiled(new (fallible) uint8_t[compiledSize]);
+  if (NS_WARN_IF(!compiled)) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  module->serialize(nullptr, 0, compiled.get(), compiledSize);
+
+  nsCOMPtr<nsIInputStream> inputStream;
+  rv = NS_NewByteInputStream(getter_AddRefs(inputStream),
+                             reinterpret_cast<const char*>(compiled.get()),
+                             compiledSize);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  RefPtr<FileInfo> newFileInfo = aFileHelper->GetNewFileInfo();
+
+  nsCOMPtr<nsIFile> newFile = aFileHelper->GetFile(newFileInfo);
+  if (NS_WARN_IF(!newFile)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  nsCOMPtr<nsIFile> newJournalFile =
+    aFileHelper->GetJournalFile(newFileInfo);
+  if (NS_WARN_IF(!newJournalFile)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  rv = aFileHelper->CreateFileFromStream(newFile,
+                                         newJournalFile,
+                                         inputStream,
+                                         /* aCompress */ false);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    nsresult rv2 = aFileHelper->RemoveFile(newFile, newJournalFile);
+    if (NS_WARN_IF(NS_FAILED(rv2))) {
+      return rv;
+    }
+    return rv;
+  }
+
+  rv = aFileHelper->ReplaceFile(compiledFile, newFile, newJournalFile);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    nsresult rv2 = aFileHelper->RemoveFile(newFile, newJournalFile);
+    if (NS_WARN_IF(NS_FAILED(rv2))) {
+      return rv;
+    }
+    return rv;
+  }
+
+  return NS_OK;
+}
+
+nsresult
 DeserializeStructuredCloneFiles(FileManager* aFileManager,
                                 const nsAString& aText,
                                 nsTArray<StructuredCloneFile>& aResult,
                                 bool* aHasPreprocessInfo)
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
-  MOZ_ASSERT(aHasPreprocessInfo);
 
   nsCharSeparatedTokenizerTemplate<TokenizerIgnoreNothing>
     tokenizer(aText, ' ');
 
   nsAutoString token;
   nsresult rv;
-  nsCOMPtr<nsIFile> directory;
+  Maybe<FileHelper> fileHelper;
 
   while (tokenizer.hasMoreTokens()) {
     token = tokenizer.nextToken();
@@ -9677,43 +9998,33 @@ DeserializeStructuredCloneFiles(FileManager* aFileManager,
       return rv;
     }
 
-    if (file->mType == StructuredCloneFile::eWasmBytecode) {
-      MOZ_ASSERT(file->mValid);
+    if (!aHasPreprocessInfo) {
+      continue;
+    }
 
+    if (file->mType == StructuredCloneFile::eWasmBytecode) {
       *aHasPreprocessInfo = true;
     }
     else if (file->mType == StructuredCloneFile::eWasmCompiled) {
-      if (!directory) {
-        directory = aFileManager->GetCheckedDirectory();
-        if (NS_WARN_IF(!directory)) {
-          return NS_ERROR_FAILURE;
+      if (fileHelper.isNothing()) {
+        fileHelper.emplace(aFileManager);
+
+        rv = fileHelper->Init();
+        if (NS_WARN_IF(NS_FAILED(rv))) {
+          return rv;
         }
       }
 
-      const int64_t fileId = file->mFileInfo->Id();
-      MOZ_ASSERT(fileId > 0);
+      MOZ_ASSERT(aResult.Length() > 1);
+      MOZ_ASSERT(aResult[aResult.Length() - 2].mType ==
+                   StructuredCloneFile::eWasmBytecode);
 
-      nsCOMPtr<nsIFile> nativeFile =
-        aFileManager->GetCheckedFileForId(directory, fileId);
-      if (NS_WARN_IF(!nativeFile)) {
-        return NS_ERROR_FAILURE;
-      }
+      StructuredCloneFile* previousFile = &aResult[aResult.Length() - 2];
 
-      ScopedPRFileDesc fileDesc;
-      rv = nativeFile->OpenNSPRFileDesc(PR_RDONLY, 0644, &fileDesc.rwget());
+      rv = CheckWasmModule(fileHelper.ptr(), previousFile, file);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
       }
-
-      JS::BuildIdCharVector buildId;
-      bool ok = GetBuildId(&buildId);
-      if (NS_WARN_IF(!ok)) {
-        return NS_ERROR_FAILURE;
-      }
-
-      MOZ_ASSERT(file->mValid);
-      file->mValid = JS::CompiledWasmModuleAssumptionsMatch(fileDesc,
-                                                            Move(buildId));
 
       *aHasPreprocessInfo = true;
     }
@@ -9865,7 +10176,7 @@ SerializeStructuredCloneFiles(
 
       case StructuredCloneFile::eWasmBytecode:
       case StructuredCloneFile::eWasmCompiled: {
-        if (!aForPreprocess || !file.mValid) {
+        if (!aForPreprocess) {
           SerializedStructuredCloneFile* serializedFile =
             aResult.AppendElement(fallible);
           MOZ_ASSERT(serializedFile);
@@ -11480,8 +11791,7 @@ UpdateRefcountFunction::ProcessValue(mozIStorageValueArray* aValues,
   }
 
   nsTArray<StructuredCloneFile> files;
-  bool dummy;
-  rv = DeserializeStructuredCloneFiles(mFileManager, ids, files, &dummy);
+  rv = DeserializeStructuredCloneFiles(mFileManager, ids, files, nullptr);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -13557,8 +13867,9 @@ Factory::RecvDeleteMe()
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(!mActorDestroyed);
 
+  IProtocol* mgr = Manager();
   if (!PBackgroundIDBFactoryParent::Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -14496,8 +14807,9 @@ Database::RecvDeleteMe()
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(!mActorDestroyed);
 
+  IProtocol* mgr = Manager();
   if (!PBackgroundIDBDatabaseParent::Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -15621,8 +15933,9 @@ NormalTransaction::RecvDeleteMe()
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(!IsActorDestroyed());
 
+  IProtocol* mgr = Manager();
   if (!PBackgroundIDBTransactionParent::Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -15927,8 +16240,9 @@ VersionChangeTransaction::RecvDeleteMe()
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(!IsActorDestroyed());
 
+  IProtocol* mgr = Manager();
   if (!PBackgroundIDBVersionChangeTransactionParent::Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -16722,8 +17036,9 @@ Cursor::RecvDeleteMe()
     return IPC_FAIL_NO_REASON(this);
   }
 
+  IProtocol* mgr = Manager();
   if (!PBackgroundIDBCursorParent::Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -18789,7 +19104,7 @@ DatabaseMaintenance::DetermineMaintenanceAction(
 
   bool lowDiskSpace = IndexedDatabaseManager::InLowDiskSpaceMode();
 
-  if (QuotaManager::kRunningXPCShellTests) {
+  if (QuotaManager::IsRunningXPCShellTests()) {
     // If we're running XPCShell then we want to test both the low disk space
     // and normal disk space code paths so pick semi-randomly based on the
     // current time.
@@ -25800,63 +26115,6 @@ ObjectStoreAddOrPutRequestOp::RemoveOldIndexDataValues(
   return NS_OK;
 }
 
-nsresult
-ObjectStoreAddOrPutRequestOp::CopyFileData(nsIInputStream* aInputStream,
-                                           nsIOutputStream* aOutputStream,
-                                           char* aBuffer,
-                                           uint32_t aBufferSize)
-{
-  AssertIsOnConnectionThread();
-  MOZ_ASSERT(aInputStream);
-  MOZ_ASSERT(aOutputStream);
-
-  PROFILER_LABEL("IndexedDB",
-                 "ObjectStoreAddOrPutRequestOp::CopyFileData",
-                 js::ProfileEntry::Category::STORAGE);
-
-  nsresult rv;
-
-  do {
-    uint32_t numRead;
-    rv = aInputStream->Read(aBuffer, aBufferSize, &numRead);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      break;
-    }
-
-    if (!numRead) {
-      break;
-    }
-
-    uint32_t numWrite;
-    rv = aOutputStream->Write(aBuffer, numRead, &numWrite);
-    if (rv == NS_ERROR_FILE_NO_DEVICE_SPACE) {
-      rv = NS_ERROR_DOM_INDEXEDDB_QUOTA_ERR;
-    }
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      break;
-    }
-
-    if (NS_WARN_IF(numWrite != numRead)) {
-      rv = NS_ERROR_FAILURE;
-      break;
-    }
-  } while (true);
-
-  if (NS_SUCCEEDED(rv)) {
-    rv = aOutputStream->Flush();
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-  }
-
-  nsresult rv2 = aOutputStream->Close();
-  if (NS_WARN_IF(NS_FAILED(rv2))) {
-    return NS_SUCCEEDED(rv) ? rv2 : rv;
-  }
-
-  return rv;
-}
-
 bool
 ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
 {
@@ -25939,9 +26197,7 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
           storedFileInfo->mFileInfo = storedFileInfo->mFileActor->GetFileInfo();
           MOZ_ASSERT(storedFileInfo->mFileInfo);
 
-          storedFileInfo->mInputStream =
-            storedFileInfo->mFileActor->GetInputStream();
-          if (storedFileInfo->mInputStream && !mFileManager) {
+          if (storedFileInfo->mFileActor->HasBlobImpl() && !mFileManager) {
             mFileManager = fileManager;
           }
 
@@ -25978,9 +26234,7 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
           storedFileInfo->mFileInfo = storedFileInfo->mFileActor->GetFileInfo();
           MOZ_ASSERT(storedFileInfo->mFileInfo);
 
-          storedFileInfo->mInputStream =
-            storedFileInfo->mFileActor->GetInputStream();
-          if (storedFileInfo->mInputStream && !mFileManager) {
+          if (storedFileInfo->mFileActor->HasBlobImpl() && !mFileManager) {
             mFileManager = fileManager;
           }
 
@@ -26197,35 +26451,16 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
     }
   }
 
-  nsCOMPtr<nsIFile> fileDirectory;
-  nsCOMPtr<nsIFile> journalDirectory;
+  Maybe<FileHelper> fileHelper;
 
   if (mFileManager) {
-    fileDirectory = mFileManager->GetDirectory();
-    if (NS_WARN_IF(!fileDirectory)) {
+    fileHelper.emplace(mFileManager);
+
+    rv = fileHelper->Init();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
       IDB_REPORT_INTERNAL_ERR();
       return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
     }
-
-    journalDirectory = mFileManager->EnsureJournalDirectory();
-    if (NS_WARN_IF(!journalDirectory)) {
-      IDB_REPORT_INTERNAL_ERR();
-      return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-    }
-
-    DebugOnly<bool> exists;
-    MOZ_ASSERT(NS_SUCCEEDED(fileDirectory->Exists(&exists)));
-    MOZ_ASSERT(exists);
-
-    DebugOnly<bool> isDirectory;
-    MOZ_ASSERT(NS_SUCCEEDED(fileDirectory->IsDirectory(&isDirectory)));
-    MOZ_ASSERT(isDirectory);
-
-    MOZ_ASSERT(NS_SUCCEEDED(journalDirectory->Exists(&exists)));
-    MOZ_ASSERT(exists);
-
-    MOZ_ASSERT(NS_SUCCEEDED(journalDirectory->IsDirectory(&isDirectory)));
-    MOZ_ASSERT(isDirectory);
   }
 
   if (!mStoredFileInfos.IsEmpty()) {
@@ -26237,151 +26472,68 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
       StoredFileInfo& storedFileInfo = mStoredFileInfos[index];
       MOZ_ASSERT(storedFileInfo.mFileInfo);
 
-      const int64_t id = storedFileInfo.mFileInfo->Id();
+      // If there is a StoredFileInfo, then one of the following is true:
+      // - This was an overflow structured clone and storedFileInfo.mInputStream
+      //   MUST be non-null.
+      // - This is a reference to a Blob that may or may not have already been
+      //   written to disk.  storedFileInfo.mFileActor MUST be non-null, but
+      //   its HasBlobImpl() may return false and so GetBlockingInputStream may
+      //   return null (so don't assert on them).
+      // - It's a mutable file.  No writing will be performed.
+      MOZ_ASSERT(storedFileInfo.mInputStream || storedFileInfo.mFileActor ||
+                 storedFileInfo.mType == StructuredCloneFile::eMutableFile);
 
       nsCOMPtr<nsIInputStream> inputStream;
+      // Check for an explicit stream, like a structured clone stream.
       storedFileInfo.mInputStream.swap(inputStream);
+      // Check for a blob-backed stream otherwise.
+      if (!inputStream && storedFileInfo.mFileActor) {
+        ErrorResult streamRv;
+        inputStream =
+          storedFileInfo.mFileActor->GetBlockingInputStream(streamRv);
+        if (NS_WARN_IF(streamRv.Failed())) {
+          return streamRv.StealNSResult();
+        }
+      }
 
       if (inputStream) {
-        MOZ_ASSERT(fileDirectory);
-        MOZ_ASSERT(journalDirectory);
+        RefPtr<FileInfo>& fileInfo = storedFileInfo.mFileInfo;
 
-        nsCOMPtr<nsIFile> diskFile =
-          mFileManager->GetFileForId(fileDirectory, id);
-        if (NS_WARN_IF(!diskFile)) {
+        nsCOMPtr<nsIFile> file = fileHelper->GetFile(fileInfo);
+        if (NS_WARN_IF(!file)) {
           IDB_REPORT_INTERNAL_ERR();
           return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
         }
 
-        bool exists;
-        rv = diskFile->Exists(&exists);
+        nsCOMPtr<nsIFile> journalFile =
+          fileHelper->GetJournalFile(fileInfo);
+        if (NS_WARN_IF(!journalFile)) {
+          IDB_REPORT_INTERNAL_ERR();
+          return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
+        }
+
+        bool compress =
+          storedFileInfo.mType == StructuredCloneFile::eStructuredClone;
+
+        rv = fileHelper->CreateFileFromStream(file,
+                                              journalFile,
+                                              inputStream,
+                                              compress);
+        if (NS_FAILED(rv) &&
+            NS_ERROR_GET_MODULE(rv) != NS_ERROR_MODULE_DOM_INDEXEDDB) {
+          IDB_REPORT_INTERNAL_ERR();
+          rv = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
+        }
         if (NS_WARN_IF(NS_FAILED(rv))) {
-          IDB_REPORT_INTERNAL_ERR();
-          return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-        }
-
-        if (exists) {
-          bool isFile;
-          rv = diskFile->IsFile(&isFile);
-          if (NS_WARN_IF(NS_FAILED(rv))) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          if (NS_WARN_IF(!isFile)) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          uint64_t inputStreamSize;
-          rv = inputStream->Available(&inputStreamSize);
-          if (NS_WARN_IF(NS_FAILED(rv))) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          int64_t fileSize;
-          rv = diskFile->GetFileSize(&fileSize);
-          if (NS_WARN_IF(NS_FAILED(rv))) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          if (NS_WARN_IF(fileSize < 0)) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          if (NS_WARN_IF(uint64_t(fileSize) != inputStreamSize)) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-        } else {
-          // Create a journal file first.
-          nsCOMPtr<nsIFile> journalFile =
-            mFileManager->GetFileForId(journalDirectory, id);
-          if (NS_WARN_IF(!journalFile)) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          rv = journalFile->Create(nsIFile::NORMAL_FILE_TYPE, 0644);
-          if (NS_WARN_IF(NS_FAILED(rv))) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          // Now try to copy the stream.
-          RefPtr<FileOutputStream> fileOutputStream =
-            FileOutputStream::Create(mPersistenceType,
-                                     mGroup,
-                                     mOrigin,
-                                     diskFile);
-          if (NS_WARN_IF(!fileOutputStream)) {
-            IDB_REPORT_INTERNAL_ERR();
-            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-
-          if (storedFileInfo.mType == StructuredCloneFile::eStructuredClone) {
-            RefPtr<SnappyCompressOutputStream> snappyOutputStream =
-              new SnappyCompressOutputStream(fileOutputStream);
-
-            UniquePtr<char[]> buffer(new char[snappyOutputStream->BlockSize()]);
-
-            rv = CopyFileData(inputStream,
-                              snappyOutputStream,
-                              buffer.get(),
-                              snappyOutputStream->BlockSize());
-          } else {
-            char buffer[kFileCopyBufferSize];
-
-            rv = CopyFileData(inputStream,
-                              fileOutputStream,
-                              buffer,
-                              kFileCopyBufferSize);
-          }
-          if (NS_FAILED(rv) &&
-              NS_ERROR_GET_MODULE(rv) != NS_ERROR_MODULE_DOM_INDEXEDDB) {
-            IDB_REPORT_INTERNAL_ERR();
-            rv = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-          }
-          if (NS_WARN_IF(NS_FAILED(rv))) {
-            // Try to remove the file if the copy failed.
-            nsresult rv2;
-            int64_t fileSize;
-
-            if (mFileManager->EnforcingQuota()) {
-              rv2 = diskFile->GetFileSize(&fileSize);
-              if (NS_WARN_IF(NS_FAILED(rv2))) {
-                return rv;
-              }
-            }
-
-            rv2 = diskFile->Remove(false);
-            if (NS_WARN_IF(NS_FAILED(rv2))) {
-              return rv;
-            }
-
-            rv2 = journalFile->Remove(false);
-            if (NS_WARN_IF(NS_FAILED(rv2))) {
-              return rv;
-            }
-
-            if (mFileManager->EnforcingQuota()) {
-              QuotaManager* quotaManager = QuotaManager::Get();
-              MOZ_ASSERT(quotaManager);
-
-              quotaManager->DecreaseUsageForOrigin(mFileManager->Type(),
-                                                   mFileManager->Group(),
-                                                   mFileManager->Origin(),
-                                                   fileSize);
-            }
-
+          // Try to remove the file if the copy failed.
+          nsresult rv2 = fileHelper->RemoveFile(file, journalFile);
+          if (NS_WARN_IF(NS_FAILED(rv2))) {
             return rv;
           }
-
-          storedFileInfo.mCopiedSuccessfully = true;
+          return rv;
         }
+
+        storedFileInfo.mCopiedSuccessfully = true;
       }
 
       if (index) {
@@ -28937,8 +29089,9 @@ Utils::RecvDeleteMe()
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(!mActorDestroyed);
 
+  IProtocol* mgr = Manager();
   if (!PBackgroundIndexedDBUtilsParent::Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -29143,6 +29296,350 @@ DEBUGThreadSlower::AfterProcessNextEvent(nsIThreadInternal* /* aThread */,
 }
 
 #endif // DEBUG
+
+nsresult
+FileHelper::Init()
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(mFileManager);
+
+  nsCOMPtr<nsIFile> fileDirectory = mFileManager->GetCheckedDirectory();
+  if (NS_WARN_IF(!fileDirectory)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  nsCOMPtr<nsIFile> journalDirectory = mFileManager->EnsureJournalDirectory();
+  if (NS_WARN_IF(!journalDirectory)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  DebugOnly<bool> exists;
+  MOZ_ASSERT(NS_SUCCEEDED(journalDirectory->Exists(&exists)));
+  MOZ_ASSERT(exists);
+
+  DebugOnly<bool> isDirectory;
+  MOZ_ASSERT(NS_SUCCEEDED(journalDirectory->IsDirectory(&isDirectory)));
+  MOZ_ASSERT(isDirectory);
+
+  mFileDirectory = Move(fileDirectory);
+  mJournalDirectory= Move(journalDirectory);
+
+  return NS_OK;
+}
+
+already_AddRefed<nsIFile>
+FileHelper::GetFile(FileInfo* aFileInfo)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aFileInfo);
+  MOZ_ASSERT(mFileManager);
+  MOZ_ASSERT(mFileDirectory);
+
+  const int64_t fileId = aFileInfo->Id();
+  MOZ_ASSERT(fileId > 0);
+
+  nsCOMPtr<nsIFile> file =
+    mFileManager->GetFileForId(mFileDirectory, fileId);
+  return file.forget();
+}
+
+already_AddRefed<nsIFile>
+FileHelper::GetCheckedFile(FileInfo* aFileInfo)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aFileInfo);
+  MOZ_ASSERT(mFileManager);
+  MOZ_ASSERT(mFileDirectory);
+
+  const int64_t fileId = aFileInfo->Id();
+  MOZ_ASSERT(fileId > 0);
+
+  nsCOMPtr<nsIFile> file =
+    mFileManager->GetCheckedFileForId(mFileDirectory, fileId);
+  return file.forget();
+}
+
+already_AddRefed<nsIFile>
+FileHelper::GetJournalFile(FileInfo* aFileInfo)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aFileInfo);
+  MOZ_ASSERT(mFileManager);
+  MOZ_ASSERT(mJournalDirectory);
+
+  const int64_t fileId = aFileInfo->Id();
+  MOZ_ASSERT(fileId > 0);
+
+  nsCOMPtr<nsIFile> file =
+    mFileManager->GetFileForId(mJournalDirectory, fileId);
+  return file.forget();
+}
+
+nsresult
+FileHelper::CreateFileFromStream(nsIFile* aFile,
+                                 nsIFile* aJournalFile,
+                                 nsIInputStream* aInputStream,
+                                 bool aCompress)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aFile);
+  MOZ_ASSERT(aJournalFile);
+  MOZ_ASSERT(aInputStream);
+  MOZ_ASSERT(mFileManager);
+  MOZ_ASSERT(mFileDirectory);
+  MOZ_ASSERT(mJournalDirectory);
+
+  bool exists;
+  nsresult rv = aFile->Exists(&exists);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  // DOM blobs that are being stored in IDB are cached by calling
+  // IDBDatabase::GetOrCreateFileActorForBlob. So if the same DOM blob is stored
+  // again under a different key or in a different object store, we just add
+  // a new reference instead of creating a new copy (all such stored blobs share
+  // the same id).
+  // However, it can happen that CreateFileFromStream failed due to quota
+  // exceeded error and for some reason the orphaned file couldn't be deleted
+  // immediately. Now, if the operation is being repeated, the DOM blob is
+  // already cached, so it has the same file id which clashes with the orphaned
+  // file. We could do some tricks to restore previous copy loop, but it's safer
+  // to just delete the orphaned file and start from scratch.
+  // This corner case is partially simulated in test_file_copy_failure.js
+  if (exists) {
+    bool isFile;
+    rv = aFile->IsFile(&isFile);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    if (NS_WARN_IF(!isFile)) {
+      return NS_ERROR_FAILURE;
+    }
+
+    rv = aJournalFile->Exists(&exists);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    if (NS_WARN_IF(!exists)) {
+      return NS_ERROR_FAILURE;
+    }
+
+    rv = aJournalFile->IsFile(&isFile);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    if (NS_WARN_IF(!isFile)) {
+      return NS_ERROR_FAILURE;
+    }
+
+    IDB_WARNING("Deleting orphaned file!");
+
+    rv = RemoveFile(aFile, aJournalFile);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  // Create a journal file first.
+  rv = aJournalFile->Create(nsIFile::NORMAL_FILE_TYPE, 0644);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  // Now try to copy the stream.
+  RefPtr<FileOutputStream> fileOutputStream =
+    FileOutputStream::Create(mFileManager->Type(),
+                             mFileManager->Group(),
+                             mFileManager->Origin(),
+                             aFile);
+  if (NS_WARN_IF(!fileOutputStream)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  if (aCompress) {
+    RefPtr<SnappyCompressOutputStream> snappyOutputStream =
+      new SnappyCompressOutputStream(fileOutputStream);
+
+    UniquePtr<char[]> buffer(new char[snappyOutputStream->BlockSize()]);
+
+    rv = SyncCopy(aInputStream,
+                  snappyOutputStream,
+                  buffer.get(),
+                  snappyOutputStream->BlockSize());
+  } else {
+    char buffer[kFileCopyBufferSize];
+
+    rv = SyncCopy(aInputStream,
+                  fileOutputStream,
+                  buffer,
+                  kFileCopyBufferSize);
+  }
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  return NS_OK;
+}
+
+nsresult
+FileHelper::ReplaceFile(nsIFile* aFile,
+                        nsIFile* aNewFile,
+                        nsIFile* aNewJournalFile)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aFile);
+  MOZ_ASSERT(aNewFile);
+  MOZ_ASSERT(aNewJournalFile);
+  MOZ_ASSERT(mFileManager);
+  MOZ_ASSERT(mFileDirectory);
+  MOZ_ASSERT(mJournalDirectory);
+
+  nsresult rv;
+
+  int64_t fileSize;
+
+  if (mFileManager->EnforcingQuota()) {
+    rv = aFile->GetFileSize(&fileSize);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  nsAutoString fileName;
+  rv = aFile->GetLeafName(fileName);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  rv = aNewFile->RenameTo(nullptr, fileName);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  if (mFileManager->EnforcingQuota()) {
+    QuotaManager* quotaManager = QuotaManager::Get();
+    MOZ_ASSERT(quotaManager);
+
+    quotaManager->DecreaseUsageForOrigin(mFileManager->Type(),
+                                         mFileManager->Group(),
+                                         mFileManager->Origin(),
+                                         fileSize);
+  }
+
+  rv = aNewJournalFile->Remove(false);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  return NS_OK;
+}
+
+nsresult
+FileHelper::RemoveFile(nsIFile* aFile,
+                       nsIFile* aJournalFile)
+{
+  nsresult rv;
+
+  int64_t fileSize;
+
+  if (mFileManager->EnforcingQuota()) {
+    rv = aFile->GetFileSize(&fileSize);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  rv = aFile->Remove(false);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  if (mFileManager->EnforcingQuota()) {
+    QuotaManager* quotaManager = QuotaManager::Get();
+    MOZ_ASSERT(quotaManager);
+
+    quotaManager->DecreaseUsageForOrigin(mFileManager->Type(),
+                                         mFileManager->Group(),
+                                         mFileManager->Origin(),
+                                         fileSize);
+  }
+
+  rv = aJournalFile->Remove(false);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  return NS_OK;
+}
+
+already_AddRefed<FileInfo>
+FileHelper::GetNewFileInfo()
+{
+  MOZ_ASSERT(mFileManager);
+
+  return mFileManager->GetNewFileInfo();
+}
+
+nsresult
+FileHelper::SyncCopy(nsIInputStream* aInputStream,
+                     nsIOutputStream* aOutputStream,
+                     char* aBuffer,
+                     uint32_t aBufferSize)
+{
+  MOZ_ASSERT(!IsOnBackgroundThread());
+  MOZ_ASSERT(aInputStream);
+  MOZ_ASSERT(aOutputStream);
+
+  PROFILER_LABEL("IndexedDB",
+                 "FileHelper::SyncCopy",
+                 js::ProfileEntry::Category::STORAGE);
+
+  nsresult rv;
+
+  do {
+    uint32_t numRead;
+    rv = aInputStream->Read(aBuffer, aBufferSize, &numRead);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      break;
+    }
+
+    if (!numRead) {
+      break;
+    }
+
+    uint32_t numWrite;
+    rv = aOutputStream->Write(aBuffer, numRead, &numWrite);
+    if (rv == NS_ERROR_FILE_NO_DEVICE_SPACE) {
+      rv = NS_ERROR_DOM_INDEXEDDB_QUOTA_ERR;
+    }
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      break;
+    }
+
+    if (NS_WARN_IF(numWrite != numRead)) {
+      rv = NS_ERROR_FAILURE;
+      break;
+    }
+  } while (true);
+
+  if (NS_SUCCEEDED(rv)) {
+    rv = aOutputStream->Flush();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  nsresult rv2 = aOutputStream->Close();
+  if (NS_WARN_IF(NS_FAILED(rv2))) {
+    return NS_SUCCEEDED(rv) ? rv2 : rv;
+  }
+
+  return rv;
+}
 
 } // namespace indexedDB
 } // namespace dom

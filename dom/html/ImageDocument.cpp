@@ -136,11 +136,21 @@ ImageListener::OnStopRequest(nsIRequest* aRequest, nsISupports* aCtxt, nsresult 
 }
 
 ImageDocument::ImageDocument()
-  : MediaDocument(),
-    mOriginalZoomLevel(1.0)
+  : MediaDocument()
+  , mVisibleWidth(0.0)
+  , mVisibleHeight(0.0)
+  , mImageWidth(0)
+  , mImageHeight(0)
+  , mResizeImageByDefault(false)
+  , mClickResizingEnabled(false)
+  , mImageIsOverflowingHorizontally(false)
+  , mImageIsOverflowingVertically(false)
+  , mImageIsResized(false)
+  , mShouldResize(false)
+  , mFirstResize(false)
+  , mObservingImageLoader(false)
+  , mOriginalZoomLevel(1.0)
 {
-  // NOTE! nsDocument::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
 }
 
 ImageDocument::~ImageDocument()
@@ -395,7 +405,7 @@ ImageDocument::ScrollImageTo(int32_t aX, int32_t aY, bool restoreImage)
 
   if (restoreImage) {
     RestoreImage();
-    FlushPendingNotifications(Flush_Layout);
+    FlushPendingNotifications(FlushType::Layout);
   }
 
   nsCOMPtr<nsIPresShell> shell = GetShell();
@@ -622,7 +632,7 @@ ImageDocument::UpdateSizeFromLayout()
     return;
   }
 
-  nsIFrame* contentFrame = mImageContent->GetPrimaryFrame(Flush_Frames);
+  nsIFrame* contentFrame = mImageContent->GetPrimaryFrame(FlushType::Frames);
   if (!contentFrame) {
     return;
   }

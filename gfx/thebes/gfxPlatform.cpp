@@ -7,6 +7,7 @@
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
+#include "mozilla/webrender/RenderThread.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/gfx/GraphicsMessages.h"
@@ -94,6 +95,7 @@
 
 #ifdef MOZ_WIDGET_ANDROID
 #include "TexturePoolOGL.h"
+#include "mozilla/layers/UiCompositorControllerChild.h"
 #endif
 
 #ifdef USE_SKIA
@@ -744,6 +746,10 @@ gfxPlatform::Init()
         MOZ_CRASH("Could not initialize gfxFontCache");
     }
 
+#ifdef MOZ_ENABLE_FREETYPE
+    Factory::SetFTLibrary(gPlatform->GetFTLibrary());
+#endif
+
     /* Create and register our CMS Override observer. */
     gPlatform->mSRGBOverrideObserver = new SRGBOverrideObserver();
     Preferences::AddWeakObserver(gPlatform->mSRGBOverrideObserver, GFX_PREF_CMS_FORCE_SRGB);
@@ -936,6 +942,9 @@ gfxPlatform::InitLayersIPC()
 
     if (XRE_IsParentProcess())
     {
+        if (gfxPrefs::WebRenderEnabled()) {
+            wr::RenderThread::Start();
+        }
         layers::CompositorThreadHolder::Start();
     }
 }
@@ -959,9 +968,14 @@ gfxPlatform::ShutdownLayersIPC()
         gfx::VRManagerChild::ShutDown();
         layers::CompositorBridgeChild::ShutDown();
         layers::ImageBridgeChild::ShutDown();
-
+#if defined(MOZ_WIDGET_ANDROID)
+        layers::UiCompositorControllerChild::Shutdown();
+#endif // defined(MOZ_WIDGET_ANDROID)
         // This has to happen after shutting down the child protocols.
         layers::CompositorThreadHolder::Shutdown();
+        if (gfxPrefs::WebRenderEnabled()) {
+            wr::RenderThread::ShutDown();
+        }
     } else {
       // TODO: There are other kind of processes and we should make sure gfx
       // stuff is either not created there or shut down properly.
@@ -1444,7 +1458,7 @@ gfxPlatform::CreateOffscreenCanvasDrawTarget(const IntSize& aSize, SurfaceFormat
 already_AddRefed<DrawTarget>
 gfxPlatform::CreateOffscreenContentDrawTarget(const IntSize& aSize, SurfaceFormat aFormat)
 {
-  NS_ASSERTION(mPreferredCanvasBackend != BackendType::NONE, "No backend.");
+  NS_ASSERTION(mContentBackend != BackendType::NONE, "No backend.");
   return CreateDrawTargetForBackend(mContentBackend, aSize, aFormat);
 }
 
@@ -1458,7 +1472,12 @@ gfxPlatform::CreateSimilarSoftwareDrawTarget(DrawTarget* aDT,
   if (Factory::DoesBackendSupportDataDrawtarget(aDT->GetBackendType())) {
     dt = aDT->CreateSimilarDrawTarget(aSize, aFormat);
   } else {
-    dt = Factory::CreateDrawTarget(BackendType::SKIA, aSize, aFormat);
+#ifdef USE_SKIA
+    BackendType backendType = BackendType::SKIA;
+#else
+    BackendType backendType = BackendType::CAIRO;
+#endif
+    dt = Factory::CreateDrawTarget(backendType, aSize, aFormat);
   }
 
   return dt.forget();
@@ -1475,7 +1494,11 @@ gfxPlatform::CreateDrawTargetForData(unsigned char* aData,
   NS_ASSERTION(backendType != BackendType::NONE, "No backend.");
 
   if (!Factory::DoesBackendSupportDataDrawtarget(backendType)) {
+#ifdef USE_SKIA
+    backendType = BackendType::SKIA;
+#else
     backendType = BackendType::CAIRO;
+#endif
   }
 
   RefPtr<DrawTarget> dt = Factory::CreateDrawTargetForData(backendType,
@@ -1669,6 +1692,7 @@ gfxPlatform::InitBackendPrefs(uint32_t aCanvasBitmask, BackendType aCanvasDefaul
           GetCanvasBackendPref(aCanvasBitmask & ~BackendTypeBit(mPreferredCanvasBackend));
     }
 
+
     mContentBackendBitmask = aContentBitmask;
     mContentBackend = GetContentBackendPref(mContentBackendBitmask);
     if (mContentBackend == BackendType::NONE) {
@@ -1678,6 +1702,10 @@ gfxPlatform::InitBackendPrefs(uint32_t aCanvasBitmask, BackendType aCanvasDefaul
         // overriding the prefs.
         mContentBackendBitmask |= BackendTypeBit(aContentDefault);
     }
+
+    uint32_t swBackendBits = BackendTypeBit(BackendType::SKIA) |
+                             BackendTypeBit(BackendType::CAIRO);
+    mSoftwareBackend = GetContentBackendPref(swBackendBits);
 
     if (XRE_IsParentProcess()) {
         gfxVars::SetContentBackend(mContentBackend);
@@ -2200,31 +2228,36 @@ gfxPlatform::InitGPUProcessPrefs()
 {
   // We want to hide this from about:support, so only set a default if the
   // pref is known to be true.
-  if (!gfxPrefs::GPUProcessDevEnabled() && !gfxPrefs::GPUProcessDevForceEnabled()) {
+  if (!gfxPrefs::GPUProcessEnabled() && !gfxPrefs::GPUProcessForceEnabled()) {
+    return;
+  }
+
+  // XXX disable GPU proces when webrender is enabled for now.
+  if (gfxPrefs::WebRenderEnabled()) {
     return;
   }
 
   FeatureState& gpuProc = gfxConfig::GetFeature(Feature::GPU_PROCESS);
 
-  gpuProc.SetDefaultFromPref(
-    gfxPrefs::GetGPUProcessDevEnabledPrefName(),
-    true,
-    gfxPrefs::GetGPUProcessDevEnabledPrefDefault());
-
-  if (gfxPrefs::GPUProcessDevForceEnabled()) {
-    gpuProc.UserForceEnable("User force-enabled via pref");
-  }
-
   // We require E10S - otherwise, there is very little benefit to the GPU
   // process, since the UI process must still use acceleration for
   // performance.
   if (!BrowserTabsRemoteAutostart()) {
-    gpuProc.ForceDisable(
+    gpuProc.DisableByDefault(
       FeatureStatus::Unavailable,
       "Multi-process mode is not enabled",
       NS_LITERAL_CSTRING("FEATURE_FAILURE_NO_E10S"));
-    return;
+  } else {
+    gpuProc.SetDefaultFromPref(
+      gfxPrefs::GetGPUProcessEnabledPrefName(),
+      true,
+      gfxPrefs::GetGPUProcessEnabledPrefDefault());
   }
+
+  if (gfxPrefs::GPUProcessForceEnabled()) {
+    gpuProc.UserForceEnable("User force-enabled via pref");
+  }
+
   if (InSafeMode()) {
     gpuProc.ForceDisable(
       FeatureStatus::Blocked,
@@ -2442,6 +2475,12 @@ gfxPlatform::AsyncPanZoomEnabled()
   if (!BrowserTabsRemoteAutostart()) {
     return false;
   }
+#ifdef MOZ_ENABLE_WEBRENDER
+  // For webrender hacking we have a special pref to disable APZ even with e10s
+  if (!gfxPrefs::APZAllowWithWebRender()) {
+    return false;
+  }
+#endif // MOZ_ENABLE_WEBRENDER
 #endif
 #ifdef MOZ_WIDGET_ANDROID
   return true;

@@ -37,7 +37,7 @@ class nsIConsoleReportCollector;
 
 namespace mozilla {
 
-class PrincipalOriginAttributes;
+class OriginAttributes;
 
 namespace dom {
 
@@ -150,7 +150,7 @@ public:
                                      nsIPrincipal* aPrincipal);
 
   void
-  DispatchFetchEvent(const PrincipalOriginAttributes& aOriginAttributes,
+  DispatchFetchEvent(const OriginAttributes& aOriginAttributes,
                      nsIDocument* aDoc,
                      const nsAString& aDocumentIdForTopLevelNavigation,
                      nsIInterceptedChannel* aChannel,
@@ -164,11 +164,11 @@ public:
          ServiceWorkerUpdateFinishCallback* aCallback);
 
   void
-  SoftUpdate(const PrincipalOriginAttributes& aOriginAttributes,
+  SoftUpdate(const OriginAttributes& aOriginAttributes,
              const nsACString& aScope);
 
   void
-  PropagateSoftUpdate(const PrincipalOriginAttributes& aOriginAttributes,
+  PropagateSoftUpdate(const OriginAttributes& aOriginAttributes,
                       const nsAString& aScope);
 
   void
@@ -187,7 +187,9 @@ public:
   GetRegistration(nsIPrincipal* aPrincipal, const nsACString& aScope) const;
 
   ServiceWorkerRegistrationInfo*
-  CreateNewRegistration(const nsCString& aScope, nsIPrincipal* aPrincipal);
+  CreateNewRegistration(const nsCString& aScope,
+                        nsIPrincipal* aPrincipal,
+                        nsLoadFlags aLoadFlags);
 
   void
   RemoveRegistration(ServiceWorkerRegistrationInfo* aRegistration);
@@ -356,12 +358,15 @@ private:
                            nsISupports** aServiceWorker);
 
   ServiceWorkerInfo*
-  GetActiveWorkerInfoForScope(const PrincipalOriginAttributes& aOriginAttributes,
+  GetActiveWorkerInfoForScope(const OriginAttributes& aOriginAttributes,
                               const nsACString& aScope);
 
   ServiceWorkerInfo*
   GetActiveWorkerInfoForDocument(nsIDocument* aDocument);
 
+  void
+  TransitionServiceWorkerRegistrationWorker(ServiceWorkerRegistrationInfo* aRegistration,
+                                            WhichServiceWorker aWhichOne);
   void
   InvalidateServiceWorkerRegistrationWorker(ServiceWorkerRegistrationInfo* aRegistration,
                                             WhichServiceWorker aWhichOnes);

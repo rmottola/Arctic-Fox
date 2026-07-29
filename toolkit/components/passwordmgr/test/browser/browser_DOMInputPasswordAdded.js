@@ -24,7 +24,7 @@ function task(consts) {
     removeEventListener("load", tabLoad, true);
     gDoc = content.document;
     // These events shouldn't escape to content.
-    gDoc.addEventListener("DOMInputPasswordAdded", unexpectedContentEvent, false);
+    gDoc.addEventListener("DOMInputPasswordAdded", unexpectedContentEvent);
     gDoc.defaultView.setTimeout(test_inputAdd, 0);
   }
 

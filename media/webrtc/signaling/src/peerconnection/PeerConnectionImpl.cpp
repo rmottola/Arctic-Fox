@@ -139,6 +139,7 @@ using namespace mozilla::dom;
 typedef PCObserverString ObString;
 
 static const char* logTag = "PeerConnectionImpl";
+static mozilla::LazyLogModule logModuleInfo("signaling");
 
 // Getting exceptions back down from PCObserver is generally not harmful.
 namespace {
@@ -231,14 +232,6 @@ namespace mozilla {
 
 class nsIDOMDataChannel;
 
-PRLogModuleInfo *signalingLogInfo() {
-  static PRLogModuleInfo *logModuleInfo = nullptr;
-  if (!logModuleInfo) {
-    logModuleInfo = PR_NewLogModule("signaling");
-  }
-  return logModuleInfo;
-}
-
 // XXX Workaround for bug 998092 to maintain the existing broken semantics
 template<>
 struct nsISupportsWeakReference::COMTypeInfo<nsSupportsWeakReference, void> {
@@ -318,7 +311,7 @@ bool IsPrivateBrowsing(nsPIDOMWindowInner* aWindow)
 }
 
 PeerConnectionImpl::PeerConnectionImpl(const GlobalObject* aGlobal)
-: mTimeCard(MOZ_LOG_TEST(signalingLogInfo(),LogLevel::Error) ?
+: mTimeCard(MOZ_LOG_TEST(logModuleInfo,LogLevel::Error) ?
             create_timecard() : nullptr)
   , mSignalingState(PCImplSignalingState::SignalingStable)
   , mIceConnectionState(PCImplIceConnectionState::New)
@@ -1337,7 +1330,7 @@ already_AddRefed<nsDOMDataChannel>
 PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
                                       const nsAString& aProtocol,
                                       uint16_t aType,
-                                      bool outOfOrderAllowed,
+                                      bool ordered,
                                       uint16_t aMaxTime,
                                       uint16_t aMaxNum,
                                       bool aExternalNegotiated,
@@ -1346,7 +1339,7 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
 {
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   RefPtr<nsDOMDataChannel> result;
-  rv = CreateDataChannel(aLabel, aProtocol, aType, outOfOrderAllowed,
+  rv = CreateDataChannel(aLabel, aProtocol, aType, ordered,
                          aMaxTime, aMaxNum, aExternalNegotiated,
                          aStream, getter_AddRefs(result));
   return result.forget();
@@ -1359,7 +1352,7 @@ NS_IMETHODIMP
 PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
                                       const nsAString& aProtocol,
                                       uint16_t aType,
-                                      bool outOfOrderAllowed,
+                                      bool ordered,
                                       uint16_t aMaxTime,
                                       uint16_t aMaxNum,
                                       bool aExternalNegotiated,
@@ -1380,7 +1373,7 @@ PeerConnectionImpl::CreateDataChannel(const nsAString& aLabel,
   }
   dataChannel = mDataConnection->Open(
     NS_ConvertUTF16toUTF8(aLabel), NS_ConvertUTF16toUTF8(aProtocol), theType,
-    !outOfOrderAllowed,
+    ordered,
     aType == DataChannelConnection::PARTIAL_RELIABLE_REXMIT ? aMaxNum :
     (aType == DataChannelConnection::PARTIAL_RELIABLE_TIMED ? aMaxTime : 0),
     nullptr, nullptr, aExternalNegotiated, aStream

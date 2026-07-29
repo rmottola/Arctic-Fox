@@ -42,8 +42,11 @@ private:
 };
 
 VideoDecoderParent::VideoDecoderParent(VideoDecoderManagerParent* aParent,
+                                       const VideoInfo& aVideoInfo,
+                                       const layers::TextureFactoryIdentifier& aIdentifier,
                                        TaskQueue* aManagerTaskQueue,
-                                       TaskQueue* aDecodeTaskQueue)
+                                       TaskQueue* aDecodeTaskQueue,
+                                       bool* aSuccess)
   : mParent(aParent)
   , mManagerTaskQueue(aManagerTaskQueue)
   , mDecodeTaskQueue(aDecodeTaskQueue)
@@ -51,11 +54,34 @@ VideoDecoderParent::VideoDecoderParent(VideoDecoderManagerParent* aParent,
   , mDestroyed(false)
 {
   MOZ_COUNT_CTOR(VideoDecoderParent);
+  MOZ_ASSERT(OnManagerThread());
   // We hold a reference to ourselves to keep us alive until IPDL
   // explictly destroys us. There may still be refs held by
   // tasks, but no new ones should be added after we're
   // destroyed.
   mIPDLSelfRef = this;
+
+  mKnowsCompositor->IdentifyTextureHost(aIdentifier);
+
+#ifdef XP_WIN
+  // TODO: Ideally we wouldn't hardcode the WMF PDM, and we'd use the normal PDM
+  // factory logic for picking a decoder.
+  WMFDecoderModule::Init();
+  RefPtr<WMFDecoderModule> pdm(new WMFDecoderModule());
+  pdm->Startup();
+
+  CreateDecoderParams params(aVideoInfo);
+  params.mTaskQueue = mDecodeTaskQueue;
+  params.mCallback = this;
+  params.mKnowsCompositor = mKnowsCompositor;
+  params.mImageContainer = new layers::ImageContainer();
+
+  mDecoder = pdm->CreateVideoDecoder(params);
+#else
+  MOZ_ASSERT(false, "Can't use RemoteVideoDecoder on non-Windows platforms yet");
+#endif
+
+  *aSuccess = !!mDecoder;
 }
 
 VideoDecoderParent::~VideoDecoderParent()
@@ -66,42 +92,20 @@ VideoDecoderParent::~VideoDecoderParent()
 void
 VideoDecoderParent::Destroy()
 {
+  MOZ_ASSERT(OnManagerThread());
   mDecodeTaskQueue->AwaitShutdownAndIdle();
   mDestroyed = true;
   mIPDLSelfRef = nullptr;
 }
 
 mozilla::ipc::IPCResult
-VideoDecoderParent::RecvInit(const VideoInfo& aInfo, const layers::TextureFactoryIdentifier& aIdentifier)
+VideoDecoderParent::RecvInit()
 {
-  mKnowsCompositor->IdentifyTextureHost(aIdentifier);
-
-#ifdef XP_WIN
-  // TODO: Ideally we wouldn't hardcode the WMF PDM, and we'd use the normal PDM
-  // factory logic for picking a decoder.
-  WMFDecoderModule::Init();
-  RefPtr<WMFDecoderModule> pdm(new WMFDecoderModule());
-  pdm->Startup();
-
-  CreateDecoderParams params(aInfo);
-  params.mTaskQueue = mDecodeTaskQueue;
-  params.mCallback = this;
-  params.mKnowsCompositor = mKnowsCompositor;
-  params.mImageContainer = new layers::ImageContainer();
-
-  mDecoder = pdm->CreateVideoDecoder(params);
-  if (!mDecoder) {
-    Unused << SendInitFailed(NS_ERROR_DOM_MEDIA_FATAL_ERR);
-    return IPC_OK();
-  }
-#else
-  MOZ_ASSERT(false, "Can't use RemoteVideoDecoder on non-Windows platforms yet");
-#endif
-
+  MOZ_ASSERT(OnManagerThread());
   RefPtr<VideoDecoderParent> self = this;
   mDecoder->Init()->Then(mManagerTaskQueue, __func__,
     [self] (TrackInfo::TrackType aTrack) {
-      if (!self->mDestroyed) {
+      if (self->mDecoder) {
         nsCString hardwareReason;
         bool hardwareAccelerated = self->mDecoder->IsHardwareAccelerated(hardwareReason);
         Unused << self->SendInitComplete(hardwareAccelerated, hardwareReason);
@@ -118,6 +122,7 @@ VideoDecoderParent::RecvInit(const VideoInfo& aInfo, const layers::TextureFactor
 mozilla::ipc::IPCResult
 VideoDecoderParent::RecvInput(const MediaRawDataIPDL& aData)
 {
+  MOZ_ASSERT(OnManagerThread());
   // XXX: This copies the data into a buffer owned by the MediaRawData. Ideally we'd just take ownership
   // of the shmem.
   RefPtr<MediaRawData> data = new MediaRawData(aData.buffer().get<uint8_t>(), aData.buffer().Size<uint8_t>());
@@ -137,9 +142,20 @@ mozilla::ipc::IPCResult
 VideoDecoderParent::RecvFlush()
 {
   MOZ_ASSERT(!mDestroyed);
+  MOZ_ASSERT(OnManagerThread());
   if (mDecoder) {
     mDecoder->Flush();
   }
+
+  // Dispatch a runnable to our own event queue so that
+  // it will be processed after anything that got dispatched
+  // during the Flush call.
+  RefPtr<VideoDecoderParent> self = this;
+  mManagerTaskQueue->Dispatch(NS_NewRunnableFunction([self]() {
+    if (!self->mDestroyed) {
+      Unused << self->SendFlushComplete();
+    }
+  }));
   return IPC_OK();
 }
 
@@ -147,6 +163,7 @@ mozilla::ipc::IPCResult
 VideoDecoderParent::RecvDrain()
 {
   MOZ_ASSERT(!mDestroyed);
+  MOZ_ASSERT(OnManagerThread());
   mDecoder->Drain();
   return IPC_OK();
 }
@@ -155,6 +172,7 @@ mozilla::ipc::IPCResult
 VideoDecoderParent::RecvShutdown()
 {
   MOZ_ASSERT(!mDestroyed);
+  MOZ_ASSERT(OnManagerThread());
   if (mDecoder) {
     mDecoder->Shutdown();
   }
@@ -166,6 +184,7 @@ mozilla::ipc::IPCResult
 VideoDecoderParent::RecvSetSeekThreshold(const int64_t& aTime)
 {
   MOZ_ASSERT(!mDestroyed);
+  MOZ_ASSERT(OnManagerThread());
   mDecoder->SetSeekThreshold(media::TimeUnit::FromMicroseconds(aTime));
   return IPC_OK();
 }
@@ -174,6 +193,7 @@ void
 VideoDecoderParent::ActorDestroy(ActorDestroyReason aWhy)
 {
   MOZ_ASSERT(!mDestroyed);
+  MOZ_ASSERT(OnManagerThread());
   if (mDecoder) {
     mDecoder->Shutdown();
     mDecoder = nullptr;
@@ -267,6 +287,12 @@ VideoDecoderParent::OnReaderTaskQueue()
   // Most of our calls into mDecoder come directly from IPDL so are on
   // the right thread, but not actually on the task queue. We only ever
   // run a single thread, not a pool, so this should work fine.
+  return OnManagerThread();
+}
+
+bool
+VideoDecoderParent::OnManagerThread()
+{
   return mParent->OnManagerThread();
 }
 

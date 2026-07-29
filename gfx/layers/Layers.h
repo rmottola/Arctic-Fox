@@ -33,6 +33,7 @@
 #include "mozilla/gfx/TiledRegion.h"    // for TiledIntRegion
 #include "mozilla/gfx/Types.h"          // for SurfaceFormat
 #include "mozilla/gfx/UserData.h"       // for UserData, etc
+#include "mozilla/layers/BSPTree.h"     // for LayerPolygon
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/mozalloc.h"           // for operator delete, etc
 #include "nsAutoPtr.h"                  // for nsAutoPtr, nsRefPtr, etc
@@ -93,14 +94,17 @@ class ReadbackLayer;
 class ReadbackProcessor;
 class RefLayer;
 class HostLayer;
+class KnowsCompositor;
 class ShadowableLayer;
 class ShadowLayerForwarder;
 class LayerManagerComposite;
 class SpecificLayerAttributes;
+class TransactionIdAllocator;
 class Compositor;
 class FrameUniformityData;
 class PersistentBufferProvider;
 class GlyphArray;
+class WebRenderLayerManager;
 
 namespace layerscope {
 class LayersPacket;
@@ -112,6 +116,11 @@ class LayersPacket;
 
 // Defined in LayerUserData.h; please include that file instead.
 class LayerUserData;
+
+class DidCompositeObserver {
+  public:
+    virtual void DidComposite() = 0;
+};
 
 /*
  * Motivation: For truly smooth animation and video playback, we need to
@@ -195,6 +204,9 @@ public:
   virtual ShadowLayerForwarder* AsShadowForwarder()
   { return nullptr; }
 
+  virtual KnowsCompositor* AsKnowsCompositor()
+  { return nullptr; }
+
   virtual LayerManagerComposite* AsLayerManagerComposite()
   { return nullptr; }
 
@@ -202,6 +214,9 @@ public:
   { return nullptr; }
 
   virtual BasicLayerManager* AsBasicLayerManager()
+  { return nullptr; }
+
+  virtual WebRenderLayerManager* AsWebRenderLayerManager()
   { return nullptr; }
 
   /**
@@ -413,7 +428,7 @@ public:
    * CONSTRUCTION PHASE ONLY
    * Create a BorderLayer for this manager's layer tree.
    */
-  virtual already_AddRefed<BorderLayer> CreateBorderLayer() { return nullptr; }
+  virtual already_AddRefed<BorderLayer> CreateBorderLayer() = 0;
   /**
    * CONSTRUCTION PHASE ONLY
    * Create a CanvasLayer for this manager's layer tree.
@@ -673,6 +688,24 @@ public:
     mPaintedPixelCount = 0;
     return count;
   }
+
+  virtual void SetLayerObserverEpoch(uint64_t aLayerObserverEpoch) {}
+
+  virtual void DidComposite(uint64_t aTransactionId,
+                            const mozilla::TimeStamp& aCompositeStart,
+                            const mozilla::TimeStamp& aCompositeEnd) {}
+
+  virtual void AddDidCompositeObserver(DidCompositeObserver* aObserver) { MOZ_CRASH("GFX: LayerManager"); }
+  virtual void RemoveDidCompositeObserver(DidCompositeObserver* aObserver) { MOZ_CRASH("GFX: LayerManager"); }
+
+  virtual void UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier) {}
+
+  virtual TextureFactoryIdentifier GetTextureFactoryIdentifier()
+  {
+    return TextureFactoryIdentifier();
+  }
+
+  virtual void SetTransactionIdAllocator(TransactionIdAllocator* aAllocator) {}
 
 protected:
   RefPtr<Layer> mRoot;
@@ -1556,6 +1589,18 @@ public:
   virtual BorderLayer* AsBorderLayer() { return nullptr; }
 
   /**
+    * Dynamic cast to a Canvas. Returns null if this is not a
+    * ColorLayer.
+    */
+  virtual CanvasLayer* AsCanvasLayer() { return nullptr; }
+
+  /**
+    * Dynamic cast to an Image. Returns null if this is not a
+    * ColorLayer.
+    */
+  virtual ImageLayer* AsImageLayer() { return nullptr; }
+
+  /**
    * Dynamic cast to a LayerComposite.  Return null if this is not a
    * LayerComposite.  Can be used anytime.
    */
@@ -1691,11 +1736,13 @@ public:
    * aStream.
    */
   void Dump(std::stringstream& aStream, const char* aPrefix="",
-            bool aDumpHtml=false, bool aSorted=false);
+            bool aDumpHtml=false, bool aSorted=false,
+            const Maybe<gfx::Polygon>& aGeometry=Nothing());
   /**
    * Dump information about just this layer manager itself to aStream.
    */
-  void DumpSelf(std::stringstream& aStream, const char* aPrefix="");
+  void DumpSelf(std::stringstream& aStream, const char* aPrefix="",
+                const Maybe<gfx::Polygon>& aGeometry=Nothing());
 
   /**
    * Dump information about this layer and its child & sibling layers to
@@ -1775,6 +1822,8 @@ public:
   AsyncPanZoomController* GetAsyncPanZoomController(uint32_t aIndex) const;
   // The ScrollMetadataChanged function is used internally to ensure the APZC array length
   // matches the frame metrics array length.
+
+  virtual void ClearCachedResources() {}
 private:
   void ScrollMetadataChanged();
 public:
@@ -2153,13 +2202,17 @@ public:
 
   virtual void FillSpecificAttributes(SpecificLayerAttributes& aAttrs) override;
 
-  void SortChildrenBy3DZOrder(nsTArray<Layer*>& aArray);
+  enum class SortMode {
+    WITH_GEOMETRY,
+    WITHOUT_GEOMETRY,
+  };
 
-  // These getters can be used anytime.
+  nsTArray<LayerPolygon> SortChildrenBy3DZOrder(SortMode aSortMode);
 
   virtual ContainerLayer* AsContainerLayer() override { return this; }
   virtual const ContainerLayer* AsContainerLayer() const override { return this; }
 
+  // These getters can be used anytime.
   virtual Layer* GetFirstChild() const override { return mFirstChild; }
   virtual Layer* GetLastChild() const override { return mLastChild; }
   float GetPreXScale() const { return mPreXScale; }
@@ -2241,7 +2294,28 @@ protected:
   void DidInsertChild(Layer* aLayer);
   void DidRemoveChild(Layer* aLayer);
 
+  bool AnyAncestorOrThisIs3DContextLeaf();
+
   void Collect3DContextLeaves(nsTArray<Layer*>& aToSort);
+
+  // Collects child layers that do not extend 3D context. For ContainerLayers
+  // that do extend 3D context, the 3D context leaves are collected.
+  nsTArray<Layer*> CollectChildren() {
+    nsTArray<Layer*> children;
+
+    for (Layer* layer = GetFirstChild(); layer; layer = layer->GetNextSibling()) {
+      ContainerLayer* container = layer->AsContainerLayer();
+
+      if (container && container->Extend3DContext() &&
+          !container->UseIntermediateSurface()) {
+        container->Collect3DContextLeaves(children);
+      } else {
+        children.AppendElement(layer);
+      }
+    }
+
+    return children;
+  }
 
   ContainerLayer(LayerManager* aManager, void* aImplData);
 
@@ -2541,6 +2615,8 @@ public:
    * Check the data is owned by this layer is still valid for rendering
    */
   virtual bool IsDataValid(const Data& aData) { return true; }
+
+  virtual CanvasLayer* AsCanvasLayer() override { return this; }
 
   /**
    * Notify this CanvasLayer that the canvas surface contents have

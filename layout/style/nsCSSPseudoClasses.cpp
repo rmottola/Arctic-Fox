@@ -89,7 +89,6 @@ nsCSSPseudoClasses::HasStringArg(Type aType)
          aType == Type::mozEmptyExceptChildrenWithLocalname ||
          aType == Type::mozSystemMetric ||
          aType == Type::mozLocaleDir ||
-         aType == Type::mozDir ||
          aType == Type::dir;
 }
 

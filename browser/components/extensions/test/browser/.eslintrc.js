@@ -1,19 +1,13 @@
-{
-  "extends": "../../.eslintrc",
+"use strict";
+
+module.exports = {  // eslint-disable-line no-undef
+  "extends": "../../../../../testing/mochitest/browser.eslintrc.js",
+
+  "env": {
+    "webextensions": true,
+  },
 
   "globals": {
-    // DOM window globals
-    "CustomEvent": false,
-    "document": false,
-    "ImageData": false,
-    "MouseEvent": false,
-    "window": false,
-    "XMLHttpRequest": false,
-
-    "gBrowser": false,
-
-    "sendAsyncMessage": false,
-
     "NetUtil": true,
     "XPCOMUtils": true,
     "Task": true,
@@ -34,5 +28,9 @@
     "openContextMenu": true,
     "openExtensionContextMenu": true,
     "CustomizableUI": true,
+  },
+
+  "rules": {
+    "no-shadow": 0,
   },
 };

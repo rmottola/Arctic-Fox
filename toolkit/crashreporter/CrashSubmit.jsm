@@ -287,16 +287,25 @@ Submitter.prototype = {
       formData.append("Throttleable", "0");
     }
     // add the minidumps
-    formData.append("upload_file_minidump", File.createFromFileName(this.dump.path));
+    let promises = [
+      File.createFromFileName(this.dump.path).then(file => {
+        formData.append("upload_file_minidump", file);
+      })
+    ]
+
     if (this.memory) {
-      formData.append("memory_report", File.createFromFileName(this.memory.path));
+      promises.push(File.createFromFileName(this.memory.path).then(file => {
+        formData.append("memory_report", file);
+      }));
     }
+
     if (this.additionalDumps.length > 0) {
       let names = [];
       for (let i of this.additionalDumps) {
         names.push(i.name);
-        formData.append("upload_file_minidump_"+i.name,
-                        File.createFromFileName(i.dump.path));
+        promises.push(File.createFromFileName(i.dump.path).then(file => {
+          formData.append("upload_file_minidump_" + i.name, file);
+        }));
       }
     }
 
@@ -308,36 +317,42 @@ Submitter.prototype = {
         let ret =
           xhr.status == 200 ? parseKeyValuePairs(xhr.responseText) : {};
         let submitted = !!ret.CrashID;
+        let p = Promise.resolve();
 
         if (this.recordSubmission) {
           let result = submitted ? manager.SUBMISSION_RESULT_OK :
                                    manager.SUBMISSION_RESULT_FAILED;
-          manager.addSubmissionResult(this.id, submissionID, new Date(),
-                                      result);
+          p = manager.addSubmissionResult(this.id, submissionID, new Date(),
+                                          result);
           if (submitted) {
             manager.setRemoteCrashID(this.id, ret.CrashID);
           }
         }
 
-        if (submitted) {
-          this.submitSuccess(ret);
-        }
-        else {
-           this.notifyStatus(FAILED);
-           this.cleanup();
-        }
+        p.then(() => {
+          if (submitted) {
+            this.submitSuccess(ret);
+          } else {
+            this.notifyStatus(FAILED);
+            this.cleanup();
+          }
+        });
       }
-    }, false);
+    });
+
+    let p = Promise.all(promises);
+    let id = this.id;
 
     if (this.recordSubmission) {
-      manager.addSubmissionAttempt(this.id, submissionID, new Date());
+      p = manager.ensureCrashIsPresent(id).then(() => {
+        return manager.addSubmissionAttempt(id, submissionID, new Date());
+      });
     }
-    xhr.send(formData);
+    p.then(() => { xhr.send(formData); });
     return true;
   },
 
-  notifyStatus: function Submitter_notify(status, ret)
-  {
+  notifyStatus: function Submitter_notify(status, ret) {
     let propBag = Cc["@mozilla.org/hash-property-bag;1"].
                   createInstance(Ci.nsIWritablePropertyBag2);
     propBag.setPropertyAsAString("minidumpID", this.id);

@@ -274,7 +274,7 @@ this.LightweightThemeManager = {
       var currentTheme = this.currentTheme;
       if (currentTheme && currentTheme.id == theme.id)
         this.currentTheme = newData;
-    }, false);
+    });
 
     req.send(null);
   },
@@ -871,7 +871,7 @@ function _persistImage(sourceURL, localFileName, successCallback) {
   persist.progressListener = new _persistProgressListener(successCallback);
 
   persist.saveURI(sourceURI, null,
-                  null, Ci.nsIHttpChannel.REFERRER_POLICY_NO_REFERRER_WHEN_DOWNGRADE,
+                  null, Ci.nsIHttpChannel.REFERRER_POLICY_UNSET,
                   null, null, targetURI, null);
 }
 

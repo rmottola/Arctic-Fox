@@ -128,6 +128,9 @@ public:
   InvalidateWorkers(WhichServiceWorker aWhichOnes) override;
 
   void
+  TransitionWorker(WhichServiceWorker aWhichOne) override;
+
+  void
   RegistrationRemoved() override;
 
   void
@@ -305,6 +308,24 @@ ServiceWorkerRegistrationMainThread::UpdateFound()
 }
 
 void
+ServiceWorkerRegistrationMainThread::TransitionWorker(WhichServiceWorker aWhichOne)
+{
+  AssertIsOnMainThread();
+
+  // We assert the worker's previous state because the 'statechange'
+  // event is dispatched in a queued runnable.
+  if (aWhichOne == WhichServiceWorker::INSTALLING_WORKER) {
+    MOZ_ASSERT_IF(mInstallingWorker, mInstallingWorker->State() == ServiceWorkerState::Installing);
+    mWaitingWorker = mInstallingWorker.forget();
+  } else if (aWhichOne == WhichServiceWorker::WAITING_WORKER) {
+    MOZ_ASSERT_IF(mWaitingWorker, mWaitingWorker->State() == ServiceWorkerState::Installed);
+    mActiveWorker = mWaitingWorker.forget();
+  } else {
+    MOZ_ASSERT_UNREACHABLE("Invalid transition!");
+  }
+}
+
+void
 ServiceWorkerRegistrationMainThread::InvalidateWorkers(WhichServiceWorker aWhichOnes)
 {
   AssertIsOnMainThread();
@@ -345,7 +366,10 @@ UpdateInternal(nsIPrincipal* aPrincipal,
   MOZ_ASSERT(aCallback);
 
   RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-  MOZ_ASSERT(swm);
+  if (!swm) {
+    // browser shutdown
+    return;
+  }
 
   swm->Update(aPrincipal, NS_ConvertUTF16toUTF8(aScope), aCallback);
 }
@@ -984,6 +1008,13 @@ public:
   UpdateFound() override;
 
   void
+  TransitionWorker(WhichServiceWorker aWhichOne) override
+  {
+    AssertIsOnMainThread();
+    NS_WARNING("FIXME: Not implemented!");
+  }
+
+  void
   InvalidateWorkers(WhichServiceWorker aWhichOnes) override
   {
     AssertIsOnMainThread();
@@ -1243,7 +1274,7 @@ ServiceWorkerRegistrationWorkerThread::ReleaseListener(Reason aReason)
     RefPtr<SyncStopListeningRunnable> r =
       new SyncStopListeningRunnable(mWorkerPrivate, mListener);
     ErrorResult rv;
-    r->Dispatch(rv);
+    r->Dispatch(Killing, rv);
     if (rv.Failed()) {
       NS_ERROR("Failed to dispatch stop listening runnable!");
       // And now what?

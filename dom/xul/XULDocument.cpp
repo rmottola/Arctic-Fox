@@ -190,13 +190,26 @@ namespace dom {
 
 XULDocument::XULDocument(void)
     : XMLDocument("application/vnd.mozilla.xul+xml"),
+      mNextSrcLoadWaiter(nullptr),
+      mApplyingPersistedAttrs(false),
+      mIsWritingFastLoad(false),
+      mDocumentLoaded(false),
+      mStillWalking(false),
+      mRestrictPersistence(false),
+      mTemplateBuilderTable(nullptr),
+      mPendingSheets(0),
       mDocLWTheme(Doc_Theme_Uninitialized),
       mState(eState_Master),
-      mResolutionPhase(nsForwardReference::eStart)
+      mCurrentScriptProto(nullptr),
+      mOffThreadCompiling(false),
+      mOffThreadCompileStringBuf(nullptr),
+      mOffThreadCompileStringLength(0),
+      mResolutionPhase(nsForwardReference::eStart),
+      mBroadcasterMap(nullptr),
+      mInitialLayoutComplete(false),
+      mHandlingDelayedAttrChange(false),
+      mHandlingDelayedBroadcasters(false)
 {
-    // NOTE! nsDocument::operator new() zeroes out all members, so don't
-    // bother initializing members to 0.
-
     // Override the default in nsDocument
     mCharacterSet.AssignLiteral("UTF-8");
 
@@ -1337,7 +1350,7 @@ XULDocument::GetViewportSize(int32_t* aWidth,
 {
     *aWidth = *aHeight = 0;
 
-    FlushPendingNotifications(Flush_Layout);
+    FlushPendingNotifications(FlushType::Layout);
 
     nsIPresShell *shell = GetShell();
     NS_ENSURE_TRUE(shell, NS_ERROR_FAILURE);
@@ -2159,6 +2172,10 @@ XULDocument::TraceProtos(JSTracer* aTrc, uint32_t aGCNumber)
     uint32_t i, count = mPrototypes.Length();
     for (i = 0; i < count; ++i) {
         mPrototypes[i]->TraceProtos(aTrc, aGCNumber);
+    }
+
+    if (mCurrentPrototype) {
+        mCurrentPrototype->TraceProtos(aTrc, aGCNumber);
     }
 }
 

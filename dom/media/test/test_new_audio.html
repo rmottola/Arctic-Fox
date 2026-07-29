@@ -35,8 +35,7 @@ function startTest(test, token) {
                      function(e){
                         ok(true, "[" + a.src + "]We should get to the end. Oh look we did.");
                         manager.finished(token);
-                     },
-                     false);
+                     });
 }
 
 manager.runTests(gAudioTests, startTest);

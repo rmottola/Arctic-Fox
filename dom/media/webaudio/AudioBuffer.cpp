@@ -27,7 +27,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(AudioBuffer)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(AudioBuffer)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(AudioBuffer)
@@ -178,6 +177,24 @@ AudioBuffer::~AudioBuffer()
   AudioBufferMemoryTracker::UnregisterAudioBuffer(this);
   ClearJSChannels();
   mozilla::DropJSObjects(this);
+}
+
+/* static */ already_AddRefed<AudioBuffer>
+AudioBuffer::Constructor(const GlobalObject& aGlobal,
+                         AudioContext& aAudioContext,
+                         const AudioBufferOptions& aOptions,
+                         ErrorResult& aRv)
+{
+  if (!aOptions.mNumberOfChannels) {
+    aRv.Throw(NS_ERROR_DOM_INDEX_SIZE_ERR);
+    return nullptr;
+  }
+
+  float sampleRate = aOptions.mSampleRate.WasPassed()
+                       ? aOptions.mSampleRate.Value()
+                       : aAudioContext.SampleRate();
+  return Create(&aAudioContext, aOptions.mNumberOfChannels, aOptions.mLength,
+                sampleRate, aRv);
 }
 
 void

@@ -102,6 +102,7 @@
 
 #if defined(XP_WIN) && defined(ACCESSIBILITY)
 #include "mozilla/a11y/AccessibleWrap.h"
+#include "mozilla/a11y/nsWinUtils.h"
 #endif
 
 using namespace mozilla::dom;
@@ -270,6 +271,16 @@ TabParent::SetOwnerElement(Element* aElement)
         reinterpret_cast<uintptr_t>(widget->GetNativeData(NS_NATIVE_WINDOW));
     }
     Unused << SendUpdateNativeWindowHandle(newWindowHandle);
+    a11y::DocAccessibleParent* doc = GetTopLevelDocAccessible();
+    if (doc) {
+      HWND hWnd = reinterpret_cast<HWND>(doc->GetEmulatedWindowHandle());
+      if (hWnd) {
+        HWND parentHwnd = reinterpret_cast<HWND>(newWindowHandle);
+        if (parentHwnd != ::GetParent(hWnd)) {
+          ::SetParent(hWnd, parentHwnd);
+        }
+      }
+    }
   }
 #endif
 
@@ -359,6 +370,12 @@ TabParent::DestroyInternal()
   IMEStateManager::OnTabParentDestroying(this);
 
   RemoveWindowListeners();
+
+#ifdef ACCESSIBILITY
+  if (a11y::DocAccessibleParent* tabDoc = GetTopLevelDocAccessible()) {
+    tabDoc->Destroy();
+  }
+#endif
 
   // If this fails, it's most likely due to a content-process crash,
   // and auto-cleanup will kick in.  Otherwise, the child side will
@@ -616,6 +633,34 @@ TabParent::LoadURL(nsIURI* aURI)
 }
 
 void
+TabParent::InitRenderFrame()
+{
+  if (IsInitedByParent()) {
+    // If TabParent is initialized by parent side then the RenderFrame must also
+    // be created here. If TabParent is initialized by child side,
+    // child side will create RenderFrame.
+    MOZ_ASSERT(!GetRenderFrame());
+    RefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
+    MOZ_ASSERT(frameLoader);
+    if (frameLoader) {
+      bool success;
+      RenderFrameParent* renderFrame = new RenderFrameParent(frameLoader, &success);
+      uint64_t layersId = renderFrame->GetLayersId();
+      AddTabParentToTable(layersId, this);
+      Unused << SendPRenderFrameConstructor(renderFrame);
+
+      TextureFactoryIdentifier textureFactoryIdentifier;
+      renderFrame->GetTextureFactoryIdentifier(&textureFactoryIdentifier);
+      Unused << SendInitRendering(textureFactoryIdentifier, layersId, renderFrame);
+    }
+  } else {
+    // Otherwise, the child should have constructed the RenderFrame,
+    // and we should already know about it.
+    MOZ_ASSERT(GetRenderFrame());
+  }
+}
+
+void
 TabParent::Show(const ScreenIntSize& size, bool aParentIsActive)
 {
     mDimensions = size;
@@ -623,28 +668,7 @@ TabParent::Show(const ScreenIntSize& size, bool aParentIsActive)
         return;
     }
 
-    TextureFactoryIdentifier textureFactoryIdentifier;
-    uint64_t layersId = 0;
-    bool success = false;
-    RenderFrameParent* renderFrame = nullptr;
-    if (IsInitedByParent()) {
-        // If TabParent is initialized by parent side then the RenderFrame must also
-        // be created here. If TabParent is initialized by child side,
-        // child side will create RenderFrame.
-        MOZ_ASSERT(!GetRenderFrame());
-        RefPtr<nsFrameLoader> frameLoader = GetFrameLoader();
-        if (frameLoader) {
-          renderFrame = new RenderFrameParent(frameLoader, &success);
-          layersId = renderFrame->GetLayersId();
-          renderFrame->GetTextureFactoryIdentifier(&textureFactoryIdentifier);
-          AddTabParentToTable(layersId, this);
-          Unused << SendPRenderFrameConstructor(renderFrame);
-        }
-    } else {
-      // Otherwise, the child should have constructed the RenderFrame,
-      // and we should already know about it.
-      MOZ_ASSERT(GetRenderFrame());
-    }
+    MOZ_ASSERT(GetRenderFrame());
 
     nsCOMPtr<nsISupports> container = mFrameElement->OwnerDoc()->GetContainer();
     nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(container);
@@ -652,8 +676,7 @@ TabParent::Show(const ScreenIntSize& size, bool aParentIsActive)
     baseWindow->GetMainWidget(getter_AddRefs(mainWidget));
     mSizeMode = mainWidget ? mainWidget->SizeMode() : nsSizeMode_Normal;
 
-    Unused << SendShow(size, GetShowInfo(), textureFactoryIdentifier,
-                       layersId, renderFrame, aParentIsActive, mSizeMode);
+    Unused << SendShow(size, GetShowInfo(), aParentIsActive, mSizeMode);
 }
 
 mozilla::ipc::IPCResult
@@ -867,7 +890,8 @@ TabParent::SetDocShell(nsIDocShell *aDocShell)
 
   a11y::PDocAccessibleParent*
 TabParent::AllocPDocAccessibleParent(PDocAccessibleParent* aParent,
-                                     const uint64_t&, const uint32_t&)
+                                     const uint64_t&, const uint32_t&,
+                                     const IAccessibleHolder&)
 {
 #ifdef ACCESSIBILITY
   return new a11y::DocAccessibleParent();
@@ -889,10 +913,19 @@ mozilla::ipc::IPCResult
 TabParent::RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
                                          PDocAccessibleParent* aParentDoc,
                                          const uint64_t& aParentID,
-                                         const uint32_t& aMsaaID)
+                                         const uint32_t& aMsaaID,
+                                         const IAccessibleHolder& aDocCOMProxy)
 {
 #ifdef ACCESSIBILITY
   auto doc = static_cast<a11y::DocAccessibleParent*>(aDoc);
+
+  // If this tab is already shutting down just mark the new actor as shutdown
+  // and ignore it.  When the tab actor is destroyed it will be too.
+  if (mIsDestroyed) {
+    doc->MarkAsShutdown();
+    return IPC_OK();
+  }
+
   if (aParentDoc) {
     // A document should never directly be the parent of another document.
     // There should always be an outer doc accessible child of the outer
@@ -903,15 +936,23 @@ TabParent::RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
     }
 
     auto parentDoc = static_cast<a11y::DocAccessibleParent*>(aParentDoc);
-    bool added = parentDoc->AddChildDoc(doc, aParentID);
+    mozilla::ipc::IPCResult added = parentDoc->AddChildDoc(doc, aParentID);
+    if (!added) {
+#ifdef DEBUG
+      return added;
+#else
+      return IPC_OK();
+#endif
+    }
+
 #ifdef XP_WIN
-    if (added) {
-      a11y::WrapperFor(doc)->SetID(aMsaaID);
+    MOZ_ASSERT(aDocCOMProxy.IsNull());
+    a11y::WrapperFor(doc)->SetID(aMsaaID);
+    if (a11y::nsWinUtils::IsWindowEmulationStarted()) {
+      doc->SetEmulatedWindowHandle(parentDoc->GetEmulatedWindowHandle());
     }
 #endif
-    if (!added) {
-      return IPC_FAIL_NO_REASON(this);
-    }
+
     return IPC_OK();
   } else {
     // null aParentDoc means this document is at the top level in the child
@@ -926,6 +967,9 @@ TabParent::RecvPDocAccessibleConstructor(PDocAccessibleParent* aDoc,
     a11y::DocManager::RemoteDocAdded(doc);
 #ifdef XP_WIN
     a11y::WrapperFor(doc)->SetID(aMsaaID);
+    MOZ_ASSERT(!aDocCOMProxy.IsNull());
+    RefPtr<IAccessible> proxy(aDocCOMProxy.Get());
+    doc->SetCOMProxy(proxy);
 #endif
   }
 #endif
@@ -1942,28 +1986,6 @@ TabParent::RecvReplyKeyEvent(const WidgetKeyboardEvent& event)
                                                       &localEvent, doc);
 
   EventDispatcher::Dispatch(mFrameElement, presContext, &localEvent);
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
-TabParent::RecvDispatchAfterKeyboardEvent(const WidgetKeyboardEvent& aEvent)
-{
-  NS_ENSURE_TRUE(mFrameElement, IPC_OK());
-
-  WidgetKeyboardEvent localEvent(aEvent);
-  localEvent.mWidget = GetWidget();
-
-  nsIDocument* doc = mFrameElement->OwnerDoc();
-  nsCOMPtr<nsIPresShell> presShell = doc->GetShell();
-  NS_ENSURE_TRUE(presShell, IPC_OK());
-
-  if (mFrameElement &&
-      PresShell::BeforeAfterKeyboardEventEnabled() &&
-      localEvent.mMessage != eKeyPress) {
-    presShell->DispatchAfterKeyboardEvent(mFrameElement, localEvent,
-                                          aEvent.DefaultPrevented());
-  }
-
   return IPC_OK();
 }
 
@@ -3224,7 +3246,7 @@ TabParent::RecvLookUpDictionary(const nsString& aText,
 }
 
 mozilla::ipc::IPCResult
-TabParent::RecvNotifySessionHistoryChange(const uint32_t& aCount)
+TabParent::RecvSHistoryUpdate(const uint32_t& aCount, const uint32_t& aLocalIndex, const bool& aTruncate)
 {
   RefPtr<nsFrameLoader> frameLoader(GetFrameLoader());
   if (!frameLoader) {
@@ -3240,7 +3262,7 @@ TabParent::RecvNotifySessionHistoryChange(const uint32_t& aCount)
     return IPC_OK();
   }
 
-  partialHistory->OnSessionHistoryChange(aCount);
+  partialHistory->HandleSHistoryUpdate(aCount, aLocalIndex, aTruncate);
   return IPC_OK();
 }
 

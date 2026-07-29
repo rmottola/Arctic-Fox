@@ -88,11 +88,6 @@ PK11_DestroyContext_true(PK11Context * ctx) {
 
 } // namespace internal
 
-// Deprecated: use the equivalent UniquePtr templates instead.
-MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedSGNDigestInfo,
-                                          SGNDigestInfo,
-                                          SGN_DestroyDigestInfo)
-
 // Emulates MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE, but for UniquePtrs.
 #define MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(name, Type, Deleter) \
 struct name##DeletePolicy \
@@ -207,9 +202,6 @@ MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedPK11SymKey,
 MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedPK11GenericObject,
                                           PK11GenericObject,
                                           PK11_DestroyGenericObject)
-MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedSEC_PKCS12DecoderContext,
-                                          SEC_PKCS12DecoderContext,
-                                          SEC_PKCS12DecoderFinish)
 namespace internal {
 
 inline void
@@ -322,9 +314,6 @@ MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedSECKEYEncryptedPrivateKeyInfo,
 MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedSECKEYPublicKey,
                                           SECKEYPublicKey,
                                           SECKEY_DestroyPublicKey)
-MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedSECAlgorithmID,
-                                          SECAlgorithmID,
-                                          internal::SECOID_DestroyAlgorithmID_true)
 
 MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueCERTCertificate,
                                       CERTCertificate,
@@ -379,11 +368,17 @@ MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniquePLArenaPool,
                                       internal::PORT_FreeArena_false)
 MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniquePORTString,
                                       char,
-                                      PORT_Free);
+                                      PORT_Free)
 MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniquePRFileDesc,
                                       PRFileDesc,
                                       PR_Close)
+MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniquePRLibraryName,
+                                      char,
+                                      PR_FreeLibraryName)
 
+MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueSECAlgorithmID,
+                                      SECAlgorithmID,
+                                      internal::SECOID_DestroyAlgorithmID_true)
 MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueSECItem,
                                       SECItem,
                                       internal::SECITEM_FreeItem_true)
@@ -396,6 +391,10 @@ MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueSECKEYPublicKey,
 MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueSECMODModule,
                                       SECMODModule,
                                       SECMOD_DestroyModule)
+
+MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueSGNDigestInfo,
+                                      SGNDigestInfo,
+                                      SGN_DestroyDigestInfo)
 
 MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueVFYContext,
                                       VFYContext,

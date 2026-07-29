@@ -53,7 +53,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Directory)
     tmp->mFileSystem->Traverse(cb);
   }
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mParent)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(Directory)
@@ -101,8 +100,8 @@ Directory::GetRoot(FileSystemBase* aFileSystem, ErrorResult& aRv)
   MOZ_ASSERT(aFileSystem);
 
   nsCOMPtr<nsIFile> path;
-  aRv = NS_NewNativeLocalFile(NS_ConvertUTF16toUTF8(aFileSystem->LocalOrDeviceStorageRootPath()),
-                              true, getter_AddRefs(path));
+  aRv = NS_NewLocalFile(aFileSystem->LocalOrDeviceStorageRootPath(),
+                        true, getter_AddRefs(path));
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -123,8 +122,7 @@ Directory::Constructor(const GlobalObject& aGlobal,
                        ErrorResult& aRv)
 {
   nsCOMPtr<nsIFile> path;
-  aRv = NS_NewNativeLocalFile(NS_ConvertUTF16toUTF8(aRealPath),
-                              true, getter_AddRefs(path));
+  aRv = NS_NewLocalFile(aRealPath, true, getter_AddRefs(path));
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }

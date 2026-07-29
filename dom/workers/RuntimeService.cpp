@@ -252,7 +252,7 @@ GetWorkerPref(const nsACString& aPref,
 void
 GenerateSharedWorkerKey(const nsACString& aScriptSpec,
                         const nsACString& aName,
-                        const PrincipalOriginAttributes& aAttrs,
+                        const OriginAttributes& aAttrs,
                         nsCString& aKey)
 {
   nsAutoCString suffix;
@@ -623,7 +623,7 @@ ContentSecurityPolicyAllows(JSContext* aCx)
         new LogViolationDetailsRunnable(worker, fileName, lineNum);
 
     ErrorResult rv;
-    runnable->Dispatch(rv);
+    runnable->Dispatch(Killing, rv);
     if (NS_WARN_IF(rv.Failed())) {
       rv.SuppressException();
     }
@@ -2427,7 +2427,7 @@ RuntimeService::CreateSharedWorkerFromLoadInfo(JSContext* aCx,
     MOZ_ASSERT(aLoadInfo->mPrincipal);
     nsAutoCString key;
     GenerateSharedWorkerKey(scriptSpec, aName,
-        BasePrincipal::Cast(aLoadInfo->mPrincipal)->OriginAttributesRef(), key);
+        aLoadInfo->mPrincipal->OriginAttributesRef(), key);
 
     if (mDomainMap.Get(aLoadInfo->mDomain, &domainInfo) &&
         domainInfo->mSharedWorkerInfos.Get(key, &sharedWorkerInfo)) {

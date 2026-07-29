@@ -99,6 +99,9 @@ public:
   nsresult OpenAlternativeOutputStream(const nsACString & type, nsIOutputStream * *_retval);
 
   void InvokeAsyncOpen(nsresult rv);
+
+  // Calls SendSetPriority if mIPCClosed is false.
+  void DoSendSetPriority(int16_t aValue);
 protected:
   // used to connect redirected-to channel in parent with just created
   // ChildChannel.  Used during redirects.
@@ -142,6 +145,7 @@ protected:
                    const bool&                aAllowStaleCacheContent,
                    const nsCString&           aContentTypeHint,
                    const nsCString&           aChannelId,
+                   const uint64_t&            aContentWindowId,
                    const nsCString&           aPreferredAlternativeType);
 
   virtual mozilla::ipc::IPCResult RecvSetPriority(const uint16_t& priority) override;

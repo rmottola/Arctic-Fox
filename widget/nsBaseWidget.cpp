@@ -1,3 +1,4 @@
+
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
@@ -55,8 +56,10 @@
 #include "mozilla/layers/APZEventState.h"
 #include "mozilla/layers/APZThreadUtils.h"
 #include "mozilla/layers/ChromeProcessController.h"
+#include "mozilla/layers/CompositorOptions.h"
 #include "mozilla/layers/InputAPZContext.h"
 #include "mozilla/layers/APZCCallbackHelper.h"
+#include "mozilla/layers/WebRenderLayerManager.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/gfx/GPUProcessManager.h"
@@ -1316,22 +1319,27 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
 
   CreateCompositorVsyncDispatcher();
 
-  RefPtr<ClientLayerManager> lm = new ClientLayerManager(this);
+  CompositorOptions options(UseAPZ(), gfxPrefs::WebRenderEnabled());
 
-  bool useAPZ = UseAPZ();
+  RefPtr<LayerManager> lm;
+  if (options.UseWebRender()) {
+    lm = new WebRenderLayerManager(this);
+  } else {
+    lm = new ClientLayerManager(this);
+  }
 
   gfx::GPUProcessManager* gpu = gfx::GPUProcessManager::Get();
   mCompositorSession = gpu->CreateTopLevelCompositor(
     this,
     lm,
     GetDefaultScale(),
-    useAPZ,
+    options,
     UseExternalCompositingSurface(),
     gfx::IntSize(aWidth, aHeight));
   mCompositorBridgeChild = mCompositorSession->GetCompositorBridgeChild();
   mCompositorWidgetDelegate = mCompositorSession->GetCompositorWidgetDelegate();
 
-  if (useAPZ) {
+  if (options.UseAPZ()) {
     mAPZC = mCompositorSession->GetAPZCTreeManager();
     ConfigureAPZCTreeManager();
   } else {
@@ -1345,11 +1353,18 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
     mInitialZoomConstraints.reset();
   }
 
-  ShadowLayerForwarder* lf = lm->AsShadowForwarder();
-  // As long as we are creating a ClientLayerManager above lf must be non-null.
-  MOZ_ASSERT(lf);
+  if (lm->AsWebRenderLayerManager()) {
+    TextureFactoryIdentifier textureFactoryIdentifier;
+    lm->AsWebRenderLayerManager()->Initialize(mCompositorBridgeChild,
+                                              mCompositorSession->RootLayerTreeId(),
+                                              &textureFactoryIdentifier);
+    ImageBridgeChild::IdentifyCompositorTextureHost(textureFactoryIdentifier);
+    gfx::VRManagerChild::IdentifyTextureHost(textureFactoryIdentifier);
+  }
 
+  ShadowLayerForwarder* lf = lm->AsShadowForwarder();
   if (lf) {
+    // lf is non-null if we are creating a ClientLayerManager above
     TextureFactoryIdentifier textureFactoryIdentifier;
     PLayerTransactionChild* shadowManager = nullptr;
 
@@ -1370,9 +1385,7 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
     }
 
     lf->SetShadowManager(shadowManager);
-    if (ClientLayerManager* clm = lm->AsClientLayerManager()) {
-      clm->UpdateTextureFactoryIdentifier(textureFactoryIdentifier);
-    }
+    lm->UpdateTextureFactoryIdentifier(textureFactoryIdentifier);
     // Some popup or transparent widgets may use a different backend than the
     // compositors used with ImageBridge and VR (and more generally web content).
     if (WidgetTypeSupportsAcceleration()) {
@@ -2254,7 +2267,7 @@ nsBaseWidget::CreateScrollCaptureContainer()
     return ImageContainer::sInvalidAsyncContainerId;
   }
 
-  return mScrollCaptureContainer->GetAsyncContainerID();
+  return mScrollCaptureContainer->GetAsyncContainerHandle().Value();
 }
 
 void
@@ -3086,6 +3099,7 @@ case _value: eventName.AssignLiteral(_name) ; break
     _ASSIGN_eventName(eMouseDown,"eMouseDown");
     _ASSIGN_eventName(eMouseUp,"eMouseUp");
     _ASSIGN_eventName(eMouseClick,"eMouseClick");
+    _ASSIGN_eventName(eMouseAuxClick,"eMouseAuxClick");
     _ASSIGN_eventName(eMouseDoubleClick,"eMouseDoubleClick");
     _ASSIGN_eventName(eMouseMove,"eMouseMove");
     _ASSIGN_eventName(eLoad,"eLoad");

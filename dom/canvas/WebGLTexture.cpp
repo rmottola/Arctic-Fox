@@ -33,12 +33,12 @@ Mutable(const T& x)
 }
 
 void
-WebGLTexture::ImageInfo::Clear()
+WebGLTexture::ImageInfo::Clear(const char* funcName)
 {
     if (!IsDefined())
         return;
 
-    OnRespecify();
+    OnRespecify(funcName);
 
     Mutable(mFormat) = LOCAL_GL_NONE;
     Mutable(mWidth) = 0;
@@ -48,8 +48,8 @@ WebGLTexture::ImageInfo::Clear()
     MOZ_ASSERT(!IsDefined());
 }
 
-WebGLTexture::ImageInfo&
-WebGLTexture::ImageInfo::operator =(const ImageInfo& a)
+void
+WebGLTexture::ImageInfo::Set(const char* funcName, const ImageInfo& a)
 {
     MOZ_ASSERT(a.IsDefined());
 
@@ -62,9 +62,7 @@ WebGLTexture::ImageInfo::operator =(const ImageInfo& a)
 
     // But *don't* transfer mAttachPoints!
     MOZ_ASSERT(a.mAttachPoints.empty());
-    OnRespecify();
-
-    return *this;
+    OnRespecify(funcName);
 }
 
 bool
@@ -91,10 +89,10 @@ WebGLTexture::ImageInfo::RemoveAttachPoint(WebGLFBAttachPoint* attachPoint)
 }
 
 void
-WebGLTexture::ImageInfo::OnRespecify() const
+WebGLTexture::ImageInfo::OnRespecify(const char* funcName) const
 {
     for (auto cur : mAttachPoints) {
-        cur->OnBackingStoreRespecified();
+        cur->OnBackingStoreRespecified(funcName);
     }
 }
 
@@ -149,8 +147,9 @@ WebGLTexture::WebGLTexture(WebGLContext* webgl, GLuint tex)
 void
 WebGLTexture::Delete()
 {
+    const char funcName[] = "WebGLTexture::Delete";
     for (auto& cur : mImageInfoArr) {
-        cur.Clear();
+        cur.Clear(funcName);
     }
 
     mContext->MakeContextCurrent();
@@ -173,18 +172,20 @@ WebGLTexture::MemoryUsage() const
 }
 
 void
-WebGLTexture::SetImageInfo(ImageInfo* target, const ImageInfo& newInfo)
+WebGLTexture::SetImageInfo(const char* funcName, ImageInfo* target,
+                           const ImageInfo& newInfo)
 {
-    *target = newInfo;
+    target->Set(funcName, newInfo);
 
     InvalidateResolveCache();
 }
 
 void
-WebGLTexture::SetImageInfosAtLevel(uint32_t level, const ImageInfo& newInfo)
+WebGLTexture::SetImageInfosAtLevel(const char* funcName, uint32_t level,
+                                   const ImageInfo& newInfo)
 {
     for (uint8_t i = 0; i < mFaceCount; i++) {
-        ImageInfoAtFace(i, level) = newInfo;
+        ImageInfoAtFace(i, level).Set(funcName, newInfo);
     }
 
     InvalidateResolveCache();
@@ -238,16 +239,26 @@ WebGLTexture::IsMipmapComplete(uint32_t texUnit) const
 
         // GLES 3.0.4, p158:
         // "[...] until the last array is reached with dimension 1 x 1 x 1."
-        if (refWidth == 1 &&
-            refHeight == 1 &&
-            refDepth == 1)
-        {
-            break;
+        if (mTarget == LOCAL_GL_TEXTURE_3D) {
+            if (refWidth == 1 &&
+                refHeight == 1 &&
+                refDepth == 1)
+            {
+                break;
+            }
+
+            refDepth = std::max(uint32_t(1), refDepth / 2);
+        } else {
+            // TEXTURE_2D_ARRAY may have depth != 1, but that's normal.
+            if (refWidth == 1 &&
+                refHeight == 1)
+            {
+                break;
+            }
         }
 
         refWidth  = std::max(uint32_t(1), refWidth  / 2);
         refHeight = std::max(uint32_t(1), refHeight / 2);
-        refDepth  = std::max(uint32_t(1), refDepth  / 2);
     }
 
     return true;
@@ -623,7 +634,8 @@ WebGLTexture::ClampLevelBaseAndMax()
 }
 
 void
-WebGLTexture::PopulateMipChain(uint32_t firstLevel, uint32_t lastLevel)
+WebGLTexture::PopulateMipChain(const char* funcName, uint32_t firstLevel,
+                               uint32_t lastLevel)
 {
     const ImageInfo& baseImageInfo = ImageInfoAtFace(0, firstLevel);
     MOZ_ASSERT(baseImageInfo.IsDefined());
@@ -654,7 +666,7 @@ WebGLTexture::PopulateMipChain(uint32_t firstLevel, uint32_t lastLevel)
         const ImageInfo cur(baseImageInfo.mFormat, refWidth, refHeight, refDepth,
                             baseImageInfo.IsDataInitialized());
 
-        SetImageInfosAtLevel(level, cur);
+        SetImageInfosAtLevel(funcName, level, cur);
     }
 }
 
@@ -704,6 +716,7 @@ WebGLTexture::BindTexture(TexTarget texTarget)
 void
 WebGLTexture::GenerateMipmap(TexTarget texTarget)
 {
+    const char funcName[] = "generateMipmap";
     // GLES 3.0.4 p160:
     // "Mipmap generation replaces texel array levels level base + 1 through q with arrays
     //  derived from the level base array, regardless of their previous contents. All
@@ -711,33 +724,35 @@ WebGLTexture::GenerateMipmap(TexTarget texTarget)
     //  computation."
     const ImageInfo& baseImageInfo = BaseImageInfo();
     if (!baseImageInfo.IsDefined()) {
-        mContext->ErrorInvalidOperation("generateMipmap: The base level of the texture is"
-                                        " not defined.");
+        mContext->ErrorInvalidOperation("%s: The base level of the texture is not"
+                                        " defined.",
+                                        funcName);
         return;
     }
 
     if (IsCubeMap() && !IsCubeComplete()) {
-      mContext->ErrorInvalidOperation("generateMipmap: Cube maps must be \"cube"
-                                      " complete\".");
+      mContext->ErrorInvalidOperation("%s: Cube maps must be \"cube complete\".",
+                                      funcName);
       return;
     }
 
     if (!mContext->IsWebGL2() && !baseImageInfo.IsPowerOfTwo()) {
-        mContext->ErrorInvalidOperation("generateMipmap: The base level of the texture"
-                                        " does not have power-of-two dimensions.");
+        mContext->ErrorInvalidOperation("%s: The base level of the texture does not have"
+                                        " power-of-two dimensions.",
+                                        funcName);
         return;
     }
 
     auto format = baseImageInfo.mFormat->format;
     if (format->compression) {
-        mContext->ErrorInvalidOperation("generateMipmap: Texture data at base level is"
-                                        " compressed.");
+        mContext->ErrorInvalidOperation("%s: Texture data at base level is compressed.",
+                                        funcName);
         return;
     }
 
     if (format->d) {
-        mContext->ErrorInvalidOperation("generateMipmap: Depth textures are not"
-                                        " supported.");
+        mContext->ErrorInvalidOperation("%s: Depth textures are not supported.",
+                                        funcName);
         return;
     }
 
@@ -760,9 +775,10 @@ WebGLTexture::GenerateMipmap(TexTarget texTarget)
     }
 
     if (!canGenerateMipmap) {
-        mContext->ErrorInvalidOperation("generateMipmap: Texture at base level is not unsized"
+        mContext->ErrorInvalidOperation("%s: Texture at base level is not unsized"
                                         " internal format or is not"
-                                        " color-renderable or texture-filterable.");
+                                        " color-renderable or texture-filterable.",
+                                        funcName);
         return;
     }
 
@@ -790,7 +806,7 @@ WebGLTexture::GenerateMipmap(TexTarget texTarget)
     // Note that we don't use MaxEffectiveMipmapLevel() here, since that returns
     // mBaseMipmapLevel if the min filter doesn't require mipmaps.
     const uint32_t maxLevel = mBaseMipmapLevel + baseImageInfo.PossibleMipmapLevels() - 1;
-    PopulateMipChain(mBaseMipmapLevel, maxLevel);
+    PopulateMipChain(funcName, mBaseMipmapLevel, maxLevel);
 }
 
 JS::Value
@@ -855,14 +871,8 @@ WebGLTexture::IsTexture() const
 // See this discussion:
 //   https://www.khronos.org/webgl/public-mailing-list/archives/1008/msg00014.html
 void
-WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntParam,
-                           GLfloat* maybeFloatParam)
+WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, const FloatOrInt& param)
 {
-    MOZ_ASSERT(maybeIntParam || maybeFloatParam);
-
-    GLint   intParam   = maybeIntParam   ? *maybeIntParam   : GLint(*maybeFloatParam);
-    GLfloat floatParam = maybeFloatParam ? *maybeFloatParam : GLfloat(*maybeIntParam);
-
     bool isPNameValid = false;
     switch (pname) {
     // GLES 2.0.25 p76:
@@ -905,16 +915,16 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
     switch (pname) {
     case LOCAL_GL_TEXTURE_BASE_LEVEL:
     case LOCAL_GL_TEXTURE_MAX_LEVEL:
-        paramBadValue = (intParam < 0);
+        paramBadValue = (param.i < 0);
         break;
 
     case LOCAL_GL_TEXTURE_COMPARE_MODE:
-        paramBadValue = (intParam != LOCAL_GL_NONE &&
-                         intParam != LOCAL_GL_COMPARE_REF_TO_TEXTURE);
+        paramBadValue = (param.i != LOCAL_GL_NONE &&
+                         param.i != LOCAL_GL_COMPARE_REF_TO_TEXTURE);
         break;
 
     case LOCAL_GL_TEXTURE_COMPARE_FUNC:
-        switch (intParam) {
+        switch (param.i) {
         case LOCAL_GL_LEQUAL:
         case LOCAL_GL_GEQUAL:
         case LOCAL_GL_LESS:
@@ -932,7 +942,7 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
         break;
 
     case LOCAL_GL_TEXTURE_MIN_FILTER:
-        switch (intParam) {
+        switch (param.i) {
         case LOCAL_GL_NEAREST:
         case LOCAL_GL_LINEAR:
         case LOCAL_GL_NEAREST_MIPMAP_NEAREST:
@@ -948,7 +958,7 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
         break;
 
     case LOCAL_GL_TEXTURE_MAG_FILTER:
-        switch (intParam) {
+        switch (param.i) {
         case LOCAL_GL_NEAREST:
         case LOCAL_GL_LINEAR:
             break;
@@ -962,7 +972,7 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
     case LOCAL_GL_TEXTURE_WRAP_S:
     case LOCAL_GL_TEXTURE_WRAP_T:
     case LOCAL_GL_TEXTURE_WRAP_R:
-        switch (intParam) {
+        switch (param.i) {
         case LOCAL_GL_CLAMP_TO_EDGE:
         case LOCAL_GL_MIRRORED_REPEAT:
         case LOCAL_GL_REPEAT:
@@ -975,34 +985,32 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
         break;
 
     case LOCAL_GL_TEXTURE_MAX_ANISOTROPY_EXT:
-        if (maybeFloatParam && floatParam < 1.0f)
-            paramBadValue = true;
-        else if (maybeIntParam && intParam < 1)
+        if (param.f < 1.0f)
             paramBadValue = true;
 
         break;
     }
 
     if (paramBadEnum) {
-        if (maybeIntParam) {
+        if (!param.isFloat) {
             mContext->ErrorInvalidEnum("texParameteri: pname 0x%04x: Invalid param"
                                        " 0x%04x.",
-                                       pname, intParam);
+                                       pname, param.i);
         } else {
             mContext->ErrorInvalidEnum("texParameterf: pname 0x%04x: Invalid param %g.",
-                                       pname, floatParam);
+                                       pname, param.f);
         }
         return;
     }
 
     if (paramBadValue) {
-        if (maybeIntParam) {
+        if (!param.isFloat) {
             mContext->ErrorInvalidValue("texParameteri: pname 0x%04x: Invalid param %i"
                                         " (0x%x).",
-                                        pname, intParam, intParam);
+                                        pname, param.i, param.i);
         } else {
             mContext->ErrorInvalidValue("texParameterf: pname 0x%04x: Invalid param %g.",
-                                        pname, floatParam);
+                                        pname, param.f);
         }
         return;
     }
@@ -1010,37 +1018,38 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
     ////////////////
     // Store any needed values
 
+    FloatOrInt clamped = param;
     switch (pname) {
     case LOCAL_GL_TEXTURE_BASE_LEVEL:
-        mBaseMipmapLevel = intParam;
+        mBaseMipmapLevel = clamped.i;
         ClampLevelBaseAndMax();
-        intParam = mBaseMipmapLevel;
+        clamped = FloatOrInt(GLint(mBaseMipmapLevel));
         break;
 
     case LOCAL_GL_TEXTURE_MAX_LEVEL:
-        mMaxMipmapLevel = intParam;
+        mMaxMipmapLevel = clamped.i;
         ClampLevelBaseAndMax();
-        intParam = mMaxMipmapLevel;
+        clamped = FloatOrInt(GLint(mMaxMipmapLevel));
         break;
 
     case LOCAL_GL_TEXTURE_MIN_FILTER:
-        mMinFilter = intParam;
+        mMinFilter = clamped.i;
         break;
 
     case LOCAL_GL_TEXTURE_MAG_FILTER:
-        mMagFilter = intParam;
+        mMagFilter = clamped.i;
         break;
 
     case LOCAL_GL_TEXTURE_WRAP_S:
-        mWrapS = intParam;
+        mWrapS = clamped.i;
         break;
 
     case LOCAL_GL_TEXTURE_WRAP_T:
-        mWrapT = intParam;
+        mWrapT = clamped.i;
         break;
 
     case LOCAL_GL_TEXTURE_COMPARE_MODE:
-        mTexCompareMode = intParam;
+        mTexCompareMode = clamped.i;
         break;
 
     // We don't actually need to store the WRAP_R, since it doesn't change texture
@@ -1061,10 +1070,10 @@ WebGLTexture::TexParameter(TexTarget texTarget, GLenum pname, GLint* maybeIntPar
     ////////////////
 
     mContext->MakeContextCurrent();
-    if (maybeIntParam)
-        mContext->gl->fTexParameteri(texTarget.get(), pname, intParam);
+    if (!clamped.isFloat)
+        mContext->gl->fTexParameteri(texTarget.get(), pname, clamped.i);
     else
-        mContext->gl->fTexParameterf(texTarget.get(), pname, floatParam);
+        mContext->gl->fTexParameterf(texTarget.get(), pname, clamped.f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

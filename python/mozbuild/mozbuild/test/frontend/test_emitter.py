@@ -7,8 +7,6 @@ from __future__ import unicode_literals
 import os
 import unittest
 
-from collections import defaultdict
-from buildconfig import topsrcdir
 from mozunit import main
 
 from mozbuild.frontend.context import (
@@ -27,6 +25,7 @@ from mozbuild.frontend.data import (
     GeneratedFile,
     GeneratedSources,
     HostDefines,
+    HostRustLibrary,
     HostRustProgram,
     HostSources,
     IPDLFile,
@@ -36,7 +35,6 @@ from mozbuild.frontend.data import (
     Program,
     RustLibrary,
     RustProgram,
-    SdkFiles,
     SharedLibrary,
     SimpleProgram,
     Sources,
@@ -374,22 +372,6 @@ class TestEmitterBasic(unittest.TestCase):
 
         self.assertEqual(len(objs), 1)
         self.assertIsInstance(objs[0], BrandingFiles)
-
-        files = objs[0].files
-
-        self.assertEqual(files._strings, ['bar.ico', 'baz.png', 'foo.xpm'])
-
-        self.assertIn('icons', files._children)
-        icons = files._children['icons']
-
-        self.assertEqual(icons._strings, ['quux.icns'])
-
-    def test_sdk_files(self):
-        reader = self.reader('sdk-files')
-        objs = self.read_topsrcdir(reader)
-
-        self.assertEqual(len(objs), 1)
-        self.assertIsInstance(objs[0], SdkFiles)
 
         files = objs[0].files
 
@@ -1152,6 +1134,17 @@ class TestEmitterBasic(unittest.TestCase):
         self.assertIsInstance(objs[0], HostRustProgram)
         self.assertEqual(objs[0].name, 'some')
 
+    def test_host_rust_libraries(self):
+        '''Test HOST_RUST_LIBRARIES emission.'''
+        reader = self.reader('host-rust-libraries',
+                             extra_substs=dict(RUST_HOST_TARGET='i686-pc-windows-msvc',
+                                               HOST_BIN_SUFFIX='.exe'))
+        objs = self.read_topsrcdir(reader)
+        self.assertEqual(len(objs), 1)
+        self.assertIsInstance(objs[0], HostRustLibrary)
+        self.assertRegexpMatches(objs[0].lib_name, 'host_lib')
+        self.assertRegexpMatches(objs[0].import_name, 'host_lib')
+
     def test_crate_dependency_path_resolution(self):
         '''Test recursive dependencies resolve with the correct paths.'''
         reader = self.reader('crate-dependency-path-resolution',
@@ -1234,29 +1227,6 @@ class TestEmitterBasic(unittest.TestCase):
         with self.assertRaisesRegexp(SandboxValidationError,
              'Objdir file specified in SYMBOLS_FILE not in GENERATED_FILES:'):
             self.read_topsrcdir(reader)
-
-    def test_allowed_xpcom_glue(self):
-        """Test that the ALLOWED_XPCOM_GLUE list is still relevant."""
-        from mozbuild.frontend.emitter import ALLOWED_XPCOM_GLUE
-
-        allowed = defaultdict(list)
-        useless = []
-        for name, path in ALLOWED_XPCOM_GLUE:
-            allowed[path].append(name)
-
-        for path, names in allowed.iteritems():
-            if path.startswith(('mailnews/', 'calendar/', 'extensions/purple/purplexpcom')):
-                continue
-            try:
-                content = open(os.path.join(topsrcdir, path, 'moz.build')).read()
-            except:
-                content = ''
-            for name in names:
-                if "'%s'" % name in content or '"%s"' % name in content:
-                    continue
-                useless.append((name, path))
-
-        self.assertEqual(useless, [])
 
 
 if __name__ == '__main__':

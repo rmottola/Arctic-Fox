@@ -7,7 +7,6 @@
 #include "pk11pub.h"
 #include "cryptohi.h"
 #include "secerr.h"
-#include "ScopedNSSTypes.h"
 #include "nsNSSComponent.h"
 #include "nsProxyRelease.h"
 
@@ -670,7 +669,7 @@ private:
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
-    ScopedPLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
+    UniquePLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
     if (!arena) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
@@ -681,7 +680,7 @@ private:
     CK_GCM_PARAMS gcmParams;
     switch (mMechanism) {
       case CKM_AES_CBC_PAD:
-        ATTEMPT_BUFFER_TO_SECITEM(arena, &param, mIv);
+        ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &param, mIv);
         break;
       case CKM_AES_CTR:
         ctrParams.ulCounterBits = mCounterLength;
@@ -707,11 +706,12 @@ private:
 
     // Import the key
     SECItem keyItem = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &keyItem, mSymKey);
-    ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &keyItem, mSymKey);
+    UniquePK11SlotInfo slot(PK11_GetInternalSlot());
     MOZ_ASSERT(slot.get());
-    ScopedPK11SymKey symKey(PK11_ImportSymKey(slot, mMechanism, PK11_OriginUnwrap,
-                                              CKA_ENCRYPT, &keyItem, nullptr));
+    UniquePK11SymKey symKey(PK11_ImportSymKey(slot.get(), mMechanism,
+                                              PK11_OriginUnwrap, CKA_ENCRYPT,
+                                              &keyItem, nullptr));
     if (!symKey) {
       return NS_ERROR_DOM_INVALID_ACCESS_ERR;
     }
@@ -815,25 +815,26 @@ private:
       return NS_ERROR_DOM_DATA_ERR;
     }
 
-    ScopedPLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
+    UniquePLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
     if (!arena) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
     // Import the key
     SECItem keyItem = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &keyItem, mSymKey);
-    ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &keyItem, mSymKey);
+    UniquePK11SlotInfo slot(PK11_GetInternalSlot());
     MOZ_ASSERT(slot.get());
-    ScopedPK11SymKey symKey(PK11_ImportSymKey(slot, mMechanism, PK11_OriginUnwrap,
-                                              CKA_WRAP, &keyItem, nullptr));
+    UniquePK11SymKey symKey(PK11_ImportSymKey(slot.get(), mMechanism,
+                                              PK11_OriginUnwrap, CKA_WRAP,
+                                              &keyItem, nullptr));
     if (!symKey) {
       return NS_ERROR_DOM_INVALID_ACCESS_ERR;
     }
 
     // Import the data to a SECItem
     SECItem dataItem = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &dataItem, mData);
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &dataItem, mData);
 
     // Parameters for the fake keys
     CK_MECHANISM_TYPE fakeMechanism = CKM_SHA_1_HMAC;
@@ -841,7 +842,7 @@ private:
 
     if (mEncrypt) {
       // Import the data into a fake PK11SymKey structure
-      ScopedPK11SymKey keyToWrap(PK11_ImportSymKey(slot, fakeMechanism,
+      UniquePK11SymKey keyToWrap(PK11_ImportSymKey(slot.get(), fakeMechanism,
                                                    PK11_OriginUnwrap, fakeOperation,
                                                    &dataItem, nullptr));
       if (!keyToWrap) {
@@ -862,19 +863,19 @@ private:
       // Decrypt the ciphertext into a temporary PK11SymKey
       // Unwrapped key should be 64 bits shorter
       int keySize = mData.Length() - 8;
-      ScopedPK11SymKey unwrappedKey(PK11_UnwrapSymKey(symKey, mMechanism, nullptr,
-                                                 &dataItem, fakeMechanism,
-                                                 fakeOperation, keySize));
+      UniquePK11SymKey unwrappedKey(
+        PK11_UnwrapSymKey(symKey.get(), mMechanism, nullptr, &dataItem,
+                          fakeMechanism, fakeOperation, keySize));
       if (!unwrappedKey) {
         return NS_ERROR_DOM_OPERATION_ERR;
       }
 
       // Export the key to get the cleartext
-      rv = MapSECStatus(PK11_ExtractKeyValue(unwrappedKey));
+      rv = MapSECStatus(PK11_ExtractKeyValue(unwrappedKey.get()));
       if (NS_FAILED(rv)) {
         return NS_ERROR_DOM_UNKNOWN_ERR;
       }
-      ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(unwrappedKey));
+      ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(unwrappedKey.get()));
     }
 
     return rv;
@@ -917,13 +918,13 @@ public:
         mEarlyRv = NS_ERROR_DOM_INVALID_ACCESS_ERR;
         return;
       }
-      mStrength = SECKEY_PublicKeyStrength(mPubKey);
+      mStrength = SECKEY_PublicKeyStrength(mPubKey.get());
     } else {
       if (!mPrivKey) {
         mEarlyRv = NS_ERROR_DOM_INVALID_ACCESS_ERR;
         return;
       }
-      mStrength = PK11_GetPrivateModulusLen(mPrivKey);
+      mStrength = PK11_GetPrivateModulusLen(mPrivKey.get());
     }
 
     // The algorithm could just be given as a string
@@ -957,8 +958,8 @@ public:
 private:
   CK_MECHANISM_TYPE mHashMechanism;
   CK_MECHANISM_TYPE mMgfMechanism;
-  ScopedSECKEYPrivateKey mPrivKey;
-  ScopedSECKEYPublicKey mPubKey;
+  UniqueSECKEYPrivateKey mPrivKey;
+  UniqueSECKEYPublicKey mPubKey;
   CryptoBuffer mLabel;
   uint32_t mStrength;
   bool mEncrypt;
@@ -1067,7 +1068,7 @@ private:
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
-    ScopedPLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
+    UniquePLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
     if (!arena) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
@@ -1075,11 +1076,12 @@ private:
     // Import the key
     uint32_t outLen;
     SECItem keyItem = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &keyItem, mSymKey);
-    ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &keyItem, mSymKey);
+    UniquePK11SlotInfo slot(PK11_GetInternalSlot());
     MOZ_ASSERT(slot.get());
-    ScopedPK11SymKey symKey(PK11_ImportSymKey(slot, mMechanism, PK11_OriginUnwrap,
-                                              CKA_SIGN, &keyItem, nullptr));
+    UniquePK11SymKey symKey(PK11_ImportSymKey(slot.get(), mMechanism,
+                                              PK11_OriginUnwrap, CKA_SIGN,
+                                              &keyItem, nullptr));
     if (!symKey) {
       return NS_ERROR_DOM_INVALID_ACCESS_ERR;
     }
@@ -1231,8 +1233,8 @@ private:
   SECOidTag mOidTag;
   CK_MECHANISM_TYPE mHashMechanism;
   CK_MECHANISM_TYPE mMgfMechanism;
-  ScopedSECKEYPrivateKey mPrivKey;
-  ScopedSECKEYPublicKey mPubKey;
+  UniqueSECKEYPrivateKey mPrivKey;
+  UniqueSECKEYPublicKey mPubKey;
   CryptoBuffer mSignature;
   CryptoBuffer mData;
   uint32_t mSaltLength;
@@ -1246,7 +1248,7 @@ private:
   virtual nsresult DoCrypto() override
   {
     SECStatus rv;
-    ScopedSECItem hash(::SECITEM_AllocItem(nullptr, nullptr,
+    UniqueSECItem hash(::SECITEM_AllocItem(nullptr, nullptr,
                                            HASH_ResultLenByOidTag(mOidTag)));
     if (!hash) {
       return NS_ERROR_DOM_OPERATION_ERR;
@@ -1258,14 +1260,16 @@ private:
 
     // Wrap hash in a digest info template (RSA-PKCS1 only).
     if (mAlgorithm == Algorithm::RSA_PKCS1) {
-      ScopedSGNDigestInfo di(SGN_CreateDigestInfo(mOidTag, hash->data, hash->len));
+      UniqueSGNDigestInfo di(SGN_CreateDigestInfo(mOidTag, hash->data,
+                                                  hash->len));
       if (!di) {
         return NS_ERROR_DOM_OPERATION_ERR;
       }
 
       // Reuse |hash|.
-      SECITEM_FreeItem(hash, false);
-      if (!SEC_ASN1EncodeItem(nullptr, hash, di, SGN_DigestInfoTemplate)) {
+      SECITEM_FreeItem(hash.get(), false);
+      if (!SEC_ASN1EncodeItem(nullptr, hash.get(), di.get(),
+                              SGN_DigestInfoTemplate)) {
         return NS_ERROR_DOM_OPERATION_ERR;
       }
     }
@@ -1291,25 +1295,27 @@ private:
     }
 
     // Allocate SECItem to hold the signature.
-    uint32_t len = mSign ? PK11_SignatureLen(mPrivKey) : 0;
-    ScopedSECItem sig(::SECITEM_AllocItem(nullptr, nullptr, len));
+    uint32_t len = mSign ? PK11_SignatureLen(mPrivKey.get()) : 0;
+    UniqueSECItem sig(::SECITEM_AllocItem(nullptr, nullptr, len));
     if (!sig) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
     if (mSign) {
       // Sign the hash.
-      rv = PK11_SignWithMechanism(mPrivKey, mech, params, sig, hash);
+      rv = PK11_SignWithMechanism(mPrivKey.get(), mech, params, sig.get(),
+                                  hash.get());
       NS_ENSURE_SUCCESS(MapSECStatus(rv), NS_ERROR_DOM_OPERATION_ERR);
-      ATTEMPT_BUFFER_ASSIGN(mSignature, sig);
+      ATTEMPT_BUFFER_ASSIGN(mSignature, sig.get());
     } else {
       // Copy the given signature to the SECItem.
-      if (!mSignature.ToSECItem(nullptr, sig)) {
+      if (!mSignature.ToSECItem(nullptr, sig.get())) {
         return NS_ERROR_DOM_OPERATION_ERR;
       }
 
       // Verify the signature.
-      rv = PK11_VerifyWithMechanism(mPubKey, mech, params, sig, hash, nullptr);
+      rv = PK11_VerifyWithMechanism(mPubKey.get(), mech, params, sig.get(),
+                                    hash.get(), nullptr);
       mVerified = NS_SUCCEEDED(MapSECStatus(rv));
     }
 
@@ -1772,16 +1778,18 @@ private:
     nsNSSShutDownPreventionLock locker;
 
     // Import the key data itself
-    ScopedSECKEYPublicKey pubKey;
-    ScopedSECKEYPrivateKey privKey;
+    UniqueSECKEYPublicKey pubKey;
+    UniqueSECKEYPrivateKey privKey;
     if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI) ||
         (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_JWK) &&
          !mJwk.mD.WasPassed())) {
       // Public key import
       if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI)) {
-        pubKey = CryptoKey::PublicKeyFromSpki(mKeyData, locker);
+        pubKey = UniqueSECKEYPublicKey(
+          CryptoKey::PublicKeyFromSpki(mKeyData, locker));
       } else {
-        pubKey = CryptoKey::PublicKeyFromJwk(mJwk, locker);
+        pubKey = UniqueSECKEYPublicKey(
+          CryptoKey::PublicKeyFromJwk(mJwk, locker));
       }
 
       if (!pubKey) {
@@ -1798,9 +1806,11 @@ private:
          mJwk.mD.WasPassed())) {
       // Private key import
       if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_PKCS8)) {
-        privKey = CryptoKey::PrivateKeyFromPkcs8(mKeyData, locker);
+        privKey = UniqueSECKEYPrivateKey(
+          CryptoKey::PrivateKeyFromPkcs8(mKeyData, locker));
       } else {
-        privKey = CryptoKey::PrivateKeyFromJwk(mJwk, locker);
+        privKey = UniqueSECKEYPrivateKey(
+          CryptoKey::PrivateKeyFromJwk(mJwk, locker));
       }
 
       if (!privKey) {
@@ -1812,7 +1822,7 @@ private:
       }
 
       mKey->SetType(CryptoKey::PRIVATE);
-      pubKey = SECKEY_ConvertToPublicKey(privKey.get());
+      pubKey = UniqueSECKEYPublicKey(SECKEY_ConvertToPublicKey(privKey.get()));
       if (!pubKey) {
         return NS_ERROR_DOM_UNKNOWN_ERR;
       }
@@ -1918,13 +1928,14 @@ private:
   virtual nsresult DoCrypto() override
   {
     // Import the key data itself
-    ScopedSECKEYPublicKey pubKey;
-    ScopedSECKEYPrivateKey privKey;
+    UniqueSECKEYPublicKey pubKey;
+    UniqueSECKEYPrivateKey privKey;
 
     nsNSSShutDownPreventionLock locker;
     if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_JWK) && mJwk.mD.WasPassed()) {
       // Private key import
-      privKey = CryptoKey::PrivateKeyFromJwk(mJwk, locker);
+      privKey = UniqueSECKEYPrivateKey(
+        CryptoKey::PrivateKeyFromJwk(mJwk, locker));
       if (!privKey) {
         return NS_ERROR_DOM_DATA_ERR;
       }
@@ -1940,11 +1951,14 @@ private:
                 !mJwk.mD.WasPassed())) {
       // Public key import
       if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_RAW)) {
-        pubKey = CryptoKey::PublicECKeyFromRaw(mKeyData, mNamedCurve, locker);
+        pubKey = UniqueSECKEYPublicKey(
+          CryptoKey::PublicECKeyFromRaw(mKeyData, mNamedCurve, locker));
       } else if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI)) {
-        pubKey = CryptoKey::PublicKeyFromSpki(mKeyData, locker);
+        pubKey = UniqueSECKEYPublicKey(
+          CryptoKey::PublicKeyFromSpki(mKeyData, locker));
       } else if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_JWK)) {
-        pubKey = CryptoKey::PublicKeyFromJwk(mJwk, locker);
+        pubKey = UniqueSECKEYPublicKey(
+          CryptoKey::PublicKeyFromJwk(mJwk, locker));
       } else {
         MOZ_ASSERT(false);
       }
@@ -2071,16 +2085,18 @@ private:
   virtual nsresult DoCrypto() override
   {
     // Import the key data itself
-    ScopedSECKEYPublicKey pubKey;
+    UniqueSECKEYPublicKey pubKey;
 
     nsNSSShutDownPreventionLock locker;
     if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_RAW) ||
         mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI)) {
       // Public key import
       if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_RAW)) {
-        pubKey = CryptoKey::PublicDhKeyFromRaw(mKeyData, mPrime, mGenerator, locker);
+        pubKey = UniqueSECKEYPublicKey(
+          CryptoKey::PublicDhKeyFromRaw(mKeyData, mPrime, mGenerator, locker));
       } else if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_SPKI)) {
-        pubKey = CryptoKey::PublicKeyFromSpki(mKeyData, locker);
+        pubKey = UniqueSECKEYPublicKey(
+          CryptoKey::PublicKeyFromSpki(mKeyData, locker));
       } else {
         MOZ_ASSERT(false);
       }
@@ -2139,8 +2155,8 @@ public:
 protected:
   nsString mFormat;
   CryptoBuffer mSymKey;
-  ScopedSECKEYPrivateKey mPrivateKey;
-  ScopedSECKEYPublicKey mPublicKey;
+  UniqueSECKEYPrivateKey mPrivateKey;
+  UniqueSECKEYPublicKey mPublicKey;
   CryptoKey::KeyType mKeyType;
   bool mExtractable;
   nsString mAlg;
@@ -2151,8 +2167,8 @@ protected:
 private:
   virtual void ReleaseNSSResources() override
   {
-    mPrivateKey.dispose();
-    mPublicKey.dispose();
+    mPrivateKey = nullptr;
+    mPublicKey = nullptr;
   }
 
   virtual nsresult DoCrypto() override
@@ -2161,7 +2177,8 @@ private:
 
     if (mFormat.EqualsLiteral(WEBCRYPTO_KEY_FORMAT_RAW)) {
       if (mPublicKey && mPublicKey->keyType == dhKey) {
-        nsresult rv = CryptoKey::PublicDhKeyToRaw(mPublicKey, mResult, locker);
+        nsresult rv = CryptoKey::PublicDhKeyToRaw(mPublicKey.get(), mResult,
+                                                  locker);
         if (NS_FAILED(rv)) {
           return NS_ERROR_DOM_OPERATION_ERR;
         }
@@ -2169,7 +2186,8 @@ private:
       }
 
       if (mPublicKey && mPublicKey->keyType == ecKey) {
-        nsresult rv = CryptoKey::PublicECKeyToRaw(mPublicKey, mResult, locker);
+        nsresult rv = CryptoKey::PublicECKeyToRaw(mPublicKey.get(), mResult,
+                                                  locker);
         if (NS_FAILED(rv)) {
           return NS_ERROR_DOM_OPERATION_ERR;
         }
@@ -2218,7 +2236,7 @@ private:
           return NS_ERROR_DOM_UNKNOWN_ERR;
         }
 
-        nsresult rv = CryptoKey::PublicKeyToJwk(mPublicKey, mJwk, locker);
+        nsresult rv = CryptoKey::PublicKeyToJwk(mPublicKey.get(), mJwk, locker);
         if (NS_FAILED(rv)) {
           return NS_ERROR_DOM_OPERATION_ERR;
         }
@@ -2227,7 +2245,8 @@ private:
           return NS_ERROR_DOM_UNKNOWN_ERR;
         }
 
-        nsresult rv = CryptoKey::PrivateKeyToJwk(mPrivateKey, mJwk, locker);
+        nsresult rv = CryptoKey::PrivateKeyToJwk(mPrivateKey.get(), mJwk,
+                                                 locker);
         if (NS_FAILED(rv)) {
           return NS_ERROR_DOM_OPERATION_ERR;
         }
@@ -2352,16 +2371,16 @@ private:
 
   virtual nsresult DoCrypto() override
   {
-    ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+    UniquePK11SlotInfo slot(PK11_GetInternalSlot());
     MOZ_ASSERT(slot.get());
 
-    ScopedPK11SymKey symKey(PK11_KeyGen(slot.get(), mMechanism, nullptr,
+    UniquePK11SymKey symKey(PK11_KeyGen(slot.get(), mMechanism, nullptr,
                                         mLength, nullptr));
     if (!symKey) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
 
-    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey));
+    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey.get()));
     if (NS_FAILED(rv)) {
       return NS_ERROR_DOM_UNKNOWN_ERR;
     }
@@ -2369,7 +2388,7 @@ private:
     // This doesn't leak, because the SECItem* returned by PK11_GetKeyData
     // just refers to a buffer managed by symKey.  The assignment copies the
     // data, so mKeyData manages one copy, while symKey manages another.
-    ATTEMPT_BUFFER_ASSIGN(mKeyData, PK11_GetKeyData(symKey));
+    ATTEMPT_BUFFER_ASSIGN(mKeyData, PK11_GetKeyData(symKey.get()));
     return NS_OK;
   }
 
@@ -2393,7 +2412,7 @@ GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
     bool aExtractable, const Sequence<nsString>& aKeyUsages)
   : mKeyPair(new CryptoKeyPair())
 {
-  mArena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
+  mArena = UniquePLArenaPool(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
   if (!mArena) {
     mEarlyRv = NS_ERROR_DOM_UNKNOWN_ERR;
     return;
@@ -2490,8 +2509,8 @@ GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
     ATTEMPT_BUFFER_INIT(generator, params.mGenerator);
 
     // Set up params.
-    if (!prime.ToSECItem(mArena, &mDhParams.prime) ||
-        !generator.ToSECItem(mArena, &mDhParams.base)) {
+    if (!prime.ToSECItem(mArena.get(), &mDhParams.prime) ||
+        !generator.ToSECItem(mArena.get(), &mDhParams.base)) {
       mEarlyRv = NS_ERROR_DOM_UNKNOWN_ERR;
       return;
     }
@@ -2565,8 +2584,8 @@ GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
 void
 GenerateAsymmetricKeyTask::ReleaseNSSResources()
 {
-  mPublicKey.dispose();
-  mPrivateKey.dispose();
+  mPublicKey = nullptr;
+  mPrivateKey = nullptr;
 }
 
 nsresult
@@ -2574,7 +2593,7 @@ GenerateAsymmetricKeyTask::DoCrypto()
 {
   MOZ_ASSERT(mKeyPair);
 
-  ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+  UniquePK11SlotInfo slot(PK11_GetInternalSlot());
   MOZ_ASSERT(slot.get());
 
   void* param;
@@ -2586,7 +2605,7 @@ GenerateAsymmetricKeyTask::DoCrypto()
       param = &mDhParams;
       break;
     case CKM_EC_KEY_PAIR_GEN: {
-      param = CreateECParamsForCurve(mNamedCurve, mArena);
+      param = CreateECParamsForCurve(mNamedCurve, mArena.get());
       if (!param) {
         return NS_ERROR_DOM_UNKNOWN_ERR;
       }
@@ -2597,22 +2616,24 @@ GenerateAsymmetricKeyTask::DoCrypto()
   }
 
   SECKEYPublicKey* pubKey = nullptr;
-  mPrivateKey = PK11_GenerateKeyPair(slot.get(), mMechanism, param, &pubKey,
-                                     PR_FALSE, PR_FALSE, nullptr);
-  mPublicKey = pubKey;
+  mPrivateKey = UniqueSECKEYPrivateKey(
+    PK11_GenerateKeyPair(slot.get(), mMechanism, param, &pubKey, PR_FALSE,
+                         PR_FALSE, nullptr));
+  mPublicKey = UniqueSECKEYPublicKey(pubKey);
+  pubKey = nullptr;
   if (!mPrivateKey.get() || !mPublicKey.get()) {
     return NS_ERROR_DOM_UNKNOWN_ERR;
   }
 
-  nsresult rv = mKeyPair->mPrivateKey.get()->SetPrivateKey(mPrivateKey);
+  nsresult rv = mKeyPair->mPrivateKey.get()->SetPrivateKey(mPrivateKey.get());
   NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
-  rv = mKeyPair->mPublicKey.get()->SetPublicKey(mPublicKey);
+  rv = mKeyPair->mPublicKey.get()->SetPublicKey(mPublicKey.get());
   NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
 
   // PK11_GenerateKeyPair() does not set a CKA_EC_POINT attribute on the
   // private key, we need this later when exporting to PKCS8 and JWK though.
   if (mMechanism == CKM_EC_KEY_PAIR_GEN) {
-    rv = mKeyPair->mPrivateKey->AddPublicKeyData(mPublicKey);
+    rv = mKeyPair->mPrivateKey->AddPublicKeyData(mPublicKey.get());
     NS_ENSURE_SUCCESS(rv, NS_ERROR_DOM_OPERATION_ERR);
   }
 
@@ -2712,21 +2733,21 @@ private:
 
   virtual nsresult DoCrypto() override
   {
-    ScopedPLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
+    UniquePLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
     if (!arena) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
     // Import the key
     SECItem keyItem = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &keyItem, mSymKey);
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &keyItem, mSymKey);
 
-    ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+    UniquePK11SlotInfo slot(PK11_GetInternalSlot());
     if (!slot.get()) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
-    ScopedPK11SymKey baseKey(PK11_ImportSymKey(slot, mMechanism,
+    UniquePK11SymKey baseKey(PK11_ImportSymKey(slot.get(), mMechanism,
                                                PK11_OriginUnwrap, CKA_WRAP,
                                                &keyItem, nullptr));
     if (!baseKey) {
@@ -2735,8 +2756,8 @@ private:
 
     SECItem salt = { siBuffer, nullptr, 0 };
     SECItem info = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &salt, mSalt);
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &info, mInfo);
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &salt, mSalt);
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &info, mInfo);
 
     CK_NSS_HKDFParams hkdfParams = { true, salt.data, salt.len,
                                      true, info.data, info.len };
@@ -2745,7 +2766,7 @@ private:
 
     // CKM_SHA512_HMAC and CKA_SIGN are key type and usage attributes of the
     // derived symmetric key and don't matter because we ignore them anyway.
-    ScopedPK11SymKey symKey(PK11_Derive(baseKey, mMechanism, &params,
+    UniquePK11SymKey symKey(PK11_Derive(baseKey.get(), mMechanism, &params,
                                         CKM_SHA512_HMAC, CKA_SIGN,
                                         mLengthInBytes));
 
@@ -2753,7 +2774,7 @@ private:
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
-    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey));
+    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey.get()));
     if (NS_FAILED(rv)) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
@@ -2761,7 +2782,7 @@ private:
     // This doesn't leak, because the SECItem* returned by PK11_GetKeyData
     // just refers to a buffer managed by symKey. The assignment copies the
     // data, so mResult manages one copy, while symKey manages another.
-    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey));
+    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey.get()));
 
     if (mLengthInBytes > mResult.Length()) {
       return NS_ERROR_DOM_DATA_ERR;
@@ -2860,13 +2881,13 @@ private:
 
   virtual nsresult DoCrypto() override
   {
-    ScopedPLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
+    UniquePLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
     if (!arena) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
     SECItem salt = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &salt, mSalt);
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &salt, mSalt);
     // PK11_CreatePBEV2AlgorithmID will "helpfully" create PBKDF2 parameters
     // with a random salt if given a SECItem* that is either null or has a null
     // data pointer. This obviously isn't what we want, so we have to fake it
@@ -2874,7 +2895,8 @@ private:
     // length.
     if (!salt.data) {
       MOZ_ASSERT(salt.len == 0);
-      salt.data = reinterpret_cast<unsigned char*>(PORT_ArenaAlloc(arena, 1));
+      salt.data =
+        reinterpret_cast<unsigned char*>(PORT_ArenaAlloc(arena.get(), 1));
       if (!salt.data) {
         return NS_ERROR_DOM_UNKNOWN_ERR;
       }
@@ -2884,28 +2906,29 @@ private:
     // parameter is unused for key generation. It is currently only used
     // for PBKDF2 authentication or key (un)wrapping when specifying an
     // encryption algorithm (PBES2).
-    ScopedSECAlgorithmID alg_id(PK11_CreatePBEV2AlgorithmID(
+    UniqueSECAlgorithmID algID(PK11_CreatePBEV2AlgorithmID(
       SEC_OID_PKCS5_PBKDF2, SEC_OID_HMAC_SHA1, mHashOidTag,
       mLength, mIterations, &salt));
 
-    if (!alg_id.get()) {
+    if (!algID) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
-    ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
+    UniquePK11SlotInfo slot(PK11_GetInternalSlot());
     if (!slot.get()) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
     SECItem keyItem = { siBuffer, nullptr, 0 };
-    ATTEMPT_BUFFER_TO_SECITEM(arena, &keyItem, mSymKey);
+    ATTEMPT_BUFFER_TO_SECITEM(arena.get(), &keyItem, mSymKey);
 
-    ScopedPK11SymKey symKey(PK11_PBEKeyGen(slot, alg_id, &keyItem, false, nullptr));
+    UniquePK11SymKey symKey(PK11_PBEKeyGen(slot.get(), algID.get(), &keyItem,
+                                           false, nullptr));
     if (!symKey.get()) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
-    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey));
+    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey.get()));
     if (NS_FAILED(rv)) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
@@ -2913,7 +2936,7 @@ private:
     // This doesn't leak, because the SECItem* returned by PK11_GetKeyData
     // just refers to a buffer managed by symKey. The assignment copies the
     // data, so mResult manages one copy, while symKey manages another.
-    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey));
+    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey.get()));
     return NS_OK;
   }
 };
@@ -3007,7 +3030,7 @@ public:
     }
 
     CryptoKey* publicKey = params.mPublic;
-    mPubKey = publicKey->GetPublicKey();
+    mPubKey = UniqueSECKEYPublicKey(publicKey->GetPublicKey());
     if (!mPubKey) {
       mEarlyRv = NS_ERROR_DOM_INVALID_ACCESS_ERR;
       return;
@@ -3027,22 +3050,23 @@ public:
 
 private:
   size_t mLength;
-  ScopedSECKEYPrivateKey mPrivKey;
-  ScopedSECKEYPublicKey mPubKey;
+  UniqueSECKEYPrivateKey mPrivKey;
+  UniqueSECKEYPublicKey mPubKey;
 
   virtual nsresult DoCrypto() override
   {
     // CKM_SHA512_HMAC and CKA_SIGN are key type and usage attributes of the
     // derived symmetric key and don't matter because we ignore them anyway.
-    ScopedPK11SymKey symKey(PK11_PubDeriveWithKDF(
-      mPrivKey, mPubKey, PR_FALSE, nullptr, nullptr, CKM_ECDH1_DERIVE,
-      CKM_SHA512_HMAC, CKA_SIGN, 0, CKD_NULL, nullptr, nullptr));
+    UniquePK11SymKey symKey(PK11_PubDeriveWithKDF(
+      mPrivKey.get(), mPubKey.get(), PR_FALSE, nullptr, nullptr,
+      CKM_ECDH1_DERIVE, CKM_SHA512_HMAC, CKA_SIGN, 0, CKD_NULL, nullptr,
+      nullptr));
 
     if (!symKey.get()) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
-    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey));
+    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey.get()));
     if (NS_FAILED(rv)) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
@@ -3050,7 +3074,7 @@ private:
     // This doesn't leak, because the SECItem* returned by PK11_GetKeyData
     // just refers to a buffer managed by symKey. The assignment copies the
     // data, so mResult manages one copy, while symKey manages another.
-    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey));
+    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey.get()));
 
     if (mLength > mResult.Length()) {
       return NS_ERROR_DOM_DATA_ERR;
@@ -3106,7 +3130,7 @@ public:
     }
 
     CryptoKey* publicKey = params.mPublic;
-    mPubKey = publicKey->GetPublicKey();
+    mPubKey = UniqueSECKEYPublicKey(publicKey->GetPublicKey());
     if (!mPubKey) {
       mEarlyRv = NS_ERROR_DOM_INVALID_ACCESS_ERR;
       return;
@@ -3126,22 +3150,23 @@ public:
 
 private:
   size_t mLength;
-  ScopedSECKEYPrivateKey mPrivKey;
-  ScopedSECKEYPublicKey mPubKey;
+  UniqueSECKEYPrivateKey mPrivKey;
+  UniqueSECKEYPublicKey mPubKey;
 
   virtual nsresult DoCrypto() override
   {
     // CKM_SHA512_HMAC and CKA_SIGN are key type and usage attributes of the
     // derived symmetric key and don't matter because we ignore them anyway.
-    ScopedPK11SymKey symKey(PK11_PubDeriveWithKDF(
-      mPrivKey, mPubKey, PR_FALSE, nullptr, nullptr, CKM_DH_PKCS_DERIVE,
-      CKM_SHA512_HMAC, CKA_SIGN, 0, CKD_NULL, nullptr, nullptr));
+    UniquePK11SymKey symKey(PK11_PubDeriveWithKDF(
+      mPrivKey.get(), mPubKey.get(), PR_FALSE, nullptr, nullptr,
+      CKM_DH_PKCS_DERIVE, CKM_SHA512_HMAC, CKA_SIGN, 0, CKD_NULL, nullptr,
+      nullptr));
 
     if (!symKey.get()) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
 
-    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey));
+    nsresult rv = MapSECStatus(PK11_ExtractKeyValue(symKey.get()));
     if (NS_FAILED(rv)) {
       return NS_ERROR_DOM_OPERATION_ERR;
     }
@@ -3149,7 +3174,7 @@ private:
     // This doesn't leak, because the SECItem* returned by PK11_GetKeyData
     // just refers to a buffer managed by symKey. The assignment copies the
     // data, so mResult manages one copy, while symKey manages another.
-    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey));
+    ATTEMPT_BUFFER_ASSIGN(mResult, PK11_GetKeyData(symKey.get()));
 
     if (mLength > mResult.Length()) {
       return NS_ERROR_DOM_DATA_ERR;

@@ -13,8 +13,9 @@
 <pre id="test">
 <script class="testbody" type="text/javascript">
 
-const videoWidth = 320;
-const videoHeight = 240;
+const videoBorderWidth = 1;
+const videoWidth = 320 + videoBorderWidth * 2;
+const videoHeight = 240 + videoBorderWidth * 2;
 
 function getMediaElement(aWindow) {
   return aWindow.document.getElementsByTagName("video")[0];

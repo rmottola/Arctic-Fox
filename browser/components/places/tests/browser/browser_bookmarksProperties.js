@@ -465,7 +465,7 @@ gTests.push({
         self._cleanShutdown = true;
         self.window.document.documentElement.cancelDialog();
       });
-    }, false);
+    });
     foldersExpander.doCommand();
   },
 

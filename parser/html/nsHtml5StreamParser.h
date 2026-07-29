@@ -108,7 +108,6 @@ class nsHtml5StreamParser : public nsICharsetDetectionObserver {
   friend class nsHtml5TimerKungFu;
 
   public:
-    NS_DECL_AND_IMPL_ZEROING_OPERATOR_NEW
     NS_DECL_CYCLE_COLLECTING_ISUPPORTS
     NS_DECL_CYCLE_COLLECTION_CLASS_AMBIGUOUS(nsHtml5StreamParser,
                                              nsICharsetDetectionObserver)
@@ -145,7 +144,7 @@ class nsHtml5StreamParser : public nsICharsetDetectionObserver {
     /**
      * Tree builder uses this to report a late <meta charset>
      */
-    bool internalEncodingDeclaration(nsString* aEncoding);
+    bool internalEncodingDeclaration(nsHtml5String aEncoding);
 
     // Not from an external interface
 

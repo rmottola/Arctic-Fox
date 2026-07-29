@@ -162,7 +162,7 @@
         if (allowOverride) {
           document.getElementById("overrideWeakCryptoPanel").style.display = "flex";
           var overrideLink = document.getElementById("overrideWeakCrypto");
-          overrideLink.addEventListener("click", () => doOverride(overrideLink), false);
+          overrideLink.addEventListener("click", () => doOverride(overrideLink));
         }
       }
 
@@ -342,7 +342,7 @@
                   var event = new CustomEvent("AboutNetErrorSetAutomatic",
                     {bubbles:true, detail:evt.target.checked});
                   document.dispatchEvent(event);
-                }, false);
+                });
             }
             const hasPrefStyleError = [
               "interrupted", // This happens with subresources that are above the max tls
@@ -439,7 +439,7 @@
               if (toggleDisplay(div) == "block") {
                 div.scrollIntoView({block: "start", behavior: "smooth"});
               }
-            }, false);
+            });
           }
         }
 
@@ -631,7 +631,7 @@
       <!-- UI for option to report certificate errors to Mozilla. Removed on
            init for other error types .-->
       <div id="certificateErrorReporting">
-        <p>
+        <p class="toggle-container-with-text">
           <input type="checkbox" id="automaticallyReportInFuture" />
           <label for="automaticallyReportInFuture" id="automaticallyReportInFuture">&errorReporting.automatic2;</label>
         </p>

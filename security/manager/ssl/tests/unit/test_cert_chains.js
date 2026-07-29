@@ -51,7 +51,7 @@ function test_bad_cert_list_serialization() {
 
 
 function test_cert_list_serialization() {
-  let certList = build_cert_chain(['default-ee', 'expired-ee']);
+  let certList = build_cert_chain(["default-ee", "expired-ee"]);
 
   throws(() => certList.addCert(null), /NS_ERROR_ILLEGAL_VALUE/,
          "trying to add a null cert to an nsIX509CertList should throw");

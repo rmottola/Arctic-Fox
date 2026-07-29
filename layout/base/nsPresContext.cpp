@@ -77,6 +77,7 @@
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
 #include "mozilla/ServoRestyleManagerInlines.h"
+#include "mozilla/Telemetry.h"
 
 #if defined(MOZ_WIDGET_GTK)
 #include "gfxPlatformGtk.h" // xxx - for UseFcFontList
@@ -201,21 +202,98 @@ IsVisualCharset(const nsCString& aCharset)
   }
 }
 
-  // NOTE! nsPresContext::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
-
 nsPresContext::nsPresContext(nsIDocument* aDocument, nsPresContextType aType)
-  : mType(aType), mDocument(aDocument), mBaseMinFontSize(0),
-    mTextZoom(1.0), mFullZoom(1.0), mOverrideDPPX(0.0),
+  : mType(aType),
+    mShell(nullptr),
+    mDocument(aDocument),
+    mMedium(nullptr),
+    mLinkHandler(nullptr),
+    mInflationDisabledForShrinkWrap(false),
+    mBaseMinFontSize(0),
+    mTextZoom(1.0),
+    mFullZoom(1.0),
+    mOverrideDPPX(0.0),
     mLastFontInflationScreenSize(gfxSize(-1.0, -1.0)),
-    mPageSize(-1, -1), mPPScale(1.0f),
+    mCurAppUnitsPerDevPixel(0),
+    mAutoQualityMinFontSizePixelsPref(0),
+    mPageSize(-1, -1),
+    mPageScale(0.0),
+    mPPScale(1.0f),
+    mDefaultColor(NS_RGBA(0,0,0,0)),
+    mBackgroundColor(NS_RGBA(0,0,0,0)),
+    mLinkColor(NS_RGBA(0,0,0,0)),
+    mActiveLinkColor(NS_RGBA(0,0,0,0)),
+    mVisitedLinkColor(NS_RGBA(0,0,0,0)),
+    mFocusBackgroundColor(NS_RGBA(0,0,0,0)),
+    mFocusTextColor(NS_RGBA(0,0,0,0)),
+    mBodyTextColor(NS_RGBA(0,0,0,0)),
     mViewportStyleScrollbar(NS_STYLE_OVERFLOW_AUTO, NS_STYLE_OVERFLOW_AUTO),
+    mFocusRingWidth(0),
+    mExistThrottledUpdates(false),
+    mImageAnimationMode(0),
     mImageAnimationModePref(imgIContainer::kNormalAnimMode),
+    mInterruptChecksToSkip(0),
+    mElementsRestyled(0),
+    mFramesConstructed(0),
+    mFramesReflowed(0),
+    mInteractionTimeEnabled(false),
+    mHasPendingInterrupt(false),
+    mPendingInterruptFromTest(false),
+    mInterruptsEnabled(false),
+    mUseDocumentFonts(false),
+    mUseDocumentColors(false),
+    mUnderlineLinks(false),
+    mSendAfterPaintToContent(false),
+    mUseFocusColors(false),
+    mFocusRingOnAnything(false),
+    mFocusRingStyle(false),
+    mDrawImageBackground(false),
+    mDrawColorBackground(false),
+    mNeverAnimate(false),
+    mIsRenderingOnlySelection(false),
+    mPaginated(false),
+    mCanPaginatedScroll(false),
+    mDoScaledTwips(false),
+    mIsRootPaginatedDocument(false),
+    mPrefBidiDirection(false),
+    mPrefScrollbarSide(0),
+    mPendingSysColorChanged(false),
+    mPendingThemeChanged(false),
+    mPendingUIResolutionChanged(false),
+    mPendingMediaFeatureValuesChanged(false),
+    mPrefChangePendingNeedsReflow(false),
+    mIsEmulatingMedia(false),
     mAllInvalidated(false),
-    mPaintFlashing(false), mPaintFlashingInitialized(false)
+    mIsGlyph(false),
+    mUsesRootEMUnits(false),
+    mUsesExChUnits(false),
+    mUsesViewportUnits(false),
+    mPendingViewportChange(false),
+    mCounterStylesDirty(false),
+    mPostedFlushCounterStyles(false),
+    mSuppressResizeReflow(false),
+    mIsVisual(false),
+    mFireAfterPaintEvents(false),
+    mIsChrome(false),
+    mIsChromeOriginImage(false),
+    mPaintFlashing(false),
+    mPaintFlashingInitialized(false),
+    mHasWarnedAboutPositionedTableParts(false),
+    mHasWarnedAboutTooLargeDashedOrDottedRadius(false),
+    mQuirkSheetAdded(false),
+    mNeedsPrefUpdate(false),
+    mHadNonBlankPaint(false)
+#ifdef RESTYLE_LOGGING
+    , mRestyleLoggingEnabled(false)
+#endif
+#ifdef DEBUG
+    , mInitialized(false)
+#endif
 {
-  // NOTE! nsPresContext::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
+  PodZero(&mBorderWidthTable);
+#ifdef DEBUG
+  PodZero(&mLayoutPhaseCount);
+#endif
 
   mDoScaledTwips = true;
 
@@ -259,6 +337,8 @@ nsPresContext::nsPresContext(nsIDocument* aDocument, nsPresContextType aType)
   NS_ASSERTION(mDocument, "Null document");
 
   mCounterStylesDirty = true;
+
+  mInteractionTimeEnabled = true;
 
   // if text perf logging enabled, init stats struct
   if (MOZ_LOG_TEST(gfxPlatform::GetLog(eGfxLog_textperf), LogLevel::Warning)) {
@@ -1583,6 +1663,71 @@ nsPresContext::IsTopLevelWindowInactive()
   return domWindow && !domWindow->IsActive();
 }
 
+void
+nsPresContext::RecordInteractionTime(InteractionType aType)
+{
+  if (!mInteractionTimeEnabled) {
+    return;
+  }
+
+  // Array of references to the member variable of each time stamp
+  // for the different interaction types, keyed by InteractionType.
+  TimeStamp nsPresContext::*interactionTimes[] = {
+    &nsPresContext::mFirstClickTime,
+    &nsPresContext::mFirstKeyTime,
+    &nsPresContext::mFirstMouseMoveTime,
+    &nsPresContext::mFirstScrollTime
+  };
+
+  // Array of histogram IDs for the different interaction types,
+  // keyed by InteractionType.
+  Telemetry::ID histogramIds[] = {
+    Telemetry::TIME_TO_FIRST_CLICK,
+    Telemetry::TIME_TO_FIRST_KEY_INPUT,
+    Telemetry::TIME_TO_FIRST_MOUSE_MOVE,
+    Telemetry::TIME_TO_FIRST_SCROLL
+  };
+
+  TimeStamp& interactionTime = this->*(
+    interactionTimes[static_cast<uint32_t>(aType)]);
+  if (!interactionTime.IsNull()) {
+    // We have already recorded an interaction time.
+    return;
+  }
+
+  // Record the interaction time if it occurs after the first paint
+  // of the top level content document.
+  nsPresContext* topContentPresContext =
+    GetToplevelContentDocumentPresContext();
+
+  if (!topContentPresContext) {
+    // There is no top content pres context so we don't care
+    // about the interaction time. Record a value anyways to avoid
+    // trying to find the top content pres context in future interactions.
+    interactionTime = TimeStamp::Now();
+    return;
+  }
+
+  if (topContentPresContext->mFirstPaintTime.IsNull()) {
+    // Top content pres context has not painted yet, so don't record
+    // interaction time.
+    return;
+  }
+
+  interactionTime = TimeStamp::Now();
+  // Only the top level content pres context reports first interaction
+  // time to telemetry (if it hasn't already done so).
+  if (this == topContentPresContext) {
+    if (Telemetry::CanRecordExtended()) {
+       double millis = (interactionTime - mFirstPaintTime).ToMilliseconds();
+       Telemetry::Accumulate(histogramIds[static_cast<uint32_t>(aType)],
+                             millis);
+    }
+  } else {
+    topContentPresContext->RecordInteractionTime(aType);
+  }
+}
+
 nsITheme*
 nsPresContext::GetTheme()
 {
@@ -2474,6 +2619,10 @@ nsPresContext::NotifyDidPaintForSubtree(uint32_t aFlags, uint64_t aTransactionId
       new DelayedFireDOMPaintEvent(this, &mUndeliveredInvalidateRequestsBeforeLastPaint,
                                    aTransactionId);
     nsContentUtils::AddScriptRunner(ev);
+
+    if (mFirstPaintTime.IsNull()) {
+      mFirstPaintTime = TimeStamp::Now();
+    }
   }
 
   NotifyDidPaintSubdocumentCallbackClosure closure = { aFlags, aTransactionId, false };

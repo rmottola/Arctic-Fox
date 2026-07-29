@@ -716,7 +716,8 @@ public:
   static const KTableEntry kBackfaceVisibilityKTable[];
   static const KTableEntry kTransformStyleKTable[];
   static const KTableEntry kImageLayerAttachmentKTable[];
-  static const KTableEntry kImageLayerOriginKTable[];
+  static const KTableEntry kBackgroundOriginKTable[];
+  static const KTableEntry kMaskOriginKTable[];
   static const KTableEntry kImageLayerPositionKTable[];
   static const KTableEntry kImageLayerRepeatKTable[];
   static const KTableEntry kImageLayerRepeatPartKTable[];
@@ -726,6 +727,7 @@ public:
   // Not const because we modify its entries when the pref
   // "layout.css.background-clip.text" changes:
   static KTableEntry kBackgroundClipKTable[];
+  static const KTableEntry kMaskClipKTable[];
   static const KTableEntry kBlendModeKTable[];
   static const KTableEntry kBorderCollapseKTable[];
   static const KTableEntry kBorderImageRepeatKTable[];

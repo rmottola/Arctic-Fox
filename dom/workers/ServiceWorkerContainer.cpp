@@ -193,8 +193,9 @@ ServiceWorkerContainer::Register(const nsAString& aScriptURL,
     rv = NS_NewURI(getter_AddRefs(scopeURI), aOptions.mScope.Value(),
                    nullptr, baseURI);
     if (NS_WARN_IF(NS_FAILED(rv))) {
+      nsIURI* uri = baseURI ? baseURI : scriptURI;
       nsAutoCString spec;
-      baseURI->GetSpec(spec);
+      uri->GetSpec(spec);
       NS_ConvertUTF8toUTF16 wSpec(spec);
       aRv.ThrowTypeError<MSG_INVALID_SCOPE>(aOptions.mScope.Value(), wSpec);
       return nullptr;
@@ -206,9 +207,14 @@ ServiceWorkerContainer::Register(const nsAString& aScriptURL,
     }
   }
 
+  bool useCache = aOptions.mUseCache.WasPassed() && aOptions.mUseCache.Value();
+  nsLoadFlags loadFlags = useCache ? nsIRequest::LOAD_NORMAL
+                                   : nsIRequest::VALIDATE_ALWAYS;
+
   // The spec says that the "client" passed to Register() must be the global
   // where the ServiceWorkerContainer was retrieved from.
-  aRv = swm->Register(GetOwner(), scopeURI, scriptURI, getter_AddRefs(promise));
+  aRv = swm->Register(GetOwner(), scopeURI, scriptURI, loadFlags,
+                      getter_AddRefs(promise));
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }

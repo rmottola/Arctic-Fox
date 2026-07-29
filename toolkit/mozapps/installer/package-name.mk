@@ -27,15 +27,7 @@ MOZ_PKG_PLATFORM := win32
 endif
 endif
 ifeq ($(OS_ARCH),Darwin)
-ifdef UNIVERSAL_BINARY
 MOZ_PKG_PLATFORM := mac
-else
-ifeq ($(TARGET_CPU),x86_64)
-MOZ_PKG_PLATFORM := mac64
-else
-MOZ_PKG_PLATFORM := mac
-endif
-endif
 endif
 ifeq ($(TARGET_OS),linux-gnu)
 MOZ_PKG_PLATFORM := linux-$(TARGET_CPU)
@@ -160,5 +152,8 @@ else
 JSSHELL_NAME = jsshell-$(MOZ_PKG_PLATFORM).zip
 endif
 PKG_JSSHELL = $(DIST)/$(JSSHELL_NAME)
+
+# Stylo binding files
+STYLO_BINDINGS_PACKAGE = $(PKG_BASENAME).stylo-bindings.zip
 
 endif # PACKAGE_NAME_MK_INCLUDED

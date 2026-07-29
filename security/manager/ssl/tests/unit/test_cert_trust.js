@@ -206,4 +206,36 @@ function run_test() {
 
   setup_basic_trusts(ca_cert, int_cert);
   test_ca_distrust(ee_cert, int_cert, false);
+
+  // Reset trust to default ("inherit trust")
+  setCertTrust(ca_cert, ",,");
+  setCertTrust(int_cert, ",,");
+
+  // If an end-entity certificate is manually trusted, it may not be the root of
+  // its own verified chain. In general this will cause "unknown issuer" errors
+  // unless a CA trust anchor can be found.
+  setCertTrust(ee_cert, "CTu,CTu,CTu");
+  checkCertErrorGeneric(certdb, ee_cert, SEC_ERROR_UNKNOWN_ISSUER,
+                        certificateUsageSSLServer);
+  checkCertErrorGeneric(certdb, ee_cert, SEC_ERROR_UNKNOWN_ISSUER,
+                        certificateUsageSSLClient);
+  checkCertErrorGeneric(certdb, ee_cert, SEC_ERROR_UNKNOWN_ISSUER,
+                        certificateUsageEmailSigner);
+  checkCertErrorGeneric(certdb, ee_cert, SEC_ERROR_UNKNOWN_ISSUER,
+                        certificateUsageEmailRecipient);
+  checkCertErrorGeneric(certdb, ee_cert, SEC_ERROR_UNKNOWN_ISSUER,
+                        certificateUsageObjectSigner);
+
+  // Now make a CA trust anchor available.
+  setCertTrust(ca_cert, "CTu,CTu,CTu");
+  checkCertErrorGeneric(certdb, ee_cert, PRErrorCodeSuccess,
+                        certificateUsageSSLServer);
+  checkCertErrorGeneric(certdb, ee_cert, PRErrorCodeSuccess,
+                        certificateUsageSSLClient);
+  checkCertErrorGeneric(certdb, ee_cert, PRErrorCodeSuccess,
+                        certificateUsageEmailSigner);
+  checkCertErrorGeneric(certdb, ee_cert, PRErrorCodeSuccess,
+                        certificateUsageEmailRecipient);
+  checkCertErrorGeneric(certdb, ee_cert, PRErrorCodeSuccess,
+                        certificateUsageObjectSigner);
 }

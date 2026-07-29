@@ -265,7 +265,7 @@ var gEditItemOverlay = {
     // Observe changes.
     if (!this._observersAdded) {
       PlacesUtils.bookmarks.addObserver(this, false);
-      window.addEventListener("unload", this, false);
+      window.addEventListener("unload", this);
       this._observersAdded = true;
     }
 
@@ -925,9 +925,8 @@ var gEditItemOverlay = {
       yield this._rebuildTagsSelectorList();
 
       // This is a no-op if we've added the listener.
-      tagsSelector.addEventListener("CheckboxStateChange", this, false);
-    }
-    else {
+      tagsSelector.addEventListener("CheckboxStateChange", this);
+    } else {
       expander.className = "expander-down";
       expander.setAttribute("tooltiptext",
                             expander.getAttribute("tooltiptextdown"));
@@ -992,8 +991,7 @@ var gEditItemOverlay = {
       if (tagCheckbox.checked) {
         if (curTagIndex == -1)
           tags.push(tagCheckbox.label);
-      }
-      else if (curTagIndex != -1) {
+      } else if (curTagIndex != -1) {
         tags.splice(curTagIndex, 1);
       }
       this._element("tagsField").value = tags.join(", ");
@@ -1054,8 +1052,7 @@ var gEditItemOverlay = {
     if (aItemId == this._paneInfo.itemId) {
       this._paneInfo.title = aNewTitle;
       this._initTextField(this._namePicker, aNewTitle);
-    }
-    else if (this._paneInfo.visibleRows.has("folderRow")) {
+    } else if (this._paneInfo.visibleRows.has("folderRow")) {
       // If the title of a folder which is listed within the folders
       // menulist has been changed, we need to update the label of its
       // representing element.

@@ -80,7 +80,7 @@ void
 NotificationController::Shutdown()
 {
   if (mObservingState != eNotObservingRefresh &&
-      mPresShell->RemoveRefreshObserver(this, Flush_Display)) {
+      mPresShell->RemoveRefreshObserver(this, FlushType::Display)) {
     mObservingState = eNotObservingRefresh;
   }
 
@@ -437,7 +437,7 @@ NotificationController::ScheduleProcessing()
   // If notification flush isn't planed yet start notification flush
   // asynchronously (after style and layout).
   if (mObservingState == eNotObservingRefresh) {
-    if (mPresShell->AddRefreshObserver(this, Flush_Display))
+    if (mPresShell->AddRefreshObserver(this, FlushType::Display))
       mObservingState = eRefreshObserving;
   }
 }
@@ -854,19 +854,20 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
 
       ipcDoc = new DocAccessibleChild(childDoc);
       childDoc->SetIPCDoc(ipcDoc);
+
+#if defined(XP_WIN)
+      MOZ_ASSERT(parentIPCDoc);
+      parentIPCDoc->ConstructChildDocInParentProcess(ipcDoc, id,
+                                                     AccessibleWrap::GetChildIDFor(childDoc));
+#else
       nsCOMPtr<nsITabChild> tabChild =
         do_GetInterface(mDocument->DocumentNode()->GetDocShell());
       if (tabChild) {
         MOZ_ASSERT(parentIPCDoc);
         static_cast<TabChild*>(tabChild.get())->
-          SendPDocAccessibleConstructor(ipcDoc, parentIPCDoc, id,
-#if defined(XP_WIN)
-                                        AccessibleWrap::GetChildIDFor(childDoc)
-#else
-                                        0
-#endif
-                                        );
+          SendPDocAccessibleConstructor(ipcDoc, parentIPCDoc, id, 0, 0);
       }
+#endif
     }
   }
 
@@ -880,7 +881,7 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
       mEvents.IsEmpty() && mTextHash.Count() == 0 &&
       mHangingChildDocuments.IsEmpty() &&
       mDocument->HasLoadState(DocAccessible::eCompletelyLoaded) &&
-      mPresShell->RemoveRefreshObserver(this, Flush_Display)) {
+      mPresShell->RemoveRefreshObserver(this, FlushType::Display)) {
     mObservingState = eNotObservingRefresh;
   }
 }

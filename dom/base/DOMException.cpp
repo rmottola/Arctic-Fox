@@ -18,7 +18,6 @@
 #include "nsIException.h"
 #include "nsIProgrammingLanguage.h"
 #include "nsMemory.h"
-#include "prprf.h"
 #include "xpcprivate.h"
 
 #include "mozilla/dom/DOMExceptionBinding.h"
@@ -165,7 +164,6 @@ NS_IMPL_CYCLE_COLLECTION_CLASS(Exception)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Exception)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLocation)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mData)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(Exception)

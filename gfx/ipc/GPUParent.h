@@ -10,6 +10,9 @@
 #include "mozilla/gfx/PGPUParent.h"
 
 namespace mozilla {
+
+class TimeStamp;
+
 namespace gfx {
 
 class VsyncBridgeParent;
@@ -33,12 +36,14 @@ public:
   mozilla::ipc::IPCResult RecvInitVsyncBridge(Endpoint<PVsyncBridgeParent>&& aVsyncEndpoint) override;
   mozilla::ipc::IPCResult RecvInitImageBridge(Endpoint<PImageBridgeParent>&& aEndpoint) override;
   mozilla::ipc::IPCResult RecvInitVRManager(Endpoint<PVRManagerParent>&& aEndpoint) override;
+  mozilla::ipc::IPCResult RecvInitUiCompositorController(Endpoint<PUiCompositorControllerParent>&& aEndpoint) override;
   mozilla::ipc::IPCResult RecvUpdatePref(const GfxPrefSetting& pref) override;
   mozilla::ipc::IPCResult RecvUpdateVar(const GfxVarUpdate& pref) override;
   mozilla::ipc::IPCResult RecvNewWidgetCompositor(
       Endpoint<PCompositorBridgeParent>&& aEndpoint,
       const CSSToLayoutDeviceScale& aScale,
       const TimeDuration& aVsyncRate,
+      const CompositorOptions& aOptions,
       const bool& aUseExternalSurface,
       const IntSize& aSurfaceSize) override;
   mozilla::ipc::IPCResult RecvNewContentCompositorBridge(Endpoint<PCompositorBridgeParent>&& aEndpoint) override;
@@ -49,10 +54,16 @@ public:
   mozilla::ipc::IPCResult RecvAddLayerTreeIdMapping(nsTArray<LayerTreeIdMapping>&& aMappings) override;
   mozilla::ipc::IPCResult RecvRemoveLayerTreeIdMapping(const LayerTreeIdMapping& aMapping) override;
   mozilla::ipc::IPCResult RecvNotifyGpuObservers(const nsCString& aTopic) override;
+  mozilla::ipc::IPCResult RecvRequestMemoryReport(
+    const uint32_t& generation,
+    const bool& anonymize,
+    const bool& minimizeMemoryUsage,
+    const MaybeFileDesc& DMDFile) override;
 
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
 private:
+  const TimeStamp mLaunchTime;
   RefPtr<VsyncBridgeParent> mVsyncBridge;
 };
 

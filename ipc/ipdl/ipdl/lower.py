@@ -1391,8 +1391,10 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
         typesToIncludes = {}
         for using in tu.using:
             typestr = str(using.type.spec)
-            assert typestr not in typesToIncludes
-            typesToIncludes[typestr] = using.header
+            if typestr not in typesToIncludes:
+                typesToIncludes[typestr] = using.header
+            else:
+                assert typesToIncludes[typestr] == using.header
 
         aggregateTypeIncludes = set()
         for su in tu.structsAndUnions:
@@ -1546,7 +1548,8 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
         stateenum.addId(_deadState().name)
         stateenum.addId(_nullState().name)
         stateenum.addId(_errorState().name)
-        stateenum.addId(_dyingState().name)
+        if self.protocol.decl.type.hasReentrantDelete:
+            stateenum.addId(_dyingState().name)
         for ts in p.transitionStmts:
             stateenum.addId(ts.state.decl.cxxname)
         if len(p.transitionStmts):
@@ -1767,19 +1770,15 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
         fromswitch.addcase(CaseLabel(_deadState().name), deadblock)
 
         # special case for Dying
-        dyingblock = Block()
         if ptype.hasReentrantDelete:
+            dyingblock = Block()
             ifdelete = StmtIf(ExprBinary(_deleteReplyId(), '==', msgexpr))
             ifdelete.addifstmt(
                 StmtExpr(ExprAssn(ExprDeref(nextvar), _deadState())))
             dyingblock.addstmt(ifdelete)
             dyingblock.addstmt(
                 StmtReturn(ExprLiteral.TRUE))
-        else:
-            dyingblock.addstmts([
-                _logicError('__delete__()d (and unexpectedly dying) actor'),
-                StmtReturn(ExprLiteral.FALSE) ])
-        fromswitch.addcase(CaseLabel(_dyingState().name), dyingblock)
+            fromswitch.addcase(CaseLabel(_dyingState().name), dyingblock)
 
         unreachedblock = Block()
         unreachedblock.addstmts([
@@ -4096,15 +4095,15 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
         actortype = ipdl.type.ActorType(actorproto)
 
         if idexpr is None:
-            idexpr = ExprCall(self.protocol.registerMethod(),
-                              args=[ actorvar ])
+            registerexpr = ExprCall(self.protocol.registerMethod(),
+                                    args=[ actorvar ])
         else:
-            idexpr = ExprCall(self.protocol.registerIDMethod(),
-                              args=[ actorvar, idexpr ])
+            registerexpr = ExprCall(self.protocol.registerIDMethod(),
+                                    args=[ actorvar, idexpr ])
 
         return [
             self.failIfNullActor(actorvar, errfn, msg="Error constructing actor %s" % actortype.name() + self.side.capitalize()),
-            StmtExpr(ExprCall(ExprSelect(actorvar, '->', 'SetId'), args=[idexpr])),
+            StmtExpr(registerexpr),
             StmtExpr(ExprCall(ExprSelect(actorvar, '->', 'SetManager'), args=[ExprVar.THIS])),
             StmtExpr(ExprCall(ExprSelect(actorvar, '->', 'SetIPCChannel'),
                               args=[self.protocol.callGetChannel()])),
@@ -4151,12 +4150,15 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
 
         msgvar, stmts = self.makeMessage(md, errfnSendDtor, actorvar)
         sendok, sendstmts = self.sendAsync(md, msgvar, actorvar)
+        failif = StmtIf(ExprNot(sendok))
+        failif.addifstmt(StmtReturn.FALSE)
+
         method.addstmts(
             stmts
             + self.genVerifyMessage(md.decl.type.verify, md.params,
                                     errfnSendDtor, ExprVar('msg__'))
             + sendstmts
-            + [ Whitespace.NL ]
+            + [ failif, Whitespace.NL ]
             + self.dtorEpilogue(md, actor.var())
             + [ StmtReturn(sendok) ])
 
@@ -4211,11 +4213,14 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             destroyedType = md.decl.type.constructedType()
         else:
             destroyedType = self.protocol.decl.type
-        return ([ StmtExpr(self.callActorDestroy(actorexpr, why)),
+        managervar = ExprVar('mgr')
+        return ([ StmtDecl(Decl(Type('IProtocol', ptr=1), managervar.name),
+                           init=self.protocol.managerVar(actorexpr)),
+                  StmtExpr(self.callActorDestroy(actorexpr, why)),
                   StmtExpr(self.callDeallocSubtree(md, actorexpr)),
                   StmtExpr(self.callRemoveActor(
                       actorexpr,
-                      manager=self.protocol.managerVar(actorexpr),
+                      manager=managervar,
                       ipdltype=destroyedType))
                 ])
 
@@ -4358,8 +4363,7 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
 
     def unregisterActor(self):
         return [ StmtExpr(ExprCall(self.protocol.unregisterMethod(),
-                                   args=[ _actorId() ])),
-                 StmtExpr(ExprCall(ExprVar('SetId'), args=[_FREED_ACTOR_ID])) ]
+                                   args=[ _actorId() ])) ]
 
     def makeMessage(self, md, errfn, fromActor=None):
         msgvar = self.msgvar
@@ -4444,6 +4448,10 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
         elif md.decl.type.isInterrupt():
             stmts.append(StmtExpr(ExprCall(
                 ExprSelect(var, '->', 'set_interrupt'))))
+
+        if md.decl.type.isCtor():
+            stmts.append(StmtExpr(ExprCall(
+                ExprSelect(var, '->', 'set_constructor'))))
 
         if reply:
             stmts.append(StmtExpr(ExprCall(

@@ -11,7 +11,7 @@ interface nsIDOMElement;
 
 %{C++
 #ifdef MOZILLA_INTERNAL_API
-#include "mozilla/BasePrincipal.h" // for DocShellOriginAttributes
+#include "mozilla/BasePrincipal.h" // for OriginAttributes
 #endif
 %}
 
@@ -68,7 +68,8 @@ interface nsILoadContext : nsISupports
   readonly attribute boolean isContent;
 
   /*
-   * Attribute that determines if private browsing should be used.
+   * Attribute that determines if private browsing should be used. May not be
+   * changed after a document has been loaded in this context.
    */
   attribute boolean usePrivateBrowsing;
 
@@ -126,7 +127,7 @@ interface nsILoadContext : nsISupports
    *
    * Defined in LoadContext.cpp
    */
-  bool GetOriginAttributes(mozilla::DocShellOriginAttributes& aAttrs);
+  bool GetOriginAttributes(mozilla::OriginAttributes& aAttrs);
 #endif
 %}
 

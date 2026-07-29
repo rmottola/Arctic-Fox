@@ -1620,7 +1620,7 @@ nsPrintEngine::ReconstructAndReflow(bool doSetPixelScale)
       }
     }
 
-    po->mPresShell->FlushPendingNotifications(Flush_Layout);
+    po->mPresShell->FlushPendingNotifications(FlushType::Layout);
 
     nsresult rv = UpdateSelectionAndShrinkPrintObject(po, documentIsTopLevel);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -2197,7 +2197,7 @@ nsPrintEngine::ReflowPrintObject(nsPrintObject * aPO)
   NS_ASSERTION(aPO->mPresShell, "Presshell should still be here");
 
   // Process the reflow event Initialize posted
-  aPO->mPresShell->FlushPendingNotifications(Flush_Layout);
+  aPO->mPresShell->FlushPendingNotifications(FlushType::Layout);
 
   rv = UpdateSelectionAndShrinkPrintObject(aPO, documentIsTopLevel);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -2614,6 +2614,7 @@ DocHasPrintCallbackCanvas(nsIDocument* aDoc)
 /**
  * Checks to see if the document this print engine is associated with has any
  * canvases that have a mozPrintCallback.
+ * https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement#Properties
  */
 bool
 nsPrintEngine::HasPrintCallbackCanvas()

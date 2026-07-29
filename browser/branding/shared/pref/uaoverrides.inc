@@ -10,6 +10,7 @@
 #define GK_VERSION @MOZILLA_COMPATVERSION_U@
 #define GK_SLICE Gecko/20100101
 #define FX_SLICE Firefox/@GK_VERSION@
+#define PM_SLICE PaleMoon/29.5
 
 #ifdef XP_UNIX
 #ifndef XP_MACOSX
@@ -22,7 +23,10 @@
 #endif
 
 // Required to use PaleMoon extension repository
-pref("@GUAO_PREF@.addons.palemoon.org", "Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAVERSION_U@) @GK_SLICE@ @FX_SLICE@ PaleMoon/29.5");
+pref("@GUAO_PREF@.addons.palemoon.org", "Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAVERSION_U@) @GK_SLICE@ @FX_SLICE@  @PM_SLICE@");
+
+// CloudFlare works a litte bit better giving PaleMoon
+pref("@GUAO_PREF@.cloudflare.com", "Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAVERSION_U@) @GRE_DATE_SLICE@ @PM_SLICE@");
 
 
 // Required for google to play nice with Arctic Fox "Mozilla/5.0 (@OS_SLICE@ rv:45.3) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/45.3 @AF_SLICE@");

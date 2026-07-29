@@ -317,16 +317,14 @@ class LinkageMultipleRustLibrariesError(Exception):
 class Linkable(ContextDerived):
     """Generic context derived container object for programs and libraries"""
     __slots__ = (
-        'name',
         'cxx_link',
         'lib_defines',
         'linked_libraries',
         'linked_system_libs',
     )
 
-    def __init__(self, context, name):
+    def __init__(self, context):
         ContextDerived.__init__(self, context)
-        self.name = name
         self.cxx_link = False
         self.linked_libraries = []
         self.linked_system_libs = []
@@ -385,7 +383,7 @@ class BaseProgram(Linkable):
     }
 
     def __init__(self, context, program, is_unit_test=False):
-        Linkable.__init__(self, context, program)
+        Linkable.__init__(self, context)
 
         bin_suffix = context.config.substs.get(self.SUFFIX_VAR, '')
         if not program.endswith(bin_suffix):
@@ -422,7 +420,7 @@ class HostSimpleProgram(HostMixin, BaseProgram):
     KIND = 'host'
 
 
-def cargo_target_directory(context, target_var='RUST_TARGET'):
+def cargo_target_directory(context, target_var):
     # cargo creates several directories and places its build artifacts
     # in those directories.  The directory structure depends not only
     # on the target, but also what sort of build we are doing.
@@ -475,7 +473,7 @@ class BaseLibrary(Linkable):
     )
 
     def __init__(self, context, basename):
-        Linkable.__init__(self, context, basename)
+        Linkable.__init__(self, context)
 
         self.basename = self.lib_name = basename
         if self.lib_name:
@@ -496,13 +494,11 @@ class Library(BaseLibrary):
     """Context derived container object for a library"""
     KIND = 'target'
     __slots__ = (
-        'is_sdk',
     )
 
-    def __init__(self, context, basename, real_name=None, is_sdk=False):
+    def __init__(self, context, basename, real_name=None):
         BaseLibrary.__init__(self, context, real_name or basename)
         self.basename = basename
-        self.is_sdk = is_sdk
 
 
 class StaticLibrary(Library):
@@ -512,9 +508,9 @@ class StaticLibrary(Library):
         'no_expand_lib',
     )
 
-    def __init__(self, context, basename, real_name=None, is_sdk=False,
+    def __init__(self, context, basename, real_name=None,
         link_into=None, no_expand_lib=False):
-        Library.__init__(self, context, basename, real_name, is_sdk)
+        Library.__init__(self, context, basename, real_name)
         self.link_into = link_into
         self.no_expand_lib = no_expand_lib
 
@@ -528,6 +524,9 @@ class RustLibrary(StaticLibrary):
         'deps_path',
         'features',
     )
+    TARGET_SUBST_VAR = 'RUST_TARGET'
+    FEATURES_VAR = 'RUST_LIBRARY_FEATURES'
+    LIB_FILE_VAR = 'RUST_LIBRARY_FILE'
 
     def __init__(self, context, basename, cargo_file, crate_type, dependencies,
                  features, **args):
@@ -543,7 +542,7 @@ class RustLibrary(StaticLibrary):
                                      basename.replace('-', '_'),
                                      context.config.lib_suffix)
         self.dependencies = dependencies
-        build_dir = cargo_target_directory(context)
+        build_dir = cargo_target_directory(context, self.TARGET_SUBST_VAR)
         self.import_name = mozpath.join(build_dir, self.lib_name)
         self.deps_path = mozpath.join(build_dir, 'deps')
         self.features = features
@@ -570,10 +569,10 @@ class SharedLibrary(Library):
     COMPONENT = 2
     MAX_VARIANT = 3
 
-    def __init__(self, context, basename, real_name=None, is_sdk=False,
+    def __init__(self, context, basename, real_name=None,
                  soname=None, variant=None, symbols_file=False):
         assert(variant in range(1, self.MAX_VARIANT) or variant is None)
-        Library.__init__(self, context, basename, real_name, is_sdk)
+        Library.__init__(self, context, basename, real_name)
         self.variant = variant
         self.lib_name = real_name or basename
         assert self.lib_name
@@ -632,6 +631,14 @@ class ExternalSharedLibrary(SharedLibrary, ExternalLibrary):
 class HostLibrary(HostMixin, BaseLibrary):
     """Context derived container object for a host library"""
     KIND = 'host'
+
+
+class HostRustLibrary(HostMixin, RustLibrary):
+    """Context derived container object for a host rust library"""
+    KIND = 'host'
+    TARGET_SUBST_VAR = 'RUST_HOST_TARGET'
+    FEATURES_VAR = 'HOST_RUST_LIBRARY_FEATURES'
+    LIB_FILE_VAR = 'HOST_RUST_LIBRARY_FILE'
 
 
 class TestManifest(ContextDerived):
@@ -981,19 +988,6 @@ class BrandingFiles(FinalTargetFiles):
     @property
     def install_target(self):
         return 'dist/branding'
-
-
-class SdkFiles(FinalTargetFiles):
-    """Sandbox container object for SDK_FILES, which is a
-    HierarchicalStringList.
-
-    We need an object derived from ContextDerived for use in the backend, so
-    this object fills that role. It just has a reference to the underlying
-    HierarchicalStringList, which is created when parsing SDK_FILES.
-    """
-    @property
-    def install_target(self):
-        return 'dist/sdk'
 
 
 class GeneratedFile(ContextDerived):

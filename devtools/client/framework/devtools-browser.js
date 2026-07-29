@@ -26,6 +26,7 @@ loader.lazyRequireGetter(this, "Toolbox", "devtools/client/framework/toolbox", t
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
 loader.lazyRequireGetter(this, "BrowserMenus", "devtools/client/framework/browser-menus");
+loader.lazyRequireGetter(this, "findCssSelector", "devtools/shared/inspector/css-logic", true);
 
 loader.lazyImporter(this, "CustomizableUI", "resource:///modules/CustomizableUI.jsm");
 loader.lazyImporter(this, "AppConstants", "resource://gre/modules/AppConstants.jsm");
@@ -232,6 +233,31 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
     }
   },
 
+  inspectNode: function (tab, node) {
+    let target = TargetFactory.forTab(tab);
+    let selector = findCssSelector(node);
+
+    return gDevTools.showToolbox(target, "inspector").then(toolbox => {
+      let inspector = toolbox.getCurrentPanel();
+
+      // new-node-front tells us when the node has been selected, whether the
+      // browser is remote or not.
+      let onNewNode = inspector.selection.once("new-node-front");
+
+      inspector.walker.getRootNode().then(rootNode => {
+        return inspector.walker.querySelector(rootNode, selector);
+      }).then(node => {
+        inspector.selection.setNodeFront(node, "browser-context-menu");
+      });
+
+      return onNewNode.then(() => {
+        // Now that the node has been selected, wait until the inspector is
+        // fully updated.
+        return inspector.once("inspector-updated");
+      });
+    });
+  },
+
   _getContentProcessTarget: function (processId) {
     // Create a DebuggerServer in order to connect locally to it
     if (!DebuggerServer.initialized) {
@@ -434,11 +460,11 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
     win.addEventListener("unload", this);
 
     let tabContainer = win.gBrowser.tabContainer;
-    tabContainer.addEventListener("TabSelect", this, false);
-    tabContainer.addEventListener("TabOpen", this, false);
-    tabContainer.addEventListener("TabClose", this, false);
-    tabContainer.addEventListener("TabPinned", this, false);
-    tabContainer.addEventListener("TabUnpinned", this, false);
+    tabContainer.addEventListener("TabSelect", this);
+    tabContainer.addEventListener("TabOpen", this);
+    tabContainer.addEventListener("TabClose", this);
+    tabContainer.addEventListener("TabPinned", this);
+    tabContainer.addEventListener("TabUnpinned", this);
   },
 
   /**
@@ -650,11 +676,11 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
     }
 
     let tabContainer = win.gBrowser.tabContainer;
-    tabContainer.removeEventListener("TabSelect", this, false);
-    tabContainer.removeEventListener("TabOpen", this, false);
-    tabContainer.removeEventListener("TabClose", this, false);
-    tabContainer.removeEventListener("TabPinned", this, false);
-    tabContainer.removeEventListener("TabUnpinned", this, false);
+    tabContainer.removeEventListener("TabSelect", this);
+    tabContainer.removeEventListener("TabOpen", this);
+    tabContainer.removeEventListener("TabClose", this);
+    tabContainer.removeEventListener("TabPinned", this);
+    tabContainer.removeEventListener("TabUnpinned", this);
   },
 
   handleEvent: function (event) {

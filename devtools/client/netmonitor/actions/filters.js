@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 "use strict";
 
 const {
@@ -41,12 +42,12 @@ function enableFilterTypeOnly(filter) {
 /**
  * Set filter text.
  *
- * @param {string} url - A filter text is going to be set
+ * @param {string} text - A filter text is going to be set
  */
-function setFilterText(url) {
+function setFilterText(text) {
   return {
     type: SET_FILTER_TEXT,
-    url,
+    text,
   };
 }
 

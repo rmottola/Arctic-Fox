@@ -1,10 +1,10 @@
-/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
-/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 /* import-globals-from ./netmonitor-controller.js */
 /* globals $ */
+
 "use strict";
 
 const {PluralForm} = require("devtools/shared/plural-form");
@@ -172,7 +172,7 @@ PerformanceStatisticsView.prototype = {
     }));
 
     for (let requestItem of items) {
-      let details = requestItem.attachment;
+      let details = requestItem;
       let type;
 
       if (Filters.html(details)) {
@@ -237,11 +237,8 @@ function responseIsFresh({ responseHeaders, status }) {
   }
 
   let list = responseHeaders.headers;
-  let cacheControl = list.filter(e => {
-    return e.name.toLowerCase() == "cache-control";
-  })[0];
-
-  let expires = list.filter(e => e.name.toLowerCase() == "expires")[0];
+  let cacheControl = list.find(e => e.name.toLowerCase() == "cache-control");
+  let expires = list.find(e => e.name.toLowerCase() == "expires");
 
   // Check the "Cache-Control" header for a maximum age value.
   if (cacheControl) {

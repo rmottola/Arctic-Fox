@@ -12,11 +12,6 @@ XPIDL_SOURCES += [
 ]
 
 EXPORTS += [
-    'gmp-api/gmp-async-shutdown.h',
-    'gmp-api/gmp-audio-codec.h',
-    'gmp-api/gmp-audio-decode.h',
-    'gmp-api/gmp-audio-host.h',
-    'gmp-api/gmp-audio-samples.h',
     'gmp-api/gmp-decryption.h',
     'gmp-api/gmp-entrypoints.h',
     'gmp-api/gmp-errors.h',
@@ -30,10 +25,6 @@ EXPORTS += [
     'gmp-api/gmp-video-frame.h',
     'gmp-api/gmp-video-host.h',
     'gmp-api/gmp-video-plane.h',
-    'GMPAudioDecoderChild.h',
-    'GMPAudioDecoderParent.h',
-    'GMPAudioDecoderProxy.h',
-    'GMPAudioHost.h',
     'GMPCallbackBase.h',
     'GMPCDMCallbackProxy.h',
     'GMPCDMProxy.h',
@@ -72,22 +63,10 @@ EXPORTS += [
     'GMPVideoHost.h',
     'GMPVideoi420FrameImpl.h',
     'GMPVideoPlaneImpl.h',
+    'widevine-adapter/content_decryption_module.h',
 ]
 
-# We link GMPLoader into xul on Android and Linux as its code does not
-# need to be covered by a DRM vendor's voucher.
-if CONFIG['OS_ARCH'] == 'Linux':
-    SOURCES += [
-      'GMPLoader.cpp',
-    ]
-    USE_LIBS += [
-        'rlz',
-    ]
-
 UNIFIED_SOURCES += [
-    'GMPAudioDecoderChild.cpp',
-    'GMPAudioDecoderParent.cpp',
-    'GMPAudioHost.cpp',
     'GMPCDMCallbackProxy.cpp',
     'GMPCDMProxy.cpp',
     'GMPChild.cpp',
@@ -98,6 +77,7 @@ UNIFIED_SOURCES += [
     'GMPDecryptorParent.cpp',
     'GMPDiskStorage.cpp',
     'GMPEncryptedBufferDataImpl.cpp',
+    'GMPLoader.cpp',
     'GMPMemoryStorage.cpp',
     'GMPParent.cpp',
     'GMPPlatform.cpp',
@@ -119,18 +99,16 @@ UNIFIED_SOURCES += [
     'GMPVideoEncoderParent.cpp',
     'GMPVideoHost.cpp',
     'GMPVideoi420FrameImpl.cpp',
-    'GMPVideoPlaneImpl.cpp',
+    'GMPVideoPlaneImpl.cpp'
 ]
 
 DIRS += [
-    'rlz',
     'widevine-adapter',
 ]
 
 IPDL_SOURCES += [
   'GMPTypes.ipdlh',
   'PGMP.ipdl',
-  'PGMPAudioDecoder.ipdl',
   'PGMPContent.ipdl',
   'PGMPDecryptor.ipdl',
   'PGMPService.ipdl',
@@ -144,6 +122,14 @@ IPDL_SOURCES += [
 DEFINES['GMP_SAFE_SHMEM'] = True
 
 include('/ipc/chromium/chromium-config.mozbuild')
+
+if CONFIG['MOZ_SANDBOX']:
+    # For sandbox includes and the include dependencies those have
+    LOCAL_INCLUDES += [
+        '/security/sandbox/chromium',
+        '/security/sandbox/chromium-shim',
+    ]
+
 
 FINAL_LIBRARY = 'xul'
 # media/mtransport so we work with --disable-webrtc

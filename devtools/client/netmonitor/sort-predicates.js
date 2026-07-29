@@ -1,9 +1,14 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 "use strict";
 
-const { getAbbreviatedMimeType,
-        getUrlBaseNameWithQuery,
-        getUrlHost,
-        loadCauseString } = require("./request-utils");
+const {
+  getAbbreviatedMimeType,
+  getUrlBaseNameWithQuery,
+  getUrlHost,
+} = require("./request-utils");
 
 /**
  * Predicates used when sorting items.
@@ -54,8 +59,8 @@ function domain(first, second) {
 }
 
 function cause(first, second) {
-  let firstCause = loadCauseString(first.cause.type);
-  let secondCause = loadCauseString(second.cause.type);
+  let firstCause = first.cause.type;
+  let secondCause = second.cause.type;
   if (firstCause == secondCause) {
     return first.startedMillis - second.startedMillis;
   }

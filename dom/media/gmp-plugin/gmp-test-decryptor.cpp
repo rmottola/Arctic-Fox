@@ -20,8 +20,6 @@
 
 using namespace std;
 
-std::string FakeDecryptor::sNodeId;
-
 FakeDecryptor* FakeDecryptor::sInstance = nullptr;
 extern GMPPlatformAPI* g_platform_api; // Defined in gmp-fake.cpp
 
@@ -98,9 +96,8 @@ private:
   set<string> mTestIDs;
 };
 
-FakeDecryptor::FakeDecryptor(GMPDecryptorHost* aHost)
+FakeDecryptor::FakeDecryptor()
   : mCallback(nullptr)
-  , mHost(aHost)
 {
   MOZ_ASSERT(!sInstance);
   sInstance = this;
@@ -561,48 +558,7 @@ FakeDecryptor::UpdateSession(uint32_t aPromiseId,
     ReadRecord("shutdown-token", new ReportReadRecordContinuation("shutdown-token"));
   } else if (task == "test-op-apis") {
     mozilla::gmptest::TestOuputProtectionAPIs();
-  } else if (task == "retrieve-plugin-voucher") {
-    const uint8_t* rawVoucher = nullptr;
-    uint32_t length = 0;
-    mHost->GetPluginVoucher(&rawVoucher, &length);
-    std::string voucher((const char*)rawVoucher, (const char*)(rawVoucher + length));
-    Message("retrieved plugin-voucher: " + voucher);
   } else if (task == "retrieve-record-names") {
     GMPEnumRecordNames(&RecvGMPRecordIterator, this);
-  } else if (task == "retrieve-node-id") {
-    Message("node-id " + sNodeId);
-  }
-}
-
-class CompleteShutdownTask : public GMPTask {
-public:
-  explicit CompleteShutdownTask(GMPAsyncShutdownHost* aHost)
-    : mHost(aHost)
-  {
-  }
-  void Run() override {
-    mHost->ShutdownComplete();
-  }
-  void Destroy() override { delete this; }
-  GMPAsyncShutdownHost* mHost;
-};
-
-void
-TestAsyncShutdown::BeginShutdown() {
-  switch (sShutdownMode) {
-    case ShutdownNormal:
-      mHost->ShutdownComplete();
-      break;
-    case ShutdownTimeout:
-      // Don't do anything; wait for timeout, Gecko should kill
-      // the plugin and recover.
-      break;
-    case ShutdownStoreToken:
-      // Store message, then shutdown.
-      WriteRecord("shutdown-token",
-                  sShutdownToken,
-                  new CompleteShutdownTask(mHost),
-                  new SendMessageTask("FAIL writing shutdown-token."));
-      break;
   }
 }

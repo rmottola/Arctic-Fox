@@ -33,6 +33,10 @@
 #include "nsWindowWatcher.h"
 #include "nsWeakReference.h"
 
+#ifdef MOZ_WIDGET_ANDROID
+#include "AndroidBridge.h"
+#endif
+
 using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::dom::workers;
@@ -127,10 +131,16 @@ public:
     WorkerPrivate* workerPrivate = mPromiseProxy->GetWorkerPrivate();
     MOZ_ASSERT(workerPrivate);
 
-    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+    UniquePtr<ServiceWorkerClientInfo> result;
     ErrorResult rv;
-    UniquePtr<ServiceWorkerClientInfo> result = swm->GetClient(workerPrivate->GetPrincipal(),
-                                                               mClientId, rv);
+
+    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+    if (!swm) {
+      rv = NS_ERROR_FAILURE;
+    } else {
+      result = swm->GetClient(workerPrivate->GetPrincipal(), mClientId, rv);
+    }
+
     RefPtr<ResolvePromiseWorkerRunnable> r =
       new ResolvePromiseWorkerRunnable(mPromiseProxy->GetWorkerPrivate(),
                                        mPromiseProxy, Move(result),
@@ -206,11 +216,12 @@ public:
       return NS_OK;
     }
 
-    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
     nsTArray<ServiceWorkerClientInfo> result;
-
-    swm->GetAllClients(mPromiseProxy->GetWorkerPrivate()->GetPrincipal(), mScope,
-                       mIncludeUncontrolled, result);
+    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+    if (swm) {
+      swm->GetAllClients(mPromiseProxy->GetWorkerPrivate()->GetPrincipal(),
+                         mScope, mIncludeUncontrolled, result);
+    }
     RefPtr<ResolvePromiseWorkerRunnable> r =
       new ResolvePromiseWorkerRunnable(mPromiseProxy->GetWorkerPrivate(),
                                        mPromiseProxy, result);
@@ -284,11 +295,15 @@ public:
     WorkerPrivate* workerPrivate = mPromiseProxy->GetWorkerPrivate();
     MOZ_ASSERT(workerPrivate);
 
+    nsresult rv = NS_OK;
     RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-    MOZ_ASSERT(swm);
-
-    nsresult rv = swm->ClaimClients(workerPrivate->GetPrincipal(),
-                                    mScope, mServiceWorkerID);
+    if (!swm) {
+      // browser shutdown
+      rv = NS_ERROR_FAILURE;
+    } else {
+      rv = swm->ClaimClients(workerPrivate->GetPrincipal(), mScope,
+                             mServiceWorkerID);
+    }
 
     RefPtr<ResolveClaimRunnable> r =
       new ResolveClaimRunnable(workerPrivate, mPromiseProxy, rv);
@@ -498,6 +513,12 @@ public:
       return NS_OK;
     }
 
+#ifdef MOZ_WIDGET_ANDROID
+    // This fires an intent that will start launching Fennec and foreground it,
+    // if necessary.
+    java::GeckoAppShell::LaunchOrBringToFront();
+#endif
+
     nsCOMPtr<nsPIDOMWindowOuter> window;
     nsresult rv = OpenWindow(getter_AddRefs(window));
     if (NS_SUCCEEDED(rv)) {
@@ -526,7 +547,10 @@ public:
       }
 
       RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-      MOZ_ASSERT(swm);
+      if (!swm) {
+        // browser shutdown
+        return NS_ERROR_FAILURE;
+      }
 
       nsCOMPtr<nsIPrincipal> principal = workerPrivate->GetPrincipal();
       MOZ_ASSERT(principal);
@@ -550,6 +574,44 @@ public:
       MOZ_ASSERT(NS_SUCCEEDED(rv));
       return NS_OK;
     }
+#ifdef MOZ_WIDGET_ANDROID
+    else if (rv == NS_ERROR_NOT_AVAILABLE) {
+      // We couldn't get a browser window, so Fennec must not be running.
+      // Send an Intent to launch Fennec and wait for "BrowserChrome:Ready"
+      // to try opening a window again.
+      nsCOMPtr<nsIObserverService> os = services::GetObserverService();
+      NS_ENSURE_STATE(os);
+
+      WorkerPrivate* workerPrivate = mPromiseProxy->GetWorkerPrivate();
+      MOZ_ASSERT(workerPrivate);
+
+      RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+      if (!swm) {
+        // browser shutdown
+        return NS_ERROR_FAILURE;
+      }
+
+      nsCOMPtr<nsIPrincipal> principal = workerPrivate->GetPrincipal();
+      MOZ_ASSERT(principal);
+
+      RefPtr<ServiceWorkerRegistrationInfo> registration =
+        swm->GetRegistration(principal, NS_ConvertUTF16toUTF8(mScope));
+      if (NS_WARN_IF(!registration)) {
+        return NS_ERROR_FAILURE;
+      }
+
+      RefPtr<ServiceWorkerInfo> serviceWorkerInfo =
+        registration->GetServiceWorkerInfoById(workerPrivate->ServiceWorkerID());
+      if (NS_WARN_IF(!serviceWorkerInfo)) {
+        return NS_ERROR_FAILURE;
+      }
+
+      os->AddObserver(static_cast<nsIObserver*>(serviceWorkerInfo->WorkerPrivate()),
+                      "BrowserChrome:Ready", true);
+      serviceWorkerInfo->WorkerPrivate()->AddPendingWindow(this);
+      return NS_OK;
+    }
+#endif
 
     RefPtr<ResolveOpenWindowRunnable> resolveRunnable =
       new ResolveOpenWindowRunnable(mPromiseProxy, nullptr, rv);
@@ -627,7 +689,7 @@ private:
       // It is possible to be running without a browser window on Mac OS, so
       // we need to open a new chrome window.
       // TODO(catalinb): open new chrome window. Bug 1218080
-      return NS_ERROR_FAILURE;
+      return NS_ERROR_NOT_AVAILABLE;
     }
 
     nsCOMPtr<nsIDOMChromeWindow> chromeWin = do_QueryInterface(browserWindow);

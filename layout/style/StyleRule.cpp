@@ -1130,14 +1130,11 @@ protected:
 DOMCSSDeclarationImpl::DOMCSSDeclarationImpl(css::StyleRule *aRule)
   : mRule(aRule)
 {
-  MOZ_COUNT_CTOR(DOMCSSDeclarationImpl);
 }
 
 DOMCSSDeclarationImpl::~DOMCSSDeclarationImpl(void)
 {
   NS_ASSERTION(!mRule, "DropReference not called.");
-
-  MOZ_COUNT_DTOR(DOMCSSDeclarationImpl);
 }
 
 inline css::DOMCSSStyleRule* DOMCSSDeclarationImpl::DomRule()
@@ -1209,13 +1206,13 @@ DOMCSSDeclarationImpl::SetCSSDeclaration(DeclarationBlock* aDecl)
   NS_PRECONDITION(mRule,
          "can only be called when |GetCSSDeclaration| returned a declaration");
 
-  nsCOMPtr<nsIDocument> owningDoc;
+  nsCOMPtr<nsIDocument> doc;
   RefPtr<CSSStyleSheet> sheet = mRule->GetStyleSheet();
   if (sheet) {
-    owningDoc = sheet->GetOwningDocument();
+    doc = sheet->GetAssociatedDocument();
   }
 
-  mozAutoDocUpdate updateBatch(owningDoc, UPDATE_STYLE, true);
+  mozAutoDocUpdate updateBatch(doc, UPDATE_STYLE, true);
 
   mRule->SetDeclaration(aDecl->AsGecko());
 
@@ -1223,8 +1220,8 @@ DOMCSSDeclarationImpl::SetCSSDeclaration(DeclarationBlock* aDecl)
     sheet->DidDirty();
   }
 
-  if (owningDoc) {
-    owningDoc->StyleRuleChanged(sheet, mRule);
+  if (doc) {
+    doc->StyleRuleChanged(sheet, mRule);
   }
   return NS_OK;
 }
@@ -1275,10 +1272,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(DOMCSSStyleRule)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(DOMCSSStyleRule)
-  // Just NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS here: that will call
-  // into our Trace hook, where we do the right thing with declarations
-  // already.
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMETHODIMP

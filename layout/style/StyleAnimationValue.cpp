@@ -10,6 +10,8 @@
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/RuleNodeCacheConditions.h"
 #include "mozilla/StyleAnimationValue.h"
+#include "mozilla/StyleSetHandle.h"
+#include "mozilla/StyleSetHandleInlines.h"
 #include "mozilla/Tuple.h"
 #include "mozilla/UniquePtr.h"
 #include "nsStyleTransformMatrix.h"
@@ -4535,6 +4537,10 @@ StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
           static_cast<const nsStyleVisibility*>(styleStruct)->mVisible,
           eUnit_Visibility);
         return true;
+      }
+      if (aStyleContext->StyleSource().IsServoComputedValues()) {
+        NS_ERROR("stylo: extracting discretely animated values not supported");
+        return false;
       }
       auto cssValue = MakeUnique<nsCSSValue>(eCSSUnit_Unset);
       aStyleContext->RuleNode()->GetDiscretelyAnimatedCSSValue(aProperty,

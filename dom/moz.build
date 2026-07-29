@@ -43,6 +43,7 @@ DIRS += [
     'browser-element',
     'cache',
     'canvas',
+    'commandhandler',
     'crypto',
     'devicestorage',
     'encoding',
@@ -86,7 +87,6 @@ DIRS += [
     'promise',
     'smil',
     'url',
-    'inputmethod',
     'webidl',
     'xbl',
     'xml',
@@ -97,6 +97,7 @@ DIRS += [
     'u2f',
     'console',
     'performance',
+    'webbrowserpersist',
     'xhr',
     'worklet',
 ]

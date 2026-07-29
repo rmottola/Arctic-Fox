@@ -83,6 +83,7 @@ using mozilla::Unused;
 
 typedef Vector<uint32_t, 0, SystemAllocPolicy> Uint32Vector;
 typedef Vector<uint8_t, 0, SystemAllocPolicy> Bytes;
+typedef UniquePtr<Bytes> UniqueBytes;
 
 typedef int8_t I8x16[16];
 typedef int16_t I16x8[8];
@@ -1096,7 +1097,10 @@ struct Assumptions
     bool operator==(const Assumptions& rhs) const;
     bool operator!=(const Assumptions& rhs) const { return !(*this == rhs); }
 
-    WASM_DECLARE_SERIALIZABLE(Assumptions)
+    size_t serializedSize() const;
+    uint8_t* serialize(uint8_t* cursor) const;
+    const uint8_t* deserialize(const uint8_t* cursor, size_t remain);
+    size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
 };
 
 // A Module can either be asm.js or wasm.

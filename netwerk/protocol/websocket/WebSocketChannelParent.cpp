@@ -49,8 +49,9 @@ WebSocketChannelParent::RecvDeleteSelf()
   LOG(("WebSocketChannelParent::RecvDeleteSelf() %p\n", this));
   mChannel = nullptr;
   mAuthProvider = nullptr;
+  IProtocol* mgr = Manager();
   if (mIPCOpen && !Send__delete__(this)) {
-    return IPC_FAIL_NO_REASON(this);
+    return IPC_FAIL_NO_REASON(mgr);
   }
   return IPC_OK();
 }
@@ -128,11 +129,13 @@ WebSocketChannelParent::RecvAsyncOpen(const OptionalURIParams& aURI,
   if (aClientSetPingInterval) {
     // IDL allows setting in seconds, so must be multiple of 1000 ms
     MOZ_ASSERT(aPingInterval >= 1000 && !(aPingInterval % 1000));
-    mChannel->SetPingInterval(aPingInterval / 1000);
+    DebugOnly<nsresult> rv = mChannel->SetPingInterval(aPingInterval / 1000);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
   if (aClientSetPingTimeout) {
     MOZ_ASSERT(aPingTimeout >= 1000 && !(aPingTimeout % 1000));
-    mChannel->SetPingTimeout(aPingTimeout / 1000);
+    DebugOnly<nsresult> rv = mChannel->SetPingTimeout(aPingTimeout / 1000);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
 
   rv = mChannel->AsyncOpen(uri, aOrigin, aInnerWindowID, this, nullptr);
@@ -212,8 +215,10 @@ WebSocketChannelParent::OnStart(nsISupports *aContext)
   nsString effectiveURL;
   bool encrypted = false;
   if (mChannel) {
-    mChannel->GetProtocol(protocol);
-    mChannel->GetExtensions(extensions);
+    DebugOnly<nsresult> rv = mChannel->GetProtocol(protocol);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
+    rv = mChannel->GetExtensions(extensions);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
 
     RefPtr<WebSocketChannel> channel;
     channel = static_cast<WebSocketChannel*>(mChannel.get());

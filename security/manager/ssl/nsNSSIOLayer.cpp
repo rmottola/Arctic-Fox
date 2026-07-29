@@ -314,23 +314,34 @@ nsNSSSocketInfo::GetNegotiatedNPN(nsACString& aNegotiatedNPN)
 NS_IMETHODIMP
 nsNSSSocketInfo::GetAlpnEarlySelection(nsACString& aAlpnSelected)
 {
+  aAlpnSelected.Truncate();
+
   nsNSSShutDownPreventionLock locker;
   if (isAlreadyShutDown() || isPK11LoggedOut()) {
     return NS_ERROR_NOT_AVAILABLE;
   }
-  SSLNextProtoState alpnState;
-  unsigned char chosenAlpn[MAX_ALPN_LENGTH];
-  unsigned int chosenAlpnLen;
-  SECStatus rv = SSL_GetNextProto(mFd, &alpnState, chosenAlpn, &chosenAlpnLen,
-                                  AssertedCast<unsigned int>(ArrayLength(chosenAlpn)));
 
-  if (rv != SECSuccess || alpnState != SSL_NEXT_PROTO_EARLY_VALUE ||
-      chosenAlpnLen == 0) {
+  SSLPreliminaryChannelInfo info;
+  SECStatus rv = SSL_GetPreliminaryChannelInfo(mFd, &info, sizeof(info));
+  if (rv != SECSuccess || !info.canSendEarlyData) {
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  aAlpnSelected.Assign(BitwiseCast<char*, unsigned char*>(chosenAlpn),
-                       chosenAlpnLen);
+  SSLNextProtoState alpnState;
+  unsigned char chosenAlpn[MAX_ALPN_LENGTH];
+  unsigned int chosenAlpnLen;
+  rv = SSL_GetNextProto(mFd, &alpnState, chosenAlpn, &chosenAlpnLen,
+                        AssertedCast<unsigned int>(ArrayLength(chosenAlpn)));
+
+  if (rv != SECSuccess) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  if (alpnState == SSL_NEXT_PROTO_EARLY_VALUE) {
+    aAlpnSelected.Assign(BitwiseCast<char*, unsigned char*>(chosenAlpn),
+                         chosenAlpnLen);
+  }
+
   return NS_OK;
 }
 
@@ -589,8 +600,8 @@ nsNSSSocketInfo::SetCertVerificationWaiting()
   // mCertVerificationState may be before_cert_verification for the first
   // handshake on the connection, or after_cert_verification for subsequent
   // renegotiation handshakes.
-  NS_ASSERTION(mCertVerificationState != waiting_for_cert_verification,
-               "Invalid state transition to waiting_for_cert_verification");
+  MOZ_ASSERT(mCertVerificationState != waiting_for_cert_verification,
+             "Invalid state transition to waiting_for_cert_verification");
   mCertVerificationState = waiting_for_cert_verification;
 }
 
@@ -602,8 +613,8 @@ void
 nsNSSSocketInfo::SetCertVerificationResult(PRErrorCode errorCode,
                                            SSLErrorMessageType errorMessageType)
 {
-  NS_ASSERTION(mCertVerificationState == waiting_for_cert_verification,
-               "Invalid state transition to cert_verification_finished");
+  MOZ_ASSERT(mCertVerificationState == waiting_for_cert_verification,
+             "Invalid state transition to cert_verification_finished");
 
   if (mFd) {
     SECStatus rv = SSL_AuthCertificateComplete(mFd, errorCode);
@@ -906,7 +917,7 @@ nsSSLIOLayerClose(PRFileDesc* fd)
          (void*) fd));
 
   nsNSSSocketInfo* socketInfo = (nsNSSSocketInfo*) fd->secret;
-  NS_ASSERTION(socketInfo,"nsNSSSocketInfo was null for an fd");
+  MOZ_ASSERT(socketInfo, "nsNSSSocketInfo was null for an fd");
 
   return socketInfo->CloseSocketAndDestroy(locker);
 }
@@ -916,9 +927,9 @@ nsNSSSocketInfo::CloseSocketAndDestroy(
     const nsNSSShutDownPreventionLock& /*proofOfLock*/)
 {
   PRFileDesc* popped = PR_PopIOLayer(mFd, PR_TOP_IO_LAYER);
-  NS_ASSERTION(popped &&
+  MOZ_ASSERT(popped &&
                popped->identity == nsSSLIOLayerHelpers::nsSSLIOLayerIdentity,
-               "SSL Layer not on top of stack");
+             "SSL Layer not on top of stack");
 
   // The plain text layer is not always present - so its not a fatal error
   // if it cannot be removed
@@ -1143,6 +1154,40 @@ retryDueToTLSIntolerance(PRErrorCode err, nsNSSSocketInfo* socketInfo)
   return true;
 }
 
+// Ensure that we haven't added too many errors to fit.
+static_assert((SSL_ERROR_END_OF_LIST - SSL_ERROR_BASE) <= 256,
+              "too many SSL errors");
+static_assert((SEC_ERROR_END_OF_LIST - SEC_ERROR_BASE) <= 256,
+              "too many SEC errors");
+static_assert((PR_MAX_ERROR - PR_NSPR_ERROR_BASE) <= 128,
+              "too many NSPR errors");
+static_assert((mozilla::pkix::ERROR_BASE - mozilla::pkix::END_OF_LIST) < 31,
+              "too many moz::pkix errors");
+
+static void
+reportHandshakeResult(int32_t bytesTransferred, PRErrorCode err)
+{
+  uint32_t bucket;
+
+  if (bytesTransferred >= 0) {
+    bucket = 0;
+  } else if (IS_SSL_ERROR(err)) {
+    bucket = err - SSL_ERROR_BASE;
+    MOZ_ASSERT(bucket > 0);   // SSL_ERROR_EXPORT_ONLY_SERVER isn't used.
+  } else if (IS_SEC_ERROR(err)) {
+    bucket = (err - SEC_ERROR_BASE) + 256;
+  } else if ((err >= PR_NSPR_ERROR_BASE) && (err < PR_MAX_ERROR)) {
+    bucket = (err - PR_NSPR_ERROR_BASE) + 512;
+  } else if ((err >= mozilla::pkix::ERROR_BASE) &&
+             (err < mozilla::pkix::ERROR_LIMIT)) {
+    bucket = (err - mozilla::pkix::ERROR_BASE) + 640;
+  } else {
+    bucket = 671;
+  }
+
+  Telemetry::Accumulate(Telemetry::SSL_HANDSHAKE_RESULT, bucket);
+}
+
 int32_t
 checkHandshake(int32_t bytesTransfered, bool wasReading,
                PRFileDesc* ssl_layer_fd, nsNSSSocketInfo* socketInfo)
@@ -1220,6 +1265,10 @@ checkHandshake(int32_t bytesTransfered, bool wasReading,
   // set the HandshakePending attribute to false so that we don't try the logic
   // above again in a subsequent transfer.
   if (handleHandshakeResultNow) {
+    // Report the result once for each handshake. Note that this does not
+    // get handshakes which are cancelled before any reads or writes
+    // happen.
+    reportHandshakeResult(bytesTransfered, originalError);
     socketInfo->SetHandshakeNotPending();
   }
 
@@ -1263,8 +1312,8 @@ nsSSLIOLayerPoll(PRFileDesc* fd, int16_t in_flags, int16_t* out_flags)
                   "or NSS shutdown or SDR logout %d\n",
              fd, (int) in_flags));
 
-    NS_ASSERTION(in_flags & PR_POLL_EXCEPT,
-                 "caller did not poll for EXCEPT (canceled)");
+    MOZ_ASSERT(in_flags & PR_POLL_EXCEPT,
+               "Caller did not poll for EXCEPT (canceled)");
     // Since this poll method cannot return errors, we want the caller to call
     // PR_Send/PR_Recv right away to get the error, so we tell that we are
     // ready for whatever I/O they are asking for. (See getSocketInfoIfRunning).
@@ -1763,7 +1812,7 @@ nsSSLIOLayerNewSocket(int32_t family,
                       const char* host,
                       int32_t port,
                       nsIProxyInfo *proxy,
-                      const NeckoOriginAttributes& originAttributes,
+                      const OriginAttributes& originAttributes,
                       PRFileDesc** fd,
                       nsISupports** info,
                       bool forSTARTTLS,
@@ -1990,8 +2039,8 @@ nsNSS_SSLGetClientAuthData(void* arg, PRFileDesc* socket,
 
   UniqueCERTCertificate serverCert(SSL_PeerCertificate(socket));
   if (!serverCert) {
-    NS_NOTREACHED("Missing server certificate should have been detected during "
-                  "server cert authentication.");
+    MOZ_ASSERT_UNREACHABLE(
+      "Missing server cert should have been detected during server cert auth.");
     PR_SetError(SSL_ERROR_NO_CERTIFICATE, 0);
     return SECFailure;
   }
@@ -2154,8 +2203,9 @@ ClientAuthDataRunnable::RunOnTargetThread()
     nsCString rememberedDBKey;
     if (cars) {
       bool found;
-      rv = cars->HasRememberedDecision(hostname, mServerCert,
-        rememberedDBKey, &found);
+      rv = cars->HasRememberedDecision(hostname,
+                                       mSocketInfo->GetOriginAttributes(),
+                                       mServerCert, rememberedDBKey, &found);
       if (NS_SUCCEEDED(rv) && found) {
         hasRemembered = true;
       }
@@ -2165,8 +2215,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
       nsCOMPtr<nsIX509CertDB> certdb = do_GetService(NS_X509CERTDB_CONTRACTID);
       if (certdb) {
         nsCOMPtr<nsIX509Cert> foundCert;
-        rv = certdb->FindCertByDBKey(rememberedDBKey.get(),
-                                     getter_AddRefs(foundCert));
+        rv = certdb->FindCertByDBKey(rememberedDBKey, getter_AddRefs(foundCert));
         if (NS_SUCCEEDED(rv) && foundCert) {
           nsNSSCertificate* objCert =
             BitwiseCast<nsNSSCertificate*, nsIX509Cert*>(foundCert.get());
@@ -2269,8 +2318,8 @@ ClientAuthDataRunnable::RunOnTargetThread()
       }
 
       if (cars && wantRemember) {
-        cars->RememberDecision(hostname, mServerCert,
-                               certChosen ? cert.get() : nullptr);
+        cars->RememberDecision(hostname, mSocketInfo->GetOriginAttributes(),
+                               mServerCert, certChosen ? cert.get() : nullptr);
       }
     }
 
@@ -2309,7 +2358,7 @@ nsSSLIOLayerImportFD(PRFileDesc* fd,
   nsNSSShutDownPreventionLock locker;
   PRFileDesc* sslSock = SSL_ImportFD(nullptr, fd);
   if (!sslSock) {
-    NS_ASSERTION(false, "NSS: Error importing socket");
+    MOZ_ASSERT_UNREACHABLE("NSS: Error importing socket");
     return nullptr;
   }
   SSL_SetPKCS11PinArg(sslSock, (nsIInterfaceRequestor*) infoObject);
@@ -2333,12 +2382,12 @@ nsSSLIOLayerImportFD(PRFileDesc* fd,
   }
   if (SECSuccess != SSL_AuthCertificateHook(sslSock, AuthCertificateHook,
                                             infoObject)) {
-    NS_NOTREACHED("failed to configure AuthCertificateHook");
+    MOZ_ASSERT_UNREACHABLE("Failed to configure AuthCertificateHook");
     goto loser;
   }
 
   if (SECSuccess != SSL_SetURL(sslSock, host)) {
-    NS_NOTREACHED("SSL_SetURL failed");
+    MOZ_ASSERT_UNREACHABLE("SSL_SetURL failed");
     goto loser;
   }
 
@@ -2494,7 +2543,7 @@ nsSSLIOLayerAddToSocket(int32_t family,
                         const char* host,
                         int32_t port,
                         nsIProxyInfo* proxy,
-                        const NeckoOriginAttributes& originAttributes,
+                        const OriginAttributes& originAttributes,
                         PRFileDesc* fd,
                         nsISupports** info,
                         bool forSTARTTLS,
@@ -2539,7 +2588,7 @@ nsSSLIOLayerAddToSocket(int32_t family,
 
   PRFileDesc* sslSock = nsSSLIOLayerImportFD(fd, infoObject, host);
   if (!sslSock) {
-    NS_ASSERTION(false, "NSS: Error importing socket");
+    MOZ_ASSERT_UNREACHABLE("NSS: Error importing socket");
     goto loser;
   }
 

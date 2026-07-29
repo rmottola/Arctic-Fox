@@ -524,7 +524,13 @@ XPCConvert::JSData2Native(void* d, HandleValue s,
             // The characters represent an existing nsStringBuffer that
             // was shared by XPCStringConvert::ReadableToJSVal.
             const char16_t* chars = JS_GetTwoByteExternalStringChars(str);
-            nsStringBuffer::FromData((void*)chars)->ToString(length, *ws);
+            if (chars[length] == '\0') {
+                // Safe to share the buffer.
+                nsStringBuffer::FromData((void*)chars)->ToString(length, *ws);
+            } else {
+                // We have to copy to ensure null-termination.
+                ws->Assign(chars, length);
+            }
         } else if (XPCStringConvert::IsLiteral(str)) {
             // The characters represent a literal char16_t string constant
             // compiled into libxul, such as the string "undefined" above.
@@ -791,7 +797,6 @@ XPCConvert::NativeInterface2JSObject(MutableHandleValue d,
         return CreateHolderIfNeeded(flat, d, dest);
     }
 
-#ifdef SPIDERMONKEY_PROMISE
     if (iid->Equals(NS_GET_IID(nsISupports))) {
         // Check for a Promise being returned via nsISupports.  In that
         // situation, we want to dig out its underlying JS object and return
@@ -804,7 +809,6 @@ XPCConvert::NativeInterface2JSObject(MutableHandleValue d,
             return CreateHolderIfNeeded(flat, d, dest);
         }
     }
-#endif // SPIDERMONKEY_PROMISE
 
     // Don't double wrap CPOWs. This is a temporary measure for compatibility
     // with objects that don't provide necessary QIs (such as objects under
@@ -943,7 +947,6 @@ XPCConvert::JSObject2NativeInterface(void** dest, HandleObject src,
             return false;
         }
 
-#ifdef SPIDERMONKEY_PROMISE
         // Deal with Promises being passed as nsISupports.  In that situation we
         // want to create a dom::Promise and use that.
         if (iid->Equals(NS_GET_IID(nsISupports))) {
@@ -954,7 +957,6 @@ XPCConvert::JSObject2NativeInterface(void** dest, HandleObject src,
                 return p && NS_SUCCEEDED(p->QueryInterface(*iid, dest));
             }
         }
-#endif // SPIDERMONKEY_PROMISE
     }
 
     RefPtr<nsXPCWrappedJS> wrapper;
@@ -1046,6 +1048,56 @@ private:
     JSContext * const mContext;
     RootedValue tvr;
 };
+
+static nsresult
+JSErrorToXPCException(const char* toStringResult,
+                      const char* ifaceName,
+                      const char* methodName,
+                      const JSErrorReport* report,
+                      nsIException** exceptn)
+{
+    AutoJSContext cx;
+    nsresult rv = NS_ERROR_FAILURE;
+    RefPtr<nsScriptError> data;
+    if (report) {
+        nsAutoString bestMessage;
+        if (report && report->message()) {
+            CopyUTF8toUTF16(report->message().c_str(), bestMessage);
+        } else if (toStringResult) {
+            CopyUTF8toUTF16(toStringResult, bestMessage);
+        } else {
+            bestMessage.AssignLiteral("JavaScript Error");
+        }
+
+        const char16_t* linebuf = report->linebuf();
+
+        data = new nsScriptError();
+        data->InitWithWindowID(
+            bestMessage,
+            NS_ConvertASCIItoUTF16(report->filename),
+            linebuf ? nsDependentString(linebuf, report->linebufLength()) : EmptyString(),
+            report->lineno,
+            report->tokenOffset(), report->flags,
+            NS_LITERAL_CSTRING("XPConnect JavaScript"),
+            nsJSUtils::GetCurrentlyRunningCodeInnerWindowID(cx));
+    }
+
+    if (data) {
+        nsAutoCString formattedMsg;
+        data->ToString(formattedMsg);
+
+        rv = XPCConvert::ConstructException(NS_ERROR_XPC_JAVASCRIPT_ERROR_WITH_DETAILS,
+                                            formattedMsg.get(), ifaceName,
+                                            methodName,
+                                            static_cast<nsIScriptError*>(data.get()),
+                                            exceptn, nullptr, nullptr);
+    } else {
+        rv = XPCConvert::ConstructException(NS_ERROR_XPC_JAVASCRIPT_ERROR,
+                                            nullptr, ifaceName, methodName,
+                                            nullptr, exceptn, nullptr, nullptr);
+    }
+    return rv;
+}
 
 // static
 nsresult
@@ -1185,58 +1237,6 @@ XPCConvert::JSValToXPCException(MutableHandleValue s,
         }
     }
     return NS_ERROR_FAILURE;
-}
-
-/********************************/
-
-// static
-nsresult
-XPCConvert::JSErrorToXPCException(const char* toStringResult,
-                                  const char* ifaceName,
-                                  const char* methodName,
-                                  const JSErrorReport* report,
-                                  nsIException** exceptn)
-{
-    AutoJSContext cx;
-    nsresult rv = NS_ERROR_FAILURE;
-    RefPtr<nsScriptError> data;
-    if (report) {
-        nsAutoString bestMessage;
-        if (report && report->message()) {
-            CopyUTF8toUTF16(report->message().c_str(), bestMessage);
-        } else if (toStringResult) {
-            CopyUTF8toUTF16(toStringResult, bestMessage);
-        } else {
-            bestMessage.AssignLiteral("JavaScript Error");
-        }
-
-        const char16_t* linebuf = report->linebuf();
-
-        data = new nsScriptError();
-        data->InitWithWindowID(
-            bestMessage,
-            NS_ConvertASCIItoUTF16(report->filename),
-            linebuf ? nsDependentString(linebuf, report->linebufLength()) : EmptyString(),
-            report->lineno,
-            report->tokenOffset(), report->flags,
-            NS_LITERAL_CSTRING("XPConnect JavaScript"),
-            nsJSUtils::GetCurrentlyRunningCodeInnerWindowID(cx));
-    }
-
-    if (data) {
-        nsAutoCString formattedMsg;
-        data->ToString(formattedMsg);
-
-        rv = ConstructException(NS_ERROR_XPC_JAVASCRIPT_ERROR_WITH_DETAILS,
-                                formattedMsg.get(), ifaceName, methodName,
-                                static_cast<nsIScriptError*>(data.get()),
-                                exceptn, nullptr, nullptr);
-    } else {
-        rv = ConstructException(NS_ERROR_XPC_JAVASCRIPT_ERROR,
-                                nullptr, ifaceName, methodName, nullptr,
-                                exceptn, nullptr, nullptr);
-    }
-    return rv;
 }
 
 /***************************************************************************/

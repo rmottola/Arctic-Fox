@@ -6,10 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 include LayersSurfaces;
-include protocol PCompositable;
 include protocol PCompositorBridge;
-include protocol PLayer;
-include protocol PImageContainer;
 include protocol PRenderFrame;
 include protocol PTexture;
 
@@ -51,6 +48,8 @@ using mozilla::gfx::Glyph from "Layers.h";
 using mozilla::layers::BorderColors from "mozilla/layers/LayersTypes.h";
 using mozilla::layers::BorderCorners from "mozilla/layers/LayersTypes.h";
 using mozilla::layers::BorderWidths from "mozilla/layers/LayersTypes.h";
+using mozilla::layers::LayerHandle from "mozilla/layers/LayersTypes.h";
+using mozilla::layers::CompositableHandle from "mozilla/layers/LayersTypes.h";
 
 namespace mozilla {
 namespace layers {
@@ -63,23 +62,23 @@ struct TargetConfig {
 };
 
 // Create a shadow layer for |layer|
-struct OpCreatePaintedLayer    { PLayer layer; };
-struct OpCreateContainerLayer  { PLayer layer; };
-struct OpCreateImageLayer      { PLayer layer; };
-struct OpCreateColorLayer      { PLayer layer; };
-struct OpCreateTextLayer       { PLayer layer; };
-struct OpCreateBorderLayer       { PLayer layer; };
-struct OpCreateCanvasLayer     { PLayer layer; };
-struct OpCreateRefLayer        { PLayer layer; };
+struct OpCreatePaintedLayer    { LayerHandle layer; };
+struct OpCreateContainerLayer  { LayerHandle layer; };
+struct OpCreateImageLayer      { LayerHandle layer; };
+struct OpCreateColorLayer      { LayerHandle layer; };
+struct OpCreateTextLayer       { LayerHandle layer; };
+struct OpCreateBorderLayer       { LayerHandle layer; };
+struct OpCreateCanvasLayer     { LayerHandle layer; };
+struct OpCreateRefLayer        { LayerHandle layer; };
 
 struct OpAttachCompositable {
-  PLayer layer;
-  PCompositable compositable;
+  LayerHandle layer;
+  CompositableHandle compositable;
 };
 
 struct OpAttachAsyncCompositable {
-  PLayer layer;
-  uint64_t containerID;
+  LayerHandle layer;
+  CompositableHandle compositable;
 };
 
 struct ThebesBufferData {
@@ -263,8 +262,8 @@ struct CommonLayerAttributes {
   bool isScrollbarContainer;
   int8_t mixBlendMode;
   bool forceIsolatedGroup;
-  nullable PLayer maskLayer;
-  PLayer[] ancestorMaskLayers;
+  LayerHandle maskLayer;
+  LayerHandle[] ancestorMaskLayers;
   // Animated colors will only honored for ColorLayers.
   Animation[] animations;
   nsIntRegion invalidRegion;
@@ -336,17 +335,17 @@ struct PluginWindowData {
 };
 
 struct OpSetLayerAttributes {
-  PLayer layer;
+  LayerHandle layer;
   LayerAttributes attrs;
 };
 
 // Monkey with the tree structure
-struct OpSetRoot          { PLayer root; };
-struct OpInsertAfter      { PLayer container; PLayer childLayer; PLayer after; };
-struct OpPrependChild     { PLayer container; PLayer childLayer; };
-struct OpRemoveChild      { PLayer container; PLayer childLayer; };
-struct OpRepositionChild  { PLayer container; PLayer childLayer; PLayer after; };
-struct OpRaiseToTopChild  { PLayer container; PLayer childLayer; };
+struct OpSetRoot          { LayerHandle root; };
+struct OpInsertAfter      { LayerHandle container; LayerHandle childLayer; LayerHandle after; };
+struct OpPrependChild     { LayerHandle container; LayerHandle childLayer; };
+struct OpRemoveChild      { LayerHandle container; LayerHandle childLayer; };
+struct OpRepositionChild  { LayerHandle container; LayerHandle childLayer; LayerHandle after; };
+struct OpRaiseToTopChild  { LayerHandle container; LayerHandle childLayer; };
 
 struct OpSetDiagnosticTypes { DiagnosticTypes diagnostics; };
 struct OpWindowOverlayChanged { };
@@ -474,7 +473,7 @@ union CompositableOperationDetail {
 };
 
 struct CompositableOperation {
-  PCompositable compositable;
+  CompositableHandle compositable;
   CompositableOperationDetail detail;
 };
 
@@ -512,13 +511,13 @@ union Edit {
 // operations for safety.
 union OpDestroy {
   PTexture;
-  PCompositable;
+  CompositableHandle;
 };
 
 // Replies to operations
 
 struct OpContentBufferSwap {
-  PCompositable compositable;
+  CompositableHandle compositable;
   nsIntRegion frontUpdatedRegion;
 };
 
@@ -527,7 +526,7 @@ struct OpContentBufferSwap {
  * image is composited by an ImageHost.
  */
 struct ImageCompositeNotification {
-  PImageContainer imageContainer;
+  CompositableHandle compositable;
   TimeStamp imageTimeStamp;
   TimeStamp firstCompositeTimeStamp;
   uint32_t frameID;
@@ -542,6 +541,22 @@ union EditReply {
 
 union AsyncParentMessageData {
   OpNotifyNotUsed;
+};
+
+struct TransactionInfo
+{
+  Edit[] cset;
+  OpDestroy[] toDestroy;
+  uint64_t fwdTransactionId;
+  uint64_t id;
+  TargetConfig targetConfig;
+  PluginWindowData[] plugins;
+  bool isFirstPaint;
+  bool scheduleComposite;
+  uint32_t paintSequenceNumber;
+  bool isRepeatTransaction;
+  TimeStamp transactionStart;
+  int32_t paintSyncId;
 };
 
 } // namespace
