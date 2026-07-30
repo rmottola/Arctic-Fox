@@ -6,7 +6,8 @@
 
 UNIFIED_SOURCES += [
     'Helpers.cpp',
-	'TestAtoms.cpp',
+    'TestAtoms.cpp',
+    'TestCallTemplates.cpp',
     'TestCloneInputStream.cpp',
     'TestCOMArray.cpp',
     'TestCRT.cpp',

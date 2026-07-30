@@ -20,7 +20,6 @@ SimplePrograms([
     'nsIFileEnumerator',
     'TestArguments',
     'TestBlockingProcess',
-    'TestCallTemplates',
     'TestINIParser',
     'TestPRIntN',
     'TestQuickReturn',
