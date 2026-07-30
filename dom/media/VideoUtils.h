@@ -465,6 +465,8 @@ public:
       SearchItemAt(mComma + 1);
       return *this;
     }
+    // DereferencedType should be 'const nsDependent[C]String' pointing into
+    // mList (which is 'const ns[C]String&').
     typedef decltype(Substring(Pointer(), Pointer())) DereferencedType;
     DereferencedType operator*()
     {
@@ -536,14 +538,14 @@ public:
   };
 
   explicit StringListRange(const String& aList) : mList(aList) {}
-  Iterator begin()
+  Iterator begin() const
   {
     return Iterator(mList.Data()
                     + ((empties == StringListRangeEmptyItems::ProcessEmptyItems
                         && mList.Length() == 0) ? 1 : 0),
                     mList.Length());
   }
-  Iterator end()
+  Iterator end() const
   {
     return Iterator(mList.Data() + mList.Length()
                     + (empties != StringListRangeEmptyItems::Skip ? 1 : 0),
