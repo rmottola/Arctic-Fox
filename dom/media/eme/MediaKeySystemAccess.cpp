@@ -7,8 +7,8 @@
 #include "mozilla/dom/MediaKeySystemAccess.h"
 #include "mozilla/dom/MediaKeySystemAccessBinding.h"
 #include "mozilla/Preferences.h"
+#include "MediaContentType.h"
 #include "MediaPrefs.h"
-#include "nsContentTypeParser.h"
 #ifdef MOZ_FMP4
 #include "MP4Decoder.h"
 #endif
@@ -470,12 +470,12 @@ IsPersistentSessionType(MediaKeySessionType aSessionType)
 }
 
 CodecType
-GetMajorType(const nsAString& aContentType)
+GetMajorType(const MediaMIMEType& aMIMEType)
 {
-  if (CaseInsensitiveFindInReadable(NS_LITERAL_STRING("audio/"), aContentType)) {
+  if (aMIMEType.HasAudioMajorType()) {
     return Audio;
   }
-  if (CaseInsensitiveFindInReadable(NS_LITERAL_STRING("video/"), aContentType)) {
+  if (aMIMEType.HasVideoMajorType()) {
     return Video;
   }
   return Invalid;
@@ -559,43 +559,44 @@ GetSupportedCapabilities(const CodecType aCodecType,
   // For each requested media capability in requested media capabilities:
   for (const MediaKeySystemMediaCapability& capabilities : aRequestedCapabilities) {
     // Let content type be requested media capability's contentType member.
-    const nsString& contentType = capabilities.mContentType;
+    const nsString& contentTypeString = capabilities.mContentType;
     // Let robustness be requested media capability's robustness member.
     const nsString& robustness = capabilities.mRobustness;
     // If content type is the empty string, return null.
-    if (contentType.IsEmpty()) {
+    if (contentTypeString.IsEmpty()) {
       EME_LOG("MediaKeySystemConfiguration (label='%s') "
               "MediaKeySystemMediaCapability('%s','%s') rejected; "
               "audio or video capability has empty contentType.",
               NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-              NS_ConvertUTF16toUTF8(contentType).get(),
+              NS_ConvertUTF16toUTF8(contentTypeString).get(),
               NS_ConvertUTF16toUTF8(robustness).get());
       return Sequence<MediaKeySystemMediaCapability>();
     }
     // If content type is an invalid or unrecognized MIME type, continue
     // to the next iteration.
-    nsAutoString container;
-    nsTArray<nsString> codecStrings;
-    if (!ParseMIMETypeString(contentType, container, codecStrings)) {
+    Maybe<MediaContentType> maybeContentType =
+      MakeMediaContentType(contentTypeString);
+    if (!maybeContentType) {
       EME_LOG("MediaKeySystemConfiguration (label='%s') "
               "MediaKeySystemMediaCapability('%s','%s') unsupported; "
               "failed to parse contentType as MIME type.",
               NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-              NS_ConvertUTF16toUTF8(contentType).get(),
+              NS_ConvertUTF16toUTF8(contentTypeString).get(),
               NS_ConvertUTF16toUTF8(robustness).get());
       continue;
     }
+    const MediaContentType& contentType = *maybeContentType;
     bool invalid = false;
     nsTArray<EMECodecString> codecs;
-    for (const nsString& codecString : codecStrings) {
-      EMECodecString emeCodec = ToEMEAPICodecString(codecString);
+    for (const auto& codecString : contentType.ExtendedType().Codecs().Range()) {
+      EMECodecString emeCodec = ToEMEAPICodecString(nsString(codecString));
       if (emeCodec.IsEmpty()) {
         invalid = true;
         EME_LOG("MediaKeySystemConfiguration (label='%s') "
                 "MediaKeySystemMediaCapability('%s','%s') unsupported; "
                 "'%s' is an invalid codec string.",
                 NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-                NS_ConvertUTF16toUTF8(contentType).get(),
+                NS_ConvertUTF16toUTF8(contentTypeString).get(),
                 NS_ConvertUTF16toUTF8(robustness).get(),
                 NS_ConvertUTF16toUTF8(codecString).get());
         break;
@@ -611,24 +612,26 @@ GetSupportedCapabilities(const CodecType aCodecType,
     // (Note: Per RFC 6838 [RFC6838], "Both top-level type and subtype names are
     // case-insensitive."'. We're using nsContentTypeParser and that is
     // case-insensitive and converts all its parameter outputs to lower case.)
-    NS_ConvertUTF16toUTF8 container_utf8(container);
-    const bool isMP4 = DecoderTraits::IsMP4TypeAndEnabled(container_utf8, aDiagnostics);
+    const bool isMP4 =
+      DecoderTraits::IsMP4TypeAndEnabled(contentType.Type().AsString(),
+                                         aDiagnostics);
     if (isMP4 && !aKeySystem.mMP4.IsSupported()) {
       EME_LOG("MediaKeySystemConfiguration (label='%s') "
               "MediaKeySystemMediaCapability('%s','%s') unsupported; "
               "MP4 requested but unsupported.",
               NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-              NS_ConvertUTF16toUTF8(contentType).get(),
+              NS_ConvertUTF16toUTF8(contentTypeString).get(),
               NS_ConvertUTF16toUTF8(robustness).get());
       continue;
     }
-    const bool isWebM = DecoderTraits::IsWebMTypeAndEnabled(container_utf8);
+    const bool isWebM =
+      DecoderTraits::IsWebMTypeAndEnabled(contentType.Type().AsString());
     if (isWebM && !aKeySystem.mWebM.IsSupported()) {
       EME_LOG("MediaKeySystemConfiguration (label='%s') "
               "MediaKeySystemMediaCapability('%s','%s') unsupported; "
               "WebM requested but unsupported.",
               NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-              NS_ConvertUTF16toUTF8(contentType).get(),
+              NS_ConvertUTF16toUTF8(contentTypeString).get(),
               NS_ConvertUTF16toUTF8(robustness).get());
       continue;
     }
@@ -637,7 +640,7 @@ GetSupportedCapabilities(const CodecType aCodecType,
               "MediaKeySystemMediaCapability('%s','%s') unsupported; "
               "Unsupported or unrecognized container requested.",
               NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-              NS_ConvertUTF16toUTF8(contentType).get(),
+              NS_ConvertUTF16toUTF8(contentTypeString).get(),
               NS_ConvertUTF16toUTF8(robustness).get());
       continue;
     }
@@ -646,7 +649,7 @@ GetSupportedCapabilities(const CodecType aCodecType,
     // content type.
     // If the user agent does not recognize one or more parameters, continue to
     // the next iteration.
-    if (IsParameterUnrecognized(contentType)) {
+    if (IsParameterUnrecognized(contentTypeString)) {
       continue;
     }
 
@@ -677,13 +680,13 @@ GetSupportedCapabilities(const CodecType aCodecType,
     }
 
     // If content type is not strictly a audio/video type, continue to the next iteration.
-    const auto majorType = GetMajorType(container);
+    const auto majorType = GetMajorType(contentType.Type());
     if (majorType == Invalid) {
       EME_LOG("MediaKeySystemConfiguration (label='%s') "
               "MediaKeySystemMediaCapability('%s','%s') unsupported; "
               "MIME type is not an audio or video MIME type.",
               NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-              NS_ConvertUTF16toUTF8(contentType).get(),
+              NS_ConvertUTF16toUTF8(contentTypeString).get(),
               NS_ConvertUTF16toUTF8(robustness).get());
       continue;
     }
@@ -693,7 +696,7 @@ GetSupportedCapabilities(const CodecType aCodecType,
               "MIME type mixes audio codecs in video capabilities "
               "or video codecs in audio capabilities.",
               NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-              NS_ConvertUTF16toUTF8(contentType).get(),
+              NS_ConvertUTF16toUTF8(contentTypeString).get(),
               NS_ConvertUTF16toUTF8(robustness).get());
       continue;
     }
@@ -706,7 +709,7 @@ GetSupportedCapabilities(const CodecType aCodecType,
                 "MediaKeySystemMediaCapability('%s','%s') unsupported; "
                 "unsupported robustness string.",
                 NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-                NS_ConvertUTF16toUTF8(contentType).get(),
+                NS_ConvertUTF16toUTF8(contentTypeString).get(),
                 NS_ConvertUTF16toUTF8(robustness).get());
         continue;
       }
@@ -715,7 +718,7 @@ GetSupportedCapabilities(const CodecType aCodecType,
                 "MediaKeySystemMediaCapability('%s','%s') unsupported; "
                 "unsupported robustness string.",
                 NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-                NS_ConvertUTF16toUTF8(contentType).get(),
+                NS_ConvertUTF16toUTF8(contentTypeString).get(),
                 NS_ConvertUTF16toUTF8(robustness).get());
         continue;
       }
@@ -728,7 +731,7 @@ GetSupportedCapabilities(const CodecType aCodecType,
     // restrictions...
     const auto& containerSupport = isMP4 ? aKeySystem.mMP4 : aKeySystem.mWebM;
     if (!CanDecryptAndDecode(aKeySystem.mKeySystem,
-                             contentType,
+                             contentTypeString,
                              majorType,
                              containerSupport,
                              codecs,
@@ -737,7 +740,7 @@ GetSupportedCapabilities(const CodecType aCodecType,
                 "MediaKeySystemMediaCapability('%s','%s') unsupported; "
                 "codec unsupported by CDM requested.",
                 NS_ConvertUTF16toUTF8(aPartialConfig.mLabel).get(),
-                NS_ConvertUTF16toUTF8(contentType).get(),
+                NS_ConvertUTF16toUTF8(contentTypeString).get(),
                 NS_ConvertUTF16toUTF8(robustness).get());
         continue;
     }
