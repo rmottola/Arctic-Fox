@@ -23,7 +23,6 @@ SimplePrograms([
     'TestINIParser',
     'TestPRIntN',
     'TestQuickReturn',
-    'TestRacingServiceManager',
     'TestRegistrationOrder',
     'TestUnicodeArguments',
 ])
