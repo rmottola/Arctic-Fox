@@ -50,8 +50,7 @@ GeckoCppUnitTests([
     'TestStringAPI',
     'TestTArray',
     'TestTextFormatter',
-    'TestThreadUtils',
-    'TestTimers'
+    'TestThreadUtils'
 ])
 
 # FIXME: bug 577500 TestStaticAtoms fails when run in dist/bin
