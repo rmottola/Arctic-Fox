@@ -27,6 +27,7 @@ UNIFIED_SOURCES += [
     'TestSynchronization.cpp',
     'TestTArray.cpp',
     'TestThreadPool.cpp',
+    'TestThreadPoolListener.cpp',
     'TestThreads.cpp',
     'TestTimers.cpp',	
     'TestTimeStamp.cpp',

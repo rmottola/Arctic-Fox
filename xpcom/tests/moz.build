@@ -25,7 +25,6 @@ SimplePrograms([
     'TestQuickReturn',
     'TestRacingServiceManager',
     'TestRegistrationOrder',
-    'TestThreadPoolListener',
     'TestUnicodeArguments',
 ])
 
