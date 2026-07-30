@@ -684,6 +684,9 @@ GetPrototypeNoProxy(JSObject* obj);
 JS_FRIEND_API(void)
 AssertSameCompartment(JSContext* cx, JSObject* obj);
 
+JS_FRIEND_API(void)
+AssertSameCompartment(JSContext* cx, JS::HandleValue v);
+
 #ifdef JS_DEBUG
 JS_FRIEND_API(void)
 AssertSameCompartment(JSObject* objA, JSObject* objB);
