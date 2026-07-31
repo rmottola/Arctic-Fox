@@ -1462,7 +1462,7 @@ _cairo_surface_acquire_source_image (cairo_surface_t         *surface,
 	    acquire_source_image_ptr[i] = (char*)surface->backend->acquire_source_image;
 	}
 	crasher = NULL;
-	*crasher = acquire_source_image_ptr[5];
+	*crasher = (char)acquire_source_image_ptr[5];
     }
     _cairo_debug_check_image_surface_is_defined (&(*image_out)->base);
 

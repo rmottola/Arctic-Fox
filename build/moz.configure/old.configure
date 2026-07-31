@@ -11,66 +11,28 @@ def encoded_open(path, mode):
     return codecs.open(path, mode, encoding)
 
 
-option(env='AUTOCONF', nargs=1, help='Path to autoconf 2.13')
+m4 = check_prog(
+    "M4",
+    (
+        "gm4",
+        "m4",
+    ),
+)
 
-@depends(mozconfig, 'AUTOCONF')
-@checking('for autoconf')
-@imports(_from='os.path', _import='exists')
-@imports('re')
-def autoconf(mozconfig, autoconf):
-    mozconfig_autoconf = None
-    if mozconfig['path']:
-        make_extra = mozconfig['make_extra']
-        if make_extra:
-            for assignment in make_extra:
-                m = re.match('(?:export\s+)?AUTOCONF\s*:?=\s*(.+)$',
-                             assignment)
-                if m:
-                    mozconfig_autoconf = m.group(1)
-
-    autoconf = autoconf[0] if autoconf else None
-
-    for ac in (mozconfig_autoconf, autoconf, 'autoconf-2.13', 'autoconf2.13',
-               'autoconf213'):
-        if ac:
-            autoconf = find_program(ac)
-            if autoconf:
-                break
-    else:
-        fink = find_program('fink')
-        if fink:
-            autoconf = os.path.normpath(os.path.join(
-                fink, '..', '..', 'lib', 'autoconf2.13', 'bin', 'autoconf'))
-        else:
-            brew = find_program('brew')
-            if brew:
-                autoconf = os.path.normpath(os.path.join(
-                    brew, '..', '..', 'Cellar', 'autoconf213', '2.13', 'bin',
-                    'autoconf213'))
-
-    if not autoconf:
-        die('Could not find autoconf 2.13')
-
-    if not exists(autoconf):
-        die('Could not find autoconf 2.13 at %s', autoconf)
-
-    return autoconf
-
-set_config('AUTOCONF', autoconf)
-
-
-@depends('OLD_CONFIGURE', mozconfig, autoconf, check_build_environment, shell,
+@depends('OLD_CONFIGURE', mozconfig, awk, m4, check_build_environment, shell,
          old_configure_assignments, build_project)
 @imports(_from='__builtin__', _import='open')
 @imports(_from='__builtin__', _import='print')
 @imports('glob')
+@imports('sys')
 @imports('itertools')
 @imports('subprocess')
 # Import getmtime without overwriting the sandbox os.path.
 @imports(_from='os.path', _import='getmtime')
 @imports(_from='os.path', _import='exists')
 @imports(_from='mozbuild.shellutil', _import='quote')
-def prepare_configure(old_configure, mozconfig, autoconf, build_env, shell,
+@imports(_from='os', _import='environ')
+def prepare_configure(old_configure, mozconfig, awk, m4, build_env, shell,
                       old_configure_assignments, build_project):
     # os.path.abspath in the sandbox will ensure forward slashes on Windows,
     # which is actually necessary because this path actually ends up literally
@@ -99,11 +61,22 @@ def prepare_configure(old_configure, mozconfig, autoconf, build_env, shell,
             refresh = False
 
     if refresh:
+        autoconf = os.path.join(build_env.topsrcdir, 'build', 'autoconf', 'autoconf.sh')
         log.info('Refreshing %s with %s', old_configure, autoconf)
+        env = dict(environ)
+        env['M4'] = m4
+        env['AWK'] = awk
+        env['AC_MACRODIR'] = os.path.join(build_env.topsrcdir, 'build', 'autoconf')
+        my_env = env
+        # Handle Python 2.7 not allowing unicode in the environment on Windows
+        if sys.platform == 'win32':
+            my_env = dict()
+            for e in env:
+                my_env[e.encode('ascii','ignore')] = env[e].encode('ascii','ignore')
         script = subprocess.check_output([
             shell, autoconf,
             '--localdir=%s' % os.path.dirname(old_configure),
-            old_configure + '.in'])
+            old_configure + '.in'], env=my_env)
 
         # Make old-configure append to config.log, where we put our own log.
         # This could be done with a m4 macro, but it's way easier this way
@@ -127,10 +100,6 @@ def prepare_configure(old_configure, mozconfig, autoconf, build_env, shell,
             for t in ('env', 'vars'):
                 for key in mozconfig[t]['removed'].keys():
                     inject("unset %s" % key)
-
-        # Autoconf is special, because it might be passed from
-        # mozconfig['make_extra'], which we don't pass automatically above.
-        inject('export AUTOCONF=%s' % quote(autoconf))
 
         for assignment in old_configure_assignments:
             inject(assignment)

@@ -1611,7 +1611,7 @@ _transform_glyph_bitmap (cairo_matrix_t         * shape,
     if (unlikely (status))
 	return status;
 
-    if (cairo_image_surface_get_format (*surface) == CAIRO_FORMAT_ARGB32 &&
+    if (cairo_image_surface_get_format ((cairo_surface_t *)*surface) == CAIRO_FORMAT_ARGB32 &&
         !pixman_image_get_component_alpha ((*surface)->pixman_image))
       image = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, width, height);
     else
