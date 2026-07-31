@@ -1456,10 +1456,6 @@ private:
 
   void OnSeekTaskResolved()
   {
-    if (mIsAudioQueueFinished) {
-      AudioQueue().Finish();
-    }
-
     if (mIsVideoQueueFinished) {
       VideoQueue().Finish();
     }
@@ -1469,10 +1465,6 @@ private:
 
   void OnSeekTaskRejected(const MediaResult& aError)
   {
-    if (mIsAudioQueueFinished) {
-      AudioQueue().Finish();
-    }
-
     if (mIsVideoQueueFinished) {
       VideoQueue().Finish();
     }
@@ -1550,7 +1542,6 @@ private:
   /*
    * Information which are going to be returned to MDSM.
    */
-  bool mIsAudioQueueFinished = false;
   bool mIsVideoQueueFinished = false;
 };
 
