@@ -1281,7 +1281,9 @@ private:
       return aSampleTime <= currentTime;
     });
 
-    if (!IsVideoRequestPending() && NeedMoreVideo()) {
+    if (NeedMoreVideo() &&
+        !Reader()->IsRequestingVideoData() &&
+        !Reader()->IsWaitingVideoData()) {
       RequestVideoData();
     }
 
@@ -1452,11 +1454,6 @@ private:
     // Need to request video when we have none and video queue is not finished.
     return VideoQueue().GetSize() == 0 &&
            !VideoQueue().IsFinished();
-  }
-
-  bool IsVideoRequestPending() const
-  {
-    return Reader()->IsRequestingVideoData() || Reader()->IsWaitingVideoData();
   }
 
   // Update the seek target's time before resolving this seek task, the updated
