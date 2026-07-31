@@ -1399,7 +1399,7 @@ private:
     if (!mTask->IsVideoRequestPending() && mTask->NeedMoreVideo()) {
       mTask->RequestVideoData();
     }
-    mTask->MaybeFinishSeek(); // Might resolve mSeekTaskPromise and modify audio queue.
+    MaybeFinishSeek(); // Might resolve mSeekTaskPromise and modify audio queue.
   }
 
   void HandleAudioDecoded(MediaData* aAudio) override
@@ -1415,7 +1415,7 @@ private:
     // We accept any audio data here.
     mTask->mSeekedAudioData = aAudio;
 
-    mTask->MaybeFinishSeek();
+    MaybeFinishSeek();
   }
 
   void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
@@ -1437,7 +1437,7 @@ private:
       return;
     }
 
-    mTask->MaybeFinishSeek();
+    MaybeFinishSeek();
   }
 
   void HandleNotDecoded(MediaData::Type aType, const MediaResult& aError) override
@@ -1453,7 +1453,7 @@ private:
       // audio decoding tasks if it needs to play audio, and MDSM will then receive
       // the decoding state from MediaDecoderReader.
 
-      mTask->MaybeFinishSeek();
+      MaybeFinishSeek();
       break;
     }
     case MediaData::VIDEO_DATA:
@@ -1486,7 +1486,7 @@ private:
         return;
       }
 
-      mTask->MaybeFinishSeek();
+      MaybeFinishSeek();
       break;
     }
     default:
@@ -1500,7 +1500,7 @@ private:
 
     // We don't make an audio decode request here, instead, let MDSM to
     // trigger further audio decode tasks if MDSM itself needs to play audio.
-    mTask->MaybeFinishSeek();
+    MaybeFinishSeek();
   }
 
   void HandleVideoWaited(MediaData::Type aType) override
@@ -1511,7 +1511,7 @@ private:
       mTask->RequestVideoData();
       return;
     }
-    mTask->MaybeFinishSeek();
+    MaybeFinishSeek();
   }
 
   void HandleNotWaited(const WaitForDataRejectValue& aRejection) override
@@ -1523,7 +1523,7 @@ private:
     {
       // We don't make an audio decode request here, instead, let MDSM to
       // trigger further audio decode tasks if MDSM itself needs to play audio.
-      mTask->MaybeFinishSeek();
+      MaybeFinishSeek();
       break;
     }
     case MediaData::VIDEO_DATA:
@@ -1533,7 +1533,7 @@ private:
         mTask->RejectIfExist(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
         return;
       }
-      mTask->MaybeFinishSeek();
+      MaybeFinishSeek();
       break;
     }
     default:
@@ -1588,6 +1588,20 @@ private:
     }
 
     mMaster->DecodeError(aValue.mError);
+  }
+
+  void MaybeFinishSeek()
+  {
+    if (mTask->IsAudioSeekComplete() && mTask->IsVideoSeekComplete()) {
+      mTask->UpdateSeekTargetTime();
+
+      auto time = mTask->mTarget.GetTime().ToMicroseconds();
+      DiscardFrames(mTask->mAudioQueue, [time] (int64_t aSampleTime) {
+        return aSampleTime < time;
+      });
+
+      mTask->Resolve(__func__); // Call to MDSM::SeekCompleted();
+    }
   }
 
   // For refactoring only, will be removed later.
