@@ -2368,7 +2368,7 @@ ShutdownState::Enter()
   // Shut down the watch manager to stop further notifications.
   master->mWatchManager.Shutdown();
 
-  return Reader()->Shutdown()->ThenPromise(
+  return Reader()->Shutdown()->Then(
     OwnerThread(), __func__, master,
     &MediaDecoderStateMachine::FinishShutdown,
     &MediaDecoderStateMachine::FinishShutdown);
