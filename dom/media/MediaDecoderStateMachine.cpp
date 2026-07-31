@@ -1018,8 +1018,8 @@ private:
              [this] (media::TimeUnit aUnit) {
                OnSeekResolved(aUnit);
              },
-             [this] (nsresult aResult) {
-               OnSeekRejected(aResult);
+             [this] (const MediaResult& aError) {
+               OnSeekRejected(aError);
              }));
   }
 
@@ -1070,11 +1070,11 @@ private:
     }
   }
 
-  void OnSeekRejected(nsresult aResult) {
+  void OnSeekRejected(const MediaResult& aError) {
     mSeekRequest.Complete();
 
-    MOZ_ASSERT(NS_FAILED(aResult), "Cancels should also disconnect mSeekRequest");
-    OnSeekTaskRejected(aResult);
+    MOZ_ASSERT(NS_FAILED(aError), "Cancels should also disconnect mSeekRequest");
+    OnSeekTaskRejected(aError);
   }
 
   void RequestAudioData()
@@ -1536,7 +1536,7 @@ private:
     SeekCompleted();
   }
 
-  void OnSeekTaskRejected(MediaResult aError)
+  void OnSeekTaskRejected(const MediaResult& aError)
   {
     if (mIsAudioQueueFinished) {
       AudioQueue().Finish();
