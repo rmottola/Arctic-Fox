@@ -1329,10 +1329,7 @@ private:
 
   void HandleAudioDecoded(MediaData* aAudio) override
   {
-    MOZ_ASSERT(aAudio);
-    MOZ_ASSERT(!mSeekJob.mPromise.IsEmpty(), "Seek shouldn't be finished");
     mMaster->Push(aAudio);
-    MaybeFinishSeek();
   }
 
   void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
@@ -1359,11 +1356,8 @@ private:
     switch (aType) {
     case MediaData::AUDIO_DATA:
     {
-      // We don't really handle audio deocde error here. Let MDSM to trigger further
-      // audio decoding tasks if it needs to play audio, and MDSM will then receive
-      // the decoding state from MediaDecoderReader.
-
-      MaybeFinishSeek();
+      // We don't care about audio decode errors in this state which will be
+      // handled by other states after seeking.
       break;
     }
     case MediaData::VIDEO_DATA:
@@ -1402,11 +1396,7 @@ private:
 
   void HandleAudioWaited(MediaData::Type aType) override
   {
-    MOZ_ASSERT(!mSeekJob.mPromise.IsEmpty(), "Seek shouldn't be finished");
-
-    // We don't make an audio decode request here, instead, let MDSM to
-    // trigger further audio decode tasks if MDSM itself needs to play audio.
-    MaybeFinishSeek();
+    // We don't care about audio in this state.
   }
 
   void HandleVideoWaited(MediaData::Type aType) override
@@ -1427,9 +1417,7 @@ private:
     switch(aRejection.mType) {
     case MediaData::AUDIO_DATA:
     {
-      // We don't make an audio decode request here, instead, let MDSM to
-      // trigger further audio decode tasks if MDSM itself needs to play audio.
-      MaybeFinishSeek();
+      // We don't care about audio in this state.
       break;
     }
     case MediaData::VIDEO_DATA:
@@ -1471,13 +1459,6 @@ private:
     return Reader()->IsRequestingVideoData() || Reader()->IsWaitingVideoData();
   }
 
-  bool IsAudioSeekComplete() const
-  {
-    // Don't finish seek until there are no pending requests. Otherwise, we might
-    // lose audio samples for the promise is resolved asynchronously.
-    return !Reader()->IsRequestingAudioData() && !Reader()->IsWaitingAudioData();
-  }
-
   bool IsVideoSeekComplete() const
   {
     // Don't finish seek until there are no pending requests. Otherwise, we might
@@ -1501,7 +1482,7 @@ private:
 
   void MaybeFinishSeek()
   {
-    if (IsAudioSeekComplete() && IsVideoSeekComplete()) {
+    if (IsVideoSeekComplete()) {
       UpdateSeekTargetTime();
 
       auto time = mSeekJob.mTarget->GetTime().ToMicroseconds();
