@@ -1019,8 +1019,8 @@ private:
              [this] (media::TimeUnit aUnit) {
                OnSeekResolved(aUnit);
              },
-             [this] (const MediaResult& aError) {
-               OnSeekRejected(aError);
+             [this] (const SeekRejectValue& aReject) {
+               OnSeekRejected(aReject);
              }));
   }
 
@@ -1071,10 +1071,10 @@ private:
     }
   }
 
-  void OnSeekRejected(const MediaResult& aError) {
+  void OnSeekRejected(const SeekRejectValue& aReject) {
     mSeekRequest.Complete();
-    MOZ_ASSERT(NS_FAILED(aError), "Cancels should also disconnect mSeekRequest");
-    mMaster->DecodeError(aError);
+    MOZ_ASSERT(NS_FAILED(aReject.mError), "Cancels should also disconnect mSeekRequest");
+    mMaster->DecodeError(aReject.mError);
   }
 
   void RequestAudioData()
