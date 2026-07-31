@@ -201,8 +201,10 @@ static const NSOpenGLPixelFormatAttribute kAttribs_doubleBuffered_accel_webrende
     NSOpenGLPFAAccelerated,
     NSOpenGLPFAAllowOfflineRenderers,
     NSOpenGLPFADoubleBuffer,
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
     NSOpenGLPFAOpenGLProfile,
     NSOpenGLProfileVersion3_2Core,
+#endif
     0
 };
 
@@ -222,9 +224,9 @@ static const NSOpenGLPixelFormatAttribute kAttribs_offscreen_accel[] = {
 
 static const NSOpenGLPixelFormatAttribute kAttribs_offscreen_coreProfile[] = {
     NSOpenGLPFAAccelerated,
-    #if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
     NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
-    #endif
+#endif
     0
 };
 

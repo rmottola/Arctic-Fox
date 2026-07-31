@@ -1621,6 +1621,9 @@ nsGlobalWindow::CleanUp()
 
   mConsole = nullptr;
 
+  mAudioWorklet = nullptr;
+  mPaintWorklet = nullptr;
+
   mExternal = nullptr;
 
   mMozSelfSupport = nullptr;
@@ -1985,6 +1988,8 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCrypto)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mU2F)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConsole)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAudioWorklet)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPaintWorklet)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mExternal)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMozSelfSupport)
 
@@ -2058,6 +2063,8 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindow)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCrypto)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mU2F)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mConsole)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mAudioWorklet)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mPaintWorklet)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mExternal)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mMozSelfSupport)
 
@@ -12628,9 +12635,14 @@ nsGlobalWindow::RunTimeoutHandler(Timeout* aTimeout,
       AutoEntryScript aes(this, reason, true);
       JS::CompileOptions options(aes.cx());
       options.setFileAndLine(filename, lineNo).setVersion(JSVERSION_DEFAULT);
+      options.setNoScriptRval(true);
       JS::Rooted<JSObject*> global(aes.cx(), FastGetGlobalJSObject());
-      nsresult rv =
-        nsJSUtils::EvaluateString(aes.cx(), script, global, options);
+      nsresult rv = NS_OK;
+      {
+        nsJSUtils::ExecutionContext exec(aes.cx(), global);
+        rv = exec.CompileAndExec(options, script);
+      }
+
       if (rv == NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW_UNCATCHABLE) {
         abortIntervalHandler = true;
       }
@@ -14360,18 +14372,40 @@ nsGlobalWindow::TemporarilyDisableDialogs::~TemporarilyDisableDialogs()
   }
 }
 
-already_AddRefed<Worklet>
-nsGlobalWindow::CreateWorklet(ErrorResult& aRv)
+Worklet*
+nsGlobalWindow::GetAudioWorklet(ErrorResult& aRv)
 {
   MOZ_RELEASE_ASSERT(IsInnerWindow());
 
-  if (!mDoc) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return nullptr;
+  if (!mAudioWorklet) {
+    nsIPrincipal* principal = GetPrincipal();
+    if (!principal) {
+      aRv.Throw(NS_ERROR_FAILURE);
+      return nullptr;
+    }
+
+    mAudioWorklet = new Worklet(AsInner(), principal, Worklet::eAudioWorklet);
   }
 
-  RefPtr<Worklet> worklet = new Worklet(AsInner(), mDoc->NodePrincipal());
-  return worklet.forget();
+  return mAudioWorklet;
+}
+
+Worklet*
+nsGlobalWindow::GetPaintWorklet(ErrorResult& aRv)
+{
+  MOZ_RELEASE_ASSERT(IsInnerWindow());
+
+  if (!mPaintWorklet) {
+    nsIPrincipal* principal = GetPrincipal();
+    if (!principal) {
+      aRv.Throw(NS_ERROR_FAILURE);
+      return nullptr;
+    }
+
+    mPaintWorklet = new Worklet(AsInner(), principal, Worklet::ePaintWorklet);
+  }
+
+  return mPaintWorklet;
 }
 
 template class nsPIDOMWindow<mozIDOMWindowProxy>;

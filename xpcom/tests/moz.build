@@ -20,13 +20,10 @@ SimplePrograms([
     'nsIFileEnumerator',
     'TestArguments',
     'TestBlockingProcess',
-    'TestCallTemplates',
     'TestINIParser',
     'TestPRIntN',
     'TestQuickReturn',
-    'TestRacingServiceManager',
     'TestRegistrationOrder',
-    'TestThreadPoolListener',
     'TestUnicodeArguments',
 ])
 
@@ -50,21 +47,13 @@ GeckoCppUnitTests([
     'TestStringAPI',
     'TestTArray',
     'TestTextFormatter',
-    'TestThreadUtils',
-    'TestTimers'
+    'TestThreadUtils'
 ])
 
 # FIXME: bug 577500 TestStaticAtoms fails when run in dist/bin
 #CPP_UNIT_TESTS += [
 #    'TestStaticAtoms',
 #]
-
-if CONFIG['MOZ_DEBUG'] and CONFIG['OS_ARCH'] not in ('WINNT'):
-    # FIXME bug 523392: TestDeadlockDetector doesn't like Windows
-    # FIXME bug 523378: also fails on OS X
-    GeckoCppUnitTests([
-        'TestDeadlockDetectorScalability',
-    ])
 
 if CONFIG['COMPILE_ENVIRONMENT']:
     TEST_HARNESS_FILES.xpcshell.xpcom.tests.unit += [

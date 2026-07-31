@@ -95,7 +95,7 @@
 #include "mozilla/Telemetry.h"
 #include "DecoderDoctorDiagnostics.h"
 #include "DecoderTraits.h"
-#include "MediaContentType.h"
+#include "MediaContainerType.h"
 
 #include "ImageContainer.h"
 #include "nsRange.h"
@@ -1444,7 +1444,9 @@ void
 HTMLMediaElement::GetMozDebugReaderData(nsAString& aString)
 {
   if (mDecoder && !mSrcStream) {
-    mDecoder->GetMozDebugReaderData(aString);
+    nsAutoCString result;
+    mDecoder->GetMozDebugReaderData(result);
+    aString = NS_ConvertUTF8toUTF16(result);
   }
 }
 
@@ -4448,8 +4450,11 @@ CanPlayStatus
 HTMLMediaElement::GetCanPlay(const nsAString& aType,
                              DecoderDoctorDiagnostics* aDiagnostics)
 {
-  MediaContentType contentType{aType};
-  return DecoderTraits::CanHandleContentType(contentType, aDiagnostics);
+  Maybe<MediaContainerType> containerType = MakeMediaContainerType(aType);
+  if (!containerType) {
+    return CANPLAY_NO;
+  }
+  return DecoderTraits::CanHandleContainerType(*containerType, aDiagnostics);
 }
 
 NS_IMETHODIMP

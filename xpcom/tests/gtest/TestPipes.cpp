@@ -107,7 +107,7 @@ TestPipe(nsIInputStream* in, nsIOutputStream* out)
     nsresult rv;
 
     nsCOMPtr<nsIThread> thread;
-    rv = NS_NewThread(getter_AddRefs(thread), receiver);
+    rv = NS_NewNamedThread("TestPipe", getter_AddRefs(thread), receiver);
     if (NS_FAILED(rv)) return rv;
 
     uint32_t total = 0;
@@ -225,7 +225,8 @@ TestShortWrites(nsIInputStream* in, nsIOutputStream* out)
     nsresult rv;
 
     nsCOMPtr<nsIThread> thread;
-    rv = NS_NewThread(getter_AddRefs(thread), receiver);
+    rv = NS_NewNamedThread("TestShortWrites", getter_AddRefs(thread),
+                           receiver);
     if (NS_FAILED(rv)) return rv;
 
     uint32_t total = 0;
@@ -330,14 +331,15 @@ TEST(Pipes, ChainedPipes)
     if (pump == nullptr) return;
 
     nsCOMPtr<nsIThread> thread;
-    rv = NS_NewThread(getter_AddRefs(thread), pump);
+    rv = NS_NewNamedThread("ChainedPipePump", getter_AddRefs(thread), pump);
     if (NS_FAILED(rv)) return;
 
     RefPtr<nsReceiver> receiver = new nsReceiver(in2);
     if (receiver == nullptr) return;
 
     nsCOMPtr<nsIThread> receiverThread;
-    rv = NS_NewThread(getter_AddRefs(receiverThread), receiver);
+    rv = NS_NewNamedThread("ChainedPipeRecv", getter_AddRefs(receiverThread),
+                           receiver);
     if (NS_FAILED(rv)) return;
 
     uint32_t total = 0;
@@ -1001,11 +1003,11 @@ CloseDuringReadFunc(nsIInputStream *aReader,
                     uint32_t aCount,
                     uint32_t* aWriteCountOut)
 {
-  MOZ_ASSERT(aReader);
-  MOZ_ASSERT(aClosure);
-  MOZ_ASSERT(aFromSegment);
-  MOZ_ASSERT(aWriteCountOut);
-  MOZ_ASSERT(aToOffset == 0);
+  MOZ_RELEASE_ASSERT(aReader);
+  MOZ_RELEASE_ASSERT(aClosure);
+  MOZ_RELEASE_ASSERT(aFromSegment);
+  MOZ_RELEASE_ASSERT(aWriteCountOut);
+  MOZ_RELEASE_ASSERT(aToOffset == 0);
 
   // This is insanity and you probably should not do this under normal
   // conditions.  We want to simulate the case where the pipe is closed
@@ -1094,5 +1096,4 @@ TEST(Pipes, Interfaces)
 
   nsCOMPtr<nsIBufferedInputStream> readerType6 = do_QueryInterface(reader);
   ASSERT_TRUE(readerType6);
-
 }

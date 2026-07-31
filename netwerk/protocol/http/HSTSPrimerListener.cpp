@@ -15,6 +15,7 @@
 #include "nsISSLStatus.h"
 #include "nsISSLStatusProvider.h"
 #include "nsStreamUtils.h"
+#include "nsStreamListenerWrapper.h"
 #include "nsHttpChannel.h"
 #include "LoadInfo.h"
 #include "mozilla/Unused.h"
@@ -25,7 +26,8 @@ namespace net {
 using namespace mozilla;
 
 NS_IMPL_ISUPPORTS(HSTSPrimingListener, nsIStreamListener,
-                  nsIRequestObserver, nsIInterfaceRequestor)
+                  nsIRequestObserver, nsIInterfaceRequestor,
+                  nsITimerCallback)
 
 // default to 3000ms, same as the preference
 uint32_t HSTSPrimingListener::sHSTSPrimingTimeout = 3000;
@@ -71,6 +73,7 @@ HSTSPrimingListener::OnStartRequest(nsIRequest *aRequest,
 {
   nsCOMPtr<nsIHstsPrimingCallback> callback;
   callback.swap(mCallback);
+
   if (mHSTSPrimingTimer) {
     Unused << mHSTSPrimingTimer->Cancel();
     mHSTSPrimingTimer = nullptr;
@@ -78,7 +81,9 @@ HSTSPrimingListener::OnStartRequest(nsIRequest *aRequest,
 
   // if callback is null, we have already canceled this request and reported
   // the failure
-  NS_ENSURE_STATE(callback);
+  if (!callback) {
+    return NS_OK;
+  }
 
   nsresult primingResult = CheckHSTSPrimingRequestStatus(aRequest);
   ReportTiming(primingResult);

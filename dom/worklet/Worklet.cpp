@@ -5,7 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Worklet.h"
-#include "WorkletGlobalScope.h"
+#include "AudioWorkletGlobalScope.h"
+#include "PaintWorkletGlobalScope.h"
+
 #include "mozilla/dom/WorkletBinding.h"
 #include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/Fetch.h"
@@ -203,14 +205,14 @@ public:
     compileOptions.setFileAndLine(NS_ConvertUTF16toUTF8(mURL).get(), 0);
     compileOptions.setVersion(JSVERSION_DEFAULT);
     compileOptions.setIsRunOnce(true);
-
-    // We only need the setNoScriptRval bit when compiling off-thread here,
-    // since otherwise nsJSUtils::EvaluateString will set it up for us.
     compileOptions.setNoScriptRval(true);
+
+    JSAutoCompartment comp(cx, globalObj);
 
     JS::Rooted<JS::Value> unused(cx);
     if (!JS::Evaluate(cx, compileOptions, buffer, &unused)) {
       ErrorResult error;
+      error.MightThrowJSException();
       error.StealExceptionFromJSContext(cx);
       RejectPromises(error.StealNSResult());
       return NS_OK;
@@ -323,9 +325,11 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Worklet)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-Worklet::Worklet(nsPIDOMWindowInner* aWindow, nsIPrincipal* aPrincipal)
+Worklet::Worklet(nsPIDOMWindowInner* aWindow, nsIPrincipal* aPrincipal,
+                 WorkletType aWorkletType)
   : mWindow(aWindow)
   , mPrincipal(aPrincipal)
+  , mWorkletType(aWorkletType)
 {
   MOZ_ASSERT(aWindow);
   MOZ_ASSERT(aPrincipal);
@@ -355,7 +359,14 @@ WorkletGlobalScope*
 Worklet::GetOrCreateGlobalScope(JSContext* aCx)
 {
   if (!mScope) {
-    mScope = new WorkletGlobalScope(mWindow);
+    switch (mWorkletType) {
+      case eAudioWorklet:
+        mScope = new AudioWorkletGlobalScope(mWindow);
+        break;
+      case ePaintWorklet:
+        mScope = new PaintWorkletGlobalScope(mWindow);
+        break;
+    }
 
     JS::Rooted<JSObject*> global(aCx);
     NS_ENSURE_TRUE(mScope->WrapGlobalObject(aCx, mPrincipal, &global), nullptr);
