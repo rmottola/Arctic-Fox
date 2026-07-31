@@ -1459,13 +1459,6 @@ private:
     return Reader()->IsRequestingVideoData() || Reader()->IsWaitingVideoData();
   }
 
-  bool IsVideoSeekComplete() const
-  {
-    // Don't finish seek until there are no pending requests. Otherwise, we might
-    // lose video samples for the promise is resolved asynchronously.
-    return !IsVideoRequestPending() && !NeedMoreVideo();
-  }
-
   // Update the seek target's time before resolving this seek task, the updated
   // time will be used in the MDSM::SeekCompleted() to update the MDSM's position.
   void UpdateSeekTargetTime()
@@ -1482,7 +1475,7 @@ private:
 
   void MaybeFinishSeek()
   {
-    if (IsVideoSeekComplete()) {
+    if (!NeedMoreVideo()) {
       UpdateSeekTargetTime();
 
       auto time = mSeekJob.mTarget->GetTime().ToMicroseconds();
