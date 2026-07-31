@@ -1073,9 +1073,9 @@ private:
   void RequestVideoData()
   {
     MOZ_ASSERT(!mDoneVideoSeeking);
-    MOZ_ASSERT(!Reader()->IsRequestingVideoData());
+    MOZ_ASSERT(!mMaster->IsRequestingVideoData());
     MOZ_ASSERT(!Reader()->IsWaitingVideoData());
-    Reader()->RequestVideoData(false, media::TimeUnit());
+    mMaster->RequestVideoData(false, media::TimeUnit());
   }
 
   void AdjustFastSeekIfNeeded(MediaData* aSample)
@@ -1283,7 +1283,7 @@ private:
 
     if (!NeedMoreVideo()) {
       FinishSeek();
-    } else if (!Reader()->IsRequestingVideoData() &&
+    } else if (!mMaster->IsRequestingVideoData() &&
                !Reader()->IsWaitingVideoData()) {
       RequestVideoData();
     }
@@ -1433,7 +1433,7 @@ private:
 
   void RequestVideoData()
   {
-    Reader()->RequestVideoData(false, media::TimeUnit());
+    mMaster->RequestVideoData(false, media::TimeUnit());
   }
 
   bool NeedMoreVideo() const
@@ -2144,7 +2144,7 @@ BufferingState::Step()
                Reader()->IsWaitingAudioData());
     MOZ_ASSERT(mMaster->mMinimizePreroll ||
                !mMaster->OutOfDecodedVideo() ||
-               Reader()->IsRequestingVideoData() ||
+               mMaster->IsRequestingVideoData() ||
                Reader()->IsWaitingVideoData());
     SLOG("In buffering mode, waiting to be notified: outOfAudio: %d, "
          "mAudioStatus: %s, outOfVideo: %d, mVideoStatus: %s",
@@ -2191,6 +2191,7 @@ ShutdownState::Enter()
   // To break the cycle-reference between MediaDecoderReaderWrapper and MDSM.
   master->CancelMediaDecoderReaderWrapperCallback();
   master->mAudioDataRequest.DisconnectIfExists();
+  master->mVideoDataRequest.DisconnectIfExists();
 
   master->Reset();
 
@@ -2583,6 +2584,14 @@ MediaDecoderStateMachine::OnAudioNotDecoded(const MediaResult& aError)
 }
 
 void
+MediaDecoderStateMachine::OnVideoNotDecoded(const MediaResult& aError)
+{
+  MOZ_ASSERT(OnTaskQueue());
+  mVideoDataRequest.Complete();
+  OnNotDecoded(MediaData::VIDEO_DATA, aError);
+}
+
+void
 MediaDecoderStateMachine::OnNotDecoded(MediaData::Type aType,
                                        const MediaResult& aError)
 {
@@ -2597,6 +2606,8 @@ MediaDecoderStateMachine::OnVideoDecoded(MediaData* aVideo,
 {
   MOZ_ASSERT(OnTaskQueue());
   MOZ_ASSERT(aVideo);
+
+  mVideoDataRequest.Complete();
 
   // Handle abnormal or negative timestamps.
   mDecodedVideoEndTime = std::max(mDecodedVideoEndTime, aVideo->GetEndTime());
@@ -2708,17 +2719,6 @@ MediaDecoderStateMachine::SetMediaDecoderReaderWrapperCallback()
 {
   MOZ_ASSERT(OnTaskQueue());
 
-  mVideoCallback = mReader->VideoCallback().Connect(
-    mTaskQueue, [this] (VideoCallbackData aData) {
-    typedef Tuple<MediaData*, TimeStamp> Type;
-    if (aData.is<Type>()) {
-      auto&& v = aData.as<Type>();
-      OnVideoDecoded(Get<0>(v), Get<1>(v));
-    } else {
-      OnNotDecoded(MediaData::VIDEO_DATA, aData.as<MediaResult>());
-    }
-  });
-
   mAudioWaitCallback = mReader->AudioWaitCallback().Connect(
     mTaskQueue, [this] (WaitCallbackData aData) {
     if (aData.is<MediaData::Type>()) {
@@ -2742,7 +2742,6 @@ void
 MediaDecoderStateMachine::CancelMediaDecoderReaderWrapperCallback()
 {
   MOZ_ASSERT(OnTaskQueue());
-  mVideoCallback.Disconnect();
   mAudioWaitCallback.Disconnect();
   mVideoWaitCallback.Disconnect();
 }
@@ -3121,33 +3120,35 @@ MediaDecoderStateMachine::EnsureVideoDecodeTaskQueued()
   }
 
   if (!IsVideoDecoding() ||
-      mReader->IsRequestingVideoData() ||
+      IsRequestingVideoData() ||
       mReader->IsWaitingVideoData()) {
     return;
   }
 
-  RequestVideoData();
+  RequestVideoData(NeedToSkipToNextKeyframe(),
+                   media::TimeUnit::FromMicroseconds(GetMediaTime()));
 }
 
 void
-MediaDecoderStateMachine::RequestVideoData()
+MediaDecoderStateMachine::RequestVideoData(bool aSkipToNextKeyframe,
+                                           const media::TimeUnit& aCurrentTime)
 {
   MOZ_ASSERT(OnTaskQueue());
-  MOZ_ASSERT(mState != DECODER_STATE_SEEKING);
-
-  bool skipToNextKeyFrame = NeedToSkipToNextKeyframe();
-
-  media::TimeUnit currentTime = media::TimeUnit::FromMicroseconds(GetMediaTime());
-
   SAMPLE_LOG("Queueing video task - queued=%i, decoder-queued=%o, skip=%i, time=%lld",
-             VideoQueue().GetSize(), mReader->SizeOfVideoQueueInFrames(), skipToNextKeyFrame,
-             currentTime.ToMicroseconds());
+             VideoQueue().GetSize(), mReader->SizeOfVideoQueueInFrames(), aSkipToNextKeyframe,
+             aCurrentTime.ToMicroseconds());
 
-  // MediaDecoderReaderWrapper::RequestVideoData() records the decoding start
-  // time and sent it back to MDSM::OnVideoDecoded() so that if the decoding is
-  // slow, we can increase our low audio threshold to reduce the chance of an
-  // audio underrun while we're waiting for a video decode to complete.
-  mReader->RequestVideoData(skipToNextKeyFrame, currentTime);
+  TimeStamp videoDecodeStartTime = TimeStamp::Now();
+  mVideoDataRequest.Begin(
+    mReader->RequestVideoData(aSkipToNextKeyframe, aCurrentTime)->Then(
+      OwnerThread(), __func__,
+      [this, videoDecodeStartTime] (MediaData* aVideo) {
+        OnVideoDecoded(aVideo, videoDecodeStartTime);
+      },
+      [this] (const MediaResult& aError) {
+        OnVideoNotDecoded(aError);
+      })
+  );
 }
 
 void
@@ -3377,6 +3378,7 @@ MediaDecoderStateMachine::Reset(TrackSet aTracks)
     mDecodedVideoEndTime = 0;
     mVideoCompleted = false;
     VideoQueue().Reset();
+    mVideoDataRequest.DisconnectIfExists();
   }
 
   if (aTracks.contains(TrackInfo::kAudioTrack)) {
@@ -3799,7 +3801,7 @@ const char*
 MediaDecoderStateMachine::VideoRequestStatus() const
 {
   MOZ_ASSERT(OnTaskQueue());
-  if (mReader->IsRequestingVideoData()) {
+  if (IsRequestingVideoData()) {
     MOZ_DIAGNOSTIC_ASSERT(!mReader->IsWaitingVideoData());
     return "pending";
   } else if (mReader->IsWaitingVideoData()) {
