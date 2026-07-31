@@ -1331,10 +1331,7 @@ private:
   {
     MOZ_ASSERT(aAudio);
     MOZ_ASSERT(!mSeekJob.mPromise.IsEmpty(), "Seek shouldn't be finished");
-
-    // We accept any audio data here.
-    mSeekedAudioData = aAudio;
-
+    mMaster->Push(aAudio);
     MaybeFinishSeek();
   }
 
@@ -1459,10 +1456,6 @@ private:
 
   void OnSeekTaskResolved()
   {
-    if (mSeekedAudioData) {
-      mMaster->Push(mSeekedAudioData);
-    }
-
     if (mSeekedVideoData) {
       mMaster->Push(mSeekedVideoData);
     }
@@ -1564,7 +1557,6 @@ private:
   /*
    * Information which are going to be returned to MDSM.
    */
-  RefPtr<MediaData> mSeekedAudioData;
   RefPtr<MediaData> mSeekedVideoData;
   bool mIsAudioQueueFinished = false;
   bool mIsVideoQueueFinished = false;
