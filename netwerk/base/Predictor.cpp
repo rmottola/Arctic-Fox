@@ -1378,11 +1378,11 @@ Predictor::RunPredictions(nsIURI *referrer, nsINetworkPredictorVerifier *verifie
     uri->GetAsciiHost(hostname);
     PREDICTOR_LOG(("    doing preresolve %s", hostname.get()));
     nsCOMPtr<nsICancelable> tmpCancelable;
-    mDnsService->AsyncResolve(hostname,
-                              (nsIDNSService::RESOLVE_PRIORITY_MEDIUM |
-                               nsIDNSService::RESOLVE_SPECULATE),
-                              mDNSListener, nullptr,
-                              getter_AddRefs(tmpCancelable));
+    mDnsService->AsyncResolveNative(hostname,
+                                    (nsIDNSService::RESOLVE_PRIORITY_MEDIUM |
+                                     nsIDNSService::RESOLVE_SPECULATE),
+                                    mDNSListener, nullptr, originAttributes,
+                                    getter_AddRefs(tmpCancelable));
     predicted = true;
     if (verifier) {
       PREDICTOR_LOG(("    sending preresolve verification"));
