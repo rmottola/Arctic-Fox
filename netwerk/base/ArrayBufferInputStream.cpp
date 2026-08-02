@@ -95,13 +95,14 @@ ArrayBufferInputStream::ReadSegments(nsWriteSegmentFun writer, void *closure,
   while (mPos < mBufferLength) {
     uint32_t remaining = mBufferLength - mPos;
     MOZ_ASSERT(mArrayBuffer);
+
     uint32_t count = std::min(aCount, remaining);
     if (count == 0) {
       break;
     }
 
     uint32_t written;
-    nsresult rv = writer(this, closure, &mArrayBuffer[0] + mPos, 0, count, &written);
+    nsresult rv = writer(this, closure, &mArrayBuffer[0] + mPos, *result, count, &written);
     if (NS_FAILED(rv)) {
       // InputStreams do not propagate errors to caller.
       return NS_OK;
