@@ -487,13 +487,13 @@ public:
 
   void HandleAudioDecoded(MediaData* aAudio) override
   {
-    mMaster->Push(aAudio);
+    mMaster->PushAudio(aAudio);
     MaybeFinishDecodeFirstFrame();
   }
 
   void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
-    mMaster->Push(aVideo);
+    mMaster->PushVideo(aVideo);
     MaybeFinishDecodeFirstFrame();
   }
 
