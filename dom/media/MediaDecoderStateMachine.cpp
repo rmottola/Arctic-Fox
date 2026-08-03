@@ -1910,7 +1910,12 @@ DecodingFirstFrameState::Enter()
   MOZ_ASSERT(!mMaster->mVideoDecodeSuspended);
 
   // Dispatch tasks to decode first frames.
-  mMaster->DispatchDecodeTasksIfNeeded();
+  if (mMaster->HasAudio()) {
+    mMaster->RequestAudioData();
+  }
+  if (mMaster->HasVideo()) {
+    mMaster->RequestVideoData(false, media::TimeUnit());
+  }
 }
 
 void
