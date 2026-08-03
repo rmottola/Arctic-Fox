@@ -1098,16 +1098,12 @@ private:
   void RequestAudioData()
   {
     MOZ_ASSERT(!mDoneAudioSeeking);
-    MOZ_ASSERT(!mMaster->IsRequestingAudioData());
-    MOZ_ASSERT(!mMaster->IsWaitingAudioData());
     mMaster->RequestAudioData();
   }
 
   void RequestVideoData()
   {
     MOZ_ASSERT(!mDoneVideoSeeking);
-    MOZ_ASSERT(!mMaster->IsRequestingVideoData());
-    MOZ_ASSERT(!mMaster->IsWaitingVideoData());
     mMaster->RequestVideoData(false, media::TimeUnit());
   }
 
@@ -3002,6 +2998,9 @@ void
 MediaDecoderStateMachine::RequestAudioData()
 {
   MOZ_ASSERT(OnTaskQueue());
+  MOZ_ASSERT(IsAudioDecoding());
+  MOZ_ASSERT(!IsRequestingAudioData());
+  MOZ_ASSERT(!IsWaitingAudioData());
   SAMPLE_LOG("Queueing audio task - queued=%i, decoder-queued=%o",
              AudioQueue().GetSize(), mReader->SizeOfAudioQueueInFrames());
 
@@ -3063,6 +3062,9 @@ MediaDecoderStateMachine::RequestVideoData(bool aSkipToNextKeyframe,
                                            const media::TimeUnit& aCurrentTime)
 {
   MOZ_ASSERT(OnTaskQueue());
+  MOZ_ASSERT(IsVideoDecoding());
+  MOZ_ASSERT(!IsRequestingVideoData());
+  MOZ_ASSERT(!IsWaitingVideoData());
   SAMPLE_LOG("Queueing video task - queued=%i, decoder-queued=%o, skip=%i, time=%lld",
              VideoQueue().GetSize(), mReader->SizeOfVideoQueueInFrames(), aSkipToNextKeyframe,
              aCurrentTime.ToMicroseconds());
