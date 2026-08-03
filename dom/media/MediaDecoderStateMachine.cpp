@@ -201,8 +201,14 @@ public:
   {
     Crash("Unexpected event!", __func__);
   }
-  virtual void HandleAudioWaited(MediaData::Type aType);
-  virtual void HandleVideoWaited(MediaData::Type aType);
+  virtual void HandleAudioWaited(MediaData::Type aType)
+  {
+    Crash("Unexpected event!", __func__);
+  }
+  virtual void HandleVideoWaited(MediaData::Type aType)
+  {
+    Crash("Unexpected event!", __func__);
+  }
   virtual void HandleNotWaited(const WaitForDataRejectValue& aRejection);
   virtual void HandleAudioCaptured() {}
 
@@ -694,6 +700,16 @@ public:
   {
     mMaster->WaitForData(MediaData::VIDEO_DATA);
     MaybeStopPrerolling();
+  }
+
+  void HandleAudioWaited(MediaData::Type aType) override
+  {
+    mMaster->EnsureAudioDecodeTaskQueued();
+  }
+
+  void HandleVideoWaited(MediaData::Type aType) override
+  {
+    mMaster->EnsureVideoDecodeTaskQueued();
   }
 
   void HandleAudioCaptured() override
@@ -1671,6 +1687,16 @@ public:
     mMaster->EnsureVideoDecodeTaskQueued();
   }
 
+  void HandleAudioWaited(MediaData::Type aType) override
+  {
+    mMaster->EnsureAudioDecodeTaskQueued();
+  }
+
+  void HandleVideoWaited(MediaData::Type aType) override
+  {
+    mMaster->EnsureVideoDecodeTaskQueued();
+  }
+
   void HandleEndOfAudio() override;
   void HandleEndOfVideo() override;
 
@@ -1842,20 +1868,6 @@ public:
     MOZ_DIAGNOSTIC_ASSERT(false, "Already shutting down.");
   }
 };
-
-void
-MediaDecoderStateMachine::
-StateObject::HandleAudioWaited(MediaData::Type aType)
-{
-  mMaster->EnsureAudioDecodeTaskQueued();
-}
-
-void
-MediaDecoderStateMachine::
-StateObject::HandleVideoWaited(MediaData::Type aType)
-{
-  mMaster->EnsureVideoDecodeTaskQueued();
-}
 
 void
 MediaDecoderStateMachine::
