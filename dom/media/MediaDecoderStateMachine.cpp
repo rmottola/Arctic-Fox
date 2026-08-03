@@ -220,10 +220,9 @@ public:
   {
     Crash("Unexpected event!", __func__);
   }
-
   virtual void HandleEndOfAudio()
   {
-    AudioQueue().Finish();
+    Crash("Unexpected event!", __func__);
   }
 
   virtual void HandleWaitingForVideo()
@@ -235,10 +234,9 @@ public:
   {
     Crash("Unexpected event!", __func__);
   }
-
   virtual void HandleEndOfVideo()
   {
-    VideoQueue().Finish();
+    Crash("Unexpected event!", __func__);
   }
 
   virtual RefPtr<MediaDecoder::SeekPromise> HandleSeek(SeekTarget aTarget);
