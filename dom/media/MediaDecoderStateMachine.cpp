@@ -193,6 +193,7 @@ public:
 
   // Event handlers for various events.
   virtual void HandleCDMProxyReady() {}
+  virtual void HandleAudioCaptured() {}
   virtual void HandleAudioDecoded(MediaData* aAudio)
   {
     Crash("Unexpected event!", __func__);
@@ -209,13 +210,10 @@ public:
   {
     Crash("Unexpected event!", __func__);
   }
-  virtual void HandleAudioCaptured() {}
-
   virtual void HandleWaitingForAudio()
   {
-    mMaster->WaitForData(MediaData::AUDIO_DATA);
+    Crash("Unexpected event!", __func__);
   }
-
   virtual void HandleAudioCanceled()
   {
     Crash("Unexpected event!", __func__);
@@ -224,12 +222,10 @@ public:
   {
     Crash("Unexpected event!", __func__);
   }
-
   virtual void HandleWaitingForVideo()
   {
-    mMaster->WaitForData(MediaData::VIDEO_DATA);
+    Crash("Unexpected event!", __func__);
   }
-
   virtual void HandleVideoCanceled()
   {
     Crash("Unexpected event!", __func__);
@@ -1654,6 +1650,16 @@ public:
   void HandleVideoCanceled() override
   {
     mMaster->EnsureVideoDecodeTaskQueued();
+  }
+
+  void HandleWaitingForAudio() override
+  {
+    mMaster->WaitForData(MediaData::AUDIO_DATA);
+  }
+
+  void HandleWaitingForVideo() override
+  {
+    mMaster->WaitForData(MediaData::VIDEO_DATA);
   }
 
   void HandleAudioWaited(MediaData::Type aType) override
