@@ -87,6 +87,7 @@ DIRS += [
     'promise',
     'smil',
     'url',
+    'webauthn',
     'webidl',
     'xbl',
     'xml',
