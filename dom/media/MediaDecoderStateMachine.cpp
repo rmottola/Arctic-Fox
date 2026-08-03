@@ -209,7 +209,6 @@ public:
   {
     Crash("Unexpected event!", __func__);
   }
-  virtual void HandleNotWaited(const WaitForDataRejectValue& aRejection);
   virtual void HandleAudioCaptured() {}
 
   virtual void HandleWaitingForAudio()
@@ -916,7 +915,6 @@ public:
   void HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override = 0;
   void HandleAudioWaited(MediaData::Type aType) override = 0;
   void HandleVideoWaited(MediaData::Type aType) override = 0;
-  void HandleNotWaited(const WaitForDataRejectValue& aRejection) override = 0;
 
   void HandleVideoSuspendTimeout() override
   {
@@ -1094,11 +1092,6 @@ public:
     MOZ_ASSERT(!mDoneAudioSeeking || !mDoneVideoSeeking, "Seek shouldn't be finished");
 
     RequestVideoData();
-  }
-
-  void HandleNotWaited(const WaitForDataRejectValue& aRejection) override
-  {
-    MOZ_ASSERT(!mDoneAudioSeeking || !mDoneVideoSeeking, "Seek shouldn't be finished");
   }
 
 private:
@@ -1548,28 +1541,6 @@ private:
     RequestVideoData();
   }
 
-  void HandleNotWaited(const WaitForDataRejectValue& aRejection) override
-  {
-    MOZ_ASSERT(!mSeekJob.mPromise.IsEmpty(), "Seek shouldn't be finished");
-    MOZ_ASSERT(NeedMoreVideo());
-
-    switch(aRejection.mType) {
-    case MediaData::AUDIO_DATA:
-    {
-      // We don't care about audio in this state.
-      break;
-    }
-    case MediaData::VIDEO_DATA:
-    {
-      // Error out if we can't finish video seeking.
-      mMaster->DecodeError(NS_ERROR_DOM_MEDIA_CANCELED);
-      break;
-    }
-    default:
-      MOZ_ASSERT_UNREACHABLE("We cannot handle RAW_DATA or NULL_DATA here.");
-    }
-  }
-
   int64_t CalculateNewCurrentTime() const override
   {
     // The HTMLMediaElement.currentTime should be updated to the seek target
@@ -1868,13 +1839,6 @@ public:
     MOZ_DIAGNOSTIC_ASSERT(false, "Already shutting down.");
   }
 };
-
-void
-MediaDecoderStateMachine::
-StateObject::HandleNotWaited(const WaitForDataRejectValue& aRejection)
-{
-
-}
 
 RefPtr<MediaDecoder::SeekPromise>
 MediaDecoderStateMachine::
@@ -3229,7 +3193,7 @@ MediaDecoderStateMachine::WaitForData(MediaData::Type aType)
         },
         [this] (const WaitForDataRejectValue& aRejection) {
           mAudioWaitRequest.Complete();
-          mStateObj->HandleNotWaited(aRejection);
+          DecodeError(NS_ERROR_DOM_MEDIA_WAITING_FOR_DATA);
         })
     );
   } else {
@@ -3243,7 +3207,7 @@ MediaDecoderStateMachine::WaitForData(MediaData::Type aType)
         },
         [this] (const WaitForDataRejectValue& aRejection) {
           mVideoWaitRequest.Complete();
-          mStateObj->HandleNotWaited(aRejection);
+          DecodeError(NS_ERROR_DOM_MEDIA_WAITING_FOR_DATA);
         })
     );
   }
