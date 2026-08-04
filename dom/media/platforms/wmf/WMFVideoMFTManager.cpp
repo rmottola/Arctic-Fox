@@ -15,6 +15,7 @@
 #include "DXVA2Manager.h"
 #include "nsThreadUtils.h"
 #include "Layers.h"
+#include "mozilla/AbstractThread.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/layers/LayersTypes.h"
 #include "MediaInfo.h"
@@ -129,6 +130,7 @@ WMFVideoMFTManager::~WMFVideoMFTManager()
     LOG(nsPrintfCString("Reporting telemetry VIDEO_MFT_OUTPUT_NULL_SAMPLES=%d", telemetry).get());
     Telemetry::Accumulate(Telemetry::ID::VIDEO_MFT_OUTPUT_NULL_SAMPLES, telemetry);
   });
+  // Non-DocGroup version of AbstractThread::MainThread is fine for Telemetry.
   AbstractThread::MainThread()->Dispatch(task.forget());
 }
 
