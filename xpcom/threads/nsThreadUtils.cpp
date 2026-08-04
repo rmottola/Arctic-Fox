@@ -439,26 +439,6 @@ NS_GetCurrentThread()
 }
 #endif
 
-// nsThreadPoolNaming
-void
-nsThreadPoolNaming::SetThreadPoolName(const nsACString& aPoolName,
-                                      nsIThread* aThread)
-{
-  nsCString name(aPoolName);
-  name.AppendLiteral(" #");
-  name.AppendInt(++mCounter, 10); // The counter is declared as volatile
-
-  if (aThread) {
-    // Set on the target thread
-    NS_SetThreadName(aThread, name);
-  } else {
-    // Set on the current thread
-#ifndef XPCOM_GLUE_AVOID_NSPR
-    PR_SetCurrentThreadName(name.BeginReading());
-#endif
-  }
-}
-
 // nsAutoLowPriorityIO
 nsAutoLowPriorityIO::nsAutoLowPriorityIO()
 {
