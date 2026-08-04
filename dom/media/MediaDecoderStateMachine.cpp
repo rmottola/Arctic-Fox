@@ -2574,18 +2574,6 @@ bool MediaDecoderStateMachine::HaveEnoughDecodedVideo()
 }
 
 bool
-MediaDecoderStateMachine::NeedToDecodeVideo()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  SAMPLE_LOG("NeedToDecodeVideo() isDec=%d minPrl=%d enufVid=%d",
-             IsVideoDecoding(), mMinimizePreroll, HaveEnoughDecodedVideo());
-  return IsVideoDecoding() &&
-         mState != DECODER_STATE_SEEKING &&
-         ((!mSentFirstFrameLoadedEvent && VideoQueue().GetSize() == 0) ||
-          (!mMinimizePreroll && !HaveEnoughDecodedVideo()));
-}
-
-bool
 MediaDecoderStateMachine::NeedToSkipToNextKeyframe()
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -2639,19 +2627,6 @@ MediaDecoderStateMachine::NeedToSkipToNextKeyframe()
   }
 
   return false;
-}
-
-bool
-MediaDecoderStateMachine::NeedToDecodeAudio()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  SAMPLE_LOG("NeedToDecodeAudio() isDec=%d minPrl=%d enufAud=%d",
-             IsAudioDecoding(), mMinimizePreroll, HaveEnoughDecodedAudio());
-
-  return IsAudioDecoding() &&
-         mState != DECODER_STATE_SEEKING &&
-         ((!mSentFirstFrameLoadedEvent && AudioQueue().GetSize() == 0) ||
-          (!mMinimizePreroll && !HaveEnoughDecodedAudio()));
 }
 
 void
@@ -3025,8 +3000,17 @@ MediaDecoderStateMachine::DispatchDecodeTasksIfNeeded()
     return;
   }
 
-  const bool needToDecodeAudio = NeedToDecodeAudio();
-  const bool needToDecodeVideo = NeedToDecodeVideo();
+  const bool needToDecodeAudio =
+    IsAudioDecoding() &&
+    mState != DECODER_STATE_SEEKING &&
+    ((!mSentFirstFrameLoadedEvent && AudioQueue().GetSize() == 0) ||
+     (!mMinimizePreroll && !HaveEnoughDecodedAudio()));
+
+  const bool needToDecodeVideo =
+    IsVideoDecoding() &&
+    mState != DECODER_STATE_SEEKING &&
+    ((!mSentFirstFrameLoadedEvent && VideoQueue().GetSize() == 0) ||
+     (!mMinimizePreroll && !HaveEnoughDecodedVideo()));
 
   SAMPLE_LOG("DispatchDecodeTasksIfNeeded needAudio=%d audioStatus=%s needVideo=%d videoStatus=%s",
              needToDecodeAudio, AudioRequestStatus(),
