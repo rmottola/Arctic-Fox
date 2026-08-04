@@ -1051,6 +1051,17 @@ class nsThreadPoolNaming
 public:
   nsThreadPoolNaming() : mCounter(0) {}
 
+  /**
+   * Returns a thread name as "<aPoolName> #<n>" and increments the counter.
+   */
+  nsCString GetNextThreadName(const nsACString& aPoolName);
+
+  template<size_t LEN>
+  nsCString GetNextThreadName(const char (&aPoolName)[LEN])
+  {
+    return GetNextThreadName(nsDependentCString(aPoolName, LEN - 1));
+  }
+
 private:
   mozilla::Atomic<uint32_t> mCounter;
 

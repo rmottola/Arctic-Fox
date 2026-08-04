@@ -398,6 +398,16 @@ NS_GetCurrentThread()
 }
 #endif
 
+// nsThreadPoolNaming
+nsCString
+nsThreadPoolNaming::GetNextThreadName(const nsACString& aPoolName)
+{
+  nsCString name(aPoolName);
+  name.AppendLiteral(" #");
+  name.AppendInt(++mCounter, 10); // The counter is declared as atomic
+  return name;
+}
+
 // nsAutoLowPriorityIO
 nsAutoLowPriorityIO::nsAutoLowPriorityIO()
 {
