@@ -59,14 +59,6 @@ public:
     , mShuttingDown(false)
   { }
 
-  /// Initialize the current thread for use by the decode pool.
-  void InitCurrentThread()
-  {
-    MOZ_ASSERT(!NS_IsMainThread());
-
-    mThreadNaming.SetThreadPoolName(NS_LITERAL_CSTRING("ImgDecoder"));
-  }
-
   /// Shut down the provided decode pool thread.
   static void ShutdownThread(nsIThread* aThisThread)
   {
@@ -132,6 +124,12 @@ public:
       // Nothing to do; block until some work is available.
       mMonitor.Wait();
     } while (true);
+  }
+
+  nsresult CreateThread(nsIThread** aThread, nsIRunnable* aInitialEvent)
+  {
+    return NS_NewNamedThread(mThreadNaming.GetNextThreadName("ImgDecoder"),
+                             aThread, aInitialEvent);
   }
 
 private:
@@ -250,7 +248,7 @@ DecodePool::DecodePool()
   for (uint32_t i = 0 ; i < limit ; ++i) {
     nsCOMPtr<nsIRunnable> worker = new DecodePoolWorker(mImpl);
     nsCOMPtr<nsIThread> thread;
-    nsresult rv = NS_NewThread(getter_AddRefs(thread), worker);
+    nsresult rv = mImpl->CreateThread(getter_AddRefs(thread), worker);
     MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv) && thread,
                        "Should successfully create image decoding threads");
     mThreads.AppendElement(Move(thread));
