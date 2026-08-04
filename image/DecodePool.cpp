@@ -164,8 +164,6 @@ public:
   {
     MOZ_ASSERT(!NS_IsMainThread());
 
-    mImpl->InitCurrentThread();
-
     nsCOMPtr<nsIThread> thisThread;
     nsThreadManager::get().GetCurrentThread(getter_AddRefs(thisThread));
 
