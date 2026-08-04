@@ -29,8 +29,8 @@
 #include <algorithm>
 #include "GeckoProfiler.h"
 #include "VideoFrameContainer.h"
+#include "mozilla/AbstractThread.h"
 #include "mozilla/Unused.h"
-#include "mozilla/media/MediaUtils.h"
 #ifdef MOZ_WEBRTC
 #include "AudioOutputObserver.h"
 #endif
@@ -1769,16 +1769,6 @@ MediaStreamGraphImpl::RunInStableState(bool aSourceIsMSG)
 
   for (uint32_t i = 0; i < runnables.Length(); ++i) {
     runnables[i]->Run();
-    // "Direct" tail dispatcher are supposed to run immediately following the
-    // execution of the current task. So the meta-tasking that we do here in
-    // RunInStableState() breaks that abstraction a bit unless we handle it here.
-    //
-    // This is particularly important because we can end up with a "stream
-    // ended" notification immediately following a "stream available" notification,
-    // and we need to make sure that the watcher responding to "stream available"
-    // has a chance to run before the second notification starts tearing things
-    // down.
-    AbstractThread::MainThread()->TailDispatcher().DrainDirectTasks();
   }
 }
 
@@ -1848,7 +1838,7 @@ MediaStreamGraphImpl::AppendMessage(UniquePtr<ControlMessage> aMessage)
   EnsureRunInStableState();
 }
 
-MediaStream::MediaStream()
+MediaStream::MediaStream(AbstractThread* aMainThread)
   : mTracksStartTime(0)
   , mStartBlocking(GRAPH_TIME_MAX)
   , mSuspendedCount(0)
@@ -1864,6 +1854,7 @@ MediaStream::MediaStream()
   , mNrOfMainThreadUsers(0)
   , mGraph(nullptr)
   , mAudioChannelType(dom::AudioChannel::Normal)
+  , mAbstractMainThread(aMainThread)
 {
   MOZ_COUNT_CTOR(MediaStream);
 }
@@ -2508,14 +2499,18 @@ MediaStream::RunAfterPendingUpdates(already_AddRefed<nsIRunnable> aRunnable)
 
   class Message : public ControlMessage {
   public:
-    explicit Message(MediaStream* aStream,
-                     already_AddRefed<nsIRunnable> aRunnable)
+    Message(MediaStream* aStream,
+            already_AddRefed<nsIRunnable> aRunnable,
+            AbstractThread* aMainThread)
       : ControlMessage(aStream)
-      , mRunnable(aRunnable) {}
+      , mRunnable(aRunnable)
+      , mAbstractMainThread(aMainThread)
+      {}
     void Run() override
     {
       mStream->Graph()->
-        DispatchToMainThreadAfterStreamStateUpdate(mRunnable.forget());
+        DispatchToMainThreadAfterStreamStateUpdate(mAbstractMainThread,
+                                                   mRunnable.forget());
     }
     void RunDuringShutdown() override
     {
@@ -2526,9 +2521,11 @@ MediaStream::RunAfterPendingUpdates(already_AddRefed<nsIRunnable> aRunnable)
     }
   private:
     nsCOMPtr<nsIRunnable> mRunnable;
+    const RefPtr<AbstractThread> mAbstractMainThread;
   };
 
-  graph->AppendMessage(MakeUnique<Message>(this, runnable.forget()));
+  graph->AppendMessage(
+    MakeUnique<Message>(this, runnable.forget(), mAbstractMainThread));
 }
 
 void
@@ -2642,8 +2639,8 @@ MediaStream::AddMainThreadListener(MainThreadMediaStreamListener* aListener)
   Unused << NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(runnable.forget())));
 }
 
-SourceMediaStream::SourceMediaStream() :
-  MediaStream(),
+SourceMediaStream::SourceMediaStream(AbstractThread* aMainThread) :
+  MediaStream(aMainThread),
   mMutex("mozilla::media::SourceMediaStream"),
   mUpdateKnownTracksTime(0),
   mPullEnabled(false),
@@ -3225,18 +3222,21 @@ MediaInputPort::BlockSourceTrackId(TrackID aTrackId, BlockingMode aBlockingMode)
 {
   class Message : public ControlMessage {
   public:
-    explicit Message(MediaInputPort* aPort,
-                     TrackID aTrackId,
-                     BlockingMode aBlockingMode,
-                     already_AddRefed<nsIRunnable> aRunnable)
+    Message(MediaInputPort* aPort,
+            TrackID aTrackId,
+            BlockingMode aBlockingMode,
+            already_AddRefed<nsIRunnable> aRunnable,
+            AbstractThread* aMainThread)
       : ControlMessage(aPort->GetDestination()),
         mPort(aPort), mTrackId(aTrackId), mBlockingMode(aBlockingMode),
-        mRunnable(aRunnable) {}
+        mRunnable(aRunnable), mAbstractMainThread(aMainThread) {}
     void Run() override
     {
       mPort->BlockSourceTrackIdImpl(mTrackId, mBlockingMode);
       if (mRunnable) {
-        mStream->Graph()->DispatchToMainThreadAfterStreamStateUpdate(mRunnable.forget());
+        mStream->Graph()->
+          DispatchToMainThreadAfterStreamStateUpdate(mAbstractMainThread,
+                                                     mRunnable.forget());
       }
     }
     void RunDuringShutdown() override
@@ -3247,6 +3247,7 @@ MediaInputPort::BlockSourceTrackId(TrackID aTrackId, BlockingMode aBlockingMode)
     TrackID mTrackId;
     BlockingMode mBlockingMode;
     nsCOMPtr<nsIRunnable> mRunnable;
+    const RefPtr<AbstractThread> mAbstractMainThread;
   };
 
   MOZ_ASSERT(IsTrackIDExplicit(aTrackId),
@@ -3258,7 +3259,9 @@ MediaInputPort::BlockSourceTrackId(TrackID aTrackId, BlockingMode aBlockingMode)
     pledge->Resolve(true);
     return NS_OK;
   });
-  GraphImpl()->AppendMessage(MakeUnique<Message>(this, aTrackId, aBlockingMode, runnable.forget()));
+  GraphImpl()->AppendMessage(MakeUnique<Message>(this, aTrackId, aBlockingMode,
+                                                 runnable.forget(),
+                                                 mAbstractMainThread));
   return pledge.forget();
 }
 
@@ -3298,7 +3301,7 @@ ProcessedMediaStream::AllocateInputPort(MediaStream* aStream, TrackID aTrackID,
              "Generic MediaInputPort cannot produce a single destination track");
   RefPtr<MediaInputPort> port =
     new MediaInputPort(aStream, aTrackID, this, aDestTrackID,
-                       aInputNumber, aOutputNumber);
+                       aInputNumber, aOutputNumber, mAbstractMainThread);
   if (aBlockedTracks) {
     for (TrackID trackID : *aBlockedTracks) {
       port->BlockSourceTrackIdImpl(trackID, BlockingMode::CREATION);
@@ -3652,25 +3655,25 @@ FinishCollectReports(nsIHandleReportCallback* aHandleReport, nsISupports* aData,
 }
 
 SourceMediaStream*
-MediaStreamGraph::CreateSourceStream()
+MediaStreamGraph::CreateSourceStream(AbstractThread* aMainThread)
 {
-  SourceMediaStream* stream = new SourceMediaStream();
+  SourceMediaStream* stream = new SourceMediaStream(aMainThread);
   AddStream(stream);
   return stream;
 }
 
 ProcessedMediaStream*
-MediaStreamGraph::CreateTrackUnionStream()
+MediaStreamGraph::CreateTrackUnionStream(AbstractThread* aMainThread)
 {
-  TrackUnionStream* stream = new TrackUnionStream();
+  TrackUnionStream* stream = new TrackUnionStream(aMainThread);
   AddStream(stream);
   return stream;
 }
 
 ProcessedMediaStream*
-MediaStreamGraph::CreateAudioCaptureStream(TrackID aTrackId)
+MediaStreamGraph::CreateAudioCaptureStream(TrackID aTrackId, AbstractThread* aMainThread)
 {
-  AudioCaptureStream* stream = new AudioCaptureStream(aTrackId);
+  AudioCaptureStream* stream = new AudioCaptureStream(aTrackId, aMainThread);
   AddStream(stream);
   return stream;
 }
@@ -4069,6 +4072,17 @@ MediaStreamGraphImpl::ConnectToCaptureStream(uint64_t aWindowId,
     }
   }
   return nullptr;
+}
+
+void
+MediaStreamGraph::
+DispatchToMainThreadAfterStreamStateUpdate(AbstractThread* aMainThread,
+                                           already_AddRefed<nsIRunnable> aRunnable)
+{
+  MOZ_ASSERT(aMainThread);
+  AssertOnGraphThreadOrNotRunning();
+  *mPendingUpdateRunnables.AppendElement() =
+    aMainThread->CreateDirectTaskDrainer(Move(aRunnable));
 }
 
 } // namespace mozilla
