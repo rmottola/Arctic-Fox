@@ -2081,13 +2081,13 @@ DecodingState::Enter()
 
   mOnAudioPopped = AudioQueue().PopEvent().Connect(
     OwnerThread(), [this] () {
-    if (!mMaster->IsShutdown() && mMaster->NeedToDecodeAudio()) {
+    if (mMaster->NeedToDecodeAudio()) {
       mMaster->EnsureAudioDecodeTaskQueued();
     }
   });
   mOnVideoPopped = VideoQueue().PopEvent().Connect(
     OwnerThread(), [this] () {
-    if (!mMaster->IsShutdown() && mMaster->NeedToDecodeVideo()) {
+    if (mMaster->NeedToDecodeVideo()) {
       mMaster->EnsureVideoDecodeTaskQueued();
     }
   });
