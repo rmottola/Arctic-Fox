@@ -957,7 +957,7 @@ MediaRecorder::MediaRecorder(DOMMediaStream& aSourceMediaStream,
                              nsPIDOMWindowInner* aOwnerWindow)
   : DOMEventTargetHelper(aOwnerWindow)
   , mState(RecordingState::Inactive)
-  , mAbstractMainThread(aSrcAudioNode.AbstractMainThread())
+  , mAbstractMainThread(aSourceMediaStream.AbstractMainThread())
 {
   MOZ_ASSERT(aOwnerWindow);
   MOZ_ASSERT(aOwnerWindow->IsInnerWindow());
@@ -971,7 +971,7 @@ MediaRecorder::MediaRecorder(AudioNode& aSrcAudioNode,
                              nsPIDOMWindowInner* aOwnerWindow)
   : DOMEventTargetHelper(aOwnerWindow)
   , mState(RecordingState::Inactive)
-  , mAbstractMainThread(aSourceMediaStream.AbstractMainThread())
+  , mAbstractMainThread(aSrcAudioNode.AbstractMainThread())
 {
   MOZ_ASSERT(aOwnerWindow);
   MOZ_ASSERT(aOwnerWindow->IsInnerWindow());
