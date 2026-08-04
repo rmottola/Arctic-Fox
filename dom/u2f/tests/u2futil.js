@@ -16,7 +16,7 @@ function local_isnot(value, expected, message) {
 
 function local_ok(expression, message) {
   let body = {"test": this.location.pathname, "status":expression, "msg": message}
-  parent.postMessage(body, "http://mochi.test:8888");
+  parent.postMessage(body, _parentOrigin);
 }
 
 function local_doesThrow(fn, name) {
@@ -28,7 +28,7 @@ function local_doesThrow(fn, name) {
 };
 
 function local_finished() {
-  parent.postMessage({"done":true}, "http://mochi.test:8888");
+  parent.postMessage({"done":true}, _parentOrigin);
 }
 
 function string2buffer(str) {
