@@ -2081,11 +2081,15 @@ DecodingState::Enter()
 
   mOnAudioPopped = AudioQueue().PopEvent().Connect(
     OwnerThread(), [this] () {
-    mMaster->DispatchAudioDecodeTaskIfNeeded();
+    if (!mMaster->IsShutdown() && mMaster->NeedToDecodeAudio()) {
+      mMaster->EnsureAudioDecodeTaskQueued();
+    }
   });
   mOnVideoPopped = VideoQueue().PopEvent().Connect(
     OwnerThread(), [this] () {
-    mMaster->DispatchVideoDecodeTaskIfNeeded();
+    if (!mMaster->IsShutdown() && mMaster->NeedToDecodeVideo()) {
+      mMaster->EnsureVideoDecodeTaskQueued();
+    }
   });
 
   mMaster->UpdateNextFrameStatus(MediaDecoderOwner::NEXT_FRAME_AVAILABLE);
@@ -3042,15 +3046,6 @@ MediaDecoderStateMachine::DispatchDecodeTasksIfNeeded()
 }
 
 void
-MediaDecoderStateMachine::DispatchAudioDecodeTaskIfNeeded()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  if (!IsShutdown() && NeedToDecodeAudio()) {
-    EnsureAudioDecodeTaskQueued();
-  }
-}
-
-void
 MediaDecoderStateMachine::EnsureAudioDecodeTaskQueued()
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -3111,15 +3106,6 @@ MediaDecoderStateMachine::RequestAudioData()
           DecodeError(aError);
       }
     })->Track(mAudioDataRequest);
-}
-
-void
-MediaDecoderStateMachine::DispatchVideoDecodeTaskIfNeeded()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  if (!IsShutdown() && NeedToDecodeVideo()) {
-    EnsureVideoDecodeTaskQueued();
-  }
 }
 
 void
