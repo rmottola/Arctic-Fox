@@ -4,7 +4,7 @@
 <title>AudioBuffer IDL Test</title>
 <script src="/resources/testharness.js"></script><script src="/resources/testharnessreport.js"></script><script src="/resources/idlharness.js"></script><script src="/resources/webidl2/lib/webidl2.js"></script><script src="/webaudio/js/lodash.js"></script><script src="/webaudio/js/vendor-prefixes.js"></script><script src="/webaudio/js/helpers.js"></script><style type="text/css">
     #event-target-idl,
-    #audio-context-idl
+    #base-audio-context-idl
     { visibility:hidden; height: 0px;}
   </style>
 </head>
@@ -79,19 +79,17 @@ interface AudioContext : EventTarget {
              float         sampleRate;
 };
 
-[Constructor(AudioContext context, AudioBufferOptions options)]
+[Constructor(BaseAudioContext context, AudioBufferOptions options)]
 interface AudioBuffer {
-
-    readonly attribute float sampleRate;
-    readonly attribute long length;
-
-    // in seconds
-    readonly attribute double duration;
-
-    readonly attribute long numberOfChannels;
-
-    Float32Array getChannelData(unsigned long channel);
-
+    readonly        attribute float         sampleRate;
+    readonly        attribute unsigned long length;
+    readonly        attribute double        duration;
+    readonly        attribute unsigned long numberOfChannels;
+    Float32Array getChannelData (unsigned long channel);
+    void         copyFromChannel (Float32Array destination, unsigned long channelNumber, optional unsigned long startInChannel = 0
+              );
+    void         copyToChannel (Float32Array source, unsigned long channelNumber, optional unsigned long startInChannel = 0
+              );
 };</pre>
 
   <div id="log"></div>
@@ -100,7 +98,7 @@ interface AudioBuffer {
 (function() {
   var idl_array = new IdlArray();
   idl_array.add_untested_idls(document.getElementById("event-target-idl").textContent);
-  idl_array.add_untested_idls(document.getElementById("audio-context-idl").textContent);
+  idl_array.add_untested_idls(document.getElementById("base-audio-context-idl").textContent);
   idl_array.add_idls(document.getElementById("audio-buffer-idl").textContent);
 
   // For these tests the value of the arguments is unimportant.

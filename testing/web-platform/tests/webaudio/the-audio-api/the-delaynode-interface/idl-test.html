@@ -4,7 +4,7 @@
 <title>DelayNode IDL Test</title>
 <script src="/resources/testharness.js"></script><script src="/resources/testharnessreport.js"></script><script src="/resources/idlharness.js"></script><script src="/resources/webidl2/lib/webidl2.js"></script><script src="/webaudio/js/lodash.js"></script><script src="/webaudio/js/vendor-prefixes.js"></script><script src="/webaudio/js/helpers.js"></script><style type="text/css">
     #event-target-idl,
-    #audio-context-idl,
+    #base-audio-context-idl,
     #audio-node-idl,
     #audio-param-idl
     { visibility:hidden; height: 0px;}
@@ -92,7 +92,7 @@ interface AudioNode : EventTarget {
     void connect(AudioParam destination, optional unsigned long output = 0);
     void disconnect(optional unsigned long output = 0);
 
-    readonly attribute AudioContext context;
+    readonly attribute BaseAudioContext context;
     readonly attribute unsigned long numberOfInputs;
     readonly attribute unsigned long numberOfOutputs;
 
@@ -130,7 +130,7 @@ interface AudioNode : EventTarget {
              double delayTime = 0;
 };
 
-[Constructor(AudioContext context, optional DelayOptions options)]
+[Constructor(BaseAudioContext context, optional DelayOptions options)]
 interface DelayNode : AudioNode {
 
     readonly attribute AudioParam delayTime;
@@ -143,7 +143,7 @@ interface DelayNode : AudioNode {
 (function() {
   var idl_array = new IdlArray();
   idl_array.add_untested_idls(document.getElementById("event-target-idl").textContent);
-  idl_array.add_untested_idls(document.getElementById("audio-context-idl").textContent);
+  idl_array.add_untested_idls(document.getElementById("base-audio-context-idl").textContent);
   idl_array.add_untested_idls(document.getElementById("audio-node-idl").textContent);
   idl_array.add_untested_idls(document.getElementById("audio-param-idl").textContent);
   idl_array.add_idls(document.getElementById("delay-node-idl").textContent);
