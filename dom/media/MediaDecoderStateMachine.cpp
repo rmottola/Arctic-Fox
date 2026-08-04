@@ -2082,7 +2082,7 @@ DecodingState::Enter()
     HandleVideoSuspendTimeout();
   }
 
-  if (mMaster->CheckIfDecodeComplete()) {
+  if (!mMaster->IsVideoDecoding() && !mMaster->IsAudioDecoding()) {
     SetState<CompletedState>();
     return;
   }
@@ -2704,17 +2704,6 @@ MediaDecoderStateMachine::IsVideoDecoding()
 {
   MOZ_ASSERT(OnTaskQueue());
   return HasVideo() && !VideoQueue().IsFinished();
-}
-
-bool
-MediaDecoderStateMachine::CheckIfDecodeComplete()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  // DecodeComplete is possible only after decoding first frames.
-  MOZ_ASSERT(mSentFirstFrameLoadedEvent);
-  MOZ_ASSERT(mState == DECODER_STATE_DECODING ||
-             mState == DECODER_STATE_BUFFERING);
-  return !IsVideoDecoding() && !IsAudioDecoding();
 }
 
 bool MediaDecoderStateMachine::IsPlaying() const
