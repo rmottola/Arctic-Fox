@@ -16,6 +16,7 @@
 #include "mozilla/TypeTraits.h"
 
 #include <new>  // for placement new
+#include <ostream>
 #include <type_traits>
 
 namespace mozilla {
@@ -431,6 +432,17 @@ public:
     MOZ_ASSERT(!mIsSome);
     ::new (mStorage.addr()) T(Forward<Args>(aArgs)...);
     mIsSome = true;
+  }
+
+  friend std::ostream&
+  operator<<(std::ostream& aStream, const Maybe<T>& aMaybe)
+  {
+    if (aMaybe) {
+      aStream << aMaybe.ref();
+    } else {
+      aStream << "<Nothing>";
+    }
+    return aStream;
   }
 };
 
