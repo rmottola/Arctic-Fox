@@ -729,6 +729,8 @@ public:
     if (aPlayState == MediaDecoder::PLAY_STATE_PLAYING) {
       // Schedule Step() to check if we can start playback.
       mMaster->ScheduleStateMachine();
+      // Try to dispatch decoding tasks for mMinimizePreroll might be reset.
+      mMaster->DispatchDecodeTasksIfNeeded();
     }
 
     if (aPlayState == MediaDecoder::PLAY_STATE_PAUSED) {
@@ -2900,7 +2902,6 @@ void MediaDecoderStateMachine::PlayStateChanged()
     // assume the user is likely to want to keep playing in future. This needs to
     // happen before we invoke StartDecoding().
     mMinimizePreroll = false;
-    DispatchDecodeTasksIfNeeded();
   }
 
   mStateObj->HandlePlayStateChanged(mPlayState);
