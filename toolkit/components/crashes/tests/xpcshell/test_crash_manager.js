@@ -254,22 +254,29 @@ add_task(function* test_main_crash_event_file() {
 add_task(function* test_main_crash_event_file_noenv() {
   let ac = new TelemetryArchiveTesting.Checker();
   yield ac.promiseInit();
+  const fileContent = crashId + "\n" +
+    "ProductName=" + productName + "\n" +
+    "ProductID=" + productId + "\n";
 
   let m = yield getManager();
-  yield m.createEventsFile("1", "crash.main.2", DUMMY_DATE, "id1\nk1=v3\nk2=v2");
+  yield m.createEventsFile(crashId, "crash.main.2", DUMMY_DATE, fileContent);
   let count = yield m.aggregateEventsFiles();
   Assert.equal(count, 1);
 
   let crashes = yield m.getCrashes();
   Assert.equal(crashes.length, 1);
-  Assert.equal(crashes[0].id, "id1");
+  Assert.equal(crashes[0].id, crashId);
   Assert.equal(crashes[0].type, "main-crash");
-  Assert.deepEqual(crashes[0].metadata, { k1: "v3", k2: "v2"});
+  Assert.deepEqual(crashes[0].metadata, {
+    ProductName: productName,
+    ProductID: productId
+  });
   Assert.deepEqual(crashes[0].crashDate, DUMMY_DATE);
 
   let found = yield ac.promiseFindPing("crash", [
     [["payload", "hasCrashEnvironment"], false],
-    [["payload", "metadata", "k1"], "v3"],
+    [["payload", "metadata", "ProductName"], productName],
+    [["payload", "metadata", "ProductID"], productId],
   ]);
   Assert.ok(found, "Telemetry ping submitted for found crash");
   Assert.ok(found.environment, "There is an environment");
