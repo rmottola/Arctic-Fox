@@ -442,6 +442,28 @@ add_task(function* test_addCrash() {
   Assert.ok(crash.isOfType(m.PROCESS_TYPE_CONTENT, m.CRASH_TYPE_HANG));
 });
 
+add_task(function* test_content_crash_ping() {
+  let ac = new TelemetryArchiveTesting.Checker();
+  yield ac.promiseInit();
+
+  let m = yield getManager();
+  let id = yield m.createDummyDump();
+  yield m.addCrash(m.PROCESS_TYPE_CONTENT, m.CRASH_TYPE_CRASH, id, DUMMY_DATE, {
+    StackTraces: stackTraces,
+    ThisShouldNot: "end-up-in-the-ping"
+  });
+  yield m._pingPromise;
+
+  let found = yield ac.promiseFindPing("crash", [
+    [["payload", "crashId"], id],
+    [["payload", "processType"], m.PROCESS_TYPE_CONTENT],
+    [["payload", "stackTraces", "status"], "OK"],
+  ]);
+  Assert.ok(found, "Telemetry ping submitted for content crash");
+  Assert.equal(found.payload.metadata.ThisShouldNot, undefined,
+               "Non-whitelisted fields should be filtered out");
+});
+
 add_task(function* test_generateSubmissionID() {
   let m = yield getManager();
 
