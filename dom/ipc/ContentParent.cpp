@@ -96,6 +96,7 @@
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Telemetry.h"
+#include "mozilla/TelemetryIPC.h"
 #include "mozilla/WebBrowserPersistDocumentParent.h"
 #include "mozilla/Unused.h"
 #include "nsAnonymousTemporaryFile.h"
@@ -4839,18 +4840,18 @@ ContentParent::ForceTabPaint(TabParent* aTabParent, uint64_t aLayerObserverEpoch
 }
 
 mozilla::ipc::IPCResult
-ContentParent::RecvAccumulateChildHistogram(
+ContentParent::RecvAccumulateChildHistograms(
                 InfallibleTArray<Accumulation>&& aAccumulations)
 {
-  Telemetry::AccumulateChild(GeckoProcessType_Content, aAccumulations);
+  TelemetryIPC::AccumulateChildHistograms(GeckoProcessType_Content, aAccumulations);
   return IPC_OK();
 }
 
 mozilla::ipc::IPCResult
-ContentParent::RecvAccumulateChildKeyedHistogram(
+ContentParent::RecvAccumulateChildKeyedHistograms(
                 InfallibleTArray<KeyedAccumulation>&& aAccumulations)
 {
-  Telemetry::AccumulateChildKeyed(GeckoProcessType_Content, aAccumulations);
+  TelemetryIPC::AccumulateChildKeyedHistograms(GeckoProcessType_Content, aAccumulations);
   return IPC_OK();
 }
 
@@ -4858,7 +4859,7 @@ mozilla::ipc::IPCResult
 ContentParent::RecvUpdateChildScalars(
                 InfallibleTArray<ScalarAction>&& aScalarActions)
 {
-  Telemetry::UpdateChildScalars(GeckoProcessType_Content, aScalarActions);
+  TelemetryIPC::UpdateChildScalars(GeckoProcessType_Content, aScalarActions);
   return IPC_OK();
 }
 
@@ -4866,7 +4867,7 @@ mozilla::ipc::IPCResult
 ContentParent::RecvUpdateChildKeyedScalars(
                 InfallibleTArray<KeyedScalarAction>&& aScalarActions)
 {
-  Telemetry::UpdateChildKeyedScalars(GeckoProcessType_Content, aScalarActions);
+  TelemetryIPC::UpdateChildKeyedScalars(GeckoProcessType_Content, aScalarActions);
   return IPC_OK();
 }
 
