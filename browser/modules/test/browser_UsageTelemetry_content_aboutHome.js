@@ -60,5 +60,10 @@ add_task(function* test_abouthome_simpleQuery() {
   Assert.equal(Object.keys(scalars[SCALAR_ABOUT_HOME]).length, 1,
                "This search must only increment one entry in the scalar.");
 
+  // Also check events.
+  let events = Services.telemetry.snapshotBuiltinEvents(Ci.nsITelemetry.DATASET_RELEASE_CHANNEL_OPTIN, false);
+  events = events.filter(e => e[1] == "navigation" && e[2] == "search");
+  checkEvents(events, [["navigation", "search", "about_home", "enter", {engine: "other-MozSearch"}]]);
+
   yield BrowserTestUtils.removeTab(tab);
 });
