@@ -521,7 +521,13 @@
           if (telemetrySearchDetails && telemetrySearchDetails.index == -1) {
             telemetrySearchDetails = null;
           }
-          BrowserSearch.recordSearchInTelemetry(engine, "searchbar", telemetrySearchDetails);
+          // If we hit here, we come either from a one-off, a plain search or a suggestion.
+          const details = {
+            isOneOff: aOneOff,
+            isSuggestion: (!aOneOff && telemetrySearchDetails),
+            selection: telemetrySearchDetails
+          };
+          BrowserSearch.recordSearchInTelemetry(engine, "searchbar", details);
           // null parameter below specifies HTML response for search
           let params = {
             postData: submission.postData,
