@@ -55,6 +55,9 @@ add_task(function* setup() {
   // Enable search suggestions in the urlbar.
   Services.prefs.setBoolPref(SUGGEST_URLBAR_PREF, true);
 
+  // Enable event recording for the events tested here.
+  Services.telemetry.setEventRecordingEnabled("navigation", true);
+
   // Make sure to restore the engine once we're done.
   registerCleanupFunction(function* () {
     Services.search.currentEngine = originalEngine;
