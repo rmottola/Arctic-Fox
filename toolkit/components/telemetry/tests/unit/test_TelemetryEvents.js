@@ -9,17 +9,22 @@ function checkEventFormat(events) {
   Assert.ok(Array.isArray(events), "Events should be serialized to an array.");
   for (let e of events) {
     Assert.ok(Array.isArray(e), "Event should be an array.");
-    Assert.equal(e.length, 6, "Event should have 6 elements.");
+    Assert.greaterOrEqual(e.length, 4, "Event should have at least 4 elements.");
+    Assert.lessOrEqual(e.length, 6, "Event should have at most 6 elements.");
 
     Assert.equal(typeof(e[0]), "number", "Element 0 should be a number.");
     Assert.equal(typeof(e[1]), "string", "Element 1 should be a string.");
     Assert.equal(typeof(e[2]), "string", "Element 2 should be a string.");
     Assert.equal(typeof(e[3]), "string", "Element 3 should be a string.");
 
-    Assert.ok(e[4] === null || typeof(e[4]) == "string",
-              "Event element 4 should be null or a string.");
-    Assert.ok(e[5] === null || typeof(e[5]) == "object",
-              "Event element 4 should be null or an object.");
+    if (e.length > 4) {
+      Assert.ok(e[4] === null || typeof(e[4]) == "string",
+                "Event element 4 should be null or a string.");
+    }
+    if (e.length > 5) {
+      Assert.ok(e[5] === null || typeof(e[5]) == "object",
+                "Event element 5 should be null or an object.");
+    }
 
     let extra = e[5];
     if (extra) {
@@ -57,6 +62,14 @@ add_task(function* test_recording() {
       Assert.ok(false, `Failed to record event ${JSON.stringify(entry.event)}: ${ex}`);
     }
     entry.tsAfter = Math.floor(Telemetry.msSinceProcessStart());
+  }
+
+  // Strip off trailing null values to match the serialized events.
+  for (let entry of expected) {
+    let e = entry.event;
+    while ((e.length >= 3) && (e[e.length - 1] === null)) {
+      e.pop();
+    }
   }
 
   // The following should not result in any recorded events.
@@ -203,6 +216,13 @@ add_task(function* test_valueLimits() {
     }
     if (event[4]) {
       event[4].key1 = event[4].key1.substr(0, LIMIT);
+    }
+  }
+
+  // Strip off trailing null values to match the serialized events.
+  for (let e of expected) {
+    while ((e.length >= 3) && (e[e.length - 1] === null)) {
+      e.pop();
     }
   }
 
