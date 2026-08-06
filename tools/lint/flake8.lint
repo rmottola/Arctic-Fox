@@ -181,6 +181,7 @@ LINTER = {
         'testing/marionette/client',
         'testing/talos/',
         'tools/lint',
+        'toolkit/components/telemetry',
     ],
     'exclude': [],
     'extensions': EXTENSIONS,
