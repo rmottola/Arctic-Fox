@@ -1,4 +1,3 @@
-
 {
   "A11Y_INSTANTIATED_FLAG": {
     "expires_in_version": "never",
@@ -212,20 +211,6 @@
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
   },
-  "CREATE_EVENT_COMMANDEVENT" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"commandevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_COMMANDEVENTS" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"commandevents\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
   "CREATE_EVENT_COMPOSITIONEVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
     "description": "Was document.createEvent(\"compositionevent\") ever called",
@@ -236,20 +221,6 @@
   "CREATE_EVENT_CUSTOMEVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
     "description": "Was document.createEvent(\"customevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_DATACONTAINEREVENT" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"datacontainerevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_DATACONTAINEREVENTS" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"datacontainerevents\") ever called",
     "expires_in_version": "56",
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
@@ -275,12 +246,12 @@
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
   },
-  "CREATE_EVENT_DRAGEVENTS" : {
+  "CREATE_EVENT_ERROREVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"dragevents\") ever called",
+    "description": "Was document.createEvent(\"errorevent\") ever called",
     "expires_in_version": "56",
     "kind": "count",
-    "bug_numbers": [1295588, 1251198]
+    "bug_numbers": [1295588, 1251198, 1333901]
   },
   "CREATE_EVENT_EVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
@@ -366,30 +337,9 @@
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
   },
-  "CREATE_EVENT_NOTIFYPAINTEVENT" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"notifypaintevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_PAGETRANSITION" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"pagetransition\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
   "CREATE_EVENT_POPSTATEEVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
     "description": "Was document.createEvent(\"popstateevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_POPUPEVENTS" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"popupevents\") ever called",
     "expires_in_version": "56",
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
@@ -401,23 +351,9 @@
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
   },
-  "CREATE_EVENT_SIMPLEGESTUREEVENT" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"simplegestureevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
   "CREATE_EVENT_STORAGEEVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
     "description": "Was document.createEvent(\"storageevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_SVGEVENT" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"svgevent\") ever called",
     "expires_in_version": "56",
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
@@ -429,20 +365,6 @@
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
   },
-  "CREATE_EVENT_SVGZOOMEVENT" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"svgzoomevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_SVGZOOMEVENTS" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"svgzoomevents\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
   "CREATE_EVENT_TEXTEVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
     "description": "Was document.createEvent(\"textevent\") ever called",
@@ -450,23 +372,9 @@
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
   },
-  "CREATE_EVENT_TEXTEVENTS" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"textevents\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
   "CREATE_EVENT_TIMEEVENT" : {
     "alert_emails": ["ayg@aryeh.name"],
     "description": "Was document.createEvent(\"timeevent\") ever called",
-    "expires_in_version": "56",
-    "kind": "count",
-    "bug_numbers": [1295588, 1251198]
-  },
-  "CREATE_EVENT_TIMEEVENTS" : {
-    "alert_emails": ["ayg@aryeh.name"],
-    "description": "Was document.createEvent(\"timeevents\") ever called",
     "expires_in_version": "56",
     "kind": "count",
     "bug_numbers": [1295588, 1251198]
@@ -891,7 +799,6 @@
   "GC_PRETENURE_COUNT": {
     "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
     "expires_in_version": "never",
-    "kind": "linear",
     "kind": "enumerated",
     "n_values": 32,
     "bug_numbers": [1293262],
@@ -2170,15 +2077,6 @@
     "n_values": 125,
     "releaseChannelCollection": "opt-out",
     "description": "The lifetime of accepted HTTPS server certificates, in weeks, up to 2 years. Bucket 105 is all end-entity HTTPS server certificates with a lifetime > 2 years."
-  },
-  "KEYGEN_GENERATED_KEY_TYPE": {
-    "expires_in_version": "55",
-    "alert_emails": ["seceng-telemetry@mozilla.com"],
-    "kind": "count",
-    "keyed": true,
-    "releaseChannelCollection": "opt-out",
-    "bug_numbers": [1191414,1284945],
-    "description": "The number of times we generate a key via keygen, keyed on algorithm and keysize. Keys include RSA with key size (512, 1024, 2048, possibly others), secp384r1, secp256r1, and 'other_ec'."
   },
   "WEBSOCKETS_HANDSHAKE_TYPE": {
     "expires_in_version": "never",
@@ -3602,6 +3500,14 @@
     "n_values": 4,
     "description": "Count the number of 0) successful connections to an ipv4 address, 1) failed connection an ipv4 address, 2) successful connection to an ipv6 address and 3) failed connections to an ipv6 address."
   },
+  "NETWORK_CONNECTION_COUNT": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "expires_in_version": "58",
+    "kind": "count",
+    "bug_numbers": [1330255],
+    "description": "Number of the use of navigator.connection."
+  },
   "NETWORK_SESSION_AT_900FD": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -4400,21 +4306,14 @@
     "description": "Time taken to download a specified distribution file (msec)",
     "cpp_guard": "ANDROID"
   },
-  "PLACES_BACKUPS_BOOKMARKSTREE_MS": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "low": 50,
-    "high": 2000,
-    "n_buckets": 10,
-    "description": "PLACES: Time to build the bookmarks tree"
-  },
-  "PLACES_BACKUPS_TOJSON_MS": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "low": 50,
-    "high": 2000,
-    "n_buckets": 10,
-    "description": "PLACES: Time to convert and write the backup"
+  "FENNEC_ORBOT_INSTALLED": {
+    "record_in_processes": ["main", "content"],
+    "expires_in_version": "60",
+    "kind": "flag",
+    "cpp_guard": "ANDROID",
+    "description": "Whether or not users have Orbot installed",
+    "alert_emails": ["seceng@mozilla.org"],
+    "bug_numbers": [1314784]
   },
   "FENNEC_READING_LIST_COUNT": {
     "expires_in_version": "50",
@@ -6689,6 +6588,24 @@
     "n_buckets": 50,
     "description": "(Bug 1207089) Time in ms between displaying a popup notification and dismissing it without an action the first time, keyed by ID"
   },
+  "PRINT_PREVIEW_OPENED_COUNT": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["carnold@mozilla.org"],
+    "bug_numbers": [1275570],
+    "expires_in_version": "60",
+    "kind": "count",
+    "releaseChannelCollection": "opt-out",
+    "description": "A counter incremented every time the browser enters print preview."
+  },
+  "PRINT_PREVIEW_SIMPLIFY_PAGE_OPENED_COUNT": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["carnold@mozilla.org"],
+    "bug_numbers": [1275570],
+    "expires_in_version": "60",
+    "kind": "count",
+    "releaseChannelCollection": "opt-out",
+    "description": "A counter incremented every time the browser enters simplified mode on print preview."
+  },
   "PRINT_PREVIEW_SIMPLIFY_PAGE_UNAVAILABLE_COUNT": {
      "alert_emails": ["carnold@mozilla.org"],
      "bug_numbers": [1287587],
@@ -6788,7 +6705,15 @@
     "kind": "boolean",
     "description": "Reports whether a decoder for an HTTP Live Streaming media type was created when requested.",
     "bug_numbers": [1262659]
-
+  },
+  "MEDIA_DECODING_PROCESS_CRASH": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["bwu@mozilla.com", "jolin@mozilla.com", "jacheng@mozilla.com"],
+    "expires_in_version": "57",
+    "kind": "count",
+    "bug_numbers": [1297556, 1257777],
+    "description": "Records a value each time Fennec remote decoding process crashes unexpected while decoding media content.",
+    "releaseChannelCollection": "opt-out"
   },
   "VIDEO_MFT_OUTPUT_NULL_SAMPLES": {
     "alert_emails": ["cpearce@mozilla.com"],
@@ -7380,6 +7305,15 @@
     "description": "Number of times the DevTools Computed View has been opened.",
     "releaseChannelCollection": "opt-out"
   },
+  "DEVTOOLS_LAYOUTVIEW_OPENED_COUNT": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "bug_numbers": [1347552],
+    "description": "Number of times the DevTools Layout View has been opened.",
+    "releaseChannelCollection": "opt-out"
+  },
   "DEVTOOLS_FONTINSPECTOR_OPENED_COUNT": {
     "alert_emails": ["dev-developer-tools@lists.mozilla.org"],
     "expires_in_version": "never",
@@ -7474,6 +7408,15 @@
     "kind": "count",
     "bug_numbers": [1247985],
     "description": "Number of times the DevTools Storage Inspector has been opened.",
+    "releaseChannelCollection": "opt-out"
+  },
+  "DEVTOOLS_DOM_OPENED_COUNT": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "bug_numbers": [1343501],
+    "description": "Number of times the DevTools DOM Inspector has been opened.",
     "releaseChannelCollection": "opt-out"
   },
   "DEVTOOLS_PAINTFLASHING_OPENED_COUNT": {
@@ -8051,6 +7994,15 @@
     "n_values": 9,
     "releaseChannelCollection": "opt-out",
     "description": "Records DevTools toolbox host each time the toolbox is opened and when the host is changed (0:Bottom, 1:Side, 2:Window, 3:Custom, 9:Unknown)."
+  },
+  "DEVTOOLS_GCLI_COMMANDS_KEYED": {
+    "record_in_processes": ["main", "content"],
+    "bug_numbers": [1347517],
+    "alert_emails": ["dev-developer-tools@lists.mozilla.org"],
+    "expires_in_version": "never",
+    "keyed": true,
+    "kind": "count",
+    "description": "Reports the command name used in GCLI e.g. 'screenshot'"
   },
   "VIEW_SOURCE_IN_BROWSER_OPENED_BOOLEAN": {
     "alert_emails": ["mozilla-dev-developer-tools@lists.mozilla.org", "jryans@mozilla.com"],
@@ -9538,6 +9490,14 @@
     "n_buckets": 20,
     "description": "Tracking how long a ServiceWorker stays alive after it is spawned. File bugs in Core::DOM in case of a Telemetry regression."
   },
+  "FILE_EMBEDDED_SERVICEWORKERS": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["dparks@mozilla.com"],
+    "expires_in_version": "58",
+    "kind": "count",
+    "bug_numbers": [1312788],
+    "description": "Count ServiceWorkers that are embedded in pages loading with the file:/// protocol."
+  },
   "GRAPHICS_SANITY_TEST": {
     "expires_in_version": "never",
     "alert_emails": ["gfx-telemetry-alerts@mozilla.com","msreckovic@mozilla.com"],
@@ -10184,6 +10144,14 @@
     "n_values": 64,
     "description": "Count of scroll actions triggered by different input methods. See gfx/layers/apz/util/ScrollInputMethods.h for a list of possible values and their meanings."
   },
+  "TOTAL_SCROLL_Y": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["hkirschner@mozilla.com"],
+    "bug_numbers": [1297867],
+    "expires_in_version": "58",
+    "kind": "count",
+    "description": "Count of the total number of CSS pixels scrolled up or down in the vertical axis of the root frame of all the pages visited in a subsession. This doesn't include any scrolling of nested scroll frames such as inputs, iframes, or scrollable divs."
+  },
   "WEB_NOTIFICATION_CLICKED": {
     "releaseChannelCollection": "opt-out",
     "alert_emails": ["firefox-dev@mozilla.org"],
@@ -10351,6 +10319,15 @@
     "n_values": 12,
     "description": "Plugin drawing model. 0 when windowed, otherwise NPDrawingModel + 1."
   },
+  "DOM_SCRIPT_SRC_ENCODING": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["dteller@mozilla.com"],
+    "expires_in_version": "61",
+    "kind": "count",
+    "keyed": true,
+    "bug_numbers": [1344152],
+    "description": "Note the encoding (e.g. 'UTF-8', 'windows-1252', 'ASCII') of each external <script> element that is successfully loaded and decoded."
+  },
   "WEB_NOTIFICATION_REQUEST_PERMISSION_CALLBACK": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
@@ -10505,6 +10482,17 @@
     "cpp_guard": "XP_LINUX",
     "description": "Whether the sandbox is enabled for the content process"
   },
+  "SANDBOX_REJECTED_SYSCALLS": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["jld@mozilla.com", "gcp@mozilla.com"],
+    "bug_numbers": [1286865],
+    "expires_in_version": "never",
+    "releaseChannelCollection": "opt-out",
+    "kind": "count",
+    "keyed": true,
+    "cpp_guard": "XP_LINUX",
+    "description": "System calls blocked by a seccomp-bpf sandbox policy; limited to syscalls where we would crash on Nightly.  The key is generally the architecture and syscall ID but in some cases we include non-personally-identifying information from the syscall arguments; see the function SubmitToTelemetry in security/sandbox/linux/reporter/SandboxReporter.cpp for details."
+  },
   "SYNC_WORKER_OPERATION": {
     "alert_emails": ["amarchesini@mozilla.com", "khuey@mozilla.com" ],
     "bug_numbers": [1267904],
@@ -10641,6 +10629,67 @@
     "bug_numbers": [1276006],
     "kind": "count",
     "description": "Tracking the total number of opened Containers."
+  },
+  "STORAGE_SYNC_GET_OPS_SIZE": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["eglassercamp@mozilla.com"],
+    "expires_in_version": "58",
+    "bug_numbers": [1328974],
+    "kind": "exponential",
+    "high": 100000,
+    "n_buckets": 30,
+    "keyed": true,
+    "description": "Track the size of results of get() operations performed this subsession. The key is the addon ID.",
+    "releaseChannelCollection": "opt-out"
+  },
+  "STORAGE_SYNC_SET_OPS_SIZE": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["eglassercamp@mozilla.com"],
+    "expires_in_version": "58",
+    "bug_numbers": [1328974],
+    "kind": "exponential",
+    "high": 100000,
+    "n_buckets": 30,
+    "keyed": true,
+    "description": "Track the size of set() operations performed by addons this subsession. The key is the addon ID.",
+    "releaseChannelCollection": "opt-out"
+  },
+  "STORAGE_SYNC_REMOVE_OPS": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["eglassercamp@mozilla.com"],
+    "expires_in_version": "58",
+    "bug_numbers": [1328974],
+    "kind": "count",
+    "keyed": true,
+    "description": "Track the number of remove() operations addons perform this subsession. The key is the addon ID.",
+    "releaseChannelCollection": "opt-out"
+  },
+  "FENNEC_SESSIONSTORE_DAMAGED_SESSION_FILE": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["jh+bugzilla@buttercookie.de"],
+    "expires_in_version": "61",
+    "kind": "flag",
+    "bug_numbers": [1284017],
+    "description": "When restoring tabs on startup, reading from sessionstore.js failed, even though the file exists and is not containing an explicitly empty window.",
+    "cpp_guard": "ANDROID"
+  },
+  "FENNEC_SESSIONSTORE_RESTORING_FROM_BACKUP": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["jh+bugzilla@buttercookie.de"],
+    "expires_in_version": "61",
+    "kind": "flag",
+    "bug_numbers": [1190627],
+    "description": "When restoring tabs on startup, reading from sessionstore.js failed, but sessionstore.bak was read successfully.",
+    "cpp_guard": "ANDROID"
+  },
+  "FENNEC_SESSIONSTORE_ALL_FILES_DAMAGED": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["jh+bugzilla@buttercookie.de"],
+    "expires_in_version": "61",
+    "kind": "flag",
+    "bug_numbers": [1337115],
+    "description": "Both the main session file and its backup could not be read and and the first run pref is false.",
+    "cpp_guard": "ANDROID"
   },
   "SHARED_WORKER_COUNT": {
     "alert_emails": ["amarchesini@mozilla.com"],
