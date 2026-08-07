@@ -39,7 +39,6 @@
 #include "mozilla/dom/ScrollAreaEvent.h"
 #include "mozilla/dom/SimpleGestureEvent.h"
 #include "mozilla/dom/StorageEvent.h"
-#include "mozilla/dom/SVGZoomEvent.h"
 #include "mozilla/dom/TimeEvent.h"
 #include "mozilla/dom/TouchEvent.h"
 #include "mozilla/dom/TransitionEvent.h"
@@ -932,9 +931,6 @@ EventDispatcher::CreateEvent(EventTarget* aOwner,
     case eClipboardEventClass:
       return NS_NewDOMClipboardEvent(aOwner, aPresContext,
                                      aEvent->AsClipboardEvent());
-    case eSVGZoomEventClass:
-      return NS_NewDOMSVGZoomEvent(aOwner, aPresContext,
-                                   aEvent->AsSVGZoomEvent());
     case eSMILTimeEventClass:
       return NS_NewDOMTimeEvent(aOwner, aPresContext,
                                 aEvent->AsSMILTimeEvent());
@@ -1041,14 +1037,6 @@ EventDispatcher::CreateEvent(EventTarget* aOwner,
   if (aEventType.LowerCaseEqualsLiteral("svgevents")) {
     LOG_EVENT_CREATION(SVGEVENTS);
     return NS_NewDOMEvent(aOwner, aPresContext, nullptr);
-  }
-  if (aEventType.LowerCaseEqualsLiteral("svgzoomevent")) {
-    LOG_EVENT_CREATION(SVGZOOMEVENT);
-    return NS_NewDOMSVGZoomEvent(aOwner, aPresContext, nullptr);
-  }
-  if (aEventType.LowerCaseEqualsLiteral("svgzoomevents")) {
-    LOG_EVENT_CREATION(SVGZOOMEVENTS);
-    return NS_NewDOMSVGZoomEvent(aOwner, aPresContext, nullptr);
   }
   if (aEventType.LowerCaseEqualsLiteral("timeevent")) {
     LOG_EVENT_CREATION(TIMEEVENT);
