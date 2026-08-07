@@ -518,9 +518,6 @@ ShadowLayerForwarder::RemoveTextureFromCompositable(CompositableClient* aComposi
     CompositableOperation(
       aCompositable->GetIPCHandle(),
       OpRemoveTexture(nullptr, aTexture->GetIPDLActor())));
-  if (aTexture->GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
-    mTxn->MarkSyncTransaction();
-  }
 }
 
 bool

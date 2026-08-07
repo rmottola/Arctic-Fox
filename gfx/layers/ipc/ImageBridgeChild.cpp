@@ -1136,15 +1136,9 @@ ImageBridgeChild::RemoveTextureFromCompositable(CompositableClient* aCompositabl
     return;
   }
 
-  CompositableOperation op(
+  mTxn->AddNoSwapEdit(CompositableOperation(
     aCompositable->GetIPCHandle(),
-    OpRemoveTexture(nullptr, aTexture->GetIPDLActor()));
-
-  if (aTexture->GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
-    mTxn->AddEdit(op);
-  } else {
-    mTxn->AddNoSwapEdit(op);
-  }
+    OpRemoveTexture(nullptr, aTexture->GetIPDLActor())));
 }
 
 bool ImageBridgeChild::IsSameProcess() const
