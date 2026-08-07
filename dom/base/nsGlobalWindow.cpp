@@ -6103,7 +6103,8 @@ nsGlobalWindow::DispatchResizeEvent(const CSSIntSize& aSize)
 
   ErrorResult res;
   RefPtr<Event> domEvent =
-    mDoc->CreateEvent(NS_LITERAL_STRING("CustomEvent"), res);
+    mDoc->CreateEvent(NS_LITERAL_STRING("CustomEvent"), CallerType::System,
+                      res);
   if (res.Failed()) {
     return false;
   }
