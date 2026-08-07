@@ -3501,7 +3501,6 @@
     "description": "Count the number of 0) successful connections to an ipv4 address, 1) failed connection an ipv4 address, 2) successful connection to an ipv6 address and 3) failed connections to an ipv6 address."
   },
   "NETWORK_CONNECTION_COUNT": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["amarchesini@mozilla.com"],
     "expires_in_version": "58",
     "kind": "count",
@@ -3583,7 +3582,8 @@
   "PLUGIN_CALLED_DIRECTLY": {
     "expires_in_version": "never",
     "kind": "flag",
-    "description": "A plugin object was successfully invoked as a function"
+    "description": "A plugin object was successfully invoked as a function",
+    "cpp_guard": "ANDROID"
   },
   "FLASH_PLUGIN_STATES": {
     "expires_in_version": "50",
@@ -4307,7 +4307,6 @@
     "cpp_guard": "ANDROID"
   },
   "FENNEC_ORBOT_INSTALLED": {
-    "record_in_processes": ["main", "content"],
     "expires_in_version": "60",
     "kind": "flag",
     "cpp_guard": "ANDROID",
@@ -4610,6 +4609,7 @@
     "expires_in_version": "never",
     "kind": "count",
     "releaseChannelCollection": "opt-out",
+    "cpp_guard": "ANDROID",
     "description": "Update: count of systems that have an app.update.url.override preference (externally initiated)"
   },
   "UPDATE_HAS_PREF_URL_OVERRIDE_NOTIFY": {
@@ -4617,6 +4617,7 @@
     "expires_in_version": "never",
     "kind": "count",
     "releaseChannelCollection": "opt-out",
+    "cpp_guard": "ANDROID",
     "description": "Update: count of systems that have an app.update.url.override preference (timer initiated)"
   },
   "UPDATE_PREF_UPDATE_CANCELATIONS_EXTERNAL": {
@@ -5185,6 +5186,7 @@
     "alert_emails": ["jaws@mozilla.com"],
     "expires_in_version": "53",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Count how often the browser is opened as an external app handler. This is generally used when the browser is set as the default browser."
   },
   "INPUT_EVENT_RESPONSE_MS": {
@@ -5923,6 +5925,7 @@
     "bug_numbers": [1250640],
     "expires_in_version": "53",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Count of TelemetrySession triggering a daily ping."
   },
   "TELEMETRY_TEST_FLAG": {
@@ -6589,7 +6592,6 @@
     "description": "(Bug 1207089) Time in ms between displaying a popup notification and dismissing it without an action the first time, keyed by ID"
   },
   "PRINT_PREVIEW_OPENED_COUNT": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["carnold@mozilla.org"],
     "bug_numbers": [1275570],
     "expires_in_version": "60",
@@ -6598,7 +6600,6 @@
     "description": "A counter incremented every time the browser enters print preview."
   },
   "PRINT_PREVIEW_SIMPLIFY_PAGE_OPENED_COUNT": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["carnold@mozilla.org"],
     "bug_numbers": [1275570],
     "expires_in_version": "60",
@@ -6707,7 +6708,6 @@
     "bug_numbers": [1262659]
   },
   "MEDIA_DECODING_PROCESS_CRASH": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["bwu@mozilla.com", "jolin@mozilla.com", "jacheng@mozilla.com"],
     "expires_in_version": "57",
     "kind": "count",
@@ -7306,7 +7306,6 @@
     "releaseChannelCollection": "opt-out"
   },
   "DEVTOOLS_LAYOUTVIEW_OPENED_COUNT": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["dev-developer-tools@lists.mozilla.org"],
     "expires_in_version": "never",
     "kind": "count",
@@ -7411,7 +7410,6 @@
     "releaseChannelCollection": "opt-out"
   },
   "DEVTOOLS_DOM_OPENED_COUNT": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["dev-developer-tools@lists.mozilla.org"],
     "expires_in_version": "never",
     "kind": "count",
@@ -7996,7 +7994,6 @@
     "description": "Records DevTools toolbox host each time the toolbox is opened and when the host is changed (0:Bottom, 1:Side, 2:Window, 3:Custom, 9:Unknown)."
   },
   "DEVTOOLS_GCLI_COMMANDS_KEYED": {
-    "record_in_processes": ["main", "content"],
     "bug_numbers": [1347517],
     "alert_emails": ["dev-developer-tools@lists.mozilla.org"],
     "expires_in_version": "never",
@@ -9491,7 +9488,6 @@
     "description": "Tracking how long a ServiceWorker stays alive after it is spawned. File bugs in Core::DOM in case of a Telemetry regression."
   },
   "FILE_EMBEDDED_SERVICEWORKERS": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["dparks@mozilla.com"],
     "expires_in_version": "58",
     "kind": "count",
@@ -9586,13 +9582,6 @@
     "high": 1000,
     "n_buckets": 10
   },
-  "DEVTOOLS_HUD_REFLOWS": {
-    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
-    "expires_in_version": "52",
-    "kind": "count",
-    "keyed": true,
-    "description": "A count of the number of reflows, keyed by appName."
-  },
   "DEVTOOLS_HUD_SECURITY_CATEGORY": {
     "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
     "expires_in_version": "52",
@@ -9600,20 +9589,6 @@
     "keyed": true,
     "description": "The security error enums, keyed by appName.",
     "n_values": 8
-  },
-  "DEVTOOLS_HUD_ERRORS": {
-    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
-    "expires_in_version": "52",
-    "kind": "count",
-    "keyed": true,
-    "description": "Number of errors, keyed by appName."
-  },
-  "DEVTOOLS_HUD_WARNINGS": {
-    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
-    "expires_in_version": "52",
-    "kind": "count",
-    "keyed": true,
-    "description": "Number of warnings, keyed by appName."
   },
   "DEVTOOLS_HUD_USS": {
     "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
@@ -9992,60 +9967,70 @@
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "flag",
+    "cpp_guard": "ANDROID",
     "description": "A Push API subscribe() operation was performed at least once this session."
   },
   "PUSH_API_PERMISSION_REQUESTED": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Count of number of times the PermissionManager explicitly prompted user for Push Notifications permission"
   },
   "PUSH_API_PERMISSION_DENIED": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "User explicitly denied Push Notifications permission"
   },
   "PUSH_API_PERMISSION_GRANTED": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "User explicitly granted Push Notifications permission"
   },
   "PUSH_API_SUBSCRIBE_ATTEMPT": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Push Service attempts to subscribe with Push Server."
   },
   "PUSH_API_SUBSCRIBE_FAILED": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Attempt to subscribe with Push Server failed."
   },
   "PUSH_API_SUBSCRIBE_SUCCEEDED": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Attempt to subscribe with Push Server succeeded."
   },
   "PUSH_API_UNSUBSCRIBE_ATTEMPT": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Push Service attempts to unsubscribe with Push Server."
   },
   "PUSH_API_UNSUBSCRIBE_FAILED": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Attempt to unsubscribe with Push Server failed."
   },
   "PUSH_API_UNSUBSCRIBE_SUCCEEDED": {
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Attempt to unsubscribe with Push Server succeeded."
   },
   "PUSH_API_SUBSCRIBE_WS_TIME": {
@@ -10084,6 +10069,7 @@
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Push notification was received from server."
   },
   "PUSH_API_NOTIFICATION_RECEIVED_BUT_DID_NOT_NOTIFY": {
@@ -10104,6 +10090,7 @@
     "alert_emails": ["push@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "description": "Attempt to notify ServiceWorker of push notification resubscription."
   },
   "D3D11_SYNC_HANDLE_FAILURE": {
@@ -10145,7 +10132,6 @@
     "description": "Count of scroll actions triggered by different input methods. See gfx/layers/apz/util/ScrollInputMethods.h for a list of possible values and their meanings."
   },
   "TOTAL_SCROLL_Y": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["hkirschner@mozilla.com"],
     "bug_numbers": [1297867],
     "expires_in_version": "58",
@@ -10320,7 +10306,6 @@
     "description": "Plugin drawing model. 0 when windowed, otherwise NPDrawingModel + 1."
   },
   "DOM_SCRIPT_SRC_ENCODING": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["dteller@mozilla.com"],
     "expires_in_version": "61",
     "kind": "count",
@@ -10483,7 +10468,6 @@
     "description": "Whether the sandbox is enabled for the content process"
   },
   "SANDBOX_REJECTED_SYSCALLS": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["jld@mozilla.com", "gcp@mozilla.com"],
     "bug_numbers": [1286865],
     "expires_in_version": "never",
@@ -10540,6 +10524,7 @@
     "alert_emails": ["gfx-telemetry-alerts@mozilla.com","bgirard@mozilla.com","msreckovic@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "bug_numbers": [1276714, 1276716],
     "description": "Number of times about:crashes has been opened.",
     "releaseChannelCollection": "opt-out"
@@ -10572,6 +10557,7 @@
     "alert_emails": ["amarchesini@mozilla.com"],
     "expires_in_version": "55",
     "kind": "count",
+    "cpp_guard": "ANDROID",
     "bug_numbers": [1280229],
     "description": "Number of the use of XHR in workers."
   },
@@ -10631,7 +10617,6 @@
     "description": "Tracking the total number of opened Containers."
   },
   "STORAGE_SYNC_GET_OPS_SIZE": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["eglassercamp@mozilla.com"],
     "expires_in_version": "58",
     "bug_numbers": [1328974],
@@ -10643,7 +10628,6 @@
     "releaseChannelCollection": "opt-out"
   },
   "STORAGE_SYNC_SET_OPS_SIZE": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["eglassercamp@mozilla.com"],
     "expires_in_version": "58",
     "bug_numbers": [1328974],
@@ -10655,7 +10639,6 @@
     "releaseChannelCollection": "opt-out"
   },
   "STORAGE_SYNC_REMOVE_OPS": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["eglassercamp@mozilla.com"],
     "expires_in_version": "58",
     "bug_numbers": [1328974],
@@ -10665,7 +10648,6 @@
     "releaseChannelCollection": "opt-out"
   },
   "FENNEC_SESSIONSTORE_DAMAGED_SESSION_FILE": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["jh+bugzilla@buttercookie.de"],
     "expires_in_version": "61",
     "kind": "flag",
@@ -10674,7 +10656,6 @@
     "cpp_guard": "ANDROID"
   },
   "FENNEC_SESSIONSTORE_RESTORING_FROM_BACKUP": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["jh+bugzilla@buttercookie.de"],
     "expires_in_version": "61",
     "kind": "flag",
@@ -10683,7 +10664,6 @@
     "cpp_guard": "ANDROID"
   },
   "FENNEC_SESSIONSTORE_ALL_FILES_DAMAGED": {
-    "record_in_processes": ["main", "content"],
     "alert_emails": ["jh+bugzilla@buttercookie.de"],
     "expires_in_version": "61",
     "kind": "flag",
