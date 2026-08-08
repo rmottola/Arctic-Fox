@@ -5,10 +5,10 @@
 
 var testGenerator = testSteps();
 
-function testSteps()
+function* testSteps()
 {
   const name =
-    this.window ? window.location.pathname : "test_wasm_put_get_values.js";
+    this.window ? window.location.pathname : "test_wasm_cursors.js";
 
   const objectStoreName = "Wasm";
 
@@ -16,7 +16,7 @@ function testSteps()
 
   if (!isWasmSupported()) {
     finishTest();
-    yield undefined;
+    return;
   }
 
   getWasmBinary('(module (func (nop)))');
@@ -55,29 +55,12 @@ function testSteps()
 
   is(request.result, wasmData.key, "Got correct key");
 
-  info("Getting wasm");
+  info("Opening cursor");
 
-  request = objectStore.get(wasmData.key);
-  request.onsuccess = continueToNextStepSync;
-  yield undefined;
-
-  info("Verifying wasm");
-
-  verifyWasmModule(request.result, wasmData.value);
-  yield undefined;
-
-  info("Getting wasm in new transaction");
-
-  request = db.transaction([objectStoreName])
-              .objectStore(objectStoreName).get(wasmData.key);
-  request.onsuccess = continueToNextStepSync;
-  yield undefined;
-
-  info("Verifying wasm");
-
-  verifyWasmModule(request.result, wasmData.value);
+  request = objectStore.openCursor();
+  request.addEventListener("error", new ExpectError("UnknownError", true));
+  request.onsuccess = unexpectedSuccessHandler;
   yield undefined;
 
   finishTest();
-  yield undefined;
 }
