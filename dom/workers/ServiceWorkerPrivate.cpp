@@ -533,7 +533,7 @@ public:
 nsresult
 ServiceWorkerPrivate::SendMessageEvent(JSContext* aCx,
                                        JS::Handle<JS::Value> aMessage,
-                                       const Optional<Sequence<JS::Value>>& aTransferable,
+                                       const Sequence<JS::Value>& aTransferable,
                                        UniquePtr<ServiceWorkerClientInfo>&& aClientInfo)
 {
   AssertIsOnMainThread();
@@ -544,10 +544,10 @@ ServiceWorkerPrivate::SendMessageEvent(JSContext* aCx,
   }
 
   JS::Rooted<JS::Value> transferable(aCx, JS::UndefinedHandleValue);
-  if (aTransferable.WasPassed()) {
-    const Sequence<JS::Value>& value = aTransferable.Value();
+  if (!aTransferable.IsEmpty()) {
     JS::HandleValueArray elements =
-      JS::HandleValueArray::fromMarkedLocation(value.Length(), value.Elements());
+      JS::HandleValueArray::fromMarkedLocation(aTransferable.Length(),
+                                               aTransferable.Elements());
 
     JSObject* array = JS_NewArrayObject(aCx, elements);
     if (!array) {
