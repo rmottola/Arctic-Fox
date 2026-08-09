@@ -1438,6 +1438,10 @@ var BookmarkingUI = {
     options.maxResults = kMaxResults;
     let query = PlacesUtils.history.getNewQuery();
 
+    let sh = Cc["@mozilla.org/network/serialization-helper;1"]
+               .getService(Ci.nsISerializationHelper);
+    let loadingPrincipal = sh.serializeToString(document.nodePrincipal);
+
     let fragment = document.createDocumentFragment();
     let root = PlacesUtils.history.executeQuery(query, options).root;
     root.containerOpen = true;
@@ -1459,6 +1463,7 @@ var BookmarkingUI = {
       if (icon) {
         let iconURL = "moz-anno:favicon:" + icon;
         item.setAttribute("image", iconURL);
+        item.setAttribute("loadingprincipal", loadingPrincipal);
       }
       item._placesNode = node;
       fragment.appendChild(item);
