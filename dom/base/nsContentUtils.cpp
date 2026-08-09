@@ -1796,7 +1796,8 @@ nsContentUtils::ParseLegacyFontSize(const nsAString& aValue)
 bool
 nsContentUtils::IsControlledByServiceWorker(nsIDocument* aDocument)
 {
-  if (nsContentUtils::IsInPrivateBrowsing(aDocument)) {
+  if (aDocument &&
+      aDocument->NodePrincipal()->OriginAttributesRef().mPrivateBrowsingId) {
     return false;
   }
 
@@ -3184,40 +3185,6 @@ nsContentUtils::GetOriginAttributes(nsILoadGroup* aLoadGroup)
   return attrs;
 }
 
-// static
-bool
-nsContentUtils::IsInPrivateBrowsing(nsIDocument* aDoc)
-{
-  if (!aDoc) {
-    return false;
-  }
-
-  nsCOMPtr<nsILoadGroup> loadGroup = aDoc->GetDocumentLoadGroup();
-  if (loadGroup) {
-    return IsInPrivateBrowsing(loadGroup);
-  }
-
-  nsCOMPtr<nsIChannel> channel = aDoc->GetChannel();
-  return channel && NS_UsePrivateBrowsing(channel);
-}
-
-// static
-bool
-nsContentUtils::IsInPrivateBrowsing(nsILoadGroup* aLoadGroup)
-{
-  if (!aLoadGroup) {
-    return false;
-  }
-  bool isPrivate = false;
-  nsCOMPtr<nsIInterfaceRequestor> callbacks;
-  aLoadGroup->GetNotificationCallbacks(getter_AddRefs(callbacks));
-  if (callbacks) {
-    nsCOMPtr<nsILoadContext> loadContext = do_GetInterface(callbacks);
-    isPrivate = loadContext && loadContext->UsePrivateBrowsing();
-  }
-  return isPrivate;
-}
-
 bool
 nsContentUtils::DocumentInactiveForImageLoads(nsIDocument* aDocument)
 {
@@ -3237,9 +3204,26 @@ nsContentUtils::GetImgLoaderForDocument(nsIDocument* aDoc)
   if (!aDoc) {
     return imgLoader::NormalLoader();
   }
-  bool isPrivate = IsInPrivateBrowsing(aDoc);
-  return isPrivate ? imgLoader::PrivateBrowsingLoader()
-                   : imgLoader::NormalLoader();
+
+  nsCOMPtr<nsILoadGroup> loadGroup = aDoc->GetDocumentLoadGroup();
+  if (loadGroup) {
+    nsCOMPtr<nsIInterfaceRequestor> callbacks;
+    loadGroup->GetNotificationCallbacks(getter_AddRefs(callbacks));
+    if (callbacks) {
+      nsCOMPtr<nsILoadContext> loadContext = do_GetInterface(callbacks);
+      if (loadContext && loadContext->UsePrivateBrowsing()) {
+        return imgLoader::PrivateBrowsingLoader();
+      }
+    }
+    return imgLoader::NormalLoader();
+  }
+
+  nsCOMPtr<nsIChannel> channel = aDoc->GetChannel();
+  if (channel && NS_UsePrivateBrowsing(channel)) {
+    return imgLoader::PrivateBrowsingLoader();
+  }
+
+  return imgLoader::NormalLoader();
 }
 
 // static
@@ -8610,7 +8594,7 @@ nsContentUtils::InternalStorageAllowedForPrincipal(nsIPrincipal* aPrincipal,
     }
 
     // Check if we are in private browsing, and record that fact
-    if (IsInPrivateBrowsing(document)) {
+    if (document->NodePrincipal()->OriginAttributesRef().mPrivateBrowsingId) {
       access = StorageAccess::ePrivateBrowsing;
     }
   }
