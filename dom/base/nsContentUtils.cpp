@@ -3671,6 +3671,22 @@ nsContentUtils::ReportToConsoleNonLocalized(const nsAString& aErrorText,
     innerWindowID = aDocument->InnerWindowID();
   }
 
+  return ReportToConsoleByWindowID(aErrorText, aErrorFlags, aCategory,
+                                   innerWindowID, aURI, aSourceLine,
+                                   aLineNumber, aColumnNumber, aLocationMode);
+}
+
+/* static */ nsresult
+nsContentUtils::ReportToConsoleByWindowID(const nsAString& aErrorText,
+                                          uint32_t aErrorFlags,
+                                          const nsACString& aCategory,
+                                          uint64_t aInnerWindowID,
+                                          nsIURI* aURI,
+                                          const nsAFlatString& aSourceLine,
+                                          uint32_t aLineNumber,
+                                          uint32_t aColumnNumber,
+                                          MissingErrorLocationMode aLocationMode)
+{
   nsresult rv;
   if (!sConsoleService) { // only need to bother null-checking here
     rv = CallGetService(NS_CONSOLESERVICE_CONTRACTID, &sConsoleService);
@@ -3697,7 +3713,7 @@ nsContentUtils::ReportToConsoleNonLocalized(const nsAString& aErrorText,
                                      aSourceLine,
                                      aLineNumber, aColumnNumber,
                                      aErrorFlags, aCategory,
-                                     innerWindowID);
+                                     aInnerWindowID);
   NS_ENSURE_SUCCESS(rv, rv);
 
   return sConsoleService->LogMessage(errorObject);
@@ -7335,8 +7351,18 @@ nsContentUtils::GetInnerWindowID(nsIRequest* aRequest)
     return 0;
   }
 
+  return GetInnerWindowID(loadGroup);
+}
+
+uint64_t
+nsContentUtils::GetInnerWindowID(nsILoadGroup* aLoadGroup)
+{
+  if (!aLoadGroup) {
+    return 0;
+  }
+
   nsCOMPtr<nsIInterfaceRequestor> callbacks;
-  rv = loadGroup->GetNotificationCallbacks(getter_AddRefs(callbacks));
+  nsresult rv = aLoadGroup->GetNotificationCallbacks(getter_AddRefs(callbacks));
   if (NS_FAILED(rv) || !callbacks) {
     return 0;
   }

@@ -2640,6 +2640,13 @@ HttpBaseChannel::AddConsoleReport(uint32_t aErrorFlags,
 }
 
 void
+HttpBaseChannel::FlushReportsToConsole(uint64_t aInnerWindowID,
+                                       ReportAction aAction)
+{
+  mReportCollector->FlushReportsToConsole(aInnerWindowID, aAction);
+}
+
+void
 HttpBaseChannel::FlushConsoleReports(nsIDocument* aDocument,
                                      ReportAction aAction)
 {
@@ -2647,16 +2654,16 @@ HttpBaseChannel::FlushConsoleReports(nsIDocument* aDocument,
 }
 
 void
-HttpBaseChannel::FlushConsoleReports(nsIConsoleReportCollector* aCollector)
+HttpBaseChannel::FlushConsoleReports(nsILoadGroup* aLoadGroup,
+                                     ReportAction aAction)
 {
-  mReportCollector->FlushConsoleReports(aCollector);
+  mReportCollector->FlushConsoleReports(aLoadGroup, aAction);
 }
 
 void
-HttpBaseChannel::FlushReportsByWindowId(uint64_t aWindowId,
-                                        ReportAction aAction)
+HttpBaseChannel::FlushConsoleReports(nsIConsoleReportCollector* aCollector)
 {
-  mReportCollector->FlushReportsByWindowId(aWindowId, aAction);
+  mReportCollector->FlushConsoleReports(aCollector);
 }
 
 void
@@ -2826,11 +2833,15 @@ HttpBaseChannel::DoNotifyListener()
   // document that started the navigation.  We want to show the reports on the
   // new document.  Otherwise the console is wiped and the user never sees
   // the information.
-  if (!IsNavigation() && mLoadInfo) {
-    nsCOMPtr<nsIDOMDocument> dommyDoc;
-    mLoadInfo->GetLoadingDocument(getter_AddRefs(dommyDoc));
-    nsCOMPtr<nsIDocument> doc = do_QueryInterface(dommyDoc);
-    FlushConsoleReports(doc);
+  if (!IsNavigation()) {
+    if (mLoadGroup) {
+      FlushConsoleReports(mLoadGroup);
+    } else if (mLoadInfo) {
+      nsCOMPtr<nsIDOMDocument> dommyDoc;
+      mLoadInfo->GetLoadingDocument(getter_AddRefs(dommyDoc));
+      nsCOMPtr<nsIDocument> doc = do_QueryInterface(dommyDoc);
+      FlushConsoleReports(doc);
+    }
   }
 }
 

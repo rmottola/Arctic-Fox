@@ -1577,10 +1577,11 @@ ServiceWorkerManager::FlushReportsToAllClients(const nsACString& aScope,
       continue;
     }
 
-    windows.AppendElement(doc->InnerWindowID());
+    uint64_t innerWindowId = doc->InnerWindowID();
+    windows.AppendElement(innerWindowId);
 
-    aReporter->FlushConsoleReports(doc,
-                                   nsIConsoleReportCollector::ReportAction::Save);
+    aReporter->FlushReportsToConsole(
+      innerWindowId, nsIConsoleReportCollector::ReportAction::Save);
   }
 
   // Report to any documents that have called .register() for this scope.  They
@@ -1605,8 +1606,8 @@ ServiceWorkerManager::FlushReportsToAllClients(const nsACString& aScope,
 
       windows.AppendElement(innerWindowId);
 
-      aReporter->FlushConsoleReports(doc,
-                                     nsIConsoleReportCollector::ReportAction::Save);
+      aReporter->FlushReportsToConsole(
+        innerWindowId, nsIConsoleReportCollector::ReportAction::Save);
     }
 
     if (regList->IsEmpty()) {
@@ -1635,15 +1636,15 @@ ServiceWorkerManager::FlushReportsToAllClients(const nsACString& aScope,
 
       windows.AppendElement(innerWindowId);
 
-      aReporter->FlushReportsByWindowId(innerWindowId,
-                                        nsIConsoleReportCollector::ReportAction::Save);
+      aReporter->FlushReportsToConsole(
+        innerWindowId, nsIConsoleReportCollector::ReportAction::Save);
     }
   }
 
   // If there are no documents to report to, at least report something to the
   // browser console.
   if (windows.IsEmpty()) {
-    aReporter->FlushConsoleReports((nsIDocument*)nullptr);
+    aReporter->FlushReportsToConsole(0);
     return;
   }
 
