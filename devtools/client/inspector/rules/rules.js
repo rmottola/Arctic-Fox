@@ -1652,7 +1652,6 @@ RuleViewTool.prototype = {
           toolbox.getCurrentPanel().selectStyleSheet(url, line, column);
         });
       }
-      return;
     });
   },
 

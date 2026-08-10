@@ -283,6 +283,8 @@ module.exports = {
     "no-return-assign": "error",
     // Allow use of javascript: urls.
     "no-script-url": "off",
+    // Disallow assignments like foo = foo
+    "no-self-assign": "error",
     // Disallow comparisons where both sides are exactly the same.
     "no-self-compare": "error",
     // Disallow use of comma operator.
@@ -330,6 +332,10 @@ module.exports = {
     "no-unused-vars": ["error", {"vars": "all", "args": "none"}],
     // Allow using variables before they are defined.
     "no-use-before-define": "off",
+    // Disallow useless Function.prototype.{call/apply}
+    "no-useless-call": "error",
+    // Disallow useless return;
+    "no-useless-return": "error",
     // We use var-only-at-top-level instead of no-var as we allow top level
     // vars.
     "no-var": "off",
