@@ -135,3 +135,39 @@ function findMessages(hud, text, selector = ".message") {
   );
   return elements;
 }
+
+/**
+ * Simulate a context menu event on the provided element, and wait for the console context
+ * menu to open. Returns a promise that resolves the menu popup element.
+ *
+ * @param object hud
+ *        The web console.
+ * @param element element
+ *        The dom element on which the context menu event should be synthesized.
+ * @return promise
+ */
+function* openContextMenu(hud, element) {
+  let onConsoleMenuOpened = hud.ui.newConsoleOutput.once("menu-open");
+  synthesizeContextMenuEvent(element);
+  yield onConsoleMenuOpened;
+  return hud.ui.newConsoleOutput.toolbox.doc.getElementById("webconsole-menu");
+}
+
+/**
+ * Hide the webconsole context menu popup. Returns a promise that will resolve when the
+ * context menu popup is hidden or immediately if the popup can't be found.
+ *
+ * @param object hud
+ *        The web console.
+ * @return promise
+ */
+function hideContextMenu(hud) {
+  let popup = hud.ui.newConsoleOutput.toolbox.doc.getElementById("webconsole-menu");
+  if (!popup) {
+    return Promise.resolve();
+  }
+
+  let onPopupHidden = once(popup, "popuphidden");
+  popup.hidePopup();
+  return onPopupHidden;
+}

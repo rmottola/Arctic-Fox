@@ -59,6 +59,12 @@ const ConsoleOutput = createClass({
     }
   },
 
+  onContextMenu(e) {
+    this.props.serviceContainer.openContextMenu(e);
+    e.stopPropagation();
+    e.preventDefault();
+  },
+
   render() {
     let {
       dispatch,
@@ -100,6 +106,7 @@ const ConsoleOutput = createClass({
     return (
       dom.div({
         className: classList.join(" "),
+        onContextMenu: this.onContextMenu,
         ref: node => {
           this.outputNode = node;
         },
