@@ -87,8 +87,6 @@ RequestsMenuView.prototype = {
       () => this.onResize()
     ));
 
-    this._onContextPerfCommand = () => NetMonitorView.toggleFrontendMode();
-
     this.sendCustomRequestEvent = this.sendCustomRequest.bind(this);
     this.closeCustomRequestEvent = this.closeCustomRequest.bind(this);
     this.cloneSelectedRequestEvent = this.cloneSelectedRequest.bind(this);
@@ -127,9 +125,6 @@ RequestsMenuView.prototype = {
     } else {
       $("#headers-summary-resend").hidden = true;
     }
-
-    $("#network-statistics-back-button")
-      .addEventListener("command", this._onContextPerfCommand);
   },
 
   /**
@@ -142,8 +137,6 @@ RequestsMenuView.prototype = {
 
     // this.flushRequestsTask.disarm();
 
-    $("#network-statistics-back-button")
-      .removeEventListener("command", this._onContextPerfCommand);
     $("#custom-request-send-button")
       .removeEventListener("click", this.sendCustomRequestEvent);
     $("#custom-request-close-button")
