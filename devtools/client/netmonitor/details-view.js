@@ -31,7 +31,7 @@ const ReactDOM = require("devtools/client/shared/vendor/react-dom");
 const Provider = createFactory(require("devtools/client/shared/vendor/react-redux").Provider);
 const PreviewPanel = createFactory(require("./shared/components/preview-panel"));
 const SecurityPanel = createFactory(require("./shared/components/security-panel"));
-const TimingsPanel = createFactory(require("./components/shared/timings-panel"));
+const TimingsPanel = createFactory(require("./shared/components/timings-panel"));
 
 // 100 KB in bytes
 const SOURCE_SYNTAX_HIGHLIGHT_MAX_FILE_SIZE = 102400;
