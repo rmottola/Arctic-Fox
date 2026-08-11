@@ -190,4 +190,4 @@ LayoutView.prototype = {
 
 };
 
-exports.LayoutView = LayoutView;
+module.exports = LayoutView;
