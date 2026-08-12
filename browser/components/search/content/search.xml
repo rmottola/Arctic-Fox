@@ -523,8 +523,8 @@
           }
           // If we hit here, we come either from a one-off, a plain search or a suggestion.
           const details = {
-            isOneOff: aOneOff,
-            isSuggestion: (!aOneOff && telemetrySearchDetails),
+            isOneOff: false,
+            isSuggestion: (!false && telemetrySearchDetails),
             selection: telemetrySearchDetails
           };
           BrowserSearch.recordSearchInTelemetry(engine, "searchbar", details);
