@@ -7630,13 +7630,13 @@ js::wasm::BaselineCanCompile(const FunctionGenerator* fg)
 }
 
 bool
-js::wasm::BaselineCompileFunction(CompileTask* task, FuncCompileUnit* unit)
+js::wasm::BaselineCompileFunction(CompileTask* task, FuncCompileUnit* unit, UniqueChars* error)
 {
     MOZ_ASSERT(unit->mode() == CompileMode::Baseline);
 
     const FuncBytes& func = unit->func();
 
-    Decoder d(func.bytes());
+    Decoder d(func.bytes(), error);
 
     // Build the local types vector.
 

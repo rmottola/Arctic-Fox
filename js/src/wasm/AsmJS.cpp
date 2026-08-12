@@ -1738,6 +1738,7 @@ class MOZ_STACK_CLASS ModuleValidator
         arrayViews_(cx),
         atomicsPresent_(false),
         simdPresent_(false),
+        mg_(nullptr),
         errorString_(nullptr),
         errorOffset_(UINT32_MAX),
         errorOverRecursed_(false)
