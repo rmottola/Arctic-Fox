@@ -1180,7 +1180,7 @@ double mozilla_sampler_time()
   return mozilla_sampler_time(mozilla::TimeStamp::Now());
 }
 
-ProfilerBacktrace* mozilla_sampler_get_backtrace()
+UniqueProfilerBacktrace mozilla_sampler_get_backtrace()
 {
   if (!stack_key_initialized)
     return nullptr;
@@ -1200,10 +1200,11 @@ ProfilerBacktrace* mozilla_sampler_get_backtrace()
     return nullptr;
   }
 
-  return new ProfilerBacktrace(t->GetBacktrace());
+  return UniqueProfilerBacktrace(new ProfilerBacktrace(t->GetBacktrace()));
 }
 
-void mozilla_sampler_free_backtrace(ProfilerBacktrace* aBacktrace)
+void
+ProfilerBacktraceDestructor::operator()(ProfilerBacktrace* aBacktrace)
 {
   delete aBacktrace;
 }
@@ -1242,10 +1243,11 @@ void mozilla_sampler_tracing(const char* aCategory, const char* aInfo,
 }
 
 void mozilla_sampler_tracing(const char* aCategory, const char* aInfo,
-                             ProfilerBacktrace* aCause,
+                             UniqueProfilerBacktrace aCause,
                              TracingMetadata aMetaData)
 {
-  mozilla_sampler_add_marker(aInfo, new ProfilerMarkerTracing(aCategory, aMetaData, aCause));
+  mozilla_sampler_add_marker(aInfo, new ProfilerMarkerTracing(aCategory, aMetaData,
+                                                              mozilla::Move(aCause)));
 }
 
 void mozilla_sampler_add_marker(const char *aMarker, ProfilerMarkerPayload *aPayload)
