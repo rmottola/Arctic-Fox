@@ -74,6 +74,7 @@ child:
                                     uint32_t aWrapColumn);
   async __delete__();
 
+/*
 state START:
   recv Attributes goto MAIN;
   recv InitFailure goto FAILED;
@@ -86,6 +87,7 @@ state MAIN:
 
 state FAILED:
   send __delete__;
+*/
 };
 
 } // namespace mozilla
