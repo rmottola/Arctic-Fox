@@ -144,7 +144,7 @@ mozilla::ipc::IPCResult
 LayerTransactionParent::RecvUpdate(const TransactionInfo& aInfo,
                                    InfallibleTArray<EditReply>* reply)
 {
-  profiler_tracing("Paint", "LayerTransaction", TRACING_INTERVAL_START);
+  GeckoProfilerTracingRAII tracer("Paint", "LayerTransaction");
   PROFILER_LABEL("LayerTransactionParent", "RecvUpdate",
     js::ProfileEntry::Category::GRAPHICS);
 
@@ -664,7 +664,6 @@ LayerTransactionParent::RecvUpdate(const TransactionInfo& aInfo,
     }
   }
 
-  profiler_tracing("Paint", "LayerTransaction", TRACING_INTERVAL_END);
   return IPC_OK();
 }
 
