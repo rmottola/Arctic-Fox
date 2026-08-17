@@ -2385,7 +2385,7 @@ Toolbox.prototype = {
   },
 
   /**
-   * Connects to the SPS profiler when the developer tools are open. This is
+   * Connects to the Gecko Profiler when the developer tools are open. This is
    * necessary because of the WebConsole's `profile` and `profileEnd` methods.
    */
   initPerformance: Task.async(function* () {
