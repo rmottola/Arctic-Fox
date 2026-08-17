@@ -514,10 +514,6 @@ profiler_init(void* stackTop)
   mozilla::tasktracer::InitTaskTracer();
 #endif
 
-#ifdef SPS_STANDALONE
-  mozilla::TimeStamp::Startup();
-#endif
-
   LOG("BEGIN profiler_init");
   if (!tlsPseudoStack.init() || !tlsTicker.init()) {
     LOG("Failed to init.");
@@ -609,10 +605,6 @@ profiler_shutdown()
   set_stderr_callback(nullptr);
 
   Sampler::Shutdown();
-
-#ifdef SPS_STANDALONE
-  mozilla::TimeStamp::Shutdown();
-#endif
 
   PseudoStack *stack = tlsPseudoStack.get();
   stack->deref();
