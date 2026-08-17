@@ -88,7 +88,7 @@ struct ProfilerBacktraceDestructor
 using UniqueProfilerBacktrace =
   mozilla::UniquePtr<ProfilerBacktrace, ProfilerBacktraceDestructor>;
 
-#if !defined(MOZ_ENABLE_PROFILER_SPS)
+#if !defined(MOZ_GECKO_PROFILER)
 
 // Use these for functions below that must be visible whether the profiler is
 // enabled or not. When the profiler is disabled they are static inline
@@ -123,7 +123,7 @@ using UniqueProfilerBacktrace =
 #define PROFILER_MAIN_THREAD_LABEL(name_space, info, category) do {} while (0)
 #define PROFILER_MAIN_THREAD_LABEL_PRINTF(name_space, info, category, format, ...) do {} while (0)
 
-#else   // defined(MOZ_ENABLE_PROFILER_SPS)
+#else   // defined(MOZ_GECKO_PROFILER)
 
 #define PROFILER_FUNC(decl, rv)  decl;
 #define PROFILER_FUNC_VOID(decl) void decl;
@@ -140,7 +140,7 @@ using UniqueProfilerBacktrace =
 #define PROFILER_MARKER(info) profiler_add_marker(info)
 #define PROFILER_MARKER_PAYLOAD(info, payload) profiler_add_marker(info, payload)
 
-#endif  // defined(MOZ_ENABLE_PROFILER_SPS)
+#endif  // defined(MOZ_GECKO_PROFILER)
 
 // These functions are defined whether the profiler is enabled or not.
 
@@ -191,7 +191,7 @@ PROFILER_FUNC_VOID(profiler_get_backtrace_noalloc(char *output,
                                                   size_t outputSize))
 
 // Free a ProfilerBacktrace returned by profiler_get_backtrace()
-#if !defined(MOZ_ENABLE_PROFILER_SPS)
+#if !defined(MOZ_GECKO_PROFILER)
 inline void ProfilerBacktraceDestructor::operator()(ProfilerBacktrace* aBacktrace) {}
 #endif
 
@@ -293,7 +293,7 @@ PROFILER_FUNC_VOID(profiler_log(const char *fmt, va_list args))
 
 // End of the functions defined whether the profiler is enabled or not.
 
-#if defined(MOZ_ENABLE_PROFILER_SPS)
+#if defined(MOZ_GECKO_PROFILER)
 
 #include <stdlib.h>
 #include <signal.h>
@@ -512,7 +512,7 @@ profiler_get_pseudo_stack(void)
   return tlsPseudoStack.get();
 }
 
-#endif  // defined(MOZ_ENABLE_PROFILER_SPS)
+#endif  // defined(MOZ_GECKO_PROFILER)
 
 namespace mozilla {
 

@@ -53,7 +53,7 @@ class nsIWidget;
 
 namespace mozilla {
 class PRemoteSpellcheckEngineParent;
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
 class ProfileGatherer;
 #endif
 
@@ -1169,7 +1169,7 @@ private:
 
   PProcessHangMonitorParent* mHangMonitorActor;
 
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   RefPtr<mozilla::ProfileGatherer> mGatherer;
 #endif
   nsCString mProfile;

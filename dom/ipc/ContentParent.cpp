@@ -89,7 +89,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/ProcessHangMonitorIPC.h"
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
 #include "mozilla/ProfileGatherer.h"
 #endif
 #include "mozilla/ScopeExit.h"
@@ -238,7 +238,7 @@
 #include "nsIBrowserSearchService.h"
 #endif
 
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
 #include "nsIProfiler.h"
 #include "nsIProfileSaveEvent.h"
 #endif
@@ -267,7 +267,7 @@ extern const char* kForceEnableE10sPref;
 
 using base::ChildPrivileges;
 using base::KillProcess;
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
 using mozilla::ProfileGatherer;
 #endif
 
@@ -472,7 +472,7 @@ static const char* sObserverTopics[] = {
 #ifdef ACCESSIBILITY
   "a11y-init-or-shutdown",
 #endif
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   "profiler-started",
   "profiler-stopped",
   "profiler-paused",
@@ -1153,7 +1153,7 @@ ContentParent::Init()
   }
 #endif
 
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   nsCOMPtr<nsIProfiler> profiler(do_GetService("@mozilla.org/tools/profiler;1"));
   bool profilerActive = false;
   DebugOnly<nsresult> rv = profiler->IsActive(&profilerActive);
@@ -1545,7 +1545,7 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
 
   mConsoleService = nullptr;
 
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   if (mGatherer && !mProfile.IsEmpty()) {
     mGatherer->OOPExitProfile(mProfile);
   }
@@ -2508,7 +2508,7 @@ ContentParent::Observe(nsISupports* aSubject,
     NS_ASSERTION(!mSubprocess, "Close should have nulled mSubprocess");
   }
 
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   // Need to do this before the mIsAlive check to avoid missing profiles.
   if (!strcmp(aTopic, "profiler-subprocess-gather")) {
     if (mGatherer) {
@@ -2620,7 +2620,7 @@ ContentParent::Observe(nsISupports* aSubject,
     }
   }
 #endif
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   else if (!strcmp(aTopic, "profiler-started")) {
     nsCOMPtr<nsIProfilerStartParams> params(do_QueryInterface(aSubject));
     StartProfiler(params);
@@ -4484,7 +4484,7 @@ ContentParent::RecvCreateWindowInDifferentProcess(
 mozilla::ipc::IPCResult
 ContentParent::RecvProfile(const nsCString& aProfile)
 {
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   if (NS_WARN_IF(!mGatherer)) {
     return IPC_OK();
   }
@@ -4602,7 +4602,7 @@ ContentParent::RecvNotifyBenchmarkResult(const nsString& aCodecName,
 void
 ContentParent::StartProfiler(nsIProfilerStartParams* aParams)
 {
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   if (NS_WARN_IF(!aParams)) {
     return;
   }
