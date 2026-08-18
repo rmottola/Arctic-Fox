@@ -719,8 +719,9 @@ JSCompartment::sweepAfterMinorGC(JSTracer* trc)
 {
     globalWriteBarriered = 0;
 
-    if (innerViews.needsSweepAfterMinorGC())
-        innerViews.sweepAfterMinorGC();
+    InnerViewTable& table = innerViews.get();
+    if (table.needsSweepAfterMinorGC())
+        table.sweepAfterMinorGC();
 
     crossCompartmentWrappers.sweepAfterMinorGC(trc);
 }
