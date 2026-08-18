@@ -1507,9 +1507,9 @@ JSObject::swap(JSContext* cx, HandleObject a, HandleObject b)
 
     AutoCompartment ac(cx, a);
 
-    if (!a->getGroup(cx))
+    if (!JSObject::getGroup(cx, a))
         oomUnsafe.crash("JSObject::swap");
-    if (!b->getGroup(cx))
+    if (!JSObject::getGroup(cx, b))
         oomUnsafe.crash("JSObject::swap");
 
     /*
@@ -3904,7 +3904,8 @@ displayAtomFromObjectGroup(ObjectGroup& group)
 bool
 JSObject::constructorDisplayAtom(JSContext* cx, js::MutableHandleAtom name)
 {
-    ObjectGroup *g = getGroup(cx);
+    RootedObject self(cx, this); // Temporary change.
+    ObjectGroup *g = JSObject::getGroup(cx, self);
     if (!g)
         return false;
 

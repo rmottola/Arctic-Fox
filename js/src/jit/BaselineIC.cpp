@@ -1109,14 +1109,20 @@ DenseOrUnboxedArraySetElemStubExists(JSContext* cx, ICStub::Kind kind,
     for (ICStubConstIterator iter = stub->beginChainConst(); !iter.atEnd(); iter++) {
         if (kind == ICStub::SetElem_DenseOrUnboxedArray && iter->isSetElem_DenseOrUnboxedArray()) {
             ICSetElem_DenseOrUnboxedArray* nstub = iter->toSetElem_DenseOrUnboxedArray();
-            if (obj->maybeShape() == nstub->shape() && obj->getGroup(cx) == nstub->group())
+            if (obj->maybeShape() == nstub->shape() &&
+                JSObject::getGroup(cx, obj) == nstub->group())
+            {
                 return true;
+            }
         }
 
         if (kind == ICStub::SetElem_DenseOrUnboxedArrayAdd && iter->isSetElem_DenseOrUnboxedArrayAdd()) {
             ICSetElem_DenseOrUnboxedArrayAdd* nstub = iter->toSetElem_DenseOrUnboxedArrayAdd();
-            if (obj->getGroup(cx) == nstub->group() && SetElemAddHasSameShapes(nstub, obj))
+            if (JSObject::getGroup(cx, obj) == nstub->group() &&
+                SetElemAddHasSameShapes(nstub, obj))
+            {
                 return true;
+            }
         }
     }
     return false;
@@ -1306,7 +1312,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
                                                   &addingCase, &protoDepth))
         {
             RootedShape shape(cx, obj->maybeShape());
-            RootedObjectGroup group(cx, obj->getGroup(cx));
+            RootedObjectGroup group(cx, JSObject::getGroup(cx, obj));
             if (!group)
                 return false;
 
@@ -3250,7 +3256,7 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
     if (!obj)
         return false;
     RootedShape oldShape(cx, obj->maybeShape());
-    RootedObjectGroup oldGroup(cx, obj->getGroup(cx));
+    RootedObjectGroup oldGroup(cx, JSObject::getGroup(cx, obj));
     if (!oldGroup)
         return false;
     RootedReceiverGuard oldGuard(cx, ReceiverGuard(obj));
@@ -4269,14 +4275,13 @@ GetTemplateObjectForNative(JSContext* cx, HandleFunction target, const CallArgs&
 
     if (native == js::array_slice) {
         if (args.thisv().isObject()) {
-            JSObject* obj = &args.thisv().toObject();
+            RootedObject obj(cx, &args.thisv().toObject());
             if (!obj->isSingleton()) {
                 if (obj->group()->maybePreliminaryObjects()) {
                     *skipAttach = true;
                     return true;
                 }
-                res.set(NewFullyAllocatedArrayTryReuseGroup(cx, &args.thisv().toObject(), 0,
-                                                            TenuredObject));
+                res.set(NewFullyAllocatedArrayTryReuseGroup(cx, obj, 0, TenuredObject));
                 if (!res)
                     return false;
                 EnsureArrayGroupAnalyzed(cx, res);
@@ -6934,7 +6939,7 @@ ICUpdatedStub*
 ICSetElemDenseOrUnboxedArrayAddCompiler::getStubSpecific(ICStubSpace* space,
                                                          Handle<ShapeVector> shapes)
 {
-    RootedObjectGroup group(cx, obj_->getGroup(cx));
+    RootedObjectGroup group(cx, JSObject::getGroup(cx, obj_));
     if (!group)
         return nullptr;
     Rooted<JitCode*> stubCode(cx, getStubCode());
@@ -7071,7 +7076,7 @@ ICSetProp_Native::ICSetProp_Native(JitCode* stubCode, ObjectGroup* group, Shape*
 ICSetProp_Native*
 ICSetProp_Native::Compiler::getStub(ICStubSpace* space)
 {
-    RootedObjectGroup group(cx, obj_->getGroup(cx));
+    RootedObjectGroup group(cx, JSObject::getGroup(cx, obj_));
     if (!group)
         return nullptr;
 

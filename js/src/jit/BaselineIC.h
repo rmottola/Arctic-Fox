@@ -1379,7 +1379,7 @@ class ICSetPropNativeAddCompiler : public ICStubCompiler
     template <size_t ProtoChainDepth>
     ICUpdatedStub* getStubSpecific(ICStubSpace* space, Handle<ShapeVector> shapes)
     {
-        RootedObjectGroup newGroup(cx, obj_->getGroup(cx));
+        RootedObjectGroup newGroup(cx, JSObject::getGroup(cx, obj_));
         if (!newGroup)
             return nullptr;
 
