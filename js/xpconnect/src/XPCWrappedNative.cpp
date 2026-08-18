@@ -888,7 +888,7 @@ void
 XPCWrappedNative::FlatJSObjectMoved(JSObject* obj, const JSObject* old)
 {
     JS::AutoAssertGCCallback inCallback(obj);
-    MOZ_ASSERT(mFlatJSObject.unbarrieredGetPtr() == old);
+    MOZ_ASSERT(mFlatJSObject == old);
 
     nsWrapperCache* cache = nullptr;
     CallQueryInterface(mIdentity, &cache);

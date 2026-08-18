@@ -101,7 +101,7 @@ XPCWrappedNativeProto::CallPostCreatePrototype()
 void
 XPCWrappedNativeProto::JSProtoObjectFinalized(js::FreeOp* fop, JSObject* obj)
 {
-    MOZ_ASSERT(obj == mJSProtoObject.unbarrieredGet(), "huh?");
+    MOZ_ASSERT(obj == mJSProtoObject, "huh?");
 
     // Only remove this proto from the map if it is the one in the map.
     ClassInfo2WrappedNativeProtoMap* map = GetScope()->GetWrappedNativeProtoMap();
@@ -116,7 +116,7 @@ XPCWrappedNativeProto::JSProtoObjectFinalized(js::FreeOp* fop, JSObject* obj)
 void
 XPCWrappedNativeProto::JSProtoObjectMoved(JSObject* obj, const JSObject* old)
 {
-    MOZ_ASSERT(mJSProtoObject.unbarrieredGet() == old);
+    MOZ_ASSERT(mJSProtoObject == old);
     mJSProtoObject.init(obj); // Update without triggering barriers.
 }
 
