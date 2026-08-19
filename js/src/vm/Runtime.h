@@ -62,6 +62,7 @@ namespace js {
 
 class PerThreadData;
 class ExclusiveContext;
+class AutoAssertNoContentJS;
 class AutoKeepAtoms;
 class EnterDebuggeeNoExecute;
 #ifdef JS_TRACE_LOGGING
@@ -1032,6 +1033,15 @@ struct JSRuntime : public JS::shadow::Runtime,
     bool isBeingDestroyed() const {
         return beingDestroyed_;
     }
+
+  private:
+    bool allowContentJS_;
+  public:
+    bool allowContentJS() const {
+        return allowContentJS_;
+    }
+
+    friend class js::AutoAssertNoContentJS;
 
   private:
     // Set of all atoms other than those in permanentAtoms and staticStrings.

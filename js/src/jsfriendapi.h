@@ -2874,6 +2874,17 @@ AllowGCBarriers(JSContext* cx);
 extern bool
 AddPluralRulesConstructor(JSContext* cx, JS::Handle<JSObject*> intl);
 
+class MOZ_STACK_CLASS JS_FRIEND_API(AutoAssertNoContentJS)
+{
+  public:
+    explicit AutoAssertNoContentJS(JSContext* cx);
+    ~AutoAssertNoContentJS();
+
+  private:
+    JSContext* context_;
+    bool prevAllowContentJS_;
+};
+
 } /* namespace js */
 
 class NativeProfiler

@@ -1451,6 +1451,18 @@ js::detail::IsWindowSlow(JSObject* obj)
     return obj->as<GlobalObject>().maybeWindowProxy();
 }
 
+AutoAssertNoContentJS::AutoAssertNoContentJS(JSContext* cx)
+  : context_(cx),
+    prevAllowContentJS_(cx->runtime()->allowContentJS_)
+{
+    cx->runtime()->allowContentJS_ = false;
+}
+
+AutoAssertNoContentJS::~AutoAssertNoContentJS()
+{
+    context_->runtime()->allowContentJS_ = prevAllowContentJS_;
+}
+
 JS_FRIEND_API(bool)
 js::AllowGCBarriers(JSContext* cx)
 {
