@@ -44,7 +44,6 @@
 
 #include "mozAutoDocUpdate.h"
 #include "mozilla/AsyncEventDispatcher.h"
-#include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/EventStates.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/ImageTracker.h"
@@ -159,8 +158,6 @@ nsImageLoadingContent::Notify(imgIRequest* aRequest,
         observers.AppendElement(observer->mObserver);
       }
     }
-    MOZ_RELEASE_ASSERT(js::AllowGCBarriers(CycleCollectedJSContext::Get()->Context()),
-                       "ImageObservers can be implement in JS, so they should not be called during painting. See bug 1311841");
 
     nsAutoScriptBlocker scriptBlocker;
 
