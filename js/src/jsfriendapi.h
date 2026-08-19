@@ -2865,6 +2865,9 @@ ToWindowProxyIfWindow(JSObject* obj);
 extern JS_FRIEND_API(JSObject*)
 ToWindowIfWindowProxy(JSObject* obj);
 
+JS_FRIEND_API(bool)
+AllowGCBarriers(JSContext* cx);
+
 } /* namespace js */
 
 class NativeProfiler
