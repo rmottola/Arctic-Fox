@@ -708,6 +708,8 @@ class MOZ_RAII IRGenerator
     CacheKind cacheKind() const { return cacheKind_; }
 };
 
+enum class CanAttachGetter { Yes, No };
+
 // GetPropIRGenerator generates CacheIR for a GetProp IC.
 class MOZ_RAII GetPropIRGenerator : public IRGenerator
 {
@@ -715,6 +717,7 @@ class MOZ_RAII GetPropIRGenerator : public IRGenerator
     HandleValue idVal_;
     ICStubEngine engine_;
     bool* isTemporarilyUnoptimizable_;
+    CanAttachGetter canAttachGetter_;
 
     enum class PreliminaryObjectAction { None, Unlink, NotePreliminary };
     PreliminaryObjectAction preliminaryObjectAction_;
@@ -760,7 +763,8 @@ class MOZ_RAII GetPropIRGenerator : public IRGenerator
 
   public:
     GetPropIRGenerator(JSContext* cx, jsbytecode* pc, CacheKind cacheKind, ICStubEngine engine,
-                       bool* isTemporarilyUnoptimizable, HandleValue val, HandleValue idVal);
+                       bool* isTemporarilyUnoptimizable, HandleValue val, HandleValue idVal,
+                       CanAttachGetter canAttachGetter);
 
     bool tryAttachStub();
     bool tryAttachIdempotentStub();
