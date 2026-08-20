@@ -21,6 +21,7 @@ loader.lazyImporter(this, "PrivateBrowsingUtils",
 // String used as an indication to generate default file name in the following
 // format: "Screen Shot yyyy-mm-dd at HH.MM.SS.png"
 const FILENAME_DEFAULT_VALUE = " ";
+const CONTAINER_FLASHING_DURATION = 500;
 
 /*
  * There are 2 commands and 1 converter here. The 2 commands are nearly
@@ -89,7 +90,13 @@ const standardParams = {
       defaultValue: null,
       description: l10n.lookup("inspectNodeDesc"),
       manual: l10n.lookup("inspectNodeManual")
-    }
+    },
+    {
+      name: "file",
+      type: "boolean",
+      description: l10n.lookup("screenshotFileDesc"),
+      manual: l10n.lookup("screenshotFileManual"),
+    },
   ]
 };
 
@@ -205,12 +212,14 @@ exports.items = [
 function simulateCameraEffect(document, effect) {
   let window = document.defaultView;
   if (effect === "shutter") {
-    const audioCamera = new window.Audio("resource://devtools/client/themes/audio/shutter.wav");
-    audioCamera.play();
+    if (Services.prefs.getBoolPref("devtools.screenshot.audio.enabled")) {
+      const audioCamera = new window.Audio("resource://devtools/client/themes/audio/shutter.wav");
+      audioCamera.play();
+    }
   }
   if (effect == "flash") {
     const frames = Cu.cloneInto({ opacity: [ 0, 1 ] }, window);
-    document.documentElement.animate(frames, 500);
+    document.documentElement.animate(frames, CONTAINER_FLASHING_DURATION);
   }
 }
 
@@ -240,7 +249,7 @@ const SKIP = Promise.resolve();
  */
 function saveScreenshot(args, context, reply) {
   const fileNeeded = args.filename != FILENAME_DEFAULT_VALUE ||
-                      (!args.imgur && !args.clipboard);
+    (!args.imgur && !args.clipboard) || args.file;
 
   return Promise.all([
     args.clipboard ? saveToClipboard(context, reply) : SKIP,
