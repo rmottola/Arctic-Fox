@@ -578,13 +578,11 @@ Toolbox.prototype = {
    * @property {Function} isChecked - Optional function called to known if the button
    *                      is toggled or not. The function should return true when
    *                      the button should be displayed as toggled on.
-   * @property {Boolean}  autoToggle - If true, the checked state is going to be
-   *                      automatically toggled on click.
    */
   _createButtonState: function (options) {
     let isCheckedValue = false;
     const { id, className, description, onClick, isInStartContainer, setup, teardown,
-            isTargetSupported, isChecked, autoToggle } = options;
+            isTargetSupported, isChecked } = options;
     const toolbox = this;
     const button = {
       id,
@@ -593,9 +591,6 @@ Toolbox.prototype = {
       onClick(event) {
         if (typeof onClick == "function") {
           onClick(event, toolbox);
-        }
-        if (autoToggle) {
-          button.isChecked = !button.isChecked;
         }
       },
       isTargetSupported,
