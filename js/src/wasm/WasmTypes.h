@@ -1018,7 +1018,7 @@ enum class SymbolicAddress
     ReportOverRecursed,
     HandleExecutionInterrupt,
     HandleDebugTrap,
-    HandleDebugThrow,
+    HandleThrow,
     ReportTrap,
     ReportOutOfBounds,
     ReportUnalignedAccess,
