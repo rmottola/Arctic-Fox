@@ -36,7 +36,6 @@ public:
     RefPtr<MediaDataDecoder> decoder =
       new FFmpegVideoDecoder<V>(mLib,
                                 aParams.mTaskQueue,
-                                aParams.mCallback,
                                 aParams.VideoConfig(),
                                 aParams.mImageContainer);
     return decoder.forget();
@@ -48,7 +47,6 @@ public:
     RefPtr<MediaDataDecoder> decoder =
       new FFmpegAudioDecoder<V>(mLib,
                                 aParams.mTaskQueue,
-                                aParams.mCallback,
                                 aParams.AudioConfig());
     return decoder.forget();
   }
