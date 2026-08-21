@@ -1735,7 +1735,7 @@ Reject(JSContext* cx, const CompileArgs& args, UniqueChars error, Handle<Promise
         if (!cx->getPendingException(&rejectionValue))
             return false;
 
-        return promise->reject(cx, rejectionValue);
+        return PromiseObject::reject(cx, promise, rejectionValue);
     }
 
     RootedObject stack(cx, promise->allocationSite());
@@ -1763,7 +1763,7 @@ Reject(JSContext* cx, const CompileArgs& args, UniqueChars error, Handle<Promise
         return false;
 
     RootedValue rejectionValue(cx, ObjectValue(*errorObj));
-    return promise->reject(cx, rejectionValue);
+    return PromiseObject::reject(cx, promise, rejectionValue);
 }
 
 static bool
@@ -1775,7 +1775,7 @@ ResolveCompilation(JSContext* cx, Module& module, Handle<PromiseObject*> promise
         return false;
 
     RootedValue resolutionValue(cx, ObjectValue(*moduleObj));
-    return promise->resolve(cx, resolutionValue);
+    return PromiseObject::resolve(cx, promise, resolutionValue);
 }
 
 struct CompilePromiseTask : PromiseTask
@@ -1810,7 +1810,7 @@ RejectWithPendingException(JSContext* cx, Handle<PromiseObject*> promise)
     if (!GetAndClearException(cx, &rejectionValue))
         return false;
 
-    return promise->reject(cx, rejectionValue);
+    return PromiseObject::reject(cx, promise, rejectionValue);
 }
 
 static bool
@@ -1898,7 +1898,7 @@ ResolveInstantiation(JSContext* cx, Module& module, HandleObject importObj,
         return false;
 
     val = ObjectValue(*resultObj);
-    return promise->resolve(cx, val);
+    return PromiseObject::resolve(cx, promise, val);
 }
 
 struct InstantiatePromiseTask : CompilePromiseTask
@@ -1970,7 +1970,7 @@ WebAssembly_instantiate(JSContext* cx, unsigned argc, Value* vp)
             return RejectWithPendingException(cx, promise, callArgs);
 
         RootedValue resolutionValue(cx, ObjectValue(*instanceObj));
-        if (!promise->resolve(cx, resolutionValue))
+        if (!PromiseObject::resolve(cx, promise, resolutionValue))
             return false;
     } else {
         auto task = cx->make_unique<InstantiatePromiseTask>(cx, promise, importObj);
