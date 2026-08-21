@@ -3472,7 +3472,7 @@ CreateNonSyntacticEnvironmentChain(JSContext* cx, AutoObjectVector& envChain,
         // declaration was qualified by "var". There is only sadness.
         //
         // See JSObject::isQualifiedVarObj.
-        if (!env->setQualifiedVarObj(cx))
+        if (!JSObject::setQualifiedVarObj(cx, env))
             return false;
 
         // Also get a non-syntactic lexical environment to capture 'let' and
