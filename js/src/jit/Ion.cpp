@@ -2186,7 +2186,7 @@ IonCompile(JSContext* cx, JSScript* script,
 
     // Make sure the script's canonical function isn't lazy. We can't de-lazify
     // it in a helper thread.
-    script->ensureNonLazyCanonicalFunction(cx);
+    script->ensureNonLazyCanonicalFunction();
 
     TrackPropertiesForSingletonScopes(cx, script, baselineFrame);
 
