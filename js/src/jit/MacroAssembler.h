@@ -1665,6 +1665,8 @@ class MacroAssembler : public MacroAssemblerSpecific
         return extractObject(value, scratch);
     }
 
+    void debugAssertIsObject(const ValueOperand& val);
+
     using MacroAssemblerSpecific::extractTag;
     Register extractTag(const TypedOrValueRegister& reg, Register scratch) {
         if (reg.hasValue())
