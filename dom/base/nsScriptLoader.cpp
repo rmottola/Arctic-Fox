@@ -1750,7 +1750,8 @@ public:
   static void Dispatch(already_AddRefed<NotifyOffThreadScriptLoadCompletedRunnable>&& aSelf) {
     RefPtr<NotifyOffThreadScriptLoadCompletedRunnable> self = aSelf;
     RefPtr<DocGroup> docGroup = self->mDocGroup;
-    docGroup->Dispatch("OffThreadScriptLoader", TaskCategory::Other, self.forget());
+    docGroup->Dispatch("NotifyOffThreadScriptLoadCompletedRunnable",
+                       TaskCategory::Other, self.forget());
   }
 
   NS_DECL_NSIRUNNABLE
