@@ -16,17 +16,6 @@
 #include "nsMimeTypes.h"
 #include "VideoUtils.h"
 
-#ifdef XP_WIN
-#include "mozilla/WindowsVersion.h"
-#include "WMFDecoderModule.h"
-#endif
-#ifdef MOZ_WIDGET_ANDROID
-#include "nsIGfxInfo.h"
-#endif
-#ifdef MOZ_APPLEMEDIA
-#include "AppleDecoderModule.h"
-#endif
-
 #include "mozilla/layers/LayersTypes.h"
 
 #include "PDMFactory.h"
@@ -56,14 +45,6 @@ IsWhitelistedH264Codec(const nsAString& aCodec)
   if (!ExtractH264CodecDetails(aCodec, profile, level)) {
     return false;
   }
-
-#ifdef XP_WIN
-  // Disable 4k video on windows vista since it performs poorly.
-  if (!IsWin7OrLater() &&
-      level >= H264_LEVEL_5) {
-    return false;
-  }
-#endif
 
   // Just assume what we can play on all platforms the codecs/formats that
   // WMF can play, since we don't have documentation about what other
