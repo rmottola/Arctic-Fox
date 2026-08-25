@@ -1095,9 +1095,6 @@ bool MinidumpCallback(
       WriteLiteral(eventFile, "\n");
       WriteString(eventFile, id_ascii);
       WriteLiteral(eventFile, "\n");
-      if (currentSessionId) {
-        WriteAnnotation(eventFile, "TelemetrySessionId", currentSessionId);
-      }
       if (crashEventAPIData) {
         eventFile.WriteBuffer(crashEventAPIData->get(), crashEventAPIData->Length());
       }
@@ -1112,6 +1109,12 @@ bool MinidumpCallback(
 #endif
       apiData.WriteBuffer(crashReporterAPIData->get(), crashReporterAPIData->Length());
     }
+
+    if (currentSessionId) {
+      WriteAnnotation(apiData, "TelemetrySessionId", crashTimeString);
+      WriteAnnotation(eventFile, "TelemetrySessionId", currentSessionId);
+    }
+
     WriteAnnotation(apiData, "CrashTime", crashTimeString);
     WriteAnnotation(eventFile, "CrashTime", crashTimeString);
 
