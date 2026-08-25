@@ -1111,7 +1111,7 @@ bool MinidumpCallback(
     }
 
     if (currentSessionId) {
-      WriteAnnotation(apiData, "TelemetrySessionId", crashTimeString);
+      WriteAnnotation(apiData, "TelemetrySessionId", currentSessionId);
       WriteAnnotation(eventFile, "TelemetrySessionId", currentSessionId);
     }
 
