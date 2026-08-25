@@ -256,24 +256,9 @@ Target.prototype = {
     this._logHistogram(data.metric);
   },
 
-  _getAddonHistogram(item) {
-    let APPNAME_IDX = 3;
-    let HISTNAME_IDX = 4;
-
-    let array = item.split('_');
-    let appName = array[APPNAME_IDX].toUpperCase();
-    let histName = array[HISTNAME_IDX].toUpperCase();
-    return Services.telemetry.getAddonHistogram(appName,
-      CUSTOM_HISTOGRAM_PREFIX + histName);
-  },
-
   _clearTelemetryData() {
     developerHUD._histograms.forEach(function(item) {
       Services.telemetry.getKeyedHistogramById(item).clear();
-    });
-
-    developerHUD._customHistograms.forEach(item => {
-      this._getAddonHistogram(item).clear();
     });
   },
 
@@ -285,16 +270,11 @@ Target.prototype = {
     let frame = this.frame;
     let payload = {
       keyedHistograms: {},
-      addonHistograms: {}
     };
     // Package the hud histograms.
     developerHUD._histograms.forEach(function(item) {
       payload.keyedHistograms[item] =
         Services.telemetry.getKeyedHistogramById(item).snapshot();
-    });
-    // Package the registered hud custom histograms
-    developerHUD._customHistograms.forEach(item => {
-      payload.addonHistograms[item] = this._getAddonHistogram(item).snapshot();
     });
 
     shell.sendEvent(frame, 'advanced-telemetry-update', Cu.cloneInto(payload, frame));
