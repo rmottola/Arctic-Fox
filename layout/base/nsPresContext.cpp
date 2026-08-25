@@ -1664,9 +1664,10 @@ nsPresContext::IsTopLevelWindowInactive()
 }
 
 void
-nsPresContext::RecordInteractionTime(InteractionType aType)
+nsPresContext::RecordInteractionTime(InteractionType aType,
+                                     const TimeStamp& aTimeStamp)
 {
-  if (!mInteractionTimeEnabled) {
+  if (!mInteractionTimeEnabled || aTimeStamp.IsNull()) {
     return;
   }
 
@@ -1682,10 +1683,10 @@ nsPresContext::RecordInteractionTime(InteractionType aType)
   // Array of histogram IDs for the different interaction types,
   // keyed by InteractionType.
   Telemetry::ID histogramIds[] = {
-    Telemetry::TIME_TO_FIRST_CLICK,
-    Telemetry::TIME_TO_FIRST_KEY_INPUT,
-    Telemetry::TIME_TO_FIRST_MOUSE_MOVE,
-    Telemetry::TIME_TO_FIRST_SCROLL
+    Telemetry::TIME_TO_FIRST_CLICK_MS,
+    Telemetry::TIME_TO_FIRST_KEY_INPUT_MS,
+    Telemetry::TIME_TO_FIRST_MOUSE_MOVE_MS,
+    Telemetry::TIME_TO_FIRST_SCROLL_MS
   };
 
   TimeStamp& interactionTime = this->*(
@@ -1708,10 +1709,22 @@ nsPresContext::RecordInteractionTime(InteractionType aType)
     return;
   }
 
-  if (topContentPresContext->mFirstPaintTime.IsNull()) {
-    // Top content pres context has not painted yet, so don't record
-    // interaction time.
+  if (topContentPresContext->mFirstNonBlankPaintTime.IsNull() ||
+      topContentPresContext->mFirstNonBlankPaintTime > aTimeStamp) {
+    // Top content pres context has not had a non-blank paint yet
+    // or the event timestamp is before the first non-blank paint,
+    // so don't record interaction time.
     return;
+  }
+
+  // Check if we are recording the first of any of the interaction types.
+  bool isFirstInteraction = true;
+  for (TimeStamp nsPresContext::* memberPtr : interactionTimes) {
+    TimeStamp& timeStamp = this->*(memberPtr);
+    if (!timeStamp.IsNull()) {
+      isFirstInteraction = false;
+      break;
+    }
   }
 
   interactionTime = TimeStamp::Now();
@@ -1719,12 +1732,17 @@ nsPresContext::RecordInteractionTime(InteractionType aType)
   // time to telemetry (if it hasn't already done so).
   if (this == topContentPresContext) {
     if (Telemetry::CanRecordExtended()) {
-       double millis = (interactionTime - mFirstPaintTime).ToMilliseconds();
+       double millis =
+         (interactionTime - mFirstNonBlankPaintTime).ToMilliseconds();
        Telemetry::Accumulate(histogramIds[static_cast<uint32_t>(aType)],
                              millis);
+
+       if (isFirstInteraction) {
+         Telemetry::Accumulate(Telemetry::TIME_TO_FIRST_INTERACTION_MS, millis);
+       }
     }
   } else {
-    topContentPresContext->RecordInteractionTime(aType);
+    topContentPresContext->RecordInteractionTime(aType, aTimeStamp);
   }
 }
 
@@ -2619,10 +2637,6 @@ nsPresContext::NotifyDidPaintForSubtree(uint32_t aFlags, uint64_t aTransactionId
       new DelayedFireDOMPaintEvent(this, &mUndeliveredInvalidateRequestsBeforeLastPaint,
                                    aTransactionId);
     nsContentUtils::AddScriptRunner(ev);
-
-    if (mFirstPaintTime.IsNull()) {
-      mFirstPaintTime = TimeStamp::Now();
-    }
   }
 
   NotifyDidPaintSubdocumentCallbackClosure closure = { aFlags, aTransactionId, false };
@@ -2915,6 +2929,8 @@ nsPresContext::NotifyNonBlankPaint()
     if (timing) {
       timing->NotifyNonBlankPaintForRootContentDocument();
     }
+
+    mFirstNonBlankPaintTime = TimeStamp::Now();
   }
 }
 
