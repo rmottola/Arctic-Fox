@@ -111,7 +111,8 @@ ArmIPCTimer(const StaticMutexAutoLock& lock)
 // EXTERNALLY VISIBLE FUNCTIONS in namespace TelemetryIPCAccumulator::
 
 void
-TelemetryIPCAccumulator::AccumulateChildHistogram(mozilla::Telemetry::ID aId, uint32_t aSample)
+TelemetryIPCAccumulator::AccumulateChildHistogram(mozilla::Telemetry::HistogramID aId,
+                                                  uint32_t aSample)
 {
   StaticMutexAutoLock locker(gTelemetryIPCAccumulatorMutex);
   if (!gHistogramAccumulations) {
@@ -127,7 +128,7 @@ TelemetryIPCAccumulator::AccumulateChildHistogram(mozilla::Telemetry::ID aId, ui
 }
 
 void
-TelemetryIPCAccumulator::AccumulateChildKeyedHistogram(mozilla::Telemetry::ID aId,
+TelemetryIPCAccumulator::AccumulateChildKeyedHistogram(mozilla::Telemetry::HistogramID aId,
                                                        const nsCString& aKey, uint32_t aSample)
 {
   StaticMutexAutoLock locker(gTelemetryIPCAccumulatorMutex);
