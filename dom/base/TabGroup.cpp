@@ -229,8 +229,6 @@ TabGroup::GetTopLevelWindows()
   return array;
 }
 
-NS_IMPL_ISUPPORTS(TabGroup, nsISupports)
-
 TabGroup::HashEntry::HashEntry(const nsACString* aKey)
   : nsCStringHashKey(aKey), mDocGroup(nullptr)
 {}
@@ -266,7 +264,7 @@ TabGroup::EventTargetFor(TaskCategory aCategory) const
 }
 
 AbstractThread*
-TabGroup::AbstractMainThreadFor(TaskCategory aCategory)
+TabGroup::AbstractMainThreadForImpl(TaskCategory aCategory)
 {
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aCategory != TaskCategory::Count);
