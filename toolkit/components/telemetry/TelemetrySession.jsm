@@ -1515,7 +1515,7 @@ var Impl = {
   * don't impact startup performance.
   * @return {Promise} Resolved when the initialization completes.
   */
-  delayedInit:function() {
+  delayedInit() {
     this._log.trace("delayedInit");
 
     this._delayedInitTask = Task.spawn(function* () {
