@@ -3675,8 +3675,9 @@ ItemIsActive(nsIDocShellTreeItem* aItem)
 
 NS_IMETHODIMP
 nsDocShell::FindItemWithName(const nsAString& aName,
-                             nsISupports* aRequestor,
+                             nsIDocShellTreeItem* aRequestor,
                              nsIDocShellTreeItem* aOriginalRequestor,
+                             bool aSkipTabGroup,
                              nsIDocShellTreeItem** aResult)
 {
   NS_ENSURE_ARG_POINTER(aResult);
@@ -3691,7 +3692,8 @@ nsDocShell::FindItemWithName(const nsAString& aName,
   if (aRequestor) {
     // If aRequestor is not null we don't need to check special names, so
     // just hand straight off to the search by actual name function.
-    return DoFindItemWithName(aName, aRequestor, aOriginalRequestor, aResult);
+    return DoFindItemWithName(aName, aRequestor, aOriginalRequestor,
+                              aSkipTabGroup, aResult);
   } else {
     // This is the entry point into the target-finding algorithm.  Check
     // for special names.  This should only be done once, hence the check
@@ -3715,7 +3717,7 @@ nsDocShell::FindItemWithName(const nsAString& aName,
     } else {
       // Do the search for item by an actual name.
       DoFindItemWithName(aName, aRequestor, aOriginalRequestor,
-                         getter_AddRefs(foundItem));
+                         aSkipTabGroup, getter_AddRefs(foundItem));
     }
 
     if (foundItem && !CanAccessItem(foundItem, aOriginalRequestor)) {
@@ -3745,8 +3747,9 @@ nsDocShell::AssertOriginAttributesMatchPrivateBrowsing() {
 
 nsresult
 nsDocShell::DoFindItemWithName(const nsAString& aName,
-                               nsISupports* aRequestor,
+                               nsIDocShellTreeItem* aRequestor,
                                nsIDocShellTreeItem* aOriginalRequestor,
+                               bool aSkipTabGroup,
                                nsIDocShellTreeItem** aResult)
 {
   // First we check our name.
@@ -3756,16 +3759,12 @@ nsDocShell::DoFindItemWithName(const nsAString& aName,
     return NS_OK;
   }
 
-  // This QI may fail, but the places where we want to compare, comparing
-  // against nullptr serves the same purpose.
-  nsCOMPtr<nsIDocShellTreeItem> reqAsTreeItem(do_QueryInterface(aRequestor));
-
   // Second we check our children making sure not to ask a child if
   // it is the aRequestor.
 #ifdef DEBUG
   nsresult rv =
 #endif
-  FindChildWithName(aName, true, true, reqAsTreeItem, aOriginalRequestor,
+  FindChildWithName(aName, true, true, aRequestor, aOriginalRequestor,
                     aResult);
   NS_ASSERTION(NS_SUCCEEDED(rv),
                "FindChildWithName should not be failing here.");
@@ -3781,7 +3780,7 @@ nsDocShell::DoFindItemWithName(const nsAString& aName,
   nsCOMPtr<nsIDocShellTreeItem> parentAsTreeItem =
     do_QueryInterface(GetAsSupports(mParent));
   if (parentAsTreeItem) {
-    if (parentAsTreeItem == reqAsTreeItem) {
+    if (parentAsTreeItem == aRequestor) {
       return NS_OK;
     }
 
@@ -3792,6 +3791,7 @@ nsDocShell::DoFindItemWithName(const nsAString& aName,
         aName,
         static_cast<nsIDocShellTreeItem*>(this),
         aOriginalRequestor,
+        /* aSkipTabGroup = */ false,
         aResult);
     }
   }
@@ -3799,13 +3799,9 @@ nsDocShell::DoFindItemWithName(const nsAString& aName,
   // If we have a null parent or the parent is not of the same type, we need to
   // give up on finding it in our tree, and start looking in our TabGroup.
   nsCOMPtr<nsPIDOMWindowOuter> window = GetWindow();
-  if (window) {
+  if (window && !aSkipTabGroup) {
     RefPtr<mozilla::dom::TabGroup> tabGroup = window->TabGroup();
-    // We don't want to make the request to our TabGroup if they are the ones
-    // which made a request to us.
-    if (tabGroup != aRequestor) {
-      tabGroup->FindItemWithName(aName, this, aOriginalRequestor, aResult);
-    }
+    tabGroup->FindItemWithName(aName, aRequestor, aOriginalRequestor, aResult);
   }
 
   return NS_OK;
@@ -9813,7 +9809,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
         aWindowTarget.LowerCaseEqualsLiteral("_self") ||
         aWindowTarget.LowerCaseEqualsLiteral("_parent") ||
         aWindowTarget.LowerCaseEqualsLiteral("_top")) {
-      rv = FindItemWithName(aWindowTarget, nullptr, this,
+      rv = FindItemWithName(aWindowTarget, nullptr, this, false,
                             getter_AddRefs(targetItem));
       NS_ENSURE_SUCCESS(rv, rv);
     }

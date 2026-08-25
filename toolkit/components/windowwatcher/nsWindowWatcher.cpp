@@ -1651,6 +1651,7 @@ nsWindowWatcher::GetWindowByName(const nsAString& aTargetName,
   if (startItem) {
     // Note: original requestor is null here, per idl comments
     startItem->FindItemWithName(aTargetName, nullptr, nullptr,
+                                /* aSkipTabGroup = */ false,
                                 getter_AddRefs(treeItem));
   } else {
     // Note: original requestor is null here, per idl comments
@@ -2107,6 +2108,7 @@ nsWindowWatcher::SafeGetWindowByName(const nsAString& aName,
   nsCOMPtr<nsIDocShellTreeItem> foundItem;
   if (startItem) {
     startItem->FindItemWithName(aName, nullptr, callerItem,
+                                /* aSkipTabGroup = */ false,
                                 getter_AddRefs(foundItem));
   } else {
     FindItemWithName(aName, nullptr, callerItem,
