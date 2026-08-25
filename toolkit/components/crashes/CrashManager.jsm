@@ -561,7 +561,7 @@ this.CrashManager.prototype = Object.freeze({
    *
    * The promise-resolved array is sorted by file mtime, oldest to newest.
    */
-  _getUnprocessedEventsFiles: function() {
+  _getUnprocessedEventsFiles() {
     return Task.spawn(function* () {
       let entries = [];
 
@@ -578,7 +578,7 @@ this.CrashManager.prototype = Object.freeze({
   },
 
   // See docs/crash-events.rst for the file format specification.
-  _processEventFile: function(entry) {
+  _processEventFile(entry) {
     return Task.spawn(function* () {
       let data = yield OS.File.read(entry.path);
       let store = yield this._getStore();
@@ -617,7 +617,7 @@ this.CrashManager.prototype = Object.freeze({
     }.bind(this));
   },
 
-  _filterAnnotations: function(annotations) {
+  _filterAnnotations(annotations) {
     let filteredAnnotations = {};
 
     for (let line in annotations) {
@@ -629,7 +629,7 @@ this.CrashManager.prototype = Object.freeze({
     return filteredAnnotations;
   },
 
-  _sendCrashPing: function(crashId, type, date, metadata = {}) {
+  _sendCrashPing(crashId, type, date, metadata = {}) {
     // If we have a saved environment, use it. Otherwise report
     // the current environment.
     let reportMeta = Cu.cloneInto(metadata, myScope);
@@ -907,7 +907,7 @@ CrashStore.prototype = Object.freeze({
    *
    * @return Promise
    */
-  load: function() {
+  load() {
     return Task.spawn(function* () {
       // Loading replaces data.
       this.reset();
