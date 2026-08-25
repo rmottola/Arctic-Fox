@@ -336,10 +336,10 @@ void CheckGeneratedPalettedImage(Decoder* aDecoder, const gfx::IntRect& aRect);
  */
 void CheckWritePixels(Decoder* aDecoder,
                       SurfaceFilter* aFilter,
-                      Maybe<gfx::IntRect> aOutputRect = Nothing(),
-                      Maybe<gfx::IntRect> aInputRect = Nothing(),
-                      Maybe<gfx::IntRect> aInputWriteRect = Nothing(),
-                      Maybe<gfx::IntRect> aOutputWriteRect = Nothing(),
+                      const Maybe<gfx::IntRect>& aOutputRect = Nothing(),
+                      const Maybe<gfx::IntRect>& aInputRect = Nothing(),
+                      const Maybe<gfx::IntRect>& aInputWriteRect = Nothing(),
+                      const Maybe<gfx::IntRect>& aOutputWriteRect = Nothing(),
                       uint8_t aFuzz = 0);
 
 /**
@@ -349,10 +349,10 @@ void CheckWritePixels(Decoder* aDecoder,
  */
 void CheckPalettedWritePixels(Decoder* aDecoder,
                               SurfaceFilter* aFilter,
-                              Maybe<gfx::IntRect> aOutputRect = Nothing(),
-                              Maybe<gfx::IntRect> aInputRect = Nothing(),
-                              Maybe<gfx::IntRect> aInputWriteRect = Nothing(),
-                              Maybe<gfx::IntRect> aOutputWriteRect = Nothing(),
+                              const Maybe<gfx::IntRect>& aOutputRect = Nothing(),
+                              const Maybe<gfx::IntRect>& aInputRect = Nothing(),
+                              const Maybe<gfx::IntRect>& aInputWriteRect = Nothing(),
+                              const Maybe<gfx::IntRect>& aOutputWriteRect = Nothing(),
                               uint8_t aFuzz = 0);
 
 
