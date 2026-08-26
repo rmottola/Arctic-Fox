@@ -2387,7 +2387,7 @@ class ICGetProp_Generic : public ICMonitoredStub
     };
 };
 
-static uint32_t
+static inline uint32_t
 SimpleTypeDescrKey(SimpleTypeDescr* descr)
 {
     if (descr->is<ScalarTypeDescr>())
