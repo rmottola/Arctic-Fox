@@ -12,6 +12,7 @@
 #include "platform.h"
 #include "PlatformMacros.h"
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/Vector.h"
 #include "GeckoProfiler.h"
@@ -96,6 +97,12 @@ static int gEntrySize = 0;
 // synchronization between that function and the set points in
 // profiler_{start,stop}().
 static double gInterval = 0;
+
+// XXX: These two variables are used extensively both on and off the main
+// thread. It's possible that code that checks them then unsafely assumes their
+// values don't subsequently change.
+static Atomic<bool> gIsActive(false);
+static Atomic<bool> gIsPaused(false);
 
 // We need to track whether we've been initialized otherwise
 // we end up using tlsStack without initializing it.
@@ -862,7 +869,10 @@ profiler_start(int aProfileEntries, double aInterval,
   gSampler = new Sampler(gEntrySize, aFeatures, aFeatureCount, aFilterCount);
   gGatherer = new mozilla::ProfileGatherer(gSampler);
 
+  MOZ_ASSERT(!gIsActive && !gIsPaused);
   gSampler->Start();
+  MOZ_ASSERT(gIsActive && !gIsPaused);  // Start() sets gIsActive.
+
   if (gSampler->ProfileJS() || gSampler->InPrivacyMode()) {
     mozilla::StaticMutexAutoLock lock(sRegisteredThreadsMutex);
 
@@ -956,6 +966,7 @@ profiler_stop()
   gFeatures.clear();
 
   gSampler->Stop();
+  MOZ_ASSERT(!gIsActive && !gIsPaused);   // Stop() clears these.
   delete gSampler;
   gSampler = nullptr;
   gEntrySize = 0;
@@ -999,7 +1010,7 @@ profiler_is_paused()
     return false;
   }
 
-  return gSampler->IsPaused();
+  return gIsPaused;
 }
 
 void
@@ -1011,7 +1022,7 @@ profiler_pause()
     return;
   }
 
-  gSampler->SetPaused(true);
+  gIsPaused = true;
   if (Sampler::CanNotifyObservers()) {
     nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
     if (os) {
@@ -1029,7 +1040,7 @@ profiler_resume()
     return;
   }
 
-  gSampler->SetPaused(false);
+  gIsPaused = false;
   if (Sampler::CanNotifyObservers()) {
     nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
     if (os) {

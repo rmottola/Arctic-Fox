@@ -197,9 +197,7 @@ Sampler::Sampler(int aEntrySize,
                  const char** aFeatures, uint32_t aFeatureCount,
                  uint32_t aFilterCount)
 
-  : paused_(false)
-  , active_(false)
-  , mBuffer(new ProfileBuffer(aEntrySize))
+  : mBuffer(new ProfileBuffer(aEntrySize))
 {
   MOZ_COUNT_CTOR(Sampler);
 
@@ -251,7 +249,7 @@ Sampler::~Sampler()
 {
   MOZ_COUNT_DTOR(Sampler);
 
-  if (IsActive())
+  if (gIsActive)
     Stop();
 
   // Destroy ThreadInfo for all threads
@@ -489,6 +487,8 @@ void BuildJavaThreadJSObject(SpliceableJSONWriter& aWriter)
 void
 Sampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
 {
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
   aWriter.Start(SpliceableJSONWriter::SingleLineStyle);
   {
     // Put shared library info
@@ -509,7 +509,7 @@ Sampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
     // Lists the samples for each thread profile
     aWriter.StartArrayProperty("threads");
     {
-      SetPaused(true);
+      gIsPaused = true;
 
       {
         StaticMutexAutoLock lock(sRegisteredThreadsMutex);
@@ -555,7 +555,7 @@ Sampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
       }
   #endif
 
-      SetPaused(false);
+      gIsPaused = false;
     }
     aWriter.EndArray();
   }
@@ -565,7 +565,7 @@ Sampler::StreamJSON(SpliceableJSONWriter& aWriter, double aSinceTime)
 void
 Sampler::FlushOnJSShutdown(JSContext* aContext)
 {
-  SetPaused(true);
+  gIsPaused = true;
 
   {
     StaticMutexAutoLock lock(sRegisteredThreadsMutex);
@@ -587,7 +587,7 @@ Sampler::FlushOnJSShutdown(JSContext* aContext)
     }
   }
 
-  SetPaused(false);
+  gIsPaused = false;
 }
 
 void PseudoStack::flushSamplerOnJSShutdown()
