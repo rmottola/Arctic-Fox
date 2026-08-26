@@ -54,6 +54,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+#include "MainThreadUtils.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "js/TypeDecls.h"
@@ -336,6 +337,8 @@ profiler_call_enter(const char* aInfo,
                     js::ProfileEntry::Category aCategory,
                     void *aFrameAddress, bool aCopy, uint32_t line)
 {
+  // This function runs both on and off the main thread.
+
   // check if we've been initialized to avoid calling pthread_getspecific
   // with a null tlsStack which will return undefined results.
   if (!stack_key_initialized)
@@ -362,6 +365,8 @@ profiler_call_enter(const char* aInfo,
 static inline void
 profiler_call_exit(void* aHandle)
 {
+  // This function runs both on and off the main thread.
+
   if (!aHandle)
     return;
 
@@ -509,6 +514,8 @@ private:
 inline PseudoStack*
 profiler_get_pseudo_stack(void)
 {
+  // This function runs both on and off the main thread.
+
   if (!stack_key_initialized)
     return nullptr;
   return tlsPseudoStack.get();
