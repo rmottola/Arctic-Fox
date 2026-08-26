@@ -2890,8 +2890,8 @@ TryAttachTypedObjectSetPropStub(JSContext* cx, HandleScript script,
 }
 
 static bool
-DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_,
-                  HandleValue lhs, HandleValue rhs, MutableHandleValue res)
+DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_, Value* stack,
+                  HandleValue lhs, HandleValue rhs)
 {
     // This fallback stub may trigger debug mode toggling.
     DebugModeOSRVolatileStub<ICSetProp_Fallback*> stub(frame, stub_);
@@ -2984,8 +2984,9 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
         }
     }
 
-    // Leave the RHS on the stack.
-    res.set(rhs);
+    // Overwrite the LHS on the stack (pushed for the decompiler) with the RHS.
+    MOZ_ASSERT(stack[1] == lhs);
+    stack[1] = rhs;
 
     // Check if debug mode toggling made the stub invalid.
     if (stub.invalid())
@@ -3031,11 +3032,11 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
     return true;
 }
 
-typedef bool (*DoSetPropFallbackFn)(JSContext*, BaselineFrame*, ICSetProp_Fallback*,
-                                    HandleValue, HandleValue, MutableHandleValue);
+typedef bool (*DoSetPropFallbackFn)(JSContext*, BaselineFrame*, ICSetProp_Fallback*, Value*,
+                                    HandleValue, HandleValue);
 static const VMFunction DoSetPropFallbackInfo =
     FunctionInfo<DoSetPropFallbackFn>(DoSetPropFallback, "DoSetPropFallback", TailCall,
-                                      PopValues(2));
+                                      PopValues(1));
 
 bool
 ICSetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
@@ -3046,12 +3047,21 @@ ICSetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     EmitRestoreTailCallReg(masm);
 
     // Ensure stack is fully synced for the expression decompiler.
-    masm.pushValue(R0);
+    // Overwrite the RHS value on top of the stack with the object, then push
+    // the RHS in R1 on top of that.
+    masm.storeValue(R0, Address(masm.getStackPointer(), 0));
     masm.pushValue(R1);
 
     // Push arguments.
     masm.pushValue(R1);
     masm.pushValue(R0);
+
+    // Push pointer to stack values, so that the stub can overwrite the object
+    // (pushed for the decompiler) with the RHS.
+    masm.computeEffectiveAddress(Address(masm.getStackPointer(), 2 * sizeof(Value)),
+                                 R0.scratchReg());
+    masm.push(R0.scratchReg());
+
     masm.push(ICStubReg);
     pushStubPayload(masm, R0.scratchReg());
 
@@ -3073,9 +3083,6 @@ ICSetProp_Fallback::Compiler::generateStubCode(MacroAssembler& masm)
     returnOffset_ = masm.currentOffset();
 
     leaveStubFrame(masm, true);
-
-    // Retrieve the stashed initial argument from the caller's frame before returning
-    EmitUnstowICValues(masm, 1);
     EmitReturnFromIC(masm);
 
     return true;
@@ -3178,8 +3185,6 @@ ICSetProp_Native::Compiler::generateStubCode(MacroAssembler& masm)
         regs.add(scr);
     }
 
-    // The RHS has to be in R0.
-    masm.moveValue(R1, R0);
     EmitReturnFromIC(masm);
 
     // Failure case - jump to next stub
@@ -3336,8 +3341,6 @@ ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
         emitPostWriteBarrierSlot(masm, objReg, R1, scr, saveRegs);
     }
 
-    // The RHS has to be in R0.
-    masm.moveValue(R1, R0);
     EmitReturnFromIC(masm);
 
     // Failure case - jump to next stub
@@ -3402,9 +3405,6 @@ ICSetProp_Unboxed::Compiler::generateStubCode(MacroAssembler& masm)
     EmitUnboxedPreBarrierForBaseline(masm, address, fieldType_);
     masm.storeUnboxedProperty(address, fieldType_,
                               ConstantOrRegister(TypedOrValueRegister(R1)), &failure);
-
-    // The RHS has to be in R0.
-    masm.moveValue(R1, R0);
 
     EmitReturnFromIC(masm);
 
@@ -3525,8 +3525,6 @@ ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
         }
     }
 
-    // The RHS has to be in R0.
-    masm.moveValue(R1, R0);
     EmitReturnFromIC(masm);
 
     masm.bind(&failurePopRHS);
@@ -3629,7 +3627,6 @@ ICSetProp_CallScripted::Compiler::generateStubCode(MacroAssembler& masm)
     // Do not care about return value from function. The original RHS should be returned
     // as the result of this operation.
     EmitUnstowICValues(masm, 2);
-    masm.moveValue(R1, R0);
     EmitReturnFromIC(masm);
 
     // Leave stub frame and go to next stub.
@@ -3723,7 +3720,6 @@ ICSetProp_CallNative::Compiler::generateStubCode(MacroAssembler& masm)
     // Do not care about return value from function. The original RHS should be returned
     // as the result of this operation.
     EmitUnstowICValues(masm, 2);
-    masm.moveValue(R1, R0);
     EmitReturnFromIC(masm);
 
     // Unstow R0 and R1
