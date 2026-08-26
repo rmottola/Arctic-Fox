@@ -888,12 +888,14 @@ class MOZ_RAII SetPropIRGenerator : public IRGenerator
     PreliminaryObjectAction preliminaryObjectAction_;
 
     // If Baseline needs an update stub, this contains information to create it.
+    RootedObjectGroup updateStubGroup_;
     RootedId updateStubId_;
     bool needUpdateStub_;
 
-    void setUpdateStubInfo(jsid id) {
+    void setUpdateStubInfo(ObjectGroup* group, jsid id) {
         MOZ_ASSERT(!needUpdateStub_);
         needUpdateStub_ = true;
+        updateStubGroup_ = group;
         updateStubId_ = id;
     }
 
@@ -918,6 +920,10 @@ class MOZ_RAII SetPropIRGenerator : public IRGenerator
     }
     bool shouldNotePreliminaryObjectStub() const {
         return preliminaryObjectAction_ == PreliminaryObjectAction::NotePreliminary;
+    }
+    ObjectGroup* updateStubGroup() const {
+        MOZ_ASSERT(updateStubGroup_);
+        return updateStubGroup_;
     }
     jsid updateStubId() const {
         MOZ_ASSERT(needUpdateStub_);

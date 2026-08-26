@@ -1508,6 +1508,7 @@ SetPropIRGenerator::SetPropIRGenerator(JSContext* cx, jsbytecode* pc, CacheKind 
     rhsVal_(rhsVal),
     isTemporarilyUnoptimizable_(isTemporarilyUnoptimizable),
     preliminaryObjectAction_(PreliminaryObjectAction::None),
+    updateStubGroup_(cx),
     updateStubId_(cx, JSID_EMPTY),
     needUpdateStub_(false)
 {}
@@ -1612,7 +1613,7 @@ SetPropIRGenerator::tryAttachNativeSetSlot(HandleObject obj, ObjOperandId objId,
     else
         preliminaryObjectAction_ = PreliminaryObjectAction::Unlink;
 
-    setUpdateStubInfo(id);
+    setUpdateStubInfo(nobj->group(), id);
     EmitStoreSlotAndReturn(writer, objId, nobj, propShape, rhsId);
     return true;
 }
@@ -1636,7 +1637,9 @@ SetPropIRGenerator::tryAttachUnboxedExpandoSetSlot(HandleObject obj, ObjOperandI
     ObjOperandId expandoId = writer.guardAndLoadUnboxedExpando(objId);
     writer.guardShape(expandoId, expando->lastProperty());
 
-    setUpdateStubInfo(id);
+    // Property types must be added to the unboxed object's group, not the
+    // expando's group (it has unknown properties).
+    setUpdateStubInfo(obj->group(), id);
     EmitStoreSlotAndReturn(writer, expandoId, expando, propShape, rhsId);
     return true;
 }
@@ -1670,7 +1673,7 @@ SetPropIRGenerator::tryAttachUnboxedProperty(HandleObject obj, ObjOperandId objI
                                 rhsId);
     writer.returnFromIC();
 
-    setUpdateStubInfo(id);
+    setUpdateStubInfo(obj->group(), id);
     preliminaryObjectAction_ = PreliminaryObjectAction::Unlink;
     return true;
 }
@@ -1704,7 +1707,7 @@ SetPropIRGenerator::tryAttachTypedObjectProperty(HandleObject obj, ObjOperandId 
     writer.guardShape(objId, obj->as<TypedObject>().shape());
     writer.guardGroup(objId, obj->group());
 
-    setUpdateStubInfo(id);
+    setUpdateStubInfo(obj->group(), id);
 
     // Scalar types can always be stored without a type update stub.
     if (fieldDescr->is<ScalarTypeDescr>()) {
