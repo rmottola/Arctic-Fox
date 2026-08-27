@@ -1215,7 +1215,7 @@ double nsWindow::GetDefaultScaleInternal()
   if (mDefaultScale <= 0.0) {
     mDefaultScale = WinUtils::LogToPhysFactor(mWnd);
   }
-  return WinUtils::LogToPhysFactor(mWnd);
+  return mDefaultScale;
 }
 
 int32_t nsWindow::LogToPhys(double aValue)
