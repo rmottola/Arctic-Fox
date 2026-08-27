@@ -1685,7 +1685,7 @@ bool nsChildView::HasPendingInputEvent()
 
 #pragma mark -
 
-NS_IMETHODIMP
+nsresult
 nsChildView::StartPluginIME(const mozilla::WidgetKeyboardEvent& aKeyboardEvent,
                             int32_t aPanelX, int32_t aPanelY,
                             nsString& aCommitted)
