@@ -766,7 +766,7 @@ LayoutDeviceIntPoint nsWindow::WidgetToScreenOffset()
     return offset;
 }
 
-NS_IMETHODIMP
+nsresult
 nsWindow::DispatchEvent(mozilla::WidgetGUIEvent* aEvent,
                         nsEventStatus& aStatus)
 {
