@@ -266,7 +266,7 @@ PuppetWidget::ConfigureChildren(const nsTArray<Configuration>& aConfigurations)
   return NS_OK;
 }
 
-NS_IMETHODIMP
+nsresult
 PuppetWidget::SetFocus(bool aRaise)
 {
   if (aRaise && mTabChild) {

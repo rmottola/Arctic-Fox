@@ -2004,7 +2004,8 @@ void nsCocoaWindow::SetMenuBar(nsMenuBarX *aMenuBar)
     mMenuBar->Paint();
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetFocus(bool aState)
+nsresult
+nsCocoaWindow::SetFocus(bool aState)
 {
   if (!mWindow)
     return NS_OK;
@@ -2228,7 +2229,8 @@ nsCocoaWindow::SetUseBrightTitlebarForeground(bool aBrightForeground)
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetNonClientMargins(LayoutDeviceIntMargin &margins)
+nsresult
+nsCocoaWindow::SetNonClientMargins(LayoutDeviceIntMargin &margins)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
