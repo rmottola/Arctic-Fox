@@ -1816,7 +1816,7 @@ nsBaseWidget::EnsureTextEventDispatcher()
   mTextEventDispatcher = new TextEventDispatcher(this);
 }
 
-NS_IMETHODIMP_(nsIWidget::TextEventDispatcher*)
+nsIWidget::TextEventDispatcher*
 nsBaseWidget::GetTextEventDispatcher()
 {
   EnsureTextEventDispatcher();
@@ -1833,7 +1833,7 @@ nsBaseWidget::GetPseudoIMEContext()
   return dispatcher->GetPseudoIMEContext();
 }
 
-NS_IMETHODIMP_(TextEventDispatcherListener*)
+TextEventDispatcherListener*
 nsBaseWidget::GetNativeTextEventDispatcherListener()
 {
   // TODO: If all platforms supported use of TextEventDispatcher for handling
@@ -2261,7 +2261,7 @@ nsBaseWidget::DefaultFillScrollCapture(DrawTarget* aSnapshotDrawTarget)
 }
 #endif
 
-NS_IMETHODIMP_(nsIWidget::NativeIMEContext)
+nsIWidget::NativeIMEContext
 nsIWidget::GetNativeIMEContext()
 {
   return NativeIMEContext(this);

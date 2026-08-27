@@ -1726,7 +1726,7 @@ nsChildView::SetPluginFocused(bool& aFocused)
   mPluginFocused = aFocused;
 }
 
-NS_IMETHODIMP_(void)
+void
 nsChildView::SetInputContext(const InputContext& aContext,
                              const InputContextAction& aAction)
 {
@@ -1764,7 +1764,7 @@ nsChildView::SetInputContext(const InputContext& aContext,
   }
 }
 
-NS_IMETHODIMP_(InputContext)
+InputContext
 nsChildView::GetInputContext()
 {
   switch (mInputContext.mIMEState.mEnabled) {
@@ -1784,7 +1784,7 @@ nsChildView::GetInputContext()
   return mInputContext;
 }
 
-NS_IMETHODIMP_(TextEventDispatcherListener*)
+TextEventDispatcherListener*
 nsChildView::GetNativeTextEventDispatcherListener()
 {
   if (NS_WARN_IF(!mTextInputHandler)) {
@@ -1833,7 +1833,7 @@ nsChildView::ExecuteNativeKeyBindingRemapped(NativeKeyBindingsType aType,
   return keyBindings->Execute(modifiedEvent, aCallback, aCallbackData);
 }
 
-NS_IMETHODIMP_(bool)
+bool
 nsChildView::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
                                      const WidgetKeyboardEvent& aEvent,
                                      DoCommandCallback aCallback,

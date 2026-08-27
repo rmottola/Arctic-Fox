@@ -2337,7 +2337,7 @@ void nsCocoaWindow::SetPopupWindowLevel()
   }
 }
 
-NS_IMETHODIMP_(void)
+void
 nsCocoaWindow::SetInputContext(const InputContext& aContext,
                                const InputContextAction& aAction)
 {
@@ -2348,7 +2348,7 @@ nsCocoaWindow::SetInputContext(const InputContext& aContext,
   NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
-NS_IMETHODIMP_(bool)
+bool
 nsCocoaWindow::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
                                        const WidgetKeyboardEvent& aEvent,
                                        DoCommandCallback aCallback,
