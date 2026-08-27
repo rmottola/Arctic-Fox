@@ -498,7 +498,7 @@ nsresult nsCocoaWindow::CreateNativeWindow(const NSRect &aRect,
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
 }
 
-NS_IMETHODIMP
+nsresult
 nsCocoaWindow::CreatePopupContentView(const LayoutDeviceIntRect &aRect)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
@@ -1491,7 +1491,7 @@ nsCocoaWindow::MakeFullScreen(bool aFullScreen, nsIScreen* aTargetScreen)
   return DoMakeFullScreen(aFullScreen, false);
 }
 
-NS_IMETHODIMP
+nsresult
 nsCocoaWindow::MakeFullScreenWithNativeTransition(bool aFullScreen,
                                                   nsIScreen* aTargetScreen)
 {
