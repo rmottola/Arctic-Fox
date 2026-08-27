@@ -6385,13 +6385,9 @@ nsWindow::DispatchRestoreEventAccessible(void)
 
 // nsChildWindow class
 
-nsChildWindow::nsChildWindow()
-{
-}
+nsChildWindow::nsChildWindow() = default;
 
-nsChildWindow::~nsChildWindow()
-{
-}
+nsChildWindow::~nsChildWindow() = default;
 
 NS_IMETHODIMP_(void)
 nsWindow::SetInputContext(const InputContext& aContext,
