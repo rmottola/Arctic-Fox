@@ -6065,7 +6065,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   return command.mSucceeded && command.mIsEnabled;
 }
 
-NS_IMETHODIMP
+nsresult
 nsChildView::GetSelectionAsPlaintext(nsAString& aResult)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
