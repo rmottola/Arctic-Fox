@@ -247,7 +247,7 @@ public:
     return mRestyleManager;
   }
 
-  mozilla::CounterStyleManager* CounterStyleManager() {
+  mozilla::CounterStyleManager* CounterStyleManager() const {
     return mCounterStyleManager;
   }
 #endif
@@ -543,12 +543,12 @@ public:
   float GetPrintPreviewScale() { return mPPScale; }
   void SetPrintPreviewScale(float aScale) { mPPScale = aScale; }
 
-  nsDeviceContext* DeviceContext() { return mDeviceContext; }
+  nsDeviceContext* DeviceContext() const { return mDeviceContext; }
   mozilla::EventStateManager* EventStateManager() { return mEventManager; }
   nsIAtom* GetLanguageFromCharset() const { return mLanguage; }
   already_AddRefed<nsIAtom> GetContentLanguage() const;
 
-  float TextZoom() { return mTextZoom; }
+  float TextZoom() const { return mTextZoom; }
   void SetTextZoom(float aZoom) {
     MOZ_ASSERT(aZoom > 0.0f, "invalid zoom factor");
     if (aZoom == mTextZoom)
