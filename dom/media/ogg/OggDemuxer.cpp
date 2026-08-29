@@ -140,7 +140,6 @@ OggDemuxer::OggDemuxer(MediaResource* aResource)
   , mOpusSerial(0)
   , mTheoraSerial(0)
   , mFlacSerial(0)
-  , mOpusPreSkip(0)
   , mIsChained(false)
   , mTimedMetadataEvent(nullptr)
   , mOnSeekableEvent(nullptr)
@@ -449,21 +448,9 @@ OggDemuxer::SetupTargetOpus(OpusState* aOpusState, OggHeaders& aHeaders)
     mOpusState->Reset();
   }
 
-  mInfo.mAudio.mMimeType = "audio/opus";
-  mInfo.mAudio.mRate = aOpusState->mRate;
-  mInfo.mAudio.mChannels = aOpusState->mChannels;
-
-  // Save preskip & the first header packet for the Opus decoder
-  uint64_t preSkip = aOpusState->Time(0, aOpusState->mPreSkip);
-  uint8_t c[sizeof(preSkip)];
-  BigEndian::writeUint64(&c[0], preSkip);
-  mInfo.mAudio.mCodecSpecificConfig->AppendElements(&c[0], sizeof(preSkip));
-  mInfo.mAudio.mCodecSpecificConfig->AppendElements(aHeaders.mHeaders[0],
-                                                    aHeaders.mHeaderLens[0]);
-
+  mInfo.mAudio = *aOpusState->GetInfo()->GetAsAudioInfo();
   mOpusState = aOpusState;
   mOpusSerial = aOpusState->mSerial;
-  mOpusPreSkip = aOpusState->mPreSkip;
 }
 
 void
@@ -567,12 +554,12 @@ OggDemuxer::SetupMediaTracksInfo(const nsTArray<uint32_t>& aSerials)
         continue;
       }
 
+      mInfo.mAudio = *opusState->GetInfo()->GetAsAudioInfo();
+
       if (msgInfo) {
         InitTrack(msgInfo, &mInfo.mAudio, mOpusState == opusState);
       }
 
-      mInfo.mAudio.mRate = opusState->mRate;
-      mInfo.mAudio.mChannels = opusState->mChannels;
       FillTags(&mInfo.mAudio, opusState->GetTags());
     } else if (codecState->GetType() == OggCodecState::TYPE_FLAC) {
       FlacState* flacState = static_cast<FlacState*>(codecState);
@@ -847,17 +834,16 @@ OggDemuxer::ReadOggChain(const media::TimeUnit& aLastEndTime)
   OggHeaders opusHeaders;
   if ((newOpusState &&
        ReadHeaders(TrackInfo::kAudioTrack, newOpusState, opusHeaders)) &&
-      (mOpusState->mRate == newOpusState->mRate) &&
-      (mOpusState->mChannels == newOpusState->mChannels)) {
+      (mOpusState->GetInfo()->GetAsAudioInfo()->mRate ==
+       newOpusState->GetInfo()->GetAsAudioInfo()->mRate) &&
+      (mOpusState->GetInfo()->GetAsAudioInfo()->mChannels ==
+       newOpusState->GetInfo()->GetAsAudioInfo()->mChannels)) {
 
     SetupTargetOpus(newOpusState, opusHeaders);
 
     if (msgInfo) {
       InitTrack(msgInfo, &mInfo.mAudio, true);
     }
-    mInfo.mAudio.mMimeType = NS_LITERAL_CSTRING("audio/opus");
-    mInfo.mAudio.mRate = newOpusState->mRate;
-    mInfo.mAudio.mChannels = newOpusState->mChannels;
 
     chained = true;
     tags = newOpusState->GetTags();
@@ -1119,7 +1105,7 @@ OggDemuxer::GetBuffered(TrackInfo::TrackType aType)
         NS_ASSERTION(startTime > 0, "Must have positive start time");
       } else if (aType == TrackInfo::kAudioTrack && mOpusState &&
                  serial == mOpusSerial) {
-        startTime = OpusState::Time(mOpusPreSkip, granulepos);
+        startTime = mOpusState->Time(granulepos);
         NS_ASSERTION(startTime > 0, "Must have positive start time");
       } else if (aType == TrackInfo::kAudioTrack && mFlacState &&
                  serial == mFlacSerial) {
