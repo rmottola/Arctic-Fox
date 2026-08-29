@@ -260,7 +260,6 @@ private:
   };
 
   layers::ImageContainer* mImageContainer;
-  const VideoInfo& mConfig;
   RefPtr<AndroidSurfaceTexture> mSurfaceTexture;
   DurationQueue mInputDurations;
 };
