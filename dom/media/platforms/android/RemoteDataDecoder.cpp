@@ -393,21 +393,46 @@ private:
   const AudioInfo& mConfig;
 };
 
-MediaDataDecoder*
-RemoteDataDecoder::CreateAudioDecoder(const AudioInfo& aConfig,
-                                          MediaFormat::Param aFormat,
-                                          MediaDataDecoderCallback* aCallback)
+already_AddRefed<MediaDataDecoder>
+RemoteDataDecoder::CreateAudioDecoder(const CreateDecoderParams& aParams,
+                                      const nsString& aDrmStubId,
+                                      CDMProxy* aProxy)
 {
-  return new RemoteAudioDecoder(aConfig, aFormat, aCallback);
+  const AudioInfo& config = aParams.AudioConfig();
+  MediaFormat::LocalRef format;
+  NS_ENSURE_SUCCESS(
+    MediaFormat::CreateAudioFormat(
+      config.mMimeType, config.mRate, config.mChannels, &format),
+    nullptr);
+
+  RefPtr<MediaDataDecoder> decoder =
+    new RemoteAudioDecoder(config, format, aDrmStubId, aParams.mTaskQueue);
+  if (aProxy) {
+    decoder = new EMEMediaDataDecoderProxy(aParams, decoder.forget(), aProxy);
+  }
+  return decoder.forget();
 }
 
-MediaDataDecoder*
-RemoteDataDecoder::CreateVideoDecoder(const VideoInfo& aConfig,
-                                          MediaFormat::Param aFormat,
-                                          MediaDataDecoderCallback* aCallback,
-                                          layers::ImageContainer* aImageContainer)
+already_AddRefed<MediaDataDecoder>
+RemoteDataDecoder::CreateVideoDecoder(const CreateDecoderParams& aParams,
+                                      const nsString& aDrmStubId,
+                                      CDMProxy* aProxy)
 {
-  return new RemoteVideoDecoder(aConfig, aFormat, aCallback, aImageContainer);
+  const VideoInfo& config = aParams.VideoConfig();
+  MediaFormat::LocalRef format;
+  NS_ENSURE_SUCCESS(
+    MediaFormat::CreateVideoFormat(TranslateMimeType(config.mMimeType),
+                                   config.mDisplay.width,
+                                   config.mDisplay.height,
+                                   &format),
+    nullptr);
+
+  RefPtr<MediaDataDecoder> decoder = new RemoteVideoDecoder(
+    config, format, aParams.mImageContainer, aDrmStubId, aParams.mTaskQueue);
+  if (aProxy) {
+    decoder = new EMEMediaDataDecoderProxy(aParams, decoder.forget(), aProxy);
+  }
+  return decoder.forget();
 }
 
 RemoteDataDecoder::RemoteDataDecoder(MediaData::Type aType,

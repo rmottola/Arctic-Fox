@@ -18,16 +18,18 @@
 
 namespace mozilla {
 
-class RemoteDataDecoder : public MediaDataDecoder {
+class RemoteDataDecoder : public MediaDataDecoder
+{
 public:
-  static MediaDataDecoder* CreateAudioDecoder(const AudioInfo& aConfig,
-                                              java::sdk::MediaFormat::Param aFormat,
-                                              MediaDataDecoderCallback* aCallback);
+  static already_AddRefed<MediaDataDecoder>
+  CreateAudioDecoder(const CreateDecoderParams& aParams,
+                     const nsString& aDrmStubId,
+                     CDMProxy* aProxy);
 
-  static MediaDataDecoder* CreateVideoDecoder(const VideoInfo& aConfig,
-                                              java::sdk::MediaFormat::Param aFormat,
-                                              MediaDataDecoderCallback* aCallback,
-                                              layers::ImageContainer* aImageContainer);
+  static already_AddRefed<MediaDataDecoder>
+  CreateVideoDecoder(const CreateDecoderParams& aParams,
+                     const nsString& aDrmStubId,
+                     CDMProxy* aProxy);
 
   virtual ~RemoteDataDecoder() {}
 

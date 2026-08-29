@@ -284,26 +284,14 @@ AndroidDecoderModule::CreateVideoDecoder(const CreateDecoderParams& aParams)
   if (aParams.VideoConfig().HasAlpha()) {
     return nullptr;
   }
-  MediaFormat::LocalRef format;
 
-  const VideoInfo& config = aParams.VideoConfig();
-  NS_ENSURE_SUCCESS(
-    MediaFormat::CreateVideoFormat(TranslateMimeType(config.mMimeType),
-                                   config.mDisplay.width,
-                                   config.mDisplay.height,
-                                   &format),
-    nullptr);
+  nsString drmStubId;
+  if (mProxy) {
+    drmStubId = mProxy->GetMediaDrmStubId();
+  }
 
-  RefPtr<MediaDataDecoder> decoder = MediaPrefs::PDMAndroidRemoteCodecEnabled() ?
-      RemoteDataDecoder::CreateVideoDecoder(config,
-                                            format,
-                                            aParams.mCallback,
-                                            aParams.mImageContainer) :
-      MediaCodecDataDecoder::CreateVideoDecoder(config,
-                                                format,
-                                                aParams.mCallback,
-                                                aParams.mImageContainer);
-
+  RefPtr<MediaDataDecoder> decoder =
+    RemoteDataDecoder::CreateVideoDecoder(aParams, drmStubId, mProxy);
   return decoder.forget();
 }
 
@@ -316,31 +304,16 @@ AndroidDecoderModule::CreateAudioDecoder(const CreateDecoderParams& aParams)
     return nullptr;
   }
 
-  MediaFormat::LocalRef format;
-
   LOG("CreateAudioFormat with mimeType=%s, mRate=%d, channels=%d",
       config.mMimeType.Data(), config.mRate, config.mChannels);
 
-  NS_ENSURE_SUCCESS(MediaFormat::CreateAudioFormat(
-      config.mMimeType,
-      config.mRate,
-      config.mChannels,
-      &format), nullptr);
-
-  RefPtr<MediaDataDecoder> decoder = MediaPrefs::PDMAndroidRemoteCodecEnabled() ?
-      RemoteDataDecoder::CreateAudioDecoder(config, format, aParams.mCallback) :
-      MediaCodecDataDecoder::CreateAudioDecoder(config, format, aParams.mCallback);
-
-  return decoder.forget();
-}
-
-PlatformDecoderModule::ConversionRequired
-AndroidDecoderModule::DecoderNeedsConversion(const TrackInfo& aConfig) const
-{
-  if (aConfig.IsVideo()) {
-    return ConversionRequired::kNeedAnnexB;
+  nsString drmStubId;
+  if (mProxy) {
+    drmStubId = mProxy->GetMediaDrmStubId();
   }
-  return ConversionRequired::kNeedNone;
+  RefPtr<MediaDataDecoder> decoder =
+   RemoteDataDecoder::CreateAudioDecoder(aParams, drmStubId, mProxy);
+  return decoder.forget();
 }
 
 } // mozilla
