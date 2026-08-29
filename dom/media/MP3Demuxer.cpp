@@ -577,10 +577,11 @@ MP3TrackDemuxer::GetNextFrame(const MediaByteRange& aRange)
     return nullptr;
   }
 
-  const uint32_t read = BlockingRead(frameWriter->Data(), frame->mOffset,
-                                     frame->Size());
+  const uint32_t read =
+    Read(frameWriter->Data(), frame->mOffset, frame->Size());
 
   if (read != aRange.Length()) {
+    MP3LOG("GetNext() Exit read=%u frame->Size()=%u", read, frame->Size());
     return nullptr;
   }
 
@@ -646,17 +647,21 @@ MP3TrackDemuxer::FrameIndexFromOffset(int64_t aOffset) const
 }
 
 int64_t
-MP3TrackDemuxer::FrameIndexFromTime(const media::TimeUnit& aTime) const {
+MP3TrackDemuxer::FrameIndexFromTime(const media::TimeUnit& aTime) const
+{
   int64_t frameIndex = 0;
   if (mSamplesPerSecond > 0 && mSamplesPerFrame > 0) {
     frameIndex = aTime.ToSeconds() * mSamplesPerSecond / mSamplesPerFrame - 1;
   }
 
+  MP3LOGV("FrameIndexFromOffset(%fs) -> %" PRId64, aTime.ToSeconds(),
+          frameIndex);
   return std::max<int64_t>(0, frameIndex);
 }
 
 void
-MP3TrackDemuxer::UpdateState(const MediaByteRange& aRange) {
+MP3TrackDemuxer::UpdateState(const MediaByteRange& aRange)
+{
   // Prevent overflow.
   if (mTotalFrameLen + aRange.Length() < mTotalFrameLen) {
     // These variables have a linear dependency and are only used to derive the
@@ -714,7 +719,8 @@ MP3TrackDemuxer::BlockingRead(uint8_t* aBuffer, int64_t aOffset, int32_t aSize) 
 }
 
 int32_t
-MP3TrackDemuxer::Read(uint8_t* aBuffer, int64_t aOffset, int32_t aSize) {
+MP3TrackDemuxer::Read(uint8_t* aBuffer, int64_t aOffset, int32_t aSize)
+{
   aSize = ClampReadSize(aOffset, aSize);
 
   uint32_t read = 0;
