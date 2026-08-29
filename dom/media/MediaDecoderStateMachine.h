@@ -162,7 +162,6 @@ public:
     DECODER_STATE_SHUTDOWN
   };
 
-  void DumpDebugInfo();
   RefPtr<MediaDecoder::DebugInfoPromise> RequestDebugInfo();
 
   void AddOutputStream(ProcessedMediaStream* aStream, bool aFinishWhenEnded);
