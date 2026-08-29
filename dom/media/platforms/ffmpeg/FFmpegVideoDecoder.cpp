@@ -16,7 +16,6 @@
 #include "FFmpegVideoDecoder.h"
 #include "FFmpegLog.h"
 #include "mozilla/PodOperations.h"
-#include "mozilla/Preferences.h"
 
 #include "libavutil/pixfmt.h"
 #if LIBAVCODEC_VERSION_MAJOR < 54
@@ -149,12 +148,6 @@ FFmpegVideoDecoder<LIBAV_VER>::InitCodecContext()
   mCodecContext->thread_count = decode_threads;
   if (decode_threads > 1) {
     mCodecContext->thread_type = FF_THREAD_SLICE | FF_THREAD_FRAME;
-  }
-  
-    if(Preferences::GetBool("media.ffmpeg.skip_loop_filter", false)) {
-    // Enable skipping loop filter and allow non spec compliant speedup tricks.
-    mCodecContext->flags2 |= 1; //AV_CODEC_FLAG2_FAST - could not inline for unknown reason ^-^'
-    mCodecContext->skip_loop_filter = AVDISCARD_ALL;
   }
 
   // FFmpeg will call back to this to negotiate a video pixel format.
