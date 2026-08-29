@@ -534,11 +534,11 @@ public:
   media::TimeUnit mStartTime;
 };
 
-class SharedTrackInfo
+class TrackInfoSharedPtr
 {
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(SharedTrackInfo)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(TrackInfoSharedPtr)
 public:
-  SharedTrackInfo(const TrackInfo& aOriginal, uint32_t aStreamID)
+  TrackInfoSharedPtr(const TrackInfo& aOriginal, uint32_t aStreamID)
     : mInfo(aOriginal.Clone())
     , mStreamSourceID(aStreamID)
     , mMimeType(mInfo->mMimeType)
@@ -548,6 +548,11 @@ public:
   uint32_t GetID() const
   {
     return mStreamSourceID;
+  }
+
+  operator const TrackInfo*() const
+  {
+    return mInfo.get();
   }
 
   const TrackInfo* operator*() const
@@ -577,7 +582,7 @@ public:
   }
 
 private:
-  ~SharedTrackInfo() { }
+  ~TrackInfoSharedPtr() { }
   UniquePtr<TrackInfo> mInfo;
   // A unique ID, guaranteed to change when changing streams.
   uint32_t mStreamSourceID;
