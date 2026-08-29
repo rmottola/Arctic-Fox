@@ -108,11 +108,10 @@ ServoStyleSet::EndUpdate()
 already_AddRefed<nsStyleContext>
 ServoStyleSet::ResolveStyleFor(Element* aElement,
                                nsStyleContext* aParentContext,
-                               ConsumeStyleBehavior aConsume,
                                LazyComputeBehavior aMayCompute)
 {
   return GetContext(aElement, aParentContext, nullptr,
-                    CSSPseudoElementType::NotPseudo, aConsume, aMayCompute);
+                    CSSPseudoElementType::NotPseudo, aMayCompute);
 }
 
 already_AddRefed<nsStyleContext>
@@ -120,7 +119,6 @@ ServoStyleSet::GetContext(nsIContent* aContent,
                           nsStyleContext* aParentContext,
                           nsIAtom* aPseudoTag,
                           CSSPseudoElementType aPseudoType,
-                          ConsumeStyleBehavior aConsume,
                           LazyComputeBehavior aMayCompute)
 {
   MOZ_ASSERT(aContent->IsElement());
@@ -129,9 +127,9 @@ ServoStyleSet::GetContext(nsIContent* aContent,
   RefPtr<ServoComputedValues> computedValues;
   if (aMayCompute == LazyComputeBehavior::Allow) {
     computedValues =
-      Servo_ResolveStyleLazily(element, nullptr, aConsume, mRawSet.get()).Consume();
+      Servo_ResolveStyleLazily(element, nullptr, mRawSet.get()).Consume();
   } else {
-    computedValues = ResolveServoStyle(element, aConsume);
+    computedValues = ResolveServoStyle(element);
   }
 
   MOZ_ASSERT(computedValues);
@@ -157,14 +155,13 @@ ServoStyleSet::GetContext(already_AddRefed<ServoComputedValues> aComputedValues,
 already_AddRefed<nsStyleContext>
 ServoStyleSet::ResolveStyleFor(Element* aElement,
                                nsStyleContext* aParentContext,
-                               ConsumeStyleBehavior aConsume,
                                LazyComputeBehavior aMayCompute,
                                TreeMatchContext& aTreeMatchContext)
 {
   // aTreeMatchContext is used to speed up selector matching,
   // but if the element already has a ServoComputedValues computed in
   // advance, then we shouldn't need to use it.
-  return ResolveStyleFor(aElement, aParentContext, aConsume, aMayCompute);
+  return ResolveStyleFor(aElement, aParentContext, aMayCompute);
 }
 
 already_AddRefed<nsStyleContext>
@@ -237,8 +234,7 @@ ServoStyleSet::ResolveTransientStyle(Element* aElement, CSSPseudoElementType aTy
   }
 
   RefPtr<ServoComputedValues> computedValues =
-    Servo_ResolveStyleLazily(aElement, pseudoTag, ConsumeStyleBehavior::DontConsume,
-                             mRawSet.get()).Consume();
+    Servo_ResolveStyleLazily(aElement, pseudoTag, mRawSet.get()).Consume();
 
   return GetContext(computedValues.forget(), nullptr, pseudoTag, aType);
 }
@@ -565,8 +561,7 @@ ServoStyleSet::RestyleWithAddedDeclaration(RawServoDeclarationBlock* aDeclaratio
 
 
 already_AddRefed<ServoComputedValues>
-ServoStyleSet::ResolveServoStyle(Element* aElement,
-                                 ConsumeStyleBehavior aConsume)
+ServoStyleSet::ResolveServoStyle(Element* aElement)
 {
-  return Servo_ResolveStyle(aElement, mRawSet.get(), aConsume).Consume();
+  return Servo_ResolveStyle(aElement, mRawSet.get()).Consume();
 }

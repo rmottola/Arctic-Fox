@@ -1466,7 +1466,6 @@ GetPropagatedScrollbarStylesForViewport(nsPresContext* aPresContext,
   StyleSetHandle styleSet = aPresContext->StyleSet();
   RefPtr<nsStyleContext> rootStyle;
   rootStyle = styleSet->ResolveStyleFor(docElement, nullptr,
-                                        ConsumeStyleBehavior::DontConsume,
                                         LazyComputeBehavior::Allow);
   if (CheckOverflow(rootStyle->StyleDisplay(), aStyles)) {
     // tell caller we stole the overflow style from the root element
@@ -1496,7 +1495,6 @@ GetPropagatedScrollbarStylesForViewport(nsPresContext* aPresContext,
 
   RefPtr<nsStyleContext> bodyStyle;
   bodyStyle = styleSet->ResolveStyleFor(bodyElement->AsElement(), rootStyle,
-                                        ConsumeStyleBehavior::DontConsume,
                                         LazyComputeBehavior::Allow);
 
   if (CheckOverflow(bodyStyle->StyleDisplay(), aStyles)) {
