@@ -2,31 +2,28 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "AndroidDecoderModule.h"
 #include "AndroidBridge.h"
+#include "AndroidDecoderModule.h"
 #include "AndroidSurfaceTexture.h"
+#include "DurationMap.h"
 #include "GeneratedJNINatives.h"
 #include "GLImages.h"
-
 #include "MediaData.h"
 #include "MediaInfo.h"
 #include "VideoUtils.h"
 #include "VPXDecoder.h"
 
-#include "nsThreadUtils.h"
-#include "nsPromiseFlatString.h"
 #include "nsIGfxInfo.h"
-
+#include "nsPromiseFlatString.h"
+#include "nsThreadUtils.h"
 #include "prlog.h"
-
 #include <jni.h>
 
-#include <deque>
-
 #undef LOG
-#define LOG(arg, ...) MOZ_LOG(sAndroidDecoderModuleLog, \
-    mozilla::LogLevel::Debug, ("RemoteDataDecoder(%p)::%s: " arg, \
-      this, __func__, ##__VA_ARGS__))
+#define LOG(arg, ...)                                                          \
+  MOZ_LOG(sAndroidDecoderModuleLog,                                            \
+          mozilla::LogLevel::Debug,                                            \
+          ("RemoteDataDecoder(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
 
 using namespace mozilla;
 using namespace mozilla::gl;

@@ -5,27 +5,27 @@
 #include "AndroidDecoderModule.h"
 #include "AndroidBridge.h"
 
-#include "MediaCodecDataDecoder.h"
-#include "RemoteDataDecoder.h"
 
 #include "MediaInfo.h"
-#include "VPXDecoder.h"
-
 #include "MediaPrefs.h"
 #include "OpusDecoder.h"
+#include "RemoteDataDecoder.h"
+#include "VPXDecoder.h"
 #include "VorbisDecoder.h"
 
-#include "nsPromiseFlatString.h"
 #include "nsIGfxInfo.h"
+#include "nsPromiseFlatString.h"
 
 #include "prlog.h"
 
 #include <jni.h>
 
 #undef LOG
-#define LOG(arg, ...) MOZ_LOG(sAndroidDecoderModuleLog, \
-    mozilla::LogLevel::Debug, ("AndroidDecoderModule(%p)::%s: " arg, \
-      this, __func__, ##__VA_ARGS__))
+#define LOG(arg, ...)                                                          \
+  MOZ_LOG(                                                                     \
+    sAndroidDecoderModuleLog,                                                  \
+    mozilla::LogLevel::Debug,                                                  \
+    ("AndroidDecoderModule(%p)::%s: " arg, this, __func__, ##__VA_ARGS__))
 
 using namespace mozilla;
 using namespace mozilla::gl;
@@ -230,8 +230,9 @@ AndroidDecoderModule::AndroidDecoderModule(CDMProxy* aProxy)
 }
 
 bool
-AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType,
-                                       DecoderDoctorDiagnostics* aDiagnostics) const
+AndroidDecoderModule::SupportsMimeType(
+  const nsACString& aMimeType,
+  DecoderDoctorDiagnostics* aDiagnostics) const
 {
   if (!AndroidBridge::Bridge() ||
       AndroidBridge::Bridge()->GetAPIVersion() < 16) {
@@ -286,11 +287,12 @@ AndroidDecoderModule::CreateVideoDecoder(const CreateDecoderParams& aParams)
   MediaFormat::LocalRef format;
 
   const VideoInfo& config = aParams.VideoConfig();
-  NS_ENSURE_SUCCESS(MediaFormat::CreateVideoFormat(
-      TranslateMimeType(config.mMimeType),
-      config.mDisplay.width,
-      config.mDisplay.height,
-      &format), nullptr);
+  NS_ENSURE_SUCCESS(
+    MediaFormat::CreateVideoFormat(TranslateMimeType(config.mMimeType),
+                                   config.mDisplay.width,
+                                   config.mDisplay.height,
+                                   &format),
+    nullptr);
 
   RefPtr<MediaDataDecoder> decoder = MediaPrefs::PDMAndroidRemoteCodecEnabled() ?
       RemoteDataDecoder::CreateVideoDecoder(config,
