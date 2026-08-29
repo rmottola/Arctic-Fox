@@ -13,7 +13,9 @@ EXPORTS += [
     'MediaTelemetryConstants.h',
     'PDMFactory.h',
     'PlatformDecoderModule.h',
-    'wrappers/H264Converter.h'
+    'wrappers/H264Converter.h',
+    'wrappers/MediaDataDecoderProxy.h'
+
 ]
 
 UNIFIED_SOURCES += [
@@ -25,7 +27,8 @@ UNIFIED_SOURCES += [
     'agnostic/VPXDecoder.cpp',
     'agnostic/WAVDecoder.cpp',
     'PDMFactory.cpp',
-    'wrappers/H264Converter.cpp'
+    'wrappers/H264Converter.cpp',
+    'wrappers/MediaDataDecoderProxy.cpp'
 ]
 
 DIRS += [
