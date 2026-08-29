@@ -807,11 +807,6 @@ private:
     }
   }
 
-  void EnterDormant()
-  {
-    SetState<DormantState>();
-  }
-
   void StartDormantTimer()
   {
     if (!mMaster->mMediaSeekable) {
@@ -826,7 +821,7 @@ private:
       return;
     } else if (timeout == 0) {
       // Enter dormant immediately without scheduling a timer.
-      EnterDormant();
+      SetState<DormantState>();
       return;
     }
 
@@ -836,7 +831,7 @@ private:
     mDormantTimer.Ensure(target,
       [this] () {
         mDormantTimer.CompleteRequest();
-        EnterDormant();
+        SetState<DormantState>();
       }, [this] () {
         mDormantTimer.CompleteRequest();
       });
