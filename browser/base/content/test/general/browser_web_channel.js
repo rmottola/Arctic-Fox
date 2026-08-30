@@ -38,7 +38,7 @@ let gTests = [
     run: function* () {
       return new Promise(function(resolve, reject) {
         let tab;
-        let channel = new WebChannel("twoway", Services.io.newURI(HTTP_PATH, null, null));
+        let channel = new WebChannel("twoway", Services.io.newURI(HTTP_PATH));
 
         channel.listen(function (id, message, sender) {
           is(id, "twoway", "bad id");
@@ -65,7 +65,7 @@ let gTests = [
     run: function* () {
       return new Promise(function(resolve, reject) {
         let tab;
-        let channel = new WebChannel("multichannel", Services.io.newURI(HTTP_PATH, null, null));
+        let channel = new WebChannel("multichannel", Services.io.newURI(HTTP_PATH));
 
         channel.listen(function (id, message, sender) {
           is(id, "multichannel");

@@ -501,7 +501,7 @@ var gAdvancedPane = {
 
     let usage = 0;
     for (let group of groups) {
-      let uri = Services.io.newURI(group, null, null);
+      let uri = Services.io.newURI(group);
       if (perm.matchesURI(uri, true)) {
         let cache = cacheService.getActiveCache(groups);
         usage += cache.usage;
@@ -598,7 +598,7 @@ var gAdvancedPane = {
                            getService(Components.interfaces.nsIApplicationCacheService);
         var groups = cacheService.getGroups();
         for (var i = 0; i < groups.length; i++) {
-          var uri = Services.io.newURI(groups[i], null, null);
+          var uri = Services.io.newURI(groups[i]);
           if (perm.matchesURI(uri, true)) {
             var cache = cacheService.getActiveCache(groups[i]);
             cache.discard();

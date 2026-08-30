@@ -264,7 +264,7 @@ function getHost(uri, href) {
   let host;
   try {
     if (!uri) {
-      uri = Services.io.newURI(href, null, null);
+      uri = Services.io.newURI(href);
     }
     host = uri.host;
   } catch (ex) {}
@@ -286,7 +286,7 @@ function prompt(aBrowser, aRequest) {
   let {audioDevices: audioDevices, videoDevices: videoDevices,
        sharingScreen: sharingScreen, sharingAudio: sharingAudio,
        requestTypes: requestTypes} = aRequest;
-  let uri = Services.io.newURI(aRequest.documentURI, null, null);
+  let uri = Services.io.newURI(aRequest.documentURI);
   let host = getHost(uri);
   let chromeDoc = aBrowser.ownerDocument;
   let chromeWin = chromeDoc.defaultView;
@@ -914,7 +914,7 @@ function updateBrowserSpecificIndicator(aBrowser, aState) {
     accessKey: stringBundle.getString("getUserMedia.stopSharing.accesskey"),
     callback: function () {
       let uris = aBrowser._devicePermissionURIs || [];
-      uris = uris.concat(Services.io.newURI(aState.documentURI, null, null));
+      uris = uris.concat(Services.io.newURI(aState.documentURI));
       let perms = Services.perms;
       for (let uri of uris) {
         if (aState.camera &&

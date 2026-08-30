@@ -75,7 +75,7 @@ function createURI(uri)
 {
   let ioServ = Cc["@mozilla.org/network/io-service;1"]
                   .getService(Components.interfaces.nsIIOService);
-  return ioServ.newURI(uri, null, null);
+  return ioServ.newURI(uri);
 }
 
 function getCacheStorage(where, lci, appcache)

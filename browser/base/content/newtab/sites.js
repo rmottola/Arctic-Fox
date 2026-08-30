@@ -149,7 +149,7 @@ Site.prototype = {
     if (this.link.endTime && this.link.endTime < Date.now()) {
        let oldUrl = this.url;
        // chop off the path part from url
-       this.link.url = Services.io.newURI(this.url, null, null).resolve("/");
+       this.link.url = Services.io.newURI(this.url).resolve("/");
        // clear supplied images - this triggers thumbnail download for new url
        delete this.link.imageURI;
        delete this.link.enhancedImageURI;

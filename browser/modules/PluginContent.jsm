@@ -28,10 +28,10 @@ this.PluginContent = function(global) {
 }
 
 const FLASH_MIME_TYPE = "application/x-shockwave-flash";
-const REPLACEMENT_STYLE_SHEET = Services.io.newURI("chrome://pluginproblem/content/pluginReplaceBinding.css", null, null);
+const REPLACEMENT_STYLE_SHEET = Services.io.newURI("chrome://pluginproblem/content/pluginReplaceBinding.css");
 
 PluginContent.prototype = {
-  init: function(global) {
+  init(global) {
     this.global = global;
     // Need to hold onto the content window or else it'll get destroyed
     this.content = this.global.content;

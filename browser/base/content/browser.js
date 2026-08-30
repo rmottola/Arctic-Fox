@@ -3298,7 +3298,7 @@ function getDetailedCertErrorInfo(location, securityInfo) {
   let flags = PrivateBrowsingUtils.isWindowPrivate(window) ?
               Ci.nsISocketProvider.NO_PERMANENT_STORAGE : 0;
 
-  let uri = Services.io.newURI(location, null, null);
+  let uri = Services.io.newURI(location);
 
   let hasHSTS = sss.isSecureHost(sss.HEADER_HSTS, uri.host, flags);
   let hasHPKP = sss.isSecureHost(sss.HEADER_HPKP, uri.host, flags);
@@ -6381,7 +6381,7 @@ var OfflineApps = {
 
     let usage = 0;
     for (let group of groups) {
-      let uri = Services.io.newURI(group, null, null);
+      let uri = Services.io.newURI(group);
       if (uri.asciiHost == host) {
         let cache = cacheService.getActiveCache(group);
         usage += cache.usage;
@@ -7923,7 +7923,7 @@ function switchToTabHavingURI(aURI, aOpenNew, aOpenParams = {}) {
 
   // This can be passed either nsIURI or a string.
   if (!(aURI instanceof Ci.nsIURI))
-    aURI = Services.io.newURI(aURI, null, null);
+    aURI = Services.io.newURI(aURI);
 
   let isBrowserWindow = !!window.gBrowser;
 
