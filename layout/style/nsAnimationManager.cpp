@@ -23,6 +23,8 @@
 #include "nsIFrame.h"
 #include "nsIDocument.h"
 #include "nsDOMMutationObserver.h"
+#include "nsIPresShell.h"
+#include "nsIPresShellInlines.h"
 #include <algorithm> // std::stable_sort
 #include <math.h>
 
@@ -434,7 +436,7 @@ nsAnimationManager::UpdateAnimations(nsStyleContext* aStyleContext,
   // or the next time somebody calls
   // nsPresShell::FlushPendingNotifications.
   if (mEventDispatcher.HasQueuedEvents()) {
-    mPresContext->Document()->SetNeedStyleFlush();
+    mPresContext->PresShell()->SetNeedStyleFlush();
   }
 }
 
