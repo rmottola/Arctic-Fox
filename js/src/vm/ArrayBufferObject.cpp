@@ -265,7 +265,7 @@ ArrayBufferObject::fun_isView(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-// new ArrayBuffer(byteLength) - ECMA-262 draft (2016 Mar 19) 24.1.2.1
+// ES2017 draft 24.1.2.1
 bool
 ArrayBufferObject::class_constructor(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -275,23 +275,18 @@ ArrayBufferObject::class_constructor(JSContext* cx, unsigned argc, Value* vp)
     if (!ThrowIfNotConstructing(cx, args, "ArrayBuffer"))
         return false;
 
-    // Step 2. ES6 specifies that `new ArrayBuffer()` without arguments should
-    // throw, but it's a bug.
-    double length = 0;
-    if (args.hasDefined(0)) {
-        if (!ToNumber(cx, args[0], &length))
-            return false;
-    }
+    // Step 2.
+    uint64_t byteLength;
+    if (!ToIndex(cx, args.get(0), &byteLength))
+        return false;
 
-    // Steps 3-4. Also refuse to allocate buffers 1GiB or larger.
-    double byteLength = ToLength(length);
-    const double SIZE_LIMIT = 1024.0 * 1024 * 1024;
-    if (length != byteLength || byteLength >= SIZE_LIMIT) {
+    // Non-standard: Refuse to allocate buffers larger than ~2 GiB.
+    if (byteLength > INT32_MAX) {
         JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BAD_ARRAY_LENGTH);
         return false;
     }
 
-    // Step 5.
+    // Step 3.
     RootedObject proto(cx);
     RootedObject newTarget(cx, &args.newTarget().toObject());
     if (!GetPrototypeFromConstructor(cx, newTarget, &proto))
