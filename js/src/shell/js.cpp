@@ -3195,9 +3195,9 @@ NewSandbox(JSContext* cx, bool lazy)
         RootedValue value(cx, BooleanValue(lazy));
         if (!JS_SetProperty(cx, obj, "lazy", value))
             return nullptr;
-    }
 
-    JS_FireOnNewGlobalObject(cx, obj);
+        JS_FireOnNewGlobalObject(cx, obj);
+    }
 
     if (!cx->compartment()->wrap(cx, &obj))
         return nullptr;
@@ -7088,9 +7088,9 @@ NewGlobalObject(JSContext* cx, JS::CompartmentOptions& options,
 
         /* Initialize FakeDOMObject.prototype */
         InitDOMObject(domProto);
-    }
 
-    JS_FireOnNewGlobalObject(cx, glob);
+        JS_FireOnNewGlobalObject(cx, glob);
+    }
 
     return glob;
 }

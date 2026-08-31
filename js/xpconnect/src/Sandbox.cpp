@@ -1223,6 +1223,7 @@ xpc::CreateSandboxObject(JSContext* cx, MutableHandleValue vp, nsISupports* prin
 
     xpc::SetSandboxMetadata(cx, sandbox, options.metadata);
 
+    JSAutoCompartment ac(cx, sandbox);
     JS_FireOnNewGlobalObject(cx, sandbox);
 
     return NS_OK;
