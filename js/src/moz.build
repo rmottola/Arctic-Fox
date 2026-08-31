@@ -587,6 +587,7 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
 if CONFIG['OS_ARCH'] == 'WINNT':
     SOURCES += [
         'jit/ExecutableAllocatorWin.cpp',
+        'threading/windows/CpuCount.cpp',
         'threading/windows/Thread.cpp',
     ]
     # _CRT_RAND_S must be #defined before #including stdlib.h to get rand_s()
@@ -594,6 +595,7 @@ if CONFIG['OS_ARCH'] == 'WINNT':
 else:
     SOURCES += [
         'jit/ExecutableAllocatorPosix.cpp',
+        'threading/posix/CpuCount.cpp',
         'threading/posix/Thread.cpp',
     ]
 
