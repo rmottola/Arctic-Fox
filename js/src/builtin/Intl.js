@@ -1394,8 +1394,7 @@ var collatorKeyMappings = {
 /**
  * Compute an internal properties object from |lazyCollatorData|.
  */
-function resolveCollatorInternals(lazyCollatorData)
-{
+function resolveCollatorInternals(lazyCollatorData) {
     assert(IsObject(lazyCollatorData), "lazy data not an object?");
 
     var internalProps = std_Object_create(null);
@@ -1481,10 +1480,12 @@ function resolveCollatorInternals(lazyCollatorData)
 
 
 /**
- * Returns an object containing the Collator internal properties of |obj|, or
- * throws a TypeError if |obj| isn't Collator-initialized.
+ * Returns an object containing the Collator internal properties of |obj|.
  */
 function getCollatorInternals(obj, methodName) {
+    assert(IsObject(obj), "getCollatorInternals called with non-object");
+    assert(IsCollator(obj), "getCollatorInternals called with non-Collator");
+
     var internals = getIntlObjectInternals(obj, "Collator", methodName);
     assert(internals.type === "Collator", "bad type escaped getIntlObjectInternals");
 
@@ -1512,11 +1513,12 @@ function getCollatorInternals(obj, methodName) {
  * Spec: ECMAScript Internationalization API Specification, 10.1.1.
  */
 function InitializeCollator(collator, locales, options) {
-    assert(IsObject(collator), "InitializeCollator");
+    assert(IsObject(collator), "InitializeCollator called with non-object");
+    assert(IsCollator(collator), "InitializeCollator called with non-Collator");
 
-    // Step 1.
-    if (isInitializedIntlObject(collator))
-        ThrowTypeError(JSMSG_INTL_OBJECT_REINITED);
+    // Steps 1-2 (These steps are no longer required and should be removed
+    // from the spec; https://github.com/tc39/ecma402/issues/115).
+    assert(!isInitializedIntlObject(collator), "collator mustn't be initialized");
 
     // Step 2.
     var internals = initializeIntlObject(collator);
@@ -1685,6 +1687,9 @@ function collatorCompareToBind(x, y) {
  */
 function Intl_Collator_compare_get() {
     // Check "this Collator object" per introduction of section 10.3.
+    if (!IsObject(this) || !IsCollator(this))
+        ThrowTypeError(JSMSG_INTL_OBJECT_NOT_INITED, "Collator", "compare", "Collator");
+
     var internals = getCollatorInternals(this, "compare");
 
     // Step 1.
@@ -1692,7 +1697,7 @@ function Intl_Collator_compare_get() {
         // Step 1.a.
         var F = collatorCompareToBind;
 
-        // Step 1.b-d.
+        // Steps 1.b-d.
         var bc = callFunction(FunctionBind, F, this);
         internals.boundCompare = bc;
     }
@@ -1709,6 +1714,9 @@ function Intl_Collator_compare_get() {
  */
 function Intl_Collator_resolvedOptions() {
     // Check "this Collator object" per introduction of section 10.3.
+    if (!IsObject(this) || !IsCollator(this))
+        ThrowTypeError(JSMSG_INTL_OBJECT_NOT_INITED, "Collator", "resolvedOptions", "Collator");
+
     var internals = getCollatorInternals(this, "resolvedOptions");
 
     var result = {
