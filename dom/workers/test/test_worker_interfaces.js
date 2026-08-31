@@ -26,6 +26,7 @@ var ecmaGlobals =
   [
     "Array",
     "ArrayBuffer",
+    "Atomics",
     "Boolean",
     "DataView",
     "Date",
