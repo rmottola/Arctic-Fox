@@ -1624,6 +1624,7 @@ Evaluate(JSContext* cx, unsigned argc, Value* vp)
     bool catchTermination = false;
     bool loadBytecode = false;
     bool saveBytecode = false;
+    bool saveIncrementalBytecode = false;
     bool assertEqBytecode = false;
     RootedObject callerGlobal(cx, cx->global());
 
@@ -1687,6 +1688,11 @@ Evaluate(JSContext* cx, unsigned argc, Value* vp)
         if (!v.isUndefined())
             saveBytecode = ToBoolean(v);
 
+        if (!JS_GetProperty(cx, opts, "saveIncrementalBytecode", &v))
+            return false;
+        if (!v.isUndefined())
+            saveIncrementalBytecode = ToBoolean(v);
+
         if (!JS_GetProperty(cx, opts, "assertEqBytecode", &v))
             return false;
         if (!v.isUndefined())
@@ -1694,10 +1700,15 @@ Evaluate(JSContext* cx, unsigned argc, Value* vp)
 
         // We cannot load or save the bytecode if we have no object where the
         // bytecode cache is stored.
-        if (loadBytecode || saveBytecode) {
+        if (loadBytecode || saveBytecode || saveIncrementalBytecode) {
             if (!cacheEntry) {
                 JS_ReportErrorNumberASCII(cx, my_GetErrorMessage, nullptr, JSSMSG_INVALID_ARGS,
                                           "evaluate");
+                return false;
+            }
+            if (saveIncrementalBytecode && saveBytecode) {
+                JS_ReportErrorASCII(cx, "saveIncrementalBytecode and saveBytecode cannot be used"
+                                    " at the same time.");
                 return false;
             }
         }
@@ -1777,6 +1788,15 @@ Evaluate(JSContext* cx, unsigned argc, Value* vp)
             if (!script->scriptSource()->setSourceMapURL(cx, smurl))
                 return false;
         }
+
+        // If we want to save the bytecode incrementally, then we should
+        // register ahead the fact that every JSFunction which is being
+        // delazified should be encoded at the end of the delazification.
+        if (saveIncrementalBytecode) {
+            if (!StartIncrementalEncoding(cx, saveBuffer, script))
+                return false;
+        }
+
         if (!JS_ExecuteScript(cx, script, args.rval())) {
             if (catchTermination && !JS_IsExceptionPending(cx)) {
                 JSAutoCompartment ac1(cx, callerGlobal);
@@ -1789,14 +1809,22 @@ Evaluate(JSContext* cx, unsigned argc, Value* vp)
             return false;
         }
 
+        // Encode the bytecode after the execution of the script.
         if (saveBytecode) {
             JS::TranscodeResult rv = JS::EncodeScript(cx, saveBuffer, script);
             if (!ConvertTranscodeResultToJSException(cx, rv))
                 return false;
         }
+
+        // Serialize the encoded bytecode, recorded before the execution, into a
+        // buffer which can be deserialized linearly.
+        if (saveIncrementalBytecode) {
+            if (!FinishIncrementalEncoding(cx, script))
+                return false;
+        }
     }
 
-    if (saveBytecode) {
+    if (saveBytecode || saveIncrementalBytecode) {
         // If we are both loading and saving, we assert that we are going to
         // replace the current bytecode by the same stream of bytes.
         if (loadBytecode && assertEqBytecode) {
