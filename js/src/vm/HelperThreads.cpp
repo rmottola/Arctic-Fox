@@ -21,6 +21,7 @@
 #include "vm/SharedImmutableStringsCache.h"
 #include "vm/Time.h"
 #include "vm/TraceLogging.h"
+#include "vm/Xdr.h"
 
 #include "jscntxtinlines.h"
 #include "jscompartmentinlines.h"
@@ -305,6 +306,18 @@ ParseTask::ParseTask(ParseTaskKind kind, ExclusiveContext* cx, JSObject* exclusi
 {
 }
 
+ParseTask::ParseTask(ParseTaskKind kind, ExclusiveContext* cx, JSObject* exclusiveContextGlobal,
+                     JSContext* initCx, JS::TranscodeBuffer& buffer, size_t cursor,
+                     JS::OffThreadCompileCallback callback, void* callbackData)
+  : kind(kind), cx(cx), options(initCx), buffer(&buffer), cursor(cursor),
+    alloc(JSRuntime::TEMP_LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
+    exclusiveContextGlobal(exclusiveContextGlobal),
+    callback(callback), callbackData(callbackData),
+    script(nullptr), sourceObject(nullptr),
+    errors(cx), overRecursed(false), outOfMemory(false)
+{
+}
+
 bool
 ParseTask::init(JSContext* cx, const ReadOnlyCompileOptions& options)
 {
@@ -388,6 +401,29 @@ ModuleParseTask::parse()
     ModuleObject* module = frontend::CompileModule(cx, options, srcBuf, alloc, &sourceObject);
     if (module)
         script = module->script();
+}
+
+ScriptDecodeTask::ScriptDecodeTask(ExclusiveContext* cx, JSObject* exclusiveContextGlobal,
+                                   JSContext* initCx, JS::TranscodeBuffer& buffer, size_t cursor,
+                                   JS::OffThreadCompileCallback callback, void* callbackData)
+  : ParseTask(ParseTaskKind::ScriptDecode, cx, exclusiveContextGlobal, initCx,
+              buffer, cursor, callback, callbackData)
+{
+}
+
+void
+ScriptDecodeTask::parse()
+{
+    RootedScript resultScript(cx);
+    XDROffThreadDecoder decoder(cx, alloc, &options, /* sourceObjectOut = */ &sourceObject,
+                                *buffer, cursor);
+    decoder.codeScript(&resultScript);
+    MOZ_ASSERT(bool(resultScript) == (decoder.resultCode() == JS::TranscodeResult_Ok));
+    if (decoder.resultCode() == JS::TranscodeResult_Ok) {
+        script = resultScript.get();
+    } else {
+        sourceObject = nullptr;
+    }
 }
 
 void
@@ -616,6 +652,18 @@ js::StartOffThreadParseModule(JSContext* cx, const ReadOnlyCompileOptions& optio
                                          callback, callbackData);
     };
     return StartOffThreadParseTask(cx, options, ParseTaskKind::Module, functor);
+}
+
+bool
+js::StartOffThreadDecodeScript(JSContext* cx, const ReadOnlyCompileOptions& options,
+                               JS::TranscodeBuffer& buffer, size_t cursor,
+                               JS::OffThreadCompileCallback callback, void* callbackData)
+{
+    auto functor = [&](ExclusiveContext* helpercx, JSObject* global) -> ScriptDecodeTask* {
+        return cx->new_<ScriptDecodeTask>(helpercx, global, cx, buffer, cursor,
+                                          callback, callbackData);
+    };
+    return StartOffThreadParseTask(cx, options, ParseTaskKind::ScriptDecode, functor);
 }
 
 void
@@ -1263,6 +1311,14 @@ JSScript*
 GlobalHelperThreadState::finishScriptParseTask(JSContext* cx, void* token)
 {
     JSScript* script = finishParseTask(cx, ParseTaskKind::Script, token);
+    MOZ_ASSERT_IF(script, script->isGlobalCode());
+    return script;
+}
+
+JSScript*
+GlobalHelperThreadState::finishScriptDecodeTask(JSContext* cx, void* token)
+{
+    JSScript* script = finishParseTask(cx, ParseTaskKind::ScriptDecode, token);
     MOZ_ASSERT_IF(script, script->isGlobalCode());
     return script;
 }
