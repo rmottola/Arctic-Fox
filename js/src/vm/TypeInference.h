@@ -542,6 +542,11 @@ static const uintptr_t BaseTypeInferenceMagic = 0xa1a2b3b4c5c6d7d8;
 static const uintptr_t TypeConstraintMagic = BaseTypeInferenceMagic + 1;
 static const uintptr_t ConstraintTypeSetMagic = BaseTypeInferenceMagic + 2;
 
+#ifdef JS_CRASH_DIAGNOSTICS
+extern MOZ_NORETURN MOZ_COLD MOZ_NEVER_INLINE void
+ReportMagicWordFailure(uintptr_t actual, uintptr_t expected);
+#endif
+
 /*
  * A constraint which listens to additions to a type set and propagates those
  * changes to other type sets.
@@ -566,7 +571,8 @@ class TypeConstraint
 
     void checkMagic() const {
 #ifdef JS_CRASH_DIAGNOSTICS
-        MOZ_RELEASE_ASSERT(magic_ == TypeConstraintMagic);
+        if (MOZ_UNLIKELY(magic_ != TypeConstraintMagic))
+            ReportMagicWordFailure(magic_, TypeConstraintMagic);
 #endif
     }
 
@@ -668,7 +674,8 @@ class ConstraintTypeSet : public TypeSet
 
     void checkMagic() const {
 #ifdef JS_CRASH_DIAGNOSTICS
-        MOZ_RELEASE_ASSERT(magic_ == ConstraintTypeSetMagic);
+        if (MOZ_UNLIKELY(magic_ != ConstraintTypeSetMagic))
+            ReportMagicWordFailure(magic_, ConstraintTypeSetMagic);
 #endif
     }
 
