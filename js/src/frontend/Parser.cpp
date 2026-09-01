@@ -620,7 +620,7 @@ ParserBase::extraWarning(unsigned errorNumber, ...)
 {
     va_list args;
     va_start(args, errorNumber);
-    bool result = tokenStream.reportStrictWarningErrorNumberVA(pos().begin, errorNumber, args);
+    bool result = tokenStream.reportExtraWarningErrorNumberVA(pos().begin, errorNumber, args);
     va_end(args);
     return result;
 }
@@ -664,7 +664,7 @@ ParserBase::reportNoOffset(ParseReportKind kind, bool strict, unsigned errorNumb
             tokenStream.reportCompileErrorNumberVA(offset, JSREPORT_WARNING, errorNumber, args);
         break;
       case ParseExtraWarning:
-        result = tokenStream.reportStrictWarningErrorNumberVA(offset, errorNumber, args);
+        result = tokenStream.reportExtraWarningErrorNumberVA(offset, errorNumber, args);
         break;
       case ParseStrictError:
         result = tokenStream.reportStrictModeErrorNumberVA(offset, strict, errorNumber, args);
