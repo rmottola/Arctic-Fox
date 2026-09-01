@@ -500,8 +500,10 @@ jit::FinishOffThreadBuilder(JSRuntime* runtime, IonBuilder* builder,
 
     // Clean up if compilation did not succeed.
     if (builder->script()->isIonCompilingOffThread()) {
-        IonScript* ion =
-            builder->abortReason() == AbortReason::Disable ? ION_DISABLED_SCRIPT : nullptr;
+        IonScript* ion = nullptr;
+        AbortReasonOr<Ok> status = builder->getOffThreadStatus();
+        if (status.isErr() && status.unwrapErr() == AbortReason::Disable)
+            ion = ION_DISABLED_SCRIPT;
         builder->script()->setIonScript(runtime, ion);
     }
 
@@ -2262,15 +2264,15 @@ IonCompile(JSContext* cx, JSScript* script,
 
     SpewBeginFunction(builder, builderScript);
 
-    bool succeeded;
+    AbortReasonOr<Ok> buildResult = Ok();
     {
         AutoEnterAnalysis enter(cx);
-        succeeded = builder->build();
+        buildResult = builder->build();
         builder->clearForBackEnd();
     }
 
-    if (!succeeded) {
-        AbortReason reason = builder->abortReason();
+    if (buildResult.isErr()) {
+        AbortReason reason = buildResult.unwrapErr();
         builder->graphSpewer().endFunction();
         if (reason == AbortReason::PreliminaryObjects) {
             // Some group was accessed which has associated preliminary objects
@@ -2330,6 +2332,7 @@ IonCompile(JSContext* cx, JSScript* script,
         return AbortReason::NoAbort;
     }
 
+    bool succeeded = false;
     {
         ScopedJSDeletePtr<CodeGenerator> codegen;
         AutoEnterAnalysis enter(cx);

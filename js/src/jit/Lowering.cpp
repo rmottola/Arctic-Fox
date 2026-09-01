@@ -508,7 +508,7 @@ LIRGenerator::visitCall(MCall* call)
 
     // In case of oom, skip the rest of the allocations.
     if (!lowerCallArguments(call)) {
-        gen->abort("OOM: LIRGenerator::visitCall");
+        abort(AbortReason::Alloc, "OOM: LIRGenerator::visitCall");
         return;
     }
 
@@ -4328,7 +4328,7 @@ LIRGenerator::visitWasmCall(MWasmCall* ins)
 
     LAllocation* args = gen->allocate<LAllocation>(ins->numOperands());
     if (!args) {
-        gen->abort("Couldn't allocate for MWasmCall");
+        abort(AbortReason::Alloc, "Couldn't allocate for MWasmCall");
         return;
     }
 
@@ -4783,7 +4783,7 @@ LIRGenerator::visitInstruction(MInstruction* ins)
     if (LOsiPoint* osiPoint = popOsiPoint())
         add(osiPoint);
 
-    return !gen->errored();
+    return !errored();
 }
 
 void
