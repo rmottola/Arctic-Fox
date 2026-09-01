@@ -1583,6 +1583,8 @@ SetPropIRGenerator::tryAttachStub()
                 return true;
             if (tryAttachTypedObjectProperty(obj, objId, id, rhsValId))
                 return true;
+            if (tryAttachSetArrayLength(obj, objId, id, rhsValId))
+                return true;
         }
         return false;
     }
@@ -1827,6 +1829,19 @@ SetPropIRGenerator::tryAttachSetter(HandleObject obj, ObjOperandId objId, Handle
     }
 
     EmitCallSetterResultNoGuards(writer, obj, holder, shape, objId, rhsId);
+    return true;
+}
+
+bool
+SetPropIRGenerator::tryAttachSetArrayLength(HandleObject obj, ObjOperandId objId, HandleId id,
+                                            ValOperandId rhsId)
+{
+    if (!obj->is<ArrayObject>() || !JSID_IS_ATOM(id, cx_->names().length))
+        return false;
+
+    writer.guardClass(objId, GuardClassKind::Array);
+    writer.callSetArrayLength(objId, IsStrictSetPC(pc_), rhsId);
+    writer.returnFromIC();
     return true;
 }
 
