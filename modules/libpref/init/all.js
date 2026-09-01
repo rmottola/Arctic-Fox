@@ -5907,3 +5907,8 @@ pref("dom.storageManager.enabled", false);
 // be blocked (automatically canceled) for that page. The counter resets
 // when the page is reloaded. To turn this feature off, just set the limit to 0.
 pref("prompts.authentication_dialog_abuse_limit", 3);
+
+#ifdef FUZZING
+pref("fuzzing.enabled", false);
+#endif
+

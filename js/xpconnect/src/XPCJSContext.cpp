@@ -1479,6 +1479,10 @@ ReloadPrefsCallback(const char* pref, void* data)
     }
 #endif // JS_GC_ZEAL
 
+#ifdef FUZZING
+    bool fuzzingEnabled = Preferences::GetBool("fuzzing.enabled");
+#endif
+
     JS::ContextOptionsRef(cx).setBaseline(useBaseline)
                              .setIon(useIon)
                              .setAsmJS(useAsmJS)
@@ -1490,6 +1494,9 @@ ReloadPrefsCallback(const char* pref, void* data)
                              .setThrowOnDebuggeeWouldRun(throwOnDebuggeeWouldRun)
                              .setDumpStackOnDebuggeeWouldRun(dumpStackOnDebuggeeWouldRun)
                              .setWerror(werror)
+#ifdef FUZZING
+                             .setFuzzing(fuzzingEnabled)
+#endif
                              .setExtraWarnings(extraWarnings);
 
     JS_SetParallelParsingEnabled(cx, parallelParsing);
