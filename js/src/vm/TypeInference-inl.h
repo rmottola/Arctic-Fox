@@ -934,6 +934,8 @@ TypeSet::setBaseObjectCount(uint32_t count)
 inline void
 HeapTypeSet::newPropertyState(ExclusiveContext* cxArg)
 {
+    checkMagic();
+
     /* Propagate the change to all constraints. */
     if (JSContext* cx = cxArg->maybeJSContext()) {
         TypeConstraint* constraint = constraintList();
@@ -949,6 +951,8 @@ HeapTypeSet::newPropertyState(ExclusiveContext* cxArg)
 inline void
 HeapTypeSet::setNonDataProperty(ExclusiveContext* cx)
 {
+    checkMagic();
+
     if (flags & TYPE_FLAG_NON_DATA_PROPERTY)
         return;
 
@@ -959,6 +963,8 @@ HeapTypeSet::setNonDataProperty(ExclusiveContext* cx)
 inline void
 HeapTypeSet::setNonWritableProperty(ExclusiveContext* cx)
 {
+    checkMagic();
+
     if (flags & TYPE_FLAG_NON_WRITABLE_PROPERTY)
         return;
 
@@ -969,6 +975,8 @@ HeapTypeSet::setNonWritableProperty(ExclusiveContext* cx)
 inline void
 HeapTypeSet::setNonConstantProperty(ExclusiveContext* cx)
 {
+    checkMagic();
+
     if (flags & TYPE_FLAG_NON_CONSTANT_PROPERTY)
         return;
 
@@ -1094,6 +1102,7 @@ ObjectGroup::getProperty(ExclusiveContext* cx, JSObject* obj, jsid id)
         markUnknown(cx);
     }
 
+    base->types.checkMagic();
     return &base->types;
 }
 
@@ -1107,7 +1116,11 @@ ObjectGroup::maybeGetProperty(jsid id)
     Property* prop = TypeHashSet::Lookup<jsid, Property, Property>
                          (propertySet, basePropertyCount(), id);
 
-    return prop ? &prop->types : nullptr;
+    if (!prop)
+        return nullptr;
+
+    prop->types.checkMagic();
+    return &prop->types;
 }
 
 inline unsigned
@@ -1123,11 +1136,16 @@ inline ObjectGroup::Property*
 ObjectGroup::getProperty(unsigned i)
 {
     MOZ_ASSERT(i < getPropertyCount());
+    Property* result;
     if (basePropertyCount() == 1) {
         MOZ_ASSERT(i == 0);
-        return (Property*) propertySet;
+        result = (Property*) propertySet;
+    } else {
+        result = propertySet[i];
     }
-    return propertySet[i];
+    if (result)
+        result->types.checkMagic();
+    return result;
 }
 
 } // namespace js
