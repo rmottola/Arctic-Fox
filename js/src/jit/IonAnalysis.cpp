@@ -4193,7 +4193,7 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, HandleFunction fun,
     if (!builder.build()) {
         if (cx->isThrowingOverRecursed() || cx->isThrowingOutOfMemory())
             return false;
-        if (builder.abortReason() == AbortReason_Alloc) {
+        if (builder.abortReason() == AbortReason::Alloc) {
             ReportOutOfMemory(cx);
             return false;
         }
@@ -4431,7 +4431,7 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
     if (!builder.build()) {
         if (cx->isThrowingOverRecursed() || cx->isThrowingOutOfMemory())
             return false;
-        if (builder.abortReason() == AbortReason_Alloc) {
+        if (builder.abortReason() == AbortReason::Alloc) {
             ReportOutOfMemory(cx);
             return false;
         }
