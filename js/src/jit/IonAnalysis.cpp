@@ -4518,6 +4518,7 @@ jit::MarkLoopBlocks(MIRGraph& graph, MBasicBlock* header, bool* canOsr)
         // A block not marked by the time we reach it is not in the loop.
         if (!block->isMarked())
             continue;
+
         // This block is in the loop; trace to its predecessors.
         for (size_t p = 0, e = block->numPredecessors(); p != e; ++p) {
             MBasicBlock* pred = block->getPredecessor(p);
@@ -4552,7 +4553,7 @@ jit::MarkLoopBlocks(MIRGraph& graph, MBasicBlock* header, bool* canOsr)
 
                     // If the nested loop is not contiguous, we may have already
                     // passed its backedge. If this happens, back up.
-                    if (backedge->id() > block->id()) {
+                    if (innerBackedge->id() > block->id()) {
                         i = graph.poBegin(innerBackedge);
                         --i;
                     }
