@@ -1483,9 +1483,3 @@ AutoAssertNoContentJS::~AutoAssertNoContentJS()
 {
     context_->runtime()->allowContentJS_ = prevAllowContentJS_;
 }
-
-JS_FRIEND_API(bool)
-js::AllowGCBarriers(JSContext* cx)
-{
-    return cx->allowGCBarriers();
-}
