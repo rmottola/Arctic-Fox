@@ -1290,10 +1290,9 @@ PrepareAndExecuteRegExp(JSContext* cx, MacroAssembler& masm, Register regexp, Re
         volatileRegs.add(regexp);
 
 #ifdef JS_TRACE_LOGGING
-    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
     if (TraceLogTextIdEnabled(TraceLogger_IrregexpExecute)) {
         masm.push(temp1);
-        masm.movePtr(ImmPtr(logger), temp1);
+        masm.loadTraceLogger(temp1);
         masm.tracelogStartId(temp1, TraceLogger_IrregexpExecute);
         masm.pop(temp1);
     }
@@ -1309,7 +1308,7 @@ PrepareAndExecuteRegExp(JSContext* cx, MacroAssembler& masm, Register regexp, Re
 
 #ifdef JS_TRACE_LOGGING
     if (TraceLogTextIdEnabled(TraceLogger_IrregexpExecute)) {
-        masm.movePtr(ImmPtr(logger), temp1);
+        masm.loadTraceLogger(temp1);
         masm.tracelogStopId(temp1, TraceLogger_IrregexpExecute);
     }
 #endif
@@ -7839,8 +7838,6 @@ JitRuntime::generateTLEventVM(JSContext* cx, MacroAssembler& masm, const VMFunct
                               bool enter)
 {
 #ifdef JS_TRACE_LOGGING
-    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
-
     bool vmEventEnabled = TraceLogTextIdEnabled(TraceLogger_VM);
     bool vmSpecificEventEnabled = TraceLogTextIdEnabled(TraceLogger_VMSpecific);
 
@@ -7848,7 +7845,7 @@ JitRuntime::generateTLEventVM(JSContext* cx, MacroAssembler& masm, const VMFunct
         AllocatableRegisterSet regs(RegisterSet::Volatile());
         Register loggerReg = regs.takeAnyGeneral();
         masm.Push(loggerReg);
-        masm.movePtr(ImmPtr(logger), loggerReg);
+        masm.loadTraceLogger(loggerReg);
 
         if (vmEventEnabled) {
             if (enter)
@@ -7857,7 +7854,7 @@ JitRuntime::generateTLEventVM(JSContext* cx, MacroAssembler& masm, const VMFunct
                 masm.tracelogStopId(loggerReg, TraceLogger_VM, /* force = */ true);
         }
         if (vmSpecificEventEnabled) {
-            TraceLoggerEvent event(logger, f.name());
+            TraceLoggerEvent event(f.name());
             if (!event.hasPayload())
                 return false;
 
@@ -9816,11 +9813,9 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
 
 #ifdef JS_TRACE_LOGGING
     bool TLFailed = false;
-    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
 
     for (uint32_t i = 0; i < patchableTLEvents_.length(); i++) {
-        // Create an event on the mainthread.
-        TraceLoggerEvent event(logger, patchableTLEvents_[i].event);
+        TraceLoggerEvent event(patchableTLEvents_[i].event);
         if (!event.hasPayload() || !ionScript->addTraceLoggerEvent(event)) {
             TLFailed = true;
             break;
@@ -9832,7 +9827,7 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
 
     if (!TLFailed && patchableTLScripts_.length() > 0) {
         MOZ_ASSERT(TraceLogTextIdEnabled(TraceLogger_Scripts));
-        TraceLoggerEvent event(logger, TraceLogger_Scripts, script);
+        TraceLoggerEvent event(TraceLogger_Scripts, script);
         if (!event.hasPayload() || !ionScript->addTraceLoggerEvent(event))
             TLFailed = true;
         if (!TLFailed) {
@@ -9843,16 +9838,6 @@ CodeGenerator::link(JSContext* cx, CompilerConstraintList* constraints)
                                                    ImmPtr((void*)0));
             }
         }
-    }
-
-    if (!TLFailed) {
-        for (uint32_t i = 0; i < patchableTraceLoggers_.length(); i++) {
-            Assembler::PatchDataWithValueCheck(CodeLocationLabel(code, patchableTraceLoggers_[i]),
-                                               ImmPtr(logger),
-                                               ImmPtr(nullptr));
-        }
-    } else {
-        TraceLoggerSilentFail(logger, "OOM when trying to patch ion log events.");
     }
 #endif
 

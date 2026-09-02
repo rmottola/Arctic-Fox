@@ -1550,7 +1550,7 @@ HelperThread::handleIonWorkload(AutoLockHelperThreadState& locked)
         AutoUnlockHelperThreadState unlock(locked);
 
         TraceLoggerThread* logger = TraceLoggerForCurrentThread();
-        TraceLoggerEvent event(logger, TraceLogger_AnnotateScripts, builder->script());
+        TraceLoggerEvent event(TraceLogger_AnnotateScripts, builder->script());
         AutoTraceLog logScript(logger, event);
         AutoTraceLog logCompile(logger, TraceLogger_IonCompilation);
 
@@ -1597,19 +1597,17 @@ HelperThread::handleIonWorkload(AutoLockHelperThreadState& locked)
     }
 }
 
-static HelperThread*
-CurrentHelperThread()
+HelperThread*
+js::CurrentHelperThread()
 {
+    if (!HelperThreadState().threads)
+        return nullptr;
     auto threadId = ThisThread::GetId();
-    HelperThread* thread = nullptr;
     for (auto& thisThread : *HelperThreadState().threads) {
-        if (thisThread.thread.isSome() && threadId == thisThread.thread->get_id()) {
-            thread = &thisThread;
-            break;
-        }
+        if (thisThread.thread.isSome() && threadId == thisThread.thread->get_id())
+            return &thisThread;
     }
-    MOZ_ASSERT(thread);
-    return thread;
+    return nullptr;
 }
 
 void
@@ -1619,6 +1617,7 @@ js::PauseCurrentHelperThread()
     AutoTraceLog logPaused(logger, TraceLogger_IonCompilationPaused);
 
     HelperThread* thread = CurrentHelperThread();
+    MOZ_ASSERT(thread);
 
     AutoLockHelperThreadState lock;
     while (thread->pause)
