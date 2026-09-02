@@ -4488,7 +4488,7 @@ GCRuntime::findZoneGroups(AutoLockForExclusiveAccess& lock)
     zoneGroupIndex = 0;
 
     for (GCZonesIter zone(rt); !zone.done(); zone.next())
-        zone->gcZoneGroupEdges.clear();
+        zone->gcZoneGroupEdges().clear();
 
     for (Zone* head = currentZoneGroup; head; head = head->nextGroup()) {
         for (Zone* zone = head; zone; zone = zone->nextNodeInGroup())
@@ -7326,10 +7326,10 @@ JS::IsIncrementalGCInProgress(JSContext* cx)
 JS_PUBLIC_API(bool)
 JS::IsIncrementalBarrierNeeded(JSContext* cx)
 {
-    if (cx->isHeapBusy())
+    if (JS::CurrentThreadIsHeapBusy())
         return false;
 
-    auto state = cx->gc.state();
+    auto state = cx->runtime()->gc.state();
     return state != gc::State::NotActive && state <= gc::State::Sweep;
 }
 
