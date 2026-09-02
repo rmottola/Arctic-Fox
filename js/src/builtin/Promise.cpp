@@ -2679,7 +2679,7 @@ js::EnqueuePromiseReactions(JSContext* cx, Handle<PromiseObject*> promise,
 }
 
 PromiseTask::PromiseTask(JSContext* cx, Handle<PromiseObject*> promise)
-  : runtime_(cx),
+  : runtime_(cx->runtime()),
     promise_(cx, promise)
 {}
 
@@ -2691,7 +2691,7 @@ PromiseTask::~PromiseTask()
 void
 PromiseTask::finish(JSContext* cx)
 {
-    MOZ_ASSERT(cx == runtime_);
+    MOZ_ASSERT(cx->runtime() == runtime_);
     {
         // We can't leave a pending exception when returning to the caller so do
         // the same thing as Gecko, which is to ignore the error. This should
@@ -2706,7 +2706,7 @@ PromiseTask::finish(JSContext* cx)
 void
 PromiseTask::cancel(JSContext* cx)
 {
-    MOZ_ASSERT(cx == runtime_);
+    MOZ_ASSERT(cx->runtime() == runtime_);
     js_delete(this);
 }
 

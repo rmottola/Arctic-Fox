@@ -861,7 +861,7 @@ js::ObjectMayHaveExtraIndexedProperties(JSObject* obj)
 }
 
 static bool
-AddLengthProperty(ExclusiveContext* cx, HandleArrayObject obj)
+AddLengthProperty(JSContext* cx, HandleArrayObject obj)
 {
     /*
      * Add the 'length' property for a newly created array,
@@ -3383,7 +3383,7 @@ const Class ArrayObject::class_ = {
  */
 
 static inline bool
-EnsureNewArrayElements(ExclusiveContext* cx, ArrayObject* obj, uint32_t length)
+EnsureNewArrayElements(JSContext* cx, ArrayObject* obj, uint32_t length)
 {
     /*
      * If ensureElements creates dynamically allocated slots, then having
@@ -3401,22 +3401,21 @@ EnsureNewArrayElements(ExclusiveContext* cx, ArrayObject* obj, uint32_t length)
 
 template <uint32_t maxLength>
 static MOZ_ALWAYS_INLINE ArrayObject*
-NewArray(ExclusiveContext* cxArg, uint32_t length,
+NewArray(JSContext* cx, uint32_t length,
          HandleObject protoArg, NewObjectKind newKind = GenericObject)
 {
     gc::AllocKind allocKind = GuessArrayGCKind(length);
     MOZ_ASSERT(CanBeFinalizedInBackground(allocKind, &ArrayObject::class_));
     allocKind = GetBackgroundAllocKind(allocKind);
 
-    RootedObject proto(cxArg, protoArg);
-    if (!proto && !GetBuiltinPrototype(cxArg, JSProto_Array, &proto))
+    RootedObject proto(cx, protoArg);
+    if (!proto && !GetBuiltinPrototype(cx, JSProto_Array, &proto))
         return nullptr;
 
-    Rooted<TaggedProto> taggedProto(cxArg, TaggedProto(proto));
-    bool isCachable = NewObjectWithTaggedProtoIsCachable(cxArg, taggedProto, newKind, &ArrayObject::class_);
+    Rooted<TaggedProto> taggedProto(cx, TaggedProto(proto));
+    bool isCachable = NewObjectWithTaggedProtoIsCachable(cx, taggedProto, newKind, &ArrayObject::class_);
     if (isCachable) {
-        JSContext* cx = cxArg->asJSContext();
-        NewObjectCache& cache = cx->caches.newObjectCache;
+        NewObjectCache& cache = cx->caches().newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
         if (cache.lookupProto(&ArrayObject::class_, proto, allocKind, &entry)) {
             gc::InitialHeap heap = GetInitialHeap(newKind, &ArrayObject::class_);
@@ -3437,8 +3436,8 @@ NewArray(ExclusiveContext* cxArg, uint32_t length,
         }
     }
 
-    RootedObjectGroup group(cxArg, ObjectGroup::defaultNewGroup(cxArg, &ArrayObject::class_,
-                                                                TaggedProto(proto)));
+    RootedObjectGroup group(cx, ObjectGroup::defaultNewGroup(cx, &ArrayObject::class_,
+                                                             TaggedProto(proto)));
     if (!group)
         return nullptr;
 
@@ -3446,40 +3445,40 @@ NewArray(ExclusiveContext* cxArg, uint32_t length,
      * Get a shape with zero fixed slots, regardless of the size class.
      * See JSObject::createArray.
      */
-    RootedShape shape(cxArg, EmptyShape::getInitialShape(cxArg, &ArrayObject::class_,
-                                                         TaggedProto(proto),
-                                                         gc::AllocKind::OBJECT0));
+    RootedShape shape(cx, EmptyShape::getInitialShape(cx, &ArrayObject::class_,
+                                                      TaggedProto(proto),
+                                                      gc::AllocKind::OBJECT0));
     if (!shape)
         return nullptr;
 
-    AutoSetNewObjectMetadata metadata(cxArg);
-    RootedArrayObject arr(cxArg, ArrayObject::createArray(cxArg, allocKind,
-                                                          GetInitialHeap(newKind, &ArrayObject::class_),
-                                                          shape, group, length, metadata));
+    AutoSetNewObjectMetadata metadata(cx);
+    RootedArrayObject arr(cx, ArrayObject::createArray(cx, allocKind,
+                                                       GetInitialHeap(newKind, &ArrayObject::class_),
+                                                       shape, group, length, metadata));
     if (!arr)
         return nullptr;
 
     if (shape->isEmptyShape()) {
-        if (!AddLengthProperty(cxArg, arr))
+        if (!AddLengthProperty(cx, arr))
             return nullptr;
         shape = arr->lastProperty();
-        EmptyShape::insertInitialShape(cxArg, shape, proto);
+        EmptyShape::insertInitialShape(cx, shape, proto);
     }
 
-    if (newKind == SingletonObject && !JSObject::setSingleton(cxArg, arr))
+    if (newKind == SingletonObject && !JSObject::setSingleton(cx, arr))
         return nullptr;
 
     if (isCachable) {
-        NewObjectCache& cache = cxArg->asJSContext()->caches.newObjectCache;
+        NewObjectCache& cache = cx->caches().newObjectCache;
         NewObjectCache::EntryIndex entry = -1;
         cache.lookupProto(&ArrayObject::class_, proto, allocKind, &entry);
         cache.fillProto(entry, &ArrayObject::class_, taggedProto, allocKind, arr);
     }
 
-    if (maxLength > 0 && !EnsureNewArrayElements(cxArg, arr, std::min(maxLength, length)))
+    if (maxLength > 0 && !EnsureNewArrayElements(cx, arr, std::min(maxLength, length)))
         return nullptr;
 
-    probes::CreateObject(cxArg, arr);
+    probes::CreateObject(cx, arr);
     return arr;
 }
 
@@ -3491,7 +3490,7 @@ js::NewDenseEmptyArray(JSContext* cx, HandleObject proto /* = nullptr */,
 }
 
 ArrayObject * JS_FASTCALL
-js::NewDenseFullyAllocatedArray(ExclusiveContext* cx, uint32_t length,
+js::NewDenseFullyAllocatedArray(JSContext* cx, uint32_t length,
                                 HandleObject proto /* = nullptr */,
                                 NewObjectKind newKind /* = GenericObject */)
 {
@@ -3499,7 +3498,7 @@ js::NewDenseFullyAllocatedArray(ExclusiveContext* cx, uint32_t length,
 }
 
 ArrayObject * JS_FASTCALL
-js::NewDensePartlyAllocatedArray(ExclusiveContext* cx, uint32_t length,
+js::NewDensePartlyAllocatedArray(JSContext* cx, uint32_t length,
                                  HandleObject proto /* = nullptr */,
                                  NewObjectKind newKind /* = GenericObject */)
 {
@@ -3507,7 +3506,7 @@ js::NewDensePartlyAllocatedArray(ExclusiveContext* cx, uint32_t length,
 }
 
 ArrayObject * JS_FASTCALL
-js::NewDenseUnallocatedArray(ExclusiveContext* cx, uint32_t length,
+js::NewDenseUnallocatedArray(JSContext* cx, uint32_t length,
                              HandleObject proto /* = nullptr */,
                              NewObjectKind newKind /* = GenericObject */)
 {
@@ -3516,7 +3515,7 @@ js::NewDenseUnallocatedArray(ExclusiveContext* cx, uint32_t length,
 
 // values must point at already-rooted Value objects
 ArrayObject*
-js::NewDenseCopiedArray(ExclusiveContext* cx, uint32_t length, const Value* values,
+js::NewDenseCopiedArray(JSContext* cx, uint32_t length, const Value* values,
                         HandleObject proto /* = nullptr */,
                         NewObjectKind newKind /* = GenericObject */)
 {
@@ -3578,7 +3577,7 @@ js::NewDenseCopyOnWriteArray(JSContext* cx, HandleArrayObject templateObject, gc
 // the given [[Prototype]].
 template <uint32_t maxLength>
 static inline JSObject*
-NewArrayTryUseGroup(ExclusiveContext* cx, HandleObjectGroup group, size_t length,
+NewArrayTryUseGroup(JSContext* cx, HandleObjectGroup group, size_t length,
                     NewObjectKind newKind = GenericObject)
 {
     MOZ_ASSERT(newKind != SingletonObject);
@@ -3614,14 +3613,14 @@ NewArrayTryUseGroup(ExclusiveContext* cx, HandleObjectGroup group, size_t length
 }
 
 JSObject*
-js::NewFullyAllocatedArrayTryUseGroup(ExclusiveContext* cx, HandleObjectGroup group, size_t length,
+js::NewFullyAllocatedArrayTryUseGroup(JSContext* cx, HandleObjectGroup group, size_t length,
                                       NewObjectKind newKind)
 {
     return NewArrayTryUseGroup<UINT32_MAX>(cx, group, length, newKind);
 }
 
 JSObject*
-js::NewPartlyAllocatedArrayTryUseGroup(ExclusiveContext* cx, HandleObjectGroup group, size_t length)
+js::NewPartlyAllocatedArrayTryUseGroup(JSContext* cx, HandleObjectGroup group, size_t length)
 {
     return NewArrayTryUseGroup<ArrayObject::EagerAllocationMaxLength>(cx, group, length);
 }
@@ -3684,7 +3683,7 @@ js::NewPartlyAllocatedArrayForCallingAllocationSite(JSContext* cx, size_t length
 }
 
 bool
-js::MaybeAnalyzeBeforeCreatingLargeArray(ExclusiveContext* cx, HandleObjectGroup group,
+js::MaybeAnalyzeBeforeCreatingLargeArray(JSContext* cx, HandleObjectGroup group,
                                          const Value* vp, size_t length)
 {
     static const size_t EagerPreliminaryObjectAnalysisThreshold = 800;
@@ -3713,7 +3712,7 @@ js::MaybeAnalyzeBeforeCreatingLargeArray(ExclusiveContext* cx, HandleObjectGroup
 }
 
 JSObject*
-js::NewCopiedArrayTryUseGroup(ExclusiveContext* cx, HandleObjectGroup group,
+js::NewCopiedArrayTryUseGroup(JSContext* cx, HandleObjectGroup group,
                               const Value* vp, size_t length, NewObjectKind newKind,
                               ShouldUpdateTypes updateTypes)
 {
@@ -3732,7 +3731,7 @@ js::NewCopiedArrayTryUseGroup(ExclusiveContext* cx, HandleObjectGroup group,
         return obj;
 
     MOZ_ASSERT(obj->is<UnboxedArrayObject>());
-    if (!UnboxedArrayObject::convertToNative(cx->asJSContext(), obj))
+    if (!UnboxedArrayObject::convertToNative(cx, obj))
         return nullptr;
 
     result = SetOrExtendBoxedOrUnboxedDenseElements<JSVAL_TYPE_MAGIC>(cx, obj, 0, vp, length,

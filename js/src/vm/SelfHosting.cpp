@@ -2749,7 +2749,7 @@ JSRuntime::initSelfHosting(JSContext* cx)
      * Self hosted state can be accessed from threads for other runtimes
      * parented to this one, so cannot include state in the nursery.
      */
-    JS::AutoDisableGenerationalGC disable(cx->runtime());
+    JS::AutoDisableGenerationalGC disable(cx);
 
     Rooted<GlobalObject*> shg(cx, JSRuntime::createSelfHostingGlobal(cx));
     if (!shg)
@@ -2799,7 +2799,7 @@ void
 JSRuntime::traceSelfHostingGlobal(JSTracer* trc)
 {
     if (selfHostingGlobal_ && !parentRuntime)
-        TraceRoot(trc, &selfHostingGlobal_, "self-hosting global");
+        TraceRoot(trc, const_cast<NativeObject**>(&selfHostingGlobal_.ref()), "self-hosting global");
 }
 
 bool
@@ -3109,7 +3109,7 @@ JSRuntime::getUnclonedSelfHostedValue(JSContext* cx, HandlePropertyName name,
                                       MutableHandleValue vp)
 {
     RootedId id(cx, NameToId(name));
-    return GetUnclonedValue(cx, HandleNativeObject::fromMarkedLocation(&selfHostingGlobal_), id, vp);
+    return GetUnclonedValue(cx, HandleNativeObject::fromMarkedLocation(&selfHostingGlobal_.ref()), id, vp);
 }
 
 JSFunction*

@@ -448,9 +448,6 @@ template <class> struct MatchContext { };
 template <> struct MatchContext<JSContext*> {
     static const bool valid = true;
 };
-template <> struct MatchContext<ExclusiveContext*> {
-    static const bool valid = true;
-};
 
 // Extract the last element of a list of types.
 template <typename... ArgTypes>
