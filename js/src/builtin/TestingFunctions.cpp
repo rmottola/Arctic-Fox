@@ -976,7 +976,7 @@ AbortGC(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    cx->runtime()->gc.abortGC();
+    JS::AbortIncrementalGC(cx);
     args.rval().setUndefined();
     return true;
 }
