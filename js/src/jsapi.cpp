@@ -4140,7 +4140,7 @@ JS::CancelOffThreadScript(JSContext* cx, void* token)
 {
     MOZ_ASSERT(cx);
     MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
-    HelperThreadState().cancelParseTask(cx, ParseTaskKind::Script, token);
+    HelperThreadState().cancelParseTask(cx->runtime(), ParseTaskKind::Script, token);
 }
 
 JS_PUBLIC_API(bool)
@@ -4165,7 +4165,7 @@ JS::CancelOffThreadModule(JSContext* cx, void* token)
 {
     MOZ_ASSERT(cx);
     MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
-    HelperThreadState().cancelParseTask(cx, ParseTaskKind::Module, token);
+    HelperThreadState().cancelParseTask(cx->runtime(), ParseTaskKind::Module, token);
 }
 
 JS_PUBLIC_API(bool)
@@ -4190,7 +4190,7 @@ JS::CancelOffThreadScriptDecoder(JSContext* cx, void* token)
 {
     MOZ_ASSERT(cx);
     MOZ_ASSERT(CurrentThreadCanAccessRuntime(cx->runtime()));
-    HelperThreadState().cancelParseTask(cx, ParseTaskKind::ScriptDecode, token);
+    HelperThreadState().cancelParseTask(cx->runtime(), ParseTaskKind::ScriptDecode, token);
 }
 
 JS_PUBLIC_API(bool)
