@@ -1035,7 +1035,7 @@ JSContext::~JSContext()
 {
 #ifdef XP_WIN
     if (threadNative_)
-        CloseHandle((HANDLE)threadNative_);
+        CloseHandle((HANDLE)threadNative_.ref());
 #endif
 
     /* Free the stuff hanging off of cx. */
@@ -1058,6 +1058,18 @@ JSContext::~JSContext()
 
     if (TlsContext.get() == this)
         TlsContext.set(nullptr);
+}
+
+void
+JSContext::setRuntime(JSRuntime* rt)
+{
+    MOZ_ASSERT(!resolvingList);
+    MOZ_ASSERT(!compartment());
+    MOZ_ASSERT(!activation());
+    MOZ_ASSERT(!unwrappedException_.ref().initialized());
+    MOZ_ASSERT(!asyncStackForNewActivations_.ref().initialized());
+
+    runtime_ = rt;
 }
 
 bool
