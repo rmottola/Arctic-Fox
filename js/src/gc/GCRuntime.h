@@ -691,8 +691,6 @@ class GCRuntime
         allocTask.cancel(GCParallelTask::CancelAndWait);
     }
 
-    void requestMinorGC(JS::gcreason::Reason reason);
-
 #ifdef DEBUG
     bool onBackgroundThread() { return helperState.onBackgroundThread(); }
 #endif // DEBUG
@@ -777,9 +775,7 @@ class GCRuntime
     bool areGrayBitsValid() const { return grayBitsValid; }
     void setGrayBitsInvalid() { grayBitsValid = false; }
 
-    bool minorGCRequested() const { return minorGCTriggerReason != JS::gcreason::NO_REASON; }
     bool majorGCRequested() const { return majorGCTriggerReason != JS::gcreason::NO_REASON; }
-    bool isGcNeeded() { return minorGCRequested() || majorGCRequested(); }
 
     bool fullGCForAtomsRequested() const { return fullGCForAtomsRequested_; }
 
@@ -934,7 +930,8 @@ class GCRuntime
     void endSweepingZoneGroup();
     IncrementalProgress sweepPhase(SliceBudget& sliceBudget, AutoLockForExclusiveAccess& lock);
     void endSweepPhase(bool lastGC, AutoLockForExclusiveAccess& lock);
-    void sweepZones(FreeOp* fop, bool lastGC);
+    void sweepZones(FreeOp* fop, ZoneGroup* group, bool lastGC);
+    void sweepZoneGroups(FreeOp* fop, bool destroyingRuntime);
     void decommitAllWithoutUnlocking(const AutoLockGC& lock);
     void startDecommit();
     void queueZonesForBackgroundSweep(ZoneList& zones);
@@ -1077,9 +1074,6 @@ class GCRuntime
     UnprotectedData<bool> grayBitsValid;
 
     mozilla::Atomic<JS::gcreason::Reason, mozilla::Relaxed> majorGCTriggerReason;
-
-  public:
-    ActiveThreadData<JS::gcreason::Reason> minorGCTriggerReason;
 
   private:
     /* Perform full GC if rt->keepAtoms() becomes false. */
