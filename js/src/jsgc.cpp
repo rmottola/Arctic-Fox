@@ -7505,6 +7505,7 @@ static bool
 ZoneGCHeapGrowthFactorGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
+    AutoLockGC lock(cx->runtime());
     args.rval().setNumber(cx->zone()->threshold.gcHeapGrowthFactor());
     return true;
 }
