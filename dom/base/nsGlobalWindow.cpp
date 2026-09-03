@@ -2526,7 +2526,7 @@ CreateNativeGlobalForInner(JSContext* aCx,
   }
 
   if (top && top->GetGlobalJSObject()) {
-    options.creationOptions().setSameZoneAs(top->GetGlobalJSObject());
+    options.creationOptions().setExistingZone(top->GetGlobalJSObject());
   }
 
   options.creationOptions().setSecureContext(aIsSecureContext);
