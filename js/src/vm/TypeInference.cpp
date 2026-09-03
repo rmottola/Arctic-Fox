@@ -515,7 +515,7 @@ ConstraintTypeSet::addConstraint(JSContext* cx, TypeConstraint* constraint, bool
         return false;
     }
 
-    MOZ_ASSERT(cx->zone()->types.activeAnalysis);
+    MOZ_RELEASE_ASSERT(cx->zone()->types.activeAnalysis);
     MOZ_ASSERT(CompartmentsMatch(maybeCompartment(), constraint->maybeCompartment()));
 
     InferSpew(ISpewOps, "addConstraint: %sT%p%s %sC%p%s %s",
@@ -690,7 +690,7 @@ ConstraintTypeSet::addType(JSContext* cx, Type type)
 {
     checkMagic();
 
-    MOZ_ASSERT(cx->zone()->types.activeAnalysis);
+    MOZ_RELEASE_ASSERT(cx->zone()->types.activeAnalysis);
 
     if (hasType(type))
         return;
@@ -1226,7 +1226,7 @@ class TypeCompilerConstraint : public TypeConstraint
     bool sweep(TypeZone& zone, TypeConstraint** res) {
         if (data.shouldSweep() || compilation.shouldSweep(zone))
             return false;
-        *res = zone.typeLifoAlloc.ref().new_<TypeCompilerConstraint<T> >(compilation, data);
+        *res = zone.typeLifoAlloc().new_<TypeCompilerConstraint<T> >(compilation, data);
         return true;
     }
 
@@ -1415,7 +1415,7 @@ class TypeConstraintFreezeStack : public TypeConstraint
     bool sweep(TypeZone& zone, TypeConstraint** res) {
         if (IsAboutToBeFinalizedUnbarriered(&script_))
             return false;
-        *res = zone.typeLifoAlloc.ref().new_<TypeConstraintFreezeStack>(script_);
+        *res = zone.typeLifoAlloc().new_<TypeConstraintFreezeStack>(script_);
         return true;
     }
 
@@ -3186,7 +3186,7 @@ class TypeConstraintClearDefiniteGetterSetter : public TypeConstraint
     bool sweep(TypeZone& zone, TypeConstraint** res) {
         if (IsAboutToBeFinalizedUnbarriered(&group))
             return false;
-        *res = zone.typeLifoAlloc.ref().new_<TypeConstraintClearDefiniteGetterSetter>(group);
+        *res = zone.typeLifoAlloc().new_<TypeConstraintClearDefiniteGetterSetter>(group);
         return true;
     }
 
@@ -3245,7 +3245,7 @@ class TypeConstraintClearDefiniteSingle : public TypeConstraint
     bool sweep(TypeZone& zone, TypeConstraint** res) {
         if (IsAboutToBeFinalizedUnbarriered(&group))
             return false;
-        *res = zone.typeLifoAlloc.ref().new_<TypeConstraintClearDefiniteSingle>(group);
+        *res = zone.typeLifoAlloc().new_<TypeConstraintClearDefiniteSingle>(group);
         return true;
     }
 
@@ -3678,7 +3678,7 @@ TypeNewScript::make(JSContext* cx, ObjectGroup* group, JSFunction* fun)
 TypeNewScript::makeNativeVersion(JSContext* cx, TypeNewScript* newScript,
                                  PlainObject* templateObject)
 {
-    MOZ_ASSERT(cx->zone()->types.activeAnalysis);
+    MOZ_RELEASE_ASSERT(cx->zone()->types.activeAnalysis);
 
     ScopedJSDeletePtr<TypeNewScript> nativeNewScript(cx->new_<TypeNewScript>());
     if (!nativeNewScript)
@@ -4173,7 +4173,7 @@ ConstraintTypeSet::trace(Zone* zone, JSTracer* trc)
             AutoEnterOOMUnsafeRegion oomUnsafe;
             ObjectKey** pentry =
                 TypeHashSet::Insert<ObjectKey*, ObjectKey, ObjectKey>
-                    (zone->types.typeLifoAlloc.ref(), objectSet, objectCount, key);
+                    (zone->types.typeLifoAlloc(), objectSet, objectCount, key);
             if (!pentry)
                 oomUnsafe.crash("ConstraintTypeSet::trace");
 
@@ -4227,7 +4227,7 @@ ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
             if (!IsObjectKeyAboutToBeFinalized(&key)) {
                 ObjectKey** pentry =
                     TypeHashSet::Insert<ObjectKey*, ObjectKey, ObjectKey>
-                        (zone->types.typeLifoAlloc.ref(), objectSet, objectCount, key);
+                        (zone->types.typeLifoAlloc(), objectSet, objectCount, key);
                 if (pentry) {
                     *pentry = key;
                 } else {
@@ -4280,7 +4280,7 @@ ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
         TypeConstraint* copy;
         if (constraint->sweep(zone->types, &copy)) {
             if (copy) {
-                MOZ_ASSERT(zone->types.typeLifoAlloc.ref().contains(copy));
+                MOZ_ASSERT(zone->types.typeLifoAlloc().contains(copy));
                 copy->setNext(constraintList_);
                 constraintList_ = copy;
             } else {
@@ -4354,7 +4354,7 @@ ObjectGroup::sweep(AutoClearTypeInferenceStateOnOOM* oom)
     if (newScript())
         newScript()->sweep();
 
-    LifoAlloc& typeLifoAlloc = zone()->types.typeLifoAlloc.ref();
+    LifoAlloc& typeLifoAlloc = zone()->types.typeLifoAlloc();
 
     /*
      * Properties were allocated from the old arena, and need to be copied over
@@ -4493,7 +4493,7 @@ Zone::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
                              size_t* shapeTables,
                              size_t* atomsMarkBitmaps)
 {
-    *typePool += types.typeLifoAlloc.ref().sizeOfExcludingThis(mallocSizeOf);
+    *typePool += types.typeLifoAlloc().sizeOfExcludingThis(mallocSizeOf);
     if (jitZone()) {
         *baselineStubsOptimized +=
             jitZone()->optimizedStubSpace()->sizeOfExcludingThis(mallocSizeOf);
@@ -4506,7 +4506,7 @@ Zone::addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf,
 
 TypeZone::TypeZone(Zone* zone)
   : zone_(zone),
-    typeLifoAlloc(zone->group(), (size_t) TYPE_LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
+    typeLifoAlloc_(zone->group(), (size_t) TYPE_LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
     generation(zone->group(), 0),
     compilerOutputs(zone->group(), nullptr),
     sweepTypeLifoAlloc(zone->group(), (size_t) TYPE_LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
@@ -4535,7 +4535,7 @@ TypeZone::beginSweep(FreeOp* fop, bool releaseTypes, AutoClearTypeInferenceState
 
     // Clear the analysis pool, but don't release its data yet. While sweeping
     // types any live data will be allocated into the pool.
-    sweepTypeLifoAlloc.ref().steal(&typeLifoAlloc.ref());
+    sweepTypeLifoAlloc.ref().steal(&typeLifoAlloc());
 
     // Sweep any invalid or dead compiler outputs, and keep track of the new
     // index for remaining live outputs.
