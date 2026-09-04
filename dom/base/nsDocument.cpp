@@ -1295,6 +1295,7 @@ nsIDocument::nsIDocument()
     mBidiEnabled(false),
     mMathMLEnabled(false),
     mIsInitialDocumentInWindow(false),
+    mIgnoreDocGroupMismatches(false),
     mLoadedAsData(false),
     mLoadedAsInteractiveData(false),
     mMayStartLayout(true),
@@ -4983,7 +4984,7 @@ nsDocument::BeginUpdate(nsUpdateType aUpdateType)
   // in the wrong DocGroup. We're unlikely to run JS or do anything else
   // observable at this point. We reach this point when cycle collecting a
   // <link> element and the unlink code removes a style sheet.
-  if (mDocGroup && !mIsGoingAway) {
+  if (mDocGroup && !mIsGoingAway && !mIgnoreDocGroupMismatches) {
     mDocGroup->ValidateAccess();
   }
 
@@ -7842,7 +7843,8 @@ nsDocument::GetExistingListenerManager() const
 nsresult
 nsDocument::GetEventTargetParent(EventChainPreVisitor& aVisitor)
 {
-  if (mDocGroup && aVisitor.mEvent->mMessage != eVoidEvent) {
+  if (mDocGroup && aVisitor.mEvent->mMessage != eVoidEvent &&
+      !mIgnoreDocGroupMismatches) {
     mDocGroup->ValidateAccess();
   }
 
