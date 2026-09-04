@@ -1485,3 +1485,15 @@ AutoAssertNoContentJS::~AutoAssertNoContentJS()
 {
     context_->runtime()->allowContentJS_ = prevAllowContentJS_;
 }
+
+JS_FRIEND_API(void)
+js::EnableAccessValidation(JSContext* cx, bool enabled)
+{
+    cx->enableAccessValidation = enabled;
+}
+
+JS_FRIEND_API(void)
+js::SetCompartmentValidAccessPtr(JSContext* cx, JS::HandleObject global, bool* accessp)
+{
+    global->compartment()->setValidAccessPtr(accessp);
+}
