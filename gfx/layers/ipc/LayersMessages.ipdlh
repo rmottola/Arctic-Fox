@@ -490,7 +490,6 @@ union Edit {
   OpCreateCanvasLayer;
   OpCreateRefLayer;
 
-  OpSetLayerAttributes;
   OpSetDiagnosticTypes;
   OpWindowOverlayChanged;
 
@@ -546,6 +545,7 @@ union AsyncParentMessageData {
 struct TransactionInfo
 {
   Edit[] cset;
+  OpSetLayerAttributes[] setAttrs;
   CompositableOperation[] paints;
   OpDestroy[] toDestroy;
   uint64_t fwdTransactionId;
