@@ -32,9 +32,10 @@ class RendererEvent;
 
 class WebRenderAPI
 {
-NS_INLINE_DECL_REFCOUNTING(WebRenderAPI);
+  NS_INLINE_DECL_REFCOUNTING(WebRenderAPI);
+
 public:
-  /// Compositor thread only.
+  /// This can be called on the compositor thread only.
   static already_AddRefed<WebRenderAPI> Create(bool aEnableProfiler,
                                                layers::CompositorBridgeParentBase* aBridge,
                                                RefPtr<widget::CompositorWidget>&& aWidget);
@@ -77,9 +78,9 @@ public:
 
 protected:
   WebRenderAPI(WrAPI* aRawApi, wr::WindowId aId, GLint aMaxTextureSize)
-  : mWrApi(aRawApi)
-  , mId(aId)
-  , mMaxTextureSize(aMaxTextureSize)
+    : mWrApi(aRawApi)
+    , mId(aId)
+    , mMaxTextureSize(aMaxTextureSize)
   {}
 
   ~WebRenderAPI();
@@ -157,7 +158,7 @@ protected:
 Maybe<WrImageFormat>
 SurfaceFormatToWrImageFormat(gfx::SurfaceFormat aFormat);
 
-} // namespace
-} // namespace
+} // namespace wr
+} // namespace mozilla
 
 #endif
