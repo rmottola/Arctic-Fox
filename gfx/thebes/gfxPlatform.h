@@ -661,6 +661,8 @@ public:
      */
     static bool PerfWarnings();
 
+    static void NotifyGPUProcessDisabled();
+
     void NotifyCompositorCreated(mozilla::layers::LayersBackend aBackend);
     mozilla::layers::LayersBackend GetCompositorBackend() const {
       return mCompositorBackend;
@@ -829,6 +831,7 @@ private:
 
     void InitCompositorAccelerationPrefs();
     void InitGPUProcessPrefs();
+    void InitWebRenderConfig();
 
     static bool IsDXInterop2Blocked();
 
