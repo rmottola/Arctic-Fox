@@ -289,8 +289,6 @@ private:
                               void* aCallbackData,
                               EndTransactionFlags);
 
-  bool DependsOnStaleDevice() const;
-
   LayerRefArray mKeepAlive;
 
   nsIWidget* mWidget;

@@ -503,7 +503,6 @@ gfxPlatform::gfxPlatform()
   , mTilesInfoCollector(this, &gfxPlatform::GetTilesSupportInfo)
   , mCompositorBackend(layers::LayersBackend::LAYERS_NONE)
   , mScreenDepth(0)
-  , mDeviceCounter(0)
 {
     mAllowDownloadableFonts = UNINITIALIZED_VALUE;
     mFallbackUsesCmaps = UNINITIALIZED_VALUE;
@@ -2593,12 +2592,6 @@ bool
 gfxPlatform::SupportsApzDragInput() const
 {
   return gfxPrefs::APZDragEnabled();
-}
-
-void
-gfxPlatform::BumpDeviceCounter()
-{
-  mDeviceCounter++;
 }
 
 void
