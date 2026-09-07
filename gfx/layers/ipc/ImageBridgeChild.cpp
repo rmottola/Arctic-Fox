@@ -94,8 +94,7 @@ private:
 struct CompositableTransaction
 {
   CompositableTransaction()
-  : mSwapRequired(false)
-  , mFinished(true)
+  : mFinished(true)
   {}
   ~CompositableTransaction()
   {
@@ -113,7 +112,6 @@ struct CompositableTransaction
   void End()
   {
     mFinished = true;
-    mSwapRequired = false;
     mOperations.clear();
     mDestroyedActors.Clear();
   }
@@ -126,19 +124,9 @@ struct CompositableTransaction
     MOZ_ASSERT(!Finished(), "forgot BeginTransaction?");
     mOperations.push_back(op);
   }
-  void AddEdit(const CompositableOperation& op)
-  {
-    AddNoSwapEdit(op);
-    MarkSyncTransaction();
-  }
-  void MarkSyncTransaction()
-  {
-    mSwapRequired = true;
-  }
 
   OpVector mOperations;
   OpDestroyVector mDestroyedActors;
-  bool mSwapRequired;
   bool mFinished;
 };
 
@@ -587,18 +575,9 @@ ImageBridgeChild::EndTransaction()
     ShadowLayerForwarder::PlatformSyncBeforeUpdate();
   }
 
-  if (mTxn->mSwapRequired) {
-    if (!SendUpdate(cset, mTxn->mDestroyedActors, GetFwdTransactionId())) {
-      NS_WARNING("could not send async texture transaction");
-      return;
-    }
-  } else {
-    // If we don't require a swap we can call SendUpdateNoSwap which
-    // assumes that aReplies is empty (DEBUG assertion)
-    if (!SendUpdateNoSwap(cset, mTxn->mDestroyedActors, GetFwdTransactionId())) {
-      NS_WARNING("could not send async texture transaction (no swap)");
-      return;
-    }
+  if (!SendUpdate(cset, mTxn->mDestroyedActors, GetFwdTransactionId())) {
+    NS_WARNING("could not send async texture transaction");
+    return;
   }
 }
 
