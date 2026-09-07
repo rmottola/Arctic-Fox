@@ -941,7 +941,7 @@ gfxPlatform::InitLayersIPC()
 
     if (XRE_IsParentProcess())
     {
-        if (gfxPrefs::WebRenderEnabled()) {
+        if (gfxPrefs::UseWebRender()) {
             wr::RenderThread::Start();
         }
         layers::CompositorThreadHolder::Start();
@@ -972,7 +972,7 @@ gfxPlatform::ShutdownLayersIPC()
 #endif // defined(MOZ_WIDGET_ANDROID)
         // This has to happen after shutting down the child protocols.
         layers::CompositorThreadHolder::Shutdown();
-        if (gfxPrefs::WebRenderEnabled()) {
+        if (gfxVars::UseWebRender()) {
             wr::RenderThread::ShutDown();
         }
     } else {

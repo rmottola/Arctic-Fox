@@ -191,6 +191,11 @@ GPUParent::RecvInit(nsTArray<GfxPrefSetting>&& prefs,
   }
 #endif
 
+  // Make sure to do this *after* we update gfxVars above.
+  if (gfxVars::UseWebRender()) {
+    wr::RenderThread::Start();
+  }
+
   VRManager::ManagerInit();
   // Send a message to the UI process that we're done.
   GPUDeviceData data;
@@ -411,6 +416,9 @@ GPUParent::ActorDestroy(ActorDestroyReason aWhy)
   }
   dom::VideoDecoderManagerParent::ShutdownVideoBridge();
   CompositorThreadHolder::Shutdown();
+  if (gfxVars::UseWebRender()) {
+    wr::RenderThread::ShutDown();
+  }
   Factory::ShutDown();
 #if defined(XP_WIN)
   DeviceManagerDx::Shutdown();
