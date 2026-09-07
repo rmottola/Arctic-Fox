@@ -401,9 +401,7 @@ WebRenderBridgeParent::ProcessWebrenderCommands(InfallibleTArray<WebRenderComman
         break;
       }
       case WebRenderCommand::TCompositableOperation: {
-        EditReplyVector replyv;
-        if (!ReceiveCompositableUpdate(cmd.get_CompositableOperation(),
-                                       replyv)) {
+        if (!ReceiveCompositableUpdate(cmd.get_CompositableOperation())) {
           NS_ERROR("ReceiveCompositableUpdate failed");
         }
         break;
