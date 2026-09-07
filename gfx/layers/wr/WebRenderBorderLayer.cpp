@@ -38,6 +38,7 @@ WebRenderBorderLayer::RenderLayer()
       OpDPPushStackingContext(wr::ToWrRect(relBounds),
                               wr::ToWrRect(overflow),
                               Nothing(),
+                              1.0f,
                               GetAnimations(),
                               transform,
                               WrMixBlendMode::Normal,
