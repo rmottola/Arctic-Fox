@@ -27,7 +27,6 @@ namespace wr {
 
 class DisplayListBuilder;
 class RendererOGL;
-class NewRenderer;
 class RendererEvent;
 
 class WebRenderAPI
@@ -89,7 +88,6 @@ protected:
   wr::WindowId mId;
   GLint mMaxTextureSize;
 
-  friend class NewRenderer;
   friend class DisplayListBuilder;
 };
 
