@@ -82,9 +82,7 @@ ContentClient::CreateContentClient(CompositableForwarder* aForwarder)
       !gfxVars::UseXRender())
 #endif
   {
-    useDoubleBuffering = (LayerManagerComposite::SupportsDirectTexturing() &&
-                         backend != LayersBackend::LAYERS_D3D9) ||
-                         backend == LayersBackend::LAYERS_BASIC;
+    useDoubleBuffering = backend == LayersBackend::LAYERS_BASIC;
   }
 
   if (useDoubleBuffering || gfxEnv::ForceDoubleBuffering()) {
@@ -321,6 +319,7 @@ ContentClientRemoteBuffer::CreateBackBuffer(const IntRect& aBufferRect)
     AbortTextureClientCreation();
     return;
   }
+  mTextureClient->EnableBlockingReadLock();
 
   if (mTextureFlags & TextureFlags::COMPONENT_ALPHA) {
     mTextureClientOnWhite = mTextureClient->CreateSimilar(
@@ -332,6 +331,7 @@ ContentClientRemoteBuffer::CreateBackBuffer(const IntRect& aBufferRect)
       AbortTextureClientCreation();
       return;
     }
+    mTextureClientOnWhite->EnableBlockingReadLock();
   }
 }
 
