@@ -546,6 +546,7 @@ union AsyncParentMessageData {
 struct TransactionInfo
 {
   Edit[] cset;
+  CompositableOperation[] paints;
   OpDestroy[] toDestroy;
   uint64_t fwdTransactionId;
   uint64_t id;
