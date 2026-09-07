@@ -28,6 +28,7 @@
 #include "mozilla/layers/ImageBridgeParent.h"
 #include "mozilla/layers/LayerTreeOwnerTracker.h"
 #include "mozilla/layers/UiCompositorControllerParent.h"
+#include "mozilla/webrender/RenderThread.h"
 #include "nsDebugImpl.h"
 #include "nsExceptionHandler.h"
 #include "nsThreadManager.h"
