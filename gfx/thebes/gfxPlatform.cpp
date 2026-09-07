@@ -941,7 +941,7 @@ gfxPlatform::InitLayersIPC()
 
     if (XRE_IsParentProcess())
     {
-        if (gfxPrefs::UseWebRender()) {
+        if (gfxVars::UseWebRender()) {
             wr::RenderThread::Start();
         }
         layers::CompositorThreadHolder::Start();
@@ -2229,11 +2229,6 @@ gfxPlatform::InitGPUProcessPrefs()
   // We want to hide this from about:support, so only set a default if the
   // pref is known to be true.
   if (!gfxPrefs::GPUProcessEnabled() && !gfxPrefs::GPUProcessForceEnabled()) {
-    return;
-  }
-
-  // XXX disable GPU proces when webrender is enabled for now.
-  if (gfxPrefs::WebRenderEnabled()) {
     return;
   }
 
