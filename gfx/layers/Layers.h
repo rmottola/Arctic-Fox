@@ -374,12 +374,8 @@ public:
    * Subclasses overriding this method must first call their
    * superclass's impl
    */
-#ifdef DEBUG
-  // In debug builds, we check some properties of |aLayer|.
-  virtual void Mutated(Layer* aLayer);
-#else
   virtual void Mutated(Layer* aLayer) { }
-#endif
+  virtual void MutatedSimple(Layer* aLayer) { }
 
   /**
    * Hints that can be used during PaintedLayer creation to influence the type
@@ -874,7 +870,7 @@ public:
                  "Can't be opaque and require component alpha");
     if (mSimpleAttrs.SetContentFlags(aFlags)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) ContentFlags", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -890,7 +886,7 @@ public:
   {
     if (mSimpleAttrs.SetLayerBounds(aLayerBounds)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) LayerBounds", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1014,7 +1010,7 @@ public:
   {
     if (mSimpleAttrs.SetOpacity(aOpacity)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) Opacity", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1022,7 +1018,7 @@ public:
   {
     if (mSimpleAttrs.SetMixBlendMode(aMixBlendMode)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) MixBlendMode", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1030,7 +1026,7 @@ public:
   {
     if (mSimpleAttrs.SetForceIsolatedGroup(aForceIsolatedGroup)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) ForceIsolatedGroup", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1091,7 +1087,7 @@ public:
   {
     if (mSimpleAttrs.SetScrolledClip(aScrolledClip)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) ScrolledClip", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1161,7 +1157,7 @@ public:
       return;
     }
     MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) BaseTransform", this));
-    Mutated();
+    MutatedSimple();
   }
 
   /**
@@ -1183,7 +1179,7 @@ public:
       return;
     }
     MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) PostScale", this));
-    Mutated();
+    MutatedSimple();
   }
 
   /**
@@ -1196,7 +1192,7 @@ public:
   {
     if (mSimpleAttrs.SetIsFixedPosition(aFixedPosition)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) IsFixedPosition", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1210,7 +1206,7 @@ public:
   {
     if (mSimpleAttrs.SetTransformIsPerspective(aTransformIsPerspective)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) TransformIsPerspective", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1260,7 +1256,7 @@ public:
   {
     if (mSimpleAttrs.SetFixedPositionData(aScrollId, aAnchor, aSides)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) FixedPositionData", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1278,7 +1274,7 @@ public:
   {
     if (mSimpleAttrs.SetStickyPositionData(aScrollId, aOuter, aInner)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) StickyPositionData", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1291,7 +1287,7 @@ public:
   {
     if (mSimpleAttrs.SetScrollbarData(aScrollId, aDir, aThumbRatio)) {
       MOZ_LAYERS_LOG_IF_SHADOWABLE(this, ("Layer::Mutated(%p) ScrollbarData", this));
-      Mutated();
+      MutatedSimple();
     }
   }
 
@@ -1299,8 +1295,16 @@ public:
   void SetIsScrollbarContainer()
   {
     if (mSimpleAttrs.SetIsScrollbarContainer()) {
-      Mutated();
+      MutatedSimple();
     }
+  }
+
+  // Used when forwarding transactions. Do not use at any other time.
+  void SetSimpleAttributes(const SimpleLayerAttributes& aAttrs) {
+    mSimpleAttrs = aAttrs;
+  }
+  const SimpleLayerAttributes& GetSimpleAttributes() const {
+    return mSimpleAttrs;
   }
 
   // These getters can be used anytime.
@@ -1797,9 +1801,11 @@ public:
 
   virtual LayerRenderState GetRenderState() { return LayerRenderState(); }
 
-  void Mutated()
-  {
+  void Mutated() {
     mManager->Mutated(this);
+  }
+  void MutatedSimple() {
+    mManager->MutatedSimple(this);
   }
 
   virtual int32_t GetMaxLayerSize() { return Manager()->GetMaxTextureSize(); }
