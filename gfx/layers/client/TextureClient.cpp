@@ -451,6 +451,35 @@ TextureClient::IsReadLocked() const
 }
 
 bool
+TextureClient::TryReadLock()
+{
+  if (!mReadLock || mIsReadLocked) {
+    return true;
+  }
+
+  if (mReadLock->AsNonBlockingLock()) {
+    if (IsReadLocked()) {
+      return false;
+    }
+  }
+
+  mReadLock->ReadLock();
+  mIsReadLocked = true;
+  return true;
+}
+
+void
+TextureClient::ReadUnlock()
+{
+  if (!mIsReadLocked) {
+    return;
+  }
+  MOZ_ASSERT(mReadLock);
+  mReadLock->ReadUnlock();
+  mIsReadLocked = false;
+ }
+
+bool
 TextureClient::Lock(OpenMode aMode)
 {
   MOZ_ASSERT(IsValid());
@@ -462,7 +491,7 @@ TextureClient::Lock(OpenMode aMode)
     return mOpenMode == aMode;
   }
 
-  if (aMode & OpenMode::OPEN_WRITE && IsReadLocked()) {
+  if (aMode & OpenMode::OPEN_WRITE && !TryReadLock()) {
     NS_WARNING("Attempt to Lock a texture that is being read by the compositor!");
     return false;
   }
@@ -492,6 +521,7 @@ TextureClient::Lock(OpenMode aMode)
 
   if (!mIsLocked) {
     UnlockActor();
+    ReadUnlock();
   }
 
   return mIsLocked;
@@ -537,6 +567,7 @@ TextureClient::Unlock()
   mOpenMode = OpenMode::OPEN_NONE;
 
   UnlockActor();
+  ReadUnlock();
 }
 
 void
@@ -1248,6 +1279,7 @@ TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags, LayersIPCC
 , mExpectedDtRefs(0)
 #endif
 , mIsLocked(false)
+, mIsReadLocked(false)
 , mUpdated(false)
 , mAddedToCompositableClient(false)
 , mWorkaroundAnnoyingSharedSurfaceLifetimeIssues(false)
