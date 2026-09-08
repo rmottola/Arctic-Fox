@@ -1660,7 +1660,6 @@ PluginModuleParent::NotifyPluginCrashed()
 
 PPluginInstanceParent*
 PluginModuleParent::AllocPPluginInstanceParent(const nsCString& aMimeType,
-                                               const uint16_t& aMode,
                                                const InfallibleTArray<nsCString>& aNames,
                                                const InfallibleTArray<nsCString>& aValues)
 {
@@ -2607,7 +2606,7 @@ PluginModuleChromeParent::NP_GetEntryPoints(NPPluginFuncs* pFuncs, NPError* erro
 
 nsresult
 PluginModuleParent::NPP_New(NPMIMEType pluginType, NPP instance,
-                            uint16_t mode, int16_t argc, char* argn[],
+                            int16_t argc, char* argn[],
                             char* argv[], NPSavedData* saved,
                             NPError* error)
 {
@@ -2619,7 +2618,7 @@ PluginModuleParent::NPP_New(NPMIMEType pluginType, NPP instance,
     }
 
     if (mIsStartingAsync) {
-        if (!PluginAsyncSurrogate::Create(this, pluginType, instance, mode,
+        if (!PluginAsyncSurrogate::Create(this, pluginType, instance,
                                           argc, argn, argv)) {
             *error = NPERR_GENERIC_ERROR;
             return NS_ERROR_FAILURE;
@@ -2643,7 +2642,7 @@ PluginModuleParent::NPP_New(NPMIMEType pluginType, NPP instance,
         values.AppendElement(NullableString(argv[i]));
     }
 
-    nsresult rv = NPP_NewInternal(pluginType, instance, mode, names, values,
+    nsresult rv = NPP_NewInternal(pluginType, instance, names, values,
                                   saved, error);
     if (NS_FAILED(rv) || !mIsStartingAsync) {
         return rv;
@@ -2674,7 +2673,6 @@ PluginModuleParent::AccumulateModuleInitBlockedTime()
 
 nsresult
 PluginModuleParent::NPP_NewInternal(NPMIMEType pluginType, NPP instance,
-                                    uint16_t mode,
                                     InfallibleTArray<nsCString>& names,
                                     InfallibleTArray<nsCString>& values,
                                     NPSavedData* saved, NPError* error)
@@ -2770,7 +2768,7 @@ PluginModuleParent::NPP_NewInternal(NPMIMEType pluginType, NPP instance,
     }
 
     if (!SendPPluginInstanceConstructor(parentInstance,
-                                        nsDependentCString(pluginType), mode,
+                                        nsDependentCString(pluginType),
                                         names, values)) {
         // |parentInstance| is automatically deleted.
         instance->pdata = nullptr;
