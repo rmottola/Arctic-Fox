@@ -1343,7 +1343,7 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
   if (lm->AsWebRenderLayerManager()) {
     TextureFactoryIdentifier textureFactoryIdentifier;
     lm->AsWebRenderLayerManager()->Initialize(mCompositorBridgeChild,
-                                              mCompositorSession->RootLayerTreeId(),
+                                              wr::AsPipelineId(mCompositorSession->RootLayerTreeId()),
                                               &textureFactoryIdentifier);
     ImageBridgeChild::IdentifyCompositorTextureHost(textureFactoryIdentifier);
     gfx::VRManagerChild::IdentifyTextureHost(textureFactoryIdentifier);
