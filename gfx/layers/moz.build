@@ -392,6 +392,7 @@ UNIFIED_SOURCES += [
     'wr/WebRenderColorLayer.cpp',
     'wr/WebRenderCompositableHolder.cpp',
     'wr/WebRenderContainerLayer.cpp',
+    'wr/WebRenderDisplayItemLayer.cpp',
     'wr/WebRenderImageHost.cpp',
     'wr/WebRenderImageLayer.cpp',
     'wr/WebRenderLayerManager.cpp',
