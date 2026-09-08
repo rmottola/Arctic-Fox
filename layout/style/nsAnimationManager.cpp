@@ -1023,8 +1023,8 @@ CSSAnimationBuilder::GetComputedValue(nsPresContext* aPresContext,
                "ServoStyleSet should not use nsAnimationManager for "
                "animations");
     mStyleWithoutAnimation = aPresContext->StyleSet()->AsGecko()->
-      ResolveStyleWithoutAnimation(mTarget, mStyleContext,
-                                   eRestyle_AllHintsWithAnimations);
+      ResolveStyleByRemovingAnimation(mTarget, mStyleContext,
+                                      eRestyle_AllHintsWithAnimations);
   }
 
   if (StyleAnimationValue::ExtractComputedValue(aProperty,
