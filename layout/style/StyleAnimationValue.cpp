@@ -691,6 +691,30 @@ AddTransformTranslate(double aCoeff1, const nsCSSValue &aValue1,
                               aResult);
 }
 
+// Unclamped AddWeightedColors.
+static RGBAColorData
+AddWeightedColors(double aCoeff1, const RGBAColorData& aValue1,
+                  double aCoeff2, const RGBAColorData& aValue2)
+{
+  float factor1 = aValue1.mA * aCoeff1;
+  float factor2 = aValue2.mA * aCoeff2;
+  float resultA = factor1 + factor2;
+  if (resultA <= 0.0) {
+    return {0, 0, 0, 0};
+  }
+
+  if (resultA > 1.0) {
+    resultA = 1.0;
+  }
+
+  float resultFactor = 1.0f / resultA;
+  return RGBAColorData(
+    (aValue1.mR * factor1 + aValue2.mR * factor2) * resultFactor,
+    (aValue1.mG * factor1 + aValue2.mG * factor2) * resultFactor,
+    (aValue1.mB * factor1 + aValue2.mB * factor2) * resultFactor,
+    resultA);
+}
+
 // CLASS METHODS
 // -------------
 
@@ -747,10 +771,23 @@ StyleAnimationValue::Add(nsCSSPropertyID aProperty,
 {
   StyleAnimationValue result(Move(aB));
 
-  Unused << AddWeighted(aProperty,
-                        1.0, result,
-                        1, aA,
-                        result);
+  Unit commonUnit =
+    GetCommonUnit(aProperty, result.GetUnit(), aA.GetUnit());
+  switch (commonUnit) {
+    case eUnit_Color: {
+      RGBAColorData color1 = ExtractColor(result);
+      RGBAColorData color2 = ExtractColor(aA);
+      result.mValue.mCSSValue->SetRGBAColorValue(
+        AddWeightedColors(1.0, color1, 1, color2));
+      break;
+    }
+    default:
+      Unused << AddWeighted(aProperty,
+                            1.0, result,
+                            1, aA,
+                            result);
+      break;
+  }
 
   return result;
 }
@@ -779,6 +816,11 @@ StyleAnimationValue::ComputeColorDistance(const RGBAColorData& aStartColor,
   double diffB = startB - endB;
   return sqrt(diffA * diffA + diffR * diffR + diffG * diffG + diffB * diffB);
 }
+
+enum class ColorAdditionType {
+  Clamped, // Clamp each color channel after adding.
+  Unclamped // Do not clamp color channels after adding.
+};
 
 enum class Restrictions {
   Enable,
@@ -1719,35 +1761,6 @@ AddCSSValuePercentNumber(const uint32_t aValueRestrictions,
   float result = (n1 - aInitialVal) * aCoeff1 + (n2 - aInitialVal) * aCoeff2;
   aResult.SetFloatValue(RestrictValue(aValueRestrictions, result + aInitialVal),
                         eCSSUnit_Number);
-}
-
-enum class ColorAdditionType {
-  Clamped, // Clamp each color channel after adding.
-  Unclamped // Do not clamp color channels after adding.
-};
-
-// Unclamped AddWeightedColors.
-static RGBAColorData
-AddWeightedColors(double aCoeff1, const RGBAColorData& aValue1,
-                  double aCoeff2, const RGBAColorData& aValue2)
-{
-  float factor1 = aValue1.mA * aCoeff1;
-  float factor2 = aValue2.mA * aCoeff2;
-  float resultA = factor1 + factor2;
-  if (resultA <= 0.0) {
-    return {0, 0, 0, 0};
-  }
-
-  if (resultA > 1.0) {
-    resultA = 1.0;
-  }
-
-  float resultFactor = 1.0f / resultA;
-  return RGBAColorData(
-    (aValue1.mR * factor1 + aValue2.mR * factor2) * resultFactor,
-    (aValue1.mG * factor1 + aValue2.mG * factor2) * resultFactor,
-    (aValue1.mB * factor1 + aValue2.mB * factor2) * resultFactor,
-    resultA);
 }
 
 // Multiplies |aValue| color by |aDilutionRation|.
@@ -3117,10 +3130,8 @@ StyleAnimationValue::Accumulate(nsCSSPropertyID aProperty,
     case eUnit_Color: {
       RGBAColorData color1 = ExtractColor(result);
       RGBAColorData color2 = ExtractColor(aA);
-      auto resultColor = MakeUnique<nsCSSValue>();
-      resultColor->SetRGBAColorValue(
+      result.mValue.mCSSValue->SetRGBAColorValue(
         AddWeightedColors(1.0, color1, aCount, color2));
-      result.SetAndAdoptCSSValueValue(resultColor.release(), eUnit_Color);
       break;
     }
     case eUnit_Transform: {
