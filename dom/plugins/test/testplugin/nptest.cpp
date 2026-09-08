@@ -862,12 +862,6 @@ NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc, char* 
 
   instanceData->instanceCountWatchGeneration = sCurrentInstanceCountWatchGeneration;
 
-  if (NP_FULL == mode) {
-    instanceData->streamMode = NP_SEEK;
-    instanceData->frame = "testframe";
-    addRange(instanceData, "100,100");
-  }
-
   AsyncDrawing requestAsyncDrawing = AD_NONE;
 
   bool requestWindow = false;
@@ -985,6 +979,29 @@ NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc, char* 
     // value, regardless of whether it is in attributes or params.
     if (strcasecmp(argn[i], "codebase") == 0) {
       instanceData->javaCodebase = argv[i];
+    }
+
+    // Bug 1307694 - There are two flash parameters that are order dependent for
+    // scaling/sizing the plugin. If they ever change from what is expected, it
+    // breaks flash on the web. In a test, if the scale tag ever happens
+    // with an salign before it, fail the plugin creation.
+    if (strcmp(argn[i], "scale") == 0) {
+      if (alreadyHasSalign) {
+        // If salign came before this parameter, error out now.
+        return NPERR_GENERIC_ERROR;
+      }
+    }
+    if (strcmp(argn[i], "salign") == 0) {
+      alreadyHasSalign = true;
+    }
+
+    // We don't support NP_FULL any more, but name="plugin" is an indication
+    // that we're a full-page plugin. We use default seek parameters for
+    // test_fullpage.html
+    if (strcmp(argn[i], "name") == 0 && strcmp(argv[i], "plugin") == 0) {
+      instanceData->streamMode = NP_SEEK;
+      instanceData->frame = "testframe";
+      addRange(instanceData, "100,100");
     }
   }
 
