@@ -4838,13 +4838,11 @@ public:
 
   void ApplyOpacity(nsDisplayListBuilder* aBuilder,
                     float aOpacity,
-                    const DisplayItemClip* aClip) override
+                    const DisplayItemClipChain* aClip) override
   {
     NS_ASSERTION(CanApplyOpacity(), "ApplyOpacity should be allowed");
     mOpacity = aOpacity;
-    if (aClip) {
-      IntersectClip(aBuilder, *aClip);
-    }
+    IntersectClip(aBuilder, aClip);
   }
 
   void WriteDebugInfo(std::stringstream& aStream) override
@@ -4872,9 +4870,7 @@ public:
   bool TryMerge(nsDisplayItem* aItem) override {
     if (aItem->GetType() != TYPE_TEXT)
       return false;
-    if (aItem->GetClip() != GetClip())
-      return false;
-    if (aItem->ScrollClip() != ScrollClip())
+    if (aItem->GetClipChain() != GetClipChain())
       return false;
 
     nsDisplayText* other = static_cast<nsDisplayText*>(aItem);
