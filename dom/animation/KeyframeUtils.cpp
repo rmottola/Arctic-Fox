@@ -834,10 +834,7 @@ ConvertKeyframeSequence(JSContext* aCx,
     }
 
     if (keyframeDict.mComposite.WasPassed()) {
-      // FIXME: Bug 1311620: We don't support additive animation yet.
-      if (keyframeDict.mComposite.Value() != dom::CompositeOperation::Add) {
-        keyframe->mComposite.emplace(keyframeDict.mComposite.Value());
-      }
+      keyframe->mComposite.emplace(keyframeDict.mComposite.Value());
     }
 
     ErrorResult rv;
@@ -1441,10 +1438,7 @@ GetKeyframeListFromPropertyIndexedKeyframe(JSContext* aCx,
 
   Maybe<dom::CompositeOperation> composite;
   if (keyframeDict.mComposite.WasPassed()) {
-    // FIXME: Bug 1311620: We don't support additive animation yet.
-    if (keyframeDict.mComposite.Value() != dom::CompositeOperation::Add) {
-      composite.emplace(keyframeDict.mComposite.Value());
-    }
+    composite.emplace(keyframeDict.mComposite.Value());
   }
 
   Maybe<ComputedTimingFunction> easing =
