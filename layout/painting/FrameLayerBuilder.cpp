@@ -4083,7 +4083,8 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
     if (!bounds.IsEmpty()) {
       if (itemASR != mContainerASR) {
         const DisplayItemClip* clip = DisplayItemClipChain::ClipForASR(item->GetClipChain(), mContainerASR);
-        MOZ_ASSERT(clip, "the item should have finite bounds with respect to mContainerASR.");
+        MOZ_ASSERT(clip || gfxPrefs::LayoutUseContainersForRootFrames(),
+                   "the item should have finite bounds with respect to mContainerASR.");
         if (clip) {
           bounds = clip->GetClipRect();
         }
@@ -5572,6 +5573,12 @@ FrameLayerBuilder::BuildContainerLayerFor(nsDisplayListBuilder* aBuilder,
   const ActiveScrolledRoot* containerASR = aContainerItem ? aContainerItem->GetActiveScrolledRoot() : nullptr;
   const ActiveScrolledRoot* containerScrollMetadataASR = aParameters.mScrollMetadataASR;
   const ActiveScrolledRoot* containerCompositorASR = aParameters.mCompositorASR;
+
+  if (!aContainerItem && gfxPrefs::LayoutUseContainersForRootFrames()) {
+    containerASR = aBuilder->ActiveScrolledRootForRootScrollframe();
+    containerScrollMetadataASR = containerASR;
+    containerCompositorASR = containerASR;
+  }
 
   ContainerLayerParameters scaleParameters;
   nsRect bounds = aChildren->GetClippedBoundsWithRespectToASR(aBuilder, containerASR);
