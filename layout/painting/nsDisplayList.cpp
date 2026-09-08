@@ -4401,7 +4401,7 @@ nsDisplayCaret::GetLayerState(nsDisplayListBuilder* aBuilder,
     return LAYER_ACTIVE;
   }
 
-  return LAYER_INACTIVE;
+  return LAYER_NONE;
 }
 
 already_AddRefed<Layer>
