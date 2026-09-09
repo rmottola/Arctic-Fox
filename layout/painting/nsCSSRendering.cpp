@@ -59,6 +59,7 @@
 #include "nsInlineFrame.h"
 #include "nsRubyTextContainerFrame.h"
 #include <algorithm>
+#include "SVGImageContext.h"
 
 using namespace mozilla;
 using namespace mozilla::css;
@@ -5987,7 +5988,7 @@ nsImageRenderer::DrawBorderImageComponent(nsPresContext*       aPresContext,
                                             subImage,
                                             samplingFilter,
                                             aFill, aDirtyRect,
-                                            nullptr,
+                                            /* no SVGImageContext */ Nothing(),
                                             drawFlags);
     }
 

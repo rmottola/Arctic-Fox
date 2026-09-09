@@ -33,6 +33,7 @@
 #include "ImageLayers.h"
 #include "imgRequestProxy.h"
 #include "nsIURI.h"
+#include "SVGImageContext.h"
 
 #include <algorithm>
 
@@ -259,7 +260,9 @@ public:
       SamplingFilter filter = nsLayoutUtils::GetSamplingFilterForFrame(aFrame);
       return nsLayoutUtils::DrawSingleImage(*aRenderingContext.ThebesContext(),
                                             aFrame->PresContext(), mImage, filter,
-                                            mDest, aDirtyRect, nullptr, aFlags);
+                                            mDest, aDirtyRect,
+                                            /* no SVGImageContext */ Nothing(),
+                                            aFlags);
     }
 
     if (IsPathType()) {
