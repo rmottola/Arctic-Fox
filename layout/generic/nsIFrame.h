@@ -1380,7 +1380,7 @@ protected:
    * implementation.
    */
   virtual void OnVisibilityChange(Visibility aNewVisibility,
-                                  Maybe<OnNonvisible> aNonvisibleAction = Nothing());
+                                  const Maybe<OnNonvisible>& aNonvisibleAction = Nothing());
 
 public:
 
@@ -1402,7 +1402,7 @@ public:
    *                          associated with to discard their surfaces if
    *                          possible.
    */
-  void DecApproximateVisibleCount(Maybe<OnNonvisible> aNonvisibleAction = Nothing());
+  void DecApproximateVisibleCount(const Maybe<OnNonvisible>& aNonvisibleAction = Nothing());
   void IncApproximateVisibleCount();
 
 
