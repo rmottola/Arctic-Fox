@@ -27,6 +27,7 @@
 #include "mozilla/UniquePtrExtensions.h"
 #include "mozilla/Vector.h"
 #include "mozilla/webrender/WebRenderTypes.h"
+#include "mozilla/layers/WebRenderBridgeChild.h"
 #include "nsComponentManagerUtils.h"
 #include "nsIClipboardHelper.h"
 #include "nsIFile.h"
@@ -1438,7 +1439,8 @@ WriteFontFileData(const uint8_t* aData, uint32_t aLength, uint32_t aIndex,
 }
 
 void
-WebRenderGlyphHelper::BuildWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+WebRenderGlyphHelper::BuildWebRenderCommands(WebRenderBridgeChild* aBridge,
+                                             nsTArray<WebRenderCommand>& aCommands,
                                              const nsTArray<GlyphArray>& aGlyphs,
                                              ScaledFont* aFont,
                                              const Point& aOffset,
@@ -1452,6 +1454,12 @@ WebRenderGlyphHelper::BuildWebRenderCommands(nsTArray<WebRenderCommand>& aComman
 
   aFont->GetFontFileData(&WriteFontFileData, this);
   wr::ByteBuffer fontBuffer(mFontDataLength, mFontData);
+
+  WrFontKey key;
+  key.mNamespace = aBridge->GetNamespace();
+  key.mHandle = aBridge->GetNextResourceId();
+
+  aBridge->SendAddRawFont(key, fontBuffer, mIndex);
 
   nsTArray<WrGlyphArray> wr_glyphs;
   wr_glyphs.SetLength(aGlyphs.Length());
@@ -1475,10 +1483,8 @@ WebRenderGlyphHelper::BuildWebRenderCommands(nsTArray<WebRenderCommand>& aComman
                             wr::ToWrRect(aBounds),
                             wr::ToWrRect(aClip),
                             wr_glyphs,
-                            mIndex,
                             mGlyphSize,
-                            fontBuffer,
-                            mFontDataLength));
+                            key));
 }
 
 } // namespace gfx

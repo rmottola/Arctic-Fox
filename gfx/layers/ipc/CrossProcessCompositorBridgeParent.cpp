@@ -200,7 +200,8 @@ CrossProcessCompositorBridgeParent::DeallocPAPZParent(PAPZParent* aActor)
 
 PWebRenderBridgeParent*
 CrossProcessCompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::PipelineId& aPipelineId,
-                                                                TextureFactoryIdentifier* aTextureFactoryIdentifier)
+                                                                TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                                                                uint32_t *aIdNamespace)
 {
 #ifndef MOZ_ENABLE_WEBRENDER
   // Extra guard since this in the parent process and we don't want a malicious
@@ -229,6 +230,7 @@ CrossProcessCompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::Pipeli
   sIndirectLayerTrees[pipelineHandle].mCrossProcessParent = this;
   sIndirectLayerTrees[pipelineHandle].mWrBridge = parent;
   *aTextureFactoryIdentifier = parent->GetTextureFactoryIdentifier();
+  *aIdNamespace = api->GetNamespace().mHandle;
   return parent;
 }
 
