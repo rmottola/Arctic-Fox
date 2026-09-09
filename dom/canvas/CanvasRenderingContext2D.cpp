@@ -567,7 +567,7 @@ public:
   explicit AdjustedTarget(CanvasRenderingContext2D* aCtx,
                           const gfx::Rect *aBounds = nullptr)
   {
-    mTarget = (DrawTarget*)aCtx->mTarget;
+    mTarget = aCtx->mTarget;
 
     // All rects in this function are in the device space of ctx->mTarget.
 
@@ -1718,7 +1718,7 @@ CanvasRenderingContext2D::SetErrorState()
     gCanvasAzureMemoryUsed -= mWidth * mHeight * 4;
   }
 
-  mTarget = (DrawTarget*)sErrorTarget;
+  mTarget = sErrorTarget;
   mBufferProvider = nullptr;
 
   // clear transforms, clips, etc.
@@ -1960,7 +1960,7 @@ CanvasRenderingContext2D::InitializeWithDrawTarget(nsIDocShell* aShell,
   IntSize size = aTarget->GetSize();
   SetDimensions(size.width, size.height);
 
-  mTarget = (DrawTarget*)aTarget;
+  mTarget = aTarget;
   mBufferProvider = new PersistentBufferProviderBasic(aTarget);
 
   if (mTarget->GetBackendType() == gfx::BackendType::CAIRO) {
@@ -3139,8 +3139,6 @@ CanvasRenderingContext2D::BeginPath()
 void
 CanvasRenderingContext2D::Fill(const CanvasWindingRule& aWinding)
 {
-  auto autoNotNull = mTarget.MakeAuto();
-
   EnsureUserSpacePath(aWinding);
 
   if (!mPath) {
@@ -4745,8 +4743,6 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
                                     uint8_t aOptional_argc,
                                     ErrorResult& aError)
 {
-  auto autoNotNull = mTarget.MakeAuto();
-
   if (mDrawObserver) {
     mDrawObserver->DidDrawCall(CanvasDrawObserver::DrawCallType::DrawImage);
   }
