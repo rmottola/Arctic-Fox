@@ -52,6 +52,7 @@ UNIFIED_SOURCES += [
     'SVGFELeafFrame.cpp',
     'SVGFEUnstyledLeafFrame.cpp',
     'SVGGeometryFrame.cpp',
+    'SVGImageContext.cpp',
     'SVGTextFrame.cpp',
     'SVGViewFrame.cpp',
 ]
