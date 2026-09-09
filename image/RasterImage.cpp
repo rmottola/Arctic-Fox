@@ -1282,7 +1282,8 @@ RasterImage::DrawInternal(DrawableSurface&& aSurface,
                           const IntSize& aSize,
                           const ImageRegion& aRegion,
                           SamplingFilter aSamplingFilter,
-                          uint32_t aFlags)
+                          uint32_t aFlags,
+                          float aOpacity)
 {
   gfxContextMatrixAutoSaveRestore saveMatrix(aContext);
   ImageRegion region(aRegion);
@@ -1301,7 +1302,7 @@ RasterImage::DrawInternal(DrawableSurface&& aSurface,
     couldRedecodeForBetterFrame = CanDownscaleDuringDecode(aSize, aFlags);
   }
 
-  if (!aSurface->Draw(aContext, region, aSamplingFilter, aFlags)) {
+  if (!aSurface->Draw(aContext, region, aSamplingFilter, aFlags, aOpacity)) {
     RecoverFromInvalidFrames(aSize, aFlags);
     return DrawResult::TEMPORARY_ERROR;
   }
@@ -1322,7 +1323,8 @@ RasterImage::Draw(gfxContext* aContext,
                   uint32_t aWhichFrame,
                   SamplingFilter aSamplingFilter,
                   const Maybe<SVGImageContext>& /*aSVGContext - ignored*/,
-                  uint32_t aFlags)
+                  uint32_t aFlags,
+                  float aOpacity)
 {
   if (aWhichFrame > FRAME_MAX_VALUE) {
     return DrawResult::BAD_ARGS;
@@ -1368,7 +1370,7 @@ RasterImage::Draw(gfxContext* aContext,
                                surface->IsFinished();
 
   auto result = DrawInternal(Move(surface), aContext, aSize,
-                             aRegion, aSamplingFilter, flags);
+                             aRegion, aSamplingFilter, flags, aOpacity);
 
   if (shouldRecordTelemetry) {
       TimeDuration drawLatency = TimeStamp::Now() - mDrawStartTime;
