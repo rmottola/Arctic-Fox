@@ -1153,7 +1153,7 @@ CompositorBridgeChild::HandleFatalError(const char* aName, const char* aMsg) con
 PWebRenderBridgeChild*
 CompositorBridgeChild::AllocPWebRenderBridgeChild(const wr::PipelineId& aPipelineId, TextureFactoryIdentifier*, uint32_t *aIdNamespace)
 {
-  WebRenderBridgeChild* child = new WebRenderBridgeChild(aPipelineId, *aIdNamespace);
+  WebRenderBridgeChild* child = new WebRenderBridgeChild(aPipelineId);
   child->AddIPDLReference();
   return child;
 }
