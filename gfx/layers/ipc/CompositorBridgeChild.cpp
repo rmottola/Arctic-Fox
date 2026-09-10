@@ -1032,7 +1032,6 @@ CompositorBridgeChild::ClearTexturePool()
 FixedSizeSmallShmemSectionAllocator*
 CompositorBridgeChild::GetTileLockAllocator()
 {
-  MOZ_ASSERT(IPCOpen());
   if (!IPCOpen()) {
     return nullptr;
   }
