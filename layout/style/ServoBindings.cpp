@@ -1073,6 +1073,12 @@ Gecko_PropertyId_IsPrefEnabled(nsCSSPropertyID id)
 }
 
 void
+Gecko_CSSValue_Drop(nsCSSValueBorrowedMut aCSSValue)
+{
+  aCSSValue->~nsCSSValue();
+}
+
+void
 Gecko_LoadStyleSheet(css::Loader* aLoader,
                      ServoStyleSheet* aParent,
                      RawServoImportRuleBorrowed aImportRule,
