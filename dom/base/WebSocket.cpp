@@ -2251,6 +2251,7 @@ public:
   }
 
 private:
+  // RawPointer because this proxy keeps alive the holder.
   WebSocketImpl* mWebSocketImpl;
 };
 
