@@ -2846,7 +2846,7 @@ public:
     }
   }
 
-  gfxUserFontSet* GetUserFontSet();
+  gfxUserFontSet* GetUserFontSet(bool aFlushUserFontSet = true);
   void FlushUserFontSet();
   void RebuildUserFontSet(); // asynchronously
   mozilla::dom::FontFaceSet* GetFonts() { return mFontFaceSet; }
