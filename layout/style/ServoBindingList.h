@@ -177,6 +177,10 @@ SERVO_BINDING_FUNC(Servo_DeclarationBlock_RemoveProperty, void,
 SERVO_BINDING_FUNC(Servo_DeclarationBlock_RemovePropertyById, void,
                    RawServoDeclarationBlockBorrowed declarations,
                    nsCSSPropertyID property)
+SERVO_BINDING_FUNC(Servo_DeclarationBlock_AddPresValue, void,
+                   RawServoDeclarationBlockBorrowed declarations,
+                   nsCSSPropertyID property,
+                   nsCSSValueBorrowedMut css_value)
 
 // CSS supports()
 SERVO_BINDING_FUNC(Servo_CSSSupports2, bool,
@@ -227,6 +231,8 @@ SERVO_BINDING_FUNC(Servo_ResolveStyleLazily, ServoComputedValuesStrong,
                    RawServoStyleSetBorrowed set)
 
 // Restyle the given subtree.
+// Use ServoStyleSet::PrepareAndTraverseSubtree instead of calling this
+// directly
 SERVO_BINDING_FUNC(Servo_TraverseSubtree, void,
                    RawGeckoElementBorrowed root, RawServoStyleSetBorrowed set,
                    mozilla::TraversalRootBehavior root_behavior)
