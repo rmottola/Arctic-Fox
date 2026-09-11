@@ -418,7 +418,7 @@ static bool
 NeedsScriptTraverse(nsINode* aNode)
 {
   return aNode->PreservingWrapper() && aNode->GetWrapperPreserveColor() &&
-         !aNode->IsBlackAndDoesNotNeedTracing(aNode);
+         !aNode->HasKnownLiveWrapperAndDoesNotNeedTracing(aNode);
 }
 
 //----------------------------------------------------------------------
@@ -438,7 +438,7 @@ NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(nsChildContentList)
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(nsChildContentList)
-  return tmp->IsBlackAndDoesNotNeedTracing(tmp);
+  return tmp->HasKnownLiveWrapperAndDoesNotNeedTracing(tmp);
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
 
 // CanSkipThis returns false to avoid problems with incomplete unlinking.
