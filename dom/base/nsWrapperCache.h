@@ -23,7 +23,6 @@ class ProcessGlobal;
 class SandboxPrivate;
 class nsInProcessTabChildGlobal;
 class nsWindowRoot;
-class nsCSSKeyframeRule;
 class nsCSSKeyframesRule;
 class nsCSSCounterStyleRule;
 
@@ -288,7 +287,6 @@ private:
   friend class SandboxPrivate;
   friend class nsInProcessTabChildGlobal;
   friend class nsWindowRoot;
-  friend class nsCSSKeyframeRule;
   friend class nsCSSKeyframesRule;
   friend class nsCSSCounterStyleRule;
   void SetIsNotDOMBinding()
