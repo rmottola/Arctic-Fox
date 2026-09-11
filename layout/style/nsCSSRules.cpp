@@ -46,6 +46,27 @@ using namespace mozilla::dom;
 
 // base class for all rule types in a CSS style sheet
 
+// Temporary code that can go away once all css::Rules are on WebIDL bindings.
+#include "xpcpublic.h"
+namespace mozilla {
+namespace dom {
+template<>
+nsresult
+UnwrapArg(JS::Handle<JSObject*> src, css::Rule** ppArg)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  nsCOMPtr<nsIDOMCSSRule> rule =
+    do_QueryInterface(xpc::UnwrapReflectorToISupports(src));
+  if (!rule) {
+    return NS_NOINTERFACE;
+  }
+  *ppArg = rule->GetCSSRule();
+  NS_ADDREF(*ppArg);
+  return NS_OK;
+}
+} // namespace dom
+} // namespace mozilla
+
 namespace mozilla {
 namespace css {
 
@@ -155,6 +176,12 @@ Rule::GetCssText(nsAString& aCssText)
   return NS_OK;
 }
 
+Rule*
+Rule::GetParentRule() const
+{
+  return mParentRule;
+}
+
 // -------------------------------
 // Style Rule List for group rules
 //
@@ -166,7 +193,7 @@ public:
 
   virtual CSSStyleSheet* GetParentObject() override;
 
-  virtual nsIDOMCSSRule*
+  virtual Rule*
   IndexedGetter(uint32_t aIndex, bool& aFound) override;
   virtual uint32_t
   Length() override;
@@ -211,7 +238,7 @@ GroupRuleRuleList::Length()
   return AssertedCast<uint32_t>(mGroupRule->StyleRuleCount());
 }
 
-nsIDOMCSSRule*
+Rule*
 GroupRuleRuleList::IndexedGetter(uint32_t aIndex, bool& aFound)
 {
   aFound = false;
