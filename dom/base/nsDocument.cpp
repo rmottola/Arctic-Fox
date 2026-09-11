@@ -2289,7 +2289,7 @@ nsDocument::ResetStylesheetsToURI(nsIURI* aURI)
         RemoveStyleSheetsFromStyleSets(*sheetService->AuthorStyleSheets(), SheetType::Doc);
       }
     } else {
-      NS_ERROR("stylo: nsStyleSheetService doesn't handle ServoStyleSheets yet");
+      NS_WARNING("stylo: nsStyleSheetService doesn't handle ServoStyleSheets yet");
     }
 
     mStyleSetFilled = false;
