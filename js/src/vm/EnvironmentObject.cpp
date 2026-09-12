@@ -888,8 +888,8 @@ LexicalEnvironmentObject::createTemplateObject(JSContext* cx, HandleShape shape,
 }
 
 /* static */ LexicalEnvironmentObject*
-LexicalEnvironmentObject::createTemplateObject(JSContext* cx, Handle<LexicalScope*> scope,
-                                               HandleObject enclosing, gc::InitialHeap heap)
+LexicalEnvironmentObject::create(JSContext* cx, Handle<LexicalScope*> scope,
+                                 HandleObject enclosing, gc::InitialHeap heap)
 {
     assertSameCompartment(cx, enclosing);
     MOZ_ASSERT(scope->hasEnvironment());
@@ -914,7 +914,7 @@ LexicalEnvironmentObject::create(JSContext* cx, Handle<LexicalScope*> scope,
                                  AbstractFramePtr frame)
 {
     RootedObject enclosing(cx, frame.environmentChain());
-    return createTemplateObject(cx, scope, enclosing, gc::DefaultHeap);
+    return create(cx, scope, enclosing, gc::DefaultHeap);
 }
 
 /* static */ LexicalEnvironmentObject*
@@ -996,8 +996,7 @@ LexicalEnvironmentObject::clone(JSContext* cx, Handle<LexicalEnvironmentObject*>
 {
     Rooted<LexicalScope*> scope(cx, &env->scope());
     RootedObject enclosing(cx, &env->enclosingEnvironment());
-    Rooted<LexicalEnvironmentObject*> copy(cx, createTemplateObject(cx, scope, enclosing,
-                                                                    gc::TenuredHeap));
+    Rooted<LexicalEnvironmentObject*> copy(cx, create(cx, scope, enclosing, gc::TenuredHeap));
     if (!copy)
         return nullptr;
 
@@ -1015,7 +1014,7 @@ LexicalEnvironmentObject::recreate(JSContext* cx, Handle<LexicalEnvironmentObjec
 {
     Rooted<LexicalScope*> scope(cx, &env->scope());
     RootedObject enclosing(cx, &env->enclosingEnvironment());
-    return createTemplateObject(cx, scope, enclosing, gc::TenuredHeap);
+    return create(cx, scope, enclosing, gc::TenuredHeap);
 }
 
 bool
@@ -1070,8 +1069,7 @@ NamedLambdaObject::create(JSContext* cx, HandleFunction callee,
 #endif
 
     LexicalEnvironmentObject* obj =
-        LexicalEnvironmentObject::createTemplateObject(cx, scope.as<LexicalScope>(),
-                                                       enclosing, heap);
+        LexicalEnvironmentObject::create(cx, scope.as<LexicalScope>(), enclosing, heap);
     if (!obj)
         return nullptr;
 
