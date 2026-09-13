@@ -3701,6 +3701,8 @@ MCompare::inputType()
       case Compare_String:
       case Compare_StrictString:
         return MIRType::String;
+      case Compare_Symbol:
+        return MIRType::Symbol;
       case Compare_Object:
         return MIRType::Object;
       case Compare_Unknown:
@@ -3814,6 +3816,10 @@ MCompare::determineCompareType(JSOp op, MDefinition* left, MDefinition* right)
     // Handle string comparisons. (Relational string compares are still unsupported).
     if (!relationalEq && lhs == MIRType::String && rhs == MIRType::String)
         return Compare_String;
+
+    // Handle symbol comparisons. (Relaational compare will throw)
+    if (!relationalEq && lhs == MIRType::Symbol && rhs == MIRType::Symbol)
+        return Compare_Symbol;
 
     // Handle strict string compare.
     if (strictEq && lhs == MIRType::String)
@@ -4415,7 +4421,8 @@ MCompare::tryFoldEqualOperands(bool* result)
                compareType_ == Compare_Double || compareType_ == Compare_DoubleMaybeCoerceLHS ||
                compareType_ == Compare_DoubleMaybeCoerceRHS || compareType_ == Compare_Float32 ||
                compareType_ == Compare_String || compareType_ == Compare_StrictString ||
-               compareType_ == Compare_Object || compareType_ == Compare_Bitwise);
+               compareType_ == Compare_Object || compareType_ == Compare_Bitwise ||
+               compareType_ == Compare_Symbol);
 
     if (isDoubleComparison() || isFloat32Comparison()) {
         if (!operandsAreNeverNaN())
