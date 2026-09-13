@@ -1591,7 +1591,7 @@ JS::ToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHandleValue
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
     MOZ_ASSERT(obj != nullptr);
-    MOZ_ASSERT(hint == JSTYPE_VOID || hint == JSTYPE_STRING || hint == JSTYPE_NUMBER);
+    MOZ_ASSERT(hint == JSTYPE_UNDEFINED || hint == JSTYPE_STRING || hint == JSTYPE_NUMBER);
     vp.setObject(*obj);
     return ToPrimitiveSlow(cx, hint, vp);
 }
@@ -1613,7 +1613,7 @@ JS::GetFirstArgumentAsTypeHint(JSContext* cx, CallArgs args, JSType *result)
     if (!EqualStrings(cx, str, cx->names().default_, &match))
         return false;
     if (match) {
-        *result = JSTYPE_VOID;
+        *result = JSTYPE_UNDEFINED;
         return true;
     }
 

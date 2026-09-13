@@ -2991,7 +2991,7 @@ ReportCantConvert(JSContext* cx, unsigned errorNumber, HandleObject obj, JSType 
 
     RootedValue val(cx, ObjectValue(*obj));
     ReportValueError2(cx, errorNumber, JSDVG_SEARCH_STACK, val, str,
-                      hint == JSTYPE_VOID
+                      hint == JSTYPE_UNDEFINED
                       ? "primitive type"
                       : hint == JSTYPE_STRING ? "string" : "number");
     return false;
@@ -3000,7 +3000,7 @@ ReportCantConvert(JSContext* cx, unsigned errorNumber, HandleObject obj, JSType 
 bool
 JS::OrdinaryToPrimitive(JSContext* cx, HandleObject obj, JSType hint, MutableHandleValue vp)
 {
-    MOZ_ASSERT(hint == JSTYPE_NUMBER || hint == JSTYPE_STRING || hint == JSTYPE_VOID);
+    MOZ_ASSERT(hint == JSTYPE_NUMBER || hint == JSTYPE_STRING || hint == JSTYPE_UNDEFINED);
 
     Rooted<jsid> id(cx);
 
@@ -3068,7 +3068,7 @@ js::ToPrimitiveSlow(JSContext* cx, JSType preferredType, MutableHandleValue vp)
 {
     // Step numbers refer to the first algorithm listed in ES6 draft rev 36
     // (2015 Mar 17) 7.1.1 ToPrimitive.
-    MOZ_ASSERT(preferredType == JSTYPE_VOID ||
+    MOZ_ASSERT(preferredType == JSTYPE_UNDEFINED ||
                preferredType == JSTYPE_STRING ||
                preferredType == JSTYPE_NUMBER);
     RootedObject obj(cx, &vp.toObject());
