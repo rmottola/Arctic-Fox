@@ -68,6 +68,12 @@ namespace JS {
     _(NewObject_SharedCache)                            \
     _(NewObject_Call)                                   \
                                                         \
+    _(Compare_SpecializedTypes)                         \
+    _(Compare_Bitwise)                                  \
+    _(Compare_SpecializedOnBaselineTypes)               \
+    _(Compare_SharedCache)                              \
+    _(Compare_Call)                                     \
+                                                        \
     _(Call_Inline)
 
 
@@ -131,6 +137,14 @@ namespace JS {
     _(TemplateObjectIsUnboxedWithoutInlineElements)                     \
     _(TemplateObjectIsPlainObjectWithDynamicSlots)                      \
     _(LengthTooBig)                                                     \
+    _(SpeculationOnInputTypesFailed)                                    \
+    _(RelationalCompare)                                                \
+    _(OperandTypeNotBitwiseComparable)                                  \
+    _(OperandMaybeEmulatesUndefined)                                    \
+    _(LoosyUndefinedNullCompare)                                        \
+    _(LoosyInt32BooleanCompare)                                         \
+    _(CallsValueOf)                                                     \
+    _(StrictCompare)                                                    \
                                                                         \
     _(ICOptStub_GenericSuccess)                                         \
                                                                         \
