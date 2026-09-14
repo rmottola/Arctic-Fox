@@ -8285,6 +8285,7 @@ nsContentUtils::SendMouseEvent(const nsCOMPtr<nsIPresShell>& aPresShell,
                                bool aIgnoreRootScrollFrame,
                                float aPressure,
                                unsigned short aInputSourceArg,
+                               uint32_t aIdentifier,
                                bool aToWindow,
                                bool *aPreventDefault,
                                bool aIsDOMEventSynthesized,
@@ -8332,6 +8333,7 @@ nsContentUtils::SendMouseEvent(const nsCOMPtr<nsIPresShell>& aPresShell,
                            WidgetMouseEvent::eReal,
                          contextMenuKey ? WidgetMouseEvent::eContextMenuKey :
                                           WidgetMouseEvent::eNormal);
+  event.pointerId = aIdentifier;
   event.mModifiers = GetWidgetModifiers(aModifiers);
   event.button = aButton;
   event.buttons = aButtons != nsIDOMWindowUtils::MOUSE_BUTTONS_NOT_SPECIFIED ?
