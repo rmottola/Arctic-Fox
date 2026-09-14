@@ -599,6 +599,10 @@ PuppetWidget::GetLayerManager(PLayerTransactionChild* aShadowManager,
 LayerManager*
 PuppetWidget::RecreateLayerManager(PLayerTransactionChild* aShadowManager)
 {
+  // Force the old LM to self destruct, otherwise if the reference dangles we
+  // could fail to revoke the most recent transaction.
+  DestroyLayerManager();
+
   MOZ_ASSERT(mTabChild);
   if (mTabChild->GetCompositorOptions().UseWebRender()) {
     mLayerManager = new WebRenderLayerManager(this);
