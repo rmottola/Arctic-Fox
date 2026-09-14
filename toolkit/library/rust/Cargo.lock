@@ -409,7 +409,8 @@ name = "selectors"
 version = "0.18.0"
 dependencies = [
  "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cssparser 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cssparser 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cssparser-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "matches 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -457,7 +458,8 @@ dependencies = [
  "bindgen 0.22.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cssparser 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cssparser 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cssparser-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "encoding 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "euclid 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -475,7 +477,6 @@ dependencies = [
  "parking_lot 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "pdqsort 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "phf 0.7.21 (registry+https://github.com/rust-lang/crates.io-index)",
- "phf_codegen 0.7.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -494,7 +495,8 @@ name = "style_traits"
 version = "0.0.1"
 dependencies = [
  "app_units 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "cssparser 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cssparser 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cssparser-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "euclid 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -505,6 +507,24 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quote 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode-xid 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "syn"
+version = "0.11.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "quote 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "synom 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode-xid 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "synom"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
  "unicode-xid 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
