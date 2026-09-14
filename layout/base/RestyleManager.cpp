@@ -12,7 +12,7 @@
 
 namespace mozilla {
 
-RestyleManagerBase::RestyleManagerBase(nsPresContext* aPresContext)
+RestyleManager::RestyleManager(nsPresContext* aPresContext)
   : mPresContext(aPresContext)
   , mRestyleGeneration(1)
   , mHoverGeneration(0)
@@ -29,10 +29,10 @@ RestyleManagerBase::RestyleManagerBase(nsPresContext* aPresContext)
  * This is called from both Restyle managers.
  */
 void
-RestyleManagerBase::ContentStateChangedInternal(Element* aElement,
-                                                EventStates aStateMask,
-                                                nsChangeHint* aOutChangeHint,
-                                                nsRestyleHint* aOutRestyleHint)
+RestyleManager::ContentStateChangedInternal(Element* aElement,
+                                            EventStates aStateMask,
+                                            nsChangeHint* aOutChangeHint,
+                                            nsRestyleHint* aOutRestyleHint)
 {
   MOZ_ASSERT(aOutChangeHint);
   MOZ_ASSERT(aOutRestyleHint);
@@ -105,7 +105,7 @@ RestyleManagerBase::ContentStateChangedInternal(Element* aElement,
 }
 
 /* static */ nsCString
-RestyleManagerBase::RestyleHintToString(nsRestyleHint aHint)
+RestyleManager::RestyleHintToString(nsRestyleHint aHint)
 {
   nsCString result;
   bool any = false;
@@ -140,7 +140,7 @@ RestyleManagerBase::RestyleHintToString(nsRestyleHint aHint)
 
 #ifdef DEBUG
 /* static */ nsCString
-RestyleManagerBase::ChangeHintToString(nsChangeHint aHint)
+RestyleManager::ChangeHintToString(nsChangeHint aHint)
 {
   nsCString result;
   bool any = false;
@@ -205,7 +205,7 @@ RestyleManagerBase::ChangeHintToString(nsChangeHint aHint)
 #endif
 
 void
-RestyleManagerBase::PostRestyleEventInternal(bool aForLazyConstruction)
+RestyleManager::PostRestyleEventInternal(bool aForLazyConstruction)
 {
   // Make sure we're not in a style refresh; if we are, we still have
   // a call to ProcessPendingRestyles coming and there's no need to
@@ -378,7 +378,7 @@ VerifyStyleTree(nsIFrame* aFrame)
 }
 
 void
-RestyleManagerBase::DebugVerifyStyleTree(nsIFrame* aFrame)
+RestyleManager::DebugVerifyStyleTree(nsIFrame* aFrame)
 {
   if (IsServo()) {
     // XXXheycam For now, we know that we don't use the same inheritance
@@ -735,7 +735,7 @@ NeedToReframeForAddingOrRemovingTransform(nsIFrame* aFrame)
 }
 
 /* static */ nsIFrame*
-RestyleManagerBase::GetNearestAncestorFrame(nsIContent* aContent)
+RestyleManager::GetNearestAncestorFrame(nsIContent* aContent)
 {
   nsIFrame* ancestorFrame = nullptr;
   for (nsIContent* ancestor = aContent->GetParent();
@@ -747,8 +747,8 @@ RestyleManagerBase::GetNearestAncestorFrame(nsIContent* aContent)
 }
 
 /* static */ nsIFrame*
-RestyleManagerBase::GetNextBlockInInlineSibling(FramePropertyTable* aPropTable,
-                                                nsIFrame* aFrame)
+RestyleManager::GetNextBlockInInlineSibling(FramePropertyTable* aPropTable,
+                                            nsIFrame* aFrame)
 {
   NS_ASSERTION(!aFrame->GetPrevContinuation(),
                "must start with the first continuation");
@@ -1024,7 +1024,7 @@ StyleChangeReflow(nsIFrame* aFrame, nsChangeHint aHint)
 }
 
 /* static */ nsIFrame*
-RestyleManagerBase::GetNextContinuationWithSameStyle(
+RestyleManager::GetNextContinuationWithSameStyle(
   nsIFrame* aFrame, nsStyleContext* aOldStyleContext,
   bool* aHaveMoreContinuations)
 {
@@ -1064,7 +1064,7 @@ RestyleManagerBase::GetNextContinuationWithSameStyle(
 }
 
 nsresult
-RestyleManagerBase::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
+RestyleManager::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
 {
   NS_ASSERTION(!nsContentUtils::IsSafeToRunScript(),
                "Someone forgot a script blocker");
@@ -1376,9 +1376,8 @@ RestyleManagerBase::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
   return NS_OK;
 }
 
-RestyleManagerBase::AnimationsWithDestroyedFrame
-                  ::AnimationsWithDestroyedFrame(
-                      RestyleManagerBase* aRestyleManager)
+RestyleManager::AnimationsWithDestroyedFrame::AnimationsWithDestroyedFrame(
+                                                RestyleManager* aRestyleManager)
   : mRestyleManager(aRestyleManager)
   , mRestorePointer(mRestyleManager->mAnimationsWithDestroyedFrame)
 {
@@ -1388,8 +1387,8 @@ RestyleManagerBase::AnimationsWithDestroyedFrame
 }
 
 void
-RestyleManagerBase::AnimationsWithDestroyedFrame
-                  ::StopAnimationsForElementsWithoutFrames()
+RestyleManager::AnimationsWithDestroyedFrame
+              ::StopAnimationsForElementsWithoutFrames()
 {
   StopAnimationsWithoutFrame(mContents, CSSPseudoElementType::NotPseudo);
   StopAnimationsWithoutFrame(mBeforeContents, CSSPseudoElementType::before);
@@ -1397,10 +1396,10 @@ RestyleManagerBase::AnimationsWithDestroyedFrame
 }
 
 void
-RestyleManagerBase::AnimationsWithDestroyedFrame
-                  ::StopAnimationsWithoutFrame(
-                      nsTArray<RefPtr<nsIContent>>& aArray,
-                      CSSPseudoElementType aPseudoType)
+RestyleManager::AnimationsWithDestroyedFrame
+              ::StopAnimationsWithoutFrame(
+                  nsTArray<RefPtr<nsIContent>>& aArray,
+                  CSSPseudoElementType aPseudoType)
 {
   nsAnimationManager* animationManager =
     mRestyleManager->PresContext()->AnimationManager();
