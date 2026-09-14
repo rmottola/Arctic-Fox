@@ -11,6 +11,7 @@
 
 #include "mozilla/AutoRestore.h"
 #include "mozilla/TextRange.h"
+#include "mozilla/UniquePtr.h"
 #include "nsISelection.h"
 #include "nsISelectionController.h"
 #include "nsISelectionListener.h"
@@ -145,7 +146,7 @@ public:
   NS_IMETHOD   LookUpSelection(nsIContent *aContent,
                                int32_t aContentOffset,
                                int32_t aContentLength,
-                               SelectionDetails** aReturnDetails,
+                               UniquePtr<SelectionDetails>* aReturnDetails,
                                SelectionType aSelectionType,
                                bool aSlowCheck);
   NS_IMETHOD   Repaint(nsPresContext* aPresContext);
