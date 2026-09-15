@@ -764,7 +764,7 @@ struct JSContext : public JS::RootingContext,
 
     void trace(JSTracer* trc);
 
-    inline js::ZoneGroupCaches& caches();
+    inline js::RuntimeCaches& caches();
 
   private:
     /*

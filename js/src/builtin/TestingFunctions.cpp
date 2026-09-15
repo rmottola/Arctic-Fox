@@ -815,7 +815,7 @@ SelectForGC(JSContext* cx, unsigned argc, Value* vp)
      * start to detect missing pre-barriers. It is invalid for nursery things
      * to be in the set, so evict the nursery before adding items.
      */
-    cx->zone()->group()->evictNursery();
+    cx->runtime()->gc.evictNursery();
 
     for (unsigned i = 0; i < args.length(); i++) {
         if (args[i].isObject()) {
@@ -3493,7 +3493,7 @@ minorGC(JSContext* cx, JSGCStatus status, void* data)
     if (info->active) {
         info->active = false;
         if (cx->zone() && !cx->zone()->isAtomsZone())
-            cx->zone()->group()->evictNursery(JS::gcreason::DEBUG_GC);
+            cx->runtime()->gc.evictNursery(JS::gcreason::DEBUG_GC);
         info->active = true;
     }
 }
