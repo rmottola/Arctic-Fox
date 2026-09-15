@@ -26,5 +26,5 @@ interface MediaKeys {
   MediaKeySession createSession(optional MediaKeySessionType sessionType = "temporary");
 
   [NewObject]
-  Promise<void> setServerCertificate((ArrayBufferView or ArrayBuffer) serverCertificate);
+  Promise<void> setServerCertificate(BufferSource serverCertificate);
 };
