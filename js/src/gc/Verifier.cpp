@@ -175,7 +175,7 @@ gc::GCRuntime::startVerifyPreBarriers()
     if (verifyPreData || isIncrementalGCInProgress())
         return;
 
-    if (IsIncrementalGCUnsafe(rt) != AbortReason::None || TlsContext.get()->keepAtoms || rt->exclusiveThreadsPresent())
+    if (IsIncrementalGCUnsafe(rt) != AbortReason::None || TlsContext.get()->keepAtoms || rt->hasHelperThreadZones())
         return;
 
     number++;
@@ -235,11 +235,10 @@ gc::GCRuntime::startVerifyPreBarriers()
     marker.start();
 
     for (ZonesIter zone(rt, WithAtoms); !zone.done(); zone.next()) {
+        MOZ_ASSERT(!zone->usedByHelperThread());
         PurgeJITCaches(zone);
-        if (!zone->usedByExclusiveThread) {
-            zone->setNeedsIncrementalBarrier(true, Zone::UpdateJit);
-            zone->arenas.purge();
-        }
+        zone->setNeedsIncrementalBarrier(true, Zone::UpdateJit);
+        zone->arenas.purge();
     }
 
     return;
@@ -345,7 +344,7 @@ gc::GCRuntime::endVerifyPreBarriers()
     if (!compartmentCreated &&
         IsIncrementalGCUnsafe(rt) == AbortReason::None &&
         !TlsContext.get()->keepAtoms &&
-        !rt->exclusiveThreadsPresent())
+        !rt->hasHelperThreadZones())
     {
         CheckEdgeTracer cetrc(rt);
 
