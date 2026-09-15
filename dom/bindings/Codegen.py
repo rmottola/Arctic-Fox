@@ -15235,15 +15235,14 @@ class CGCallback(CGClass):
                 ],
                 body=body),
             ClassConstructor(
-                [Argument("JSContext*", "aCx"),
-                 Argument("JS::Handle<JSObject*>", "aCallback"),
+                [Argument("JS::Handle<JSObject*>", "aCallback"),
                  Argument("nsIGlobalObject*", "aIncumbentGlobal"),
                  Argument("const FastCallbackConstructor&", "")],
                 bodyInHeader=True,
                 visibility="public",
                 explicit=True,
                 baseConstructors=[
-                    "%s(aCx, aCallback, aIncumbentGlobal, FastCallbackConstructor())" % self.baseName,
+                    "%s(aCallback, aIncumbentGlobal, FastCallbackConstructor())" % self.baseName,
                 ],
                 body=body),
             ClassConstructor(
@@ -15423,7 +15422,7 @@ class CGFastCallback(CGClass):
             visibility="public",
             explicit=True,
             baseConstructors=[
-                "%s(aCx, aCallback, aIncumbentGlobal, FastCallbackConstructor())" %
+                "%s(aCallback, aIncumbentGlobal, FastCallbackConstructor())" %
                 baseName,
             ],
             body="")
