@@ -3542,6 +3542,7 @@ var gDetailView = {
     let readyPromise;
     if (remote) {
       browser.setAttribute("remote", "true");
+      browser.setAttribute("remoteType", E10SUtils.EXTENSION_REMOTE_TYPE);
       readyPromise = promiseEvent("XULFrameLoaderCreated", browser);
     } else {
       readyPromise = promiseEvent("load", browser, true);
