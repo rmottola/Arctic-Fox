@@ -161,20 +161,15 @@ function loadJSONAsync(file, options) {
 
 // Returns a promise that is resolved with the AddonInstall for that URL.
 function addonInstallForURL(url, hash) {
-  let deferred = Promise.defer();
-  AddonManager.getInstallForURL(url, install => deferred.resolve(install),
-                                "application/x-xpinstall", hash);
-  return deferred.promise;
+  return AddonManager.getInstallForURL(url, null, "application/x-xpinstall", hash);
 }
 
 // Returns a promise that is resolved with an Array<Addon> of the installed
 // experiment addons.
 function installedExperimentAddons() {
-  let deferred = Promise.defer();
-  AddonManager.getAddonsByTypes(["experiment"], (addons) => {
-    deferred.resolve(addons.filter(a => !a.appDisabled));
+  return AddonManager.getAddonsByTypes(["experiment"]).then(addons => {
+    return addons.filter(a => !a.appDisabled);
   });
-  return deferred.promise;
 }
 
 // Takes an Array<Addon> and returns a promise that is resolved when the
@@ -2024,26 +2019,22 @@ Experiments.ExperimentEntry.prototype = {
    *
    * @return Promise<Addon|null>
    */
-  _getAddon: function () {
+  _getAddon() {
     if (!this._addonId) {
       return Promise.resolve(null);
     }
 
-    let deferred = Promise.defer();
-
-    AddonManager.getAddonByID(this._addonId, (addon) => {
+    return AddonManager.getAddonByID(this._addonId).then(addon => {
       if (addon && addon.appDisabled) {
         // Don't return PreviousExperiments.
-        addon = null;
+        return null;
       }
 
-      deferred.resolve(addon);
+      return addon;
     });
-
-    return deferred.promise;
   },
 
-  _logTermination: function (terminationKind, terminationReason) {
+  _logTermination(terminationKind, terminationReason) {
     if (terminationKind === undefined) {
       return;
     }
@@ -2064,7 +2055,7 @@ Experiments.ExperimentEntry.prototype = {
   /**
    * Determine whether an active experiment should be stopped.
    */
-  shouldStop: function () {
+  shouldStop () {
     if (!this._enabled) {
       throw new Error("shouldStop must not be called on disabled experiments.");
     }
@@ -2085,7 +2076,7 @@ Experiments.ExperimentEntry.prototype = {
   /*
    * Should this be discarded from the cache due to age?
    */
-  shouldDiscard: function () {
+  shouldDiscard() {
     let limit = this._policy.now();
     limit.setDate(limit.getDate() - KEEP_HISTORY_N_DAYS);
     return (this._lastChangedDate < limit);
@@ -2095,7 +2086,7 @@ Experiments.ExperimentEntry.prototype = {
    * Get next date (in epoch-ms) to schedule a re-evaluation for this.
    * Returns 0 if it doesn't need one.
    */
-  getScheduleTime: function () {
+  getScheduleTime() {
     if (this._enabled) {
       let now = this._policy.now();
       let startTime = this._startDate.getTime();
@@ -2113,7 +2104,7 @@ Experiments.ExperimentEntry.prototype = {
   /*
    * Perform sanity checks on the experiment data.
    */
-  _isManifestDataValid: function (data) {
+  _isManifestDataValid(data) {
     this._log.trace("isManifestDataValid() - data: " + JSON.stringify(data));
 
     for (let key of this.MANIFEST_REQUIRED_FIELDS) {

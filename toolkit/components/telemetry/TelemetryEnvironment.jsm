@@ -255,17 +255,6 @@ function getSystemLocale() {
 }
 
 /**
- * Asynchronously get a list of addons of the specified type from the AddonManager.
- * @param aTypes An array containing the types of addons to request.
- * @return Promise<Array> resolved when AddonManager has finished, returning an
- *         array of addons.
- */
-function promiseGetAddonsByTypes(aTypes) {
-  return new Promise((resolve) =>
-                     AddonManager.getAddonsByTypes(aTypes, (addons) => resolve(addons)));
-}
-
-/**
  * Safely get a sysinfo property and return its value. If the property is not
  * available, return aDefault.
  *
@@ -570,7 +559,7 @@ EnvironmentAddonBuilder.prototype = {
    */
   _getActiveAddons: Task.async(function* () {
     // Request addons, asynchronously.
-    let allAddons = yield promiseGetAddonsByTypes(["extension", "service"]);
+    let allAddons = yield AddonManager.getAddonsByTypes(["extension", "service"]);
 
     let activeAddons = {};
     for (let addon of allAddons) {
@@ -621,7 +610,7 @@ EnvironmentAddonBuilder.prototype = {
    */
   _getActiveTheme: Task.async(function* () {
     // Request themes, asynchronously.
-    let themes = yield promiseGetAddonsByTypes(["theme"]);
+    let themes = yield AddonManager.getAddonsByTypes(["theme"]);
 
     let activeTheme = {};
     // We only store information about the active theme.
@@ -697,7 +686,7 @@ EnvironmentAddonBuilder.prototype = {
    */
   _getActiveGMPlugins: Task.async(function* () {
     // Request plugins, asynchronously.
-    let allPlugins = yield promiseGetAddonsByTypes(["plugin"]);
+    let allPlugins = yield AddonManager.getAddonsByTypes(["plugin"]);
 
     let activeGMPlugins = {};
     for (let plugin of allPlugins) {
