@@ -128,7 +128,7 @@ namespace mozilla {
 
 static const char pluginSandboxRules[] =
   "(version 1)\n"
-  "(deny default)\n"
+  "(deny default %s)\n"
   "(allow signal (target self))\n"
   "(allow sysctl-read)\n"
   // Illegal syntax on OS X 10.6, needed on 10.7 and up.
@@ -178,7 +178,7 @@ static const char contentSandboxRules[] =
   "    (< sandbox-level 1))\n"
   "  (allow default)\n"
   "  (begin\n"
-  "    (deny default)\n"
+  "    (deny default %s)\n"
   "    (debug deny)\n"
   "\n"
   "    (define resolving-literal literal)\n"
@@ -447,18 +447,22 @@ static const char contentSandboxRules[] =
   "  )\n"
   ")\n";
 
+static const char* NO_LOGGING_CMD = "(with no-log)";
+
 bool StartMacSandbox(MacSandboxInfo aInfo, std::string &aErrorMessage)
 {
   char *profile = NULL;
   if (aInfo.type == MacSandboxType_Plugin) {
     if (OSXVersion::OnLionOrLater()) {
       asprintf(&profile, pluginSandboxRules, "", ";",
+               aInfo.shouldLog ? "" : NO_LOGGING_CMD,
                aInfo.pluginInfo.pluginPath.c_str(),
                aInfo.pluginInfo.pluginBinaryPath.c_str(),
                aInfo.appPath.c_str(),
                aInfo.appBinaryPath.c_str());
     } else {
       asprintf(&profile, pluginSandboxRules, ";", "",
+               aInfo.shouldLog ? "" : NO_LOGGING_CMD,
                aInfo.pluginInfo.pluginPath.c_str(),
                aInfo.pluginInfo.pluginBinaryPath.c_str(),
                aInfo.appPath.c_str(),
@@ -485,7 +489,8 @@ bool StartMacSandbox(MacSandboxInfo aInfo, std::string &aErrorMessage)
                aInfo.appTempDir.c_str(),
                aInfo.hasSandboxedProfile ? 1 : 0,
                aInfo.profileDir.c_str(),
-               getenv("HOME"));
+               getenv("HOME"),
+               aInfo.shouldLog ? "" : NO_LOGGING_CMD);
     } else {
       fprintf(stderr,
         "Content sandbox disabled due to sandbox level setting\n");
