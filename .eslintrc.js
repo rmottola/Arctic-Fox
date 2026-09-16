@@ -6,7 +6,8 @@ module.exports = {
     "mozilla"
   ],
   "rules": {
-    "mozilla/import-globals": 1,
+    "mozilla/import-globals": "warn",
+    "mozilla/no-useless-parameters": "error",
   },
   "env": {
     "es6": true
