@@ -8596,14 +8596,18 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
     }
   }
 
-#ifdef MOZ_WEBSPEECH
+
   if (win) {
     auto* globalWindow = nsGlobalWindow::Cast(win);
+#ifdef MOZ_WEBSPEECH
     if (globalWindow->HasActiveSpeechSynthesis()) {
       return false;
     }
-  }
 #endif
+    if (globalWindow->HasUsedVR()) {
+      return false;
+    }
+  }
 
   return true;
 }

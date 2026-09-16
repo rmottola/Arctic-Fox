@@ -445,6 +445,7 @@ public:
   // Inner windows only.
   virtual void SetHasGamepadEventListener(bool aHasGamepad = true) override;
   void NotifyVREventListenerAdded();
+  bool HasUsedVR() const;
   virtual void EventListenerAdded(nsIAtom* aType) override;
 
   // nsIInterfaceRequestor
