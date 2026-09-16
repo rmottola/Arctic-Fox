@@ -472,8 +472,8 @@ KeyframeUtils::GetKeyframesFromObject(JSContext* aCx,
   if ((!AnimationUtils::IsCoreAPIEnabled() ||
        aDocument->IsStyledByServo()) &&
       RequiresAdditiveAnimation(keyframes, aDocument)) {
-    aRv.Throw(NS_ERROR_DOM_ANIM_MISSING_PROPS_ERR);
     keyframes.Clear();
+    aRv.Throw(NS_ERROR_DOM_ANIM_MISSING_PROPS_ERR);
   }
 
   return keyframes;
@@ -765,8 +765,8 @@ GetKeyframeListFromKeyframeSequence(JSContext* aCx,
   // Convert the object in aIterator to a sequence of keyframes producing
   // an array of Keyframe objects.
   if (!ConvertKeyframeSequence(aCx, aDocument, aIterator, aResult)) {
-    aRv.Throw(NS_ERROR_FAILURE);
     aResult.Clear();
+    aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
 
