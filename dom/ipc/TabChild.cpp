@@ -164,7 +164,6 @@ static const char BEFORE_FIRST_PAINT[] = "before-first-paint";
 
 typedef nsDataHashtable<nsUint64HashKey, TabChild*> TabChildMap;
 static TabChildMap* sTabChildren;
-bool TabChild::sInLargeAllocProcess = false;
 
 TabChildBase::TabChildBase()
   : mTabChildGlobal(nullptr)
@@ -3130,10 +3129,9 @@ TabChild::RecvThemeChanged(nsTArray<LookAndFeelInt>&& aLookAndFeelIntCache)
 }
 
 mozilla::ipc::IPCResult
-TabChild::RecvSetIsLargeAllocation(const bool& aIsLA, const bool& aNewProcess)
+TabChild::RecvAwaitLargeAlloc()
 {
-  mAwaitingLA = aIsLA;
-  sInLargeAllocProcess = aIsLA && aNewProcess;
+  mAwaitingLA = true;
   return IPC_OK();
 }
 
@@ -3144,7 +3142,7 @@ TabChild::IsAwaitingLargeAlloc()
 }
 
 bool
-TabChild::TakeAwaitingLargeAlloc()
+TabChild::StopAwaitingLargeAlloc()
 {
   bool awaiting = mAwaitingLA;
   mAwaitingLA = false;
