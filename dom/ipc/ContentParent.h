@@ -173,7 +173,6 @@ public:
                              hal::ProcessPriority aPriority =
                              hal::ProcessPriority::PROCESS_PRIORITY_FOREGROUND,
                              ContentParent* aOpener = nullptr,
-                             bool aLargeAllocationProcess = false,
                              bool* anew = nullptr);
 
   /**
@@ -184,8 +183,7 @@ public:
   static TabParent*
   CreateBrowser(const TabContext& aContext,
                 Element* aFrameElement,
-                ContentParent* aOpenerContentParent,
-                bool aFreshProcess = false);
+                ContentParent* aOpenerContentParent);
 
   static void GetAll(nsTArray<ContentParent*>& aArray);
 
