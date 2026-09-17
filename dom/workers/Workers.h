@@ -279,6 +279,9 @@ struct WorkerLoadInfo
 
   void
   SetPrincipalOnMainThread(nsIPrincipal* aPrincipal, nsILoadGroup* aLoadGroup);
+
+  nsresult
+  SetPrincipalFromChannel(nsIChannel* aChannel);
 };
 
 // All of these are implemented in RuntimeService.cpp
