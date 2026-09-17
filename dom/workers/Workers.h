@@ -292,6 +292,9 @@ struct WorkerLoadInfo
   bool
   FinalChannelPrincipalIsValid(nsIChannel* aChannel);
 #endif
+
+  void
+  ForgetMainThreadObjects(nsTArray<nsCOMPtr<nsISupports> >& aDoomed);
 };
 
 // All of these are implemented in RuntimeService.cpp
