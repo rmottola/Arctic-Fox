@@ -472,6 +472,12 @@ public:
     return mLoadInfo.mFromWindow;
   }
 
+  nsLoadFlags
+  GetLoadFlags() const
+  {
+    return mLoadInfo.mLoadFlags;
+  }
+
   uint64_t
   WindowID() const
   {
