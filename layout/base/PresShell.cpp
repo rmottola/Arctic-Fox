@@ -8143,6 +8143,9 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
           }
         }
       }
+      if (aEvent->mMessage == eKeyDown) {
+        mIsLastKeyDownCanceled = aEvent->mFlags.mDefaultPrevented;
+      }
       break;
     }
     case eMouseUp:
@@ -8932,6 +8935,9 @@ PresShell::FireOrClearDelayedEvents(bool aFireEvents)
            !doc->EventHandlingSuppressed()) {
       nsAutoPtr<DelayedEvent> ev(mDelayedEvents[0].forget());
       mDelayedEvents.RemoveElementAt(0);
+      if (ev->IsKeyPressEvent() && mIsLastKeyDownCanceled) {
+        continue;
+      }
       ev->Dispatch();
     }
     if (!doc->EventHandlingSuppressed()) {
@@ -9737,6 +9743,12 @@ PresShell::DelayedKeyEvent::DelayedKeyEvent(WidgetKeyboardEvent* aEvent) :
   keyEvent->mFlags.mIsSynthesizedForTests = aEvent->mFlags.mIsSynthesizedForTests;
   keyEvent->mFlags.mIsSuppressedOrDelayed = true;
   mEvent = keyEvent;
+}
+
+bool
+PresShell::DelayedKeyEvent::IsKeyPressEvent()
+{
+  return mEvent->mMessage == eKeyPress;
 }
 
 // Start of DEBUG only code
