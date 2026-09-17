@@ -1296,7 +1296,7 @@ function getSpecialFolderDir(aCSIDL) {
                                            ctypes.bool /* BOOL fCreate */);
 
   let aryPath = ctypes.char16_t.array()(260);
-  let rv = SHGetSpecialFolderPath(0, aryPath, aCSIDL, false);
+  SHGetSpecialFolderPath(0, aryPath, aCSIDL, false);
   lib.close();
 
   let path = aryPath.readString(); // Convert the c-string to js-string

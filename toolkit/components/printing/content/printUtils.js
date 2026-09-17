@@ -108,8 +108,7 @@ var PrintUtils = {
    * @param aBrowser
    *        The <xul:browser> that the nsIDOMWindow for aWindowID belongs to.
    */
-  printWindow: function(aWindowID, aBrowser)
-  {
+  printWindow(aWindowID, aBrowser) {
     let mm = aBrowser.messageManager;
     mm.sendAsyncMessage("Printing:Print", {
       windowID: aWindowID,

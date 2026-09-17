@@ -394,8 +394,6 @@
       <method name="adjustArrowPosition">
         <body>
         <![CDATA[
-        var arrow = document.getAnonymousElementByAttribute(this, "anonid", "arrow");
-
         var anchor = this.anchorNode;
         if (!anchor) {
           return;

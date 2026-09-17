@@ -153,4 +153,3 @@ add_test(function test_addon_manager_get_by_sync_guid() {
     });
   });
 });
-

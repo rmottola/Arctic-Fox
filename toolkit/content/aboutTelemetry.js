@@ -420,7 +420,6 @@ var PingPicker = {
     let weekSelector = document.getElementById("choose-ping-week");
     removeAllChildNodes(weekSelector);
 
-    let index = 0;
     for (let week of this._weeks) {
       let text = shortDateString(week.startDate)
                  + " - " + shortDateString(yesterday(week.endDate));
@@ -634,7 +633,6 @@ var EnvironmentData = {
   },
 
   renderActivePlugins: function(addonObj, addonSection, sectionTitle) {
-    let data = explodeObject(addonObj);
     let table = document.createElement("table");
     table.setAttribute("id", sectionTitle);
     this.appendAddonSubsectionTitle(sectionTitle, table);
