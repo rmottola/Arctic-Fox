@@ -12105,10 +12105,7 @@ nsDocument::MaybeActiveMediaComponents()
   }
 
   mEverInForeground = true;
-  if (GetWindow()->GetMediaSuspend() == nsISuspendedTypes::SUSPENDED_BLOCK &&
-      AudioChannelService::IsServiceStarted()) {
-    GetWindow()->SetMediaSuspend(nsISuspendedTypes::NONE_SUSPENDED);
-  }
+  GetWindow()->MaybeActiveMediaComponents();
 }
 
 NS_IMETHODIMP
