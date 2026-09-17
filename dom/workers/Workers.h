@@ -277,7 +277,7 @@ struct WorkerLoadInfo
 
   void StealFrom(WorkerLoadInfo& aOther);
 
-  void
+  nsresult
   SetPrincipalOnMainThread(nsIPrincipal* aPrincipal, nsILoadGroup* aLoadGroup);
 
   nsresult
