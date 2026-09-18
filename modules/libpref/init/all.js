@@ -1494,6 +1494,9 @@ pref("dom.forms.autocomplete.experimental", false);
 // Enables requestAutocomplete DOM API on forms.
 pref("dom.forms.requestAutocomplete", false);
 
+// Enable search in <select> dropdowns (more than 40 options)
+pref("dom.forms.selectSearch", false);
+
 #ifdef NIGHTLY_BUILD
 pref("dom.input.dirpicker", true);
 #endif
