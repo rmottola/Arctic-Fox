@@ -458,7 +458,7 @@ var SpellCheckHelper = {
   getComputedStyle(aElem, aProp) {
     return aElem.ownerDocument
                 .defaultView
-                .getComputedStyle(aElem, "").getPropertyValue(aProp);
+                .getComputedStyle(aElem).getPropertyValue(aProp);
   },
 
   isEditable(element, window) {

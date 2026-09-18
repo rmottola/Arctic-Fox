@@ -3513,7 +3513,7 @@
         <parameter name="aEvent"/>
         <body>
           <![CDATA[
-            var direction = window.getComputedStyle(this.parentNode, null).direction;
+            var direction = window.getComputedStyle(this.parentNode).direction;
             if ((direction == "ltr" && aEvent.keyCode == KeyEvent.DOM_VK_RIGHT) ||
                 (direction == "rtl" && aEvent.keyCode == KeyEvent.DOM_VK_LEFT))
               this.moveTabForward();
@@ -4674,10 +4674,10 @@
 
             var offset = 1;
             switch (aEvent.charCode) {
-              case '}'.charCodeAt(0):
+              case "}".charCodeAt(0):
                 offset = -1;
-              case '{'.charCodeAt(0):
-                if (window.getComputedStyle(this, null).direction == "ltr")
+              case "{".charCodeAt(0):
+                if (window.getComputedStyle(this).direction == "ltr")
                   offset *= -1;
                 this.tabContainer.advanceSelectedTab(offset, true);
                 aEvent.preventDefault();
@@ -5429,7 +5429,7 @@
         <body><![CDATA[
           if (this._tabMarginLeft === null || this._tabMarginRight === null) {
             let tabMiddle = document.getAnonymousElementByAttribute(aTab, "class", "tab-background-middle");
-            let tabMiddleStyle = window.getComputedStyle(tabMiddle, null);
+            let tabMiddleStyle = window.getComputedStyle(tabMiddle);
             this._tabMarginLeft = parseFloat(tabMiddleStyle.marginLeft);
             this._tabMarginRight = parseFloat(tabMiddleStyle.marginRight);
           }
@@ -6103,7 +6103,7 @@
         <body><![CDATA[
           var tabs = this.childNodes;
           var tab = this._getDragTargetTab(event, isLink);
-          if (window.getComputedStyle(this, null).direction == "ltr") {
+          if (window.getComputedStyle(this).direction == "ltr") {
             for (let i = tab ? tab._tPos : 0; i < tabs.length; i++)
               if (event.screenX < tabs[i].boxObject.screenX + tabs[i].boxObject.width / 2)
                 return i;
@@ -6381,7 +6381,7 @@
           // nothing.
           if (this.tabbrowser._removingTabs.length) {
             let visibleTabs = this.tabbrowser.visibleTabs;
-            let ltr = (window.getComputedStyle(this, null).direction == "ltr");
+            let ltr = (window.getComputedStyle(this).direction == "ltr");
             let lastTab = visibleTabs[visibleTabs.length - 1];
             let endOfTab = lastTab.getBoundingClientRect()[ltr ? "right" : "left"];
             if ((ltr && event.clientX > endOfTab) ||
@@ -6535,7 +6535,7 @@
         event.stopPropagation();
 
         var tabStrip = this.mTabstrip;
-        var ltr = (window.getComputedStyle(this, null).direction == "ltr");
+        var ltr = (window.getComputedStyle(this).direction == "ltr");
 
         // autoscroll the tab strip if we drag over the scroll
         // buttons, even if we aren't dragging a tab, but then

@@ -74,8 +74,7 @@
             var event = document.createEvent("Events");
             event.initEvent("change", true, true);
             aPreference.dispatchEvent(event);
-          }
-          catch (e) {
+          } catch (e) {
             Components.utils.reportError(e);
           }
         ]]>
@@ -849,11 +848,10 @@
                 if (this._shouldAnimate && oldPane.id != aPaneElement.id) {
                   aPaneElement.style.opacity = 0.0;
                   this.animate(oldPane, aPaneElement);
-                }
-                else if (!this._shouldAnimate && prefpanes.length > 1) {
-                  var targetHeight = parseInt(window.getComputedStyle(this._paneDeckContainer, "").height);
-                  var verticalPadding = parseInt(window.getComputedStyle(aPaneElement, "").paddingTop);
-                  verticalPadding += parseInt(window.getComputedStyle(aPaneElement, "").paddingBottom);
+                } else if (!this._shouldAnimate && prefpanes.length > 1) {
+                  var targetHeight = parseInt(window.getComputedStyle(this._paneDeckContainer).height);
+                  var verticalPadding = parseInt(window.getComputedStyle(aPaneElement).paddingTop);
+                  verticalPadding += parseInt(window.getComputedStyle(aPaneElement).paddingBottom);
                   if (aPaneElement.contentHeight > targetHeight - verticalPadding) {
                     // To workaround the bottom border of a groupbox from being
                     // cutoff an hbox with a class of bottomBox may enclose it.
@@ -862,7 +860,7 @@
                     var bottomPadding = 0;
                     var bottomBox = aPaneElement.getElementsByAttribute("class", "bottomBox")[0];
                     if (bottomBox)
-                      bottomPadding = parseInt(window.getComputedStyle(bottomBox, "").paddingBottom);
+                      bottomPadding = parseInt(window.getComputedStyle(bottomBox).paddingBottom);
                     window.innerHeight += bottomPadding + verticalPadding + aPaneElement.contentHeight - targetHeight;
                   }
 
@@ -941,14 +939,13 @@
             if (increment != 0) {
               window.innerHeight += increment;
               this._currentHeight += increment;
-            }
-            else {
+            } else {
               aTimer.cancel();
               this._setUpFadeTimer();
             }
           } else if (aTimer == this._fadeTimer) {
             var elt = document.getElementById(this.lastSelected);
-            var newOpacity = parseFloat(window.getComputedStyle(elt, "").opacity) + this._fadeIncrement;
+            var newOpacity = parseFloat(window.getComputedStyle(elt).opacity) + this._fadeIncrement;
             if (newOpacity < 1.0)
               elt.style.opacity = newOpacity;
             else {
@@ -1064,8 +1061,7 @@
             let panes = this.preferencePanes;
             for (let i = 0; i < panes.length; ++i)
               panes[i].writePreferences(true);
-          }
-          else {
+          } else {
             // Clone all the preferences elements from the child document and
             // insert them into the pane collection of the parent.
             var pdoc = window.opener.document;
@@ -1108,8 +1104,7 @@
               }
             }
           }
-        }
-        else {
+        } else {
           let panes = this.preferencePanes;
           for (var i = 0; i < panes.length; ++i)
             panes[i].writePreferences(false);
@@ -1352,8 +1347,7 @@
           try {
             var preference = this.preferenceForElement(elements[i]);
             preference.setElementValue(elements[i]);
-          }
-          catch (e) {
+          } catch (e) {
             dump("*** No preference found for " + elements[i].getAttribute("preference") + "\n");
           }
         }
