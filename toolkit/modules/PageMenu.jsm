@@ -20,7 +20,7 @@ PageMenu.prototype = {
   _browser: null,
 
   // Given a target node, get the context menu for it or its ancestor.
-  getContextMenu: function(aTarget) {
+  getContextMenu(aTarget) {
     let target = aTarget;
     while (target) {
       let contextMenu = target.contextMenu;
@@ -35,7 +35,7 @@ PageMenu.prototype = {
 
   // Given a target node, generate a JSON object for any context menu
   // associated with it, or null if there is no context menu.
-  maybeBuild: function(aTarget) {
+  maybeBuild(aTarget) {
     let pageMenu = this.getContextMenu(aTarget);
     if (!pageMenu) {
       return null;
@@ -62,7 +62,7 @@ PageMenu.prototype = {
   },
 
   // Given a JSON menu object and popup, add the context menu to the popup.
-  buildAndAttachMenuWithObject: function(aMenu, aBrowser, aPopup) {
+  buildAndAttachMenuWithObject(aMenu, aBrowser, aPopup) {
     if (!aMenu) {
       return false;
     }
@@ -95,7 +95,7 @@ PageMenu.prototype = {
   },
 
   // Construct the XUL menu structure for a given JSON object.
-  buildXULMenu: function(aNode, aElementForAppending) {
+  buildXULMenu(aNode, aElementForAppending) {
     let document = aElementForAppending.ownerDocument;
 
     let children = aNode.children;
@@ -151,7 +151,7 @@ PageMenu.prototype = {
   },
 
   // Called when the generated menuitem is executed.
-  handleEvent: function(event) {
+  handleEvent(event) {
     let type = event.type;
     let target = event.target;
     if (type == "command" && target.hasAttribute(this.GENERATEDITEMID_ATTR)) {
@@ -160,8 +160,7 @@ PageMenu.prototype = {
       // browser to execute the menuitem.
       if (this._builder) {
         this._builder.click(target.getAttribute(this.GENERATEDITEMID_ATTR));
-      }
-      else if (this._browser) {
+      } else if (this._browser) {
         let win = target.ownerDocument.defaultView;
         let windowUtils = win.QueryInterface(Ci.nsIInterfaceRequestor)
                              .getInterface(Ci.nsIDOMWindowUtils);
@@ -183,7 +182,7 @@ PageMenu.prototype = {
   },
 
   // Get the first child of the given element with the given tag name.
-  getImmediateChild: function(element, tag) {
+  getImmediateChild(element, tag) {
     let child = element.firstChild;
     while (child) {
       if (child.localName == tag) {
@@ -197,7 +196,7 @@ PageMenu.prototype = {
   // Return the location where the generated items should be inserted into the
   // given popup. They should be inserted as the next sibling of the returned
   // element.
-  getInsertionPoint: function(aPopup) {
+  getInsertionPoint(aPopup) {
     if (aPopup.hasAttribute(this.PAGEMENU_ATTR))
       return aPopup;
 
@@ -219,7 +218,7 @@ PageMenu.prototype = {
   },
 
   // Remove the generated content from the given popup.
-  removeGeneratedContent: function(aPopup) {
+  removeGeneratedContent(aPopup) {
     let ungenerated = [];
     ungenerated.push(aPopup);
 
@@ -247,7 +246,7 @@ this.PageMenuParent = function PageMenuParent() {
 }
 
 PageMenuParent.prototype = {
-  __proto__ : PageMenu.prototype,
+  __proto__: PageMenu.prototype,
 
   /*
    * Given a target node and popup, add the context menu to the popup. This is
@@ -256,7 +255,7 @@ PageMenuParent.prototype = {
    *
    * Returns true if custom menu items were present.
    */
-  buildAndAddToPopup: function(aTarget, aPopup) {
+  buildAndAddToPopup(aTarget, aPopup) {
     let menuObject = this.maybeBuild(aTarget);
     if (!menuObject) {
       return false;
@@ -273,7 +272,7 @@ PageMenuParent.prototype = {
    *
    * Returns true if custom menu items were present.
    */
-  addToPopup: function(aMenu, aBrowser, aPopup) {
+  addToPopup(aMenu, aBrowser, aPopup) {
     return this.buildAndAttachMenuWithObject(aMenu, aBrowser, aPopup);
   }
 }
@@ -283,7 +282,7 @@ this.PageMenuChild = function PageMenuChild() {
 }
 
 PageMenuChild.prototype = {
-  __proto__ : PageMenu.prototype,
+  __proto__: PageMenu.prototype,
 
   /*
    * Given a target node, return a JSON object for the custom menu commands. The
@@ -300,7 +299,7 @@ PageMenuChild.prototype = {
    *
    * If there is no menu associated with aTarget, null will be returned.
    */
-  build: function(aTarget) {
+  build(aTarget) {
     return this.maybeBuild(aTarget);
   },
 
@@ -309,7 +308,7 @@ PageMenuChild.prototype = {
    * is assumed that only one command will be executed so the builder is
    * cleared afterwards.
    */
-  executeMenu: function(aId) {
+  executeMenu(aId) {
     if (this._builder) {
       this._builder.click(aId);
       this._builder = null;
