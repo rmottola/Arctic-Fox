@@ -18,6 +18,11 @@ const MAX_ROWS = 20;
 // Interval between autoscrolls
 const AUTOSCROLL_INTERVAL = 25;
 
+// Dragging states
+const NOT_DRAGGING = 0;
+const DRAG_OVER_SELECT = -1;
+const DRAG_OVER_POPUP = 1;
+
 var currentBrowser = null;
 var currentMenulist = null;
 var currentZoom = 1;
@@ -25,7 +30,7 @@ var closedWithEnter = false;
 var selectRect;
 
 this.SelectParentHelper = {
-  draggedOverPopup: false,
+  draggingState: NOT_DRAGGING,
   scrollTimer: 0,
 
   populate: function(menulist, items, selectedIndex, zoom) {
@@ -72,18 +77,26 @@ this.SelectParentHelper = {
     menupopup.openPopupAtScreenRect(AppConstants.platform == "macosx" ? "selection" : "after_start", rect.left, rect.top, rect.width, rect.height, false, false);
 
     // Set up for dragging
-    menupopup.setCaptureAlways();
-    this.draggedOverPopup = false;
-    menupopup.addEventListener("mousemove", this);
+    this.enableDragScrolling(false);
   },
 
-  hide: function(menulist, browser) {
+  hide(menulist, browser) {
     if (currentBrowser == browser) {
       menulist.menupopup.hidePopup();
     }
   },
 
-  clearScrollTimer: function() {
+  enableDragScrolling(overOption) {
+    if (this.draggingState) {
+      return;
+    }
+
+    currentMenulist.menupopup.setCaptureAlways();
+    this.draggingState = overOption ? DRAG_OVER_POPUP : DRAG_OVER_SELECT;
+    currentMenulist.menupopup.addEventListener("mousemove", this);
+  },
+
+  clearScrollTimer() {
     if (this.scrollTimer) {
       let win = currentBrowser.ownerDocument.defaultView;
       win.clearInterval(this.scrollTimer);
@@ -91,9 +104,10 @@ this.SelectParentHelper = {
     }
   },
 
-  handleEvent: function(event) {
+  handleEvent(event) {
     switch (event.type) {
       case "mouseup":
+        this.draggingState = NOT_DRAGGING;
         this.clearScrollTimer();
         currentMenulist.menupopup.removeEventListener("mousemove", this);
 
@@ -115,6 +129,14 @@ this.SelectParentHelper = {
         currentBrowser.messageManager.sendAsyncMessage("Forms:MouseOut", {});
         break;
 
+      case "mousedown":
+        if (event.target.localName == "menuitem" ||
+            event.target.localName == "menu" ||
+            event.target.localName == "menucaption") {
+          this.enableDragScrolling(true);
+        }
+        break;
+
       case "mousemove":
         let menupopup = currentMenulist.menupopup;
 
@@ -132,18 +154,18 @@ this.SelectParentHelper = {
 
         // If dragging outside the top or bottom edge of the popup, but within
         // the popup area horizontally, scroll the list in that direction. The
-        // draggedOverPopup flag is used to ensure that scrolling does not start
-        // until the mouse has moved over the popup first, preventing scrolling
-        // while over the dropdown button.
+        // this.draggingState flag is used to ensure that scrolling does not
+        // start until the mouse has moved over the popup first, preventing
+        // scrolling while over the dropdown button.
         let popupRect = menupopup.getOuterScreenRect();
         if (event.screenX >= popupRect.left && event.screenX <= popupRect.right) {
-          if (!this.draggedOverPopup) {
+          if (this.draggingState == DRAG_OVER_SELECT) {
             if (event.screenY > popupRect.top && event.screenY < popupRect.bottom) {
-              this.draggedOverPopup = true;
+              this.draggingState = DRAG_OVER_POPUP;
             }
           }
 
-          if (this.draggedOverPopup &&
+          if (this.draggingState == DRAG_OVER_POPUP &&
               (event.screenY <= popupRect.top || event.screenY >= popupRect.bottom)) {
             let scrollAmount = event.screenY <= popupRect.top ? -1 : 1;
             menupopup.scrollBox.scrollByIndex(scrollAmount);
@@ -182,6 +204,7 @@ this.SelectParentHelper = {
         currentBrowser.messageManager.sendAsyncMessage("Forms:DismissedDropDown", {});
         let popup = event.target;
         this._unregisterListeners(currentBrowser, popup);
+        this.draggingState = NOT_DRAGGING;
         this.clearScrollTimer();
         popup.releaseCapture();
         popup.parentNode.hidden = true;
@@ -209,6 +232,7 @@ this.SelectParentHelper = {
   _registerListeners: function(browser, popup) {
     popup.addEventListener("command", this);
     popup.addEventListener("popuphidden", this);
+    popup.addEventListener("mousedown", this);
     popup.addEventListener("mouseover", this);
     popup.addEventListener("mouseout", this);
     browser.ownerDocument.defaultView.addEventListener("mouseup", this, true);
@@ -220,6 +244,7 @@ this.SelectParentHelper = {
   _unregisterListeners: function(browser, popup) {
     popup.removeEventListener("command", this);
     popup.removeEventListener("popuphidden", this);
+    popup.removeEventListener("mousedown", this);
     popup.removeEventListener("mouseover", this);
     popup.removeEventListener("mouseout", this);
     browser.ownerDocument.defaultView.removeEventListener("mouseup", this, true);
