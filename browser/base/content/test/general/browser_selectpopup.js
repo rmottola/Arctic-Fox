@@ -9,7 +9,8 @@ const XHTML_DTD = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www
 
 const PAGECONTENT =
   "<html xmlns='http://www.w3.org/1999/xhtml'>" +
-  "<body onload='gChangeEvents = 0;gInputEvents = 0; document.body.firstChild.focus()'><select oninput='gInputEvents++' onchange='gChangeEvents++'>" +
+  "<body onload='gChangeEvents = 0;gInputEvents = 0; gClickEvents = 0; document.body.firstChild.focus()'>" +
+  "<select oninput='gInputEvents++' onchange='gChangeEvents++' onclick='if (event.target == this) gClickEvents++'>" +
   "  <optgroup label='First Group'>" +
   "    <option value='One'>One</option>" +
   "    <option value='Two'>Two</option>" +
@@ -146,6 +147,7 @@ function doSelectTests(contentType, dtd)
 
   is((yield getInputEvents()), 0, "Before closed - number of input events");
   is((yield getChangeEvents()), 0, "Before closed - number of change events");
+  is((yield getClickEvents()), 0, "Before closed - number of click events");
 
   EventUtils.synthesizeKey("a", { accelKey: true });
   yield ContentTask.spawn(gBrowser.selectedBrowser, { isWindows }, function(args) {
