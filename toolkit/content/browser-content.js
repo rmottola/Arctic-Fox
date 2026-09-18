@@ -68,7 +68,7 @@ var ClickEventHandler = {
 
   findNearestScrollableElement: function(aNode) {
     // this is a list of overflow property values that allow scrolling
-    const scrollingAllowed = ['scroll', 'auto'];
+    const scrollingAllowed = ["scroll", "auto"];
 
     // go upward in the DOM and find any parent element that has a overflow
     // area and can therefore be scrolled
@@ -83,11 +83,11 @@ var ClickEventHandler = {
       }
 
       var overflowx = this._scrollable.ownerDocument.defaultView
-                          .getComputedStyle(this._scrollable, '')
-                          .getPropertyValue('overflow-x');
+                          .getComputedStyle(this._scrollable, "")
+                          .getPropertyValue("overflow-x");
       var overflowy = this._scrollable.ownerDocument.defaultView
-                          .getComputedStyle(this._scrollable, '')
-                          .getPropertyValue('overflow-y');
+                          .getComputedStyle(this._scrollable, "")
+                          .getPropertyValue("overflow-y");
       // we already discarded non-multiline selects so allow vertical
       // scroll for multiline ones directly without checking for a
       // overflow property
@@ -199,13 +199,13 @@ var ClickEventHandler = {
     var actualScrollY = 0;
     // don't bother scrolling vertically when the scrolldir is only horizontal
     // and the other way around
-    if (this._scrolldir != 'EW') {
+    if (this._scrolldir != "EW") {
       var y = this.accelerate(this._screenY, this._startY) * timeCompensation;
       var desiredScrollY = this._scrollErrorY + y;
       actualScrollY = this.roundToZero(desiredScrollY);
       this._scrollErrorY = (desiredScrollY - actualScrollY);
     }
-    if (this._scrolldir != 'NS') {
+    if (this._scrolldir != "NS") {
       var x = this.accelerate(this._screenX, this._startX) * timeCompensation;
       var desiredScrollX = this._scrollErrorX + x;
       actualScrollX = this.roundToZero(desiredScrollX);
@@ -896,7 +896,7 @@ let WebChannelMessageToChromeListener = {
     let principal = e.target.nodePrincipal ? e.target.nodePrincipal : e.target.document.nodePrincipal;
 
     if (e.detail) {
-      if (typeof e.detail != 'string') {
+      if (typeof e.detail != "string") {
         // Check if the principal is one of the ones that's allowed to send
         // non-string values for e.detail.
         let objectsAllowed = this._getWhitelistedPrincipals().some(whitelisted =>
@@ -1356,7 +1356,7 @@ var ViewSelectionSource = {
       tmp = tmp.replace(/^ +/, "");
       tmp = tmp.replace(/ +$/, "");
       if (tmp.length != 0) {
-        str += '<span class="text">' + this.unicodeToEntity(tmp) + '</span>';
+        str += '<span class="text">' + this.unicodeToEntity(tmp) + "</span>";
       }
       break;
     default:
@@ -1387,7 +1387,7 @@ var ViewSelectionSource = {
         var unichar = this._entityConverter
                           .ConvertToEntity(letter, entityVersion);
         var entity = unichar.substring(1); // extract '&'
-        return '&amp;<span class="entity">' + entity + '</span>';
+        return '&amp;<span class="entity">' + entity + "</span>";
       } catch (ex) {
         return letter;
       }

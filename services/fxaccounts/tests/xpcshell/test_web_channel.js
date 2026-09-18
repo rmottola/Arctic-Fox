@@ -25,7 +25,7 @@ add_test(function () {
   "Error: Missing 'content_uri' option");
 
   validationHelper({
-    content_uri: 'bad uri',
+    content_uri: "bad uri",
     channel_id: WEBCHANNEL_ID
   },
   /NS_ERROR_MALFORMED_URI/);
@@ -59,8 +59,8 @@ add_test(function test_profile_image_change_message() {
 
 add_test(function test_login_message() {
   let mockMessage = {
-    command: 'fxaccounts:login',
-    data: { email: 'testuser@testuser.com' }
+    command: "fxaccounts:login",
+    data: { email: "testuser@testuser.com" }
   };
 
   let channel = new FxAccountsWebChannel({
@@ -79,7 +79,7 @@ add_test(function test_login_message() {
 
 add_test(function test_logout_message() {
   let mockMessage = {
-    command: 'fxaccounts:logout',
+    command: "fxaccounts:logout",
     data: { uid: "foo" }
   };
 
@@ -99,7 +99,7 @@ add_test(function test_logout_message() {
 
 add_test(function test_delete_message() {
   let mockMessage = {
-    command: 'fxaccounts:delete',
+    command: "fxaccounts:delete",
     data: { uid: "foo" }
   };
 
@@ -119,8 +119,8 @@ add_test(function test_delete_message() {
 
 add_test(function test_can_link_account_message() {
   let mockMessage = {
-    command: 'fxaccounts:can_link_account',
-    data: { email: 'testuser@testuser.com' }
+    command: "fxaccounts:can_link_account",
+    data: { email: "testuser@testuser.com" }
   };
 
   let channel = new FxAccountsWebChannel({
@@ -139,7 +139,7 @@ add_test(function test_can_link_account_message() {
 
 add_test(function test_unrecognized_message() {
   let mockMessage = {
-    command: 'fxaccounts:unrecognized',
+    command: "fxaccounts:unrecognized",
     data: {}
   };
 
@@ -157,8 +157,8 @@ add_test(function test_unrecognized_message() {
 add_test(function test_helpers_should_allow_relink_same_email() {
   let helpers = new FxAccountsWebChannelHelpers();
 
-  helpers.setPreviousAccountNameHashPref('testuser@testuser.com');
-  do_check_true(helpers.shouldAllowRelink('testuser@testuser.com'));
+  helpers.setPreviousAccountNameHashPref("testuser@testuser.com");
+  do_check_true(helpers.shouldAllowRelink("testuser@testuser.com"));
 
   run_next_test();
 });
@@ -166,14 +166,14 @@ add_test(function test_helpers_should_allow_relink_same_email() {
 add_test(function test_helpers_should_allow_relink_different_email() {
   let helpers = new FxAccountsWebChannelHelpers();
 
-  helpers.setPreviousAccountNameHashPref('testuser@testuser.com');
+  helpers.setPreviousAccountNameHashPref("testuser@testuser.com");
 
   helpers._promptForRelink = (acctName) => {
-    return acctName === 'allowed_to_relink@testuser.com';
+    return acctName === "allowed_to_relink@testuser.com";
   };
 
-  do_check_true(helpers.shouldAllowRelink('allowed_to_relink@testuser.com'));
-  do_check_false(helpers.shouldAllowRelink('not_allowed_to_relink@testuser.com'));
+  do_check_true(helpers.shouldAllowRelink("allowed_to_relink@testuser.com"));
+  do_check_false(helpers.shouldAllowRelink("not_allowed_to_relink@testuser.com"));
 
   run_next_test();
 });
@@ -266,7 +266,7 @@ function validationHelper(params, expected) {
   try {
     new FxAccountsWebChannel(params);
   } catch (e) {
-    if (typeof expected === 'string') {
+    if (typeof expected === "string") {
       return do_check_eq(e.toString(), expected);
     } else {
       return do_check_true(e.toString().match(expected));

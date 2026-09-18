@@ -616,7 +616,7 @@ this.LoginHelper = {
   loginToVanillaObject(login) {
     let obj = {};
     for (let i in login.QueryInterface(Ci.nsILoginMetaInfo)) {
-      if (typeof login[i] !== 'function') {
+      if (typeof login[i] !== "function") {
         obj[i] = login[i];
       }
     }

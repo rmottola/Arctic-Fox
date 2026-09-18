@@ -2,23 +2,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-'use strict';
+"use strict";
 
 const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
-Cu.import('resource://gre/modules/Services.jsm');
-Cu.import('resource://gre/modules/XPCOMUtils.jsm');
-Cu.import('resource://gre/modules/AppConstants.jsm');
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/AppConstants.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(
   this,
-  'ProfileService',
-  '@mozilla.org/toolkit/profile-service;1',
-  'nsIToolkitProfileService'
+  "ProfileService",
+  "@mozilla.org/toolkit/profile-service;1",
+  "nsIToolkitProfileService"
 );
 
 const bundle = Services.strings.createBundle(
-  'chrome://global/locale/aboutProfiles.properties');
+  "chrome://global/locale/aboutProfiles.properties");
 
 // nsIToolkitProfileService.selectProfile can be used only during the selection
 // of the profile in the ProfileManager. If we are showing about:profiles in a
@@ -52,7 +52,7 @@ function findCurrentProfile() {
 }
 
 function refreshUI() {
-  let parent = document.getElementById('profiles');
+  let parent = document.getElementById("profiles");
   while (parent.firstChild) {
     parent.removeChild(parent.firstChild);
   }
@@ -72,13 +72,13 @@ function refreshUI() {
               isCurrentProfile: profile == currentProfile });
   }
 
-  let createButton = document.getElementById('create-button');
+  let createButton = document.getElementById("create-button");
   createButton.onclick = createProfileWizard;
 
-  let restartSafeModeButton = document.getElementById('restart-in-safe-mode-button');
+  let restartSafeModeButton = document.getElementById("restart-in-safe-mode-button");
   restartSafeModeButton.onclick = function() { restart(true); }
 
-  let restartNormalModeButton = document.getElementById('restart-button');
+  let restartNormalModeButton = document.getElementById("restart-button");
   restartNormalModeButton.onclick = function() { restart(false); }
 }
 
@@ -171,8 +171,8 @@ function display(profileData) {
   }
 
   if (!profileData.isDefault) {
-    let defaultButton = document.createElement('button');
-    defaultButton.appendChild(document.createTextNode(bundle.GetStringFromName('setAsDefault')));
+    let defaultButton = document.createElement("button");
+    defaultButton.appendChild(document.createTextNode(bundle.GetStringFromName("setAsDefault")));
     defaultButton.onclick = function() {
       defaultProfile(profileData.profile);
     };
@@ -199,14 +199,14 @@ function CreateProfile(profile) {
 
 function createProfileWizard() {
   // This should be rewritten in HTML eventually.
-  window.openDialog('chrome://mozapps/content/profile/createProfileWizard.xul',
-                    '', 'centerscreen,chrome,modal,titlebar',
+  window.openDialog("chrome://mozapps/content/profile/createProfileWizard.xul",
+                    "", "centerscreen,chrome,modal,titlebar",
                     ProfileService);
 }
 
 function renameProfile(profile) {
-  let title = bundle.GetStringFromName('renameProfileTitle');
-  let msg = bundle.formatStringFromName('renameProfile', [profile.name], 1);
+  let title = bundle.GetStringFromName("renameProfileTitle");
+  let msg = bundle.formatStringFromName("renameProfile", [profile.name], 1);
   let newName = { value: profile.name };
 
   if (Services.prompt.prompt(window, title, msg, newName, null,
@@ -220,8 +220,8 @@ function renameProfile(profile) {
     try {
       profile.name = newName;
     } catch (e) {
-      let title = bundle.GetStringFromName('invalidProfileNameTitle');
-      let msg = bundle.formatStringFromName('invalidProfileName', [newName], 1);
+      let title = bundle.GetStringFromName("invalidProfileNameTitle");
+      let msg = bundle.formatStringFromName("invalidProfileName", [newName], 1);
       Services.prompt.alert(window, title, msg);
       return;
     }
@@ -235,17 +235,17 @@ function removeProfile(profile) {
   let deleteFiles = false;
 
   if (profile.rootDir.exists()) {
-    let title = bundle.GetStringFromName('deleteProfileTitle');
-    let msg = bundle.formatStringFromName('deleteProfileConfirm',
+    let title = bundle.GetStringFromName("deleteProfileTitle");
+    let msg = bundle.formatStringFromName("deleteProfileConfirm",
                                           [profile.rootDir.path], 1);
 
     let buttonPressed = Services.prompt.confirmEx(window, title, msg,
                           (Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_0) +
                           (Services.prompt.BUTTON_TITLE_CANCEL * Services.prompt.BUTTON_POS_1) +
                           (Services.prompt.BUTTON_TITLE_IS_STRING * Services.prompt.BUTTON_POS_2),
-                          bundle.GetStringFromName('dontDeleteFiles'),
+                          bundle.GetStringFromName("dontDeleteFiles"),
                           null,
-                          bundle.GetStringFromName('deleteFiles'),
+                          bundle.GetStringFromName("deleteFiles"),
                           null, {value:0});
     if (buttonPressed == 1) {
       return;
@@ -297,7 +297,7 @@ function restart(safeMode) {
   }
 }
 
-window.addEventListener('DOMContentLoaded', function load() {
-  window.removeEventListener('DOMContentLoaded', load);
+window.addEventListener("DOMContentLoaded", function load() {
+  window.removeEventListener("DOMContentLoaded", load);
   refreshUI();
 });

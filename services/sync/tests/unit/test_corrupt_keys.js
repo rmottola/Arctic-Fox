@@ -158,7 +158,7 @@ add_task(function* test_locally_changed_keys() {
     _("Busting some new server values.");
     // Now what happens if we corrupt the HMAC on the server?
     for (let i = 5; i < 10; i++) {
-      let id = 'record-no--' + i;
+      let id = "record-no--" + i;
       let modified = 1 + (Date.now() / 1000);
 
       let w = new CryptoWrapper("history", "id");

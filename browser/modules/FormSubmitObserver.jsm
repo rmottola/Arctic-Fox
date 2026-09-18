@@ -128,11 +128,11 @@ FormSubmitObserver.prototype =
     element.focus();
 
     // Watch for input changes which may change the validation message.
-    element.addEventListener("input", this, false);
+    element.addEventListener("input", this);
 
     // Watch for focus changes so we can disconnect our listeners and
     // hide the popup.
-    element.addEventListener("blur", this, false);
+    element.addEventListener("blur", this);
 
     this._showPopup(element);
   },
@@ -193,13 +193,13 @@ FormSubmitObserver.prototype =
     // and where the content begin for the other elements.
     let offset = 0;
 
-    if (aElement.tagName == 'INPUT' &&
-        (aElement.type == 'radio' || aElement.type == 'checkbox')) {
+    if (aElement.tagName == "INPUT" &&
+        (aElement.type == "radio" || aElement.type == "checkbox")) {
       panelData.position = "bottomcenter topleft";
     } else {
       let win = aElement.ownerGlobal;
       let style = win.getComputedStyle(aElement, null);
-      if (style.direction == 'rtl') {
+      if (style.direction == "rtl") {
         offset = parseInt(style.paddingRight) + parseInt(style.borderRightWidth);
       } else {
         offset = parseInt(style.paddingLeft) + parseInt(style.borderLeftWidth);

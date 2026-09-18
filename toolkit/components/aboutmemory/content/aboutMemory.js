@@ -54,7 +54,7 @@ XPCOMUtils.defineLazyGetter(this, "nsGzipConverter",
 var gMgr = Cc["@mozilla.org/memory-reporter-manager;1"]
              .getService(Ci.nsIMemoryReporterManager);
 
-const gPageName = 'about:memory';
+const gPageName = "about:memory";
 document.title = gPageName;
 
 const gUnnamedProcessStr = "Main Process";
@@ -69,9 +69,9 @@ var gIsDiff = false;
 function flipBackslashes(aUnsafeStr)
 {
   // Save memory by only doing the replacement if it's necessary.
-  return (aUnsafeStr.indexOf('\\') === -1)
+  return (aUnsafeStr.indexOf("\\") === -1)
          ? aUnsafeStr
-         : aUnsafeStr.replace(/\\/g, '/');
+         : aUnsafeStr.replace(/\\/g, "/");
 }
 
 const gAssertionFailureMsgPrefix = "aboutMemory.js assertion failed: ";
@@ -157,11 +157,11 @@ function updateTitleMainAndFooter(aTitleNote, aMsg, aFooterAction, aClassName)
   gMain.parentNode.replaceChild(tmp, gMain);
   gMain = tmp;
 
-  gMain.classList.remove('hidden');
-  gMain.classList.remove('verbose');
-  gMain.classList.remove('non-verbose');
+  gMain.classList.remove("hidden");
+  gMain.classList.remove("verbose");
+  gMain.classList.remove("non-verbose");
   if (gVerbose) {
-    gMain.classList.add(gVerbose.checked ? 'verbose' : 'non-verbose');
+    gMain.classList.add(gVerbose.checked ? "verbose" : "non-verbose");
   }
 
   let msgElement;
@@ -363,9 +363,9 @@ function onLoad()
 
   appendElementWithText(row4, "div", "opsRowLabel", "Save GC & CC logs");
   appendButton(row4, GCAndCCLogDesc,
-               saveGCLogAndConciseCCLog, "Save concise", 'saveLogsConcise');
+               saveGCLogAndConciseCCLog, "Save concise", "saveLogsConcise");
   appendButton(row4, GCAndCCAllLogDesc,
-               saveGCLogAndVerboseCCLog, "Save verbose", 'saveLogsVerbose');
+               saveGCLogAndVerboseCCLog, "Save verbose", "saveLogsVerbose");
 
   // Three cases here:
   // - DMD is disabled (i.e. not built): don't show the button.
@@ -386,12 +386,12 @@ function onLoad()
   // Generate the main div, where content ("section" divs) will go.  It's
   // hidden at first.
 
-  gMain = appendElement(document.body, 'div', '');
-  gMain.id = 'mainDiv';
+  gMain = appendElement(document.body, "div", "");
+  gMain.id = "mainDiv";
 
   // Generate the footer.  It's hidden at first.
 
-  gFooter = appendElement(document.body, 'div', 'ancillary hidden');
+  gFooter = appendElement(document.body, "div", "ancillary hidden");
 
   let a = appendElementWithText(gFooter, "a", "option",
                                 "Troubleshooting information");
@@ -408,12 +408,12 @@ function onLoad()
   // See if we're loading from a file.  (Because about:memory is a non-standard
   // URL, location.search is undefined, so we have to use location.href
   // instead.)
-  let search = location.href.split('?')[1];
+  let search = location.href.split("?")[1];
   if (search) {
-    let searchSplit = search.split('&');
+    let searchSplit = search.split("&");
     for (let i = 0; i < searchSplit.length; i++) {
-      if (searchSplit[i].toLowerCase().startsWith('file=')) {
-        let filename = searchSplit[i].substring('file='.length);
+      if (searchSplit[i].toLowerCase().startsWith("file=")) {
+        let filename = searchSplit[i].substring("file=".length);
         updateAboutMemoryFromFile(decodeURIComponent(filename));
         return;
       }
@@ -485,14 +485,14 @@ function dumpGCLogAndCCLog(aVerbose)
                 .getService(Ci.nsIMemoryInfoDumper);
 
   let inProgress = updateMainAndFooter("Saving logs...", HIDE_FOOTER);
-  let section = appendElement(gMain, 'div', "section");
+  let section = appendElement(gMain, "div", "section");
 
   function displayInfo(gcLog, ccLog, isParent) {
-    appendElementWithText(section, 'div', "",
+    appendElementWithText(section, "div", "",
                           "Saved GC log to " + gcLog.path);
 
     let ccLogType = aVerbose ? "verbose" : "concise";
-    appendElementWithText(section, 'div', "",
+    appendElementWithText(section, "div", "",
                           "Saved " + ccLogType + " CC log to " + ccLog.path);
   }
 
@@ -985,7 +985,7 @@ function appendAboutMemoryMain(aProcessReports, aHasMozMallocUsableSize)
            "bad presence");
 
     let process = aProcess === "" ? gUnnamedProcessStr : aProcess;
-    let unsafeNames = aUnsafePath.split('/');
+    let unsafeNames = aUnsafePath.split("/");
     let unsafeName0 = unsafeNames[0];
     let isDegenerate = unsafeNames.length === 1;
 
@@ -1058,8 +1058,8 @@ function appendAboutMemoryMain(aProcessReports, aHasMozMallocUsableSize)
       }
 
       // Then sort by resident size.
-      let nodeA = pcollsByProcess[aProcessA]._degenerates['resident'];
-      let nodeB = pcollsByProcess[aProcessB]._degenerates['resident'];
+      let nodeA = pcollsByProcess[aProcessA]._degenerates["resident"];
+      let nodeB = pcollsByProcess[aProcessB]._degenerates["resident"];
       let residentA = nodeA ? nodeA._amount : -1;
       let residentB = nodeB ? nodeB._amount : -1;
 
@@ -1084,7 +1084,7 @@ function appendAboutMemoryMain(aProcessReports, aHasMozMallocUsableSize)
     // Generate output for each process.
     for (let i = 0; i < processes.length; i++) {
       let process = processes[i];
-      let section = appendElement(gMain, 'div', 'section');
+      let section = appendElement(gMain, "div", "section");
 
       appendProcessAboutMemoryElements(section, i, process,
                                        pcollsByProcess[process]._trees,
@@ -1151,7 +1151,7 @@ TreeNode.prototype = {
       return Math.abs(this._amount);
     }
 
-    if ('_maxAbsDescendant' in this) {
+    if ("_maxAbsDescendant" in this) {
       // We've computed this before? Return the saved value.
       return this._maxAbsDescendant;
     }
@@ -1223,7 +1223,7 @@ function fillInTree(aRoot)
       // to avoid redundant entries.
       let kid = aT._kids[0];
       let kidBytes = fillInNonLeafNodes(kid);
-      aT._unsafeName += '/' + kid._unsafeName;
+      aT._unsafeName += "/" + kid._unsafeName;
       if (kid._kids) {
         aT._kids = kid._kids;
       } else {
@@ -1253,7 +1253,7 @@ function fillInTree(aRoot)
           (aT._presence === DReport.PRESENT_IN_FIRST_ONLY ||
            aT._presence === DReport.PRESENT_IN_SECOND_ONLY)) {
         aT._amount += kidsBytes;
-        let fake = new TreeNode('(fake child)', aT._units);
+        let fake = new TreeNode("(fake child)", aT._units);
         fake._presence = DReport.ADDED_FOR_BALANCE;
         fake._amount = aT._amount - kidsBytes;
         aT._kids.push(fake);
@@ -1551,7 +1551,7 @@ function appendProcessAboutMemoryElements(aP, aN, aProcess, aTrees,
   }
   for (let i = 0; i < otherDegenerates.length; i++) {
     let t = otherDegenerates[i];
-    let padText = pad("", maxStringLength - t.toString().length, ' ');
+    let padText = pad("", maxStringLength - t.toString().length, " ");
     appendTreeElements(pre, t, aProcess, padText);
   }
   appendTextNode(aP, "\n");  // gives nice spacing when we copy and paste
@@ -1738,15 +1738,15 @@ function appendMrNameSpan(aP, aDescription, aUnsafeName, aIsInvalid, aNMerged,
     let c, title;
     switch (aPresence) {
      case DReport.PRESENT_IN_FIRST_ONLY:
-      c = '-';
+      c = "-";
       title = "This value was only present in the first set of memory reports.";
       break;
      case DReport.PRESENT_IN_SECOND_ONLY:
-      c = '+';
+      c = "+";
       title = "This value was only present in the second set of memory reports.";
       break;
      case DReport.ADDED_FOR_BALANCE:
-      c = '!';
+      c = "!";
       title = "One of the sets of memory reports lacked children for this " +
               "node's parent. This is a fake child node added to make the " +
               "two memory sets comparable.";

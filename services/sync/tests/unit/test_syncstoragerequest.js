@@ -99,7 +99,7 @@ add_test(function test_weave_timestamp() {
  */
 add_test(function test_weave_backoff() {
   function handler(request, response) {
-    response.setHeader("X-Weave-Backoff", '600', false);
+    response.setHeader("X-Weave-Backoff", "600", false);
     response.setStatusLine(request.httpVersion, 200, "OK");
   }
   let server = httpd_setup({"/resource": handler});
@@ -124,7 +124,7 @@ add_test(function test_weave_backoff() {
  */
 add_test(function test_weave_quota_notice() {
   function handler(request, response) {
-    response.setHeader("X-Weave-Quota-Remaining", '1048576', false);
+    response.setHeader("X-Weave-Quota-Remaining", "1048576", false);
     response.setStatusLine(request.httpVersion, 200, "OK");
   }
   let server = httpd_setup({"/resource": handler});
@@ -149,7 +149,7 @@ add_test(function test_weave_quota_notice() {
  */
 add_test(function test_weave_quota_error() {
   function handler(request, response) {
-    response.setHeader("X-Weave-Quota-Remaining", '1048576', false);
+    response.setHeader("X-Weave-Quota-Remaining", "1048576", false);
     response.setStatusLine(request.httpVersion, 400, "Bad Request");
   }
   let server = httpd_setup({"/resource": handler});
@@ -173,8 +173,8 @@ add_test(function test_weave_quota_error() {
 add_test(function test_abort() {
   function handler(request, response) {
     response.setHeader("X-Weave-Timestamp", "" + TIMESTAMP, false);
-    response.setHeader("X-Weave-Quota-Remaining", '1048576', false);
-    response.setHeader("X-Weave-Backoff", '600', false);
+    response.setHeader("X-Weave-Quota-Remaining", "1048576", false);
+    response.setHeader("X-Weave-Backoff", "600", false);
     response.setStatusLine(request.httpVersion, 200, "OK");
   }
   let server = httpd_setup({"/resource": handler});

@@ -48,7 +48,7 @@ function getParent(path) {
     if (lastSlash == -1) {
       return "";
     }
-    return '/' + path.substring(0, lastSlash).replace(/\\/g, '/');
+    return "/" + path.substring(0, lastSlash).replace(/\\/g, "/");
   }
   return path.substring(0, lastSlash);
 }
@@ -69,7 +69,7 @@ function copyDirToTempProfile(path, subdirname) {
   }
 
   // The SimpleTest directory is hidden
-  var files = Array.from(dirIter('file://' + rootDir));
+  var files = Array.from(dirIter("file://" + rootDir));
   for (f in files) {
     files[f].copyTo(tmpdir, "");
   }
@@ -89,8 +89,8 @@ function chromeURIToFile(chromeURI)
   var jar = getJar(chromeURI);
   if (jar) {
     var tmpDir = extractJarToTmp(jar);
-    let parts = chromeURI.split('/');
-    if (parts[parts.length - 1] != '') {
+    let parts = chromeURI.split("/");
+    if (parts[parts.length - 1] != "") {
       tmpDir.append(parts[parts.length - 1]);
     }
     return tmpDir;

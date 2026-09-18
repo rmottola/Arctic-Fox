@@ -208,8 +208,8 @@ let gTests = [
           Assert.ok("Tab successfully opened");
 
           // It should have asked for keys.
-          let queryString = gBrowser.currentURI.spec.split('?')[1];
-          Assert.ok(queryString.indexOf('keys=true') >= 0);
+          let queryString = gBrowser.currentURI.spec.split("?")[1];
+          Assert.ok(queryString.indexOf("keys=true") >= 0);
 
           tabOpened = true;
         });

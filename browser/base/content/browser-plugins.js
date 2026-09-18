@@ -403,7 +403,7 @@ var gPluginHandler = {
         appendNotification(message, "plugin-hidden", null,
                            notificationBox.PRIORITY_INFO_HIGH, buttons);
       if (haveInsecure) {
-        n.classList.add('pluginVulnerable');
+        n.classList.add("pluginVulnerable");
       }
     }
 

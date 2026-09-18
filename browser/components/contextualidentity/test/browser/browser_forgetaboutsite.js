@@ -206,7 +206,7 @@ function* test_image_cache_cleared() {
 
   for (let userContextId of Object.keys(USER_CONTEXTS)) {
     // Open our tab in the given user context to cache image.
-    tabs[userContextId] = yield* openTabInUserContext('http://localhost:' + gHttpServer.identity.primaryPort + '/loadImage.html',
+    tabs[userContextId] = yield* openTabInUserContext("http://localhost:" + gHttpServer.identity.primaryPort + "/loadImage.html",
                                                       userContextId);
     yield BrowserTestUtils.removeTab(tabs[userContextId].tab);
   }
@@ -225,7 +225,7 @@ function* test_image_cache_cleared() {
   // Load again.
   for (let userContextId of Object.keys(USER_CONTEXTS)) {
     // Open our tab in the given user context to cache image.
-    tabs[userContextId] = yield* openTabInUserContext('http://localhost:' + gHttpServer.identity.primaryPort + '/loadImage.html',
+    tabs[userContextId] = yield* openTabInUserContext("http://localhost:" + gHttpServer.identity.primaryPort + "/loadImage.html",
                                                       userContextId);
     yield BrowserTestUtils.removeTab(tabs[userContextId].tab);
   }
@@ -327,8 +327,8 @@ add_task(function* setup() {
   // Create a http server for the image cache test.
   if (!gHttpServer) {
     gHttpServer = new HttpServer();
-    gHttpServer.registerPathHandler('/image.png', imageHandler);
-    gHttpServer.registerPathHandler('/loadImage.html', loadImagePageHandler);
+    gHttpServer.registerPathHandler("/image.png", imageHandler);
+    gHttpServer.registerPathHandler("/loadImage.html", loadImagePageHandler);
     gHttpServer.start(-1);
   }
 });

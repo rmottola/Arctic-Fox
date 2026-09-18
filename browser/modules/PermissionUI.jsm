@@ -70,12 +70,12 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
 
 XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
   return Services.strings
-                 .createBundle('chrome://branding/locale/brand.properties');
+                 .createBundle("chrome://branding/locale/brand.properties");
 });
 
 XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
   return Services.strings
-                 .createBundle('chrome://browser/locale/browser.properties');
+                 .createBundle("chrome://browser/locale/browser.properties");
 });
 
 this.PermissionUI = {};

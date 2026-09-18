@@ -153,7 +153,7 @@ function wrapWithExceptionHandler(f) {
     try {
       f(...args);
     } catch (ex) {
-      if (typeof(ex) != 'object') {
+      if (typeof(ex) != "object") {
         throw ex;
       }
       dump("Caught exception: " + ex.message + "\n");

@@ -6,7 +6,7 @@ Cu.import("resource://testing-common/services/common/utils.js");
 Cu.import("resource://testing-common/PlacesTestUtils.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-XPCOMUtils.defineLazyGetter(this, 'SyncPingSchema', function() {
+XPCOMUtils.defineLazyGetter(this, "SyncPingSchema", function() {
   let ns = {};
   Cu.import("resource://gre/modules/FileUtils.jsm", ns);
   let stream = Cc["@mozilla.org/network/file-input-stream;1"]
@@ -28,7 +28,7 @@ XPCOMUtils.defineLazyGetter(this, 'SyncPingSchema', function() {
   return schema;
 });
 
-XPCOMUtils.defineLazyGetter(this, 'SyncPingValidator', function() {
+XPCOMUtils.defineLazyGetter(this, "SyncPingValidator", function() {
   let ns = {};
   Cu.import("resource://testing-common/ajv-4.1.1.js", ns);
   let ajv = new ns.Ajv({ async: "co*" });

@@ -19,7 +19,7 @@ add_task(function* setup() {
 add_task(function* test() {
   info("Creating a tab with UCI = 1...");
   let tab = gBrowser.addTab(BASE_URI, {userContextId: 1});
-  is(tab.getAttribute('usercontextid'), 1, "New tab has UCI equal 1");
+  is(tab.getAttribute("usercontextid"), 1, "New tab has UCI equal 1");
 
   let browser = gBrowser.getBrowserForTab(tab);
   yield BrowserTestUtils.browserLoaded(browser);
@@ -33,7 +33,7 @@ add_task(function* test() {
   let newTab = newWin.gBrowser.selectedTab;
 
   yield BrowserTestUtils.browserLoaded(newTab.linkedBrowser);
-  is(newTab.getAttribute('usercontextid'), 1, "New tab has UCI equal 1");
+  is(newTab.getAttribute("usercontextid"), 1, "New tab has UCI equal 1");
 
   info("Closing the new window and tab...");
   yield BrowserTestUtils.closeWindow(newWin);

@@ -1326,7 +1326,7 @@ CustomizeMode.prototype = {
 
   openAddonsManagerThemes: function(aEvent) {
     aEvent.target.parentNode.parentNode.hidePopup();
-    this.window.BrowserOpenAddonsMgr('addons://list/theme');
+    this.window.BrowserOpenAddonsMgr("addons://list/theme");
   },
 
   getMoreThemes: function(aEvent) {
@@ -2028,7 +2028,7 @@ CustomizeMode.prototype = {
         if (makeSpaceImmediately) {
           aItem.setAttribute("notransition", "true");
         }
-        aItem.style[prop] = width + 'px';
+        aItem.style[prop] = width + "px";
         aItem.style.removeProperty(otherProp);
         if (makeSpaceImmediately) {
           // Force a layout flush:

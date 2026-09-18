@@ -120,7 +120,7 @@
  *   install completes.
  */
 
-'use strict';
+"use strict";
 
 /* globals TESTS, runTest, finishTest */
 

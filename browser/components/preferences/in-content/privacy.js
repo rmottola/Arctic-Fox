@@ -415,7 +415,7 @@ var gPrivacyPane = {
     let mode = document.getElementById("historyMode");
     let autoStart = document.getElementById("privateBrowsingAutoStart");
     this._lastMode = mode.selectedIndex;
-    this._lastCheckState = autoStart.hasAttribute('checked');
+    this._lastCheckState = autoStart.hasAttribute("checked");
   },
 
   _lastMode: null,
@@ -429,7 +429,7 @@ var gPrivacyPane = {
           (mode.value == "dontremember" && this._lastCheckState)) {
           // These are all no-op changes, so we don't need to prompt.
           this._lastMode = mode.selectedIndex;
-          this._lastCheckState = autoStart.hasAttribute('checked');
+          this._lastCheckState = autoStart.hasAttribute("checked");
           return;
       }
 
@@ -460,9 +460,9 @@ var gPrivacyPane = {
       if (this._lastCheckState) {
         autoStart.checked = "checked";
       } else {
-        autoStart.removeAttribute('checked');
+        autoStart.removeAttribute("checked");
       }
-      pref.value = autoStart.hasAttribute('checked');
+      pref.value = autoStart.hasAttribute("checked");
       mode.selectedIndex = this._lastMode;
       mode.doCommand();
 
