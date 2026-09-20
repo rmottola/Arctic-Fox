@@ -170,7 +170,8 @@ function transformPacket(packet) {
         stacktrace: pageError.stacktrace ? pageError.stacktrace : null,
         frame,
         exceptionDocURL: pageError.exceptionDocURL,
-        timeStamp: pageError.timeStamp
+        timeStamp: pageError.timeStamp,
+        notes: pageError.notes,
       });
     }
 
@@ -194,6 +195,7 @@ function transformPacket(packet) {
         frame,
         result: parameters,
         timestamp: timeStamp,
+        notes,
       } = packet;
 
       const level = messageText ? MESSAGE_LEVEL.ERROR : MESSAGE_LEVEL.LOG;
@@ -206,6 +208,7 @@ function transformPacket(packet) {
         exceptionDocURL,
         frame,
         timeStamp,
+        notes,
       });
     }
   }
