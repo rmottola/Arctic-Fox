@@ -29,7 +29,7 @@ function prepareMessage(packet, idGenerator) {
   if (packet.allowRepeating) {
     packet = packet.set("repeatId", getRepeatId(packet));
   }
-  return packet.set("id", idGenerator.getNextId());
+  return packet.set("id", idGenerator.getNextId(packet));
 }
 
 /**
@@ -183,7 +183,8 @@ function transformPacket(packet) {
         isXHR: networkEvent.isXHR,
         request: networkEvent.request,
         response: networkEvent.response,
-        timeStamp: networkEvent.timeStamp
+        timeStamp: networkEvent.timeStamp,
+        totalTime: networkEvent.totalTime,
       });
     }
 
