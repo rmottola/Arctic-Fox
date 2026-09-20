@@ -32,7 +32,9 @@
 #include "nsIObjectOutputStream.h"
 #include "nsScriptSecurityManager.h"
 #include "nsIPermissionManager.h"
+#include "nsIScriptError.h"
 #include "nsContentUtils.h"
+#include "nsScriptError.h"
 #include "jsfriendapi.h"
 
 using namespace mozilla;
