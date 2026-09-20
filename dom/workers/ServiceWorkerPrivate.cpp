@@ -1842,6 +1842,11 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
 
   WorkerPrivate::OverrideLoadInfoLoadGroup(info);
 
+  rv = info.SetPrincipalOnMainThread(info.mPrincipal, info.mLoadGroup);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
   AutoJSAPI jsapi;
   jsapi.Init();
   ErrorResult error;
