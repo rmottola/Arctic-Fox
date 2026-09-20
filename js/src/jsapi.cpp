@@ -6056,7 +6056,7 @@ JS_ExecuteRegExp(JSContext* cx, HandleObject obj, HandleObject reobj, char16_t* 
     if (!input)
         return false;
 
-    return ExecuteRegExpLegacy(cx, res, reobj->as<RegExpObject>(), input, indexp, test, rval);
+    return ExecuteRegExpLegacy(cx, res, reobj.as<RegExpObject>(), input, indexp, test, rval);
 }
 
 JS_PUBLIC_API(bool)
@@ -6070,7 +6070,7 @@ JS_ExecuteRegExpNoStatics(JSContext* cx, HandleObject obj, char16_t* chars, size
     if (!input)
         return false;
 
-    return ExecuteRegExpLegacy(cx, nullptr, obj->as<RegExpObject>(), input, indexp, test,
+    return ExecuteRegExpLegacy(cx, nullptr, obj.as<RegExpObject>(), input, indexp, test,
                                rval);
 }
 
