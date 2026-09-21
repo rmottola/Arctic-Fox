@@ -169,10 +169,8 @@ PluginModuleChild::GetChrome()
     return gChromeInstance;
 }
 
-bool
-PluginModuleChild::CommonInit(base::ProcessId aParentPid,
-                              MessageLoop* aIOLoop,
-                              IPC::Channel* aChannel)
+void
+PluginModuleChild::CommonInit()
 {
     PLUGIN_LOG_DEBUG_METHOD;
 
@@ -182,15 +180,9 @@ PluginModuleChild::CommonInit(base::ProcessId aParentPid,
     // Bug 1090573 - Don't do this for connections to content processes.
     GetIPCChannel()->SetChannelFlags(MessageChannel::REQUIRE_DEFERRED_MESSAGE_PROTECTION);
 
-    if (!Open(aChannel, aParentPid, aIOLoop)) {
-        return false;
-    }
-
     memset((void*) &mFunctions, 0, sizeof(mFunctions));
     mFunctions.size = sizeof(mFunctions);
     mFunctions.version = (NP_VERSION_MAJOR << 8) | NP_VERSION_MINOR;
-
-    return true;
 }
 
 bool
@@ -198,7 +190,9 @@ PluginModuleChild::InitForContent(base::ProcessId aParentPid,
                                   MessageLoop* aIOLoop,
                                   IPC::Channel* aChannel)
 {
-    if (!CommonInit(aParentPid, aIOLoop, aChannel)) {
+    CommonInit();
+
+    if (!Open(aChannel, aParentPid, aIOLoop)) {
         return false;
     }
 
@@ -280,7 +274,9 @@ PluginModuleChild::InitForChrome(const std::string& aPluginFilename,
     }
     NS_ASSERTION(mLibrary, "couldn't open shared object");
 
-    if (!CommonInit(aParentPid, aIOLoop, aChannel)) {
+    CommonInit();
+
+    if (!Open(aChannel, aParentPid, aIOLoop)) {
         return false;
     }
 
