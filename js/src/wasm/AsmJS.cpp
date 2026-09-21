@@ -5801,7 +5801,8 @@ CheckCoercedCall(FunctionValidator& f, ParseNode* call, Type ret, Type* type)
 {
     MOZ_ASSERT(ret.isCanonical());
 
-    JS_CHECK_RECURSION_DONT_REPORT(f.cx(), return f.m().failOverRecursed());
+    if (!CheckRecursionLimitDontReport(f.cx()))
+        return f.m().failOverRecursed();
 
     bool isSimd = false;
     if (IsNumericLiteral(f.m(), call, &isSimd)) {
@@ -6110,7 +6111,8 @@ CheckMultiply(FunctionValidator& f, ParseNode* star, Type* type)
 static bool
 CheckAddOrSub(FunctionValidator& f, ParseNode* expr, Type* type, unsigned* numAddOrSubOut = nullptr)
 {
-    JS_CHECK_RECURSION_DONT_REPORT(f.cx(), return f.m().failOverRecursed());
+    if (!CheckRecursionLimitDontReport(f.cx()))
+        return f.m().failOverRecursed();
 
     MOZ_ASSERT(expr->isKind(PNK_ADD) || expr->isKind(PNK_SUB));
     ParseNode* lhs = AddSubLeft(expr);
@@ -6350,7 +6352,8 @@ CheckBitwise(FunctionValidator& f, ParseNode* bitwise, Type* type)
 static bool
 CheckExpr(FunctionValidator& f, ParseNode* expr, Type* type)
 {
-    JS_CHECK_RECURSION_DONT_REPORT(f.cx(), return f.m().failOverRecursed());
+    if (!CheckRecursionLimitDontReport(f.cx()))
+        return f.m().failOverRecursed();
 
     bool isSimd = false;
     if (IsNumericLiteral(f.m(), expr, &isSimd)) {
@@ -7009,7 +7012,8 @@ CheckBreakOrContinue(FunctionValidator& f, bool isBreak, ParseNode* stmt)
 static bool
 CheckStatement(FunctionValidator& f, ParseNode* stmt)
 {
-    JS_CHECK_RECURSION_DONT_REPORT(f.cx(), return f.m().failOverRecursed());
+    if (!CheckRecursionLimitDontReport(f.cx()))
+        return f.m().failOverRecursed();
 
     switch (stmt->getKind()) {
       case PNK_SEMI:          return CheckExprStatement(f, stmt);

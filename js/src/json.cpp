@@ -532,7 +532,8 @@ Str(JSContext* cx, const Value& v, StringifyContext* scx)
     /* Step 11 must be handled by the caller. */
     MOZ_ASSERT(!IsFilteredValue(v));
 
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     /*
      * This method implements the Str algorithm in ES5 15.12.3, but:
@@ -762,7 +763,8 @@ js::Stringify(JSContext* cx, MutableHandleValue vp, JSObject* replacer_, const V
 static bool
 Walk(JSContext* cx, HandleObject holder, HandleId name, HandleValue reviver, MutableHandleValue vp)
 {
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     /* Step 1. */
     RootedValue val(cx);
