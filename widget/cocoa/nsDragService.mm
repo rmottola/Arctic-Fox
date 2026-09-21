@@ -704,7 +704,7 @@ nsDragService::DragMovedWithView(NSDraggingSession* aSession, NSPoint aPoint)
 }
 
 NS_IMETHODIMP
-nsDragService::EndDragSession(bool aDoneDrag)
+nsDragService::EndDragSession(bool aDoneDrag, uint32_t aKeyModifiers)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
@@ -719,7 +719,7 @@ nsDragService::EndDragSession(bool aDoneDrag)
 
   mUserCancelled = gUserCancelledDrag;
 
-  nsresult rv = nsBaseDragService::EndDragSession(aDoneDrag);
+  nsresult rv = nsBaseDragService::EndDragSession(aDoneDrag, aKeyModifiers);
   mDataItems = nullptr;
   return rv;
 

@@ -3065,7 +3065,8 @@ TabParent::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
   if (!shell) {
     if (Manager()->IsContentParent()) {
       Unused << Manager()->AsContentParent()->SendEndDragSession(true, true,
-                                                                 LayoutDeviceIntPoint());
+                                                                 LayoutDeviceIntPoint(),
+                                                                 0);
     }
     return IPC_OK();
   }
