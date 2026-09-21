@@ -1816,8 +1816,8 @@ nsresult
 JsepSessionImpl::SetRemoteTracksFromDescription(const Sdp* remoteDescription)
 {
   // Unassign all remote tracks
-  for (auto i = mRemoteTracks.begin(); i != mRemoteTracks.end(); ++i) {
-    i->mAssignedMLine.reset();
+  for (auto& remoteTrack : mRemoteTracks) {
+    remoteTrack.mAssignedMLine.reset();
   }
 
   // This will not exist if we're rolling back the first remote description
@@ -2097,9 +2097,8 @@ JsepSessionImpl::CreateGenericSDP(UniquePtr<Sdp>* sdpp)
 
   UniquePtr<SdpFingerprintAttributeList> fpl =
       MakeUnique<SdpFingerprintAttributeList>();
-  for (auto fp = mDtlsFingerprints.begin(); fp != mDtlsFingerprints.end();
-       ++fp) {
-    fpl->PushEntry(fp->mAlgorithm, fp->mValue);
+  for (auto& dtlsFingerprint : mDtlsFingerprints) {
+    fpl->PushEntry(dtlsFingerprint.mAlgorithm, dtlsFingerprint.mValue);
   }
   sdp->GetAttributeList().SetAttribute(fpl.release());
 
@@ -2548,8 +2547,8 @@ JsepSessionImpl::GetLastError() const
 bool
 JsepSessionImpl::AllLocalTracksAreAssigned() const
 {
-  for (auto i = mLocalTracks.begin(); i != mLocalTracks.end(); ++i) {
-    if (!i->mAssignedMLine.isSome()) {
+  for (const auto& localTrack : mLocalTracks) {
+    if (!localTrack.mAssignedMLine.isSome()) {
       return false;
     }
   }
