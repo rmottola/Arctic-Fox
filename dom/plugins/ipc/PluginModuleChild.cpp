@@ -110,7 +110,6 @@ PluginModuleChild::PluginModuleChild(bool aIsChrome)
   , mQuirks(QUIRKS_NOT_INITIALIZED)
   , mIsChrome(aIsChrome)
   , mHasShutdown(false)
-  , mTransport(nullptr)
   , mShutdownFunc(0)
   , mInitializeFunc(0)
 #if defined(OS_WIN) || defined(OS_MACOSX)
@@ -187,8 +186,6 @@ PluginModuleChild::InitForContent(Endpoint<PPluginModuleChild>&& aEndpoint)
     if (!aEndpoint.Bind(this)) {
         return false;
     }
-
-    mTransport = aChannel;
 
     mLibrary = GetChrome()->mLibrary;
     mFunctions = GetChrome()->mFunctions;

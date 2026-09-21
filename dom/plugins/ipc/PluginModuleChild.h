@@ -265,7 +265,6 @@ private:
 
     bool mIsChrome;
     bool mHasShutdown; // true if NP_Shutdown has run
-    Transport* mTransport;
 
     // we get this from the plugin
     NP_PLUGINSHUTDOWN mShutdownFunc;
