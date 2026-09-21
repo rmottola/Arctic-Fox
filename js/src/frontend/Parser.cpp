@@ -1011,6 +1011,8 @@ Parser<ParseHandler>::notePositionalFormalParameter(Node fn, HandlePropertyName 
                                                     bool disallowDuplicateParams,
                                                     bool* duplicatedParam)
 {
+    AutoTraceLog traceLog(TraceLoggerForCurrentThread(context), TraceLogger_FrontendNameAnalysis);
+
     if (AddDeclaredNamePtr p = pc->functionScope().lookupDeclaredNameForAdd(name)) {
         if (disallowDuplicateParams) {
             error(JSMSG_BAD_DUP_ARGS);
@@ -1233,6 +1235,8 @@ bool
 Parser<ParseHandler>::tryDeclareVarForAnnexBLexicalFunction(HandlePropertyName name,
                                                             bool* tryAnnexB)
 {
+    AutoTraceLog traceLog(TraceLoggerForCurrentThread(context), TraceLogger_FrontendNameAnalysis);
+
     Maybe<DeclarationKind> redeclaredKind;
     if (!tryDeclareVar(name, DeclarationKind::VarForAnnexBLexicalFunction, &redeclaredKind))
         return false;
@@ -1278,6 +1282,8 @@ bool
 Parser<ParseHandler>::noteDeclaredName(HandlePropertyName name, DeclarationKind kind,
                                        TokenPos pos)
 {
+    AutoTraceLog traceLog(TraceLoggerForCurrentThread(context), TraceLogger_FrontendNameAnalysis);
+
     // The asm.js validator does all its own symbol-table management so, as an
     // optimization, avoid doing any work here.
     if (pc->useAsmOrInsideUseAsm())
@@ -1433,6 +1439,8 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::noteUsedName(HandlePropertyName name)
 {
+    AutoTraceLog traceLog(TraceLoggerForCurrentThread(context), TraceLogger_FrontendNameAnalysis);
+
     // If the we are delazifying, the LazyScript already has all the
     // closed-over info for bindings and there's no need to track used names.
     if (handler.canSkipLazyClosedOverBindings())
@@ -1458,6 +1466,8 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::hasUsedName(HandlePropertyName name)
 {
+    AutoTraceLog traceLog(TraceLoggerForCurrentThread(context), TraceLogger_FrontendNameAnalysis);
+
     if (UsedNamePtr p = usedNames.lookup(name))
         return p->value().isUsedInScript(pc->scriptId());
     return false;
@@ -1467,6 +1477,8 @@ template <typename ParseHandler>
 bool
 Parser<ParseHandler>::propagateFreeNamesAndMarkClosedOverBindings(ParseContext::Scope& scope)
 {
+    AutoTraceLog traceLog(TraceLoggerForCurrentThread(context), TraceLogger_FrontendNameAnalysis);
+
     if (handler.canSkipLazyClosedOverBindings()) {
         // Scopes are nullptr-delimited in the LazyScript closed over bindings
         // array.
