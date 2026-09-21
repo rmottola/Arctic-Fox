@@ -3865,7 +3865,6 @@ JS::TransitiveCompileOptions::copyPODTransitiveOptions(const TransitiveCompileOp
     asmJSOption = rhs.asmJSOption;
     throwOnAsmJSValidationFailureOption = rhs.throwOnAsmJSValidationFailureOption;
     forceAsync = rhs.forceAsync;
-    installedFile = rhs.installedFile;
     sourceIsLazy = rhs.sourceIsLazy;
     introductionType = rhs.introductionType;
     introductionLineno = rhs.introductionLineno;
