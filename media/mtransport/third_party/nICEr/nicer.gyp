@@ -214,6 +214,7 @@
                     '-Wmissing-prototypes',
                     '-Wno-format',
                     '-Wno-format-security',
+                    '-Wno-implicit-function-declaration',
                  ],
                  'defines' : [
                      'LINUX',
