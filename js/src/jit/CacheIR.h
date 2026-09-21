@@ -190,6 +190,7 @@ enum class CacheKind : uint8_t
     _(LoadTypedObjectResult)              \
     _(LoadDenseElementResult)             \
     _(LoadDenseElementHoleResult)         \
+    _(LoadDenseElementExistsResult)       \
     _(LoadUnboxedArrayElementResult)      \
     _(LoadTypedElementResult)             \
     _(LoadInt32ArrayLengthResult)         \
@@ -691,6 +692,10 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter
         writeOpWithOperandId(CacheOp::LoadDenseElementHoleResult, obj);
         writeOperandId(index);
     }
+    void loadDenseElementExistsResult(ObjOperandId obj, Int32OperandId index) {
+        writeOpWithOperandId(CacheOp::LoadDenseElementExistsResult, obj);
+        writeOperandId(index);
+    }
     void loadUnboxedArrayElementResult(ObjOperandId obj, Int32OperandId index, JSValueType elementType) {
         writeOpWithOperandId(CacheOp::LoadUnboxedArrayElementResult, obj);
         writeOperandId(index);
@@ -1016,6 +1021,9 @@ class MOZ_RAII InIRGenerator : public IRGenerator
 {
     HandleValue key_;
     HandleObject obj_;
+
+    bool tryAttachDenseIn(uint32_t index, Int32OperandId indexId,
+                          HandleObject obj, ObjOperandId objId);
 
   public:
     InIRGenerator(JSContext* cx, jsbytecode* pc, HandleValue key, HandleObject obj);
