@@ -1818,6 +1818,11 @@ bool
 SetPropIRGenerator::tryAttachSetter(HandleObject obj, ObjOperandId objId, HandleId id,
                                     ValOperandId rhsId)
 {
+    // Don't attach a setter stub for ops like JSOP_INITELEM.
+    if (IsPropertyInitOp(JSOp(*pc_)))
+        return false;
+    MOZ_ASSERT(IsPropertySetOp(JSOp(*pc_)));
+
     PropertyResult prop;
     JSObject* holder;
     if (!LookupPropertyPure(cx_, obj, id, &holder, &prop))
