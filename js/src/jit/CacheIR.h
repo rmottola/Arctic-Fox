@@ -210,6 +210,7 @@ enum class CacheKind : uint8_t
     _(CallProxyGetResult)                 \
     _(CallProxyGetByValueResult)          \
     _(LoadUndefinedResult)                \
+    _(LoadBooleanResult)                  \
                                           \
     _(TypeMonitorResult)                  \
     _(ReturnFromIC)
@@ -643,6 +644,10 @@ class MOZ_RAII CacheIRWriter : public JS::CustomAutoRooter
         writeOperandId(rhs);
     }
 
+    void loadBooleanResult(bool val) {
+        writeOp(CacheOp::LoadBooleanResult);
+        buffer_.writeByte(uint32_t(val));
+    }
     void loadUndefinedResult() {
         writeOp(CacheOp::LoadUndefinedResult);
     }
@@ -1024,6 +1029,8 @@ class MOZ_RAII InIRGenerator : public IRGenerator
 
     bool tryAttachDenseIn(uint32_t index, Int32OperandId indexId,
                           HandleObject obj, ObjOperandId objId);
+    bool tryAttachNativeIn(HandleId key, ValOperandId keyId,
+                           HandleObject obj, ObjOperandId objId);
 
   public:
     InIRGenerator(JSContext* cx, jsbytecode* pc, HandleValue key, HandleObject obj);
