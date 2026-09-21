@@ -743,7 +743,7 @@ ICEStats.prototype = {
 
     var type = c.candidateType;
 
-    if (c.type == "localcandidate" && c.candidateType == "relayed") {
+    if (c.type == "local-candidate" && c.candidateType == "relayed") {
       type = `${c.candidateType}-${c.mozLocalTransport}`;
     }
 
