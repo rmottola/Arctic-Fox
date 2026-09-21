@@ -471,8 +471,8 @@ private:
   int mMinBitrate;
   int mStartBitrate;
   int mPrefMaxBitrate;
-  int mMinBitrateEstimate;
   int mNegotiatedMaxBitrate;
+  int mMinBitrateEstimate;
 
   bool mRtpStreamIdEnabled;
   uint8_t mRtpStreamIdExtId;
