@@ -1262,7 +1262,7 @@ jit::AttachBaselineCacheIRStub(JSContext* cx, const CacheIRWriter& writer,
     // unlimited number of stubs.
     MOZ_ASSERT(stub->numOptimizedStubs() < MaxOptimizedCacheIRStubs);
 
-    enum class CacheIRStubKind { Monitored, Updated };
+    enum class CacheIRStubKind { Regular, Monitored, Updated };
 
     uint32_t stubDataOffset;
     CacheIRStubKind stubKind;
@@ -1318,6 +1318,16 @@ jit::AttachBaselineCacheIRStub(JSContext* cx, const CacheIRWriter& writer,
     // conditions.
     for (ICStubConstIterator iter = stub->beginChainConst(); !iter.atEnd(); iter++) {
         switch (stubKind) {
+          case CacheIRStubKind::Regular: {
+            if (!iter->isCacheIR_Regular())
+                continue;
+            auto otherStub = iter->toCacheIR_Regular();
+            if (otherStub->stubInfo() != stubInfo)
+                continue;
+            if (!writer.stubDataEqualsMaybeUpdate(otherStub->stubDataStart()))
+                continue;
+            break;
+          }
           case CacheIRStubKind::Monitored: {
             if (!iter->isCacheIR_Monitored())
                 continue;
@@ -1357,6 +1367,12 @@ jit::AttachBaselineCacheIRStub(JSContext* cx, const CacheIRWriter& writer,
         return nullptr;
 
     switch (stubKind) {
+      case CacheIRStubKind::Regular: {
+        auto newStub = new(newStubMem) ICCacheIR_Regular(code, stubInfo);
+        writer.copyStubData(newStub->stubDataStart());
+        stub->addNewStub(newStub);
+        return newStub;
+      }
       case CacheIRStubKind::Monitored: {
         ICStub* monitorStub =
             stub->toMonitoredFallbackStub()->fallbackMonitorStub()->firstMonitorStub();
@@ -1378,6 +1394,12 @@ jit::AttachBaselineCacheIRStub(JSContext* cx, const CacheIRWriter& writer,
     }
 
     MOZ_CRASH("Invalid kind");
+}
+
+uint8_t*
+ICCacheIR_Regular::stubDataStart()
+{
+    return reinterpret_cast<uint8_t*>(this) + stubInfo_->stubDataOffset();
 }
 
 uint8_t*
