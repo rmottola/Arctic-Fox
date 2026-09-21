@@ -411,13 +411,13 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
         static_cast<VideoSessionConduit*>(it->second.second.get()));
   }
 
+  void AddVideoConduit(size_t level, const RefPtr<VideoSessionConduit> &aConduit) {
+    mConduits[level] = std::make_pair(true, aConduit);
+  }
+
   // Add a conduit
   void AddAudioConduit(size_t level, const RefPtr<AudioSessionConduit> &aConduit) {
     mConduits[level] = std::make_pair(false, aConduit);
-  }
-
-  void AddVideoConduit(size_t level, const RefPtr<VideoSessionConduit> &aConduit) {
-    mConduits[level] = std::make_pair(true, aConduit);
   }
 
   // ICE state signals
@@ -433,6 +433,8 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
       SignalUpdateDefaultCandidate;
   sigslot::signal1<uint16_t>
       SignalEndOfLocalCandidates;
+
+  RefPtr<WebRtcCallWrapper> mCall;
 
  private:
   nsresult InitProxy();

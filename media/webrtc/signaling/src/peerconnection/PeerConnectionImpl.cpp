@@ -2736,7 +2736,11 @@ PeerConnectionImpl::ReplaceTrack(MediaStreamTrack& aThisTrack,
   // We update the media pipelines here so we can apply different codec
   // settings for different sources (e.g. screensharing as opposed to camera.)
   // TODO: We should probably only do this if the source has in fact changed.
-  mMedia->UpdateMediaPipelines(*mJsepSession);
+
+  if (NS_FAILED((rv = mMedia->UpdateMediaPipelines(*mJsepSession)))) {
+    CSFLogError(logTag, "Error Updating MediaPipelines");
+    return rv;
+  }
 
   pco->OnReplaceTrackSuccess(jrv);
   if (jrv.Failed()) {
@@ -3155,7 +3159,11 @@ PeerConnectionImpl::SetSignalingState_m(PCImplSignalingState aSignalingState,
     // transports, but nothing further needs to be done.
     mMedia->ActivateOrRemoveTransports(*mJsepSession);
     if (!rollback) {
-      mMedia->UpdateMediaPipelines(*mJsepSession);
+      if (NS_FAILED(mMedia->UpdateMediaPipelines(*mJsepSession))) {
+        CSFLogError(logTag, "Error Updating MediaPipelines");
+        NS_ASSERTION(false, "Error Updating MediaPipelines in SetSignalingState_m()");
+        // XXX what now?  Not much we can do but keep going, without major restructuring
+      }
       InitializeDataChannel();
       mMedia->StartIceChecks(*mJsepSession);
     }
@@ -3745,15 +3753,17 @@ PeerConnectionImpl::ExecuteStatsQuery_s(RTCStatsQuery *query) {
     idstr.AppendLiteral("_");
     idstr.AppendInt(mp.level());
 
+    // TODO(@@NG):ssrcs handle Conduits having multiple stats at the same level
+    // This is pending spec work
     // Gather pipeline stats.
     switch (mp.direction()) {
       case MediaPipeline::TRANSMIT: {
         nsString localId = NS_LITERAL_STRING("outbound_rtp_") + idstr;
         nsString remoteId;
         nsString ssrc;
-        unsigned int ssrcval;
-        if (mp.Conduit()->GetLocalSSRC(&ssrcval)) {
-          ssrc.AppendInt(ssrcval);
+        std::vector<unsigned int> ssrcvals = mp.Conduit()->GetLocalSSRCs();
+        if (!ssrcvals.empty()) {
+          ssrc.AppendInt(ssrcvals[0]);
         }
         {
           // First, fill in remote stat with rtcp receiver data, if present.

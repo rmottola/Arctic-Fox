@@ -20,6 +20,9 @@
         '<(webrtc_root)/common_video/common_video.gyp:common_video',
         '<(webrtc_root)/system_wrappers/system_wrappers.gyp:system_wrappers',
       ],
+      'cflags_mozilla': [
+        '$(NSPR_CFLAGS)',
+      ],
       'sources': [
         'device_info_impl.cc',
         'device_info_impl.h',
@@ -40,6 +43,9 @@
       'type': 'static_library',
       'dependencies': [
         'video_capture_module',
+      ],
+      'cflags_mozilla': [
+        '$(NSPR_CFLAGS)',
       ],
       'sources': [
         'external/device_info_external.cc',
@@ -135,6 +141,10 @@
                 'windows/video_capture_factory_windows.cc',
                 'windows/video_capture_mf.cc',
                 'windows/video_capture_mf.h',
+		'windows/BasePin.cpp',
+                'windows/BaseFilter.cpp',
+                'windows/BaseInputPin.cpp',
+                'windows/MediaType.cpp',
               ],
               'link_settings': {
                 'libraries': [
@@ -159,6 +169,14 @@
                 },
               },
             }],
+            ['OS=="android"', {
+              'sources': [
+                'android/device_info_android.cc',
+                'android/device_info_android.h',
+                'android/video_capture_android.cc',
+                'android/video_capture_android.h',
+              ],
+            }],  # android
             ['OS=="ios"', {
               'sources': [
                 'ios/device_info_ios.h',
@@ -173,6 +191,9 @@
               'xcode_settings': {
                 'CLANG_ENABLE_OBJC_ARC': 'YES',
               },
+              'cflags_mozilla': [
+                '-fobjc-arc',
+              ],
               'all_dependent_settings': {
                 'xcode_settings': {
                   'OTHER_LDFLAGS': [
@@ -205,7 +226,7 @@
             'test/video_capture_main_mac.mm',
           ],
           'conditions': [
-            ['OS=="mac" or OS=="linux"', {
+            ['OS!="win" and OS!="android"', {
               'cflags': [
                 '-Wno-write-strings',
               ],
@@ -213,11 +234,15 @@
                 '-lpthread -lm',
               ],
             }],
+            ['include_v4l2_video_capture==1', {
+              'libraries': [
+                '-lXext',
+                '-lX11',
+              ],
+            }],
             ['OS=="linux"', {
               'libraries': [
                 '-lrt',
-                '-lXext',
-                '-lX11',
               ],
             }],
             ['OS=="mac"', {

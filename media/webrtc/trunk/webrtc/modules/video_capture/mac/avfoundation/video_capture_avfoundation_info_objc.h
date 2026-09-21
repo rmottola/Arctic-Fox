@@ -9,26 +9,23 @@
  */
 
 //
-//  video_capture_avfoundation_info_objc.h
+//  video_capture_qtkit_info_objc.h
 //
 //
 
-#ifndef WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_MAC_AVFOUNDATION_VIDEO_CAPTURE_AVFOUNDATION_INFO_OBJC_H_
-#define WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_MAC_AVFOUNDATION_VIDEO_CAPTURE_AVFOUNDATION_INFO_OBJC_H_
+#ifndef WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_MAC_QTKIT_VIDEO_CAPTURE_QTKIT_INFO_OBJC_H_
+#define WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_MAC_QTKIT_VIDEO_CAPTURE_QTKIT_INFO_OBJC_H_
 
 #import <Foundation/Foundation.h>
-#import <AVFoundation/AVFoundation.h>
+#import <QTKit/QTKit.h>
 
-#include "webrtc/modules/video_capture/mac/avfoundation/video_capture_avfoundation_info.h"
-#include "webrtc/modules/video_capture/mac/avfoundation/video_capture_avfoundation_utility.h"
+#include "webrtc/modules/video_capture/mac/qtkit/video_capture_qtkit_info.h"
+#include "webrtc/modules/video_capture/mac/qtkit/video_capture_qtkit_utility.h"
 
-@interface VideoCaptureMacAVFoundationInfoObjC : NSObject{
+@interface VideoCaptureMacQTKitInfoObjC : NSObject{
     bool                                _OSSupportedInfo;
     NSArray*                            _captureDevicesInfo;
     int                                    _captureDeviceCountInfo;
-    NSArray*                            _observers;
-    NSLock*                             _lock;
-    webrtc::videocapturemodule::VideoCaptureMacAVFoundationInfo* _owner;
 
 }
 
