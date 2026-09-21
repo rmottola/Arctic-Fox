@@ -2291,8 +2291,15 @@ PeerConnectionImpl::AddIceCandidate(const char* aCandidate, const char* aMid, un
     pco->OnAddIceCandidateError(error, ObString(errorString.c_str()), rv);
   }
 
-  UpdateSignalingState();
   return NS_OK;
+}
+
+void
+PeerConnectionImpl::UpdateNetworkState(bool online) {
+  if (!mMedia) {
+    return;
+  }
+  mMedia->UpdateNetworkState(online);
 }
 
 NS_IMETHODIMP
@@ -3358,8 +3365,6 @@ PeerConnectionImpl::CandidateReady(const std::string& candidate,
   CSFLogDebug(logTag, "Passing local candidate to content: %s",
               candidate.c_str());
   SendLocalIceCandidateToContent(level, mid, candidate);
-
-  UpdateSignalingState();
 }
 
 static void
