@@ -1431,7 +1431,7 @@ ContentParent::ShutDownMessageManager()
 }
 
 void
-ContentParent::MarkAsDead()
+ContentParent::MarkAsTroubled()
 {
   if (sBrowserContentParents) {
     nsTArray<ContentParent*>* contentParents =
@@ -1455,7 +1455,13 @@ ContentParent::MarkAsDead()
       sPrivateContent = nullptr;
     }
   }
+  mIsAvailable = false;
+}
 
+void
+ContentParent::MarkAsDead()
+{
+  MarkAsTroubled();
   mIsAlive = false;
 }
 
@@ -1755,8 +1761,8 @@ ContentParent::ShouldKeepProcessAlive() const
     return false;
   }
 
-  // If we have already been marked as dead, don't prevent shutdown.
-  if (!IsAlive()) {
+  // If we have already been marked as troubled/dead, don't prevent shutdown.
+  if (!IsAvailable()) {
     return false;
   }
 
@@ -1900,6 +1906,7 @@ ContentParent::InitializeMembers()
   mChildID = gContentChildID++;
   mGeolocationWatchID = -1;
   mNumDestroyingTabs = 0;
+  mIsAvailable = true;
   mIsAlive = true;
   mSendPermissionUpdates = false;
   mCalledClose = false;
@@ -4778,9 +4785,14 @@ ContentParent::RecvNotifyPushSubscriptionModifiedObservers(const nsCString& aSco
 mozilla::ipc::IPCResult
 ContentParent::RecvNotifyLowMemory()
 {
+  MarkAsTroubled();
+
+  Telemetry::ScalarAdd(Telemetry::ScalarID::DOM_CONTENTPROCESS_TROUBLED_DUE_TO_MEMORY, 1);
+
 #ifdef MOZ_CRASHREPORTER
   nsThread::SaveMemoryReportNearOOM(nsThread::ShouldSaveMemoryReport::kForceReport);
 #endif
+
   return IPC_OK();
 }
 
