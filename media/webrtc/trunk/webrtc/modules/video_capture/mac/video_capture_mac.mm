@@ -199,11 +199,56 @@ VideoCaptureModule* VideoCaptureImpl::Create(
     return newCaptureModule;
 #else // AVFoundation version
 
-    WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideoCapture, id,
-                 "Using AVFoundation framework to capture video", id);
+#if __MAC_OS_X_VERSION_MIN_REQUIRED == __MAC_10_4 // QuickTime version
+    if (webrtc::videocapturemodule::CheckQTVersion() == false)
+    {
+        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoCapture, id,
+                     "QuickTime version is too old. Could not create video "
+                     "capture module. Returning NULL");
+        return NULL;
+    }
 
-    RefCountImpl<videocapturemodule::VideoCaptureMacAVFoundation>* newCaptureModule =
-        new RefCountImpl<videocapturemodule::VideoCaptureMacAVFoundation>(id);
+    WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideoCapture, id,
+                 "%s line %d. QTKit is not supported on this machine. Using "
+                 "QuickTime framework to capture video",
+                 __FILE__, __LINE__);
+
+    RefCountImpl<videocapturemodule::VideoCaptureMacQuickTime>*
+        newCaptureModule =
+            new RefCountImpl<videocapturemodule::VideoCaptureMacQuickTime>(id);
+
+    if (!newCaptureModule)
+    {
+        WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVideoCapture, id,
+                     "could not Create for unique device %s, !newCaptureModule",
+                     deviceUniqueIdUTF8);
+        return NULL;
+    }
+
+    if (newCaptureModule->Init(id, deviceUniqueIdUTF8) != 0)
+    {
+        WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVideoCapture, id,
+                     "could not Create for unique device %s, "
+                     "newCaptureModule->Init()!=0",
+                     deviceUniqueIdUTF8);
+        delete newCaptureModule;
+        return NULL;
+    }
+
+    // Successfully created VideoCaptureMacQuicktime. Return it
+    WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideoCapture, id,
+                 "Module created for unique device %s. Will use QuickTime "
+                 "framework to capture",
+                 deviceUniqueIdUTF8);
+    return newCaptureModule;
+
+#else // QTKit version
+
+    WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideoCapture, id,
+                 "Using QTKit framework to capture video", id);
+
+    RefCountImpl<videocapturemodule::VideoCaptureMacQTKit>* newCaptureModule =
+        new RefCountImpl<videocapturemodule::VideoCaptureMacQTKit>(id);
 
     if(!newCaptureModule)
     {
@@ -308,6 +353,8 @@ VideoCaptureImpl::CreateDeviceInfo(const int32_t id)
     WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideoCapture, id,
                  "VideoCaptureModule created for id", id);
     return newCaptureInfoModule;
+#endif
+
 #endif
 
 }
