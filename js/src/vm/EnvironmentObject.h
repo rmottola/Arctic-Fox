@@ -1048,6 +1048,14 @@ IsGlobalLexicalEnvironment(JSObject* env)
            env->as<LexicalEnvironmentObject>().isGlobal();
 }
 
+inline JSObject*
+MaybeUnwrapSyntacticWithEnvironment(JSObject* env)
+{
+    if (env->is<WithEnvironmentObject>() && env->as<WithEnvironmentObject>().isSyntactic())
+        return &env->as<WithEnvironmentObject>().object();
+    return env;
+}
+
 template <typename SpecificEnvironment>
 inline bool
 IsFrameInitialEnvironment(AbstractFramePtr frame, SpecificEnvironment& env)
