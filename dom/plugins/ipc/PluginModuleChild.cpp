@@ -31,7 +31,6 @@
 #include "mozilla/plugins/StreamNotifyChild.h"
 #include "mozilla/plugins/BrowserStreamChild.h"
 #include "mozilla/plugins/PluginStreamChild.h"
-#include "mozilla/dom/CrashReporterChild.h"
 #include "mozilla/Sprintf.h"
 #include "mozilla/Unused.h"
 
