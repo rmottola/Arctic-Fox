@@ -1024,6 +1024,8 @@ ContentChild::InitXPCOM(const XPCOMInitData& aXPCOMInit,
   mozilla::dom::time::InitializeDateCacheCleaner();
 
   GfxInfoBase::SetFeatureStatus(aXPCOMInit.gfxFeatureStatus());
+
+  DataStorage::SetCachedStorageEntries(aXPCOMInit.dataStorage());
 }
 
 mozilla::ipc::IPCResult
