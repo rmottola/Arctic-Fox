@@ -236,6 +236,13 @@ struct GMPCapabilityData
     GMPAPITags[] capabilities;
 };
 
+struct GfxInfoFeatureStatus
+{
+    int32_t feature;
+    int32_t status;
+    nsCString failureId;
+};
+
 struct XPCOMInitData
 {
     bool isOffline;
@@ -250,13 +257,7 @@ struct XPCOMInitData
     FontFamilyListEntry[] fontFamilies;
     OptionalURIParams userContentSheetURL;
     PrefSetting[] prefs;
-};
-
-struct GfxInfoFeatureStatus
-{
-    int32_t feature;
-    int32_t status;
-    nsCString failureId;
+    GfxInfoFeatureStatus[] gfxFeatureStatus;
 };
 
 /**
@@ -819,8 +820,6 @@ parent:
                                 nsString pageURL,
                                 bool isAudio,
                                 bool isVideo);
-
-    sync GetGfxInfoFeatureStatus() returns (GfxInfoFeatureStatus[] features);
 
     // Graphics errors
     async GraphicsError(nsCString aError);
