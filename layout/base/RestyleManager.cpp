@@ -6,7 +6,6 @@
 
 #include "mozilla/RestyleManager.h"
 #include "mozilla/StyleSetHandleInlines.h"
-#include "mozilla/css/StyleRule.h" // For nsCSSSelector
 #include "nsIFrame.h"
 #include "nsIPresShellInlines.h"
 
