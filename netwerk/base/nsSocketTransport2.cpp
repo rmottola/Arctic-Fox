@@ -2410,7 +2410,7 @@ nsSocketTransport::GetPort(int32_t *port)
 }
 
 NS_IMETHODIMP
-nsSocketTransport::GetNetworkInterfaceId(nsACString_internal &aNetworkInterfaceId)
+nsSocketTransport::GetNetworkInterfaceId(nsACString &aNetworkInterfaceId)
 {
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread, "wrong thread");
     aNetworkInterfaceId = mNetworkInterfaceId;
@@ -2418,7 +2418,7 @@ nsSocketTransport::GetNetworkInterfaceId(nsACString_internal &aNetworkInterfaceI
 }
 
 NS_IMETHODIMP
-nsSocketTransport::SetNetworkInterfaceId(const nsACString_internal &aNetworkInterfaceId)
+nsSocketTransport::SetNetworkInterfaceId(const nsACString &aNetworkInterfaceId)
 {
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread, "wrong thread");
     mNetworkInterfaceId = aNetworkInterfaceId;
