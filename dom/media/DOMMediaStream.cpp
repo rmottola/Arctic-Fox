@@ -407,7 +407,7 @@ DOMMediaStream::DOMMediaStream(nsPIDOMWindowInner* aWindow,
     mPlaybackTrackListener(MakeAndAddRef<PlaybackTrackListener>(this)),
     mTracksCreated(false), mNotifiedOfMediaStreamGraphShutdown(false),
     mActive(false), mSetInactiveOnFinish(false),
-    mAbstractMainThread(aWindow->GetDocGroup()->AbstractMainThreadFor(TaskCategory::Other))
+    mAbstractMainThread(aWindow ? aWindow->GetDocGroup()->AbstractMainThreadFor(TaskCategory::Other) : nullptr)
 {
   nsresult rv;
   nsCOMPtr<nsIUUIDGenerator> uuidgen =
@@ -851,6 +851,7 @@ DOMMediaStream::SetInactiveOnFinish()
 void
 DOMMediaStream::InitSourceStream(MediaStreamGraph* aGraph)
 {
+  MOZ_ASSERT(mAbstractMainThread);
   InitInputStreamCommon(aGraph->CreateSourceStream(mAbstractMainThread), aGraph);
   InitOwnedStreamCommon(aGraph);
   InitPlaybackStreamCommon(aGraph);
@@ -859,6 +860,7 @@ DOMMediaStream::InitSourceStream(MediaStreamGraph* aGraph)
 void
 DOMMediaStream::InitTrackUnionStream(MediaStreamGraph* aGraph)
 {
+  MOZ_ASSERT(mAbstractMainThread);
   InitInputStreamCommon(aGraph->CreateTrackUnionStream(mAbstractMainThread), aGraph);
   InitOwnedStreamCommon(aGraph);
   InitPlaybackStreamCommon(aGraph);
@@ -867,6 +869,7 @@ DOMMediaStream::InitTrackUnionStream(MediaStreamGraph* aGraph)
 void
 DOMMediaStream::InitAudioCaptureStream(nsIPrincipal* aPrincipal, MediaStreamGraph* aGraph)
 {
+  MOZ_ASSERT(mAbstractMainThread);
   const TrackID AUDIO_TRACK = 1;
 
   RefPtr<BasicTrackSource> audioCaptureSource =
@@ -897,6 +900,7 @@ DOMMediaStream::InitInputStreamCommon(MediaStream* aStream,
 void
 DOMMediaStream::InitOwnedStreamCommon(MediaStreamGraph* aGraph)
 {
+  MOZ_ASSERT(mAbstractMainThread);
   MOZ_ASSERT(!mPlaybackStream, "Owned stream must be initialized before playback stream");
 
   mOwnedStream = aGraph->CreateTrackUnionStream(mAbstractMainThread);
@@ -914,6 +918,7 @@ DOMMediaStream::InitOwnedStreamCommon(MediaStreamGraph* aGraph)
 void
 DOMMediaStream::InitPlaybackStreamCommon(MediaStreamGraph* aGraph)
 {
+  MOZ_ASSERT(mAbstractMainThread);
   mPlaybackStream = aGraph->CreateTrackUnionStream(mAbstractMainThread);
   mPlaybackStream->SetAutofinish(true);
   mPlaybackStream->RegisterUser();
