@@ -6,6 +6,7 @@ module.exports = {
     "mozilla"
   ],
   "rules": {
+    "mozilla/avoid-removeChild": "error",
     "mozilla/import-globals": "warn",
     "mozilla/no-useless-parameters": "error",
   },
