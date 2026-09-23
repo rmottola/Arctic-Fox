@@ -815,6 +815,7 @@ private:
 
   bool mAllowIceLoopback;
   bool mAllowIceLinkLocal;
+  bool mForceIceTcp;
   RefPtr<PeerConnectionMedia> mMedia;
 
   // The JSEP negotiation session.
