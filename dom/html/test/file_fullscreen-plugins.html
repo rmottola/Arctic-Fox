@@ -63,7 +63,7 @@ function e(id) {
 }
 
 function removeElement(e) {
-  e.parentNode.removeChild(e);
+  e.remove();
 }
 
 const supportsWindowedMode = navigator.appVersion.indexOf("Windows") != -1;

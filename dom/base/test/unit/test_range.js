@@ -194,7 +194,7 @@ function getParsedDocument(aPath) {
   var i;
   for (i = splits.length - 1; i >= 0; i--) {
     var node = splits.item(i);
-    node.parentNode.removeChild(node);
+    node.remove();
   }
   splits = null;
 

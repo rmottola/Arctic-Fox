@@ -849,9 +849,9 @@ var popupTests = [
   testname: "remove content",
   test: function(testname, step) {
     var submenupopup = document.getElementById("submenupopup");
-    submenupopup.parentNode.removeChild(submenupopup);
+    submenupopup.remove();
     var popup = document.getElementById("thepopup");
-    popup.parentNode.removeChild(popup);
+    popup.remove();
   }
 }
 

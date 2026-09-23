@@ -240,8 +240,8 @@ function runOMTATest(aTestFunction, aOnSkip) {
 
     // Common clean up code
     var cleanUp = function() {
-      div.parentNode.removeChild(div);
-      style.parentNode.removeChild(style);
+      div.remove();
+      style.remove();
       if (utils.isTestControllingRefreshes) {
         utils.restoreNormalRefresh();
       }

@@ -45,20 +45,22 @@
       <property name="notificationsHidden"
                 onget="return this.getAttribute('notificationshidden') == 'true';">
         <setter>
-          if (val)
-            this.setAttribute('notificationshidden', true);
-          else this.removeAttribute('notificationshidden');
-          return val;
+          <![CDATA[
+            if (val)
+              this.setAttribute("notificationshidden", true);
+            else this.removeAttribute("notificationshidden");
+            return val;
+          ]]>
         </setter>
       </property>
 
       <property name="allNotifications" readonly="true">
         <getter>
-        <![CDATA[
-          var closedNotification = this._closedNotification;
-          var notifications = this.getElementsByTagName('notification');
-          return Array.filter(notifications, n => n != closedNotification);
-        ]]>
+          <![CDATA[
+            var closedNotification = this._closedNotification;
+            var notifications = this.getElementsByTagName("notification");
+            return Array.filter(notifications, n => n != closedNotification);
+          ]]>
         </getter>
       </property>
 
@@ -279,8 +281,7 @@
                 this._setBlockingState(this.currentNotification);
                 return;
               }
-            }
-            else {
+            } else {
               this._closedNotification = aNotification;
               var notifications = this.allNotifications;
               var idx = notifications.length - 1;
@@ -354,11 +355,9 @@
                 context.globalAlpha = 0.5;
                 context.drawWindow(win, win.scrollX, win.scrollY,
                                    width, height, bgcolor);
-              }
-              catch (ex) { }
-            }
-            else if (canvas) {
-              canvas.parentNode.removeChild(canvas);
+              } catch (ex) { }
+            } else if (canvas) {
+              canvas.remove();
               this._blockingCanvas = null;
               let content = this.firstChild;
               if (content)
@@ -453,8 +452,7 @@
               document.getElementById(button.popup).
                 openPopup(aEvent.originalTarget, "after_start", 0, 0, false, false, aEvent);
               aEvent.stopPropagation();
-            }
-            else {
+            } else {
               var callback = button.callback;
               if (callback) {
                 var result = callback(this, button);

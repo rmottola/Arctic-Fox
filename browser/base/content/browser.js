@@ -674,28 +674,26 @@ var gPopupBlockerObserver = {
     }, null);
   },
 
-  onPopupHiding: function(aEvent) {
+  onPopupHiding(aEvent) {
     if (aEvent.target.anchorNode.id == "page-report-button")
       aEvent.target.anchorNode.removeAttribute("open");
 
     let item = aEvent.target.lastChild;
     while (item && item.getAttribute("observes") != "blockedPopupsSeparator") {
       let next = item.previousSibling;
-      item.parentNode.removeChild(item);
+      item.remove();
       item = next;
     }
   },
 
-  showBlockedPopup: function(aEvent)
-  {
+  showBlockedPopup(aEvent) {
     var target = aEvent.target;
     var popupReportIndex = target.getAttribute("popupReportIndex");
     let browser = target.popupReportBrowser;
     browser.unblockPopup(popupReportIndex);
   },
 
-  showAllBlockedPopups: function(aBrowser)
-  {
+  showAllBlockedPopups(aBrowser) {
     let popups = aBrowser.retrieveListOfBlockedPopups().then(popups => {
       for (let i = 0; i < popups.length; i++) {
         if (popups[i].popupWindowURIspec)
@@ -704,8 +702,7 @@ var gPopupBlockerObserver = {
     }, null);
   },
 
-  editPopupSettings: function()
-  {
+  editPopupSettings() {
     var host = "";
     try {
       host = gBrowser.currentURI.host;
@@ -724,14 +721,12 @@ var gPopupBlockerObserver = {
     if (existingWindow) {
       existingWindow.initWithParams(params);
       existingWindow.focus();
-    }
-    else
+    } else
       window.openDialog("chrome://browser/content/preferences/permissions.xul",
                         "_blank", "resizable,dialog=no,centerscreen", params);
   },
 
-  dontShowMessage: function()
-  {
+  dontShowMessage() {
     var showMessage = gPrefService.getBoolPref("privacy.popups.showBrowserMessage");
     gPrefService.setBoolPref("privacy.popups.showBrowserMessage", !showMessage);
     gBrowser.getNotificationBox().removeCurrentNotification();
@@ -745,7 +740,7 @@ function gKeywordURIFixup({ target: browser, data: fixupInfo }) {
   // whether the original input would be vaguely interpretable as a URL,
   // so figure that out first.
   let alternativeURI = deserializeURI(fixupInfo.fixedURI);
-  if (!fixupInfo.keywordProviderName  || !alternativeURI || !alternativeURI.host) {
+  if (!fixupInfo.keywordProviderName || !alternativeURI || !alternativeURI.host) {
     return;
   }
 
@@ -2574,7 +2569,7 @@ function UpdateUrlbarSearchSplitterState()
     }
     urlbar.parentNode.insertBefore(splitter, ibefore);
   } else if (splitter)
-    splitter.parentNode.removeChild(splitter);
+    splitter.remove();
 }
 
 function setUrlAndSearchBarWidthForConditionalForwardButton() {
@@ -4160,7 +4155,7 @@ function BrowserCustomizeToolbar() {
 
   var splitter = document.getElementById("urlbar-search-splitter");
   if (splitter)
-    splitter.parentNode.removeChild(splitter);
+    splitter.remove();
 
   CombinedStopReload.uninit();
 
@@ -4205,7 +4200,7 @@ function BrowserToolboxCustomizeDone(aToolboxChanged) {
   if (gCustomizeSheet) {
     document.getElementById("customizeToolbarSheetPopup").hidePopup();
     let iframe = document.getElementById("customizeToolbarSheetIFrame");
-    iframe.parentNode.removeChild(iframe);
+    iframe.remove();
   }
 
   // Update global UI elements that may have been added or removed
@@ -5572,7 +5567,7 @@ var TabsOnTop = {
     // Only show the toggle UI if the user disabled tabs on top.
 //    if (Services.prefs.getBoolPref(this._prefName)) {
 //      for (let item of document.querySelectorAll("menuitem[command=cmd_ToggleTabsOnTop]"))
-//        item.parentNode.removeChild(item);
+//        item.remove();
 //    }
   },
 

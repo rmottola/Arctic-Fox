@@ -1529,7 +1529,7 @@ is(cs.marginLeft, "50px", "dynamic rule change test, change in keyframe keyText"
 dyn1.deleteRule("25%");
 is(cs.marginLeft, "25px", "dynamic rule change test, @keyframes deleteRule");
 done_div();
-dyn_sheet_elt.parentNode.removeChild(dyn_sheet_elt);
+dyn_sheet_elt.remove();
 dyn_sheet_elt = null;
 dyn_sheet = null;
 

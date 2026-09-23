@@ -1375,7 +1375,7 @@ Inspector.prototype = {
     }
 
     if (this._markupFrame) {
-      this._markupFrame.parentNode.removeChild(this._markupFrame);
+      this._markupFrame.remove();
       this._markupFrame = null;
     }
 
