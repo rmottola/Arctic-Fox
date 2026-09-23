@@ -35,9 +35,7 @@ namespace mozilla {
 class MediaPipelineFilter;
 class PeerIdentity;
 class AudioProxyThread;
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
 class VideoFrameConverter;
-#endif
 
 #ifndef USE_FAKE_MEDIA_STREAMS
 namespace dom {
@@ -324,14 +322,12 @@ public:
   // written and used from MainThread
   bool IsVideo() const override;
 
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   // When the principal of the domtrack changes, it calls through to here
   // so that we can determine whether to enable track transmission.
   // `track` has to be null or equal `domtrack_` for us to apply the update.
   virtual void UpdateSinkIdentity_m(dom::MediaStreamTrack* track,
                                     nsIPrincipal* principal,
                                     const PeerIdentity* sinkIdentity);
-#endif
 
   // Called on the main thread.
   void DetachMedia() override;
@@ -355,10 +351,8 @@ public:
  private:
   RefPtr<PipelineListener> listener_;
   RefPtr<AudioProxyThread> audio_processing_;
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   RefPtr<VideoFrameFeeder> feeder_;
   RefPtr<VideoFrameConverter> converter_;
-#endif
   dom::MediaStreamTrack* domtrack_;
 };
 

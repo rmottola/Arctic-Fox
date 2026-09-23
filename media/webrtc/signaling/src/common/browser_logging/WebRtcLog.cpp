@@ -126,12 +126,10 @@ void ConfigWebRtcLog(uint32_t trace_mask, nsCString &aLogFile, nsCString &aAECLo
   }
 #endif
 
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   if (XRE_IsParentProcess()) {
     // Capture the final choice for the trace setting.
     mozilla::Preferences::SetCString("media.webrtc.debug.log_file", aLogFile);
   }
-#endif
   return;
 }
 
@@ -216,12 +214,10 @@ void ConfigAecLog(nsCString &aAECLogDir) {
   }
 #endif
   webrtc::Trace::set_aec_debug_filename(aAECLogDir.get());
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   if (XRE_IsParentProcess()) {
     // Capture the final choice for the aec_log_dir setting.
     mozilla::Preferences::SetCString("media.webrtc.debug.aec_log_dir", aAECLogDir);
   }
-#endif
 }
 
 void StartAecLog()
