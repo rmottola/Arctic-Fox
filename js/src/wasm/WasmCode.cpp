@@ -76,6 +76,8 @@ AllocateCodeSegment(JSContext* cx, uint32_t codeLength)
         return nullptr;
     }
 
+    cx->zone()->updateJitCodeMallocBytes(codeLength);
+
     wasmCodeAllocations++;
     return (uint8_t*)p;
 }
@@ -247,7 +249,6 @@ CodeSegment::~CodeSegment()
     if (!bytes_)
         return;
 
-
     MOZ_ASSERT(wasmCodeAllocations > 0);
     wasmCodeAllocations--;
 
@@ -259,7 +260,6 @@ CodeSegment::~CodeSegment()
     vtune::UnmarkBytes(bytes_, size);
 #endif
     DeallocateExecutableMemory(bytes_, size);
-
 }
 
 void
