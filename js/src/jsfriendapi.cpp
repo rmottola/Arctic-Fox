@@ -1230,7 +1230,7 @@ void
 JS::ObjectPtr::finalize(JSRuntime* rt)
 {
     if (IsIncrementalBarrierNeeded(rt->activeContextFromOwnThread()))
-        IncrementalObjectBarrier(value);
+        IncrementalPreWriteBarrier(value);
     value = nullptr;
 }
 

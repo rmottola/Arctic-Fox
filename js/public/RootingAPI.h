@@ -1220,13 +1220,13 @@ class JS_PUBLIC_API(ObjectPtr)
     JSObject* unbarrieredGet() const { return value.unbarrieredGet(); }
 
     void writeBarrierPre(JSContext* cx) {
-        IncrementalObjectBarrier(value);
+        IncrementalPreWriteBarrier(value);
     }
 
     void updateWeakPointerAfterGC();
 
     ObjectPtr& operator=(JSObject* obj) {
-        IncrementalObjectBarrier(value);
+        IncrementalPreWriteBarrier(value);
         value = obj;
         return *this;
     }
