@@ -916,7 +916,19 @@ IonCacheIRCompiler::emitStoreDenseElement()
 }
 
 bool
+IonCacheIRCompiler::emitStoreDenseElementHole()
+{
+    MOZ_CRASH("Baseline-specific op");
+}
+
+bool
 IonCacheIRCompiler::emitStoreUnboxedArrayElement()
+{
+    MOZ_CRASH("Baseline-specific op");
+}
+
+bool
+IonCacheIRCompiler::emitStoreUnboxedArrayElementHole()
 {
     MOZ_CRASH("Baseline-specific op");
 }
