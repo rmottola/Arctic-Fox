@@ -1012,12 +1012,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
         as_nop();
     }
 
-    BufferOffset ma_BoundsCheck(Register bounded) {
-        BufferOffset bo = m_buffer.nextOffset();
-        ma_liPatchable(bounded, ImmWord(0));
-        return bo;
-    }
-
     void moveFloat32(FloatRegister src, FloatRegister dest) {
         as_movs(dest, src);
     }
