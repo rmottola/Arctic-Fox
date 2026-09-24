@@ -904,6 +904,15 @@ LoadTypedThingLength(MacroAssembler& masm, TypedThingLayout layout, Register obj
     }
 }
 
+static void
+SetUpdateStubData(ICCacheIR_Updated* stub, const PropertyTypeCheckInfo* info)
+{
+    if (info->isSet()) {
+        stub->updateStubGroup() = info->group();
+        stub->updateStubId() = info->id();
+    }
+}
+
 static bool
 DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_, Value* stack,
                   HandleValue objv, HandleValue index, HandleValue rhs)
@@ -954,10 +963,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
                 JitSpew(JitSpew_BaselineIC, "  Attached CacheIR stub");
                 attached = true;
 
-                if (gen.needUpdateStub()) {
-                    newStub->toCacheIR_Updated()->updateStubGroup() = gen.updateStubGroup();
-                    newStub->toCacheIR_Updated()->updateStubId() = gen.updateStubId();
-                }
+                SetUpdateStubData(newStub->toCacheIR_Updated(), gen.typeCheckInfo());
 
                 if (gen.shouldNotePreliminaryObjectStub())
                     newStub->toCacheIR_Updated()->notePreliminaryObject();
@@ -1020,8 +1026,7 @@ DoSetElemFallback(JSContext* cx, BaselineFrame* frame, ICSetElem_Fallback* stub_
             if (newStub) {
                 JitSpew(JitSpew_BaselineIC, "  Attached CacheIR stub");
                 attached = true;
-                newStub->toCacheIR_Updated()->updateStubGroup() = gen.updateStubGroup();
-                newStub->toCacheIR_Updated()->updateStubId() = gen.updateStubId();
+                SetUpdateStubData(newStub->toCacheIR_Updated(), gen.typeCheckInfo());
                 return true;
             }
         } else {
@@ -1085,8 +1090,9 @@ BaselineScript::noteHasDenseAdd(uint32_t pcOffset)
         stub->toSetElem_Fallback()->noteHasDenseAdd();
 }
 
+template <typename T>
 void
-EmitUnboxedPreBarrierForBaseline(MacroAssembler &masm, const BaseIndex& address, JSValueType type)
+EmitICUnboxedPreBarrier(MacroAssembler& masm, const T& address, JSValueType type)
 {
     if (type == JSVAL_TYPE_OBJECT)
         EmitPreBarrier(masm, address, MIRType::Object);
@@ -1095,6 +1101,12 @@ EmitUnboxedPreBarrierForBaseline(MacroAssembler &masm, const BaseIndex& address,
     else
         MOZ_ASSERT(!UnboxedTypeNeedsPreBarrier(type));
 }
+
+template void
+EmitICUnboxedPreBarrier(MacroAssembler& masm, const Address& address, JSValueType type);
+
+template void
+EmitICUnboxedPreBarrier(MacroAssembler& masm, const BaseIndex& address, JSValueType type);
 
 template <typename T>
 void
@@ -1511,10 +1523,7 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
                 JitSpew(JitSpew_BaselineIC, "  Attached CacheIR stub");
                 attached = true;
 
-                if (gen.needUpdateStub()) {
-                    newStub->toCacheIR_Updated()->updateStubGroup() = gen.updateStubGroup();
-                    newStub->toCacheIR_Updated()->updateStubId() = gen.updateStubId();
-                }
+                SetUpdateStubData(newStub->toCacheIR_Updated(), gen.typeCheckInfo());
 
                 if (gen.shouldNotePreliminaryObjectStub())
                     newStub->toCacheIR_Updated()->notePreliminaryObject();
@@ -1579,8 +1588,7 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
             if (newStub) {
                 JitSpew(JitSpew_BaselineIC, "  Attached CacheIR stub");
                 attached = true;
-                newStub->toCacheIR_Updated()->updateStubGroup() = gen.updateStubGroup();
-                newStub->toCacheIR_Updated()->updateStubId() = gen.updateStubId();
+                SetUpdateStubData(newStub->toCacheIR_Updated(), gen.typeCheckInfo());
             }
         } else {
             gen.trackNotAttached();
