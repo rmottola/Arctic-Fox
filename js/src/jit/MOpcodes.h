@@ -297,6 +297,7 @@ namespace jit {
     _(AsmJSAtomicExchangeHeap)                                              \
     _(AsmJSAtomicBinopHeap)                                                 \
     _(WasmBoundsCheck)                                                      \
+    _(WasmLoadTls)                                                          \
     _(WasmAddOffset)                                                        \
     _(WasmLoad)                                                             \
     _(WasmStore)                                                            \
