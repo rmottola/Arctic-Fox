@@ -4016,7 +4016,6 @@ class IDLAttribute(IDLInterfaceMember):
                               "interface type as its type", [self.location])
 
         if (not self.type.isInterface() and
-            not self.type.isPromise() and
             self.getExtendedAttribute("SameObject")):
             raise WebIDLError("An attribute with [SameObject] must have an "
                               "interface type as its type", [self.location])
