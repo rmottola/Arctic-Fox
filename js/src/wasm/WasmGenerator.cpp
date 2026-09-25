@@ -254,8 +254,8 @@ ModuleGenerator::finishOutstandingTask()
 
             if (HelperThreadState().wasmFailed(lock)) {
                 if (error_) {
-                  MOZ_ASSERT(!*error_, "Should have stopped earlier");
-                  *error_ = Move(HelperThreadState().harvestWasmError(lock));
+                    MOZ_ASSERT(!*error_, "Should have stopped earlier");
+                    *error_ = Move(HelperThreadState().harvestWasmError(lock));
                 }
                 return false;
             }
