@@ -280,6 +280,7 @@ class LIRGeneratorShared : public MDefinitionVisitor
     }
 
     void visitConstant(MConstant* ins) override;
+    void visitWasmFloatConstant(MWasmFloatConstant* ins);
 
     // Whether to generate typed reads for element accesses with hole checks.
     static bool allowTypedElementHoleCheck() {
