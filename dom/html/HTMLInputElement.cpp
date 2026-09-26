@@ -7001,8 +7001,8 @@ HTMLInputElement::RestoreState(nsPresState* aState)
     }
   }
 
-  if (aState->IsDisabledSet()) {
-    SetDisabled(aState->GetDisabled());
+  if (aState->IsDisabledSet() && !aState->GetDisabled()) {
+    SetDisabled(false);
   }
 
   return restoredCheckedState;
