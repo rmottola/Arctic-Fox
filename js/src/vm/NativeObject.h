@@ -722,7 +722,7 @@ class NativeObject : public ShapedObject
      * after calling object-parameter-free shape methods, avoiding coupling
      * logic across the object vs. shape module wall.
      */
-    static bool allocSlot(JSContext* cx, HandleNativeObject obj, uint32_t* slotp);
+    static bool allocDictionarySlot(JSContext* cx, HandleNativeObject obj, uint32_t* slotp);
     void freeSlot(JSContext* cx, uint32_t slot);
 
   private:
