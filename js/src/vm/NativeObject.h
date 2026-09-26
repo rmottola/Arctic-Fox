@@ -488,8 +488,8 @@ class NativeObject : public ShapedObject
     void checkShapeConsistency() { }
 #endif
 
-    Shape*
-    replaceWithNewEquivalentShape(JSContext* cx,
+    static Shape*
+    replaceWithNewEquivalentShape(JSContext* cx, HandleNativeObject obj,
                                   Shape* existingShape, Shape* newShape = nullptr,
                                   bool accessorShape = false);
 
@@ -606,11 +606,14 @@ class NativeObject : public ShapedObject
     }
 
   public:
-    bool generateOwnShape(JSContext* cx, Shape* newShape = nullptr) {
-        return replaceWithNewEquivalentShape(cx, lastProperty(), newShape);
+    static MOZ_MUST_USE bool generateOwnShape(JSContext* cx, HandleNativeObject obj,
+                                              Shape* newShape = nullptr)
+    {
+        return replaceWithNewEquivalentShape(cx, obj, obj->lastProperty(), newShape);
     }
 
-    bool shadowingShapeChange(JSContext* cx, const Shape& shape);
+    static MOZ_MUST_USE bool shadowingShapeChange(JSContext* cx, HandleNativeObject obj,
+                                                  const Shape& shape);
     static bool clearFlag(JSContext* cx, HandleNativeObject obj, BaseShape::Flag flag);
 
     // The maximum number of slots in an object.
@@ -780,7 +783,8 @@ class NativeObject : public ShapedObject
                         unsigned flags, ShapeTable::Entry* entry, bool allowDictionary,
                         const AutoKeepShapeTables& keep);
 
-    bool fillInAfterSwap(JSContext* cx, const Vector<Value>& values, void* priv);
+    static MOZ_MUST_USE bool fillInAfterSwap(JSContext* cx, HandleNativeObject obj,
+                                             const Vector<Value>& values, void* priv);
 
   public:
     // Return true if this object has been converted from shared-immutable
