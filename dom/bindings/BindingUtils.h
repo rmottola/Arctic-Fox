@@ -1733,7 +1733,7 @@ template <class T>
 inline JSObject*
 GetCallbackFromCallbackObject(T* aObj)
 {
-  return aObj->Callback();
+  return aObj->CallbackOrNull();
 }
 
 // Helper for getting the callback JSObject* of a smart ptr around a
