@@ -1065,23 +1065,22 @@ js::NativeLookupOwnProperty<NoGC>(JSContext* cx, NativeObject* const& obj, const
 
 /*** [[DefineOwnProperty]] ***********************************************************************/
 
-static inline bool
-CallAddPropertyHook(JSContext* cx, HandleNativeObject obj, HandleShape shape,
-                    HandleValue value)
+static MOZ_ALWAYS_INLINE bool
+CallAddPropertyHook(JSContext* cx, HandleNativeObject obj, HandleId id, HandleValue value)
 {
-    if (JSAddPropertyOp addProperty = obj->getClass()->getAddProperty()) {
+    JSAddPropertyOp addProperty = obj->getClass()->getAddProperty();
+    if (MOZ_UNLIKELY(addProperty)) {
         MOZ_ASSERT(!cx->helperThread());
 
-        RootedId id(cx, shape->propid());
         if (!CallJSAddPropertyOp(cx, addProperty, obj, id, value)) {
-            NativeObject::removeProperty(cx, obj, shape->propid());
+            NativeObject::removeProperty(cx, obj, id);
             return false;
         }
     }
     return true;
 }
 
-static inline bool
+static MOZ_ALWAYS_INLINE bool
 CallAddPropertyHookDense(JSContext* cx, HandleNativeObject obj, uint32_t index,
                          HandleValue value)
 {
@@ -1094,7 +1093,8 @@ CallAddPropertyHookDense(JSContext* cx, HandleNativeObject obj, uint32_t index,
         return true;
     }
 
-    if (JSAddPropertyOp addProperty = obj->getClass()->getAddProperty()) {
+    JSAddPropertyOp addProperty = obj->getClass()->getAddProperty();
+    if (MOZ_UNLIKELY(addProperty)) {
         MOZ_ASSERT(!cx->helperThread());
 
         if (!obj->maybeCopyElementsForWrite(cx))
@@ -1231,8 +1231,8 @@ AddOrChangeProperty(JSContext* cx, HandleNativeObject obj, HandleId id,
         }
     }
 
-    RootedShape shape(cx, NativeObject::putProperty(cx, obj, id, desc.getter(), desc.setter(),
-                                                    SHAPE_INVALID_SLOT, desc.attributes(), 0));
+    Shape* shape = NativeObject::putProperty(cx, obj, id, desc.getter(), desc.setter(),
+                                             SHAPE_INVALID_SLOT, desc.attributes(), 0);
     if (!shape)
         return false;
 
@@ -1256,7 +1256,7 @@ AddOrChangeProperty(JSContext* cx, HandleNativeObject obj, HandleId id,
         }
     }
 
-    return CallAddPropertyHook(cx, obj, shape, desc.value());
+    return CallAddPropertyHook(cx, obj, id, desc.value());
 }
 
 static bool IsConfigurable(unsigned attrs) { return (attrs & JSPROP_PERMANENT) == 0; }
