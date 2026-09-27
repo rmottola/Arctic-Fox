@@ -1959,6 +1959,7 @@ TabChild::RecvRealKeyEvent(const WidgetKeyboardEvent& aEvent,
 
   WidgetKeyboardEvent localEvent(aEvent);
   localEvent.mWidget = mPuppetWidget;
+  localEvent.mUniqueId = aEvent.mUniqueId;
   nsEventStatus status = APZCCallbackHelper::DispatchWidgetEvent(localEvent);
 
   // Update the end time of the possible repeated event so that we can skip

@@ -2282,6 +2282,11 @@ nsIWidget::OnWindowedPluginKeyEvent(const NativeEventData& aKeyEventData,
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
+void
+nsIWidget::PostHandleKeyEvent(mozilla::WidgetKeyboardEvent* aEvent)
+{
+}
+
 namespace mozilla {
 namespace widget {
 

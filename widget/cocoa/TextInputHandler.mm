@@ -1507,7 +1507,8 @@ TextInputHandler::~TextInputHandler()
 }
 
 bool
-TextInputHandler::HandleKeyDownEvent(NSEvent* aNativeEvent)
+TextInputHandler::HandleKeyDownEvent(NSEvent* aNativeEvent,
+                                     uint32_t aUniqueId)
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
@@ -1541,7 +1542,7 @@ TextInputHandler::HandleKeyDownEvent(NSEvent* aNativeEvent)
 
   RefPtr<nsChildView> widget(mWidget);
 
-  KeyEventState* currentKeyEvent = PushKeyEvent(aNativeEvent);
+  KeyEventState* currentKeyEvent = PushKeyEvent(aNativeEvent, aUniqueId);
   AutoKeyEventStateCleaner remover(this);
 
   ComplexTextInputPanel* ctiPanel = ComplexTextInputPanel::GetSharedComplexTextInputPanel();
@@ -2572,6 +2573,12 @@ IMEInputHandler::WillDispatchKeyboardEvent(
   KeyEventState* currentKeyEvent = static_cast<KeyEventState*>(aData);
   NSEvent* nativeEvent = currentKeyEvent->mKeyEvent;
   nsAString* insertString = currentKeyEvent->mInsertString;
+  if (aKeyboardEvent.mMessage == eKeyPress && aIndexOfKeypress == 0 &&
+      (!insertString || insertString->IsEmpty())) {
+    // Inform the child process that this is an event that we want a reply
+    // from.
+    aKeyboardEvent.mFlags.mWantReplyFromContentProcess = true;
+  }
   if (KeyboardLayoutOverrideRef().mOverrideEnabled) {
     TISInputSourceWrapper tis;
     tis.InitByLayoutID(KeyboardLayoutOverrideRef().mKeyboardLayout, true);
@@ -4463,6 +4470,7 @@ TextInputHandlerBase::KeyEventState::InitKeyEvent(
                         keyCode:[mKeyEvent keyCode]];
   }
 
+  aKeyEvent.mUniqueId = mUniqueId;
   aHandler->InitKeyEvent(nativeEvent, aKeyEvent, mInsertString);
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
