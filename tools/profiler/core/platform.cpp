@@ -1723,6 +1723,14 @@ RegisterCurrentThread(PS::LockRef aLock, const char* aName,
 
   MaybeSetProfile(aLock, info);
 
+  // This must come after the MaybeSetProfile() call.
+  if (gPS->IsActive(aLock) && info->HasProfile() && gPS->FeatureJS(aLock)) {
+    // This startJSSampling() call is on-thread, so we can poll manually to
+    // start JS sampling immediately.
+    aPseudoStack->startJSSampling();
+    aPseudoStack->pollJSSampling();
+  }
+
   threads.push_back(info);
 }
 
@@ -2254,12 +2262,20 @@ locked_profiler_start(PS::LockRef aLock, int aEntries, double aInterval,
 
     MaybeSetProfile(aLock, info);
 
-    if (info->IsPendingDelete() || !info->HasProfile()) {
-      continue;
+    if (info->HasProfile() && !info->IsPendingDelete()) {
+      info->Stack()->reinitializeOnResume();
+
+      if (featureJS) {
+        info->Stack()->startJSSampling();
+      }
     }
-    info->Stack()->reinitializeOnResume();
-    if (featureJS) {
-      info->Stack()->enableJSSampling();
+  }
+
+  if (featureJS) {
+    // We just called startJSSampling() on all relevant threads. We can also
+    // manually poll the current thread so it starts sampling immediately.
+    if (PseudoStack* stack = tlsPseudoStack.get()) {
+      stack->pollJSSampling();
     }
   }
 
@@ -2387,16 +2403,25 @@ locked_profiler_stop(PS::LockRef aLock)
   }
 #endif
 
-  // Destroy ThreadInfo for dead threads.
   PS::ThreadVector& threads = gPS->Threads(aLock);
   for (uint32_t i = 0; i < threads.size(); i++) {
     ThreadInfo* info = threads.at(i);
-    // We've stopped profiling. We no longer need to retain information for a
-    // dead thread.
     if (info->IsPendingDelete()) {
+      // We've stopped profiling. Destroy ThreadInfo for dead threads.
       delete info;
       threads.erase(threads.begin() + i);
       i--;
+    } else if (info->HasProfile() && gPS->FeatureJS(aLock)) {
+      // Stop JS sampling live threads.
+      info->Stack()->stopJSSampling();
+    }
+  }
+
+  if (gPS->FeatureJS(aLock)) {
+    // We just called stopJSSampling() on all relevant threads. We can also
+    // manually poll the current thread so it stops profiling immediately.
+    if (PseudoStack* stack = tlsPseudoStack.get()) {
+      stack->pollJSSampling();
     }
   }
 
@@ -2406,12 +2431,6 @@ locked_profiler_stop(PS::LockRef aLock)
 
   delete gPS->Buffer(aLock);
   gPS->SetBuffer(aLock, nullptr);
-
-  if (gPS->FeatureJS(aLock)) {
-    PseudoStack *stack = tlsPseudoStack.get();
-    MOZ_ASSERT(stack != nullptr);
-    stack->disableJSSampling();
-  }
 
   gPS->SetFeatureDisplayListDump(aLock, false);
   gPS->SetFeatureGPU(aLock, false);
@@ -2660,6 +2679,9 @@ profiler_unregister_thread()
     }
   }
 
+  // We don't call PseudoStack::stopJSSampling() here; there's no point doing
+  // that for a JS thread that is in the process of disappearing.
+
   if (!wasPseudoStackTransferred) {
     delete tlsPseudoStack.get();
   }
@@ -2674,7 +2696,7 @@ profiler_thread_sleep()
   MOZ_RELEASE_ASSERT(gPS);
 
   PseudoStack *stack = tlsPseudoStack.get();
-  if (stack == nullptr) {
+  if (!stack) {
     return;
   }
   stack->setSleeping();
@@ -2688,7 +2710,7 @@ profiler_thread_wake()
   MOZ_RELEASE_ASSERT(gPS);
 
   PseudoStack *stack = tlsPseudoStack.get();
-  if (stack == nullptr) {
+  if (!stack) {
     return;
   }
   stack->setAwake();
@@ -2701,16 +2723,17 @@ profiler_thread_is_sleeping()
   MOZ_RELEASE_ASSERT(gPS);
 
   PseudoStack *stack = tlsPseudoStack.get();
-  if (stack == nullptr) {
+  if (!stack) {
     return false;
   }
   return stack->isSleeping();
 }
 
 void
-profiler_js_operation_callback()
+profiler_js_interrupt_callback()
 {
-  // This function runs both on and off the main thread.
+  // This function runs both on and off the main thread, on JS threads being
+  // sampled.
 
   MOZ_RELEASE_ASSERT(gPS);
 
@@ -2719,7 +2742,7 @@ profiler_js_operation_callback()
     return;
   }
 
-  stack->jsOperationCallback();
+  stack->pollJSSampling();
 }
 
 double
@@ -2964,6 +2987,9 @@ profiler_clear_js_context()
 
     gPS->SetIsPaused(lock, false);
   }
+
+  // We don't call stack->stopJSSampling() here; there's no point doing
+  // that for a JS thread that is in the process of disappearing.
 
   stack->mContext = nullptr;
 }
