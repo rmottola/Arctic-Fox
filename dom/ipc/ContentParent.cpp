@@ -86,9 +86,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/ProcessHangMonitorIPC.h"
-#ifdef MOZ_GECKO_PROFILER
-#include "mozilla/ProfileGatherer.h"
-#endif
+#include "GeckoProfiler.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPtr.h"
@@ -266,9 +264,6 @@ extern const char* kForceEnableE10sPref;
 
 using base::ChildPrivileges;
 using base::KillProcess;
-#ifdef MOZ_GECKO_PROFILER
-using mozilla::ProfileGatherer;
-#endif
 
 #ifdef MOZ_CRASHREPORTER
 using namespace CrashReporter;
@@ -1268,10 +1263,7 @@ ContentParent::Init()
     rv = profiler->GetStartParams(getter_AddRefs(currentProfilerParams));
     MOZ_ASSERT(NS_SUCCEEDED(rv));
 
-    nsCOMPtr<nsISupports> gatherer;
-    rv = profiler->GetProfileGatherer(getter_AddRefs(gatherer));
-    MOZ_ASSERT(NS_SUCCEEDED(rv));
-    mGatherer = static_cast<ProfileGatherer*>(gatherer.get());
+    mIsProfilerActive = true;
 
     StartProfiler(currentProfilerParams);
   }
@@ -1663,8 +1655,8 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
   mConsoleService = nullptr;
 
 #ifdef MOZ_GECKO_PROFILER
-  if (mGatherer && !mProfile.IsEmpty()) {
-    mGatherer->OOPExitProfile(mProfile);
+  if (mIsProfilerActive && !mProfile.IsEmpty()) {
+    profiler_OOP_exit_profile(mProfile);
   }
 #endif
 
@@ -2003,6 +1995,9 @@ ContentParent::ContentParent(ContentParent* aOpener,
   , mShutdownPending(false)
   , mIPCOpen(true)
   , mHangMonitorActor(nullptr)
+#ifdef MOZ_GECKO_PROFILER
+  , mIsProfilerActive(false)
+#endif
 {
   // Insert ourselves into the global linked list of ContentParent objects.
   if (!sContentParents) {
@@ -2638,8 +2633,8 @@ ContentParent::Observe(nsISupports* aSubject,
 #ifdef MOZ_GECKO_PROFILER
   // Need to do this before the mIsAlive check to avoid missing profiles.
   if (!strcmp(aTopic, "profiler-subprocess-gather")) {
-    if (mGatherer) {
-      mGatherer->WillGatherOOPProfile();
+    if (mIsProfilerActive) {
+      profiler_will_gather_OOP_profile();
       if (mIsAlive && mSubprocess) {
         Unused << SendGatherProfile();
       }
@@ -2747,7 +2742,7 @@ ContentParent::Observe(nsISupports* aSubject,
     StartProfiler(params);
   }
   else if (!strcmp(aTopic, "profiler-stopped")) {
-    mGatherer = nullptr;
+    mIsProfilerActive = false;
     Unused << SendStopProfiler();
   }
   else if (!strcmp(aTopic, "profiler-paused")) {
@@ -4540,11 +4535,11 @@ mozilla::ipc::IPCResult
 ContentParent::RecvProfile(const nsCString& aProfile)
 {
 #ifdef MOZ_GECKO_PROFILER
-  if (NS_WARN_IF(!mGatherer)) {
+  if (NS_WARN_IF(!mIsProfilerActive)) {
     return IPC_OK();
   }
   mProfile = aProfile;
-  mGatherer->GatheredOOPProfile();
+  profiler_gathered_OOP_profile();
 #endif
   return IPC_OK();
 }
@@ -4657,9 +4652,7 @@ ContentParent::StartProfiler(nsIProfilerStartParams* aParams)
   if (NS_WARN_IF(!profiler)) {
     return;
   }
-  nsCOMPtr<nsISupports> gatherer;
-  profiler->GetProfileGatherer(getter_AddRefs(gatherer));
-  mGatherer = static_cast<ProfileGatherer*>(gatherer.get());
+  mIsProfilerActive = true;
 #endif
 }
 
