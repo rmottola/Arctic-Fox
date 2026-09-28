@@ -20,8 +20,6 @@ public:
   // profile in which the backtrace is as a marker payload.
   void StreamJSON(SpliceableJSONWriter& aWriter, UniqueStacks& aUniqueStacks);
 
-  virtual void EndUnwind();
-
 private:
   friend class ProfilerBacktrace;
 };
