@@ -2385,7 +2385,7 @@ profiler_js_operation_callback()
 double
 profiler_time(const mozilla::TimeStamp& aTime)
 {
-  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  // This function runs both on and off the main thread.
 
   mozilla::TimeDuration delta = aTime - gStartTime;
   return delta.ToMilliseconds();
@@ -2394,7 +2394,7 @@ profiler_time(const mozilla::TimeStamp& aTime)
 double
 profiler_time()
 {
-  MOZ_RELEASE_ASSERT(NS_IsMainThread());
+  // This function runs both on and off the main thread.
 
   return profiler_time(mozilla::TimeStamp::Now());
 }
