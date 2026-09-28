@@ -85,9 +85,9 @@ AddonPolicyService.prototype = {
    *
    * @see nsIAddonPolicyService.addonMayLoadURI
    */
-  addonMayLoadURI(aAddonId, aURI) {
+  addonMayLoadURI(aAddonId, aURI, aExplicit = false) {
     let cb = this.mayLoadURICallbacks.get(aAddonId);
-    return cb ? cb(aURI) : false;
+    return cb ? cb(aURI, aExplicit) : false;
   },
 
   /*
