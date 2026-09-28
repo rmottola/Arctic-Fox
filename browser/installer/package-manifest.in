@@ -766,8 +766,8 @@ bin/libfreebl_32int64_3.so
 @BINPATH@/crashreporter.app/
 #else
 @BINPATH@/crashreporter@BIN_SUFFIX@
-@BINPATH@/minidump-analyzer@BIN_SUFFIX@
 @RESPATH@/crashreporter.ini
+@BINPATH@/minidump-analyzer@BIN_SUFFIX@
 #ifdef XP_UNIX
 @RESPATH@/Throbber-small.gif
 #endif
@@ -777,6 +777,10 @@ bin/libfreebl_32int64_3.so
 @BINPATH@/breakpadinjector.dll
 #endif
 #endif
+
+; [ Ping Sender ]
+;
+@BINPATH@/pingsender@BIN_SUFFIX@
 
 @RESPATH@/components/dom_audiochannel.xpt
 
