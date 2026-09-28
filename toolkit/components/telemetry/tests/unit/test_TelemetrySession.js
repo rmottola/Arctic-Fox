@@ -18,6 +18,7 @@ Cu.import("resource://gre/modules/TelemetrySession.jsm", this);
 Cu.import("resource://gre/modules/TelemetryStorage.jsm", this);
 Cu.import("resource://gre/modules/TelemetryEnvironment.jsm", this);
 Cu.import("resource://gre/modules/TelemetrySend.jsm", this);
+Cu.import("resource://gre/modules/TelemetryUtils.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
 Cu.import("resource://gre/modules/Preferences.jsm");
@@ -539,7 +540,7 @@ add_task(function* test_simplePing() {
   Assert.equal(payload.info.subsessionLength, SESSION_DURATION_IN_MINUTES * 60);
 
   // Restore the UUID generator so we don't mess with other tests.
-  fakeGenerateUUID(generateUUID, generateUUID);
+  fakeGenerateUUID(TelemetryUtils.generateUUID, TelemetryUtils.generateUUID);
 });
 
 // Saves the current session histograms, reloads them, performs a ping
@@ -1338,7 +1339,7 @@ add_task(function* test_invalidSessionData() {
   yield TelemetryController.testShutdown();
 
   // Restore the UUID generator so we don't mess with other tests.
-  fakeGenerateUUID(generateUUID, generateUUID);
+  fakeGenerateUUID(TelemetryUtils.generateUUID, TelemetryUtils.generateUUID);
 
   // Load back the serialised session data.
   let data = yield CommonUtils.readJSON(dataFilePath);
