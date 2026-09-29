@@ -14,7 +14,6 @@
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Casting.h"
 #include "mozilla/dom/ContentChild.h"
-#include "mozilla/dom/ChromeUtils.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/dom/ProfileTimelineMarkerBinding.h"
@@ -8012,9 +8011,7 @@ nsDocShell::CreateAboutBlankContentViewer(nsIPrincipal* aPrincipal,
 
   if (aPrincipal && !nsContentUtils::IsSystemPrincipal(aPrincipal) &&
       mItemType != typeChrome) {
-    MOZ_ASSERT(ChromeUtils::IsOriginAttributesEqualIgnoringAddonId(
-      aPrincipal->OriginAttributesRef(),
-      mOriginAttributes));
+    MOZ_ASSERT(aPrincipal->OriginAttributesRef() == mOriginAttributes);
   }
 
   // Make sure timing is created.  But first record whether we had it
