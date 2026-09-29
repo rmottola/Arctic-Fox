@@ -20,9 +20,11 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1180921
   let aps = Cc["@mozilla.org/addons/policy-service;1"].getService(Ci.nsIAddonPolicyService).wrappedJSObject;
 
   SimpleTest.waitForExplicitFinish();
+  let oldAddonIdCallback = aps.setExtensionURIToAddonIdCallback(uri => uri.host);
   SimpleTest.registerCleanupFunction(function() {
-    aps.setAddonLoadURICallback('addonA', null);
-    aps.setAddonLoadURICallback('addonB', null);
+    aps.setAddonLoadURICallback('addona', null);
+    aps.setAddonLoadURICallback('addonb', null);
+    aps.setExtensionURIToAddonIdCallback(oldAddonIdCallback);
   });
 
   function tryLoad(sb, uri) {
