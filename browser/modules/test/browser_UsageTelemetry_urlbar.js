@@ -107,6 +107,15 @@ add_task(function* test_searchAlias() {
   Assert.equal(Object.keys(scalars[SCALAR_URLBAR]).length, 1,
                "This search must only increment one entry in the scalar.");
 
+  // Check the histograms as well.
+  let resultIndexes = resultIndexHist.snapshot();
+  checkHistogramResults(resultIndexes, 0, "FX_URLBAR_SELECTED_RESULT_INDEX");
+
+  let resultTypes = resultTypeHist.snapshot();
+  checkHistogramResults(resultTypes,
+    URLBAR_SELECTED_RESULT_TYPES.searchengine,
+    "FX_URLBAR_SELECTED_RESULT_TYPE");
+
   yield BrowserTestUtils.removeTab(tab);
 });
 
@@ -131,6 +140,15 @@ add_task(function* test_oneOff() {
   checkKeyedScalar(scalars, SCALAR_URLBAR, "search_oneoff", 1);
   Assert.equal(Object.keys(scalars[SCALAR_URLBAR]).length, 1,
                "This search must only increment one entry in the scalar.");
+
+  // Check the histograms as well.
+  let resultIndexes = resultIndexHist.snapshot();
+  checkHistogramResults(resultIndexes, 0, "FX_URLBAR_SELECTED_RESULT_INDEX");
+
+  let resultTypes = resultTypeHist.snapshot();
+  checkHistogramResults(resultTypes,
+    URLBAR_SELECTED_RESULT_TYPES.searchengine,
+    "FX_URLBAR_SELECTED_RESULT_TYPE");
 
   yield BrowserTestUtils.removeTab(tab);
 });
@@ -167,6 +185,15 @@ add_task(function* test_suggestion() {
   checkKeyedScalar(scalars, SCALAR_URLBAR, "search_suggestion", 1);
   Assert.equal(Object.keys(scalars[SCALAR_URLBAR]).length, 1,
                "This search must only increment one entry in the scalar.");
+
+  // Check the histograms as well.
+  let resultIndexes = resultIndexHist.snapshot();
+  checkHistogramResults(resultIndexes, 3, "FX_URLBAR_SELECTED_RESULT_INDEX");
+
+  let resultTypes = resultTypeHist.snapshot();
+  checkHistogramResults(resultTypes,
+    URLBAR_SELECTED_RESULT_TYPES.searchsuggestion,
+    "FX_URLBAR_SELECTED_RESULT_TYPE");
 
   Services.search.currentEngine = previousEngine;
   Services.search.removeEngine(suggestionEngine);
