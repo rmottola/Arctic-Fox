@@ -1403,13 +1403,13 @@ var BookmarkingUI = {
       if (event.target == event.currentTarget) {
         updatePlacesContextMenu(true);
 
-        Services.prefs.removeObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver, false);
+        Services.prefs.removeObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver);
         placesContextMenu.removeEventListener("popupshowing", onPlacesContextMenuShowing);
         bookmarksMenu.removeEventListener("popuphidden", onBookmarksMenuHidden);
       }
     };
 
-    Services.prefs.addObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver, false);
+    Services.prefs.addObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver);
     placesContextMenu.addEventListener("popupshowing", onPlacesContextMenuShowing);
     bookmarksMenu.addEventListener("popuphidden", onBookmarksMenuHidden);
   },

@@ -1820,7 +1820,7 @@ var Impl = {
       this._hasXulWindowVisibleObserver = false;
     }
     if (AppConstants.platform === "android") {
-      Services.obs.removeObserver(this, "application-background", false);
+      Services.obs.removeObserver(this, "application-background");
     }
     GCTelemetry.shutdown();
   },

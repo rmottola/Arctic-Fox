@@ -94,7 +94,7 @@ var DevEdition = {
 
   uninit: function () {
     Services.prefs.removeObserver(this._devtoolsThemePrefName, this);
-    Services.obs.removeObserver(this, "lightweight-theme-styling-update", false);
+    Services.obs.removeObserver(this, "lightweight-theme-styling-update");
     if (this.styleSheet) {
       this.styleSheet.removeEventListener("load", this);
     }

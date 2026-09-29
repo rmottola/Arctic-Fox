@@ -14,7 +14,7 @@ window.addEventListener("load", function onLoad() {
   let inputs = document.querySelectorAll("[data-pref]");
   for (let i of inputs) {
     let pref = i.dataset.pref;
-    Services.prefs.addObserver(pref, FillForm, false);
+    Services.prefs.addObserver(pref, FillForm);
     i.addEventListener("change", SaveForm);
   }
 
