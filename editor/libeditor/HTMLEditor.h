@@ -104,7 +104,6 @@ public:
   Element* GetSelectionContainer();
 
   // TextEditor overrides
-  NS_IMETHOD GetIsDocumentEditable(bool* aIsDocumentEditable) override;
   NS_IMETHOD BeginningOfDocument() override;
   virtual nsresult HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent) override;
   virtual already_AddRefed<nsIContent> GetFocusedContent() override;
@@ -739,11 +738,6 @@ protected:
   void NormalizeEOLInsertPosition(nsINode* firstNodeToInsert,
                                   nsCOMPtr<nsIDOMNode>* insertParentNode,
                                   int32_t* insertOffset);
-
-  /**
-   * Small utility routine to test the eEditorReadonly bit.
-   */
-  bool IsModifiable();
 
   /**
    * Helpers for block transformations.
