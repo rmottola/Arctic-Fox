@@ -146,7 +146,6 @@ GetLoadContextInfo(nsILoadContext *aLoadContext, bool aIsAnonymous)
   DebugOnly<bool> pb = aLoadContext->UsePrivateBrowsing();
   OriginAttributes oa;
   aLoadContext->GetOriginAttributes(oa);
-  oa.StripAttributes(OriginAttributes::STRIP_ADDON_ID);
 
   MOZ_ASSERT(pb == (oa.mPrivateBrowsingId > 0));
   return new LoadContextInfo(aIsAnonymous, oa);
