@@ -1554,18 +1554,6 @@ private:
   DoProcessOriginDirectories();
 };
 
-class OriginKey : public nsAutoCString
-{
-public:
-  OriginKey(PersistenceType aPersistenceType,
-            const nsACString& aOrigin)
-  {
-    PersistenceTypeToText(aPersistenceType, *this);
-    Append(':');
-    Append(aOrigin);
-  }
-};
-
 void
 SanitizeOriginString(nsCString& aOrigin)
 {
@@ -1577,18 +1565,6 @@ SanitizeOriginString(nsCString& aOrigin)
 #endif
 
   aOrigin.ReplaceChar(QuotaManager::kReplaceChars, '+');
-}
-
-bool
-IsTreatedAsPersistent(PersistenceType aPersistenceType)
-{
-  return aPersistenceType == PERSISTENCE_TYPE_PERSISTENT;
-}
-
-bool
-IsTreatedAsTemporary(PersistenceType aPersistenceType)
-{
-  return !IsTreatedAsPersistent(aPersistenceType);
 }
 
 nsresult
@@ -2990,8 +2966,8 @@ QuotaManager::CollectOriginsForEviction(
                            nsTArray<OriginInfo*>& aInactiveOriginInfos)
     {
       for (OriginInfo* originInfo : aOriginInfos) {
-        MOZ_ASSERT(
-          IsTreatedAsTemporary(originInfo->mGroupInfo->mPersistenceType));
+        MOZ_ASSERT(originInfo->mGroupInfo->mPersistenceType !=
+                     PERSISTENCE_TYPE_PERSISTENT);
 
         OriginScope originScope = OriginScope::FromOrigin(originInfo->mOrigin);
 
@@ -3248,7 +3224,7 @@ QuotaManager::InitQuotaForOrigin(PersistenceType aPersistenceType,
                                  int64_t aAccessTime)
 {
   AssertIsOnIOThread();
-  MOZ_ASSERT(IsTreatedAsTemporary(aPersistenceType));
+  MOZ_ASSERT(aPersistenceType != PERSISTENCE_TYPE_PERSISTENT);
 
   MutexAutoLock lock(mQuotaMutex);
 
@@ -3788,7 +3764,7 @@ QuotaManager::InitializeOrigin(PersistenceType aPersistenceType,
 
   nsresult rv;
 
-  bool trackQuota = IsQuotaEnforced(aPersistenceType);
+  bool trackQuota = aPersistenceType != PERSISTENCE_TYPE_PERSISTENT;
 
   // We need to initialize directories of all clients if they exists and also
   // get the total usage to initialize the quota.
@@ -4491,8 +4467,8 @@ QuotaManager::EnsureOriginIsInitialized(PersistenceType aPersistenceType,
                              getter_AddRefs(directory));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  if (IsTreatedAsPersistent(aPersistenceType)) {
-    if (mInitializedOrigins.Contains(OriginKey(aPersistenceType, aOrigin))) {
+  if (aPersistenceType == PERSISTENCE_TYPE_PERSISTENT) {
+    if (mInitializedOrigins.Contains(aOrigin)) {
       directory.forget(aDirectory);
       return NS_OK;
     }
@@ -4573,7 +4549,7 @@ QuotaManager::EnsureOriginIsInitialized(PersistenceType aPersistenceType,
   rv = EnsureDirectory(directory, &created);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  if (IsTreatedAsPersistent(aPersistenceType)) {
+  if (aPersistenceType == PERSISTENCE_TYPE_PERSISTENT) {
     if (created) {
       timestamp = PR_Now();
 
@@ -4593,9 +4569,8 @@ QuotaManager::EnsureOriginIsInitialized(PersistenceType aPersistenceType,
                                     aOrigin);
       NS_ENSURE_SUCCESS(rv, rv);
     } else {
-      bool persistent = aPersistenceType == PERSISTENCE_TYPE_PERSISTENT;
       rv = GetDirectoryMetadata2WithRestore(directory,
-                                            persistent,
+                                            /* aPersistent */ true,
                                             &timestamp);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
@@ -4608,7 +4583,7 @@ QuotaManager::EnsureOriginIsInitialized(PersistenceType aPersistenceType,
                           directory);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    mInitializedOrigins.AppendElement(OriginKey(aPersistenceType, aOrigin));
+    mInitializedOrigins.AppendElement(aOrigin);
   } else if (created) {
     timestamp = PR_Now();
 
@@ -4643,8 +4618,8 @@ QuotaManager::OriginClearCompleted(PersistenceType aPersistenceType,
 {
   AssertIsOnIOThread();
 
-  if (IsTreatedAsPersistent(aPersistenceType)) {
-    mInitializedOrigins.RemoveElement(OriginKey(aPersistenceType, aOrigin));
+  if (aPersistenceType == PERSISTENCE_TYPE_PERSISTENT) {
+    mInitializedOrigins.RemoveElement(aOrigin);
   }
 
   for (uint32_t index = 0; index < Client::TYPE_MAX; index++) {
@@ -4869,25 +4844,6 @@ QuotaManager::IsOriginWhitelistedForPersistentStorage(const nsACString& aOrigin)
   }
 
   return false;
-}
-
-// static
-bool
-QuotaManager::IsFirstPromptRequired(PersistenceType aPersistenceType,
-                                    const nsACString& aOrigin)
-{
-  if (IsTreatedAsTemporary(aPersistenceType)) {
-    return false;
-  }
-
-  return !IsOriginWhitelistedForPersistentStorage(aOrigin);
-}
-
-// static
-bool
-QuotaManager::IsQuotaEnforced(PersistenceType aPersistenceType)
-{
-  return IsTreatedAsTemporary(aPersistenceType);
 }
 
 // static
@@ -5972,10 +5928,9 @@ GetUsageOp::AddToUsage(QuotaManager* aQuotaManager,
   if (exists && !mUsageInfo.Canceled()) {
     bool initialized;
 
-    if (IsTreatedAsPersistent(aPersistenceType)) {
-      nsCString originKey =
-        OriginKey(aPersistenceType, mOriginScope.GetOrigin());
-      initialized = aQuotaManager->IsOriginInitialized(originKey);
+    if (aPersistenceType == PERSISTENCE_TYPE_PERSISTENT) {
+      initialized =
+        aQuotaManager->IsOriginInitialized(mOriginScope.GetOrigin());
     } else {
       initialized = aQuotaManager->IsTemporaryStorageInitialized();
     }
