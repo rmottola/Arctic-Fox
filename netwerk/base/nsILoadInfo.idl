@@ -731,6 +731,14 @@ interface nsILoadInfo : nsISupports
   [infallible] readonly attribute boolean isTopLevelLoad;
 
   /**
+   * Returns the null principal of the resulting resource if the SEC_SANDBOXED
+   * flag is set.  Otherwise returns null.  This is used by
+   * GetChannelResultPrincipal() to ensure that the same null principal object
+   * is returned every time.
+   */
+  [noscript] readonly attribute nsIPrincipal sandboxedLoadingPrincipal;
+
+  /**
    * This attribute will be true if this is a load triggered by
    * https://html.spec.whatwg.org/multipage/iframe-embed-object.html#process-the-iframe-attributes
    * or https://html.spec.whatwg.org/multipage/obsolete.html#process-the-frame-attributes
