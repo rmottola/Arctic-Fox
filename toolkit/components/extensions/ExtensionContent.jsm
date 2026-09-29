@@ -341,6 +341,7 @@ class ContentScriptContextChild extends BaseContext {
       // into the iframe's window, see Bug 1214658 for rationale)
       this.sandbox = Cu.Sandbox(contentWindow, {
         sandboxPrototype: contentWindow,
+        sameZoneAs: contentWindow,
         wantXrays: false,
         isWebExtensionContentScript: true,
       });
@@ -356,6 +357,7 @@ class ContentScriptContextChild extends BaseContext {
       this.sandbox = Cu.Sandbox(principal, {
         metadata,
         sandboxPrototype: contentWindow,
+        sameZoneAs: contentWindow,
         wantXrays: true,
         isWebExtensionContentScript: true,
         wantExportHelpers: true,
