@@ -15,7 +15,7 @@
 #include "nsIDocumentObserver.h"         // for typedef (nsUpdateType)
 #include "nsILoadGroup.h"                // for member (in nsCOMPtr)
 #include "nsINode.h"                     // for base class
-#include "nsIPrincipal.h"
+#include "nsIParser.h"
 #include "nsIScriptGlobalObject.h"       // for member (in nsCOMPtr)
 #include "nsIServiceManager.h"
 #include "nsIUUIDGenerator.h"
@@ -359,6 +359,8 @@ public:
    * Set referrer policy and upgrade-insecure-requests flags
    */
   virtual void ApplySettingsFromCSP(bool aSpeculative) = 0;
+
+  virtual already_AddRefed<nsIParser> CreatorParserOrNull() = 0;
 
   /**
    * Return the referrer policy of the document. Return "default" if there's no
@@ -2806,6 +2808,9 @@ public:
   void ObsoleteSheet(nsIURI *aSheetURI, mozilla::ErrorResult& rv);
 
   void ObsoleteSheet(const nsAString& aSheetURI, mozilla::ErrorResult& rv);
+
+  already_AddRefed<mozilla::dom::Promise> BlockParsing(mozilla::OwningNonNull<mozilla::dom::Promise> aPromise,
+                                                       mozilla::ErrorResult& aRv);
 
   already_AddRefed<nsIURI> GetMozDocumentURIIfNotForErrorPages();
 
