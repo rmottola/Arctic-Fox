@@ -21,8 +21,8 @@ const Actions = require("./actions/index");
 const { Prefs } = require("./prefs");
 
 const {
+  fetchHeaders,
   formDataURI,
-  writeHeaderText,
   getFormDataSections,
 } = require("./request-utils");
 
@@ -141,11 +141,6 @@ RequestsMenuView.prototype = {
 
     this.sendCustomRequestEvent = this.sendCustomRequest.bind(this);
     this.closeCustomRequestEvent = this.closeCustomRequest.bind(this);
-    this.cloneSelectedRequestEvent = this.cloneSelectedRequest.bind(this);
-    this.toggleRawHeadersEvent = this.toggleRawHeaders.bind(this);
-
-    $("#toggle-raw-headers")
-      .addEventListener("click", this.toggleRawHeadersEvent);
 
     this._summary = $("#requests-menu-network-summary-button");
     this._summary.setAttribute("label", L10N.getStr("networkMenu.empty"));
@@ -169,13 +164,9 @@ RequestsMenuView.prototype = {
   _onConnect() {
     if (NetMonitorController.supportsCustomRequest) {
       $("#custom-request-send-button")
-        .addEventListener("click", this.sendCustomRequestEvent);
+        .addEventListener("click", this.sendCustomRequestEvent, false);
       $("#custom-request-close-button")
-        .addEventListener("click", this.closeCustomRequestEvent);
-      $("#headers-summary-resend")
-        .addEventListener("click", this.cloneSelectedRequestEvent);
-    } else {
-      $("#headers-summary-resend").hidden = true;
+        .addEventListener("click", this.closeCustomRequestEvent, false);
     }
   },
 
@@ -190,16 +181,12 @@ RequestsMenuView.prototype = {
     // this.flushRequestsTask.disarm();
 
     $("#custom-request-send-button")
-      .removeEventListener("click", this.sendCustomRequestEvent);
+      .removeEventListener("click", this.sendCustomRequestEvent, false);
     $("#custom-request-close-button")
-      .removeEventListener("click", this.closeCustomRequestEvent);
-    $("#headers-summary-resend")
-      .removeEventListener("click", this.cloneSelectedRequestEvent);
-    $("#toggle-raw-headers")
-      .removeEventListener("click", this.toggleRawHeadersEvent);
+      .removeEventListener("click", this.closeCustomRequestEvent, false);
 
-    this._splitter.removeEventListener("mouseup", this.onResize);
-    window.removeEventListener("resize", this.onResize);
+    this._splitter.removeEventListener("mouseup", this.onResize, false);
+    window.removeEventListener("resize", this.onResize, false);
 
     this.tooltip.destroy();
 
@@ -249,7 +236,36 @@ RequestsMenuView.prototype = {
     const action = Actions.updateRequest(id, data, true);
     yield this.store.dispatch(action);
 
-    let { responseContent, requestPostData } = action.data;
+    let {
+      requestHeaders,
+      requestPostData,
+      responseContent,
+      responseHeaders,
+    } = action.data;
+
+    if (requestHeaders && requestHeaders.headers && requestHeaders.headers.length) {
+      let headers = yield fetchHeaders(
+        requestHeaders, gNetwork.getString.bind(gNetwork));
+      if (headers) {
+        yield this.store.dispatch(Actions.updateRequest(
+          action.id,
+          { requestHeaders: headers },
+          true,
+        ));
+      }
+    }
+
+    if (responseHeaders && responseHeaders.headers && responseHeaders.headers.length) {
+      let headers = yield fetchHeaders(
+        responseHeaders, gNetwork.getString.bind(gNetwork));
+      if (headers) {
+        yield this.store.dispatch(Actions.updateRequest(
+          action.id,
+          { responseHeaders: headers },
+          true,
+        ));
+      }
+    }
 
     if (responseContent && responseContent.content) {
       let request = getRequestById(this.store.getState(), action.id);
@@ -377,28 +393,6 @@ RequestsMenuView.prototype = {
    */
   cloneSelectedRequest() {
     this.store.dispatch(Actions.cloneSelectedRequest());
-  },
-
-  /**
-   * Shows raw request/response headers in textboxes.
-   */
-  toggleRawHeaders: function () {
-    let requestTextarea = $("#raw-request-headers-textarea");
-    let responseTextarea = $("#raw-response-headers-textarea");
-    let rawHeadersHidden = $("#raw-headers").getAttribute("hidden");
-
-    if (rawHeadersHidden) {
-      let selected = getSelectedRequest(this.store.getState());
-      let selectedRequestHeaders = selected.requestHeaders.headers;
-      let selectedResponseHeaders = selected.responseHeaders.headers;
-      requestTextarea.value = writeHeaderText(selectedRequestHeaders);
-      responseTextarea.value = writeHeaderText(selectedResponseHeaders);
-      $("#raw-headers").hidden = false;
-    } else {
-      requestTextarea.value = null;
-      responseTextarea.value = null;
-      $("#raw-headers").hidden = true;
-    }
   },
 
   /**
