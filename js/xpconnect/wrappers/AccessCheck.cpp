@@ -7,6 +7,7 @@
 #include "AccessCheck.h"
 
 #include "nsJSPrincipals.h"
+#include "BasePrincipal.h"
 #include "nsGlobalWindow.h"
 
 #include "XPCWrapper.h"
@@ -46,7 +47,7 @@ AccessCheck::subsumes(JSCompartment* a, JSCompartment* b)
 {
     nsIPrincipal* aprin = GetCompartmentPrincipal(a);
     nsIPrincipal* bprin = GetCompartmentPrincipal(b);
-    return aprin->Subsumes(bprin);
+    return BasePrincipal::Cast(aprin)->FastSubsumes(bprin);
 }
 
 bool
@@ -62,7 +63,7 @@ AccessCheck::subsumesConsideringDomain(JSCompartment* a, JSCompartment* b)
     MOZ_ASSERT(OriginAttributes::IsRestrictOpenerAccessForFPI());
     nsIPrincipal* aprin = GetCompartmentPrincipal(a);
     nsIPrincipal* bprin = GetCompartmentPrincipal(b);
-    return aprin->SubsumesConsideringDomain(bprin);
+    return BasePrincipal::Cast(aprin)->FastSubsumesConsideringDomain(bprin);
 }
 
 bool
@@ -72,7 +73,7 @@ AccessCheck::subsumesConsideringDomainIgnoringFPD(JSCompartment* a,
     MOZ_ASSERT(!OriginAttributes::IsRestrictOpenerAccessForFPI());
     nsIPrincipal* aprin = GetCompartmentPrincipal(a);
     nsIPrincipal* bprin = GetCompartmentPrincipal(b);
-    return aprin->SubsumesConsideringDomainIgnoringFPD(bprin);
+    return BasePrincipal::Cast(aprin)->FastSubsumesConsideringDomainIgnoringFPD(bprin);
 }
 
 // Does the compartment of the wrapper subsumes the compartment of the wrappee?
