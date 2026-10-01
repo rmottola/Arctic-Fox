@@ -5486,6 +5486,36 @@ GCRuntime::sweepPhase(SliceBudget& sliceBudget, AutoLockForExclusiveAccess& lock
     }
 }
 
+bool
+GCRuntime::allCCVisibleZonesWereCollected() const
+{
+    // Calculate whether the gray marking state is now valid.
+    //
+    // The gray bits change from invalid to valid if we finished a full GC from
+    // the point of view of the cycle collector. We ignore the following:
+    //
+    //  - Helper thread zones, as these are not reachable from the main heap.
+    //  - The atoms zone, since strings and symbols are never marked gray.
+    //  - Empty zones.
+    //
+    // These exceptions ensure that when the CC requests a full GC the gray mark
+    // state ends up valid even it we don't collect all of the zones.
+
+    if (isFull)
+        return true;
+
+    for (ZonesIter zone(rt, SkipAtoms); !zone.done(); zone.next()) {
+        if (!zone->isCollecting() &&
+            !zone->usedByHelperThread() &&
+            !zone->arenas.arenaListsAreEmpty())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void
 GCRuntime::endSweepPhase(bool destroyingRuntime, AutoLockForExclusiveAccess& lock)
 {
@@ -5531,8 +5561,7 @@ GCRuntime::endSweepPhase(bool destroyingRuntime, AutoLockForExclusiveAccess& loc
         gcstats::AutoPhase ap(stats(), gcstats::PHASE_FINALIZE_END);
         callFinalizeCallbacks(&fop, JSFINALIZE_COLLECTION_END);
 
-        /* If we finished a full GC, then the gray bits are correct. */
-        if (isFull)
+        if (allCCVisibleZonesWereCollected())
             grayBitsValid = true;
     }
 
@@ -7883,7 +7912,9 @@ js::gc::detail::CellIsMarkedGrayIfKnown(const Cell* cell)
         return false;
 
     auto tc = &cell->asTenured();
-    auto rt = tc->runtimeFromAnyThread();
+    MOZ_ASSERT(!tc->zoneFromAnyThread()->usedByHelperThread());
+
+    auto rt = tc->runtimeFromActiveCooperatingThread();
     if (rt->gc.isIncrementalGCInProgress() && !tc->zone()->wasGCStarted())
         return false;
 
