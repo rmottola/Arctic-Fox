@@ -481,7 +481,8 @@ public:
   CategoryNotificationRunnable(nsISupports* aSubject,
                                const char* aTopic,
                                const char* aData)
-    : mSubject(aSubject)
+    : Runnable("CategoryNotificationRunnable")
+    , mSubject(aSubject)
     , mTopic(aTopic)
     , mData(aData)
   {

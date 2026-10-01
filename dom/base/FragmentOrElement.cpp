@@ -1231,6 +1231,7 @@ class ContentUnbinder : public Runnable
 {
 public:
   ContentUnbinder()
+    : Runnable("ContentUnbinder")
   {
     mLast = this;
   }

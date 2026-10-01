@@ -187,7 +187,7 @@ nsAsyncInstantiateEvent::Run()
 class CheckPluginStopEvent : public Runnable {
 public:
   explicit CheckPluginStopEvent(nsObjectLoadingContent* aContent)
-  : mContent(aContent) {}
+  : Runnable("CheckPluginStopEvent"), mContent(aContent) {}
 
   ~CheckPluginStopEvent() override = default;
 

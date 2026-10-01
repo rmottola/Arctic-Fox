@@ -1587,7 +1587,8 @@ class MediaStreamGraphStableStateRunnable : public Runnable {
 public:
   explicit MediaStreamGraphStableStateRunnable(MediaStreamGraphImpl* aGraph,
                                                bool aSourceIsMSG)
-    : mGraph(aGraph)
+    : Runnable("MediaStreamGraphStableStateRunnable")
+    , mGraph(aGraph)
     , mSourceIsMSG(aSourceIsMSG)
   {
   }
