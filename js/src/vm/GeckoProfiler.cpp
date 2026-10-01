@@ -507,7 +507,7 @@ GeckoProfilerBaselineOSRMarker::~GeckoProfilerBaselineOSRMarker()
     entry.unsetOSR();
 }
 
-JSScript*
+JS_PUBLIC_API(JSScript*)
 ProfileEntry::script() const volatile
 {
     MOZ_ASSERT(isJs());
