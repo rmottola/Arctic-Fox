@@ -3612,6 +3612,9 @@ GCRuntime::purgeRuntime(AutoLockForExclusiveAccess& lock)
         cache->purge();
 
     rt->promiseTasksToDestroy.lock()->clear();
+
+    MOZ_ASSERT(unmarkGrayStack.empty());
+    unmarkGrayStack.clearAndFree();
 }
 
 bool
