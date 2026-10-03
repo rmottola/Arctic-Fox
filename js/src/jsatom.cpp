@@ -27,6 +27,7 @@
 #include "jscompartmentinlines.h"
 #include "jsobjinlines.h"
 
+#include "gc/AtomMarking-inl.h"
 #include "vm/String-inl.h"
 
 using namespace js;
@@ -355,7 +356,7 @@ AtomizeAndCopyChars(JSContext* cx, const CharT* tbchars, size_t length, PinningB
     if (p) {
         JSAtom* atom = p->asPtr(cx);
         p->setPinned(bool(pin));
-        cx->markAtom(atom);
+        cx->atomMarking().inlinedMarkAtom(cx, atom);
         return atom;
     }
 
@@ -384,7 +385,7 @@ AtomizeAndCopyChars(JSContext* cx, const CharT* tbchars, size_t length, PinningB
         }
     }
 
-    cx->markAtom(atom);
+    cx->atomMarking().inlinedMarkAtom(cx, atom);
     return atom;
 }
 
