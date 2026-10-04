@@ -4672,12 +4672,11 @@ bool
 Parser<FullParseHandler>::namedImportsOrNamespaceImport(TokenKind tt, Node importSpecSet)
 {
     if (tt == TOK_LC) {
-        TokenStream::Modifier modifier = TokenStream::KeywordIsName;
         while (true) {
             // Handle the forms |import {} from 'a'| and
             // |import { ..., } from 'a'| (where ... is non empty), by
             // escaping the loop early if the next token is }.
-            if (!tokenStream.peekToken(&tt, TokenStream::KeywordIsName))
+            if (!tokenStream.getToken(&tt, TokenStream::KeywordIsName))
                 return false;
 
             if (tt == TOK_RC)
@@ -4686,7 +4685,11 @@ Parser<FullParseHandler>::namedImportsOrNamespaceImport(TokenKind tt, Node impor
             // If the next token is a keyword, the previous call to
             // peekToken matched it as a TOK_NAME, and put it in the
             // lookahead buffer, so this call will match keywords as well.
-            MUST_MATCH_TOKEN_MOD(TOK_NAME, TokenStream::KeywordIsName, JSMSG_NO_IMPORT_NAME);
+            if (tt != TOK_NAME) {
+                error(JSMSG_NO_IMPORT_NAME);
+                return false;
+            }
+
             Rooted<PropertyName*> importName(context, tokenStream.currentName());
             TokenPos importNamePos = pos();
 
@@ -4744,17 +4747,18 @@ Parser<FullParseHandler>::namedImportsOrNamespaceImport(TokenKind tt, Node impor
 
             handler.addList(importSpecSet, importSpec);
 
-            bool matched;
-            if (!tokenStream.matchToken(&matched, TOK_COMMA))
+            TokenKind next;
+            if (!tokenStream.getToken(&next))
                 return false;
 
-            if (!matched) {
-                modifier = TokenStream::None;
+            if (next == TOK_RC)
                 break;
+
+            if (next != TOK_COMMA) {
+                error(JSMSG_RC_AFTER_IMPORT_SPEC_LIST);
+                return false;
             }
         }
-
-        MUST_MATCH_TOKEN_MOD(TOK_RC, modifier, JSMSG_RC_AFTER_IMPORT_SPEC_LIST);
     } else {
         MOZ_ASSERT(tt == TOK_MUL);
         if (!tokenStream.getToken(&tt))
