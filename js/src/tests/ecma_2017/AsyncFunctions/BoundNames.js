@@ -10,7 +10,7 @@ var test2 = (async function test2() {});
 assertEq(test2.name, "test2");
 
 var anon = async function() {};
-assertEq(anon.name, "anon");
+assertEq(anon.name, "");
 
 if (typeof Reflect !== "undefined" && Reflect.parse) {
   var tree = Reflect.parse("export default async function() {}", { target: "module" });
