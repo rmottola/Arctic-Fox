@@ -125,7 +125,7 @@ Shape::new_(JSContext* cx, Handle<StackShape> other, uint32_t nfixed)
 inline void
 Shape::updateBaseShapeAfterMovingGC()
 {
-    BaseShape* base = base_.unbarrieredGet();
+    BaseShape* base = base_;
     if (IsForwarded(base))
         base_.unsafeSet(Forwarded(base));
 }
