@@ -553,7 +553,7 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleScope enclosingScope,
 {
     enum FirstWordFlag {
         HasAtom             = 0x1,
-        IsStarGenerator     = 0x2,
+        HasStarGeneratorProto = 0x2,
         IsLazy              = 0x4,
         HasSingletonType    = 0x8
     };
@@ -576,8 +576,8 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleScope enclosingScope,
         if (fun->explicitName() || fun->hasCompileTimeName() || fun->hasGuessedAtom())
             firstword |= HasAtom;
 
-        if (fun->isStarGenerator())
-            firstword |= IsStarGenerator;
+        if (fun->isStarGenerator() || fun->isAsync())
+            firstword |= HasStarGeneratorProto;
 
         if (fun->isInterpretedLazy()) {
             // Encode a lazy script.
@@ -617,7 +617,7 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleScope enclosingScope,
 
     if (mode == XDR_DECODE) {
         RootedObject proto(cx);
-        if (firstword & IsStarGenerator) {
+        if (firstword & HasStarGeneratorProto) {
             // If we are off thread, the generator meta-objects have
             // already been created by js::StartOffThreadParseTask, so
             // JSContext* will not be necessary.
@@ -1004,7 +1004,7 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool prettyPrint)
     }
     if (!fun->isArrow()) {
         bool ok;
-        if (fun->isStarGenerator() && !fun->isAsync())
+        if (fun->isStarGenerator())
             ok = out.append("function* ");
         else
             ok = out.append("function ");
@@ -1602,8 +1602,6 @@ FunctionConstructor(JSContext* cx, const CallArgs& args, GeneratorKind generator
     bool isStarGenerator = generatorKind == StarGenerator;
     bool isAsync = asyncKind == AsyncFunction;
     MOZ_ASSERT(generatorKind != LegacyGenerator);
-    MOZ_ASSERT_IF(isAsync, isStarGenerator);
-    MOZ_ASSERT_IF(!isStarGenerator, !isAsync);
 
     RootedScript maybeScript(cx);
     const char* filename;
@@ -1700,7 +1698,7 @@ FunctionConstructor(JSContext* cx, const CallArgs& args, GeneratorKind generator
 
     // Step 4.d, use %Generator% as the fallback prototype.
     // Also use %Generator% for the unwrapped function of async functions.
-    if (!proto && isStarGenerator) {
+    if (!proto && (isStarGenerator || isAsync)) {
         proto = GlobalObject::getOrCreateStarGeneratorFunctionPrototype(cx, global);
         if (!proto)
             return false;
@@ -1768,7 +1766,7 @@ js::AsyncFunctionConstructor(JSContext* cx, unsigned argc, Value* vp)
     else
         newTarget = &args.callee();
 
-    if (!FunctionConstructor(cx, args, StarGenerator, AsyncFunction))
+    if (!FunctionConstructor(cx, args, NotGenerator, AsyncFunction))
         return false;
 
     // ES2017, draft rev 0f10dba4ad18de92d47d421f378233a2eae8f077
@@ -1964,7 +1962,7 @@ NewFunctionClone(JSContext* cx, HandleFunction fun, NewObjectKind newKind,
                  gc::AllocKind allocKind, HandleObject proto)
 {
     RootedObject cloneProto(cx, proto);
-    if (!proto && fun->isStarGenerator()) {
+    if (!proto && (fun->isStarGenerator() || fun->isAsync())) {
         cloneProto = GlobalObject::getOrCreateStarGeneratorFunctionPrototype(cx, cx->global());
         if (!cloneProto)
             return nullptr;
