@@ -603,8 +603,8 @@ class BaseCompiler
     ValTypeVector               SigI64I64_;
     ValTypeVector               SigD_;
     ValTypeVector               SigF_;
-    ValTypeVector               SigI_;
-    ValTypeVector               Sig_;
+    MIRTypeVector               SigPI_;
+    MIRTypeVector               SigP_;
     Label                       returnLabel_;
     Label                       stackOverflowLabel_;
     CodeOffset                  stackAddOffset_;
@@ -2486,8 +2486,13 @@ class BaseCompiler
     // TODO / OPTIMIZE (Bug 1316821): This is expensive; let's roll the iterator
     // walking into the walking done for passArg.  See comments in passArg.
 
-    size_t stackArgAreaSize(const ValTypeVector& args) {
-        ABIArgIter<const ValTypeVector> i(args);
+    // Note, stackArgAreaSize() must process all the arguments to get the
+    // alignment right; the signature must therefore be the complete call
+    // signature.
+
+    template<class T>
+    size_t stackArgAreaSize(const T& args) {
+        ABIArgIter<const T> i(args);
         while (!i.done())
             i++;
         return AlignBytes(i.stackBytesConsumedSoFar(), 16u);
@@ -2495,10 +2500,7 @@ class BaseCompiler
 
     void startCallArgs(FunctionCall& call, size_t stackArgAreaSize)
     {
-        // It's possible the TLS pointer may have implicitly used stack before.
-        MOZ_ASSERT(call.stackArgAreaSize == 0 || call.stackArgAreaSize == sizeof(void*));
-
-        call.stackArgAreaSize += stackArgAreaSize;
+        call.stackArgAreaSize = stackArgAreaSize;
 
         size_t adjustment = call.stackArgAreaSize + call.frameAlignAdjustment;
         if (adjustment)
@@ -2506,10 +2508,7 @@ class BaseCompiler
     }
 
     const ABIArg reservePointerArgument(FunctionCall& call) {
-        ABIArg ret = call.abi.next(MIRType::Pointer);
-        if (ret.kind() == ABIArg::Stack)
-            call.stackArgAreaSize += sizeof(void*);
-        return ret;
+        return call.abi.next(MIRType::Pointer);
     }
 
     // TODO / OPTIMIZE (Bug 1316821): Note passArg is used only in one place.
@@ -6770,7 +6769,7 @@ BaseCompiler::emitGrowMemory()
 
     ABIArg instanceArg = reservePointerArgument(baselineCall);
 
-    startCallArgs(baselineCall, stackArgAreaSize(SigI_));
+    startCallArgs(baselineCall, stackArgAreaSize(SigPI_));
     passArg(baselineCall, ValType::I32, peek(0));
     builtinInstanceMethodCall(SymbolicAddress::GrowMemory, instanceArg, baselineCall);
     endCall(baselineCall, stackSpace);
@@ -6800,7 +6799,7 @@ BaseCompiler::emitCurrentMemory()
 
     ABIArg instanceArg = reservePointerArgument(baselineCall);
 
-    startCallArgs(baselineCall, stackArgAreaSize(Sig_));
+    startCallArgs(baselineCall, stackArgAreaSize(SigP_));
     builtinInstanceMethodCall(SymbolicAddress::CurrentMemory, instanceArg, baselineCall);
     endCall(baselineCall, 0);
 
@@ -7575,7 +7574,9 @@ BaseCompiler::init()
         return false;
     if (!SigF_.append(ValType::F32))
         return false;
-    if (!SigI_.append(ValType::I32))
+    if (!SigP_.append(MIRType::Pointer))
+        return false;
+    if (!SigPI_.append(MIRType::Pointer) || !SigPI_.append(MIRType::Int32))
         return false;
     if (!SigI64I64_.append(ValType::I64) || !SigI64I64_.append(ValType::I64))
         return false;
