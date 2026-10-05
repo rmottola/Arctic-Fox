@@ -1519,6 +1519,8 @@ class MochitestDesktop(MochitestBase):
     DEFAULT_TIMEOUT = 60.0
     mediaDevices = None
 
+    patternFiles = {}
+
     # XXX use automation.py for test name to avoid breaking legacy
     # TODO: replace this with 'runtests.py' or 'mochitest' or the like
     test_name = 'automation.py'

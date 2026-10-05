@@ -526,6 +526,12 @@ class MochitestArguments(ArgumentContainer):
           "help": "Timeout while waiting to receive a message from the marionette server.",
           "suppress": True,
           }],
+        [["--failure-pattern-file"],
+         {"default": None,
+          "dest": "failure_pattern_file",
+          "help": "File describes all failure patterns of the tests.",
+          "suppress": True,
+          }],
     ]
 
     defaults = {

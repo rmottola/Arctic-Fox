@@ -234,6 +234,12 @@ SimpleTest.ok = function (condition, name, diag, stack = null) {
       }
       var successInfo = {status:"FAIL", expected:"FAIL", message:"TEST-KNOWN-FAIL"};
       var failureInfo = {status:"PASS", expected:"FAIL", message:"TEST-UNEXPECTED-PASS"};
+    } else if (!test.result && usesFailurePatterns()) {
+      if (recordIfMatchesFailurePattern(name, diag)) {
+        test.result = true;
+      }
+      var successInfo = {status:"FAIL", expected:"FAIL", message:"TEST-KNOWN-FAIL"};
+      var failureInfo = {status:"FAIL", expected:"PASS", message:"TEST-UNEXPECTED-FAIL"};
     } else {
       var successInfo = {status:"PASS", expected:"PASS", message:"TEST-PASS"};
       var failureInfo = {status:"FAIL", expected:"PASS", message:"TEST-UNEXPECTED-FAIL"};
@@ -296,6 +302,14 @@ SimpleTest.doesThrow = function(fn, name) {
 
 SimpleTest.todo = function(condition, name, diag) {
     var test = {'result': !!condition, 'name': name, 'diag': diag, todo: true};
+    if (test.result && usesFailurePatterns() &&
+        recordIfMatchesFailurePattern(name, diag)) {
+      // Flipping the result to false so we don't get unexpected result. There
+      // is no perfect way here. A known failure can trigger unexpected pass,
+      // in which case, tagging it as KNOWN-FAIL probably makes more sense than
+      // marking it PASS.
+      test.result = false;
+    }
     var successInfo = {status:"PASS", expected:"FAIL", message:"TEST-UNEXPECTED-PASS"};
     var failureInfo = {status:"FAIL", expected:"FAIL", message:"TEST-KNOWN-FAIL"};
     SimpleTest._logResult(test, successInfo, failureInfo);
@@ -1000,6 +1014,24 @@ SimpleTest.finish = function() {
 
         SimpleTest._logResult(test, successInfo, failureInfo);
         SimpleTest._tests.push(test);
+    } else if (usesFailurePatterns()) {
+        SimpleTest.expected.forEach(([pat, expected_count], i) => {
+            let count = SimpleTest.num_failed[i];
+            let diag;
+            if (expected_count === null && count == 0) {
+                diag = "expected some failures but got none";
+            } else if (expected_count !== null && expected_count != count) {
+                diag = `expected ${expected_count} failures but got ${count}`;
+            } else {
+                return;
+            }
+            var name = pat ? `failure pattern \`${pat}\` in this test` : "failures in this test";
+            var test = {'result': false, name, diag};
+            var successInfo = {status:"PASS", expected:"PASS", message:"TEST-PASS"};
+            var failureInfo = {status:"FAIL", expected:"PASS", message:"TEST-UNEXPECTED-FAIL"};
+            SimpleTest._logResult(test, successInfo, failureInfo);
+            SimpleTest._tests.push(test);
+        });
     }
 
     SimpleTest.testsLength = SimpleTest._tests.length;
