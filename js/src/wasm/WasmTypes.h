@@ -1244,6 +1244,7 @@ class CalleeDesc
         } import;
         struct {
             uint32_t globalDataOffset_;
+            uint32_t minLength_;
             bool external_;
             SigIdDesc sigId_;
         } table;
@@ -1268,6 +1269,7 @@ class CalleeDesc
         CalleeDesc c;
         c.which_ = WasmTable;
         c.u.table.globalDataOffset_ = desc.globalDataOffset;
+        c.u.table.minLength_ = desc.limits.initial;
         c.u.table.external_ = desc.external;
         c.u.table.sigId_ = sigId;
         return c;
@@ -1319,6 +1321,10 @@ class CalleeDesc
     SigIdDesc wasmTableSigId() const {
         MOZ_ASSERT(which_ == WasmTable);
         return u.table.sigId_;
+    }
+    uint32_t wasmTableMinLength() const {
+        MOZ_ASSERT(which_ == WasmTable);
+        return u.table.minLength_;
     }
     SymbolicAddress builtin() const {
         MOZ_ASSERT(which_ == Builtin || which_ == BuiltinInstanceMethod);
