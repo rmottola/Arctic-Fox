@@ -743,6 +743,9 @@ class UsedNameTracker
     }
 };
 
+template <typename ParseHandler>
+class AutoAwaitIsKeyword;
+
 class ParserBase : public StrictModeGetter
 {
   private:
@@ -792,7 +795,13 @@ class ParserBase : public StrictModeGetter
     /* Unexpected end of input, i.e. TOK_EOF not at top-level. */
     bool isUnexpectedEOF_:1;
 
+    bool awaitIsKeyword_:1;
+
   public:
+    bool awaitIsKeyword() const {
+      return awaitIsKeyword_;
+    }
+
     ParserBase(JSContext* cx, LifoAlloc& alloc, const ReadOnlyCompileOptions& options,
                const char16_t* chars, size_t length, bool foldConstants,
                UsedNameTracker& usedNames, Parser<SyntaxParseHandler>* syntaxParser,
@@ -1011,6 +1020,9 @@ class Parser final : public ParserBase, private JS::AutoGCRooter
            Parser<SyntaxParseHandler>* syntaxParser, LazyScript* lazyOuterFunction);
     ~Parser();
 
+    friend class AutoAwaitIsKeyword<ParseHandler>;
+    void setAwaitIsKeyword(bool isKeyword);
+
     bool checkOptions();
 
     // A Parser::Mark is the extension of the LifoAlloc::Mark to the entire
@@ -1058,8 +1070,6 @@ class Parser final : public ParserBase, private JS::AutoGCRooter
                             HandleObject proto);
 
     void trace(JSTracer* trc);
-
-    bool checkUnescapedName();
 
   private:
     Parser* thisForCtor() { return this; }
@@ -1330,17 +1340,18 @@ class Parser final : public ParserBase, private JS::AutoGCRooter
     Node classDefinition(YieldHandling yieldHandling, ClassContext classContext,
                          DefaultHandling defaultHandling);
 
-    PropertyName* labelOrIdentifierReference(YieldHandling yieldHandling,
-                                             bool yieldTokenizedAsName);
+    PropertyName* checkLabelOrIdentifierReference(PropertyName* ident,
+                                                  uint32_t offset,
+                                                  YieldHandling yieldHandling);
+
+    PropertyName* labelOrIdentifierReference(YieldHandling yieldHandling);
 
     PropertyName* labelIdentifier(YieldHandling yieldHandling) {
-        return labelOrIdentifierReference(yieldHandling, false);
+        return labelOrIdentifierReference(yieldHandling);
     }
 
-    PropertyName* identifierReference(YieldHandling yieldHandling,
-                                      bool yieldTokenizedAsName = false)
-    {
-        return labelOrIdentifierReference(yieldHandling, yieldTokenizedAsName);
+    PropertyName* identifierReference(YieldHandling yieldHandling) {
+        return labelOrIdentifierReference(yieldHandling);
     }
 
     PropertyName* importedBinding() {
@@ -1460,6 +1471,25 @@ class Parser final : public ParserBase, private JS::AutoGCRooter
     JSAtom* prefixAccessorName(PropertyType propType, HandleAtom propAtom);
 
     bool asmJS(Node list);
+};
+
+template <typename ParseHandler>
+class MOZ_STACK_CLASS AutoAwaitIsKeyword
+{
+  private:
+    Parser<ParseHandler>* parser_;
+    bool oldAwaitIsKeyword_;
+
+  public:
+    AutoAwaitIsKeyword(Parser<ParseHandler>* parser, bool awaitIsKeyword) {
+        parser_ = parser;
+        oldAwaitIsKeyword_ = parser_->awaitIsKeyword_;
+        parser_->setAwaitIsKeyword(awaitIsKeyword);
+    }
+
+    ~AutoAwaitIsKeyword() {
+        parser_->setAwaitIsKeyword(oldAwaitIsKeyword_);
+    }
 };
 
 } /* namespace frontend */
