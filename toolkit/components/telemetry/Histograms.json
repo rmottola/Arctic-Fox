@@ -10847,6 +10847,30 @@
     "kind": "count",
     "description": "Tracking whether a ServiceWorker spawn gets queued due to hitting max workers per domain limit. File bugs in Core::DOM in case of a Telemetry regression."
   },
+  "READER_MODE_SERIALIZE_DOM_MS": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "bug_numbers": [1129029],
+    "expires_in_version": "42",
+    "kind": "count",
+    "description": "Time (ms) to serialize a DOM to send to the reader worker"
+  },
+  "READER_MODE_WORKER_PARSE_MS": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "bug_numbers": [1129029],
+    "expires_in_version": "42",
+    "kind": "count",
+    "description": "Time (ms) for the reader worker to parse a document"
+  },
+  "READER_MODE_DOWNLOAD_MS": {
+    "record_in_processes": ["main", "content"],
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "bug_numbers": [1129029],
+    "expires_in_version": "42",
+    "kind": "count",
+    "description": "Time (ms) to download a document to show in reader mode"
+  },
   "SHARED_WORKER_SPAWN_GETS_QUEUED": {
     "record_in_processes": ["main", "content"],
     "alert_emails": ["amarchesini@mozilla.com"],
