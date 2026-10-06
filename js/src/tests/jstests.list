@@ -30,6 +30,9 @@ skip script test262/built-ins/ThrowTypeError/unique-per-realm-function-proto.js
 skip script test262/language/expressions/yield/iter-value-specified.js
 skip script test262/language/expressions/yield/iter-value-unspecified.js
 
+# Async generator is non-release-or-beta only.
+skip-if(release_or_beta) include test262/language/expressions/async-generators/jstests.list
+skip-if(release_or_beta) include test262/language/statements/async-generator/jstests.list
 
 #####################################
 # Test262 tests disabled on browser #
@@ -505,15 +508,6 @@ skip script test262/annexB/language/eval-code/indirect/global-if-decl-else-decl-
 skip script test262/annexB/language/eval-code/indirect/global-block-decl-eval-global-exsting-global-init.js
 skip script test262/annexB/language/eval-code/indirect/global-switch-case-eval-global-exsting-global-init.js
 
-# https://bugzilla.mozilla.org/show_bug.cgi?id=1331092
-skip script test262/language/expressions/async-generators/expression-yield-as-statement.js
-skip script test262/language/expressions/async-generators/expression-await-thenable-as-yield-operand.js
-skip script test262/language/expressions/async-generators/expression-yield-as-operand.js
-skip script test262/language/expressions/async-generators/expression-await-as-yield-operand.js
-skip script test262/language/expressions/async-generators/expression-yield-newline.js
-skip script test262/language/expressions/async-generators/expression-await-promise-as-yield-operand.js
-skip script test262/language/expressions/async-generators/expression-yield-star-before-newline.js
-
 # https://bugzilla.mozilla.org/show_bug.cgi?id=1050755
 skip script test262/built-ins/Date/UTC/return-value.js
 
@@ -575,3 +569,8 @@ skip script test262/built-ins/Function/prototype/toString/AsyncFunction.js
 
 # Async generators are now a thing.
 skip script test262/language/statements/async-function/early-errors-no-async-generator-n.js
+
+# Need to be rewritten to follow the change in https://github.com/tc39/proposal-async-iteration/pull/92
+skip script test262/language/statements/async-generator/yield-star-async-next.js
+skip script test262/language/statements/async-generator/yield-star-async-return.js
+skip script test262/language/statements/async-generator/yield-star-async-throw.js
