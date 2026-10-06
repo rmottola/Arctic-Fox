@@ -19,5 +19,6 @@ if 'a' in CONFIG['GRE_MILESTONE']:
 # Nightly-only system add-ons
 if CONFIG['NIGHTLY_BUILD']:
     DIRS += [
+        'activity-stream',
         'webcompat-reporter',
     ]
