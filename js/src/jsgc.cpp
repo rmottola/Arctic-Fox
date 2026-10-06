@@ -2485,8 +2485,6 @@ GCRuntime::updateZonePointersToRelocatedCells(Zone* zone, AutoLockForExclusiveAc
     // Call callbacks to get the rest of the system to fixup other untraced pointers.
     for (CompartmentsInZoneIter comp(zone); !comp.done(); comp.next())
         callWeakPointerCompartmentCallbacks(comp);
-    if (rt->sweepZoneCallback)
-        rt->sweepZoneCallback(zone);
 }
 
 /*
@@ -3441,8 +3439,6 @@ Zone::sweepCompartments(FreeOp* fop, bool keepAtleastOne, bool destroyingRuntime
 void
 GCRuntime::sweepZones(FreeOp* fop, ZoneGroup* group, bool destroyingRuntime)
 {
-    JSZoneCallback callback = rt->destroyZoneCallback;
-
     Zone** read = group->zones().begin();
     Zone** end = group->zones().end();
     Zone** write = read;
@@ -3467,9 +3463,6 @@ GCRuntime::sweepZones(FreeOp* fop, ZoneGroup* group, bool destroyingRuntime)
                 if (!zone->arenas.checkEmptyArenaLists())
                     arenasEmptyAtShutdown = false;
 #endif
-
-                if (callback)
-                    callback(zone);
 
                 zone->sweepCompartments(fop, false, destroyingRuntime);
                 MOZ_ASSERT(zone->compartments().empty());
@@ -3562,8 +3555,10 @@ GCRuntime::purgeRuntime(AutoLockForExclusiveAccess& lock)
     for (GCCompartmentsIter comp(rt); !comp.done(); comp.next())
         comp->purge();
 
-    for (GCZonesIter zone(rt); !zone.done(); zone.next())
+    for (GCZonesIter zone(rt); !zone.done(); zone.next()) {
         zone->atomCache().clearAndShrink();
+        zone->externalStringCache().purge();
+    }
 
     for (const CooperatingContext& target : rt->cooperatingContexts()) {
         freeUnusedLifoBlocksAfterSweeping(&target.context()->tempLifoAlloc());
@@ -5022,9 +5017,6 @@ GCRuntime::beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock)
 
         if (zone->isAtomsZone())
             sweepingAtoms = true;
-
-        if (rt->sweepZoneCallback)
-            rt->sweepZoneCallback(zone);
 
 #ifdef DEBUG
         zone->gcLastSweepGroupIndex = sweepGroupIndex;

@@ -681,18 +681,6 @@ JS_SetSizeOfIncludingThisCompartmentCallback(JSContext* cx,
 }
 
 JS_PUBLIC_API(void)
-JS_SetDestroyZoneCallback(JSContext* cx, JSZoneCallback callback)
-{
-    cx->runtime()->destroyZoneCallback = callback;
-}
-
-JS_PUBLIC_API(void)
-JS_SetSweepZoneCallback(JSContext* cx, JSZoneCallback callback)
-{
-    cx->runtime()->sweepZoneCallback = callback;
-}
-
-JS_PUBLIC_API(void)
 JS_SetCompartmentNameCallback(JSContext* cx, JSCompartmentNameCallback callback)
 {
     cx->runtime()->compartmentNameCallback = callback;
@@ -1505,11 +1493,11 @@ JS_NewExternalString(JSContext* cx, const char16_t* chars, size_t length,
 
 JS_PUBLIC_API(JSString*)
 JS_NewMaybeExternalString(JSContext* cx, const char16_t* chars, size_t length,
-                          const JSStringFinalizer* fin, bool* isExternal)
+                          const JSStringFinalizer* fin, bool* allocatedExternal)
 {
     AssertHeapIsIdle();
     CHECK_REQUEST(cx);
-    return NewMaybeExternalString(cx, chars, length, fin, isExternal);
+    return NewMaybeExternalString(cx, chars, length, fin, allocatedExternal);
 }
 
 extern JS_PUBLIC_API(bool)
