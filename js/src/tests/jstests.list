@@ -572,3 +572,6 @@ skip script test262/built-ins/DataView/prototype/setInt16/detached-buffer-after-
 
 # https://github.com/tc39/Function-prototype-toString-revision/issues/20
 skip script test262/built-ins/Function/prototype/toString/AsyncFunction.js
+
+# Async generators are now a thing.
+skip script test262/language/statements/async-function/early-errors-no-async-generator-n.js
