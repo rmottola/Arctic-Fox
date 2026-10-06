@@ -991,11 +991,6 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool prettyPrint)
         }
     }
 
-    if (fun->isAsync()) {
-        if (!out.append("async "))
-            return nullptr;
-    }
-
     bool funIsMethodOrNonArrowLambda = (fun->isLambda() && !fun->isArrow()) || fun->isMethod() ||
                                         fun->isGetter() || fun->isSetter();
     bool haveSource = fun->isInterpreted() && !fun->isSelfHostedBuiltin();
@@ -1003,6 +998,10 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool prettyPrint)
     // If we're not in pretty mode, put parentheses around lambda functions and methods.
     if (haveSource && !prettyPrint && funIsMethodOrNonArrowLambda) {
         if (!out.append("("))
+            return nullptr;
+    }
+    if (fun->isAsync()) {
+        if (!out.append("async "))
             return nullptr;
     }
     if (!fun->isArrow()) {
