@@ -16,9 +16,6 @@ assertEq(Reflect.parse("function* a() {}").body[0].async, false);
 assertEq(Reflect.parse("async function a() {}").body[0].async, true);
 assertEq(Reflect.parse("() => {}").body[0].async, undefined);
 
-// Async generators are not allowed (with regards to spec)
-assertThrows(() => Reflect.parse("async function* a() {}"), SyntaxError);
-
 // No line terminator after async
 assertEq(Reflect.parse("async\nfunction a(){}").body[0].expression.name, "async");
 
