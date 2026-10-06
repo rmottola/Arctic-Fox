@@ -505,6 +505,19 @@
                    onpopupshowing="if (!this.parentNode._placesView)
                                      new PlacesMenu(event, 'place:folder=TOOLBAR');"/>
       </menu>
+      <menu id="menu_mobileBookmarks"
+            class="menu-iconic bookmark-item"
+            label="&mobileBookmarksCmd.label;"
+            hidden="true"
+            container="true">
+        <menupopup id="mobileBookmarksFolderPopup"
+#ifndef XP_MACOSX
+                   placespopup="true"
+#endif
+                   context="placesContext"
+                   onpopupshowing="if (!this.parentNode._placesView)
+                                     new PlacesMenu(event, 'place:folder=MOBILE_BOOKMARKS');"/>
+      </menu>
       <menuseparator id="bookmarksMenuItemsSeparator"/>
       <!-- Bookmarks menu items -->
       <menuseparator builder="end"

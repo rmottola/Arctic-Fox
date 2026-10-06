@@ -860,6 +860,19 @@
                          onpopupshowing="if (!this.parentNode._placesView)
                                          new PlacesMenu(event, 'place:folder=TOOLBAR');"/>
             </menu>
+            <menu id="BMB_mobileBookmarks"
+                  class="menu-iconic bookmark-item subviewbutton"
+                  label="&bookmarksMenuButton.mobile.label;"
+                  hidden="true"
+                  container="true">
+              <menupopup id="BMB_mobileBookmarksPopup"
+                         placespopup="true"
+                         context="placesContext"
+                         onpopupshowing="if (!this.parentNode._placesView)
+                                           new PlacesMenu(event, 'place:folder=MOBILE_BOOKMARKS',
+                                                          PlacesUIUtils.getViewForNode(this.parentNode.parentNode).options);"/>
+            </menu>
+
             <menuseparator/>
             <!-- Bookmarks menu items -->
             <menuseparator builder="end"
