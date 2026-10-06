@@ -288,6 +288,8 @@ CallerGetterImpl(JSContext* cx, const CallArgs& args)
     }
 
     RootedObject caller(cx, iter.callee(cx));
+    if (caller->is<JSFunction>() && caller->as<JSFunction>().isAsync())
+        caller = GetWrappedAsyncFunction(&caller->as<JSFunction>());
     if (!cx->compartment()->wrap(cx, &caller))
         return false;
 
@@ -302,6 +304,8 @@ CallerGetterImpl(JSContext* cx, const CallArgs& args)
         }
 
         JSFunction* callerFun = &callerObj->as<JSFunction>();
+        if (IsWrappedAsyncFunction(callerFun))
+            callerFun = GetUnwrappedAsyncFunction(callerFun);
         MOZ_ASSERT(!callerFun->isBuiltin(), "non-builtin iterator returned a builtin?");
 
         if (callerFun->strict()) {
@@ -355,6 +359,10 @@ CallerSetterImpl(JSContext* cx, const CallArgs& args)
         return true;
 
     RootedObject caller(cx, iter.callee(cx));
+    // |caller| is only used for security access-checking and for its
+    // strictness.  An unwrapped async function has its wrapped async
+    // function's security access and strictness, so don't bother calling
+    // |GetUnwrappedAsyncFunction|.
     if (!cx->compartment()->wrap(cx, &caller)) {
         cx->clearPendingException();
         return true;
