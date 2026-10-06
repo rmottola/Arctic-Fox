@@ -1011,8 +1011,10 @@ Parser<ParseHandler>::reportMissingClosing(unsigned errorNumber, unsigned noteNu
                                            uint32_t openedPos)
 {
     auto notes = MakeUnique<JSErrorNotes>();
-    if (!notes)
+    if (!notes) {
+        ReportOutOfMemory(pc->sc()->context);
         return;
+    }
 
     uint32_t line, column;
     tokenStream.srcCoords.lineNumAndColumnIndex(openedPos, &line, &column);
@@ -1049,8 +1051,10 @@ Parser<ParseHandler>::reportRedeclaration(HandlePropertyName name, DeclarationKi
     }
 
     auto notes = MakeUnique<JSErrorNotes>();
-    if (!notes)
+    if (!notes) {
+        ReportOutOfMemory(pc->sc()->context);
         return;
+    }
 
     uint32_t line, column;
     tokenStream.srcCoords.lineNumAndColumnIndex(prevPos, &line, &column);
