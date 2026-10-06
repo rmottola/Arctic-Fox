@@ -651,10 +651,11 @@ this.CrashManager.prototype = Object.freeze({
       {
         version: 1,
         crashDate: date.toISOString().slice(0, 10), // YYYY-MM-DD
-        sessionId: sessionId,
-        crashId: crashId,
+        crashTime: date.toISOString().slice(0, 13) + ":00:00.000Z", // per-hour resolution
+        sessionId,
+        crashId,
         processType: type,
-        stackTraces: stackTraces,
+        stackTraces,
         metadata: reportMeta,
         hasCrashEnvironment: (crashEnvironment !== null),
       },
