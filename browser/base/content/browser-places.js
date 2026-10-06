@@ -1434,7 +1434,7 @@ var BookmarkingUI = {
       }
     };
 
-    Services.prefs.addObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver);
+    Services.prefs.addObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver, false);
     placesContextMenu.addEventListener("popupshowing", onPlacesContextMenuShowing);
     bookmarksMenu.addEventListener("popuphidden", onBookmarksMenuHidden);
   },
