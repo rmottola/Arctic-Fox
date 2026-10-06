@@ -379,12 +379,12 @@ add_task(function* log_message_with_params() {
   ob = function() {};
   ob.toJSON = function() {throw "oh noes JSON"};
   do_check_eq(formatMessage("Fail is ${sub}", {sub: ob}),
-              "Fail is (function () {})");
+              "Fail is (function() {})");
 
   // Fall back to .toString if both .toJSON and .toSource fail.
   ob.toSource = function() {throw "oh noes SOURCE"};
   do_check_eq(formatMessage("Fail is ${sub}", {sub: ob}),
-              "Fail is function () {}");
+              "Fail is function() {}");
 
   // Fall back to '[object]' if .toJSON, .toSource and .toString fail.
   ob.toString = function() {throw "oh noes STRING"};
