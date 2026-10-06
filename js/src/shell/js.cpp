@@ -2507,10 +2507,10 @@ UpdateSwitchTableBounds(JSContext* cx, HandleScript script, unsigned offset,
 static MOZ_MUST_USE bool
 SrcNotes(JSContext* cx, HandleScript script, Sprinter* sp)
 {
-    if (sp->put("\nSource notes:\n") < 0 ||
+    if (!sp->put("\nSource notes:\n") ||
         !sp->jsprintf("%4s %4s %5s %6s %-8s %s\n",
                       "ofs", "line", "pc", "delta", "desc", "args") ||
-        sp->put("---- ---- ----- ------ -------- ------\n") < 0)
+        !sp->put("---- ---- ----- ------ -------- ------\n"))
     {
         return false;
     }
@@ -2618,7 +2618,7 @@ SrcNotes(JSContext* cx, HandleScript script, Sprinter* sp)
           default:
             MOZ_ASSERT_UNREACHABLE("unrecognized srcnote");
         }
-        if (sp->put("\n") < 0)
+        if (!sp->put("\n"))
             return false;
     }
 
@@ -2676,7 +2676,7 @@ TryNotes(JSContext* cx, HandleScript script, Sprinter* sp)
     if (!script->hasTrynotes())
         return true;
 
-    if (sp->put("\nException table:\nkind             stack    start      end\n") < 0)
+    if (!sp->put("\nException table:\nkind             stack    start      end\n"))
         return false;
 
     JSTryNote* tn = script->trynotes()->vector;
@@ -2699,7 +2699,7 @@ ScopeNotes(JSContext* cx, HandleScript script, Sprinter* sp)
     if (!script->hasScopeNotes())
         return true;
 
-    if (sp->put("\nScope notes:\n   index   parent    start      end\n") < 0)
+    if (!sp->put("\nScope notes:\n   index   parent    start      end\n"))
         return false;
 
     ScopeNoteArray* notes = script->scopeNotes();
@@ -2730,41 +2730,41 @@ DisassembleScript(JSContext* cx, HandleScript script, HandleFunction fun,
                   bool lines, bool recursive, bool sourceNotes, Sprinter* sp)
 {
     if (fun) {
-        if (sp->put("flags:") < 0)
+        if (!sp->put("flags:"))
             return false;
         if (fun->isLambda()) {
-            if (sp->put(" LAMBDA") < 0)
+            if (!sp->put(" LAMBDA"))
                 return false;
         }
         if (fun->needsCallObject()) {
-            if (sp->put(" NEEDS_CALLOBJECT") < 0)
+            if (!sp->put(" NEEDS_CALLOBJECT"))
                 return false;
         }
         if (fun->needsExtraBodyVarEnvironment()) {
-            if (sp->put(" NEEDS_EXTRABODYVARENV") < 0)
+            if (!sp->put(" NEEDS_EXTRABODYVARENV"))
                 return false;
         }
         if (fun->needsNamedLambdaEnvironment()) {
-            if (sp->put(" NEEDS_NAMEDLAMBDAENV") < 0)
+            if (!sp->put(" NEEDS_NAMEDLAMBDAENV"))
                 return false;
         }
         if (fun->isConstructor()) {
-            if (sp->put(" CONSTRUCTOR") < 0)
+            if (!sp->put(" CONSTRUCTOR"))
                 return false;
         }
         if (script->isExprBody()) {
-            if (sp->put(" EXPRESSION_CLOSURE") < 0)
+            if (!sp->put(" EXPRESSION_CLOSURE"))
                 return false;
         }
         if (fun->isSelfHostedBuiltin()) {
-            if (sp->put(" SELF_HOSTED") < 0)
+            if (!sp->put(" SELF_HOSTED"))
                 return false;
         }
         if (fun->isArrow()) {
-            if (sp->put(" ARROW") < 0)
+            if (!sp->put(" ARROW"))
                 return false;
         }
-        if (sp->put("\n") < 0)
+        if (!sp->put("\n"))
             return false;
     }
 
@@ -2784,7 +2784,7 @@ DisassembleScript(JSContext* cx, HandleScript script, HandleFunction fun,
         for (unsigned i = 0; i != objects->length; ++i) {
             JSObject* obj = objects->vector[i];
             if (obj->is<JSFunction>()) {
-                if (sp->put("\n") < 0)
+                if (!sp->put("\n"))
                     return false;
 
                 RootedFunction fun(cx, &obj->as<JSFunction>());
@@ -2795,7 +2795,7 @@ DisassembleScript(JSContext* cx, HandleScript script, HandleFunction fun,
                             return false;
                     }
                 } else {
-                    if (sp->put("[native code]\n") < 0)
+                    if (!sp->put("[native code]\n"))
                         return false;
                 }
             }
@@ -5512,7 +5512,7 @@ class SprintOptimizationTypeInfoOp : public JS::ForEachTrackedOptimizationTypeIn
         do {
             if (!startedTypes_) {
                 startedTypes_ = true;
-                if (sp->put("{\"typeset\": [") < 0)
+                if (!sp->put("{\"typeset\": ["))
                     break;
             }
 
@@ -5534,7 +5534,7 @@ class SprintOptimizationTypeInfoOp : public JS::ForEachTrackedOptimizationTypeIn
                 if (!sp->jsprintf(",\"line\":%u", *lineno))
                     break;
             }
-            if (sp->put("},") < 0)
+            if (!sp->put("},"))
                 break;
 
             return;
@@ -5552,12 +5552,12 @@ class SprintOptimizationTypeInfoOp : public JS::ForEachTrackedOptimizationTypeIn
                 // Clear trailing ,
                 if ((*sp)[sp->getOffset() - 1] == ',')
                     (*sp)[sp->getOffset() - 1] = ' ';
-                if (sp->put("],") < 0)
+                if (!sp->put("],"))
                     break;
 
                 startedTypes_ = false;
             } else {
-                if (sp->put("{") < 0)
+                if (!sp->put("{"))
                     break;
             }
 
@@ -5651,7 +5651,7 @@ ReflectTrackedOptimizations(JSContext* cx, unsigned argc, Value* vp)
     const jit::IonTrackedOptimizationsRegionTable* regions =
         entry.ionEntry().trackedOptimizationsRegionTable();
 
-    if (sp.put("{\"regions\": [") < 0)
+    if (!sp.put("{\"regions\": ["))
         return false;
 
     for (uint32_t i = 0; i < regions->numEntries(); i++) {
@@ -5681,10 +5681,10 @@ ReflectTrackedOptimizations(JSContext* cx, unsigned argc, Value* vp)
         }
     }
 
-    if (sp.put("],") < 0)
+    if (!sp.put("],"))
         return false;
 
-    if (sp.put("\"opts\": [") < 0)
+    if (!sp.put("\"opts\": ["))
         return false;
 
     for (uint8_t i = 0; i < entry.ionEntry().numOptimizationAttempts(); i++) {
@@ -5701,7 +5701,7 @@ ReflectTrackedOptimizations(JSContext* cx, unsigned argc, Value* vp)
         if (sp[sp.getOffset() - 1] == ',')
             sp[sp.getOffset() - 1] = ' ';
 
-        if (sp.put("],\"attempts\":[") < 0)
+        if (!sp.put("],\"attempts\":["))
             return false;
 
         SprintOptimizationAttemptsOp aop(&sp);
@@ -5713,11 +5713,11 @@ ReflectTrackedOptimizations(JSContext* cx, unsigned argc, Value* vp)
         if (sp[sp.getOffset() - 1] == ',')
             sp[sp.getOffset() - 1] = ' ';
 
-        if (sp.put("]}") < 0)
+        if (!sp.put("]}"))
             return false;
     }
 
-    if (sp.put("]}") < 0)
+    if (!sp.put("]}"))
         return false;
 
     if (sp.hadOutOfMemory())
