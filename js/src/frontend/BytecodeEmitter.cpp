@@ -8342,7 +8342,7 @@ bool
 BytecodeEmitter::emitYield(ParseNode* pn)
 {
     MOZ_ASSERT(sc->isFunctionBox());
-    MOZ_ASSERT(pn->getOp() == JSOP_YIELD || pn->getOp() == JSOP_AWAIT);
+    MOZ_ASSERT(pn->getOp() == JSOP_YIELD);
 
     bool needsIteratorResult = sc->asFunctionBox()->needsIteratorResult();
     if (needsIteratorResult) {
@@ -8364,9 +8364,24 @@ BytecodeEmitter::emitYield(ParseNode* pn)
     if (!emitGetDotGenerator())
         return false;
 
-    if (!emitYieldOp(pn->getOp()))
+    if (!emitYieldOp(JSOP_YIELD))
         return false;
 
+    return true;
+}
+
+bool
+BytecodeEmitter::emitAwait(ParseNode* pn)
+{
+    MOZ_ASSERT(sc->isFunctionBox());
+    MOZ_ASSERT(pn->getOp() == JSOP_AWAIT);
+
+    if (!emitTree(pn->pn_kid))
+        return false;
+    if (!emitGetDotGenerator())
+        return false;
+    if (!emitYieldOp(JSOP_AWAIT))
+        return false;
     return true;
 }
 
@@ -10388,8 +10403,12 @@ BytecodeEmitter::emitTree(ParseNode* pn, EmitLineNumberNote emitLineNote)
         break;
 
       case PNK_YIELD:
-      case PNK_AWAIT:
         if (!emitYield(pn))
+            return false;
+        break;
+
+      case PNK_AWAIT:
+        if (!emitAwait(pn))
             return false;
         break;
 
