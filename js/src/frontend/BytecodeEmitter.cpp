@@ -525,8 +525,6 @@ class BytecodeEmitter::EmitterScope : public Nestable<BytecodeEmitter::EmitterSc
     }
 
     NameLocation lookup(BytecodeEmitter* bce, JSAtom* name) {
-        AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx),
-                              TraceLogger_FrontendNameAnalysis);
         if (Maybe<NameLocation> loc = lookupInCache(bce, name))
             return *loc;
         return searchAndCache(bce, name);
@@ -813,8 +811,6 @@ Maybe<NameLocation>
 BytecodeEmitter::EmitterScope::locationBoundInScope(BytecodeEmitter* bce, JSAtom* name,
                                                     EmitterScope* target)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     // The target scope must be an intra-frame enclosing scope of this
     // one. Count the number of extra hops to reach it.
     uint8_t extraHops = 0;
@@ -872,8 +868,6 @@ bool
 BytecodeEmitter::EmitterScope::enterLexical(BytecodeEmitter* bce, ScopeKind kind,
                                             Handle<LexicalScope::Data*> bindings)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(kind != ScopeKind::NamedLambda && kind != ScopeKind::StrictNamedLambda);
     MOZ_ASSERT(this == bce->innermostEmitterScope);
 
@@ -944,8 +938,6 @@ BytecodeEmitter::EmitterScope::enterLexical(BytecodeEmitter* bce, ScopeKind kind
 bool
 BytecodeEmitter::EmitterScope::enterNamedLambda(BytecodeEmitter* bce, FunctionBox* funbox)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(this == bce->innermostEmitterScope);
     MOZ_ASSERT(funbox->namedLambdaBindings());
 
@@ -1013,8 +1005,6 @@ BytecodeEmitter::EmitterScope::enterComprehensionFor(BytecodeEmitter* bce,
 bool
 BytecodeEmitter::EmitterScope::enterParameterExpressionVar(BytecodeEmitter* bce)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(this == bce->innermostEmitterScope);
 
     if (!ensureCache(bce))
@@ -1136,8 +1126,6 @@ BytecodeEmitter::EmitterScope::enterFunction(BytecodeEmitter* bce, FunctionBox* 
 bool
 BytecodeEmitter::EmitterScope::enterFunctionExtraBodyVar(BytecodeEmitter* bce, FunctionBox* funbox)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(funbox->hasParameterExprs);
     MOZ_ASSERT(funbox->extraVarScopeBindings() ||
                funbox->needsExtraBodyVarEnvironmentRegardlessOfBindings());
@@ -1227,8 +1215,6 @@ class DynamicBindingIter : public BindingIter
 bool
 BytecodeEmitter::EmitterScope::enterGlobal(BytecodeEmitter* bce, GlobalSharedContext* globalsc)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(this == bce->innermostEmitterScope);
 
     bce->setVarEmitterScope(this);
@@ -1289,8 +1275,6 @@ BytecodeEmitter::EmitterScope::enterGlobal(BytecodeEmitter* bce, GlobalSharedCon
 bool
 BytecodeEmitter::EmitterScope::enterEval(BytecodeEmitter* bce, EvalSharedContext* evalsc)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(this == bce->innermostEmitterScope);
 
     bce->setVarEmitterScope(this);
@@ -1346,8 +1330,6 @@ BytecodeEmitter::EmitterScope::enterEval(BytecodeEmitter* bce, EvalSharedContext
 bool
 BytecodeEmitter::EmitterScope::enterModule(BytecodeEmitter* bce, ModuleSharedContext* modulesc)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(this == bce->innermostEmitterScope);
 
     bce->setVarEmitterScope(this);
@@ -1405,8 +1387,6 @@ BytecodeEmitter::EmitterScope::enterModule(BytecodeEmitter* bce, ModuleSharedCon
 bool
 BytecodeEmitter::EmitterScope::enterWith(BytecodeEmitter* bce)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     MOZ_ASSERT(this == bce->innermostEmitterScope);
 
     if (!ensureCache(bce))
@@ -1433,8 +1413,6 @@ BytecodeEmitter::EmitterScope::enterWith(BytecodeEmitter* bce)
 bool
 BytecodeEmitter::EmitterScope::leave(BytecodeEmitter* bce, bool nonLocal)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendNameAnalysis);
-
     // If we aren't leaving the scope due to a non-local jump (e.g., break),
     // we must be the innermost scope.
     MOZ_ASSERT_IF(!nonLocal, this == bce->innermostEmitterScope);
@@ -1492,8 +1470,6 @@ BytecodeEmitter::EmitterScope::leave(BytecodeEmitter* bce, bool nonLocal)
 Maybe<MaybeCheckTDZ>
 BytecodeEmitter::TDZCheckCache::needsTDZCheck(BytecodeEmitter* bce, JSAtom* name)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendTDZAnalysis);
-
     if (!ensureCache(bce))
         return Nothing();
 
@@ -1523,8 +1499,6 @@ bool
 BytecodeEmitter::TDZCheckCache::noteTDZCheck(BytecodeEmitter* bce, JSAtom* name,
                                              MaybeCheckTDZ check)
 {
-    AutoTraceLog traceLog(TraceLoggerForCurrentThread(bce->cx), TraceLogger_FrontendTDZAnalysis);
-
     if (!ensureCache(bce))
         return false;
 
