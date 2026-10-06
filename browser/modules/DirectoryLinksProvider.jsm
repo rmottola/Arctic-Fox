@@ -192,8 +192,7 @@ var DirectoryLinksProvider = {
     let matchOS;
     try {
       matchOS = Services.prefs.getBoolPref(PREF_MATCH_OS_LOCALE);
-    }
-    catch (e) {}
+    } catch (e) {}
 
     if (matchOS) {
       return Services.locale.getLocaleComponentForUserAgent();
@@ -205,13 +204,11 @@ var DirectoryLinksProvider = {
       if (locale) {
         return locale.data;
       }
-    }
-    catch (e) {}
+    } catch (e) {}
 
     try {
       return Services.prefs.getCharPref(PREF_SELECTED_LOCALE);
-    }
-    catch (e) {}
+    } catch (e) {}
 
     return "en-US";
   },

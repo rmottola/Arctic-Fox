@@ -518,8 +518,8 @@ var observer = (window) => {
   // Set up the child side of the message port
   new ChildMessagePort(messageManager, window);
 };
-Services.obs.addObserver(observer, "chrome-document-global-created", false);
-Services.obs.addObserver(observer, "content-document-global-created", false);
+Services.obs.addObserver(observer, "chrome-document-global-created");
+Services.obs.addObserver(observer, "content-document-global-created");
 
 // A message from chrome telling us what pages to listen for
 Services.cpmm.addMessageListener("RemotePage:Register", ({ data }) => {
