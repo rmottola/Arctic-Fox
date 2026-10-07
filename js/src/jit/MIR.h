@@ -14272,12 +14272,11 @@ class MWasmParameter : public MNullaryInstruction
 };
 
 class MWasmReturn
-  : public MAryControlInstruction<2, 0>,
+  : public MAryControlInstruction<1, 0>,
     public NoTypePolicy::Data
 {
-    explicit MWasmReturn(MDefinition* ins, MDefinition* tlsPtr) {
+    explicit MWasmReturn(MDefinition* ins) {
         initOperand(0, ins);
-        initOperand(1, tlsPtr);
     }
 
   public:
@@ -14286,13 +14285,9 @@ class MWasmReturn
 };
 
 class MWasmReturnVoid
-  : public MAryControlInstruction<1, 0>,
+  : public MAryControlInstruction<0, 0>,
     public NoTypePolicy::Data
 {
-    explicit MWasmReturnVoid(MDefinition* tlsPtr) {
-        initOperand(0, tlsPtr);
-    }
-
   public:
     INSTRUCTION_HEADER(WasmReturnVoid)
     TRIVIAL_NEW_WRAPPERS
