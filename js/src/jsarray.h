@@ -170,9 +170,6 @@ extern bool
 array_pop(JSContext* cx, unsigned argc, js::Value* vp);
 
 extern bool
-array_splice_impl(JSContext* cx, unsigned argc, js::Value* vp, bool pop);
-
-extern bool
 array_join(JSContext* cx, unsigned argc, js::Value* vp);
 
 extern void
@@ -195,6 +192,8 @@ array_reverse(JSContext* cx, unsigned argc, js::Value* vp);
 
 extern bool
 array_splice(JSContext* cx, unsigned argc, js::Value* vp);
+
+extern const JSJitInfo array_splice_info;
 
 /*
  * Append the given (non-hole) value to the end of an array.  The array must be
