@@ -27,7 +27,6 @@ hal/**
 image/**
 intl/**
 ipc/**
-js/**
 layout/**
 media/**
 memory/**
@@ -161,6 +160,17 @@ devtools/client/sourceeditor/codemirror/**/*.js
 devtools/client/sourceeditor/tern/*
 devtools/client/sourceeditor/test/codemirror/*
 devtools/client/inspector/markup/test/lib_*
+
+# Exclude everything but self-hosted JS
+js/ductwork/**
+js/examples/**
+js/ipc/**
+js/public/**
+js/xpconnect/**
+js/src/devtools/**
+js/src/octane/**
+js/src/jit-test/**
+js/src/tests/**
 
 # mobile/android/ exclusions
 mobile/android/chrome/content
