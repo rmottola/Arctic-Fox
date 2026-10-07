@@ -3585,10 +3585,13 @@ WorkerMain(void* arg)
         JS_ExecuteScript(cx, script, &result);
     } while (0);
 
-    JS::SetLargeAllocationFailureCallback(cx, nullptr, nullptr);
+    if (input->parentRuntime) {
+        JS::SetLargeAllocationFailureCallback(cx, nullptr, nullptr);
 
-    JS::SetGetIncumbentGlobalCallback(cx, nullptr);
-    JS::SetEnqueuePromiseJobCallback(cx, nullptr);
+        JS::SetGetIncumbentGlobalCallback(cx, nullptr);
+        JS::SetEnqueuePromiseJobCallback(cx, nullptr);
+    }
+
     sc->jobQueue.reset();
 
     KillWatchdog(cx);
