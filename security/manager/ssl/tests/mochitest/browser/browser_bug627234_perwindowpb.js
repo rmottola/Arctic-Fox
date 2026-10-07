@@ -48,7 +48,9 @@ function test() {
       uri = aWindow.Services.io.newURI("https://localhost/img.png", null, null);
       gSSService.processHeader(Ci.nsISiteSecurityService.HEADER_HSTS, uri,
                                "max-age=1000", sslStatus, privacyFlags(aIsPrivateMode));
-      ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS, "localhost", privacyFlags(aIsPrivateMode)), "checking sts host");
+      ok(gSSService.isSecureURI(Ci.nsISiteSecurityService.HEADER_HSTS, uri,
+                                privacyFlags(aIsPrivateMode)),
+                                "checking sts host");
 
       aCallback();
     }, true);

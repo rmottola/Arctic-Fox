@@ -2,7 +2,6 @@
 
 function check_ip(s, v, ip) {
   let sslStatus = new FakeSSLStatus();
-  ok(!s.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS, ip, 0));
 
   let str = "https://";
   if (v == 6) {

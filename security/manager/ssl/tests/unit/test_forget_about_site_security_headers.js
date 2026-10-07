@@ -54,20 +54,16 @@ add_task(function* () {
   sss.processHeader(Ci.nsISiteSecurityService.HEADER_HPKP, uri,
                     GOOD_MAX_AGE + VALID_PIN + BACKUP_PIN, sslStatus, 0);
 
-  Assert.ok(sss.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "a.pinning2.example.com", 0),
+  Assert.ok(sss.isSecureURI(Ci.nsISiteSecurityService.HEADER_HSTS, uri, 0),
             "a.pinning2.example.com should be HSTS");
-  Assert.ok(sss.isSecureHost(Ci.nsISiteSecurityService.HEADER_HPKP,
-                             "a.pinning2.example.com", 0),
+  Assert.ok(sss.isSecureURI(Ci.nsISiteSecurityService.HEADER_HPKP, uri, 0),
             "a.pinning2.example.com should be HPKP");
 
   yield ForgetAboutSite.removeDataFromDomain("a.pinning2.example.com");
 
-  Assert.ok(!sss.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                              "a.pinning2.example.com", 0),
+  Assert.ok(!sss.isSecureURI(Ci.nsISiteSecurityService.HEADER_HSTS, uri, 0),
             "a.pinning2.example.com should not be HSTS now");
-  Assert.ok(!sss.isSecureHost(Ci.nsISiteSecurityService.HEADER_HPKP,
-                              "a.pinning2.example.com", 0),
+  Assert.ok(!sss.isSecureURI(Ci.nsISiteSecurityService.HEADER_HPKP, uri, 0),
             "a.pinning2.example.com should not be HPKP now");
 });
 
@@ -81,11 +77,9 @@ add_task(function* () {
   sss.processHeader(Ci.nsISiteSecurityService.HEADER_HPKP, uri,
                     GOOD_MAX_AGE + VALID_PIN + BACKUP_PIN, sslStatus, 0);
 
-  Assert.ok(sss.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "a.pinning2.example.com", 0),
+  Assert.ok(sss.isSecureURI(Ci.nsISiteSecurityService.HEADER_HSTS, uri, 0),
             "a.pinning2.example.com should be HSTS (subdomain case)");
-  Assert.ok(sss.isSecureHost(Ci.nsISiteSecurityService.HEADER_HPKP,
-                             "a.pinning2.example.com", 0),
+  Assert.ok(sss.isSecureURI(Ci.nsISiteSecurityService.HEADER_HPKP, uri, 0),
             "a.pinning2.example.com should be HPKP (subdomain case)");
 
   yield ForgetAboutSite.removeDataFromDomain("example.com");
