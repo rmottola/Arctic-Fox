@@ -19,7 +19,7 @@ class nsIObjectOutputStream;
 class nsIObjectInputStream;
 class nsIURI;
 
-class nsExpandedPrincipal;
+class ExpandedPrincipal;
 
 namespace mozilla {
 
@@ -285,7 +285,7 @@ protected:
   // principal would allow the load ignoring any common behavior implemented in
   // BasePrincipal::CheckMayLoad.
   virtual bool MayLoadInternal(nsIURI* aURI) = 0;
-  friend class ::nsExpandedPrincipal;
+  friend class ::ExpandedPrincipal;
 
   // This function should be called as the last step of the initialization of the
   // principal objects.  It's typically called as the last step from the Init()
