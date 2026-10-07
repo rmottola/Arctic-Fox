@@ -2313,6 +2313,7 @@ struct JSJitInfo {
         Method,
         StaticMethod,
         InlinableNative,
+        IgnoresReturnValueNative,
         // Must be last
         OpTypeCount
     };
@@ -2404,7 +2405,12 @@ struct JSJitInfo {
         JSJitMethodOp method;
         /** A DOM static method, used for Promise wrappers */
         JSNative staticMethod;
+        JSNative ignoresReturnValueMethod;
     };
+
+    static unsigned offsetOfIgnoresReturnValueNative() {
+        return offsetof(JSJitInfo, ignoresReturnValueMethod);
+    }
 
     union {
         uint16_t protoID;
