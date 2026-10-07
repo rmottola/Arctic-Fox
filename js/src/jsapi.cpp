@@ -7043,11 +7043,10 @@ JS::DeserializeWasmModule(PRFileDesc* bytecode, PRFileDesc* maybeCompiled,
 }
 
 JS_PUBLIC_API(void)
-JS::SetLargeAllocationFailureCallback(JSContext* cx, JS::LargeAllocationFailureCallback lafc,
-                                      void* data)
+JS::SetProcessLargeAllocationFailureCallback(JS::LargeAllocationFailureCallback lafc)
 {
-    cx->runtime()->largeAllocationFailureCallback = lafc;
-    cx->runtime()->largeAllocationFailureCallbackData = data;
+    MOZ_ASSERT(!OnLargeAllocationFailure);
+    OnLargeAllocationFailure = lafc;
 }
 
 JS_PUBLIC_API(void)

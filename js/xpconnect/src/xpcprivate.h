@@ -535,7 +535,7 @@ public:
 
     void CustomGCCallback(JSGCStatus status) override;
     void CustomOutOfMemoryCallback() override;
-    void CustomLargeAllocationFailureCallback() override;
+    void OnLargeAllocationFailure();
     static void GCSliceCallback(JSContext* cx,
                                 JS::GCProgress progress,
                                 const JS::GCDescription& desc);
