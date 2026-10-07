@@ -16,6 +16,8 @@
  */
 'use strict';
 
+var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+
 var TOP_URI = "https://example.com/browser/dom/security/test/hsts/file_priming-top.html";
 
 var test_servers = {
@@ -150,10 +152,13 @@ const Observer = {
     }
     throw "Can't handle topic "+topic;
   },
-  add_observers: function (services) {
+  add_observers: function (services, include_on_modify = false) {
     services.obs.addObserver(Observer, "console-api-log-event", false);
     services.obs.addObserver(Observer, "http-on-examine-response", false);
     services.obs.addObserver(Observer, "http-on-modify-request", false);
+  },
+  cleanup: function () {
+    this.listeners = {};
   },
   // When a load is blocked which results in an error event within a page, the
   // test logs to the console.
@@ -253,6 +258,8 @@ function do_cleanup() {
 
   Services.obs.removeObserver(Observer, "console-api-log-event");
   Services.obs.removeObserver(Observer, "http-on-examine-response");
+
+  Observer.cleanup();
 }
 
 function SetupPrefTestEnvironment(which, additional_prefs) {
