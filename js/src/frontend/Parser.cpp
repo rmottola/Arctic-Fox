@@ -5847,6 +5847,7 @@ Parser<ParseHandler>::matchInOrOf(bool* isForInp, bool* isForOfp)
 template <class ParseHandler>
 bool
 Parser<ParseHandler>::forHeadStart(YieldHandling yieldHandling,
+                                   IteratorKind iterKind,
                                    ParseNodeKind* forHeadKind,
                                    Node* forInitialPart,
                                    Maybe<ParseContext::Scope>& forLoopLexicalScope,
@@ -5937,6 +5938,11 @@ Parser<ParseHandler>::forHeadStart(YieldHandling yieldHandling,
     if (!matchInOrOf(&isForIn, &isForOf))
         return false;
 
+    if (iterKind == IteratorKind::Async && !isForOf) {
+        error(JSMSG_FOR_AWAIT_NOT_OF);
+        return false;
+    }
+
     // If we don't encounter 'in'/'of', we have a for(;;) loop.  We've handled
     // the init expression; the caller handles the rest.  Allow the Operand
     // modifier when regetting: Operand must be used to examine the ';' in
@@ -6010,6 +6016,7 @@ Parser<ParseHandler>::forStatement(YieldHandling yieldHandling)
     ParseContext::Statement stmt(pc, StatementKind::ForLoop);
 
     bool isForEach = false;
+    IteratorKind iterKind = IteratorKind::Sync;
     unsigned iflags = 0;
 
     if (allowsForEachIn()) {
@@ -6024,6 +6031,19 @@ Parser<ParseHandler>::forStatement(YieldHandling yieldHandling)
                 return null();
         }
     }
+
+#ifndef RELEASE_OR_BETA
+    if (pc->isAsync()) {
+        bool matched;
+        if (!tokenStream.matchToken(&matched, TOK_AWAIT))
+            return null();
+
+        if (matched) {
+            iflags |= JSITER_FORAWAITOF;
+            iterKind = IteratorKind::Async;
+        }
+    }
+#endif
 
     MUST_MATCH_TOKEN(TOK_LP, JSMSG_PAREN_AFTER_FOR);
 
@@ -6062,7 +6082,7 @@ Parser<ParseHandler>::forStatement(YieldHandling yieldHandling)
     //
     // In either case the subsequent token can be consistently accessed using
     // TokenStream::None semantics.
-    if (!forHeadStart(yieldHandling, &headKind, &startNode, forLoopLexicalScope,
+    if (!forHeadStart(yieldHandling, iterKind, &headKind, &startNode, forLoopLexicalScope,
                       &iteratedExpr))
     {
         return null();
