@@ -106,6 +106,7 @@
 #include "nsIScriptSecurityManager.h"
 #include "nsIPermissionManager.h"
 #include "nsIPrincipal.h"
+#include "nsNullPrincipal.h"
 
 #include "nsIDOMWindow.h"
 #include "nsPIDOMWindow.h"
@@ -2744,7 +2745,7 @@ nsDocument::InitCSP(nsIChannel* aChannel)
   if (cspSandboxFlags & SANDBOXED_ORIGIN) {
     // If the new CSP sandbox flags do not have the allow-same-origin flag
     // reset the document principal to a null principal
-    principal = do_CreateInstance("@mozilla.org/nullprincipal;1");
+    principal = nsNullPrincipal::Create();
     SetPrincipal(principal);
   }
 
