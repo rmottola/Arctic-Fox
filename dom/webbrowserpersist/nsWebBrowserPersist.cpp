@@ -2548,8 +2548,8 @@ nsWebBrowserPersist::URIData::GetLocalURI(nsIURI *targetBaseURI, nsCString& aSpe
             nsAutoCString rawPathURL(mRelativePathToData);
             rawPathURL.Append(filename);
             
-            nsAutoCString buf;
-            aSpecOut = NS_EscapeURL(rawPathURL, esc_FilePath, buf);
+            rv = NS_EscapeURL(rawPathURL, esc_FilePath, aSpecOut, fallible);
+            NS_ENSURE_SUCCESS(rv, rv);
         } else {
             nsAutoCString rawPathURL;
             
@@ -2568,8 +2568,8 @@ nsWebBrowserPersist::URIData::GetLocalURI(nsIURI *targetBaseURI, nsCString& aSpe
             rv = dataFile->GetRelativePath(parentDir, rawPathURL);
             NS_ENSURE_SUCCESS(rv, rv);
             
-            nsAutoCString buf;
-            aSpecOut = NS_EscapeURL(rawPathURL, esc_FilePath, buf);
+            rv = NS_EscapeURL(rawPathURL, esc_FilePath, aSpecOut, fallible);
+            NS_ENSURE_SUCCESS(rv, rv);
         }
     } else {
         fileAsURI->GetSpec(aSpecOut);
