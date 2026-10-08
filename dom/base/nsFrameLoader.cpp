@@ -2438,7 +2438,7 @@ nsFrameLoader::MaybeCreateDocShell()
     MOZ_ASSERT(attrs.mPrivateBrowsingId == oa.mPrivateBrowsingId,
               "docshell and document should have the same privateBrowsingId attribute.");
 
-    attrs.Inherit(oa);
+    attrs = oa;
   }
 
   if (OwnerIsMozBrowserFrame()) {

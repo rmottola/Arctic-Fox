@@ -2279,10 +2279,7 @@ PredictorLearn(nsIURI *targetURI, nsIURI *sourceURI,
       loadContext = do_GetInterface(callbacks);
 
       if (loadContext) {
-        OriginAttributes dAttrs;
-        loadContext->GetOriginAttributes(dAttrs);
-
-        originAttributes.Inherit(dAttrs);
+        loadContext->GetOriginAttributes(originAttributes);
       }
     }
   }
@@ -2311,9 +2308,8 @@ PredictorLearn(nsIURI *targetURI, nsIURI *sourceURI,
     nsCOMPtr<nsIPrincipal> docPrincipal = document->NodePrincipal();
 
     if (docPrincipal) {
-      originAttributes.Inherit(docPrincipal->OriginAttributesRef());
+      originAttributes = docPrincipal->OriginAttributesRef();
     }
-
   }
 
   return predictor->LearnNative(targetURI, sourceURI, reason, originAttributes);
