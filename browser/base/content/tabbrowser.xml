@@ -1533,6 +1533,7 @@
             var aUserContextId;
             var aRelatedBrowser;
             var aOriginPrincipal;
+            var aOpener;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
