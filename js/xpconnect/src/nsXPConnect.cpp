@@ -69,11 +69,12 @@ nsXPConnect::nsXPConnect()
     if (!mContext) {
         NS_RUNTIMEABORT("Couldn't create XPCJSContext.");
     }
+    mRuntime = mContext->Runtime();
 }
 
 nsXPConnect::~nsXPConnect()
 {
-    mContext->DeleteSingletonScopes();
+    mRuntime->DeleteSingletonScopes();
 
     // In order to clean up everything properly, we need to GC twice: once now,
     // to clean anything that can go away on its own (like the Junk Scope, which
@@ -81,7 +82,7 @@ nsXPConnect::~nsXPConnect()
     // XPConnect, to clean the stuff we forcibly disconnected. The forced
     // shutdown code defaults to leaking in a number of situations, so we can't
     // get by with only the second GC. :-(
-    mContext->GarbageCollect(JS::gcreason::XPCONNECT_SHUTDOWN);
+    mRuntime->GarbageCollect(JS::gcreason::XPCONNECT_SHUTDOWN);
 
     mShuttingDown = true;
     XPCWrappedNativeScope::SystemIsBeingShutDown();
@@ -90,7 +91,7 @@ nsXPConnect::~nsXPConnect()
     // after which point we need to GC to clean everything up. We need to do
     // this before deleting the XPCJSContext, because doing so destroys the
     // maps that our finalize callback depends on.
-    mContext->GarbageCollect(JS::gcreason::XPCONNECT_SHUTDOWN);
+    mRuntime->GarbageCollect(JS::gcreason::XPCONNECT_SHUTDOWN);
 
     NS_RELEASE(gSystemPrincipal);
     gScriptSecurityManager = nullptr;
@@ -126,11 +127,11 @@ nsXPConnect::InitStatics()
 
     if (!JS::InitSelfHostedCode(gSelf->mContext->Context()))
         MOZ_CRASH("InitSelfHostedCode failed");
-    if (!gSelf->mContext->JSContextInitialized(gSelf->mContext->Context()))
-        MOZ_CRASH("JSContextInitialized failed");
+    if (!gSelf->mRuntime->InitializeStrings(gSelf->mContext->Context()))
+        MOZ_CRASH("InitializeStrings failed");
 
     // Initialize our singleton scopes.
-    gSelf->mContext->InitSingletonScopes();
+    gSelf->mRuntime->InitSingletonScopes();
 }
 
 nsXPConnect*
@@ -158,6 +159,14 @@ nsXPConnect::GetContextInstance()
 {
     nsXPConnect* xpc = XPConnect();
     return xpc->GetContext();
+}
+
+// static
+XPCJSRuntime*
+nsXPConnect::GetRuntimeInstance()
+{
+    nsXPConnect* xpc = XPConnect();
+    return xpc->GetContext()->Runtime();
 }
 
 // static
@@ -845,8 +854,8 @@ NS_IMETHODIMP
 nsXPConnect::SetFunctionThisTranslator(const nsIID & aIID,
                                        nsIXPCFunctionThisTranslator* aTranslator)
 {
-    XPCJSContext* cx = GetContext();
-    IID2ThisTranslatorMap* map = cx->GetThisTranslatorMap();
+    XPCJSRuntime* rt = GetRuntimeInstance();
+    IID2ThisTranslatorMap* map = rt->GetThisTranslatorMap();
     map->Add(aIID, aTranslator);
     return NS_OK;
 }
@@ -936,9 +945,9 @@ nsXPConnect::DebugDump(int16_t depth)
     XPC_LOG_INDENT();
         XPC_LOG_ALWAYS(("gSelf @ %p", gSelf));
         XPC_LOG_ALWAYS(("gOnceAliveNowDead is %d", (int)gOnceAliveNowDead));
-        if (mContext) {
+        if (GetRuntimeInstance()) {
             if (depth)
-                mContext->DebugDump(depth);
+                GetRuntimeInstance()->DebugDump(depth);
             else
                 XPC_LOG_ALWAYS(("XPCJSContext @ %p", mContext));
         } else
