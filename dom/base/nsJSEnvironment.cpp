@@ -57,6 +57,7 @@
 #include "mozilla/dom/ErrorEvent.h"
 #include "nsAXPCNativeCallContext.h"
 #include "mozilla/CycleCollectedJSContext.h"
+#include "mozilla/SystemGroup.h"
 
 #include "nsJSPrincipals.h"
 
@@ -1554,6 +1555,7 @@ nsJSContext::BeginCycleCollectionCallback()
   // an incremental collection, and we want to be sure to finish it.
   CallCreateInstance("@mozilla.org/timer;1", &sICCTimer);
   if (sICCTimer) {
+    sICCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
     sICCTimer->InitWithNamedFuncCallback(ICCTimerFired, nullptr,
                                          kICCIntersliceDelay,
                                          nsITimer::TYPE_REPEATING_SLACK,
@@ -1960,6 +1962,7 @@ nsJSContext::PokeGC(JS::gcreason::Reason aReason,
 
   static bool first = true;
 
+  sGCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
   sGCTimer->InitWithNamedFuncCallback(GCTimerFired,
                                       reinterpret_cast<void *>(aReason),
                                       aDelay
@@ -1987,6 +1990,7 @@ nsJSContext::PokeShrinkingGC()
     return;
   }
 
+  sShrinkingGCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
   sShrinkingGCTimer->InitWithNamedFuncCallback(ShrinkingGCTimerFired, nullptr,
                                                sCompactOnUserInactiveDelay,
                                                nsITimer::TYPE_ONE_SHOT,
@@ -2010,6 +2014,7 @@ nsJSContext::MaybePokeCC()
     // We can kill some objects before running forgetSkippable.
     nsCycleCollector_dispatchDeferredDeletion();
 
+    sCCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
     sCCTimer->InitWithNamedFuncCallback(CCTimerFired, nullptr,
                                         NS_CC_SKIPPABLE_DELAY,
                                         nsITimer::TYPE_REPEATING_SLACK,
@@ -2160,6 +2165,7 @@ DOMGCSliceCallback(JSContext* aCx, JS::GCProgress aProgress, const JS::GCDescrip
       if (aDesc.isZone_) {
         if (!sFullGCTimer && !sShuttingDown) {
           CallCreateInstance("@mozilla.org/timer;1", &sFullGCTimer);
+          sFullGCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
           sFullGCTimer->InitWithNamedFuncCallback(FullGCTimerFired,
                                                   nullptr,
                                                   NS_FULL_GC_DELAY,
@@ -2190,6 +2196,7 @@ DOMGCSliceCallback(JSContext* aCx, JS::GCProgress aProgress, const JS::GCDescrip
       nsJSContext::KillInterSliceGCTimer();
       if (!sShuttingDown) {
         CallCreateInstance("@mozilla.org/timer;1", &sInterSliceGCTimer);
+        sInterSliceGCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
         sInterSliceGCTimer->InitWithNamedFuncCallback(InterSliceGCTimerFired,
                                                       nullptr,
                                                       NS_INTERSLICE_GC_DELAY,
@@ -2599,6 +2606,7 @@ nsJSContext::NotifyDidPaint()
     sICCTimer->Cancel();
     ICCTimerFired(nullptr, nullptr);
     if (sICCTimer) {
+      sICCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
       sICCTimer->InitWithNamedFuncCallback(ICCTimerFired, nullptr,
                                            kICCIntersliceDelay,
                                            nsITimer::TYPE_REPEATING_SLACK,
@@ -2617,6 +2625,7 @@ nsJSContext::NotifyDidPaint()
     sCCTimer->Cancel();
     CCTimerFired(nullptr, nullptr);
     if (sCCTimer) {
+      sCCTimer->SetTarget(SystemGroup::EventTargetFor(TaskCategory::GarbageCollection));
       sCCTimer->InitWithNamedFuncCallback(CCTimerFired, nullptr,
                                           NS_CC_SKIPPABLE_DELAY,
                                           nsITimer::TYPE_REPEATING_SLACK,
