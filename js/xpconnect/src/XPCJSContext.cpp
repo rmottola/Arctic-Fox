@@ -1716,7 +1716,12 @@ XPCJSContext::~XPCJSContext()
     profiler_clear_js_context();
 #endif
 
-    Preferences::UnregisterCallback(ReloadPrefsCallback, JS_OPTIONS_DOT_STR, this);
+    Preferences::UnregisterPrefixCallback(ReloadPrefsCallback,
+                                          JS_OPTIONS_DOT_STR, this);
+
+#ifdef FUZZING
+    Preferences::UnRegisterCallback(ReloadPrefsCallback, "fuzzing.enabled", this);
+#endif
 }
 
 // If |*anonymizeID| is non-zero and this is a user compartment, the name will
@@ -3647,7 +3652,8 @@ XPCJSContext::Initialize()
 
     // Watch for the JS boolean options.
     ReloadPrefsCallback(nullptr, this);
-    Preferences::RegisterCallback(ReloadPrefsCallback, JS_OPTIONS_DOT_STR, this);
+    Preferences::RegisterPrefixCallback(ReloadPrefsCallback,
+                                        JS_OPTIONS_DOT_STR, this);
 
 #ifdef FUZZING
     Preferences::RegisterCallback(ReloadPrefsCallback, "fuzzing.enabled", this);

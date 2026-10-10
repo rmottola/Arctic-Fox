@@ -5588,7 +5588,7 @@ EventStateManager::WheelPrefs::OnPrefChanged(const char* aPrefName,
 EventStateManager::WheelPrefs::WheelPrefs()
 {
   Reset();
-  Preferences::RegisterCallback(OnPrefChanged, "mousewheel.", nullptr);
+  Preferences::RegisterPrefixCallback(OnPrefChanged, "mousewheel.");
   Preferences::AddBoolVarCache(&sWheelEventsEnabledOnPlugins,
                                "plugin.mousewheel.enabled",
                                true);
@@ -5596,7 +5596,7 @@ EventStateManager::WheelPrefs::WheelPrefs()
 
 EventStateManager::WheelPrefs::~WheelPrefs()
 {
-  Preferences::UnregisterCallback(OnPrefChanged, "mousewheel.", nullptr);
+  Preferences::UnregisterPrefixCallback(OnPrefChanged, "mousewheel.");
 }
 
 void
