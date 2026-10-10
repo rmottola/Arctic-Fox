@@ -1022,6 +1022,7 @@
     "description": "Use of SpiderMonkey's deprecated language extensions in add-ons: ForEach=0, DestructuringForIn=1 (obsolete), LegacyGenerator=2, ExpressionClosure=3, LetBlock=4 (obsolete), LetExpression=5 (obsolete), NoSuchMethod=6 (obsolete), FlagsArgument=7 (obsolete), RegExpSourceProp=8 (obsolete), RestoredRegExpStatics=9 (obsolete), BlockScopeFunRedecl=10"
   },
   "JS_PRIVILEGED_PARSER_COMPILE_LAZY_AFTER_MS": {
+    "record_in_processes": ["main", "content"],
     "alert_emails": ["dteller@mozilla.com"],
     "expires_in_version": "70",
     "bug_numbers": [1343483],
@@ -1032,6 +1033,7 @@
     "description": "Time elapsed between the moment a function is lazy-parsed (end of parsing of the ScriptSource) and the moment it is recompiled as non-lazy (start of compilation), in milliseconds, for privileged code."
   },
   "JS_WEB_PARSER_COMPILE_LAZY_AFTER_MS": {
+    "record_in_processes": ["main", "content"],
     "alert_emails": ["dteller@mozilla.com"],
     "expires_in_version": "70",
     "bug_numbers": [1343483],
