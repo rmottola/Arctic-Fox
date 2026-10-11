@@ -39,7 +39,6 @@
 #include "gc/GCInternals.h"
 #include "jit/arm/Simulator-arm.h"
 #include "jit/arm64/vixl/Simulator-vixl.h"
-#include "jit/IonBuilder.h"
 #include "jit/JitCompartment.h"
 #include "jit/mips32/Simulator-mips32.h"
 #include "jit/mips64/Simulator-mips64.h"
@@ -176,7 +175,6 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     debuggerMallocSizeOf(ReturnZeroSize),
     lastAnimationTime(0),
     performanceMonitoring_(thisFromCtor()),
-    ionLazyLinkListSize_(0),
     stackFormat_(parentRuntime ? js::StackFormat::Default
                                : js::StackFormat::SpiderMonkey)
 {
@@ -308,8 +306,6 @@ JSRuntime::destroyRuntime()
 
     AutoNoteSingleThreadedRegion anstr;
 
-    MOZ_ASSERT(ionLazyLinkListSize_ == 0);
-    MOZ_ASSERT(ionLazyLinkList().isEmpty());
     MOZ_ASSERT_IF(!geckoProfiler().enabled(), !singleThreadedExecutionRequired_);
 
     MOZ_ASSERT(!hasHelperThreadZones());
@@ -875,36 +871,6 @@ JS::IsProfilingEnabledForContext(JSContext* cx)
 {
     MOZ_ASSERT(cx);
     return cx->runtime()->geckoProfiler().enabled();
-}
-
-JSRuntime::IonBuilderList&
-JSRuntime::ionLazyLinkList()
-{
-    MOZ_ASSERT(CurrentThreadCanAccessRuntime(this),
-               "Should only be mutated by the active thread.");
-    return ionLazyLinkList_.ref();
-}
-
-void
-JSRuntime::ionLazyLinkListRemove(jit::IonBuilder* builder)
-{
-    MOZ_ASSERT(CurrentThreadCanAccessRuntime(this),
-               "Should only be mutated by the active thread.");
-    MOZ_ASSERT(ionLazyLinkListSize_ > 0);
-
-    builder->removeFrom(ionLazyLinkList());
-    ionLazyLinkListSize_--;
-
-    MOZ_ASSERT(ionLazyLinkList().isEmpty() == (ionLazyLinkListSize_ == 0));
-}
-
-void
-JSRuntime::ionLazyLinkListAdd(jit::IonBuilder* builder)
-{
-    MOZ_ASSERT(CurrentThreadCanAccessRuntime(this),
-               "Should only be mutated by the active thread.");
-    ionLazyLinkList().insertFront(builder);
-    ionLazyLinkListSize_++;
 }
 
 JS_PUBLIC_API(void)
