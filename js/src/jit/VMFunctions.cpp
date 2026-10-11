@@ -686,6 +686,9 @@ GetIndexFromString(JSString* str)
 JSObject*
 WrapObjectPure(JSContext* cx, JSObject* obj)
 {
+    // IC code calls this directly so we shouldn't GC.
+    JS::AutoCheckCannotGC nogc;
+
     MOZ_ASSERT(obj);
     MOZ_ASSERT(cx->compartment() != obj->compartment());
 
@@ -1450,6 +1453,9 @@ CallNativeSetter(JSContext* cx, HandleFunction callee, HandleObject obj, HandleV
 bool
 EqualStringsHelper(JSString* str1, JSString* str2)
 {
+    // IC code calls this directly so we shouldn't GC.
+    JS::AutoCheckCannotGC nogc;
+
     MOZ_ASSERT(str1->isAtom());
     MOZ_ASSERT(!str2->isAtom());
     MOZ_ASSERT(str1->length() == str2->length());
