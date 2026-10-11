@@ -14589,7 +14589,8 @@ bool ElementAccessIsTypedArray(CompilerConstraintList* constraints,
 bool ElementAccessIsPacked(CompilerConstraintList* constraints, MDefinition* obj);
 bool ElementAccessMightBeCopyOnWrite(CompilerConstraintList* constraints, MDefinition* obj);
 bool ElementAccessMightBeFrozen(CompilerConstraintList* constraints, MDefinition* obj);
-bool ElementAccessHasExtraIndexedProperty(IonBuilder* builder, MDefinition* obj);
+AbortReasonOr<bool>
+ElementAccessHasExtraIndexedProperty(IonBuilder* builder, MDefinition* obj);
 MIRType DenseNativeElementType(CompilerConstraintList* constraints, MDefinition* obj);
 BarrierKind PropertyReadNeedsTypeBarrier(JSContext* propertycx,
                                          CompilerConstraintList* constraints,
@@ -14614,8 +14615,10 @@ bool PropertyWriteNeedsTypeBarrier(TempAllocator& alloc, CompilerConstraintList*
                                    MBasicBlock* current, MDefinition** pobj,
                                    PropertyName* name, MDefinition** pvalue,
                                    bool canModify, MIRType implicitType = MIRType::None);
-bool ArrayPrototypeHasIndexedProperty(IonBuilder* builder, JSScript* script);
-bool TypeCanHaveExtraIndexedProperties(IonBuilder* builder, TemporaryTypeSet* types);
+AbortReasonOr<bool>
+ArrayPrototypeHasIndexedProperty(IonBuilder* builder, JSScript* script);
+AbortReasonOr<bool>
+TypeCanHaveExtraIndexedProperties(IonBuilder* builder, TemporaryTypeSet* types);
 
 inline MIRType
 MIRTypeForTypedArrayRead(Scalar::Type arrayType, bool observedDouble)
