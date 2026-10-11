@@ -648,6 +648,7 @@ struct ZoneStats
     macro(Other,   GCHeapUsed,  regExpSharedsGCHeap) \
     macro(Other,   MallocHeap,  regExpSharedsMallocHeap) \
     macro(Other,   MallocHeap,  typePool) \
+    macro(Other,   MallocHeap,  jitZone) \
     macro(Other,   MallocHeap,  baselineStubsOptimized) \
     macro(Other,   MallocHeap,  cachedCFG) \
     macro(Other,   MallocHeap,  uniqueIdMap) \
