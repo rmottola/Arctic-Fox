@@ -6065,12 +6065,27 @@ IonBuilder::jsop_newobject()
 AbortReasonOr<Ok>
 IonBuilder::jsop_initelem()
 {
+    MOZ_ASSERT(*pc == JSOP_INITELEM || *pc == JSOP_INITHIDDENELEM);
+
     MDefinition* value = current->pop();
     MDefinition* id = current->pop();
-    MDefinition* obj = current->peek(-1);
+    MDefinition* obj = current->pop();
+
+    bool emitted = false;
+
+    if (!forceInlineCaches() && *pc == JSOP_INITELEM) {
+        MOZ_TRY(initOrSetElemTryDense(&emitted, obj, id, value, /* writeHole = */ true));
+        if (emitted)
+            return Ok();
+    }
+
+    MOZ_TRY(initOrSetElemTryCache(&emitted, obj, id, value));
+    if (emitted)
+        return Ok();
 
     MInitElem* initElem = MInitElem::New(alloc(), obj, id, value);
     current->add(initElem);
+    current->push(obj);
 
     return resumeAfter(initElem);
 }
@@ -8663,7 +8678,7 @@ IonBuilder::jsop_setelem()
         trackOptimizationAttempt(TrackedStrategy::SetElem_Dense);
         SetElemICInspector icInspect(inspector->setElemICInspector(pc));
         bool writeHole = icInspect.sawOOBDenseWrite();
-        MOZ_TRY(setElemTryDense(&emitted, object, index, value, writeHole));
+        MOZ_TRY(initOrSetElemTryDense(&emitted, object, index, value, writeHole));
         if (emitted)
             return Ok();
 
@@ -8681,7 +8696,7 @@ IonBuilder::jsop_setelem()
     }
 
     trackOptimizationAttempt(TrackedStrategy::SetElem_InlineCache);
-    MOZ_TRY(setElemTryCache(&emitted, object, index, value));
+    MOZ_TRY(initOrSetElemTryCache(&emitted, object, index, value));
     if (emitted)
         return Ok();
 
@@ -8869,8 +8884,8 @@ IonBuilder::setElemTryTypedArray(bool* emitted, MDefinition* object,
 }
 
 AbortReasonOr<Ok>
-IonBuilder::setElemTryDense(bool* emitted, MDefinition* object,
-                            MDefinition* index, MDefinition* value, bool writeHole)
+IonBuilder::initOrSetElemTryDense(bool* emitted, MDefinition* object,
+                                  MDefinition* index, MDefinition* value, bool writeHole)
 {
     MOZ_ASSERT(*emitted == false);
 
@@ -8915,7 +8930,7 @@ IonBuilder::setElemTryDense(bool* emitted, MDefinition* object,
     }
 
     // Emit dense setelem variant.
-    MOZ_TRY(jsop_setelem_dense(conversion, object, index, value, unboxedType, writeHole, emitted));
+    MOZ_TRY(initOrSetElemDense(conversion, object, index, value, unboxedType, writeHole, emitted));
 
     if (!*emitted) {
         trackOptimizationOutcome(TrackedOutcome::NonWritableProperty);
@@ -8940,10 +8955,12 @@ IonBuilder::setElemTryArguments(bool* emitted, MDefinition* object,
 }
 
 AbortReasonOr<Ok>
-IonBuilder::setElemTryCache(bool* emitted, MDefinition* object,
-                            MDefinition* index, MDefinition* value)
+IonBuilder::initOrSetElemTryCache(bool* emitted, MDefinition* object,
+                                  MDefinition* index, MDefinition* value)
 {
     MOZ_ASSERT(*emitted == false);
+
+    MDefinition* objectArg = object;
 
     if (!object->mightBeType(MIRType::Object)) {
         trackOptimizationOutcome(TrackedOutcome::NotObject);
@@ -8992,7 +9009,11 @@ IonBuilder::setElemTryCache(bool* emitted, MDefinition* object,
     MSetPropertyCache* ins =
         MSetPropertyCache::New(alloc(), object, index, value, strict, barrier, guardHoles);
     current->add(ins);
-    current->push(value);
+
+    if (IsPropertyInitOp(JSOp(*pc)))
+        current->push(objectArg);
+    else
+        current->push(value);
 
     MOZ_TRY(resumeAfter(ins));
 
@@ -9002,11 +9023,13 @@ IonBuilder::setElemTryCache(bool* emitted, MDefinition* object,
 }
 
 AbortReasonOr<Ok>
-IonBuilder::jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
+IonBuilder::initOrSetElemDense(TemporaryTypeSet::DoubleConversion conversion,
                                MDefinition* obj, MDefinition* id, MDefinition* value,
                                JSValueType unboxedType, bool writeHole, bool* emitted)
 {
     MOZ_ASSERT(*emitted == false);
+
+    MDefinition* objArg = obj;
 
     MIRType elementType = MIRType::None;
     if (unboxedType == JSVAL_TYPE_MAGIC)
@@ -9083,7 +9106,6 @@ IonBuilder::jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
         common = ins;
 
         current->add(ins);
-        current->push(value);
     } else if (mayBeFrozen) {
         MOZ_ASSERT(!hasExtraIndexedProperty,
                    "FallibleStoreElement codegen assumes no extra indexed properties");
@@ -9095,7 +9117,6 @@ IonBuilder::jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
         common = ins;
 
         current->add(ins);
-        current->push(value);
     } else {
         MInstruction* initLength = initializedLength(obj, elements, unboxedType);
 
@@ -9111,9 +9132,12 @@ IonBuilder::jsop_setelem_dense(TemporaryTypeSet::DoubleConversion conversion,
 
             current->add(store);
         }
-
-        current->push(value);
     }
+
+    if (IsPropertyInitOp(JSOp(*pc)))
+        current->push(objArg);
+    else
+        current->push(value);
 
     MOZ_TRY(resumeAfter(store));
 
