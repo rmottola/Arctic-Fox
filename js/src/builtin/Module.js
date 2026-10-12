@@ -312,11 +312,3 @@ function ModuleEvaluation()
     return EvaluateModule(module);
 }
 _SetCanonicalName(ModuleEvaluation, "ModuleEvaluation");
-
-function ModuleNamespaceEnumerate()
-{
-    if (!IsObject(this) || !IsModuleNamespace(this))
-        return callFunction(CallModuleMethodIfWrapped, this, "ModuleNamespaceEnumerate");
-
-    return CreateListIterator(ModuleNamespaceExports(this));
-}
