@@ -1072,6 +1072,10 @@ class TypeNewScript
                                             PlainObject* templateObject);
 
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
+
+    static size_t offsetOfPreliminaryObjects() {
+        return offsetof(TypeNewScript, preliminaryObjects);
+    }
 };
 
 /* Is this a reasonable PC to be doing inlining on? */
