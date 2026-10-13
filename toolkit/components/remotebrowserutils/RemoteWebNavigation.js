@@ -61,7 +61,7 @@ RemoteWebNavigation.prototype = {
   goBack() {
     this._sendMessage("WebNavigation:GoBack", {});
   },
-  goForward: function() {
+  goForward() {
     this._sendMessage("WebNavigation:GoForward", {});
   },
   gotoIndex(aIndex) {
