@@ -539,23 +539,6 @@ intrinsic_FinishBoundFunctionInit(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-static bool
-intrinsic_SetPrototype(JSContext *cx, unsigned argc, Value *vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 2);
-    MOZ_ASSERT(args[0].isObject());
-    MOZ_ASSERT(args[1].isObjectOrNull());
-
-    RootedObject obj(cx, &args[0].toObject());
-    RootedObject proto(cx, args[1].toObjectOrNull());
-    if (!SetPrototype(cx, obj, proto))
-        return false;
-
-    args.rval().setUndefined();
-    return true;
-}
-
 /*
  * Used to decompile values in the nearest non-builtin stack frame, falling
  * back to decompiling in the current frame. Helpful for printing higher-order
@@ -700,34 +683,6 @@ intrinsic_UnsafeGetBooleanFromReservedSlot(JSContext* cx, unsigned argc, Value* 
         return false;
     MOZ_ASSERT(vp->isBoolean());
     return true;
-}
-
-/**
- * Intrinsic for creating an empty array in the compartment of the object
- * passed as the first argument.
- *
- * Returns the array, wrapped in the default wrapper to use between the two
- * compartments.
- */
-static bool
-intrinsic_NewArrayInCompartment(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    RootedObject wrapped(cx, &args[0].toObject());
-    MOZ_ASSERT(IsWrapper(wrapped));
-    RootedObject obj(cx, UncheckedUnwrap(wrapped));
-
-    RootedArrayObject arr(cx);
-    {
-        AutoCompartment ac(cx, obj);
-        arr = NewDenseEmptyArray(cx);
-        if (!arr)
-            return false;
-    }
-
-    args.rval().setObject(*arr);
-    return wrapped->compartment()->wrap(cx, args.rval());
 }
 
 static bool
@@ -2293,8 +2248,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_INLINABLE_FN("std_Math_max",              math_max,                     2,0, MathMax),
     JS_INLINABLE_FN("std_Math_min",              math_min,                     2,0, MathMin),
     JS_INLINABLE_FN("std_Math_abs",              math_abs,                     1,0, MathAbs),
-    JS_INLINABLE_FN("std_Math_imul",             math_imul,                    2,0, MathImul),
-    JS_INLINABLE_FN("std_Math_log2",             math_log2,                    1,0, MathLog2),
 
     JS_FN("std_Map_has",                         MapObject::has,               1,0),
     JS_FN("std_Map_iterator",                    MapObject::entries,           0,0),
@@ -2307,7 +2260,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("std_Object_getOwnPropertyNames",      obj_getOwnPropertyNames,      1,0),
     JS_FN("std_Object_getOwnPropertyDescriptor", obj_getOwnPropertyDescriptor, 2,0),
     JS_FN("std_Object_hasOwnProperty",           obj_hasOwnProperty,           1,0),
-    JS_FN("std_Object_setPrototypeOf",           intrinsic_SetPrototype,       2,0),
     JS_FN("std_Object_toString",                 obj_toString,                 0,0),
 
     JS_FN("std_Reflect_getPrototypeOf",          Reflect_getPrototypeOf,       1,0),
@@ -2372,7 +2324,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_INLINABLE_FN("IsCallable",    intrinsic_IsCallable,              1,0, IntrinsicIsCallable),
     JS_INLINABLE_FN("IsConstructor", intrinsic_IsConstructor,           1,0,
                     IntrinsicIsConstructor),
-    JS_FN("IsFunctionObject",intrinsic_IsInstanceOfBuiltin<JSFunction>, 1,0),
     JS_FN("GetBuiltinConstructorImpl", intrinsic_GetBuiltinConstructor, 1,0),
     JS_FN("MakeConstructible",       intrinsic_MakeConstructible,       2,0),
     JS_FN("_ConstructFunction",      intrinsic_ConstructFunction,       2,0),
@@ -2410,8 +2361,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
                     IntrinsicUnsafeGetStringFromReservedSlot),
     JS_INLINABLE_FN("UnsafeGetBooleanFromReservedSlot", intrinsic_UnsafeGetBooleanFromReservedSlot,2,0,
                     IntrinsicUnsafeGetBooleanFromReservedSlot),
-
-    JS_FN("NewArrayInCompartment",   intrinsic_NewArrayInCompartment,   1,0),
 
     JS_FN("IsPackedArray",           intrinsic_IsPackedArray,           1,0),
 
@@ -2538,10 +2487,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("IsWeakSet", intrinsic_IsInstanceOfBuiltin<WeakSetObject>, 1,0),
     JS_FN("CallWeakSetMethodIfWrapped",
           CallNonGenericSelfhostedMethod<Is<WeakSetObject>>, 2, 0),
-
-    JS_FN("Promise_static_resolve",                Promise_static_resolve, 1, 0),
-    JS_FN("Promise_static_reject",                 Promise_reject, 1, 0),
-    JS_FN("Promise_then",                          Promise_then, 2, 0),
 
     // See builtin/TypedObject.h for descriptors of the typedobj functions.
     JS_FN("NewOpaqueTypedObject",           js::NewOpaqueTypedObject, 1, 0),
