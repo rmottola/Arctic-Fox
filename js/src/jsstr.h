@@ -482,6 +482,12 @@ JSString*
 str_replace_string_raw(JSContext* cx, HandleString string, HandleString pattern,
                        HandleString replacement);
 
+extern JSString*
+StringToLowerCase(JSContext* cx, HandleLinearString string);
+
+extern JSString*
+StringToUpperCase(JSContext* cx, HandleLinearString string);
+
 extern bool
 StringConstructor(JSContext* cx, unsigned argc, Value* vp);
 
