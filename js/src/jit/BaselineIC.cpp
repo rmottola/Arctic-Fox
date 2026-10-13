@@ -1916,6 +1916,11 @@ GetTemplateObjectForNative(JSContext* cx, HandleFunction target, const CallArgs&
         return !!res;
     }
 
+    if (native == js::intrinsic_NewArrayIterator) {
+        res.set(NewArrayIteratorObject(cx, TenuredObject));
+        return !!res;
+    }
+
     if (JitSupportsSimd() && GetTemplateObjectForSimd(cx, target, res))
        return !!res;
 
