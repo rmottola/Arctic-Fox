@@ -1419,9 +1419,9 @@ var Impl = {
   attachObservers: function attachObservers() {
     if (!this._initialized)
       return;
-    Services.obs.addObserver(this, "idle-daily", false);
+    Services.obs.addObserver(this, "idle-daily");
     if (Telemetry.canRecordExtended) {
-      Services.obs.addObserver(this, TOPIC_CYCLE_COLLECTOR_BEGIN, false);
+      Services.obs.addObserver(this, TOPIC_CYCLE_COLLECTOR_BEGIN);
     }
   },
 
@@ -1481,11 +1481,11 @@ var Impl = {
       Preferences.set(PREF_PREVIOUS_BUILDID, thisBuildID);
     }
 
-    Services.obs.addObserver(this, "sessionstore-windows-restored", false);
+    Services.obs.addObserver(this, "sessionstore-windows-restored");
     if (AppConstants.platform === "android") {
-      Services.obs.addObserver(this, "application-background", false);
+      Services.obs.addObserver(this, "application-background");
     }
-    Services.obs.addObserver(this, "xul-window-visible", false);
+    Services.obs.addObserver(this, "xul-window-visible");
     this._hasWindowRestoredObserver = true;
     this._hasXulWindowVisibleObserver = true;
 
@@ -1576,7 +1576,7 @@ var Impl = {
       return;
     }
 
-    Services.obs.addObserver(this, "content-child-shutdown", false);
+    Services.obs.addObserver(this, "content-child-shutdown");
     cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_THREAD_HANGS, this);
     cpml.addMessageListener(MESSAGE_TELEMETRY_GET_CHILD_USS, this);
 
@@ -1616,7 +1616,7 @@ var Impl = {
       delete message.data.childUUID;
 
       this._childTelemetry.push({
-        source: source,
+        source,
         payload: message.data,
       });
 
@@ -1697,7 +1697,7 @@ var Impl = {
             });
 
             // This notification is for testing only.
-            Services.obs.notifyObservers(null, "gather-memory-telemetry-finished", null);
+            Services.obs.notifyObservers(null, "gather-memory-telemetry-finished");
           }
           this._USSFromChildProcesses = undefined;
         }
@@ -1759,7 +1759,7 @@ var Impl = {
     * This needs to be called after TelemetrySend shuts down otherwise pings
     * would be sent instead of getting persisted to disk.
     */
-  saveShutdownPings: function() {
+  saveShutdownPings() {
     this._log.trace("saveShutdownPings");
 
     // We don't wait for "shutdown" pings to be written to disk before gathering the
@@ -1902,7 +1902,7 @@ var Impl = {
   /**
    * This observer drives telemetry.
    */
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     // Prevent the cycle collector begin topic from cluttering the log.
     if (aTopic != TOPIC_CYCLE_COLLECTOR_BEGIN) {
       this._log.trace("observe - " + aTopic + " notified.");
@@ -1986,7 +1986,7 @@ var Impl = {
   /**
    * This tells TelemetrySession to uninitialize and save any pending pings.
    */
-  shutdownChromeProcess: function() {
+  shutdownChromeProcess() {
     this._log.trace("shutdownChromeProcess");
 
     let cleanup = () => {
@@ -2037,7 +2037,7 @@ var Impl = {
    * Gather and send a daily ping.
    * @return {Promise} Resolved when the ping is sent.
    */
-  _sendDailyPing: function() {
+  _sendDailyPing() {
     this._log.trace("_sendDailyPing");
     let payload = this.getSessionPayload(REASON_DAILY, true);
 
@@ -2090,7 +2090,7 @@ var Impl = {
   /**
    * Get the session data object to serialise to disk.
    */
-  _getSessionDataObject: function() {
+  _getSessionDataObject() {
     return {
       sessionId: this._sessionId,
       subsessionId: this._subsessionId,
@@ -2098,7 +2098,7 @@ var Impl = {
     };
   },
 
-  _onEnvironmentChange: function(reason, oldEnvironment) {
+  _onEnvironmentChange(reason, oldEnvironment) {
     this._log.trace("_onEnvironmentChange", reason);
 
     let now = Policy.monotonicNow();
@@ -2120,7 +2120,7 @@ var Impl = {
     TelemetryController.submitExternalPing(getPingType(payload), payload, options);
   },
 
-  _isClassicReason: function(reason) {
+  _isClassicReason(reason) {
     const classicReasons = [
       REASON_SAVED_SESSION,
       REASON_GATHER_PAYLOAD,
@@ -2132,7 +2132,7 @@ var Impl = {
   /**
    * Get an object describing the current state of this module for AsyncShutdown diagnostics.
    */
-  _getState: function() {
+  _getState() {
     return {
       initialized: this._initialized,
       initStarted: this._initStarted,
