@@ -1299,7 +1299,6 @@ var Impl = {
         HISTOGRAM_SUFFIXES.GPU in keyedHistograms ||
         INTERNAL_PROCESSES_NAMES.GPU in scalars ||
         INTERNAL_PROCESSES_NAMES.GPU in keyedScalars) {
-    {
       payloadObj.processes.gpu = {
         scalars: scalars[INTERNAL_PROCESSES_NAMES.GPU],
         keyedScalars: keyedScalars[INTERNAL_PROCESSES_NAMES.GPU],
