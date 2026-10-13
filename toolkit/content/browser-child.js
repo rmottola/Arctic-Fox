@@ -26,15 +26,8 @@ if (AppConstants.MOZ_CRASHREPORTER) {
                                      "nsICrashReporter");
 }
 
-function makeInputStream(aString) {
-  let stream = Cc["@mozilla.org/io/string-input-stream;1"].
-               createInstance(Ci.nsISupportsCString);
-  stream.data = aString;
-  return stream; // XPConnect will QI this to nsIInputStream for us.
-}
-
 var WebProgressListener = {
-  init: function() {
+  init() {
     this._filter = Cc["@mozilla.org/appshell/component/browser-status-filter;1"]
                      .createInstance(Ci.nsIWebProgress);
     this._filter.addProgressListener(this, Ci.nsIWebProgress.NOTIFY_ALL);
@@ -53,7 +46,7 @@ var WebProgressListener = {
     this._filter = null;
   },
 
-  _requestSpec: function(aRequest, aPropertyName) {
+  _requestSpec(aRequest, aPropertyName) {
     if (!aRequest || !(aRequest instanceof Ci.nsIChannel))
       return null;
     return aRequest.QueryInterface(Ci.nsIChannel)[aPropertyName].spec;
@@ -296,19 +289,19 @@ var WebNavigation =  {
     }
   },
 
-  goBack: function() {
+  goBack() {
     if (this.webNavigation.canGoBack) {
       this._wrapURIChangeCall(() => this.webNavigation.goBack());
     }
   },
 
-  goForward: function() {
+  goForward() {
     if (this.webNavigation.canGoForward) {
       this._wrapURIChangeCall(() => this.webNavigation.goForward());
     }
   },
 
-  gotoIndex: function(index) {
+  gotoIndex(index) {
     this._wrapURIChangeCall(() => this.webNavigation.gotoIndex(index));
   },
 
@@ -327,7 +320,7 @@ var WebNavigation =  {
     if (referrer)
       referrer = Services.io.newURI(referrer);
     if (postData)
-      postData = makeInputStream(postData);
+      postData = Utils.makeInputStream(postData);
     if (headers)
       headers = Utils.makeInputStream(headers);
     if (baseURI)
@@ -340,17 +333,17 @@ var WebNavigation =  {
     });
   },
 
-  setOriginAttributes: function(originAttributes) {
+  setOriginAttributes(originAttributes) {
     if (originAttributes) {
       this.webNavigation.setOriginAttributesBeforeLoading(originAttributes);
     }
   },
 
-  reload: function(flags) {
+  reload(flags) {
     this.webNavigation.reload(flags);
   },
 
-  stop: function(flags) {
+  stop(flags) {
     this.webNavigation.stop(flags);
   }
 };
@@ -358,7 +351,7 @@ var WebNavigation =  {
 WebNavigation.init();
 
 var SecurityUI = {
-  getSSLStatusAsString: function() {
+  getSSLStatusAsString() {
     let status = docShell.securityUI.QueryInterface(Ci.nsISSLStatusProvider).SSLStatus;
 
     if (status) {
@@ -374,12 +367,12 @@ var SecurityUI = {
 };
 
 var ControllerCommands = {
-  init: function() {
+  init() {
     addMessageListener("ControllerCommands:Do", this);
     addMessageListener("ControllerCommands:DoWithParams", this);
   },
 
-  receiveMessage: function(message) {
+  receiveMessage(message) {
     switch (message.name) {
       case "ControllerCommands:Do":
         if (docShell.isCommandEnabled(message.data))
@@ -455,12 +448,12 @@ const ZoomManager = {
     this._markupViewer.textZoom = value;
   },
 
-  refreshFullZoom: function() {
-    return this._refreshZoomValue('fullZoom');
+  refreshFullZoom() {
+    return this._refreshZoomValue("fullZoom");
   },
 
-  refreshTextZoom: function() {
-    return this._refreshZoomValue('textZoom');
+  refreshTextZoom() {
+    return this._refreshZoomValue("textZoom");
   },
 
   /**
@@ -470,7 +463,7 @@ const ZoomManager = {
    * @returns Returns true if cached value was actually refreshed.
    * @private
    */
-  _refreshZoomValue: function(valueName) {
+  _refreshZoomValue(valueName) {
     let actualZoomValue = this._markupViewer[valueName];
     // Round to remove any floating-point error.
     actualZoomValue = Number(actualZoomValue.toFixed(2));
