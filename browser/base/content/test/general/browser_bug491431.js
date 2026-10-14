@@ -26,9 +26,9 @@ function test() {
         newWin.close();
         executeSoon(finish);
       });
-    }, true);
+    }, {capture: true, once: true});
     newWin = gBrowser.replaceTabWithWindow(tabB);
-  }, true);
+  }, {capture: true, once: true});
   gBrowser.removeTab(tabA);
 }
 

@@ -75,10 +75,9 @@ function promise_open_compatibility_window(aInactiveAddonIds) {
 
     win.addEventListener("pageshow", page_shown);
     win.addEventListener("unload", function() {
-      win.removeEventListener("unload", arguments.callee);
       win.removeEventListener("pageshow", page_shown);
       dump("Compatibility dialog closed\n");
-    });
+    }, {once: true});
 
     deferred.resolve(win);
   });
@@ -88,9 +87,8 @@ function promise_open_compatibility_window(aInactiveAddonIds) {
 function promise_window_close(aWindow) {
   let deferred = Promise.defer();
   aWindow.addEventListener("unload", function() {
-    aWindow.removeEventListener("unload", arguments.callee);
     deferred.resolve(aWindow);
-  });
+  }, {once: true});
   return deferred.promise;
 }
 

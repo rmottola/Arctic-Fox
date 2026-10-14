@@ -368,9 +368,8 @@ function wait_for_view_load(aManagerWindow, aCallback, aForceWait, aLongerTimeou
   }
 
   aManagerWindow.document.addEventListener("ViewChanged", function() {
-    aManagerWindow.document.removeEventListener("ViewChanged", arguments.callee);
     log_exceptions(aCallback, aManagerWindow);
-  });
+  }, {once: true});
 }
 
 function wait_for_manager_load(aManagerWindow, aCallback) {
@@ -381,9 +380,8 @@ function wait_for_manager_load(aManagerWindow, aCallback) {
 
   info("Waiting for initialization");
   aManagerWindow.document.addEventListener("Initialized", function() {
-    aManagerWindow.document.removeEventListener("Initialized", arguments.callee);
     log_exceptions(aCallback, aManagerWindow);
-  });
+  }, {once: true});
 }
 
 function open_manager(aView, aCallback, aLoadCallback, aLongerTimeout) {
@@ -480,11 +478,10 @@ function wait_for_window_open(aCallback) {
       let domwindow = aWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                              .getInterface(Ci.nsIDOMWindow);
       domwindow.addEventListener("load", function() {
-        domwindow.removeEventListener("load", arguments.callee);
         executeSoon(function() {
           aCallback(domwindow);
         });
-      });
+      }, {once: true});
     },
 
     onCloseWindow: function(aWindow) {
@@ -569,9 +566,8 @@ function CategoryUtilities(aManagerWindow) {
 
   var self = this;
   this.window.addEventListener("unload", function() {
-    self.window.removeEventListener("unload", arguments.callee);
     self.window = null;
-  });
+  }, {once: true});
 }
 
 CategoryUtilities.prototype = {

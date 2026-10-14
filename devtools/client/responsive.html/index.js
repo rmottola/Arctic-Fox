@@ -76,10 +76,9 @@ let bootstrap = {
 // manager.js sends a message to signal init
 message.wait(window, "init").then(() => bootstrap.init());
 
-window.addEventListener("unload", function onUnload() {
-  window.removeEventListener("unload", onUnload);
+window.addEventListener("unload", function () {
   bootstrap.destroy();
-});
+}, {once: true});
 
 // Allows quick testing of actions from the console
 window.dispatch = action => bootstrap.dispatch(action);

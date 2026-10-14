@@ -42,8 +42,7 @@ function test() {
   }
 
   function doTest(aIsPrivateMode, aWindow, aCallback) {
-    aWindow.gBrowser.selectedBrowser.addEventListener("load", function onLoad() {
-      aWindow.gBrowser.selectedBrowser.removeEventListener("load", onLoad, true);
+    aWindow.gBrowser.selectedBrowser.addEventListener("load", function() {
       let sslStatus = new FakeSSLStatus();
       uri = aWindow.Services.io.newURI("https://localhost/img.png", null, null);
       gSSService.processHeader(Ci.nsISiteSecurityService.HEADER_HSTS, uri,
@@ -53,7 +52,7 @@ function test() {
                                 "checking sts host");
 
       aCallback();
-    }, true);
+    }, {capture: true, once: true});
 
     aWindow.gBrowser.selectedBrowser.loadURI(testURI);
   }

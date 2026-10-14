@@ -40,10 +40,9 @@ var focusWindow = Task.async(function* focusWindow(win) {
   }
 
   let promise = new Promise(resolve => {
-    win.addEventListener("focus", function listener() {
-      win.removeEventListener("focus", listener, true);
+    win.addEventListener("focus", function() {
       resolve();
-    }, true);
+    }, {capture: true, once: true});
   });
 
   win.focus();

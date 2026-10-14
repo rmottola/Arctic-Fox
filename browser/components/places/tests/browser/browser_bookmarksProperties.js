@@ -527,10 +527,9 @@ function runNextTest() {
 function execute_test_in_sidebar() {
     var sidebar = document.getElementById("sidebar");
     sidebar.addEventListener("load", function() {
-      sidebar.removeEventListener("load", arguments.callee, true);
       // Need to executeSoon since the tree is initialized on sidebar load.
       executeSoon(open_properties_dialog);
-    }, true);
+    }, {capture: true, once: true});
     SidebarUI.show(gCurrentTest.sidebar);
 }
 

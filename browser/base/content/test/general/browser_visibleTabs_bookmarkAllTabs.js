@@ -52,7 +52,7 @@ function test() {
     is(gBrowser.selectedTab, origTab, "got the orig tab");
     is(origTab.hidden, false, "and it's not hidden -- visible!");
     finish();
-  }, true);
+  }, {capture: true, once: true});
 }
 
 function Disabled() {

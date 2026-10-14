@@ -4144,12 +4144,11 @@ OverflowableToolbar.prototype = {
       this._chevron.open = true;
 
       let overflowableToolbarInstance = this;
-      this._panel.addEventListener("popupshown", function onPopupShown(aEvent) {
-        this.removeEventListener("popupshown", onPopupShown);
+      this._panel.addEventListener("popupshown", function(aEvent) {
         this.addEventListener("dragover", overflowableToolbarInstance);
         this.addEventListener("dragend", overflowableToolbarInstance);
         resolve();
-      });
+      }, {once: true});
     });
   },
 

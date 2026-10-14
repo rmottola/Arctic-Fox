@@ -395,11 +395,10 @@ var LoginManagerContent = {
       log("Arming the DeferredTask we just created since document.readyState == 'complete'");
       deferredTask.arm();
     } else {
-      window.addEventListener("DOMContentLoaded", function armPasswordAddedTask() {
-        window.removeEventListener("DOMContentLoaded", armPasswordAddedTask);
+      window.addEventListener("DOMContentLoaded", function() {
         log("Arming the onDOMInputPasswordAdded DeferredTask due to DOMContentLoaded");
         deferredTask.arm();
-      });
+      }, {once: true});
     }
   },
 

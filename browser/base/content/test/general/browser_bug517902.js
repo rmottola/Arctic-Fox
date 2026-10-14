@@ -28,8 +28,8 @@ function test() {
           finish();
         });
       });
-    }, true);
-  }, true);
+    }, {capture: true, once: true});
+  }, {capture: true, once: true});
 
   content.location =
     "data:text/html," +

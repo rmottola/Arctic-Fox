@@ -100,13 +100,12 @@ function testConnectionReady() {
 function testIncomingMessage() {
   return new Promise(function(aResolve, aReject) {
     info('Receiver: --- testIncomingMessage ---');
-    connection.addEventListener('message', function messageHandler(evt) {
-      connection.removeEventListener('message', messageHandler);
+    connection.addEventListener('message', function(evt) {
       let msg = evt.data;
       is(msg, 'msg-sender-to-receiver', 'Receiver: Receiver should receive message from sender.');
       command('forward-command', JSON.stringify({ name: 'message-from-sender-received' }));
       aResolve();
-    });
+    }, {once: true});
     command('forward-command', JSON.stringify({ name: 'trigger-message-from-sender' }));
   });
 }
@@ -165,15 +164,14 @@ function testIncomingArrayBuffer() {
     info('Receiver: --- testIncomingArrayBuffer ---');
     connection.binaryType = "blob";
     connection.send('testIncomingArrayBuffer');
-    connection.addEventListener('message', function messageHandler(evt) {
-      connection.removeEventListener('message', messageHandler);
+    connection.addEventListener('message', function(evt) {
       var fileReader = new FileReader();
       fileReader.onload = function() {
         ok(is_same_buffer(DATA_ARRAY_BUFFER, this.result), "expected same buffer data");
         aResolve();
       };
       fileReader.readAsArrayBuffer(evt.data);
-    });
+    }, {once: true});
   });
 }
 
@@ -182,11 +180,10 @@ function testIncomingArrayBufferView() {
     info('Receiver: --- testIncomingArrayBufferView ---');
     connection.binaryType = "arraybuffer";
     connection.send('testIncomingArrayBufferView');
-    connection.addEventListener('message', function messageHandler(evt) {
-      connection.removeEventListener('message', messageHandler);
+    connection.addEventListener('message', function(evt) {
       ok(is_same_buffer(evt.data, TYPED_DATA_ARRAY), "expected same buffer data");
       aResolve();
-    });
+    }, {once: true});
   });
 }
 

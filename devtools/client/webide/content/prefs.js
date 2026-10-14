@@ -7,9 +7,7 @@
 const Cu = Components.utils;
 const {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
 
-window.addEventListener("load", function onLoad() {
-  window.removeEventListener("load", onLoad);
-
+window.addEventListener("load", function () {
   // Listen to preference changes
   let inputs = document.querySelectorAll("[data-pref]");
   for (let i of inputs) {

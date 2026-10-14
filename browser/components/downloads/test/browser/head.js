@@ -37,10 +37,9 @@ function promiseOpenAndLoadWindow(aOptions)
 {
   return new Promise((resolve, reject) => {
     let win = OpenBrowserWindow(aOptions);
-    win.addEventListener("load", function onLoad() {
-      win.removeEventListener("load", onLoad);
+    win.addEventListener("load", function() {
       resolve(win);
-    });
+    }, {once: true});
   });
 }
 
@@ -270,8 +269,7 @@ function promiseAlertDialogOpen(buttonAction) {
         // The test listens for the "load" event which guarantees that the alert
         // class has already been added (it is added when "DOMContentLoaded" is
         // fired).
-        subj.addEventListener("load", function onLoad() {
-          subj.removeEventListener("load", onLoad);
+        subj.addEventListener("load", function() {
           if (subj.document.documentURI ==
               "chrome://global/content/commonDialog.xul") {
             Services.ww.unregisterNotification(onOpen);
@@ -284,7 +282,7 @@ function promiseAlertDialogOpen(buttonAction) {
             doc.getButton(buttonAction).click();
             resolve();
           }
-        });
+        }, {once: true});
       }
     });
   });

@@ -50,7 +50,7 @@ add_task(function*() {
       is(dt.mozGetDataAt("text/plain", 0), "Alternate", "text/plain returned in mozGetDataAt");
 
       resolve();
-    }, true);
+    }, {capture: true, once: true});
 
     EventUtils.synthesizeKey("v", { accelKey: true });
   });

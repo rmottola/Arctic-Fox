@@ -311,10 +311,9 @@ add_task(function*() {
           elem = content.document.getElementById(step[0]);
         }
 
-        changedWin.addEventListener("MozAfterPaint", function onPaint() {
-          changedWin.removeEventListener("MozAfterPaint", onPaint);
+        changedWin.addEventListener("MozAfterPaint", function() {
           resolve();
-        });
+        }, {once: true});
 
         elem.style = step[1];
       });
@@ -600,11 +599,10 @@ add_task(function* test_mousemove_correcttarget() {
   yield popupShownPromise;
 
   yield new Promise(resolve => {
-    window.addEventListener("mousemove", function checkForMouseMove(event) {
-      window.removeEventListener("mousemove", checkForMouseMove, true);
+    window.addEventListener("mousemove", function(event) {
       is(event.target.localName.indexOf("menu"), 0, "mouse over menu");
       resolve();
-    }, true);
+    }, {capture: true, once: true});
 
     EventUtils.synthesizeMouseAtCenter(selectPopup.firstChild, { type: "mousemove" });
   });
