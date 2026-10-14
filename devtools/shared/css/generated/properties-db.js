@@ -8989,9 +8989,6 @@ exports.CSS_PROPERTIES = {
     ],
     "supports": [],
     "values": [
-      "-moz-isolate",
-      "-moz-isolate-override",
-      "-moz-plaintext",
       "bidi-override",
       "embed",
       "inherit",
