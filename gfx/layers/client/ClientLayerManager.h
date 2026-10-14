@@ -34,7 +34,6 @@ namespace layers {
 class ClientPaintedLayer;
 class CompositorBridgeChild;
 class ImageLayer;
-class PLayerChild;
 class FrameUniformityData;
 
 class ClientLayerManager final : public LayerManager
@@ -386,9 +385,9 @@ public:
   }
 };
 
-// Create a shadow layer (PLayerChild) for aLayer, if we're forwarding
-// our layer tree to a parent process.  Record the new layer creation
-// in the current open transaction as a side effect.
+// Create a LayerHandle for aLayer, if we're forwarding our layer tree
+// to a parent process.  Record the new layer creation in the current
+// open transaction as a side effect.
 template<typename CreatedMethod> void
 CreateShadowFor(ClientLayer* aLayer,
                 ClientLayerManager* aMgr,

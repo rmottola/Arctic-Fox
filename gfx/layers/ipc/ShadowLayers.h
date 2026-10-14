@@ -36,7 +36,6 @@ class CompositorBridgeChild;
 class FixedSizeSmallShmemSectionAllocator;
 class ImageContainer;
 class Layer;
-class PLayerChild;
 class PLayerTransactionChild;
 class LayerTransactionChild;
 class ShadowableLayer;
