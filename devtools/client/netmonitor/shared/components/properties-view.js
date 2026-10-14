@@ -205,5 +205,3 @@ const PropertiesView = createClass({
 });
 
 module.exports = PropertiesView;
-
-/* eslint-enable react/prop-types */
