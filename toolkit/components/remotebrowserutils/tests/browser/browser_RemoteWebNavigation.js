@@ -127,7 +127,8 @@ add_task(function* test_badarguments() {
   try {
     browser.webNavigation.loadURI(DUMMY1,
                                   Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
-                                  null, {}, null);
+                                  null, {}, null,
+                                  SYSTEMPRINCIPAL);
     ok(false, "Should have seen an exception from trying to pass some postdata");
   }
   catch (e) {
@@ -137,7 +138,8 @@ add_task(function* test_badarguments() {
   try {
     browser.webNavigation.loadURI(DUMMY1,
                                   Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
-                                  null, null, {});
+                                  null, null, {},
+                                  SYSTEMPRINCIPAL);
     ok(false, "Should have seen an exception from trying to pass some headers");
   }
   catch (e) {
