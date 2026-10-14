@@ -734,8 +734,10 @@ TimeStamp
 Animation::ElapsedTimeToTimeStamp(
   const StickyTimeDuration& aElapsedTime) const
 {
-  return AnimationTimeToTimeStamp(aElapsedTime +
-                                  mEffect->SpecifiedTiming().mDelay);
+  TimeDuration delay = mEffect
+                       ? mEffect->SpecifiedTiming().mDelay
+                       : TimeDuration();
+  return AnimationTimeToTimeStamp(aElapsedTime + delay);
 }
 
 // https://w3c.github.io/web-animations/#silently-set-the-current-time
