@@ -887,10 +887,7 @@ ExtensionManager = {
       }
 
       case "Extension:FlushJarCache": {
-        let nsIFile = Components.Constructor("@mozilla.org/file/local;1", "nsIFile",
-                                             "initWithPath");
-        let file = new nsIFile(data.path);
-        flushJarCache(file);
+        flushJarCache(data.path);
         Services.cpmm.sendAsyncMessage("Extension:FlushJarCacheComplete");
         break;
       }

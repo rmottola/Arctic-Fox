@@ -12,6 +12,7 @@
 #include "nsICryptoHash.h"
 #include "nsIDataSignatureVerifier.h"
 #include "mozilla/Omnijar.h"
+#include "mozilla/Unused.h"
 
 #ifdef XP_UNIX
   #include <sys/stat.h>
@@ -1364,7 +1365,14 @@ nsZipReaderCache::Observe(nsISupports *aSubject,
     mZips.Clear();
   }
   else if (strcmp(aTopic, "flush-cache-entry") == 0) {
-    nsCOMPtr<nsIFile> file = do_QueryInterface(aSubject);
+    nsCOMPtr<nsIFile> file;
+    if (aSubject) {
+      file = do_QueryInterface(aSubject);
+    } else if (aSomeData) {
+      nsDependentString fileName(aSomeData);
+      Unused << NS_NewLocalFile(fileName, false, getter_AddRefs(file));
+    }
+
     if (!file)
       return NS_OK;
 
