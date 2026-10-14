@@ -132,6 +132,8 @@ CommandList.prototype = {
         let win = event.target.ownerDocument.defaultView;
         browserActionFor(this.extension).triggerAction(win);
       } else {
+        TabManager.for(this.extension)
+                  .addActiveTabPermission(TabManager.activeTab);
         this.emit("command", name);
       }
     });
@@ -244,8 +246,8 @@ extensions.registerSchemaAPI("commands", "addon_parent", context => {
         }));
       },
       onCommand: new EventManager(context, "commands.onCommand", fire => {
-        let listener = (event, name) => {
-          fire(name);
+        let listener = (eventName, commandName) => {
+          fire(commandName);
         };
         commandsMap.get(extension).on("command", listener);
         return () => {
