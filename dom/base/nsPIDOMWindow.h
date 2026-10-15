@@ -215,8 +215,6 @@ public:
     return mDoc;
   }
 
-  virtual bool IsRunningTimeout() = 0;
-
 protected:
   // Lazily instantiate an about:blank document if necessary, and if
   // we have what it takes to do so.
@@ -884,6 +882,8 @@ public:
   bool IsPlayingAudio();
 
   mozilla::dom::TimeoutManager& TimeoutManager();
+
+  bool IsRunningTimeout();
 
 protected:
   void CreatePerformanceObjectIfNeeded();

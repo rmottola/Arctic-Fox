@@ -4229,6 +4229,12 @@ nsPIDOMWindowOuter::MaybeActiveMediaComponents()
   }
 }
 
+bool
+nsPIDOMWindowInner::IsRunningTimeout()
+{
+  return TimeoutManager().IsRunningTimeout();
+}
+
 SuspendTypes
 nsPIDOMWindowOuter::GetMediaSuspend() const
 {
@@ -12456,13 +12462,6 @@ nsGlobalWindow::FireDelayedDOMEvents()
   }
 
   return NS_OK;
-}
-
-bool
-nsGlobalWindow::IsRunningTimeout()
-{
-  MOZ_ASSERT(IsInnerWindow());
-  return mTimeoutManager->IsRunningTimeout();
 }
 
 //*****************************************************************************
