@@ -1529,5 +1529,6 @@ js::wasm::IsPCInWasmCode(void *pc)
     if (!activation)
         return false;
 
-    return !!activation->compartment()->wasm.lookupCode(pc);
+    return !!activation->compartment()->wasm.lookupCode(pc) ||
+           !!activation->cx()->runtime()->wasm().lookupBuiltin(pc);
 }
