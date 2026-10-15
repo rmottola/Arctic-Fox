@@ -3446,6 +3446,7 @@ ICCall_Native::Compiler::generateStubCode(MacroAssembler& masm)
     EmitBaselineCreateStubFrameDescriptor(masm, scratch, ExitFrameLayout::Size());
     masm.push(scratch);
     masm.push(ICTailCallReg);
+    masm.loadJSContext(scratch);
     masm.enterFakeExitFrameForNative(scratch, isConstructing_);
 
     // Execute call.
@@ -3543,6 +3544,7 @@ ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler& masm)
     EmitBaselineCreateStubFrameDescriptor(masm, scratch, ExitFrameLayout::Size());
     masm.push(scratch);
     masm.push(ICTailCallReg);
+    masm.loadJSContext(scratch);
     masm.enterFakeExitFrameForNative(scratch, isConstructing_);
 
     // Execute call.
