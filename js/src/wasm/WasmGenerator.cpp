@@ -619,7 +619,7 @@ ModuleGenerator::finishCodegen()
         return false;
 
     interruptExit.offsetBy(offsetInWhole);
-    if (!metadata_->codeRanges.emplaceBack(CodeRange::Inline, interruptExit))
+    if (!metadata_->codeRanges.emplaceBack(CodeRange::Interrupt, interruptExit))
         return false;
 
     throwStub.offsetBy(offsetInWhole);
