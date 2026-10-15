@@ -11695,20 +11695,9 @@ class MGetNameCache
   : public MUnaryInstruction,
     public SingleObjectPolicy::Data
 {
-  public:
-    enum AccessKind {
-        NAMETYPEOF,
-        NAME
-    };
-
   private:
-    CompilerPropertyName name_;
-    AccessKind kind_;
-
-    MGetNameCache(MDefinition* obj, PropertyName* name, AccessKind kind)
-      : MUnaryInstruction(obj),
-        name_(name),
-        kind_(kind)
+    explicit MGetNameCache(MDefinition* obj)
+      : MUnaryInstruction(obj)
     {
         setResultType(MIRType::Value);
     }
@@ -11717,16 +11706,6 @@ class MGetNameCache
     INSTRUCTION_HEADER(GetNameCache)
     TRIVIAL_NEW_WRAPPERS
     NAMED_OPERANDS((0, envObj))
-
-    PropertyName* name() const {
-        return name_;
-    }
-    AccessKind accessKind() const {
-        return kind_;
-    }
-    bool appendRoots(MRootList& roots) const override {
-        return roots.append(name_);
-    }
 };
 
 class MCallGetIntrinsicValue : public MNullaryInstruction
