@@ -3881,6 +3881,9 @@ class IDLConst(IDLInterfaceMember):
         if type.isDictionary():
             raise WebIDLError("A constant cannot be of a dictionary type",
                               [self.location])
+        if type.isMozMap():
+            raise WebIDLError("A constant cannot be of a MozMap type",
+                              [self.location])
         self.type = type
         self.value = value
 
