@@ -648,7 +648,6 @@ WEBIDL_FILES = [
     'InputEvent.webidl',
     'InspectorUtils.webidl',
     'IntersectionObserver.webidl',
-    'IntlUtils.webidl',
     'IterableIterator.webidl',
     'KeyAlgorithm.webidl',
     'KeyboardEvent.webidl',
@@ -1133,4 +1132,9 @@ if CONFIG['MOZ_B2G']:
 if CONFIG['ACCESSIBILITY']:
     WEBIDL_FILES += [
         'AccessibleNode.webidl',
+    ]
+
+if CONFIG['ENABLE_INTL_API']:
+    WEBIDL_FILES += [
+        'IntlUtils.webidl',
     ]
