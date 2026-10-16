@@ -648,6 +648,7 @@ WEBIDL_FILES = [
     'InputEvent.webidl',
     'InspectorUtils.webidl',
     'IntersectionObserver.webidl',
+    'IntlUtils.webidl',
     'IterableIterator.webidl',
     'KeyAlgorithm.webidl',
     'KeyboardEvent.webidl',
