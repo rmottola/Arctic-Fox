@@ -1524,8 +1524,8 @@ GetPropIRGenerator::tryAttachProxyElement(HandleObject obj, ObjOperandId objId)
 void
 GetPropIRGenerator::trackAttached(const char* name)
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
@@ -1540,8 +1540,8 @@ GetPropIRGenerator::trackAttached(const char* name)
 void
 GetPropIRGenerator::trackNotAttached()
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
@@ -2091,8 +2091,8 @@ InIRGenerator::tryAttachStub()
 void
 InIRGenerator::trackAttached(const char* name)
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
@@ -2108,8 +2108,8 @@ InIRGenerator::trackAttached(const char* name)
 void
 InIRGenerator::trackNotAttached()
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
@@ -2222,8 +2222,8 @@ HasOwnIRGenerator::tryAttachStub()
 void
 HasOwnIRGenerator::trackAttached(const char* name)
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
@@ -2238,8 +2238,8 @@ HasOwnIRGenerator::trackAttached(const char* name)
 void
 HasOwnIRGenerator::trackNotAttached()
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
@@ -2590,8 +2590,8 @@ SetPropIRGenerator::tryAttachTypedObjectProperty(HandleObject obj, ObjOperandId 
 void
 SetPropIRGenerator::trackAttached(const char* name)
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
@@ -2607,8 +2607,8 @@ SetPropIRGenerator::trackAttached(const char* name)
 void
 SetPropIRGenerator::trackNotAttached()
 {
-#ifdef JS_JITSPEW
-    CacheIRSpewer& sp = GetCacheIRSpewerSingleton();
+#ifdef JS_CACHEIR_SPEW
+    CacheIRSpewer& sp = CacheIRSpewer::singleton();
     if (sp.enabled()) {
         LockGuard<Mutex> guard(sp.lock());
         sp.beginCache(guard, *this);
