@@ -495,6 +495,9 @@ wasm::GenerateImportFunction(jit::MacroAssembler& masm, const FuncImport& fi, Si
     masm.loadWasmPinnedRegsFromTls();
 
     GenerateFunctionEpilogue(masm, framePushed, &offsets);
+
+    masm.wasmEmitTrapOutOfLineCode();
+
     offsets.end = masm.currentOffset();
     return offsets;
 }
