@@ -781,8 +781,6 @@ JSCompartment::traceRoots(JSTracer* trc, js::gc::GCRuntime::TraceOrMarkRuntime t
 
     if (nonSyntacticLexicalEnvironments_)
         nonSyntacticLexicalEnvironments_->trace(trc);
-
-    wasm.trace(trc);
 }
 
 void
