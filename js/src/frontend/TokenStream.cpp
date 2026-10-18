@@ -482,34 +482,40 @@ TokenStream::updateFlagsForEOL()
 }
 
 // This gets the next char, normalizing all EOL sequences to '\n' as it goes.
-int32_t
-TokenStream::getChar()
+bool
+TokenStream::getChar(int32_t* cp)
 {
-    int32_t c;
-    if (MOZ_LIKELY(userbuf.hasRawChars())) {
-        c = userbuf.getRawChar();
+    if (MOZ_UNLIKELY(!userbuf.hasRawChars())) {
+        flags.isEOF = true;
+        *cp = EOF;
+        return true;
+    }
 
+    int32_t c = userbuf.getRawChar();
+
+    do {
         // Normalize the char16_t if it was a newline.
         if (MOZ_UNLIKELY(c == '\n'))
-            goto eol;
+            break;
+
         if (MOZ_UNLIKELY(c == '\r')) {
             // If it's a \r\n sequence: treat as a single EOL, skip over the \n.
             if (MOZ_LIKELY(userbuf.hasRawChars()))
                 userbuf.matchRawChar('\n');
-            goto eol;
+
+            break;
         }
+
         if (MOZ_UNLIKELY(c == LINE_SEPARATOR || c == PARA_SEPARATOR))
-            goto eol;
+            break;
 
-        return c;
-    }
+        *cp = c;
+        return true;
+    } while (false);
 
-    flags.isEOF = true;
-    return EOF;
-
-  eol:
     updateLineInfoForEOL();
-    return '\n';
+    *cp = '\n';
+    return true;
 }
 
 // This gets the next char. It does nothing special with EOL sequences, not
@@ -609,8 +615,11 @@ bool
 TokenStream::advance(size_t position)
 {
     const char16_t* end = userbuf.rawCharPtrAt(position);
-    while (userbuf.addressOfNextRawChar() < end)
-        getChar();
+    while (userbuf.addressOfNextRawChar() < end) {
+        int32_t c;
+        if (!getChar(&c))
+            return false;
+    }
 
     Token* cur = &tokens[cursor];
     cur->pos.begin = userbuf.offset();
@@ -1764,14 +1773,19 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
             if (!peekChar(&c))
                 goto error;
             if (c == '@' || c == '#') {
-                bool shouldWarn = getChar() == '@';
+                consumeKnownChar(c);
+
+                bool shouldWarn = c == '@';
                 if (!getDirectives(false, shouldWarn))
                     goto error;
             }
 
         skipline:
-            while ((c = getChar()) != EOF && c != '\n')
-                continue;
+            do {
+                if (!getChar(&c))
+                    goto error;
+            } while (c != EOF && c != '\n');
+
             ungetChar(c);
             cursor = (cursor - 1) & ntokensMask;
             goto retry;
@@ -1780,18 +1794,26 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
         // Look for a multi-line comment.
         if (matchChar('*')) {
             unsigned linenoBefore = lineno;
-            while ((c = getChar()) != EOF &&
-                   !(c == '*' && matchChar('/'))) {
+
+            do {
+                if (!getChar(&c))
+                    return false;
+
+                if (c == EOF) {
+                    reportError(JSMSG_UNTERMINATED_COMMENT);
+                    goto error;
+                }
+
+                if (c == '*' && matchChar('/'))
+                    break;
+
                 if (c == '@' || c == '#') {
                     bool shouldWarn = c == '@';
                     if (!getDirectives(true, shouldWarn))
                         goto error;
                 }
-            }
-            if (c == EOF) {
-                reportError(JSMSG_UNTERMINATED_COMMENT);
-                goto error;
-            }
+            } while (true);
+
             if (linenoBefore != lineno)
                 updateFlagsForEOL();
             cursor = (cursor - 1) & ntokensMask;
@@ -1803,12 +1825,15 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
             tokenbuf.clear();
 
             bool inCharClass = false;
-            for (;;) {
-                c = getChar();
+            do {
+                if (!getChar(&c))
+                    goto error;
+
                 if (c == '\\') {
                     if (!tokenbuf.append(c))
                         goto error;
-                    c = getChar();
+                    if (!getChar(&c))
+                        goto error;
                 } else if (c == '[') {
                     inCharClass = true;
                 } else if (c == ']') {
@@ -1824,7 +1849,7 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
                 }
                 if (!tokenbuf.append(c))
                     goto error;
-            }
+            } while (true);
 
             RegExpFlag reflags = NoFlags;
             unsigned length = tokenbuf.length() + 1;
@@ -1843,7 +1868,8 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
                     reflags = RegExpFlag(reflags | UnicodeFlag);
                 else
                     break;
-                getChar();
+                if (!getChar(&c))
+                    goto error;
                 length++;
             }
 
@@ -1854,7 +1880,7 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
                 tp->pos.begin += length + 1;
                 buf[0] = char(c);
                 reportError(JSMSG_BAD_REGEXP_FLAG, buf);
-                (void) getChar();
+                consumeKnownChar(c);
                 goto error;
             }
             tp->type = TOK_REGEXP;
@@ -1956,7 +1982,10 @@ TokenStream::getStringOrTemplateToken(int untilChar, Token** tp)
             // invalid escapes; these are handled by the parser.
             // In those cases we don't append to tokenbuf, since it won't be
             // read.
-            switch (c = getChar()) {
+            if (!getChar(&c))
+                return false;
+
+            switch (c) {
               case 'b': c = '\b'; break;
               case 'f': c = '\f'; break;
               case 'n': c = '\n'; break;
@@ -2109,14 +2138,14 @@ TokenStream::getStringOrTemplateToken(int untilChar, Token** tp)
 
                     if (JS7_ISOCT(c)) {
                         val = 8 * val + JS7_UNOCT(c);
-                        getChar();
+                        consumeKnownChar(c);
                         if (!peekChar(&c))
                             return false;
                         if (JS7_ISOCT(c)) {
                             int32_t save = val;
                             val = 8 * val + JS7_UNOCT(c);
                             if (val <= 0xFF)
-                                getChar();
+                                consumeKnownChar(c);
                             else
                                 val = save;
                         }
