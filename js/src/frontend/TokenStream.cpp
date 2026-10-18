@@ -286,8 +286,13 @@ TokenStream::SourceCoords::add(uint32_t lineNum, uint32_t lineStartOffset)
         // only if lineStartOffsets_.append succeeds, to keep sentinel.
         // Otherwise return false to tell TokenStream about OOM.
         uint32_t maxPtr = MAX_PTR;
-        if (!lineStartOffsets_.append(maxPtr))
+        if (!lineStartOffsets_.append(maxPtr)) {
+            static_assert(mozilla::IsSame<decltype(lineStartOffsets_.allocPolicy()),
+                                          TempAllocPolicy&>::value,
+                          "this function's caller depends on it reporting an "
+                          "error on failure, as TempAllocPolicy ensures");
             return false;
+        }
 
         lineStartOffsets_[lineIndex] = lineStartOffset;
     } else {
@@ -626,10 +631,8 @@ TokenStream::advance(size_t position)
     MOZ_MAKE_MEM_UNDEFINED(&cur->type, sizeof(cur->type));
     lookahead = 0;
 
-    if (flags.hitOOM) {
-        error(JSMSG_OUT_OF_MEMORY);
+    if (flags.hitOOM)
         return false;
-    }
 
     return true;
 }
@@ -1922,7 +1925,7 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
 
   out:
     if (flags.hitOOM)
-        return reportError(JSMSG_OUT_OF_MEMORY);
+        return false;
 
     flags.isDirtyLine = true;
     tp->pos.end = userbuf.offset();
@@ -1939,7 +1942,7 @@ TokenStream::getTokenInternal(TokenKind* ttp, Modifier modifier)
 
   error:
     if (flags.hitOOM)
-        return reportError(JSMSG_OUT_OF_MEMORY);
+        return false;
 
     flags.isDirtyLine = true;
     tp->pos.end = userbuf.offset();
