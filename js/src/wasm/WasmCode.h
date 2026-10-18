@@ -297,6 +297,8 @@ struct MetadataCacheablePod
     {}
 };
 
+typedef uint8_t ModuleHash[8];
+
 struct Metadata : ShareableBase<Metadata>, MetadataCacheablePod
 {
     explicit Metadata(ModuleKind kind = ModuleKind::Wasm) : MetadataCacheablePod(kind) {}
@@ -316,6 +318,7 @@ struct Metadata : ShareableBase<Metadata>, MetadataCacheablePod
     NameInBytecodeVector  funcNames;
     CustomSectionVector   customSections;
     CacheableChars        filename;
+    ModuleHash            hash;
 
     // Debug-enabled code is not serialized.
     bool                  debugEnabled;
@@ -513,6 +516,10 @@ class Code
 
     bool debugGetLocalTypes(uint32_t funcIndex, ValTypeVector* locals, size_t* argsLength);
     ExprType debugGetResultType(uint32_t funcIndex);
+
+    // Debug URL helpers.
+
+    JSString* debugDisplayURL(JSContext* cx) const;
 
     // about:memory reporting:
 
