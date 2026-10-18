@@ -3559,6 +3559,11 @@ class MNewArrayIterator
     AliasSet getAliasSet() const override {
         return AliasSet::None();
     }
+
+    MOZ_MUST_USE bool writeRecoverData(CompactBufferWriter& writer) const override;
+    bool canRecoverOnBailout() const override {
+        return true;
+    }
 };
 
 
