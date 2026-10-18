@@ -555,7 +555,8 @@ AddressOf(SymbolicAddress imm, ABIFunctionType* abiType)
 }
 
 static bool
-GenerateBuiltinThunk(JSContext* cx, void* func, ABIFunctionType abiType, UniqueBuiltinThunk* thunk)
+GenerateBuiltinThunk(JSContext* cx, void* func, ABIFunctionType abiType, ExitReason exitReason,
+                     UniqueBuiltinThunk* thunk)
 {
     if (!cx->compartment()->ensureJitCompartmentExists(cx))
         return false;
@@ -564,7 +565,7 @@ GenerateBuiltinThunk(JSContext* cx, void* func, ABIFunctionType abiType, UniqueB
     TempAllocator tempAlloc(&lifo);
     MacroAssembler masm(MacroAssembler::WasmToken(), tempAlloc);
 
-    CallableOffsets offsets = GenerateBuiltinImportExit(masm, abiType, func);
+    CallableOffsets offsets = GenerateBuiltinNativeExit(masm, abiType, exitReason, func);
 
     masm.finish();
     if (masm.oom())
@@ -608,7 +609,7 @@ struct BuiltinMatcher
 
 bool
 wasm::Runtime::getBuiltinThunk(JSContext* cx, void* funcPtr, ABIFunctionType abiType,
-                               void** thunkPtr)
+                               ExitReason exitReason, void** thunkPtr)
 {
     TypedFuncPtr lookup(funcPtr, abiType);
     auto ptr = builtinThunkMap_.lookupForAdd(lookup);
@@ -618,7 +619,7 @@ wasm::Runtime::getBuiltinThunk(JSContext* cx, void* funcPtr, ABIFunctionType abi
     }
 
     UniqueBuiltinThunk thunk;
-    if (!GenerateBuiltinThunk(cx, funcPtr, abiType, &thunk))
+    if (!GenerateBuiltinThunk(cx, funcPtr, abiType, exitReason, &thunk))
         return false;
 
     // Maintain sorted order of thunk addresses.
@@ -714,7 +715,7 @@ wasm::Runtime::getBuiltinThunk(JSContext* cx, SymbolicAddress func, void** thunk
         return true;
     }
 
-    return getBuiltinThunk(cx, funcPtr, abiType, thunkPtr);
+    return getBuiltinThunk(cx, funcPtr, abiType, ExitReason(func), thunkPtr);
 }
 
 static ABIFunctionType
@@ -748,7 +749,8 @@ wasm::Runtime::getBuiltinThunk(JSContext* cx, void* funcPtr, const Sig& sig, voi
 #ifdef JS_SIMULATOR
     funcPtr = Simulator::RedirectNativeFunction(funcPtr, abiType);
 #endif
-    return getBuiltinThunk(cx, funcPtr, abiType, thunkPtr);
+    ExitReason nativeExitReason(ExitReason::Fixed::BuiltinNative);
+    return getBuiltinThunk(cx, funcPtr, abiType, nativeExitReason, thunkPtr);
 }
 
 BuiltinThunk*
