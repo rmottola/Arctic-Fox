@@ -4140,6 +4140,7 @@ nsDisplayOutline::BuildLayer(nsDisplayListBuilder* aBuilder,
 
 void
 nsDisplayOutline::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                          nsTArray<WebRenderParentCommand>& aParentCommands,
                                           WebRenderDisplayItemLayer* aLayer)
 {
   MOZ_ASSERT(mBorderRenderer.isSome());
@@ -4419,6 +4420,7 @@ nsDisplayCaret::Paint(nsDisplayListBuilder* aBuilder,
 
 void
 nsDisplayCaret::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                        nsTArray<WebRenderParentCommand>& aParentCommands,
                                         WebRenderDisplayItemLayer* aLayer) {
   using namespace mozilla::layers;
   int32_t contentOffset;
@@ -4821,6 +4823,7 @@ nsDisplayBoxShadowOuter::BuildLayer(nsDisplayListBuilder* aBuilder,
 
 void
 nsDisplayBoxShadowOuter::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                                 nsTArray<WebRenderParentCommand>& aParentCommands,
                                                  WebRenderDisplayItemLayer* aLayer)
 {
   int32_t appUnitsPerDevPixel = mFrame->PresContext()->AppUnitsPerDevPixel();
@@ -4974,6 +4977,7 @@ nsDisplayBoxShadowInner::BuildLayer(nsDisplayListBuilder* aBuilder,
 
 void
 nsDisplayBoxShadowInner::CreateWebRenderCommands(nsTArray<WebRenderCommand>& aCommands,
+                                                 nsTArray<WebRenderParentCommand>& aParentCommands,
                                                  WebRenderDisplayItemLayer* aLayer)
 {
   if (!nsCSSRendering::CanPaintBoxShadowInner(mFrame)) {
