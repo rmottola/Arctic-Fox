@@ -1643,7 +1643,6 @@ jit::JitActivation::traceIonRecovery(JSTracer* trc)
 WasmActivation::WasmActivation(JSContext* cx)
   : Activation(cx, Wasm),
     entrySP_(nullptr),
-    resumePC_(nullptr),
     exitFP_(nullptr),
     exitReason_(wasm::ExitReason::Fixed::None)
 {
@@ -1689,7 +1688,7 @@ WasmActivation::startInterrupt(void* pc, uint8_t* fp)
     MOZ_ASSERT(!interrupted());
     MOZ_ASSERT(compartment()->wasm.lookupCode(pc)->lookupRange(pc)->isFunction());
 
-    resumePC_ = pc;
+    cx_->runtime()->setWasmResumePC(pc);
     exitFP_ = fp;
 
     MOZ_ASSERT(interrupted());
@@ -1701,8 +1700,21 @@ WasmActivation::finishInterrupt()
     MOZ_ASSERT(interrupted());
     MOZ_ASSERT(exitFP_);
 
-    resumePC_ = nullptr;
+    cx_->runtime()->setWasmResumePC(nullptr);
     exitFP_ = nullptr;
+}
+
+bool
+WasmActivation::interrupted() const
+{
+    return !!cx_->runtime()->wasmResumePC();
+}
+
+void*
+WasmActivation::resumePC() const
+{
+    MOZ_ASSERT(interrupted());
+    return cx_->runtime()->wasmResumePC();
 }
 
 InterpreterFrameIterator&
