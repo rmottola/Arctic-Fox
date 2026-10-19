@@ -59,7 +59,7 @@ private:
 
   GMPVideoHost* mVideoHost;
   RefPtr<CDMWrapper> mCDMWrapper;
-  GMPVideoDecoderCallback* mCallback;
+  GMPVideoDecoderCallback* mCallback = nullptr;
   std::map<uint64_t, uint64_t> mFrameDurations;
   bool mSentInput;
   GMPVideoCodecType mCodecType;

@@ -373,10 +373,18 @@ void
 WidevineVideoDecoder::DecodingComplete()
 {
   CDM_LOG("WidevineVideoDecoder::DecodingComplete()");
+
   if (mCDMWrapper) {
-    CDM()->DeinitializeDecoder(kStreamTypeVideo);
+    // mCallback will be null if the decoder has not been fully initialized.
+    if (mCallback) {
+      CDM()->DeinitializeDecoder(kStreamTypeVideo);
+    } else {
+      CDM_LOG("WideVineDecoder::DecodingComplete() Decoder was not fully initialized!");
+    }
+
     mCDMWrapper = nullptr;
   }
+
   // Release that corresponds to AddRef() in constructor.
   Release();
 }
