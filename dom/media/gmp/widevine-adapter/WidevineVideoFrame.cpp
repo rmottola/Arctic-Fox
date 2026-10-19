@@ -6,6 +6,7 @@
 #include "WidevineVideoFrame.h"
 
 #include "WidevineUtils.h"
+#include "mozilla/IntegerPrintfMacros.h"
 
 using namespace cdm;
 
