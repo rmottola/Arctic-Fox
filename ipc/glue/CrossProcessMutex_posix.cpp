@@ -89,7 +89,7 @@ CrossProcessMutex::CrossProcessMutex(CrossProcessMutexHandle aHandle)
     MOZ_CRASH();
   }
 
-  if (!mSharedBuffer->SetHandle(aHandle)) {
+  if (!mSharedBuffer->SetHandle(aHandle, ipc::SharedMemory::RightsReadWrite)) {
     MOZ_CRASH();
   }
 
