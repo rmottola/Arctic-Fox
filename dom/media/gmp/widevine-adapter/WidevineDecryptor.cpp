@@ -189,8 +189,7 @@ WidevineDecryptor::ThrottleDecrypt(cdm::Time aWallTime, cdm::Time aSampleDuratio
 
 void
 WidevineDecryptor::Decrypt(GMPBuffer* aBuffer,
-                           GMPEncryptedBufferMetadata* aMetadata,
-                           uint64_t aDurationUsecs)
+                           GMPEncryptedBufferMetadata* aMetadata)
 {
   if (!mCallback) {
     CDM_LOG("WidevineDecryptor::Decrypt() this=%p FAIL; !mCallback", this);
