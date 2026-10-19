@@ -113,7 +113,7 @@ WidevineVideoFrame::Stride(cdm::VideoFrame::VideoPlane aPlane)
 void
 WidevineVideoFrame::SetTimestamp(int64_t timestamp)
 {
-  Log("WidevineVideoFrame::SetTimestamp(%lld) this=%p", timestamp, this);
+  CDM_LOG("WidevineVideoFrame::SetTimestamp(%" PRId64 ") this=%p", timestamp, this);
   mTimestamp = timestamp;
 }
 
