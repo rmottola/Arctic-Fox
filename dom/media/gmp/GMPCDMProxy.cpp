@@ -35,7 +35,6 @@ GMPCDMProxy::GMPCDMProxy(dom::MediaKeys* aKeys,
              aPersistentStateRequired)
   , mCrashHelper(aCrashHelper)
   , mCDM(nullptr)
-  , mDecryptionJobCount(0)
   , mShutdownCalled(false)
   , mDecryptorId(0)
   , mCreatePromiseId(0)
@@ -695,7 +694,6 @@ GMPCDMProxy::gmp_Decrypt(RefPtr<DecryptJob> aJob)
     return;
   }
 
-  aJob->mId = ++mDecryptionJobCount;
   nsTArray<uint8_t> data;
   data.AppendElements(aJob->mSample->Data(), aJob->mSample->Size());
   mCDM->Decrypt(aJob->mId, aJob->mSample->mCrypto, data, aJob->mSample->mDuration);
