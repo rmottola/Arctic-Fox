@@ -1591,6 +1591,8 @@ public:
                                   bool aUseEmbeddedBitmap,
                                   bool aForceGDIMode);
 
+  static void UpdateSystemTextQuality();
+
 private:
   static ID2D1Device *mD2D1Device;
   static ID3D11Device *mD3D11Device;

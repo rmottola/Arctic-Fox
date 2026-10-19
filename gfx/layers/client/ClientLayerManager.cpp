@@ -33,6 +33,7 @@
 #endif
 #ifdef XP_WIN
 #include "mozilla/gfx/DeviceManagerDx.h"
+#include "gfxDWriteFonts.h"
 #endif
 
 namespace mozilla {
@@ -313,6 +314,14 @@ ClientLayerManager::EndTransactionInternal(DrawPaintedLayerCallback aCallback,
                                            EndTransactionFlags)
 {
   PaintTelemetry::AutoRecord record(PaintTelemetry::Metric::Rasterization);
+
+#ifdef WIN32
+  if (aCallbackData) {
+    // Content processes don't get OnPaint called. So update here whenever we
+    // may do Thebes drawing.
+    gfxDWriteFont::UpdateClearTypeUsage();
+  }
+#endif
 
   PROFILER_LABEL("ClientLayerManager", "EndTransactionInternal",
     js::ProfileEntry::Category::GRAPHICS);
