@@ -63,6 +63,16 @@ public:
   virtual void ClearPendingTransactions() = 0;
 
   /**
+   * Transaction id is usually initialized as 0, however when ClientLayerManager
+   * switches to another refresh driver, completed transactions of the previous
+   * refresh driver could be delivered and confuse the newly adopted refresh
+   * driver. To prevent this situation, use this function to reset transaction
+   * id to the last transaction id from previous refresh driver, so that all
+   * completed transactions of previous refresh driver will be ignored.
+   */
+  virtual void ResetInitialTransactionId(uint64_t aTransactionId) = 0;
+
+  /**
    * Get the start time of the current refresh tick.
    */
   virtual mozilla::TimeStamp GetTransactionStart() = 0;
