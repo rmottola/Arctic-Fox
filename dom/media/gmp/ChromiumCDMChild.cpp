@@ -500,6 +500,7 @@ ChromiumCDMChild::RecvResetVideoDecoder()
   if (mDecoderInitialized) {
     mCDM->ResetDecoder(cdm::kStreamTypeVideo);
   }
+  Unused << SendResetVideoDecoderComplete();
   return IPC_OK();
 }
 

@@ -73,6 +73,8 @@ public:
   RefPtr<MediaDataDecoder::DecodePromise> DecryptAndDecodeFrame(
     MediaRawData* aSample);
 
+  RefPtr<MediaDataDecoder::FlushPromise> FlushVideoDecoder();
+
 protected:
   ~ChromiumCDMParent() {}
 
@@ -109,6 +111,7 @@ protected:
   ipc::IPCResult RecvDecoded(const CDMVideoFrame& aFrame) override;
   ipc::IPCResult RecvDecodeFailed(const uint32_t& aStatus) override;
   ipc::IPCResult RecvShutdown() override;
+  ipc::IPCResult RecvResetVideoDecoderComplete() override;
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
   void RejectPromise(uint32_t aPromiseId,
@@ -132,6 +135,8 @@ protected:
   RefPtr<layers::ImageContainer> mImageContainer;
   VideoInfo mVideoInfo;
   uint64_t mLastStreamOffset = 0;
+
+  MozPromiseHolder<MediaDataDecoder::FlushPromise> mFlushDecoderPromise;
 };
 
 } // namespace gmp
