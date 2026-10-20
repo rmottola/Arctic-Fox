@@ -113,6 +113,7 @@ protected:
   DurationMap mFrameDurations;
 
   bool mDecoderInitialized = false;
+  bool mPersistentStateAllowed = false;
 };
 
 } // namespace gmp
