@@ -1382,7 +1382,7 @@ ReportInternalError(const char* aFile, uint32_t aLine, const char* aStr)
 
   nsContentUtils::LogSimpleConsoleError(
     NS_ConvertUTF8toUTF16(nsPrintfCString(
-                          "Quota %s: %s:%lu", aStr, aFile, aLine)),
+                          "Quota %s: %s:%" PRIu32, aStr, aFile, aLine)),
     "quota");
 }
 
@@ -4547,7 +4547,7 @@ QuotaManager::EnsureStorageIsInitialized()
       // Set the page size first.
       if (kSQLitePageSizeOverride) {
         rv = connection->ExecuteSimpleSQL(
-          nsPrintfCString("PRAGMA page_size = %lu;", kSQLitePageSizeOverride)
+          nsPrintfCString("PRAGMA page_size = %" PRIu32 ";", kSQLitePageSizeOverride)
         );
         if (NS_WARN_IF(NS_FAILED(rv))) {
           return rv;

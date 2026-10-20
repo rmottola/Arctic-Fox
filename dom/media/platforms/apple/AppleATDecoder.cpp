@@ -268,7 +268,7 @@ AppleATDecoder::DecodeSample(MediaRawData* aSample)
       LOG("Error decoding audio sample: %d\n", rv);
       return MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
                          RESULT_DETAIL("Error decoding audio sample: %d @ %lld",
-                                       rv, aSample->mTime));
+                                       static_cast<int>(rv), aSample->mTime));
     }
 
     if (numFrames) {
