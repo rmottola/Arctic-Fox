@@ -77,6 +77,8 @@ public:
 
   RefPtr<MediaDataDecoder::DecodePromise> Drain();
 
+  RefPtr<ShutdownPromise> ShutdownVideoDecoder();
+
 protected:
   ~ChromiumCDMParent() {}
 
