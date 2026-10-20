@@ -33,19 +33,6 @@ SplitAt(const char* aDelims,
 }
 
 nsCString
-ToBase64(const nsTArray<uint8_t>& aBytes)
-{
-  nsAutoCString base64;
-  nsDependentCSubstring raw(reinterpret_cast<const char*>(aBytes.Elements()),
-                            aBytes.Length());
-  nsresult rv = Base64Encode(raw, base64);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return NS_LITERAL_CSTRING("[Base64EncodeFailed]");
-  }
-  return base64;
-}
-
-nsCString
 ToHexString(const uint8_t * aBytes, uint32_t aLength)
 {
   static const char hex[] = {
@@ -63,6 +50,12 @@ ToHexString(const uint8_t * aBytes, uint32_t aLength)
     str.AppendASCII(buf);
   }
   return str;
+}
+
+nsCString
+ToHexString(const nsTArray<uint8_t>& aBytes)
+{
+  return ToHexString(aBytes.Elements(), aBytes.Length());
 }
 
 bool
