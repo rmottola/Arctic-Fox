@@ -14,6 +14,7 @@
 #include "GMPContentParent.h"
 #include "GMPMessageUtils.h"
 #include "mozilla/gmp/GMPTypes.h"
+#include "nsPrintfCString.h"
 
 namespace mozilla {
 
