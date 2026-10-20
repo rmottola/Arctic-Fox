@@ -6,6 +6,7 @@
 
 EXPORTS += [
     'BRNameMatchingPolicy.h',
+    'Buffer.h',
     'CertVerifier.h',
     'CTLog.h',
     'CTPolicyEnforcer.h',
@@ -17,6 +18,7 @@ EXPORTS += [
 
 UNIFIED_SOURCES += [
     'BRNameMatchingPolicy.cpp',
+    'Buffer.cpp',
     'CertVerifier.cpp',
     'CTDiversityPolicy.cpp',
     'CTLogVerifier.cpp',
