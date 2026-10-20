@@ -8,8 +8,10 @@
 #include "nsDeque.h"
 #include "MediaData.h"
 #include "mozilla/ErrorResult.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Sprintf.h"
+#include "mozilla/SizePrintfMacros.h"
 
 extern mozilla::LogModule* GetSourceBufferResourceLog();
 

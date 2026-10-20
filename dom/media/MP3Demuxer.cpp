@@ -11,6 +11,7 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/EndianUtils.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "nsAutoPtr.h"
 #include "VideoUtils.h"
 #include "TimeUnits.h"

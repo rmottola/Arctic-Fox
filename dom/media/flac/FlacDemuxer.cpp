@@ -7,6 +7,7 @@
 #include "FlacDemuxer.h"
 
 #include "mozilla/Maybe.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mp4_demuxer/BitReader.h"
 #include "nsAutoPtr.h"
 #include "prenv.h"

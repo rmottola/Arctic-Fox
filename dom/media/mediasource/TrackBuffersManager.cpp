@@ -9,6 +9,7 @@
 #include "MediaSourceDemuxer.h"
 #include "MediaSourceUtils.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/StateMirroring.h"
 #include "SourceBufferResource.h"
 #include "SourceBuffer.h"

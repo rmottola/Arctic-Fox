@@ -12,6 +12,7 @@
 #include "mozilla/dom/TextTrackCue.h"
 #include "mozilla/dom/Event.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Telemetry.h"
 #include "nsComponentManagerUtils.h"
 #include "nsVariant.h"

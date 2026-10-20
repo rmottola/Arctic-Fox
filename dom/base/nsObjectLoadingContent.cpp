@@ -85,6 +85,7 @@
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventStates.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/dom/HTMLObjectElementBinding.h"
 #include "mozilla/dom/HTMLSharedObjectElement.h"
 #include "nsChannelClassifier.h"

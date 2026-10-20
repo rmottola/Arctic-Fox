@@ -20,6 +20,7 @@
 #include "nsIRunnable.h"
 #include "nsThreadUtils.h"
 #include "mozilla/Logging.h"
+#include "mozilla/SizePrintfMacros.h"
 #include <time.h>
 #include "TimeUnits.h"
 

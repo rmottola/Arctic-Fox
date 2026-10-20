@@ -12,6 +12,7 @@
 #include "VideoUtils.h"
 #include "TimeUnits.h"
 #include "prenv.h"
+#include "mozilla/SizePrintfMacros.h"
 
 #ifdef PR_LOGGING
 extern mozilla::LazyLogModule gMediaDemuxerLog;

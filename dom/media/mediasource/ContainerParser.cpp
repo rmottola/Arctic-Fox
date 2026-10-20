@@ -8,7 +8,9 @@
 
 #include "WebMBufferedParser.h"
 #include "mozilla/EndianUtils.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/ErrorResult.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mp4_demuxer/MoofParser.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Maybe.h"

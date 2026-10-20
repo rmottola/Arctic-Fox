@@ -5,6 +5,7 @@
 
 #include "MediaStreamGraphImpl.h"
 #include "mozilla/MathAlgorithms.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Unused.h"
 
 #include "AudioSegment.h"

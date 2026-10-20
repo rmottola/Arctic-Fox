@@ -12,6 +12,7 @@
 
 #include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "MediaPrefs.h"
 
 namespace mozilla {

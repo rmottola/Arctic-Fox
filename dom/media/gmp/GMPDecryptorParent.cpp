@@ -6,6 +6,7 @@
 #include "GMPDecryptorParent.h"
 #include "GMPContentParent.h"
 #include "MediaData.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Unused.h"
 
 namespace mozilla {

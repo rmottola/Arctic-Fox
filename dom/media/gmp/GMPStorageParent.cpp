@@ -6,6 +6,7 @@
 #include "GMPStorageParent.h"
 #include "GMPParent.h"
 #include "gmp-storage.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Unused.h"
 #include "mozIGeckoMediaPluginService.h"
 

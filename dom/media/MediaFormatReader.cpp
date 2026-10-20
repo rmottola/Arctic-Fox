@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "AutoTaskQueue.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "Layers.h"
 #include "MediaData.h"
 #include "MediaInfo.h"
