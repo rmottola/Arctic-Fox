@@ -6,6 +6,7 @@
 #include "ChromiumCDMParent.h"
 #include "mozilla/gmp/GMPTypes.h"
 #include "GMPContentChild.h"
+#include "GMPContentParent.h"
 #include "mozilla/Unused.h"
 #include "ChromiumCDMProxy.h"
 #include "mozilla/dom/MediaKeyMessageEventBinding.h"
@@ -33,6 +34,9 @@ ChromiumCDMParent::Init(ChromiumCDMProxy* aProxy,
                         bool aAllowPersistentState)
 {
   GMP_LOG("ChromiumCDMParent::Init(this=%p)", this);
+  if (!aProxy) {
+    return false;
+  }
   mProxy = aProxy;
   return SendInit(aAllowDistinctiveIdentifier, aAllowPersistentState);
 }
@@ -45,6 +49,12 @@ ChromiumCDMParent::CreateSession(uint32_t aCreateSessionToken,
                                  const nsTArray<uint8_t>& aInitData)
 {
   GMP_LOG("ChromiumCDMParent::CreateSession(this=%p)", this);
+  if (mIsShutdown) {
+    RejectPromise(aPromiseId,
+                  NS_ERROR_DOM_INVALID_STATE_ERR,
+                  NS_LITERAL_CSTRING("CDM is shutdown."));
+    return;
+  }
   if (!SendCreateSessionAndGenerateRequest(
         aPromiseId, aSessionType, aInitDataType, aInitData)) {
     RejectPromise(
@@ -87,6 +97,12 @@ ChromiumCDMParent::SetServerCertificate(uint32_t aPromiseId,
                                         const nsTArray<uint8_t>& aCert)
 {
   GMP_LOG("ChromiumCDMParent::SetServerCertificate(this=%p)", this);
+  if (mIsShutdown) {
+    RejectPromise(aPromiseId,
+                  NS_ERROR_DOM_INVALID_STATE_ERR,
+                  NS_LITERAL_CSTRING("CDM is shutdown."));
+    return;
+  }
   if (!SendSetServerCertificate(aPromiseId, aCert)) {
     RejectPromise(
       aPromiseId,
@@ -101,6 +117,12 @@ ChromiumCDMParent::UpdateSession(const nsCString& aSessionId,
                                  const nsTArray<uint8_t>& aResponse)
 {
   GMP_LOG("ChromiumCDMParent::UpdateSession(this=%p)", this);
+  if (mIsShutdown) {
+    RejectPromise(aPromiseId,
+                  NS_ERROR_DOM_INVALID_STATE_ERR,
+                  NS_LITERAL_CSTRING("CDM is shutdown."));
+    return;
+  }
   if (!SendUpdateSession(aPromiseId, aSessionId, aResponse)) {
     RejectPromise(
       aPromiseId,
@@ -114,6 +136,12 @@ ChromiumCDMParent::CloseSession(const nsCString& aSessionId,
                                 uint32_t aPromiseId)
 {
   GMP_LOG("ChromiumCDMParent::CloseSession(this=%p)", this);
+  if (mIsShutdown) {
+    RejectPromise(aPromiseId,
+                  NS_ERROR_DOM_INVALID_STATE_ERR,
+                  NS_LITERAL_CSTRING("CDM is shutdown."));
+    return;
+  }
   if (!SendCloseSession(aPromiseId, aSessionId)) {
     RejectPromise(
       aPromiseId,
@@ -127,6 +155,12 @@ ChromiumCDMParent::RemoveSession(const nsCString& aSessionId,
                                  uint32_t aPromiseId)
 {
   GMP_LOG("ChromiumCDMParent::RemoveSession(this=%p)", this);
+  if (mIsShutdown) {
+    RejectPromise(aPromiseId,
+                  NS_ERROR_DOM_INVALID_STATE_ERR,
+                  NS_LITERAL_CSTRING("CDM is shutdown."));
+    return;
+  }
   if (!SendRemoveSession(aPromiseId, aSessionId)) {
     RejectPromise(
       aPromiseId,
@@ -164,6 +198,10 @@ ChromiumCDMParent::InitCDMInputBuffer(gmp::CDMInputBuffer& aBuffer, MediaRawData
 RefPtr<DecryptPromise>
 ChromiumCDMParent::Decrypt(MediaRawData* aSample)
 {
+  if (mIsShutdown) {
+    return DecryptPromise::CreateAndReject(DecryptResult(GenericErr, aSample),
+                                           __func__);
+  }
   CDMInputBuffer buffer;
   if (!InitCDMInputBuffer(buffer, aSample)) {
     return DecryptPromise::CreateAndReject(DecryptResult(GenericErr, aSample),
@@ -186,7 +224,12 @@ ChromiumCDMParent::Decrypt(MediaRawData* aSample)
 ipc::IPCResult
 ChromiumCDMParent::Recv__delete__()
 {
+  MOZ_ASSERT(mIsShutdown);
   GMP_LOG("ChromiumCDMParent::Recv__delete__(this=%p)", this);
+  if (mContentParent) {
+    mContentParent->ChromiumCDMDestroyed(this);
+    mContentParent = nullptr;
+  }
   return IPC_OK();
 }
 
@@ -199,7 +242,7 @@ ChromiumCDMParent::RecvOnResolveNewSessionPromise(const uint32_t& aPromiseId,
           this,
           aPromiseId,
           aSessionId.get());
-  if (!mProxy) {
+  if (!mProxy || mIsShutdown) {
     return IPC_OK();
   }
 
@@ -249,7 +292,9 @@ ChromiumCDMParent::ResolvePromise(uint32_t aPromiseId)
   GMP_LOG(
     "ChromiumCDMParent::ResolvePromise(this=%p, pid=%u)", this, aPromiseId);
 
-  if (!mProxy) {
+  // Note: The MediaKeys rejects all pending DOM promises when it
+  // initiates shutdown.
+  if (!mProxy || mIsShutdown) {
     return;
   }
   NS_DispatchToMainThread(NewRunnableMethod<uint32_t>(
@@ -297,7 +342,9 @@ ChromiumCDMParent::RejectPromise(uint32_t aPromiseId,
 {
   GMP_LOG(
     "ChromiumCDMParent::RejectPromise(this=%p, pid=%u)", this, aPromiseId);
-  if (!mProxy) {
+  // Note: The MediaKeys rejects all pending DOM promises when it
+  // initiates shutdown.
+  if (!mProxy || mIsShutdown) {
     return;
   }
   NS_DispatchToMainThread(NewRunnableMethod<uint32_t, nsresult, nsCString>(
@@ -341,7 +388,7 @@ ChromiumCDMParent::RecvOnSessionMessage(const nsCString& aSessionId,
   GMP_LOG("ChromiumCDMParent::RecvOnSessionMessage(this=%p, sid=%s)",
           this,
           aSessionId.get());
-  if (!mProxy) {
+  if (!mProxy || mIsShutdown) {
     return IPC_OK();
   }
   RefPtr<CDMProxy> proxy = mProxy;
@@ -384,7 +431,7 @@ ChromiumCDMParent::RecvOnSessionKeysChange(
   nsTArray<CDMKeyInformation>&& aKeysInfo)
 {
   GMP_LOG("ChromiumCDMParent::RecvOnSessionKeysChange(this=%p)", this);
-  if (!mProxy) {
+  if (!mProxy || mIsShutdown) {
     return IPC_OK();
   }
   bool keyStatusesChange = false;
@@ -414,7 +461,7 @@ ChromiumCDMParent::RecvOnExpirationChange(const nsCString& aSessionId,
   GMP_LOG("ChromiumCDMParent::RecvOnExpirationChange(this=%p) time=%lf",
           this,
           aSecondsSinceEpoch);
-  if (!mProxy) {
+  if (!mProxy || mIsShutdown) {
     return IPC_OK();
   }
   NS_DispatchToMainThread(NewRunnableMethod<nsString, UnixTime>(
@@ -429,7 +476,7 @@ ipc::IPCResult
 ChromiumCDMParent::RecvOnSessionClosed(const nsCString& aSessionId)
 {
   GMP_LOG("ChromiumCDMParent::RecvOnSessionClosed(this=%p)", this);
-  if (!mProxy) {
+  if (!mProxy || mIsShutdown) {
     return IPC_OK();
   }
   NS_DispatchToMainThread(
@@ -446,7 +493,7 @@ ChromiumCDMParent::RecvOnLegacySessionError(const nsCString& aSessionId,
                                             const nsCString& aMessage)
 {
   GMP_LOG("ChromiumCDMParent::RecvOnLegacySessionError(this=%p)", this);
-  if (!mProxy) {
+  if (!mProxy || mIsShutdown) {
     return IPC_OK();
   }
   NS_DispatchToMainThread(
@@ -482,6 +529,10 @@ ChromiumCDMParent::RecvDecrypted(const uint32_t& aId,
           this,
           aId,
           aStatus);
+  if (mIsShutdown) {
+    MOZ_ASSERT(mDecrypts.IsEmpty());
+    return IPC_OK();
+  }
   for (size_t i = 0; i < mDecrypts.Length(); i++) {
     if (mDecrypts[i]->mId == aId) {
       mDecrypts[i]->PostResult(ToDecryptStatus(aStatus), aData);
@@ -495,7 +546,7 @@ ChromiumCDMParent::RecvDecrypted(const uint32_t& aId,
 ipc::IPCResult
 ChromiumCDMParent::RecvDecoded(const CDMVideoFrame& aFrame)
 {
-  if (mDecodePromise.IsEmpty()) {
+  if (mIsShutdown || mDecodePromise.IsEmpty()) {
     return IPC_OK();
   }
   VideoData::YCbCrBuffer b;
@@ -555,6 +606,10 @@ ChromiumCDMParent::RecvDecoded(const CDMVideoFrame& aFrame)
 ipc::IPCResult
 ChromiumCDMParent::RecvDecodeFailed(const uint32_t& aStatus)
 {
+  if (mIsShutdown) {
+    MOZ_ASSERT(mDecodePromise.IsEmpty());
+    return IPC_OK();
+  }
   mDecodePromise.RejectIfExists(
     MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                 RESULT_DETAIL("ChromiumCDMParent::RecvDecodeFailed")),
@@ -566,7 +621,7 @@ ipc::IPCResult
 ChromiumCDMParent::RecvShutdown()
 {
   GMP_LOG("ChromiumCDMParent::RecvShutdown(this=%p)", this);
-  // TODO: SendDestroy(), call Terminated.
+  Shutdown();
   return IPC_OK();
 }
 
@@ -574,6 +629,26 @@ void
 ChromiumCDMParent::ActorDestroy(ActorDestroyReason aWhy)
 {
   GMP_LOG("ChromiumCDMParent::ActorDestroy(this=%p, reason=%d)", this, aWhy);
+  MOZ_ASSERT(!mActorDestroyed);
+  mActorDestroyed = true;
+  if (!mIsShutdown) {
+    // Plugin crash.
+    MOZ_ASSERT(aWhy == AbnormalShutdown);
+    Shutdown();
+  }
+  MOZ_ASSERT(mIsShutdown);
+  RefPtr<ChromiumCDMParent> kungFuDeathGrip(this);
+  if (mContentParent) {
+    mContentParent->ChromiumCDMDestroyed(this);
+    mContentParent = nullptr;
+  }
+  bool abnormalShutdown = (aWhy == AbnormalShutdown);
+  if (abnormalShutdown && mProxy) {
+    RefPtr<Runnable> task =
+      NewRunnableMethod(mProxy, &ChromiumCDMProxy::Terminated);
+    NS_DispatchToMainThread(task);
+  }
+  MaybeDisconnect(abnormalShutdown);
 }
 
 RefPtr<MediaDataDecoder::InitPromise>
@@ -582,6 +657,13 @@ ChromiumCDMParent::InitializeVideoDecoder(
   const VideoInfo& aInfo,
   RefPtr<layers::ImageContainer> aImageContainer)
 {
+  if (mIsShutdown) {
+    return MediaDataDecoder::InitPromise::CreateAndReject(
+      MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                  RESULT_DETAIL("ChromiumCDMParent is shutdown")),
+      __func__);
+  }
+
   if (!SendInitializeVideoDecoder(aConfig)) {
     return MediaDataDecoder::InitPromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
@@ -589,6 +671,7 @@ ChromiumCDMParent::InitializeVideoDecoder(
       __func__);
   }
 
+  mVideoDecoderInitialized = true;
   mImageContainer = aImageContainer;
   mVideoInfo = aInfo;
 
@@ -601,9 +684,14 @@ ChromiumCDMParent::RecvOnDecoderInitDone(const uint32_t& aStatus)
   GMP_LOG("ChromiumCDMParent::RecvOnDecoderInitDone(this=%p, status=%u)",
           this,
           aStatus);
+  if (mIsShutdown) {
+    MOZ_ASSERT(mInitVideoDecoderPromise.IsEmpty());
+    return IPC_OK();
+  }
   if (aStatus == static_cast<uint32_t>(cdm::kSuccess)) {
     mInitVideoDecoderPromise.ResolveIfExists(TrackInfo::kVideoTrack, __func__);
   } else {
+    mVideoDecoderInitialized = false;
     mInitVideoDecoderPromise.RejectIfExists(
       MediaResult(
         NS_ERROR_DOM_MEDIA_FATAL_ERR,
@@ -616,6 +704,13 @@ ChromiumCDMParent::RecvOnDecoderInitDone(const uint32_t& aStatus)
 RefPtr<MediaDataDecoder::DecodePromise>
 ChromiumCDMParent::DecryptAndDecodeFrame(MediaRawData* aSample)
 {
+  if (mIsShutdown) {
+    return MediaDataDecoder::DecodePromise::CreateAndReject(
+      MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                  RESULT_DETAIL("ChromiumCDMParent is shutdown")),
+      __func__);
+  }
+
   CDMInputBuffer buffer;
 
   if (!InitCDMInputBuffer(buffer, aSample)) {
@@ -643,6 +738,13 @@ ChromiumCDMParent::DecryptAndDecodeFrame(MediaRawData* aSample)
 RefPtr<MediaDataDecoder::FlushPromise>
 ChromiumCDMParent::FlushVideoDecoder()
 {
+  if (mIsShutdown) {
+    return MediaDataDecoder::FlushPromise::CreateAndReject(
+      MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                  RESULT_DETAIL("ChromiumCDMParent is shutdown")),
+      __func__);
+  }
+
   mDecodePromise.RejectIfExists(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
   if (!SendResetVideoDecoder()) {
     return MediaDataDecoder::FlushPromise::CreateAndReject(
@@ -655,7 +757,11 @@ ChromiumCDMParent::FlushVideoDecoder()
 ipc::IPCResult
 ChromiumCDMParent::RecvResetVideoDecoderComplete()
 {
-  mFlushDecoderPromise.Resolve(true, __func__);
+  if (mIsShutdown) {
+    MOZ_ASSERT(mFlushDecoderPromise.IsEmpty());
+    return IPC_OK();
+  }
+  mFlushDecoderPromise.ResolveIfExists(true, __func__);
   return IPC_OK();
 }
 
@@ -663,6 +769,12 @@ RefPtr<MediaDataDecoder::DecodePromise>
 ChromiumCDMParent::Drain()
 {
   MOZ_ASSERT(mDecodePromise.IsEmpty(), "Must wait for decoding to complete");
+  if (mIsShutdown) {
+    return MediaDataDecoder::DecodePromise::CreateAndReject(
+      MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                  RESULT_DETAIL("ChromiumCDMParent is shutdown")),
+      __func__);
+  }
 
   RefPtr<MediaDataDecoder::DecodePromise> p = mDecodePromise.Ensure(__func__);
   if (!SendDrain()) {
@@ -674,20 +786,69 @@ ChromiumCDMParent::Drain()
 ipc::IPCResult
 ChromiumCDMParent::RecvDrainComplete()
 {
+  if (mIsShutdown) {
+    MOZ_ASSERT(mDecodePromise.IsEmpty());
+    return IPC_OK();
+  }
   mDecodePromise.ResolveIfExists(MediaDataDecoder::DecodedData(), __func__);
   return IPC_OK();
 }
 RefPtr<ShutdownPromise>
 ChromiumCDMParent::ShutdownVideoDecoder()
 {
+  if (mIsShutdown || !mVideoDecoderInitialized) {
+    return ShutdownPromise::CreateAndResolve(true, __func__);
+  }
   mInitVideoDecoderPromise.RejectIfExists(NS_ERROR_DOM_MEDIA_CANCELED,
                                           __func__);
-  MOZ_ASSERT(mDecodePromise.IsEmpty());
+  mDecodePromise.RejectIfExists(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
   MOZ_ASSERT(mFlushDecoderPromise.IsEmpty());
   if (!SendDeinitializeVideoDecoder()) {
     return ShutdownPromise::CreateAndResolve(true, __func__);
   }
+  mVideoDecoderInitialized = false;
   return ShutdownPromise::CreateAndResolve(true, __func__);
+}
+
+void
+ChromiumCDMParent::Shutdown()
+{
+  GMP_LOG("ChromiumCDMParent::Shutdown(this=%p)", this);
+
+  if (mIsShutdown) {
+    return;
+  }
+  mIsShutdown = true;
+
+  for (RefPtr<DecryptJob>& decrypt : mDecrypts) {
+    decrypt->PostResult(AbortedErr);
+  }
+  mDecrypts.Clear();
+
+  if (mVideoDecoderInitialized && !mActorDestroyed) {
+    Unused << SendDeinitializeVideoDecoder();
+    mVideoDecoderInitialized = false;
+  }
+
+  // Note: MediaKeys rejects all outstanding promises when it initiates shutdown.
+  mPromiseToCreateSessionToken.Clear();
+
+  mInitVideoDecoderPromise.RejectIfExists(
+    MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                RESULT_DETAIL("ChromiumCDMParent is shutdown")),
+    __func__);
+  mDecodePromise.RejectIfExists(
+    MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                RESULT_DETAIL("ChromiumCDMParent is shutdown")),
+    __func__);
+  mFlushDecoderPromise.RejectIfExists(
+    MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                RESULT_DETAIL("ChromiumCDMParent is shutdown")),
+    __func__);
+
+  if (!mActorDestroyed) {
+    Unused << SendDestroy();
+  }
 }
 
 } // namespace gmp

@@ -79,6 +79,8 @@ public:
 
   RefPtr<ShutdownPromise> ShutdownVideoDecoder();
 
+  void Shutdown();
+
 protected:
   ~ChromiumCDMParent() {}
 
@@ -144,6 +146,10 @@ protected:
   uint64_t mLastStreamOffset = 0;
 
   MozPromiseHolder<MediaDataDecoder::FlushPromise> mFlushDecoderPromise;
+
+  bool mIsShutdown = false;
+  bool mVideoDecoderInitialized = false;
+  bool mActorDestroyed = false;
 };
 
 } // namespace gmp
