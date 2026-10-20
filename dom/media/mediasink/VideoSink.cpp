@@ -9,6 +9,7 @@
 #include "MediaPrefs.h"
 
 #include "mozilla/IntegerPrintfMacros.h"
+#include "mozilla/SizePrintfMacros.h"
 
 namespace mozilla {
 
