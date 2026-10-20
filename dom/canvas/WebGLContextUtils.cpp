@@ -10,12 +10,12 @@
 #include "jsapi.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/Sprintf.h"
 #include "nsIDOMEvent.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIVariant.h"
 #include "nsPrintfCString.h"
 #include "nsServiceManagerUtils.h"
-#include "prprf.h"
 #include <stdarg.h>
 #include "WebGLBuffer.h"
 #include "WebGLExtensions.h"
@@ -75,7 +75,7 @@ WebGLContext::GenerateWarning(const char* fmt, va_list ap)
     mAlreadyGeneratedWarnings++;
 
     char buf[1024];
-    PR_vsnprintf(buf, 1024, fmt, ap);
+    VsprintfLiteral(buf, fmt, ap);
 
     // no need to print to stderr, as JS_ReportWarning takes care of this for us.
 
@@ -128,7 +128,7 @@ WebGLContext::GeneratePerfWarning(const char* fmt, ...) const
     va_start(ap, fmt);
 
     char buf[1024];
-    PR_vsnprintf(buf, 1024, fmt, ap);
+    VsprintfLiteral(buf, fmt, ap);
 
     va_end(ap);
 
