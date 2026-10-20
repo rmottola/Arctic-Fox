@@ -940,6 +940,8 @@ typedef struct RcOverride{
  */
 #define AV_CODEC_FLAG2_RO_FLUSH_NOOP  (1 << 30)
 
+#define CODEC_FLAG_LOW_DELAY      AV_CODEC_FLAG_LOW_DELAY
+
 /* Unsupported options :
  *              Syntax Arithmetic coding (SAC)
  *              Reference Picture Selection
