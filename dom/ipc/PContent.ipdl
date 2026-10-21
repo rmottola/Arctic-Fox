@@ -27,6 +27,7 @@ include protocol PPluginModule;
 include protocol PGMP;
 include protocol PPrinting;
 include protocol PChildToParentStream;
+include protocol PParentToChildStream;
 include protocol POfflineCacheUpdate;
 include protocol PRenderFrame;
 include protocol PScreenManager;
@@ -288,6 +289,7 @@ nested(upto inside_cpow) sync protocol PContent
     manages POfflineCacheUpdate;
     manages PPrinting;
     manages PChildToParentStream;
+    manages PParentToChildStream;
     manages PScreenManager;
     manages PSpeechSynthesis;
     manages PStorage;
@@ -580,6 +582,8 @@ child:
     async Deactivate(PBrowser aTab);
 
     async ParentActivated(PBrowser aTab, bool aActivated);
+
+    async PParentToChildStream();
 
 parent:
     async InitBackground(Endpoint<PBackgroundParent> aEndpoint);

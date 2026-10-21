@@ -113,6 +113,12 @@ ContentBridgeParent::SendPBrowserConstructor(PBrowserParent* aActor,
                                                        aIsForBrowser);
 }
 
+PParentToChildStreamParent*
+ContentBridgeParent::SendPParentToChildStreamConstructor(PParentToChildStreamParent* aActor)
+{
+  return PContentBridgeParent::SendPParentToChildStreamConstructor(aActor);
+}
+
 PBlobParent*
 ContentBridgeParent::AllocPBlobParent(const BlobConstructorParams& aParams)
 {
@@ -190,6 +196,12 @@ ContentBridgeParent::Observe(nsISupports* aSubject,
 }
 
 PFileDescriptorSetParent*
+ContentBridgeParent::SendPFileDescriptorSetConstructor(const FileDescriptor& aFD)
+{
+  return PContentBridgeParent::SendPFileDescriptorSetConstructor(aFD);
+}
+
+PFileDescriptorSetParent*
 ContentBridgeParent::AllocPFileDescriptorSetParent(const FileDescriptor& aFD)
 {
   return nsIContentParent::AllocPFileDescriptorSetParent(aFD);
@@ -211,6 +223,18 @@ bool
 ContentBridgeParent::DeallocPChildToParentStreamParent(PChildToParentStreamParent* aActor)
 {
   return nsIContentParent::DeallocPChildToParentStreamParent(aActor);
+}
+
+PParentToChildStreamParent*
+ContentBridgeParent::AllocPParentToChildStreamParent()
+{
+  return nsIContentParent::AllocPParentToChildStreamParent();
+}
+
+bool
+ContentBridgeParent::DeallocPParentToChildStreamParent(PParentToChildStreamParent* aActor)
+{
+  return nsIContentParent::DeallocPParentToChildStreamParent(aActor);
 }
 
 } // namespace dom

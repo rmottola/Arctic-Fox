@@ -9,6 +9,8 @@ include protocol PContentBridge;
 namespace mozilla {
 namespace ipc {
 
+// This is protocol is the opposite of PParentToChildStream. Please keep these
+// protocols in sync.
 protocol PChildToParentStream
 {
   manager PBackground or PContent or PContentBridge;
