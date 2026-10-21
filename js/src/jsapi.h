@@ -6305,7 +6305,6 @@ SetBuildIdOp(JSContext* cx, BuildIdOp buildIdOp);
 
 struct WasmModule : js::AtomicRefCounted<WasmModule>
 {
-    MOZ_DECLARE_REFCOUNTED_TYPENAME(WasmModule)
     virtual ~WasmModule() {}
 
     virtual void serializedSize(size_t* maybeBytecodeSize, size_t* maybeCompiledSize) const = 0;
