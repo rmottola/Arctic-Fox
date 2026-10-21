@@ -7,7 +7,6 @@
 #ifndef mozilla_dom_audiochannelservice_h__
 #define mozilla_dom_audiochannelservice_h__
 
-#include "nsIAudioChannelService.h"
 #include "nsAutoPtr.h"
 #include "nsIObserver.h"
 #include "nsTObserverArray.h"
@@ -57,13 +56,11 @@ public:
   uint32_t mSuspend;
 };
 
-class AudioChannelService final : public nsIAudioChannelService
-                                , public nsIObserver
+class AudioChannelService final : public nsIObserver
 {
 public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIOBSERVER
-  NS_DECL_NSIAUDIOCHANNELSERVICE
 
   /**
    * eNotAudible : agent is not audible
@@ -143,19 +140,6 @@ public:
                            AudibleState aAudible,
                            AudibleChangedReasons aReason);
 
-  /* Methods for the BrowserElementAudioChannel */
-  float GetAudioChannelVolume(nsPIDOMWindowOuter* aWindow, AudioChannel aChannel);
-
-  void SetAudioChannelVolume(nsPIDOMWindowOuter* aWindow, AudioChannel aChannel,
-                             float aVolume);
-
-  bool GetAudioChannelMuted(nsPIDOMWindowOuter* aWindow, AudioChannel aChannel);
-
-  void SetAudioChannelMuted(nsPIDOMWindowOuter* aWindow, AudioChannel aChannel,
-                            bool aMuted);
-
-  bool IsAudioChannelActive(nsPIDOMWindowOuter* aWindow, AudioChannel aChannel);
-
   bool IsWindowActive(nsPIDOMWindowOuter* aWindow);
 
   /**
@@ -184,9 +168,6 @@ public:
   void RefreshAgentsVolume(nsPIDOMWindowOuter* aWindow);
   void RefreshAgentsSuspend(nsPIDOMWindowOuter* aWindow,
                             nsSuspendedTypes aSuspend);
-
-  void RefreshAgentsVolumeAndPropagate(AudioChannel aAudioChannel,
-                                       nsPIDOMWindowOuter* aWindow);
 
   // This method needs to know the inner window that wants to capture audio. We
   // group agents per top outer window, but we can have multiple innerWindow per
@@ -256,10 +237,7 @@ private:
       , mIsAudioCaptured(false)
       , mOwningAudioFocus(!AudioChannelService::IsEnableAudioCompeting())
       , mShouldSendBlockStopEvent(false)
-    {
-      // Workaround for bug1183033, system channel type can always playback.
-      mChannels[(int16_t)AudioChannel::System].mMuted = false;
-    }
+    {}
 
     void AudioFocusChanged(AudioChannelAgent* aNewPlayingAgent, bool aActive);
     void AudioAudibleChanged(AudioChannelAgent* aAgent,
