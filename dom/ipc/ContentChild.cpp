@@ -3123,6 +3123,7 @@ ContentChild::FileCreationRequest(nsID& aUUID, FileCreatorHelper* aHelper,
                                   const nsAString& aType,
                                   const nsAString& aName,
                                   const Optional<int64_t>& aLastModified,
+                                  bool aExistenceCheck,
                                   bool aIsFromNsIFile)
 {
   MOZ_ASSERT(aHelper);
@@ -3136,7 +3137,8 @@ ContentChild::FileCreationRequest(nsID& aUUID, FileCreatorHelper* aHelper,
 
   Unused << SendFileCreationRequest(aUUID, nsString(aFullPath), nsString(aType),
                                     nsString(aName), lastModifiedPassed,
-                                    lastModified, aIsFromNsIFile);
+                                    lastModified, aExistenceCheck,
+                                    aIsFromNsIFile);
   mFileCreationPending.Put(aUUID, aHelper);
 }
 

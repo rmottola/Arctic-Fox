@@ -33,8 +33,7 @@ add_task(function* test_downloads_saveAs() {
   const extension = ExtensionTestUtils.loadExtension(manifest);
 
   MockFilePicker.init(window);
-  MockFilePicker.useAnyFile();
-  const [file] = MockFilePicker.returnFiles;
+  const file = yield MockFilePicker.useAnyFile();
 
   yield extension.startup();
   yield extension.awaitMessage("ready");
@@ -43,6 +42,8 @@ add_task(function* test_downloads_saveAs() {
   let result = yield extension.awaitMessage("done");
 
   ok(result.ok, "downloads.download() works with saveAs");
+
+  ok(file.exists(), "the file exists.");
   is(file.fileSize, 12, "downloaded file is the correct size");
   file.remove(false);
 
