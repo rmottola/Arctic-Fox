@@ -99,12 +99,6 @@ MediaKeySession::GetError() const
 }
 
 void
-MediaKeySession::GetKeySystem(nsString& aOutKeySystem) const
-{
-  aOutKeySystem.Assign(mKeySystem);
-}
-
-void
 MediaKeySession::GetSessionId(nsString& aSessionId) const
 {
   aSessionId = GetSessionId();
