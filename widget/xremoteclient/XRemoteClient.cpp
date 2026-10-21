@@ -51,7 +51,7 @@
 
 using mozilla::LogLevel;
 
-static PRLogModuleInfo *sRemoteLm = nullptr;
+static mozilla::LazyLogModule sRemoteLm("XRemoteClient");
 
 static int (*sOldHandler)(Display *, XErrorEvent *);
 static bool sGotBadWindow;
@@ -69,8 +69,6 @@ XRemoteClient::XRemoteClient()
   mMozProfileAtom = 0;
   mMozProgramAtom = 0;
   mLockData = 0;
-  if (!sRemoteLm)
-    sRemoteLm = PR_NewLogModule("XRemoteClient");
   MOZ_LOG(sRemoteLm, LogLevel::Debug, ("XRemoteClient::XRemoteClient"));
 }
 
