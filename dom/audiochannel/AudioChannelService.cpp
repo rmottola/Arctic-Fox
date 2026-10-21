@@ -259,27 +259,13 @@ NS_IMPL_ADDREF(AudioChannelService)
 NS_IMPL_RELEASE(AudioChannelService)
 
 AudioChannelService::AudioChannelService()
-  : mDefChannelChildID(CONTENT_PROCESS_ID_UNKNOWN)
-  , mTelephonyChannel(false)
-  , mContentOrNormalChannel(false)
-  , mAnyChannel(false)
 {
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
   if (obs) {
     obs->AddObserver(this, "xpcom-shutdown", false);
     obs->AddObserver(this, "outer-window-destroyed", false);
-    if (IsParentProcess()) {
-      obs->AddObserver(this, "ipc:content-shutdown", false);
-
-#ifdef MOZ_WIDGET_GONK
-      // To monitor the volume settings based on audio channel.
-      obs->AddObserver(this, "mozsettings-changed", false);
-#endif
-    }
   }
 
-  Preferences::AddBoolVarCache(&sAudioChannelMutedByDefault,
-                               "dom.audiochannel.mutedByDefault");
   Preferences::AddBoolVarCache(&sAudioChannelCompeting,
                                "dom.audiochannel.audioCompeting");
 }
