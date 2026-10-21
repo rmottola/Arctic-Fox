@@ -363,6 +363,7 @@ public:
     char buff[kBuffSize];
 
     char* buffToWrite = buff;
+    SmprintfPointer allocatedBuff;
 
     va_list argsCopy;
     va_copy(argsCopy, aArgs);
@@ -379,7 +380,8 @@ public:
       charsWritten = strlen(buff);
     } else if (static_cast<size_t>(charsWritten) >= kBuffSize - 1) {
       // We may have maxed out, allocate a buffer instead.
-      buffToWrite = mozilla::Vsmprintf(aFmt, aArgs);
+      allocatedBuff = mozilla::Vsmprintf(aFmt, aArgs);
+      buffToWrite = allocatedBuff.get();
       charsWritten = strlen(buffToWrite);
     }
 
@@ -437,10 +439,6 @@ public:
 
     if (mIsSync) {
       fflush(out);
-    }
-
-    if (buffToWrite != buff) {
-      mozilla::SmprintfFree(buffToWrite);
     }
 
     if (mRotate > 0 && outFile) {
