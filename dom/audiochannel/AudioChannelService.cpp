@@ -32,6 +32,8 @@
 using namespace mozilla;
 using namespace mozilla::dom;
 
+static mozilla::LazyLogModule gAudioChannelLog("AudioChannel");
+
 namespace {
 
 bool sAudioChannelCompeting = false;
@@ -210,13 +212,9 @@ AudioChannelService::Get()
   return service.forget();
 }
 
-/* static */ PRLogModuleInfo*
+/* static */ LogModule*
 AudioChannelService::GetAudioChannelLog()
 {
-  static PRLogModuleInfo *gAudioChannelLog;
-  if (!gAudioChannelLog) {
-    gAudioChannelLog = PR_NewLogModule("AudioChannel");
-  }
   return gAudioChannelLog;
 }
 
