@@ -9920,7 +9920,6 @@ Parser<ParseHandler>::primaryExpr(YieldHandling yieldHandling, TripledotHandling
         if (!expr)
             return null();
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_IN_PAREN);
-        handler.setEndPosition(expr, pos().end);
         return handler.parenthesize(expr);
       }
 
