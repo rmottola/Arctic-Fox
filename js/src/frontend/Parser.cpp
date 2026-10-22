@@ -2192,7 +2192,7 @@ Parser<FullParseHandler>::moduleBody(ModuleSharedContext* modulesc)
     if (!varScope.init(pc))
         return nullptr;
 
-    Node mn = handler.newModule();
+    Node mn = handler.newModule(pos());
     if (!mn)
         return null();
 
@@ -2503,11 +2503,11 @@ Parser<FullParseHandler>::standaloneFunction(HandleFunction fun,
         tokenStream.ungetToken();
     }
 
-    Node fn = handler.newFunctionStatement();
+    Node fn = handler.newFunctionStatement(pos());
     if (!fn)
         return null();
 
-    ParseNode* argsbody = handler.newList(PNK_PARAMSBODY);
+    ParseNode* argsbody = handler.newList(PNK_PARAMSBODY, pos());
     if (!argsbody)
         return null();
     fn->pn_body = argsbody;
@@ -2970,7 +2970,7 @@ Parser<ParseHandler>::functionArguments(YieldHandling yieldHandling, FunctionSyn
         funbox->setStart(tokenStream);
     }
 
-    Node argsbody = handler.newList(PNK_PARAMSBODY);
+    Node argsbody = handler.newList(PNK_PARAMSBODY, pos());
     if (!argsbody)
         return false;
     handler.setFunctionFormalParametersAndBody(funcpn, argsbody);
@@ -3539,7 +3539,7 @@ Parser<FullParseHandler>::standaloneLazyFunction(HandleFunction fun, bool strict
 {
     MOZ_ASSERT(checkOptionsCalled);
 
-    Node pn = handler.newFunctionStatement();
+    Node pn = handler.newFunctionStatement(pos());
     if (!pn)
         return null();
 
@@ -3812,7 +3812,7 @@ Parser<ParseHandler>::functionStmt(uint32_t preludeStart, YieldHandling yieldHan
             return null();
     }
 
-    Node pn = handler.newFunctionStatement();
+    Node pn = handler.newFunctionStatement(pos());
     if (!pn)
         return null();
 
@@ -3857,7 +3857,7 @@ Parser<ParseHandler>::functionExpr(uint32_t preludeStart, InvokedPrediction invo
         tokenStream.ungetToken();
     }
 
-    Node pn = handler.newFunctionExpression();
+    Node pn = handler.newFunctionExpression(pos());
     if (!pn)
         return null();
 
@@ -4768,7 +4768,7 @@ Parser<ParseHandler>::declarationList(YieldHandling yieldHandling,
         MOZ_CRASH("Unknown declaration kind");
     }
 
-    Node decl = handler.newDeclarationList(kind, op);
+    Node decl = handler.newDeclarationList(kind, pos(), op);
     if (!decl)
         return null();
 
@@ -4970,7 +4970,7 @@ Parser<FullParseHandler>::importDeclaration()
     if (!tokenStream.getToken(&tt))
         return null();
 
-    Node importSpecSet = handler.newList(PNK_IMPORT_SPEC_LIST);
+    Node importSpecSet = handler.newList(PNK_IMPORT_SPEC_LIST, pos());
     if (!importSpecSet)
         return null();
 
@@ -5221,7 +5221,7 @@ Parser<ParseHandler>::exportBatch(uint32_t begin)
 
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_MUL));
 
-    Node kid = handler.newList(PNK_EXPORT_SPEC_LIST);
+    Node kid = handler.newList(PNK_EXPORT_SPEC_LIST, pos());
     if (!kid)
         return null();
 
@@ -5272,7 +5272,7 @@ Parser<ParseHandler>::exportClause(uint32_t begin)
 
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_LC));
 
-    Node kid = handler.newList(PNK_EXPORT_SPEC_LIST);
+    Node kid = handler.newList(PNK_EXPORT_SPEC_LIST, pos());
     if (!kid)
         return null();
 
@@ -6789,7 +6789,7 @@ Parser<ParseHandler>::tryStatement(YieldHandling yieldHandling)
     if (!tokenStream.getToken(&tt))
         return null();
     if (tt == TOK_CATCH) {
-        catchList = handler.newCatchList();
+        catchList = handler.newCatchList(pos());
         if (!catchList)
             return null();
 
@@ -8109,7 +8109,7 @@ Parser<ParseHandler>::assignExpr(InHandling inHandling, YieldHandling yieldHandl
                 tokenStream.ungetToken();
         }
 
-        Node pn = handler.newArrowFunction();
+        Node pn = handler.newArrowFunction(pos());
         if (!pn)
             return null();
 
@@ -8405,7 +8405,7 @@ template <typename ParseHandler>
 typename ParseHandler::Node
 Parser<ParseHandler>::generatorComprehensionLambda(unsigned begin)
 {
-    Node genfn = handler.newFunctionExpression();
+    Node genfn = handler.newFunctionExpression(pos());
     if (!genfn)
         return null();
 
@@ -8803,10 +8803,6 @@ Parser<ParseHandler>::memberExpr(YieldHandling yieldHandling, TripledotHandling 
         if (newTarget) {
             lhs = newTarget;
         } else {
-            lhs = handler.newList(PNK_NEW, newBegin, JSOP_NEW);
-            if (!lhs)
-                return null();
-
             // Gotten by tryNewTarget
             tt = tokenStream.currentToken().type;
             Node ctorExpr = memberExpr(yieldHandling, TripledotProhibited, tt,
@@ -8815,7 +8811,9 @@ Parser<ParseHandler>::memberExpr(YieldHandling yieldHandling, TripledotHandling 
             if (!ctorExpr)
                 return null();
 
-            handler.addList(lhs, ctorExpr);
+            lhs = handler.newNewExpression(newBegin, ctorExpr);
+            if (!lhs)
+                return null();
 
             bool matched;
             if (!tokenStream.matchToken(&matched, TOK_LP))
@@ -8922,7 +8920,10 @@ Parser<ParseHandler>::memberExpr(YieldHandling yieldHandling, TripledotHandling 
                     return null();
                 }
 
-                nextMember = tt == TOK_LP ? handler.newCall() : handler.newTaggedTemplate();
+                TokenPos nextMemberPos = pos();
+                nextMember = tt == TOK_LP
+                             ? handler.newCall(nextMemberPos)
+                             : handler.newTaggedTemplate(nextMemberPos);
                 if (!nextMember)
                     return null();
 
@@ -9753,7 +9754,7 @@ Parser<ParseHandler>::methodDefinition(uint32_t preludeStart, PropertyType propT
 
     YieldHandling yieldHandling = GetYieldHandling(generatorKind);
 
-    Node pn = handler.newFunctionExpression();
+    Node pn = handler.newFunctionExpression(pos());
     if (!pn)
         return null();
 
