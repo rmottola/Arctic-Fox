@@ -2661,6 +2661,14 @@ SrcNotes(JSContext* cx, HandleScript script, Sprinter* sp)
                 return false;
             break;
 
+          case SRC_CLASS_SPAN: {
+            unsigned startOffset = GetSrcNoteOffset(sn, 0);
+            unsigned endOffset = GetSrcNoteOffset(sn, 1);
+            if (!sp->jsprintf(" %u %u", startOffset, endOffset))
+                return false;
+            break;
+          }
+
           default:
             MOZ_ASSERT_UNREACHABLE("unrecognized srcnote");
         }
