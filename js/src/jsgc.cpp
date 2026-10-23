@@ -2119,6 +2119,8 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
         c->objectGroups.sweep(fop);
         c->sweepRegExps();
         c->sweepSavedStacks();
+        c->sweepTemplateLiteralMap();
+        c->sweepVarNames();
         c->sweepGlobalObject(fop);
         c->sweepSelfHostingScriptSource();
         c->sweepDebugEnvironments();
@@ -2476,7 +2478,6 @@ GCRuntime::updateZonePointersToRelocatedCells(Zone* zone, AutoLockForExclusiveAc
 
         WeakMapBase::traceZone(zone, &trc);
         for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
-            c->trace(&trc);
             if (c->watchpointMap)
                 c->watchpointMap->trace(&trc);
         }
@@ -4951,6 +4952,7 @@ SweepMiscTask::run()
 {
     for (GCCompartmentGroupIter c(runtime()); !c.done(); c.next()) {
         c->sweepSavedStacks();
+        c->sweepTemplateLiteralMap();
         c->sweepSelfHostingScriptSource();
         c->sweepNativeIterators();
     }

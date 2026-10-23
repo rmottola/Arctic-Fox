@@ -715,8 +715,12 @@ JSCompartment::traceIncomingCrossCompartmentEdgesForZoneGC(JSTracer* trc)
 }
 
 void
-JSCompartment::trace(JSTracer* trc)
+JSCompartment::traceGlobal(JSTracer* trc)
 {
+    // Trace things reachable from the compartment's global. Note that these
+    // edges must be swept too in case the compartment is live but the global is
+    // not.
+
     savedStacks_.trace(trc);
 
     // The template registry strongly holds everything in it by design and
@@ -834,6 +838,12 @@ void
 JSCompartment::sweepSavedStacks()
 {
     savedStacks_.sweep();
+}
+
+void
+JSCompartment::sweepTemplateLiteralMap()
+{
+    templateLiteralMap_.sweep();
 }
 
 void

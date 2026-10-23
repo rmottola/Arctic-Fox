@@ -684,10 +684,10 @@ struct JSCompartment
      * This method traces data that is live iff we know that this compartment's
      * global is still live.
      */
-    void trace(JSTracer* trc);
+    void traceGlobal(JSTracer* trc);
     /*
      * This method traces JSCompartment-owned GC roots that are considered live
-     * regardless of whether the JSCompartment itself is still live.
+     * regardless of whether the compartment's global is still live.
      */
     void traceRoots(JSTracer* trc, js::gc::GCRuntime::TraceOrMarkRuntime traceOrMark);
     /*
@@ -710,6 +710,7 @@ struct JSCompartment
 
     void sweepCrossCompartmentWrappers();
     void sweepSavedStacks();
+    void sweepTemplateLiteralMap();
     void sweepGlobalObject(js::FreeOp* fop);
     void sweepSelfHostingScriptSource();
     void sweepJitCompartment(js::FreeOp* fop);
