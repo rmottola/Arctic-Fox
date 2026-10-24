@@ -103,7 +103,7 @@ struct PCComparator
     }
 };
 
-Code*
+const Code*
 Compartment::lookupCode(const void* pc) const
 {
     // lookupCode() can be called asynchronously from the interrupt signal
