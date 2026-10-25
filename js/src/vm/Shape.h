@@ -124,8 +124,8 @@ struct ShapeHasher : public DefaultHasher<Shape*> {
     typedef Shape* Key;
     typedef StackShape Lookup;
 
-    static inline HashNumber hash(const Lookup& l);
-    static inline bool match(Key k, const Lookup& l);
+    static MOZ_ALWAYS_INLINE HashNumber hash(const Lookup& l);
+    static MOZ_ALWAYS_INLINE bool match(Key k, const Lookup& l);
 };
 
 typedef HashSet<Shape*, ShapeHasher, SystemAllocPolicy> KidsHash;
@@ -201,6 +201,8 @@ class PropertyTree
     {
     }
 
+    MOZ_ALWAYS_INLINE Shape* inlinedGetChild(JSContext* cx, Shape* parent,
+                                             JS::Handle<StackShape> child);
     Shape* getChild(JSContext* cx, Shape* parent, JS::Handle<StackShape> child);
 };
 
