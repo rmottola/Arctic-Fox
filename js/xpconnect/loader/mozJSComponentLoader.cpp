@@ -142,11 +142,11 @@ public:
     explicit JSCLContextHelper(JSContext* aCx);
     ~JSCLContextHelper();
 
-    void reportErrorAfterPop(char* buf);
+    void reportErrorAfterPop(UniqueChars&& buf);
 
 private:
     JSContext* mContext;
-    char*      mBuf;
+    UniqueChars mBuf;
 
     // prevent copying and assignment
     JSCLContextHelper(const JSCLContextHelper&) = delete;
@@ -164,14 +164,13 @@ ReportOnCallerUTF8(JSContext* callerContext,
     va_list ap;
     va_start(ap, format);
 
-    char* buf = JS_vsmprintf(format, ap);
+    UniqueChars buf = JS_vsmprintf(format, ap);
     if (!buf) {
         va_end(ap);
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
-    JS_ReportErrorUTF8(callerContext, "%s", buf);
-    JS_smprintf_free(buf);
+    JS_ReportErrorUTF8(callerContext, "%s", buf.get());
 
     va_end(ap);
     return NS_OK;
@@ -185,13 +184,13 @@ ReportOnCallerUTF8(JSCLContextHelper& helper,
     va_list ap;
     va_start(ap, format);
 
-    char* buf = JS_vsmprintf(format, ap);
+    UniqueChars buf = JS_vsmprintf(format, ap);
     if (!buf) {
         va_end(ap);
         return NS_ERROR_OUT_OF_MEMORY;
     }
 
-    helper.reportErrorAfterPop(buf);
+    helper.reportErrorAfterPop(Move(buf));
     va_end(ap);
     return NS_OK;
 }
@@ -1426,14 +1425,13 @@ JSCLContextHelper::JSCLContextHelper(JSContext* aCx)
 JSCLContextHelper::~JSCLContextHelper()
 {
     if (mBuf) {
-        JS_ReportErrorUTF8(mContext, "%s", mBuf);
-        JS_smprintf_free(mBuf);
+        JS_ReportErrorUTF8(mContext, "%s", mBuf.get());
     }
 }
 
 void
-JSCLContextHelper::reportErrorAfterPop(char* buf)
+JSCLContextHelper::reportErrorAfterPop(UniqueChars&& buf)
 {
     MOZ_ASSERT(!mBuf, "Already called reportErrorAfterPop");
-    mBuf = buf;
+    mBuf = Move(buf);
 }

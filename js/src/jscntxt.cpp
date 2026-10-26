@@ -539,14 +539,13 @@ static bool
 PrintSingleError(JSContext* cx, FILE* file, JS::ConstUTF8CharsZ toStringResult,
                  T* report, PrintErrorKind kind)
 {
-    UniquePtr<char> prefix;
+    UniqueChars prefix;
     if (report->filename)
-        prefix.reset(JS_smprintf("%s:", report->filename));
+        prefix = JS_smprintf("%s:", report->filename);
 
     if (report->lineno) {
-        UniquePtr<char> tmp(JS_smprintf("%s%u:%u ", prefix ? prefix.get() : "", report->lineno,
-                                        report->column));
-        prefix = Move(tmp);
+        prefix = JS_smprintf("%s%u:%u ", prefix ? prefix.get() : "", report->lineno,
+                                        report->column);
     }
 
     if (kind != PrintErrorKind::Error) {
@@ -565,8 +564,7 @@ PrintSingleError(JSContext* cx, FILE* file, JS::ConstUTF8CharsZ toStringResult,
             break;
         }
 
-        UniquePtr<char> tmp(JS_smprintf("%s%s: ", prefix ? prefix.get() : "", kindPrefix));
-        prefix = Move(tmp);
+        prefix = JS_smprintf("%s%s: ", prefix ? prefix.get() : "", kindPrefix);
     }
 
     const char* message = toStringResult ? toStringResult.c_str() : report->message().c_str();
