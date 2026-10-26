@@ -1640,6 +1640,9 @@ pref("browser.crashReports.unsubmittedCheck.autoSubmit", false);
 pref("services.sync.validation.enabled", true);
 #endif
 
+// Preferences for the form autofill system extension
+pref("browser.formautofill.enabled", false);
+
 // ****************** domain-specific UAs ******************
 
 // AMO needs "Firefox", obviously - pass on the OS (determined at build time)
