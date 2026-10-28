@@ -13,6 +13,7 @@
 #include "base/basictypes.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/Logging.h"
+#include "mozilla/Printf.h"
 
 #ifdef NO_CHROMIUM_LOGGING
 #include <sstream>
@@ -39,7 +40,6 @@ public:
     : mSeverity(severity)
     , mFile(file)
     , mLine(line)
-    , mMsg(NULL)
   { }
 
   ~Logger();
@@ -54,7 +54,7 @@ private:
   LogSeverity mSeverity;
   const char* mFile;
   int mLine;
-  char* mMsg;
+  SmprintfPointer mMsg;
 
   DISALLOW_EVIL_CONSTRUCTORS(Logger);
 };
@@ -77,8 +77,6 @@ struct EmptyLog
 {
 };
 
-} // namespace mozilla
-
 mozilla::Logger& operator<<(mozilla::Logger& log, const char* s);
 mozilla::Logger& operator<<(mozilla::Logger& log, const std::string& s);
 mozilla::Logger& operator<<(mozilla::Logger& log, int i);
@@ -90,6 +88,8 @@ const mozilla::EmptyLog& operator <<(const mozilla::EmptyLog& log, const T&)
 {
   return log;
 }
+
+} // namespace mozilla
 
 #ifdef NO_CHROMIUM_LOGGING
 #define CHROMIUM_LOG(info) std::stringstream()

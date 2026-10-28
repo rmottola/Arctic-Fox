@@ -544,9 +544,8 @@ GetDOMFileOrDirectoryPath(const OwningFileOrDirectory& aData,
 bool
 HTMLInputElement::ValueAsDateEnabled(JSContext* cx, JSObject* obj)
 {
-  return Preferences::GetBool("dom.experimental_forms", false) ||
-    Preferences::GetBool("dom.forms.datepicker", false) ||
-    Preferences::GetBool("dom.forms.datetime", false);
+  return IsExperimentalFormsEnabled() || IsDatePickerEnabled() ||
+         IsInputDateTimeEnabled();
 }
 
 NS_IMETHODIMP
@@ -629,7 +628,7 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
   RefPtr<DispatchChangeEventCallback> dispatchChangeEventCallback =
     new DispatchChangeEventCallback(mInput);
 
-  if (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+  if (IsWebkitDirPickerEnabled() &&
       mInput->HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)) {
     ErrorResult error;
     GetFilesHelper* helper = mInput->GetOrCreateGetFilesHelper(true, error);
@@ -830,7 +829,7 @@ HTMLInputElement::IsPopupBlocked() const
 nsresult
 HTMLInputElement::InitDatePicker()
 {
-  if (!Preferences::GetBool("dom.forms.datepicker", false)) {
+  if (!IsDatePickerEnabled()) {
     return NS_OK;
   }
 
@@ -2569,10 +2568,8 @@ bool
 HTMLInputElement::IsExperimentalMobileType(uint8_t aType)
 {
   return (aType == NS_FORM_INPUT_DATE &&
-    !Preferences::GetBool("dom.forms.datetime", false) &&
-    !Preferences::GetBool("dom.forms.datepicker", false)) ||
-    (aType == NS_FORM_INPUT_TIME &&
-     !Preferences::GetBool("dom.forms.datetime", false));
+    !IsInputDateTimeEnabled() && !IsDatePickerEnabled()) ||
+    (aType == NS_FORM_INPUT_TIME && !IsInputDateTimeEnabled());
 }
 
 bool
@@ -2953,7 +2950,7 @@ HTMLInputElement::CreateEditor()
   return NS_ERROR_FAILURE;
 }
 
-NS_IMETHODIMP_(nsIContent*)
+NS_IMETHODIMP_(Element*)
 HTMLInputElement::GetRootEditorNode()
 {
   nsTextEditorState* state = GetEditorState();
@@ -3020,8 +3017,8 @@ HTMLInputElement::GetDisplayFileName(nsAString& aValue) const
   nsXPIDLString value;
 
   if (mFilesOrDirectories.IsEmpty()) {
-    if ((Preferences::GetBool("dom.input.dirpicker", false) && Allowdirs()) ||
-        (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+    if ((IsDirPickerEnabled() && Allowdirs()) ||
+        (IsWebkitDirPickerEnabled() &&
          HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
       nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
                                          "NoDirSelected", value);
@@ -3050,7 +3047,7 @@ HTMLInputElement::SetFilesOrDirectories(const nsTArray<OwningFileOrDirectory>& a
 {
   ClearGetFilesHelpers();
 
-  if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
+  if (IsWebkitFileSystemEnabled()) {
     HTMLInputElementBinding::ClearCachedWebkitEntriesValue(this);
     mEntries.Clear();
   }
@@ -3069,7 +3066,7 @@ HTMLInputElement::SetFiles(nsIDOMFileList* aFiles,
   mFilesOrDirectories.Clear();
   ClearGetFilesHelpers();
 
-  if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
+  if (IsWebkitFileSystemEnabled()) {
     HTMLInputElementBinding::ClearCachedWebkitEntriesValue(this);
     mEntries.Clear();
   }
@@ -3092,14 +3089,14 @@ HTMLInputElement::MozSetDndFilesAndDirectories(const nsTArray<OwningFileOrDirect
 {
   SetFilesOrDirectories(aFilesOrDirectories, true);
 
-  if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
+  if (IsWebkitFileSystemEnabled()) {
     UpdateEntries(aFilesOrDirectories);
   }
 
   RefPtr<DispatchChangeEventCallback> dispatchChangeEventCallback =
     new DispatchChangeEventCallback(this);
 
-  if (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+  if (IsWebkitDirPickerEnabled() &&
       HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)) {
     ErrorResult rv;
     GetFilesHelper* helper = GetOrCreateGetFilesHelper(true /* recursionFlag */,
@@ -3179,8 +3176,8 @@ HTMLInputElement::GetFiles()
     return nullptr;
   }
 
-  if (Preferences::GetBool("dom.input.dirpicker", false) && Allowdirs() &&
-      (!Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) ||
+  if (IsDirPickerEnabled() && Allowdirs() &&
+      (!IsWebkitDirPickerEnabled() ||
        !HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
     return nullptr;
   }
@@ -4389,8 +4386,8 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
       do_QueryInterface(aVisitor.mEvent->mOriginalTarget);
     if (target &&
         target->FindFirstNonChromeOnlyAccessContent() == this &&
-        ((Preferences::GetBool("dom.input.dirpicker", false) && Allowdirs()) ||
-         (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+        ((IsDirPickerEnabled() && Allowdirs()) ||
+         (IsWebkitDirPickerEnabled() &&
           HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)))) {
       type = FILE_PICKER_DIRECTORY;
     }
@@ -5794,20 +5791,133 @@ HTMLInputElement::ParseTime(const nsAString& aValue, uint32_t* aResult)
   return true;
 }
 
-static bool
-IsDateTimeEnabled(int32_t aNewType)
+/* static */ bool
+HTMLInputElement::IsDateTimeTypeSupported(uint8_t aDateTimeInputType)
 {
-  return (aNewType == NS_FORM_INPUT_DATE &&
-          (Preferences::GetBool("dom.forms.datetime", false) ||
-           Preferences::GetBool("dom.experimental_forms", false) ||
-           Preferences::GetBool("dom.forms.datepicker", false))) ||
-         (aNewType == NS_FORM_INPUT_TIME &&
-          (Preferences::GetBool("dom.forms.datetime", false) ||
-           Preferences::GetBool("dom.experimental_forms", false))) ||
-         ((aNewType == NS_FORM_INPUT_MONTH ||
-           aNewType == NS_FORM_INPUT_WEEK ||
-           aNewType == NS_FORM_INPUT_DATETIME_LOCAL) &&
-          Preferences::GetBool("dom.forms.datetime", false));
+  return (aDateTimeInputType == NS_FORM_INPUT_DATE &&
+          (IsInputDateTimeEnabled() || IsExperimentalFormsEnabled() ||
+           IsDatePickerEnabled())) ||
+         (aDateTimeInputType == NS_FORM_INPUT_TIME &&
+          (IsInputDateTimeEnabled() || IsExperimentalFormsEnabled())) ||
+         ((aDateTimeInputType == NS_FORM_INPUT_MONTH ||
+           aDateTimeInputType == NS_FORM_INPUT_WEEK ||
+           aDateTimeInputType == NS_FORM_INPUT_DATETIME_LOCAL) &&
+          IsInputDateTimeEnabled());
+}
+
+/* static */ bool
+HTMLInputElement::IsWebkitDirPickerEnabled()
+{
+  static bool sWebkitDirPickerEnabled = false;
+  static bool sWebkitDirPickerPrefCached = false;
+  if (!sWebkitDirPickerPrefCached) {
+    sWebkitDirPickerPrefCached = true;
+    Preferences::AddBoolVarCache(&sWebkitDirPickerEnabled,
+                                 "dom.webkitBlink.dirPicker.enabled",
+                                 false);
+  }
+
+  return sWebkitDirPickerEnabled;
+}
+
+/* static */ bool
+HTMLInputElement::IsWebkitFileSystemEnabled()
+{
+  static bool sWebkitFileSystemEnabled = false;
+  static bool sWebkitFileSystemPrefCached = false;
+  if (!sWebkitFileSystemPrefCached) {
+    sWebkitFileSystemPrefCached = true;
+    Preferences::AddBoolVarCache(&sWebkitFileSystemEnabled,
+                                 "dom.webkitBlink.filesystem.enabled",
+                                 false);
+  }
+
+  return sWebkitFileSystemEnabled;
+}
+
+/* static */ bool
+HTMLInputElement::IsDirPickerEnabled()
+{
+  static bool sDirPickerEnabled = false;
+  static bool sDirPickerPrefCached = false;
+  if (!sDirPickerPrefCached) {
+    sDirPickerPrefCached = true;
+    Preferences::AddBoolVarCache(&sDirPickerEnabled, "dom.input.dirpicker",
+                                 false);
+  }
+
+  return sDirPickerEnabled;
+}
+
+/* static */ bool
+HTMLInputElement::IsDatePickerEnabled()
+{
+  static bool sDatePickerEnabled = false;
+  static bool sDatePickerPrefCached = false;
+  if (!sDatePickerPrefCached) {
+    sDatePickerPrefCached = true;
+    Preferences::AddBoolVarCache(&sDatePickerEnabled, "dom.forms.datepicker",
+                                 false);
+  }
+
+  return sDatePickerEnabled;
+}
+
+/* static */ bool
+HTMLInputElement::IsExperimentalFormsEnabled()
+{
+  static bool sExperimentalFormsEnabled = false;
+  static bool sExperimentalFormsPrefCached = false;
+  if (!sExperimentalFormsPrefCached) {
+    sExperimentalFormsPrefCached = true;
+    Preferences::AddBoolVarCache(&sExperimentalFormsEnabled,
+                                 "dom.experimental_forms",
+                                 false);
+  }
+
+  return sExperimentalFormsEnabled;
+}
+
+/* static */ bool
+HTMLInputElement::IsInputDateTimeEnabled()
+{
+  static bool sDateTimeEnabled = false;
+  static bool sDateTimePrefCached = false;
+  if (!sDateTimePrefCached) {
+    sDateTimePrefCached = true;
+    Preferences::AddBoolVarCache(&sDateTimeEnabled, "dom.forms.datetime",
+                                 false);
+  }
+
+  return sDateTimeEnabled;
+}
+
+/* static */ bool
+HTMLInputElement::IsInputNumberEnabled()
+{
+  static bool sInputNumberEnabled = false;
+  static bool sInputNumberPrefCached = false;
+  if (!sInputNumberPrefCached) {
+    sInputNumberPrefCached = true;
+    Preferences::AddBoolVarCache(&sInputNumberEnabled, "dom.forms.number",
+                                 false);
+  }
+
+  return sInputNumberEnabled;
+}
+
+/* static */ bool
+HTMLInputElement::IsInputColorEnabled()
+{
+  static bool sInputColorEnabled = false;
+  static bool sInputColorPrefCached = false;
+  if (!sInputColorPrefCached) {
+    sInputColorPrefCached = true;
+    Preferences::AddBoolVarCache(&sInputColorEnabled, "dom.forms.color",
+                                 false);
+  }
+
+  return sInputColorEnabled;
 }
 
 bool
@@ -5825,12 +5935,11 @@ HTMLInputElement::ParseAttribute(int32_t aNamespaceID,
       if (success) {
         newType = aResult.GetEnumValue();
         if ((IsExperimentalMobileType(newType) &&
-             !Preferences::GetBool("dom.experimental_forms", false)) ||
-            (newType == NS_FORM_INPUT_NUMBER &&
-             !Preferences::GetBool("dom.forms.number", false)) ||
-            (newType == NS_FORM_INPUT_COLOR &&
-             !Preferences::GetBool("dom.forms.color", false)) ||
-            (IsDateTimeInputType(newType) && !IsDateTimeEnabled(newType))) {
+             !IsExperimentalFormsEnabled()) ||
+            (newType == NS_FORM_INPUT_NUMBER && !IsInputNumberEnabled()) ||
+            (newType == NS_FORM_INPUT_COLOR && !IsInputColorEnabled()) ||
+            (IsDateTimeInputType(newType) &&
+             !IsDateTimeTypeSupported(newType))) {
           newType = kInputDefaultType->value;
           aResult.SetTo(newType, &aValue);
         }
@@ -6321,34 +6430,30 @@ HTMLInputElement::GetSelectionStart(ErrorResult& aRv)
     return Nullable<int32_t>();
   }
 
-  int32_t selStart;
-  nsresult rv = GetSelectionStart(&selStart);
-  if (NS_FAILED(rv)) {
-    aRv.Throw(rv);
+  int32_t selStart = GetSelectionStartIgnoringType(aRv);
+  if (aRv.Failed()) {
+    return Nullable<int32_t>();
   }
 
   return Nullable<int32_t>(selStart);
 }
 
-NS_IMETHODIMP
-HTMLInputElement::GetSelectionStart(int32_t* aSelectionStart)
+int32_t
+HTMLInputElement::GetSelectionStartIgnoringType(ErrorResult& aRv)
 {
-  NS_ENSURE_ARG_POINTER(aSelectionStart);
-
   int32_t selEnd, selStart;
   nsresult rv = GetSelectionRange(&selStart, &selEnd);
 
   if (NS_FAILED(rv)) {
     nsTextEditorState* state = GetEditorState();
     if (state && state->IsSelectionCached()) {
-      *aSelectionStart = state->GetSelectionProperties().GetStart();
-      return NS_OK;
+      return state->GetSelectionProperties().GetStart();
     }
-    return rv;
+    aRv.Throw(rv);
+    return 0;
   }
 
-  *aSelectionStart = selStart;
-  return NS_OK;
+  return selStart;
 }
 
 void
@@ -6389,15 +6494,6 @@ HTMLInputElement::SetSelectionStart(const Nullable<int32_t>& aSelectionStart,
   }
 
   aRv = SetSelectionRange(start, end, direction);
-}
-
-NS_IMETHODIMP
-HTMLInputElement::SetSelectionStart(int32_t aSelectionStart)
-{
-  ErrorResult rv;
-  Nullable<int32_t> selStart(aSelectionStart);
-  SetSelectionStart(selStart, rv);
-  return rv.StealNSResult();
 }
 
 Nullable<int32_t>
@@ -6494,17 +6590,30 @@ HTMLInputElement::GetFiles(nsIDOMFileList** aFileList)
   return NS_OK;
 }
 
-nsresult
+NS_IMETHODIMP
 HTMLInputElement::GetSelectionRange(int32_t* aSelectionStart,
                                     int32_t* aSelectionEnd)
 {
-  nsIFormControlFrame* formControlFrame = GetFormControlFrame(true);
-  nsITextControlFrame* textControlFrame = do_QueryFrame(formControlFrame);
-  if (textControlFrame) {
-    return textControlFrame->GetSelectionRange(aSelectionStart, aSelectionEnd);
+  // Flush frames, because our editor state will want to work with the frame.
+  if (IsInComposedDoc()) {
+    GetComposedDoc()->FlushPendingNotifications(FlushType::Frames);
+  }
+  if (!GetPrimaryFrame()) {
+    // Can we return a selection range anyway here, now that it lives on our
+    // state?  In fact, could we make this behave more like
+    // GetSelectionDirection, in the sense of working even when we have no
+    // frame, by just delegating entirely to mState?  And then, do we really
+    // need the flush?
+    return NS_ERROR_FAILURE;
   }
 
-  return NS_ERROR_FAILURE;
+  nsTextEditorState* state = GetEditorState();
+  if (!state) {
+    // Not a text control.
+    return NS_ERROR_FAILURE;
+  }
+
+  return state->GetSelectionRange(aSelectionStart, aSelectionEnd);
 }
 
 static void
@@ -6529,28 +6638,29 @@ HTMLInputElement::GetSelectionDirection(nsAString& aDirection, ErrorResult& aRv)
     return;
   }
 
-  nsresult rv = NS_ERROR_FAILURE;
   nsIFormControlFrame* formControlFrame = GetFormControlFrame(true);
-  nsITextControlFrame* textControlFrame = do_QueryFrame(formControlFrame);
-  if (textControlFrame) {
-    nsITextControlFrame::SelectionDirection dir;
-    rv = textControlFrame->GetSelectionRange(nullptr, nullptr, &dir);
-    if (NS_SUCCEEDED(rv)) {
-      DirectionToName(dir, aDirection);
-    }
+  nsTextEditorState* state = GetEditorState();
+  if (!state) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return;
   }
 
-  if (NS_FAILED(rv)) {
-    nsTextEditorState* state = GetEditorState();
-    if (state && state->IsSelectionCached()) {
-      DirectionToName(state->GetSelectionProperties().GetDirection(), aDirection);
+  nsresult rv = NS_ERROR_FAILURE;
+  if (formControlFrame) {
+    nsITextControlFrame::SelectionDirection dir;
+    rv = state->GetSelectionDirection(&dir);
+    if (NS_SUCCEEDED(rv)) {
+      DirectionToName(dir, aDirection);
       return;
     }
   }
-
-  if (NS_FAILED(rv)) {
-    aRv.Throw(rv);
+  
+  if (state->IsSelectionCached()) {
+    DirectionToName(state->GetSelectionProperties().GetDirection(), aDirection);
+    return;
   }
+
+  aRv.Throw(rv);
 }
 
 NS_IMETHODIMP

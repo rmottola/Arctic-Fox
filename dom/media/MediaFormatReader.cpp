@@ -79,7 +79,7 @@ public:
 private:
   class AutoDeallocToken;
   using PromisePrivate = Promise::Private;
-  explicit DecoderAllocPolicy(TrackType aTrack);
+  DecoderAllocPolicy();
   ~DecoderAllocPolicy();
   // Called by the destructor of TokenImpl to restore the decoder limit.
   void Dealloc();
@@ -92,8 +92,6 @@ private:
   ReentrantMonitor mMonitor;
   // The number of decoders available for creation.
   int mDecoderLimit;
-  // Track type.
-  const TrackType mTrack;
   // Requests to acquire tokens.
   std::queue<RefPtr<PromisePrivate>> mPromises;
 };
@@ -103,21 +101,20 @@ StaticMutex DecoderAllocPolicy::sMutex;
 class DecoderAllocPolicy::AutoDeallocToken : public Token
 {
 public:
-  explicit AutoDeallocToken(TrackType aTrack) : mTrack(aTrack) { }
+  explicit AutoDeallocToken(DecoderAllocPolicy& aPolicy) : mPolicy(aPolicy) { }
 
 private:
   ~AutoDeallocToken()
   {
-    DecoderAllocPolicy::Instance(mTrack).Dealloc();
+    mPolicy.Dealloc();
   }
 
-  const TrackType mTrack;
+  DecoderAllocPolicy& mPolicy; // reference to a singleton object.
 };
 
-DecoderAllocPolicy::DecoderAllocPolicy(TrackType aTrack)
+DecoderAllocPolicy::DecoderAllocPolicy()
   : mMonitor("DecoderAllocPolicy::mMonitor")
   , mDecoderLimit(MediaPrefs::MediaDecoderLimit())
-  , mTrack(aTrack)
 {
   // Non DocGroup-version AbstractThread::MainThread is fine for
   // ClearOnShutdown().
@@ -140,10 +137,10 @@ DecoderAllocPolicy::Instance(TrackType aTrack)
 {
   StaticMutexAutoLock lock(sMutex);
   if (aTrack == TrackType::kAudioTrack) {
-    static auto sAudioPolicy = new DecoderAllocPolicy(TrackType::kAudioTrack);
+    static auto sAudioPolicy = new DecoderAllocPolicy();
     return *sAudioPolicy;
   } else {
-    static auto sVideoPolicy = new DecoderAllocPolicy(TrackType::kVideoTrack);
+    static auto sVideoPolicy = new DecoderAllocPolicy();
     return *sVideoPolicy;
   }
 }
@@ -180,7 +177,7 @@ DecoderAllocPolicy::ResolvePromise(ReentrantMonitorAutoEnter& aProofOfLock)
     --mDecoderLimit;
     RefPtr<PromisePrivate> p = mPromises.front().forget();
     mPromises.pop();
-    p->Resolve(new AutoDeallocToken(mTrack), __func__);
+    p->Resolve(new AutoDeallocToken(*this), __func__);
   }
 }
 
@@ -197,7 +194,11 @@ class MediaFormatReader::DecoderFactory
   using Token = DecoderAllocPolicy::Token;
 
 public:
-  explicit DecoderFactory(MediaFormatReader* aOwner) : mOwner(aOwner) { }
+  explicit DecoderFactory(MediaFormatReader* aOwner)
+    : mAudio(aOwner->mAudio, TrackInfo::kAudioTrack)
+    , mVideo(aOwner->mVideo, TrackInfo::kVideoTrack)
+    , mOwner(WrapNotNull(aOwner)) { }
+
   void CreateDecoder(TrackType aTrack);
   // Shutdown any decoder pending initialization.
   RefPtr<ShutdownPromise> ShutdownDecoder(TrackType aTrack)
@@ -234,6 +235,13 @@ private:
 
   struct Data
   {
+    Data(DecoderData& aOwnerData, TrackType aTrack)
+      : mOwnerData(aOwnerData)
+      , mTrack(aTrack)
+      , mPolicy(DecoderAllocPolicy::Instance(aTrack)) { }
+    DecoderData& mOwnerData;
+    const TrackType mTrack;
+    DecoderAllocPolicy& mPolicy;
     Stage mStage = Stage::None;
     RefPtr<Token> mToken;
     RefPtr<MediaDataDecoder> mDecoder;
@@ -243,11 +251,12 @@ private:
     RefPtr<ShutdownPromise> mShutdownPromise;
   } mAudio, mVideo;
 
-  void RunStage(TrackType aTrack);
-  MediaResult DoCreateDecoder(TrackType aTrack);
-  void DoInitDecoder(TrackType aTrack);
+  void RunStage(Data& aData);
+  MediaResult DoCreateDecoder(Data& aData);
+  void DoInitDecoder(Data& aData);
 
-  MediaFormatReader* const mOwner; // guaranteed to be valid by the owner.
+  // guaranteed to be valid by the owner.
+  const NotNull<MediaFormatReader*> mOwner;
 };
 
 void
@@ -255,7 +264,7 @@ MediaFormatReader::DecoderFactory::CreateDecoder(TrackType aTrack)
 {
   MOZ_ASSERT(aTrack == TrackInfo::kAudioTrack
              || aTrack == TrackInfo::kVideoTrack);
-  RunStage(aTrack);
+  RunStage(aTrack == TrackInfo::kAudioTrack ? mAudio : mVideo);
 }
 
 class MediaFormatReader::DecoderFactory::Wrapper : public MediaDataDecoder
@@ -306,68 +315,65 @@ private:
 };
 
 void
-MediaFormatReader::DecoderFactory::RunStage(TrackType aTrack)
+MediaFormatReader::DecoderFactory::RunStage(Data& aData)
 {
-  auto& data = aTrack == TrackInfo::kAudioTrack ? mAudio : mVideo;
-
-  switch (data.mStage) {
+  switch (aData.mStage) {
     case Stage::None: {
-      MOZ_ASSERT(!data.mToken);
-      DecoderAllocPolicy::Instance(aTrack).Alloc()->Then(
+      MOZ_ASSERT(!aData.mToken);
+      aData.mPolicy.Alloc()->Then(
         mOwner->OwnerThread(), __func__,
-        [this, &data, aTrack] (Token* aToken) {
-          data.mTokenRequest.Complete();
-          data.mToken = aToken;
-          data.mStage = Stage::CreateDecoder;
-          RunStage(aTrack);
+        [this, &aData] (Token* aToken) {
+          aData.mTokenRequest.Complete();
+          aData.mToken = aToken;
+          aData.mStage = Stage::CreateDecoder;
+          RunStage(aData);
         },
-        [&data] () {
-          data.mTokenRequest.Complete();
-          data.mStage = Stage::None;
-        })->Track(data.mTokenRequest);
-      data.mStage = Stage::WaitForToken;
+        [&aData] () {
+          aData.mTokenRequest.Complete();
+          aData.mStage = Stage::None;
+        })->Track(aData.mTokenRequest);
+      aData.mStage = Stage::WaitForToken;
       break;
     }
 
     case Stage::WaitForToken: {
-      MOZ_ASSERT(!data.mToken);
-      MOZ_ASSERT(data.mTokenRequest.Exists());
+      MOZ_ASSERT(!aData.mToken);
+      MOZ_ASSERT(aData.mTokenRequest.Exists());
       break;
     }
 
     case Stage::CreateDecoder: {
-      MOZ_ASSERT(data.mToken);
-      MOZ_ASSERT(!data.mDecoder);
-      MOZ_ASSERT(!data.mInitRequest.Exists());
+      MOZ_ASSERT(aData.mToken);
+      MOZ_ASSERT(!aData.mDecoder);
+      MOZ_ASSERT(!aData.mInitRequest.Exists());
 
-      MediaResult rv = DoCreateDecoder(aTrack);
+      MediaResult rv = DoCreateDecoder(aData);
       if (NS_FAILED(rv)) {
         NS_WARNING("Error constructing decoders");
-        data.mToken = nullptr;
-        data.mStage = Stage::None;
-        mOwner->NotifyError(aTrack, rv);
+        aData.mToken = nullptr;
+        aData.mStage = Stage::None;
+        mOwner->NotifyError(aData.mTrack, rv);
         return;
       }
 
-      data.mDecoder = new Wrapper(data.mDecoder.forget(), data.mToken.forget());
-      DoInitDecoder(aTrack);
-      data.mStage = Stage::WaitForInit;
+      aData.mDecoder = new Wrapper(aData.mDecoder.forget(), aData.mToken.forget());
+      DoInitDecoder(aData);
+      aData.mStage = Stage::WaitForInit;
       break;
     }
 
     case Stage::WaitForInit: {
-      MOZ_ASSERT(data.mDecoder);
-      MOZ_ASSERT(data.mInitRequest.Exists());
+      MOZ_ASSERT(aData.mDecoder);
+      MOZ_ASSERT(aData.mInitRequest.Exists());
       break;
     }
   }
 }
 
 MediaResult
-MediaFormatReader::DecoderFactory::DoCreateDecoder(TrackType aTrack)
+MediaFormatReader::DecoderFactory::DoCreateDecoder(Data& aData)
 {
-  auto& ownerData = mOwner->GetDecoderData(aTrack);
-  auto& data = aTrack == TrackInfo::kAudioTrack ? mAudio : mVideo;
+  auto& ownerData = aData.mOwnerData;
 
   auto decoderCreatingError = "error creating audio decoder";
   MediaResult result =
@@ -381,9 +387,9 @@ MediaFormatReader::DecoderFactory::DoCreateDecoder(TrackType aTrack)
     }
   }
 
-  switch (aTrack) {
+  switch (aData.mTrack) {
     case TrackInfo::kAudioTrack: {
-      data.mDecoder = mOwner->mPlatform->CreateDecoder({
+      aData.mDecoder = mOwner->mPlatform->CreateDecoder({
         ownerData.mInfo
         ? *ownerData.mInfo->GetAsAudioInfo()
         : *ownerData.mOriginalInfo->GetAsAudioInfo(),
@@ -391,7 +397,7 @@ MediaFormatReader::DecoderFactory::DoCreateDecoder(TrackType aTrack)
         mOwner->mCrashHelper,
         ownerData.mIsBlankDecode,
         &result,
-        aTrack,
+        TrackInfo::kAudioTrack,
         &mOwner->OnTrackWaitingForKeyProducer()
       });
       break;
@@ -400,7 +406,7 @@ MediaFormatReader::DecoderFactory::DoCreateDecoder(TrackType aTrack)
     case TrackType::kVideoTrack: {
       // Decoders use the layers backend to decide if they can use hardware decoding,
       // so specify LAYERS_NONE if we want to forcibly disable it.
-      data.mDecoder = mOwner->mPlatform->CreateDecoder({
+      aData.mDecoder = mOwner->mPlatform->CreateDecoder({
         ownerData.mInfo
         ? *ownerData.mInfo->GetAsVideoInfo()
         : *ownerData.mOriginalInfo->GetAsVideoInfo(),
@@ -410,7 +416,7 @@ MediaFormatReader::DecoderFactory::DoCreateDecoder(TrackType aTrack)
         mOwner->mCrashHelper,
         ownerData.mIsBlankDecode,
         &result,
-        aTrack,
+        TrackType::kVideoTrack,
         &mOwner->OnTrackWaitingForKeyProducer()
       });
       break;
@@ -420,7 +426,7 @@ MediaFormatReader::DecoderFactory::DoCreateDecoder(TrackType aTrack)
       break;
   }
 
-  if (data.mDecoder) {
+  if (aData.mDecoder) {
     return NS_OK;
   }
 
@@ -429,41 +435,40 @@ MediaFormatReader::DecoderFactory::DoCreateDecoder(TrackType aTrack)
 }
 
 void
-MediaFormatReader::DecoderFactory::DoInitDecoder(TrackType aTrack)
+MediaFormatReader::DecoderFactory::DoInitDecoder(Data& aData)
 {
-  auto& ownerData = mOwner->GetDecoderData(aTrack);
-  auto& data = aTrack == TrackInfo::kAudioTrack ? mAudio : mVideo;
+  auto& ownerData = aData.mOwnerData;
 
-  data.mDecoder->Init()
+  aData.mDecoder->Init()
     ->Then(mOwner->OwnerThread(), __func__,
-           [this, &data, &ownerData](TrackType aTrack) {
-             data.mInitRequest.Complete();
-             data.mStage = Stage::None;
+           [this, &aData, &ownerData](TrackType aTrack) {
+             aData.mInitRequest.Complete();
+             aData.mStage = Stage::None;
              MutexAutoLock lock(ownerData.mMutex);
-             ownerData.mDecoder = data.mDecoder.forget();
+             ownerData.mDecoder = aData.mDecoder.forget();
              ownerData.mDescription = ownerData.mDecoder->GetDescriptionName();
              mOwner->SetVideoDecodeThreshold();
              mOwner->ScheduleUpdate(aTrack);
            },
-           [this, &data, &ownerData, aTrack](const MediaResult& aError) {
-             data.mInitRequest.Complete();
+           [this, &aData, &ownerData](const MediaResult& aError) {
+             aData.mInitRequest.Complete();
              MOZ_RELEASE_ASSERT(!ownerData.mDecoder,
                                 "Can't have a decoder already set");
-             data.mStage = Stage::None;
-             data.mShutdownPromise = data.mDecoder->Shutdown();
-             data.mShutdownPromise
+             aData.mStage = Stage::None;
+             aData.mShutdownPromise = aData.mDecoder->Shutdown();
+             aData.mShutdownPromise
                ->Then(
                  mOwner->OwnerThread(), __func__,
-                 [this, &data, aTrack, aError]() {
-                   data.mShutdownRequest.Complete();
-                   data.mShutdownPromise = nullptr;
-                   data.mDecoder = nullptr;
-                   mOwner->NotifyError(aTrack, aError);
+                 [this, &aData, aError]() {
+                   aData.mShutdownRequest.Complete();
+                   aData.mShutdownPromise = nullptr;
+                   aData.mDecoder = nullptr;
+                   mOwner->NotifyError(aData.mTrack, aError);
                  },
                  []() { MOZ_RELEASE_ASSERT(false, "Can't ever get here"); })
-               ->Track(data.mShutdownRequest);
+               ->Track(aData.mShutdownRequest);
            })
-    ->Track(data.mInitRequest);
+    ->Track(aData.mInitRequest);
 }
 
 // DemuxerProxy ensures that the original main demuxer is only ever accessed

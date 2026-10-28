@@ -5058,9 +5058,9 @@ class MOZ_RAII JSAutoByteString
     }
 
     /* Take ownership of the given byte array. */
-    void initBytes(char* bytes) {
+    void initBytes(JS::UniqueChars&& bytes) {
         MOZ_ASSERT(!mBytes);
-        mBytes = bytes;
+        mBytes = bytes.release();
     }
 
     char* encodeLatin1(JSContext* cx, JSString* str) {
@@ -5601,7 +5601,7 @@ class JSErrorReport : public JSErrorBase
     // One of the JSExnType constants.
     int16_t exnType;
 
-    // See the comment in ReadOnlyCompileOptions.
+    // See the comment in TransitiveCompileOptions.
     bool isMuted : 1;
 
   private:
@@ -6305,7 +6305,6 @@ SetBuildIdOp(JSContext* cx, BuildIdOp buildIdOp);
 
 struct WasmModule : js::AtomicRefCounted<WasmModule>
 {
-    MOZ_DECLARE_REFCOUNTED_TYPENAME(WasmModule)
     virtual ~WasmModule() {}
 
     virtual void serializedSize(size_t* maybeBytecodeSize, size_t* maybeCompiledSize) const = 0;

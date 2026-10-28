@@ -18,6 +18,7 @@
 #include "jit/IonBuilder.h"
 #include "threading/CpuCount.h"
 #include "vm/Debugger.h"
+#include "vm/ErrorReporting.h"
 #include "vm/SharedImmutableStringsCache.h"
 #include "vm/Time.h"
 #include "vm/TraceLogging.h"
@@ -376,7 +377,6 @@ ScriptParseTask::parse(JSContext* cx)
     SourceBufferHolder srcBuf(chars, length, SourceBufferHolder::NoOwnership);
     script = frontend::CompileGlobalScript(cx, alloc, ScopeKind::Global,
                                            options, srcBuf,
-                                           /* extraSct = */ nullptr,
                                            /* sourceObjectOut = */ &sourceObject);
 }
 
@@ -1631,9 +1631,9 @@ js::PauseCurrentHelperThread()
 }
 
 bool
-JSContext::addPendingCompileError(frontend::CompileError** error)
+JSContext::addPendingCompileError(js::CompileError** error)
 {
-    auto errorPtr = make_unique<frontend::CompileError>();
+    auto errorPtr = make_unique<js::CompileError>();
     if (!errorPtr)
         return false;
     if (!helperThread()->parseTask()->errors.append(errorPtr.get())) {
@@ -1660,7 +1660,7 @@ JSContext::addPendingOutOfMemory()
 }
 
 void
-HelperThread::handleParseWorkload(AutoLockHelperThreadState& locked, uintptr_t stackLimit)
+HelperThread::handleParseWorkload(AutoLockHelperThreadState& locked)
 {
     MOZ_ASSERT(HelperThreadState().canStartParseTask(locked));
     MOZ_ASSERT(idle());
@@ -1902,14 +1902,7 @@ HelperThread::threadLoop()
             oomUnsafe.crash("HelperThread cx.init()");
     }
     cx.setHelperThread(this);
-
-    // Compute the thread's stack limit, for over-recursed checks.
-    uintptr_t stackLimit = GetNativeStackBase();
-#if JS_STACK_GROWTH_DIRECTION > 0
-    stackLimit += HELPER_STACK_QUOTA;
-#else
-    stackLimit -= HELPER_STACK_QUOTA;
-#endif
+    JS_SetNativeStackQuota(&cx, HELPER_STACK_QUOTA);
 
     while (true) {
         MOZ_ASSERT(idle());
@@ -1945,7 +1938,7 @@ HelperThread::threadLoop()
             handlePromiseTaskWorkload(lock);
         } else if (HelperThreadState().canStartParseTask(lock)) {
             js::oom::SetThreadType(js::oom::THREAD_TYPE_PARSE);
-            handleParseWorkload(lock, stackLimit);
+            handleParseWorkload(lock);
         } else if (HelperThreadState().canStartCompressionTask(lock)) {
             js::oom::SetThreadType(js::oom::THREAD_TYPE_COMPRESS);
             handleCompressionWorkload(lock);

@@ -970,11 +970,34 @@ bool PDBSourceLineWriter::GetSymbolFunctionName(IDiaSymbol *function,
                                    UNDNAME_NO_ECSU;
 
   // Use get_undecoratedNameEx to get readable C++ names with arguments.
-  if (function->get_undecoratedNameEx(undecorate_options, name) != S_OK) {
+  // However, on some rust symbols it can crash with a divide-by-zero,
+  // so catch that.
+  HRESULT res;
+  __try {
+    res = function->get_undecoratedNameEx(undecorate_options, name);
+  }
+  __except (GetExceptionCode() == EXCEPTION_INT_DIVIDE_BY_ZERO ?
+            EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+  {
+    fprintf(stderr, "div-by-zero error in get_undecoratedNameEx\n");
+    // Fall through to using get_name
+    res = E_FAIL;
+  }
+  if (res != S_OK) {
     if (function->get_name(name) != S_OK) {
       fprintf(stderr, "failed to get function name\n");
       return false;
     }
+
+    // It's possible for get_name to return an empty string, so
+    // special-case that.
+    if (wcscmp(*name, L"") == 0) {
+      SysFreeString(*name);
+      // dwarf_cu_to_module.cc uses "<name omitted>", so match that.
+      *name = SysAllocString(L"<name omitted>");
+      return true;
+    }
+
     // If a name comes from get_name because no undecorated form existed,
     // it's already formatted properly to be used as output.  Don't do any
     // additional processing.

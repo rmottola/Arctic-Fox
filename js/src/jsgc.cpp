@@ -278,8 +278,10 @@ static_assert(JS_ARRAY_LENGTH(slotsToThingKind) == SLOTS_TO_THING_KIND_LIMIT,
                   #sizedType " is smaller than SortedArenaList::MinThingSize!"); \
     static_assert(sizeof(sizedType) >= sizeof(FreeSpan), \
                   #sizedType " is smaller than FreeSpan"); \
-    static_assert(sizeof(sizedType) % CellSize == 0, \
-                  "Size of " #sizedType " is not a multiple of CellSize");
+    static_assert(sizeof(sizedType) % CellAlignBytes == 0, \
+                  "Size of " #sizedType " is not a multiple of CellAlignBytes"); \
+    static_assert(sizeof(sizedType) >= MinCellSize, \
+                  "Size of " #sizedType " is smaller than the minimum size");
 FOR_EACH_ALLOCKIND(CHECK_THING_SIZE);
 #undef CHECK_THING_SIZE
 
@@ -427,7 +429,8 @@ inline size_t
 Arena::finalize(FreeOp* fop, AllocKind thingKind, size_t thingSize)
 {
     /* Enforce requirements on size of T. */
-    MOZ_ASSERT(thingSize % CellSize == 0);
+    MOZ_ASSERT(thingSize % CellAlignBytes == 0);
+    MOZ_ASSERT(thingSize >= MinCellSize);
     MOZ_ASSERT(thingSize <= 255);
 
     MOZ_ASSERT(allocated());
@@ -2119,6 +2122,8 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
         c->objectGroups.sweep(fop);
         c->sweepRegExps();
         c->sweepSavedStacks();
+        c->sweepTemplateLiteralMap();
+        c->sweepVarNames();
         c->sweepGlobalObject(fop);
         c->sweepSelfHostingScriptSource();
         c->sweepDebugEnvironments();
@@ -2476,7 +2481,6 @@ GCRuntime::updateZonePointersToRelocatedCells(Zone* zone, AutoLockForExclusiveAc
 
         WeakMapBase::traceZone(zone, &trc);
         for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
-            c->trace(&trc);
             if (c->watchpointMap)
                 c->watchpointMap->trace(&trc);
         }
@@ -4951,6 +4955,7 @@ SweepMiscTask::run()
 {
     for (GCCompartmentGroupIter c(runtime()); !c.done(); c.next()) {
         c->sweepSavedStacks();
+        c->sweepTemplateLiteralMap();
         c->sweepSelfHostingScriptSource();
         c->sweepNativeIterators();
     }

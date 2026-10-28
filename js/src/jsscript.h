@@ -485,9 +485,7 @@ class ScriptSource
     MOZ_MUST_USE bool initFromOptions(JSContext* cx,
                                       const ReadOnlyCompileOptions& options,
                                       const mozilla::Maybe<uint32_t>& parameterListEnd = mozilla::Nothing());
-    MOZ_MUST_USE bool setSourceCopy(JSContext* cx,
-                                    JS::SourceBufferHolder& srcBuf,
-                                    SourceCompressionTask* tok);
+    MOZ_MUST_USE bool setSourceCopy(JSContext* cx, JS::SourceBufferHolder& srcBuf);
     void setSourceRetrievable() { sourceRetrievable_ = true; }
     bool sourceRetrievable() const { return sourceRetrievable_; }
     bool hasSourceData() const { return !data.is<Missing>(); }
@@ -899,25 +897,42 @@ class JSScript : public js::gc::TenuredCell
 
     uint32_t        bodyScopeIndex_; /* index into the scopes array of the body scope */
 
-    // Range of characters in scriptSource which contains this script's source.
-    // each field points the following location.
+    // Range of characters in scriptSource which contains this script's
+    // source, that is, the range used by the Parser to produce this script.
+    //
+    // Most scripted functions have sourceStart_ == toStringStart_ and
+    // sourceEnd_ == toStringEnd_. However, for functions with extra
+    // qualifiers (e.g. generators, async) and for class constructors (which
+    // need to return the entire class source), their values differ.
+    //
+    // Each field points the following locations.
     //
     //   function * f(a, b) { return a + b; }
     //   ^          ^                        ^
     //   |          |                        |
     //   |          sourceStart_             sourceEnd_
-    //   |
-    //   preludeStart_
+    //   |                                   |
+    //   toStringStart_                      toStringEnd_
     //
+    // And, in the case of class constructors, an additional toStringEnd
+    // offset is used.
+    //
+    //   class C { constructor() { this.field = 42; } }
+    //   ^         ^                                 ^ ^
+    //   |         |                                 | `---------`
+    //   |         sourceStart_                      sourceEnd_  |
+    //   |                                                       |
+    //   toStringStart_                                          toStringEnd_
     uint32_t        sourceStart_;
     uint32_t        sourceEnd_;
-    uint32_t        preludeStart_;
+    uint32_t        toStringStart_;
+    uint32_t        toStringEnd_;
 
 #ifdef MOZ_VTUNE
     // Unique Method ID passed to the VTune profiler, or 0 if unset.
     // Allows attribution of different jitcode to the same source script.
     uint32_t        vtuneMethodId_;
-    // Extra padding to maintain JSScript as a multiple of gc::CellSize.
+    // Extra padding to maintain JSScript as a multiple of gc::CellAlignBytes.
     uint32_t        __vtune_unused_padding_;
 #endif
 
@@ -1081,7 +1096,7 @@ class JSScript : public js::gc::TenuredCell
     // instead of private to suppress -Wunused-private-field compiler warnings.
   protected:
 #if JS_BITS_PER_WORD == 32
-    uint32_t padding;
+    // Currently no padding is needed.
 #endif
 
     //
@@ -1091,8 +1106,9 @@ class JSScript : public js::gc::TenuredCell
   public:
     static JSScript* Create(JSContext* cx,
                             const JS::ReadOnlyCompileOptions& options,
-                            js::HandleObject sourceObject, uint32_t sourceStart,
-                            uint32_t sourceEnd, uint32_t preludeStart);
+                            js::HandleObject sourceObject,
+                            uint32_t sourceStart, uint32_t sourceEnd,
+                            uint32_t toStringStart, uint32_t toStringEnd);
 
     void initCompartment(JSContext* cx);
 
@@ -1243,8 +1259,12 @@ class JSScript : public js::gc::TenuredCell
         return sourceEnd_;
     }
 
-    size_t preludeStart() const {
-        return preludeStart_;
+    uint32_t toStringStart() const {
+        return toStringStart_;
+    }
+
+    uint32_t toStringEnd() const {
+        return toStringEnd_;
     }
 
     bool noScriptRval() const {
@@ -1580,7 +1600,7 @@ class JSScript : public js::gc::TenuredCell
     bool mayReadFrameArgsDirectly();
 
     static JSFlatString* sourceData(JSContext* cx, JS::HandleScript script);
-    static JSFlatString* sourceDataWithPrelude(JSContext* cx, JS::HandleScript script);
+    static JSFlatString* sourceDataForToString(JSContext* cx, JS::HandleScript script);
 
     static bool loadSource(JSContext* cx, js::ScriptSource* ss, bool* worked);
 
@@ -1591,6 +1611,9 @@ class JSScript : public js::gc::TenuredCell
     js::ScriptSourceObject& scriptSourceUnwrap() const;
     js::ScriptSource* scriptSource() const;
     js::ScriptSource* maybeForwardedScriptSource() const;
+
+    void setDefaultClassConstructorSpan(JSObject* sourceObject, uint32_t start, uint32_t end);
+
     bool mutedErrors() const { return scriptSource()->mutedErrors(); }
     const char* filename() const { return scriptSource()->filename(); }
     const char* maybeForwardedFilename() const { return maybeForwardedScriptSource()->filename(); }
@@ -1976,8 +1999,8 @@ class JSScript : public js::gc::TenuredCell
 };
 
 /* If this fails, add/remove padding within JSScript. */
-static_assert(sizeof(JSScript) % js::gc::CellSize == 0,
-              "Size of JSScript must be an integral multiple of js::gc::CellSize");
+static_assert(sizeof(JSScript) % js::gc::CellAlignBytes == 0,
+              "Size of JSScript must be an integral multiple of js::gc::CellAlignBytes");
 
 namespace js {
 
@@ -2009,7 +2032,7 @@ class LazyScript : public gc::TenuredCell
     // instead of private to suppress -Wunused-private-field compiler warnings.
   protected:
 #if JS_BITS_PER_WORD == 32
-    // Currently no padding is needed.
+    uint32_t padding;
 #endif
 
   private:
@@ -2057,14 +2080,15 @@ class LazyScript : public gc::TenuredCell
     // See the comment in JSScript for the details
     uint32_t begin_;
     uint32_t end_;
-    uint32_t preludeStart_;
+    uint32_t toStringStart_;
+    uint32_t toStringEnd_;
     // Line and column of |begin_| position, that is the position where we
     // start parsing.
     uint32_t lineno_;
     uint32_t column_;
 
     LazyScript(JSFunction* fun, void* table, uint64_t packedFields,
-               uint32_t begin, uint32_t end, uint32_t preludeStart,
+               uint32_t begin, uint32_t end, uint32_t toStringStart,
                uint32_t lineno, uint32_t column);
 
     // Create a LazyScript without initializing the closedOverBindings and the
@@ -2072,7 +2096,7 @@ class LazyScript : public gc::TenuredCell
     // with valid atoms and functions.
     static LazyScript* CreateRaw(JSContext* cx, HandleFunction fun,
                                  uint64_t packedData, uint32_t begin, uint32_t end,
-                                 uint32_t preludeStart, uint32_t lineno, uint32_t column);
+                                 uint32_t toStringStart, uint32_t lineno, uint32_t column);
 
   public:
     static const uint32_t NumClosedOverBindingsLimit = 1 << NumClosedOverBindingsBits;
@@ -2084,7 +2108,7 @@ class LazyScript : public gc::TenuredCell
                               const frontend::AtomVector& closedOverBindings,
                               Handle<GCVector<JSFunction*, 8>> innerFunctions,
                               JSVersion version, uint32_t begin, uint32_t end,
-                              uint32_t preludeStart, uint32_t lineno, uint32_t column);
+                              uint32_t toStringStart, uint32_t lineno, uint32_t column);
 
     // Create a LazyScript and initialize the closedOverBindings and the
     // innerFunctions with dummy values to be replaced in a later initialization
@@ -2099,7 +2123,7 @@ class LazyScript : public gc::TenuredCell
                               HandleScript script, HandleScope enclosingScope,
                               HandleScriptSource sourceObject,
                               uint64_t packedData, uint32_t begin, uint32_t end,
-                              uint32_t preludeStart, uint32_t lineno, uint32_t column);
+                              uint32_t toStringStart, uint32_t lineno, uint32_t column);
 
     void initRuntimeFields(uint64_t packedFields);
 
@@ -2280,14 +2304,23 @@ class LazyScript : public gc::TenuredCell
     uint32_t end() const {
         return end_;
     }
-    uint32_t preludeStart() const {
-        return preludeStart_;
+    uint32_t toStringStart() const {
+        return toStringStart_;
+    }
+    uint32_t toStringEnd() const {
+        return toStringEnd_;
     }
     uint32_t lineno() const {
         return lineno_;
     }
     uint32_t column() const {
         return column_;
+    }
+
+    void setToStringEnd(uint32_t toStringEnd) {
+        MOZ_ASSERT(toStringStart_ <= toStringEnd);
+        MOZ_ASSERT(toStringEnd_ >= end_);
+        toStringEnd_ = toStringEnd;
     }
 
     bool hasUncompiledEnclosingScript() const;
@@ -2309,8 +2342,8 @@ class LazyScript : public gc::TenuredCell
 };
 
 /* If this fails, add/remove padding within LazyScript. */
-static_assert(sizeof(LazyScript) % js::gc::CellSize == 0,
-              "Size of LazyScript must be an integral multiple of js::gc::CellSize");
+static_assert(sizeof(LazyScript) % js::gc::CellAlignBytes == 0,
+              "Size of LazyScript must be an integral multiple of js::gc::CellAlignBytes");
 
 struct ScriptAndCounts
 {

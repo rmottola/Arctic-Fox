@@ -14,6 +14,7 @@ DIRS += [
 if 'a' in CONFIG['GRE_MILESTONE']:
     DIRS += [
         'flyweb',
+        'formautofill',
     ]
 
 # Nightly-only system add-ons

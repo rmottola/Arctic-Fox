@@ -28,6 +28,7 @@
 #include "jstypes.h"
 #include "jsutil.h"
 
+#include "ds/Nestable.h"
 #include "frontend/Parser.h"
 #include "frontend/TokenStream.h"
 #include "vm/Debugger.h"
@@ -368,7 +369,8 @@ class BytecodeEmitter::EmitterScope : public Nestable<BytecodeEmitter::EmitterSc
         if (bi.nextFrameSlot() >= LOCALNO_LIMIT ||
             bi.nextEnvironmentSlot() >= ENVCOORD_SLOT_LIMIT)
         {
-            return bce->reportError(nullptr, JSMSG_TOO_MANY_LOCALS);
+            bce->reportError(nullptr, JSMSG_TOO_MANY_LOCALS);
+            return false;
         }
         return true;
     }
@@ -379,8 +381,12 @@ class BytecodeEmitter::EmitterScope : public Nestable<BytecodeEmitter::EmitterSc
             hops = emitterScope->environmentChainLength_;
         else
             hops = bce->sc->compilationEnclosingScope()->environmentChainLength();
-        if (hops >= ENVCOORD_HOPS_LIMIT - 1)
-            return bce->reportError(nullptr, JSMSG_TOO_DEEP, js_function_str);
+
+        if (hops >= ENVCOORD_HOPS_LIMIT - 1) {
+            bce->reportError(nullptr, JSMSG_TOO_DEEP, js_function_str);
+            return false;
+        }
+
         environmentChainLength_ = mozilla::AssertedCast<uint8_t>(hops + 1);
         return true;
     }
@@ -2121,7 +2127,7 @@ class ForOfLoopControl : public LoopControl
 };
 
 BytecodeEmitter::BytecodeEmitter(BytecodeEmitter* parent,
-                                 Parser<FullParseHandler>* parser, SharedContext* sc,
+                                 Parser<FullParseHandler, char16_t>* parser, SharedContext* sc,
                                  HandleScript script, Handle<LazyScript*> lazyScript,
                                  uint32_t lineNum, EmitterMode emitterMode)
   : sc(sc),
@@ -2161,7 +2167,7 @@ BytecodeEmitter::BytecodeEmitter(BytecodeEmitter* parent,
 }
 
 BytecodeEmitter::BytecodeEmitter(BytecodeEmitter* parent,
-                                 Parser<FullParseHandler>* parser, SharedContext* sc,
+                                 Parser<FullParseHandler, char16_t>* parser, SharedContext* sc,
                                  HandleScript script, Handle<LazyScript*> lazyScript,
                                  TokenPos bodyPosition, EmitterMode emitterMode)
     : BytecodeEmitter(parent, parser, sc, script, lazyScript,
@@ -2511,8 +2517,11 @@ BytecodeEmitter::updateLineNumberNotes(uint32_t offset)
 {
     TokenStream* ts = &parser->tokenStream;
     bool onThisLine;
-    if (!ts->srcCoords.isOnThisLine(offset, currentLine(), &onThisLine))
-        return ts->reportError(JSMSG_OUT_OF_MEMORY);
+    if (!ts->srcCoords.isOnThisLine(offset, currentLine(), &onThisLine)) {
+        ts->reportError(JSMSG_OUT_OF_MEMORY);
+        return false;
+    }
+
     if (!onThisLine) {
         unsigned line = ts->srcCoords.lineNum(offset);
         unsigned delta = line - currentLine();
@@ -3573,7 +3582,7 @@ BytecodeEmitter::tokenStream()
     return parser->tokenStream;
 }
 
-bool
+void
 BytecodeEmitter::reportError(ParseNode* pn, unsigned errorNumber, ...)
 {
     TokenPos pos = pn ? pn->pn_pos : tokenStream().currentToken().pos;
@@ -3581,16 +3590,12 @@ BytecodeEmitter::reportError(ParseNode* pn, unsigned errorNumber, ...)
     va_list args;
     va_start(args, errorNumber);
 
+    TokenStream& ts = tokenStream();
     ErrorMetadata metadata;
-    bool result = tokenStream().computeErrorMetadata(&metadata, pos.begin);
-    if (result) {
-        result =
-            tokenStream().reportCompileErrorNumberVA(Move(metadata), nullptr, JSREPORT_ERROR,
-                                                     errorNumber, args);
-    }
+    if (ts.computeErrorMetadata(&metadata, pos.begin))
+        ReportCompileError(cx, Move(metadata), nullptr, JSREPORT_ERROR, errorNumber, args);
 
     va_end(args);
-    return result;
 }
 
 bool
@@ -7925,7 +7930,8 @@ BytecodeEmitter::emitFunction(ParseNode* pn, bool needsProto)
             Rooted<JSObject*> sourceObject(cx, script->sourceObject());
             Rooted<JSScript*> script(cx, JSScript::Create(cx, options, sourceObject,
                                                           funbox->bufStart, funbox->bufEnd,
-                                                          funbox->preludeStart));
+                                                          funbox->toStringStart,
+                                                          funbox->toStringEnd));
             if (!script)
                 return false;
 
@@ -10455,6 +10461,13 @@ BytecodeEmitter::emitClass(ParseNode* pn)
                 return false;
         }
     } else {
+        // In the case of default class constructors, emit the start and end
+        // offsets in the source buffer as source notes so that when we
+        // actually make the constructor during execution, we can give it the
+        // correct toString output.
+        if (!newSrcNote3(SRC_CLASS_SPAN, ptrdiff_t(pn->pn_pos.begin), ptrdiff_t(pn->pn_pos.end)))
+            return false;
+
         JSAtom *name = names ? names->innerBinding()->pn_atom : cx->names().empty;
         if (heritageExpression) {
             if (!emitAtomOp(name, JSOP_DERIVEDCONSTRUCTOR))

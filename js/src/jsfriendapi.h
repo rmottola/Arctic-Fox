@@ -267,8 +267,9 @@ DumpBacktrace(JSContext* cx);
 namespace JS {
 
 /** Exposed for DumpJSStack */
-extern JS_FRIEND_API(char*)
-FormatStackDump(JSContext* cx, char* buf, bool showArgs, bool showLocals, bool showThisProps);
+extern JS_FRIEND_API(JS::UniqueChars)
+FormatStackDump(JSContext* cx, JS::UniqueChars&& buf, bool showArgs, bool showLocals,
+                bool showThisProps);
 
 /**
  * Set all of the uninitialized lexicals on an object to undefined. Return
@@ -1164,9 +1165,9 @@ extern JS_FRIEND_API(unsigned)
 GetEnterCompartmentDepth(JSContext* cx);
 #endif
 
-using RegExpGuard = JS::Rooted<RegExpShared*>;
 extern JS_FRIEND_API(bool)
-RegExpToSharedNonInline(JSContext* cx, JS::HandleObject regexp, RegExpGuard* shared);
+RegExpToSharedNonInline(JSContext* cx, JS::HandleObject regexp,
+                        JS::MutableHandle<RegExpShared*> shared);
 
 /* Implemented in CrossCompartmentWrapper.cpp. */
 typedef enum NukeReferencesToWindow {

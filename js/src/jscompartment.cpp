@@ -9,6 +9,8 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/MemoryReporting.h"
 
+#include <stddef.h>
+
 #include "jscntxt.h"
 #include "jsfriendapi.h"
 #include "jsgc.h"
@@ -117,8 +119,15 @@ JSCompartment::~JSCompartment()
     js_delete(debugEnvs);
     js_delete(objectMetadataTable);
     js_delete(lazyArrayBuffers);
-    js_delete(nonSyntacticLexicalEnvironments_),
+    js_delete(nonSyntacticLexicalEnvironments_);
     js_free(enumerators);
+
+#ifdef DEBUG
+    // Avoid assertion destroying the unboxed layouts list if the embedding
+    // leaked GC things.
+    if (!rt->gc.shutdownCollectedEverything())
+        unboxedLayouts.clear();
+#endif
 
     runtime_->numCompartments--;
 }
@@ -558,10 +567,13 @@ JSCompartment::getOrCreateNonSyntacticLexicalEnvironment(JSContext* cx, HandleOb
             return nullptr;
     }
 
-    // The key is the unwrapped dynamic scope, as we may be creating different
-    // WithEnvironmentObject wrappers each time.
-    MOZ_ASSERT(!enclosing->as<WithEnvironmentObject>().isSyntactic());
-    RootedObject key(cx, &enclosing->as<WithEnvironmentObject>().object());
+    // If a wrapped WithEnvironmentObject was passed in, unwrap it, as we may
+    // be creating different WithEnvironmentObject wrappers each time.
+    RootedObject key(cx, enclosing);
+    if (enclosing->is<WithEnvironmentObject>()) {
+        MOZ_ASSERT(!enclosing->as<WithEnvironmentObject>().isSyntactic());
+        key = &enclosing->as<WithEnvironmentObject>().object();
+    }
     RootedObject lexicalEnv(cx, nonSyntacticLexicalEnvironments_->lookup(key));
 
     if (!lexicalEnv) {
@@ -580,9 +592,13 @@ JSCompartment::getNonSyntacticLexicalEnvironment(JSObject* enclosing) const
 {
     if (!nonSyntacticLexicalEnvironments_)
         return nullptr;
-    if (!enclosing->is<WithEnvironmentObject>())
-        return nullptr;
-    JSObject* key = &enclosing->as<WithEnvironmentObject>().object();
+    // If a wrapped WithEnvironmentObject was passed in, unwrap it as in
+    // getOrCreateNonSyntacticLexicalEnvironment.
+    JSObject* key = enclosing;
+    if (enclosing->is<WithEnvironmentObject>()) {
+        MOZ_ASSERT(!enclosing->as<WithEnvironmentObject>().isSyntactic());
+        key = &enclosing->as<WithEnvironmentObject>().object();
+    }
     JSObject* lexicalEnv = nonSyntacticLexicalEnvironments_->lookup(key);
     if (!lexicalEnv)
         return nullptr;
@@ -642,11 +658,6 @@ JSCompartment::getTemplateLiteralObject(JSContext* cx, HandleObject rawStrings,
         // registry.
         MOZ_ASSERT(!templateObj->nonProxyIsExtensible());
     } else {
-        // Add the template object to the registry before freezing to avoid
-        // needing to call relookupOrAdd.
-        if (!templateLiteralMap_.add(p, rawStrings, templateObj))
-            return false;
-
         MOZ_ASSERT(templateObj->nonProxyIsExtensible());
         RootedValue rawValue(cx, ObjectValue(*rawStrings));
         if (!DefineProperty(cx, templateObj, cx->names().raw, rawValue, nullptr, nullptr, 0))
@@ -654,6 +665,9 @@ JSCompartment::getTemplateLiteralObject(JSContext* cx, HandleObject rawStrings,
         if (!FreezeObject(cx, rawStrings))
             return false;
         if (!FreezeObject(cx, templateObj))
+            return false;
+
+        if (!templateLiteralMap_.relookupOrAdd(p, rawStrings, templateObj))
             return false;
     }
 
@@ -701,8 +715,12 @@ JSCompartment::traceIncomingCrossCompartmentEdgesForZoneGC(JSTracer* trc)
 }
 
 void
-JSCompartment::trace(JSTracer* trc)
+JSCompartment::traceGlobal(JSTracer* trc)
 {
+    // Trace things reachable from the compartment's global. Note that these
+    // edges must be swept too in case the compartment is live but the global is
+    // not.
+
     savedStacks_.trace(trc);
 
     // The template registry strongly holds everything in it by design and
@@ -820,6 +838,12 @@ void
 JSCompartment::sweepSavedStacks()
 {
     savedStacks_.sweep();
+}
+
+void
+JSCompartment::sweepTemplateLiteralMap()
+{
+    templateLiteralMap_.sweep();
 }
 
 void
@@ -1032,6 +1056,7 @@ JSCompartment::purge()
     dtoaCache.purge();
     newProxyCache.purge();
     lastCachedNativeIterator = nullptr;
+    objectGroups.purge();
 }
 
 void
@@ -1360,7 +1385,7 @@ JSCompartment::reportTelemetry()
              : JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT;
 
     // Call back into Firefox's Telemetry reporter.
-    for (size_t i = 0; i < DeprecatedLanguageExtensionCount; i++) {
+    for (size_t i = 0; i < size_t(DeprecatedLanguageExtension::Count); i++) {
         if (sawDeprecatedLanguageExtension[i])
             runtime_->addTelemetry(id, i);
     }
@@ -1375,7 +1400,7 @@ JSCompartment::addTelemetry(const char* filename, DeprecatedLanguageExtension e)
     if (!creationOptions_.addonIdOrNull() && (!filename || strncmp(filename, "http", 4) != 0))
         return;
 
-    sawDeprecatedLanguageExtension[e] = true;
+    sawDeprecatedLanguageExtension[size_t(e)] = true;
 }
 
 HashNumber
@@ -1435,4 +1460,3 @@ AutoSetNewObjectMetadata::~AutoSetNewObjectMetadata()
         cx_->compartment()->objectMetadataState = prevState_;
     }
 }
-

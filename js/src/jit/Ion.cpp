@@ -68,7 +68,7 @@ using namespace js;
 using namespace js::jit;
 
 // Assert that JitCode is gc::Cell aligned.
-JS_STATIC_ASSERT(sizeof(JitCode) % gc::CellSize == 0);
+JS_STATIC_ASSERT(sizeof(JitCode) % gc::CellAlignBytes == 0);
 
 static MOZ_THREAD_LOCAL(JitContext*) TlsJitContext;
 
@@ -3307,12 +3307,11 @@ jit::Invalidate(JSContext* cx, JSScript* script, bool resetUses, bool cancelOffT
             filename = "<unknown>";
 
         // Construct the descriptive string.
-        char* buf = JS_smprintf("Invalidate %s:%" PRIuSIZE, filename, script->lineno());
+        UniqueChars buf = JS_smprintf("Invalidate %s:%" PRIuSIZE, filename, script->lineno());
 
         // Ignore the event on allocation failure.
         if (buf) {
-            cx->runtime()->geckoProfiler().markEvent(buf);
-            JS_smprintf_free(buf);
+            cx->runtime()->geckoProfiler().markEvent(buf.get());
         }
     }
 

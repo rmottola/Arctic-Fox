@@ -42,19 +42,22 @@ const uint32_t kRotateFilesNumber = 4;
 
 namespace mozilla {
 
-namespace detail {
-
-void log_print(const PRLogModuleInfo* aModule,
-               LogLevel aLevel,
-               const char* aFmt, ...)
+LazyLogModule::operator LogModule*()
 {
-  va_list ap;
-  va_start(ap, aFmt);
-  char* buff = mozilla::Vsmprintf(aFmt, ap);
-  PR_LogPrint("%s", buff);
-  mozilla::SmprintfFree(buff);
-  va_end(ap);
+  // NB: The use of an atomic makes the reading and assignment of mLog
+  //     thread-safe. There is a small chance that mLog will be set more
+  //     than once, but that's okay as it will be set to the same LogModule
+  //     instance each time. Also note LogModule::Get is thread-safe.
+  LogModule* tmp = mLog;
+  if (MOZ_UNLIKELY(!tmp)) {
+    tmp = LogModule::Get(mLogName);
+    mLog = tmp;
+  }
+
+  return tmp;
 }
+
+namespace detail {
 
 void log_print(const LogModule* aModule,
                LogLevel aLevel,
@@ -363,6 +366,7 @@ public:
     char buff[kBuffSize];
 
     char* buffToWrite = buff;
+    SmprintfPointer allocatedBuff;
 
     va_list argsCopy;
     va_copy(argsCopy, aArgs);
@@ -379,7 +383,8 @@ public:
       charsWritten = strlen(buff);
     } else if (static_cast<size_t>(charsWritten) >= kBuffSize - 1) {
       // We may have maxed out, allocate a buffer instead.
-      buffToWrite = mozilla::Vsmprintf(aFmt, aArgs);
+      allocatedBuff = mozilla::Vsmprintf(aFmt, aArgs);
+      buffToWrite = allocatedBuff.get();
       charsWritten = strlen(buffToWrite);
     }
 
@@ -437,10 +442,6 @@ public:
 
     if (mIsSync) {
       fflush(out);
-    }
-
-    if (buffToWrite != buff) {
-      mozilla::SmprintfFree(buffToWrite);
     }
 
     if (mRotate > 0 && outFile) {

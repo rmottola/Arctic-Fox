@@ -49,6 +49,7 @@
 #include "jit/Ion.h"
 #include "jit/PcScriptCache.h"
 #include "js/CharacterEncoding.h"
+#include "vm/ErrorReporting.h"
 #include "vm/HelperThreads.h"
 #include "vm/Shape.h"
 #include "wasm/WasmSignalHandlers.h"
@@ -538,14 +539,13 @@ static bool
 PrintSingleError(JSContext* cx, FILE* file, JS::ConstUTF8CharsZ toStringResult,
                  T* report, PrintErrorKind kind)
 {
-    UniquePtr<char> prefix;
+    UniqueChars prefix;
     if (report->filename)
-        prefix.reset(JS_smprintf("%s:", report->filename));
+        prefix = JS_smprintf("%s:", report->filename);
 
     if (report->lineno) {
-        UniquePtr<char> tmp(JS_smprintf("%s%u:%u ", prefix ? prefix.get() : "", report->lineno,
-                                        report->column));
-        prefix = Move(tmp);
+        prefix = JS_smprintf("%s%u:%u ", prefix ? prefix.get() : "", report->lineno,
+                                        report->column);
     }
 
     if (kind != PrintErrorKind::Error) {
@@ -564,8 +564,7 @@ PrintSingleError(JSContext* cx, FILE* file, JS::ConstUTF8CharsZ toStringResult,
             break;
         }
 
-        UniquePtr<char> tmp(JS_smprintf("%s%s: ", prefix ? prefix.get() : "", kindPrefix));
-        prefix = Move(tmp);
+        prefix = JS_smprintf("%s%s: ", prefix ? prefix.get() : "", kindPrefix);
     }
 
     const char* message = toStringResult ? toStringResult.c_str() : report->message().c_str();
@@ -928,16 +927,6 @@ js::ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback call
     ReportError(cx, &report, callback, userRef);
 
     return warning;
-}
-
-void
-js::CallWarningReporter(JSContext* cx, JSErrorReport* reportp)
-{
-    MOZ_ASSERT(reportp);
-    MOZ_ASSERT(JSREPORT_IS_WARNING(reportp->flags));
-
-    if (JS::WarningReporter warningReporter = cx->runtime()->warningReporter)
-        warningReporter(cx, reportp);
 }
 
 bool

@@ -634,23 +634,23 @@ JSBreakpointSite::destroyIfEmpty(FreeOp* fop)
         script->destroyBreakpointSite(fop, pc);
 }
 
-WasmBreakpointSite::WasmBreakpointSite(wasm::Code* code_, uint32_t offset_)
-  : BreakpointSite(Type::Wasm), code(code_), offset(offset_)
+WasmBreakpointSite::WasmBreakpointSite(wasm::DebugState* debug_, uint32_t offset_)
+  : BreakpointSite(Type::Wasm), debug(debug_), offset(offset_)
 {
-    MOZ_ASSERT(code_);
+    MOZ_ASSERT(debug_);
 }
 
 void
 WasmBreakpointSite::recompile(FreeOp* fop)
 {
-    code->toggleBreakpointTrap(fop->runtime(), offset, isEnabled());
+    debug->toggleBreakpointTrap(fop->runtime(), offset, isEnabled());
 }
 
 void
 WasmBreakpointSite::destroyIfEmpty(FreeOp* fop)
 {
     if (isEmpty())
-        code->destroyBreakpointSite(fop, offset);
+        debug->destroyBreakpointSite(fop, offset);
 }
 
 /*** Debugger hook dispatch **********************************************************************/
@@ -1353,26 +1353,6 @@ Debugger::unwrapPropertyDescriptor(JSContext* cx, HandleObject obj,
     return true;
 }
 
-namespace {
-class MOZ_STACK_CLASS ReportExceptionClosure : public ScriptEnvironmentPreparer::Closure
-{
-public:
-    explicit ReportExceptionClosure(RootedValue& exn)
-        : exn_(exn)
-    {
-    }
-
-    bool operator()(JSContext* cx) override
-    {
-        cx->setPendingException(exn_);
-        return false;
-    }
-
-private:
-    RootedValue& exn_;
-};
-} // anonymous namespace
-
 JSTrapStatus
 Debugger::reportUncaughtException(Maybe<AutoCompartment>& ac)
 {
@@ -1395,13 +1375,11 @@ Debugger::reportUncaughtException(Maybe<AutoCompartment>& ac)
         RootedValue exn(cx);
         if (cx->getPendingException(&exn)) {
             /*
-             * Clear the exception, because
-             * PrepareScriptEnvironmentAndInvoke will assert that we don't
-             * have one.
+             * Clear the exception, because ReportErrorToGlobal will assert that
+             * we don't have one.
              */
             cx->clearPendingException();
-            ReportExceptionClosure reportExn(exn);
-            PrepareScriptEnvironmentAndInvoke(cx, cx->global(), reportExn);
+            ReportErrorToGlobal(cx, cx->global(), exn);
         }
         /*
          * And if not, or if PrepareScriptEnvironmentAndInvoke somehow left
@@ -1996,7 +1974,7 @@ Debugger::onTrap(JSContext* cx, MutableHandleValue vp)
         isJS = false;
         pc = nullptr;
         bytecodeOffset = iter.wasmBytecodeOffset();
-        site = iter.wasmInstance()->code().getOrCreateBreakpointSite(cx, bytecodeOffset);
+        site = iter.wasmInstance()->debug().getOrCreateBreakpointSite(cx, bytecodeOffset);
     }
 
     /* Build list of breakpoint handlers. */
@@ -2050,7 +2028,7 @@ Debugger::onTrap(JSContext* cx, MutableHandleValue vp)
             if (isJS)
                 site = iter.script()->getBreakpointSite(pc);
             else
-                site = iter.wasmInstance()->code().getOrCreateBreakpointSite(cx, bytecodeOffset);
+                site = iter.wasmInstance()->debug().getOrCreateBreakpointSite(cx, bytecodeOffset);
         }
     }
 
@@ -5316,10 +5294,11 @@ Debugger::isCompilableUnit(JSContext* cx, unsigned argc, Value* vp)
     frontend::UsedNameTracker usedNames(cx);
     if (!usedNames.init())
         return false;
-    frontend::Parser<frontend::FullParseHandler> parser(cx, cx->tempLifoAlloc(),
-                                                        options, chars.twoByteChars(),
-                                                        length, /* foldConstants = */ true,
-                                                        usedNames, nullptr, nullptr);
+    frontend::Parser<frontend::FullParseHandler, char16_t> parser(cx, cx->tempLifoAlloc(),
+                                                                  options, chars.twoByteChars(),
+                                                                  length,
+                                                                  /* foldConstants = */ true,
+                                                                  usedNames, nullptr, nullptr);
     JS::WarningReporter older = JS::SetWarningReporter(cx, nullptr);
     if (!parser.checkOptions() || !parser.parse()) {
         // We ran into an error. If it was because we ran out of memory we report
@@ -5695,7 +5674,7 @@ struct DebuggerScriptGetLineCountMatcher
     }
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
         uint32_t result;
-        if (!wasmInstance->instance().code().totalSourceLines(cx_, &result))
+        if (!wasmInstance->instance().debug().totalSourceLines(cx_, &result))
             return false;
         totalLines = double(result);
         return true;
@@ -6246,7 +6225,7 @@ class DebuggerScriptGetOffsetLocationMatcher
         size_t lineno;
         size_t column;
         bool found;
-        if (!instance->instance().code().getOffsetLocation(cx_, offset_, &found, &lineno, &column))
+        if (!instance->instance().debug().getOffsetLocation(cx_, offset_, &found, &lineno, &column))
             return false;
 
         if (!found) {
@@ -6464,7 +6443,7 @@ class DebuggerScriptGetLineOffsetsMatcher
 
     ReturnType match(Handle<WasmInstanceObject*> instance) {
         Vector<uint32_t> offsets(cx_);
-        if (!instance->instance().code().getLineOffsets(cx_, lineno_, &offsets))
+        if (!instance->instance().debug().getLineOffsets(cx_, lineno_, &offsets))
             return false;
 
         result_.set(NewDenseEmptyArray(cx_));
@@ -6767,11 +6746,11 @@ struct DebuggerScriptSetBreakpointMatcher
 
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
         wasm::Instance& instance = wasmInstance->instance();
-        if (!instance.code().hasBreakpointTrapAtOffset(offset_)) {
+        if (!instance.debug().hasBreakpointTrapAtOffset(offset_)) {
             JS_ReportErrorNumberASCII(cx_, GetErrorMessage, nullptr, JSMSG_DEBUG_BAD_OFFSET);
             return false;
         }
-        WasmBreakpointSite* site = instance.code().getOrCreateBreakpointSite(cx_, offset_);
+        WasmBreakpointSite* site = instance.debug().getOrCreateBreakpointSite(cx_, offset_);
         if (!site)
             return false;
         site->inc(cx_->runtime()->defaultFreeOp());
@@ -6861,7 +6840,7 @@ class DebuggerScriptClearBreakpointMatcher
     }
 
     ReturnType match(Handle<WasmInstanceObject*> instance) {
-        return instance->instance().code().clearBreakpointsIn(cx_, instance, dbg_, handler_);
+        return instance->instance().debug().clearBreakpointsIn(cx_, instance, dbg_, handler_);
     }
 };
 
@@ -7239,7 +7218,7 @@ class DebuggerSourceGetTextMatcher
     }
 
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
-        return wasmInstance->instance().code().createText(cx_);
+        return wasmInstance->instance().debug().createText(cx_);
     }
 };
 
@@ -7283,7 +7262,7 @@ class DebuggerSourceGetURLMatcher
         return Nothing();
     }
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
-        if (JSString* str = wasmInstance->instance().code().debugDisplayURL(cx_))
+        if (JSString* str = wasmInstance->instance().debug().debugDisplayURL(cx_))
             return Some(str);
         return Nothing();
     }
@@ -7916,11 +7895,11 @@ DebuggerFrame::setOnStepHandler(JSContext* cx, HandleDebuggerFrame frame, OnStep
         wasm::DebugFrame* wasmFrame = referent.asWasmDebugFrame();
         if (handler && !prior) {
             // Single stepping toggled off->on.
-            if (!instance->code().incrementStepModeCount(cx, wasmFrame->funcIndex()))
+            if (!instance->debug().incrementStepModeCount(cx, wasmFrame->funcIndex()))
                 return false;
         } else if (!handler && prior) {
             // Single stepping toggled on->off.
-            if (!instance->code().decrementStepModeCount(cx, wasmFrame->funcIndex()))
+            if (!instance->debug().decrementStepModeCount(cx, wasmFrame->funcIndex()))
                 return false;
         }
     } else {
@@ -8250,8 +8229,8 @@ DebuggerFrame_maybeDecrementFrameScriptStepModeCount(FreeOp* fop, AbstractFrameP
         return;
     if (frame.isWasmDebugFrame()) {
         wasm::Instance* instance = frame.wasmInstance();
-        instance->code().decrementStepModeCount(instance->cx(),
-                                                frame.asWasmDebugFrame()->funcIndex());
+        instance->debug().decrementStepModeCount(instance->cx(),
+                                                 frame.asWasmDebugFrame()->funcIndex());
     } else {
         frame.script()->decrementStepModeCount(fop);
     }

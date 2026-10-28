@@ -1553,7 +1553,8 @@ JS_SetNativeStackQuota(JSContext* cx, size_t systemCodeStackSize, size_t trusted
     SetNativeStackQuotaAndLimit(cx, JS::StackForTrustedScript, trustedScriptStackSize);
     SetNativeStackQuotaAndLimit(cx, JS::StackForUntrustedScript, untrustedScriptStackSize);
 
-    cx->initJitStackLimit();
+    if (cx->isCooperativelyScheduled())
+        cx->initJitStackLimit();
 }
 
 /************************************************************************/
@@ -1885,8 +1886,8 @@ JS_GlobalObjectTraceHook(JSTracer* trc, JSObject* global)
         return;
 
     // Trace the compartment for any GC things that should only stick around if
-    // we know the compartment is live.
-    global->compartment()->trace(trc);
+    // we know the global is live.
+    global->compartment()->traceGlobal(trc);
 
     if (JSTraceOp trace = global->compartment()->creationOptions().getTrace())
         trace(trc, global);
@@ -4260,10 +4261,10 @@ JS_BufferIsCompilableUnit(JSContext* cx, HandleObject obj, const char* utf8, siz
     frontend::UsedNameTracker usedNames(cx);
     if (!usedNames.init())
         return false;
-    frontend::Parser<frontend::FullParseHandler> parser(cx, cx->tempLifoAlloc(),
-                                                        options, chars, length,
-                                                        /* foldConstants = */ true,
-                                                        usedNames, nullptr, nullptr);
+    frontend::Parser<frontend::FullParseHandler, char16_t> parser(cx, cx->tempLifoAlloc(),
+                                                                  options, chars, length,
+                                                                  /* foldConstants = */ true,
+                                                                  usedNames, nullptr, nullptr);
     JS::WarningReporter older = JS::SetWarningReporter(cx, nullptr);
     if (!parser.checkOptions() || !parser.parse()) {
         // We ran into an error. If it was because we ran out of source, we
@@ -4591,9 +4592,8 @@ Evaluate(JSContext* cx, ScopeKind scopeKind, HandleObject env,
     MOZ_ASSERT_IF(!IsGlobalLexicalEnvironment(env), scopeKind == ScopeKind::NonSyntactic);
 
     options.setIsRunOnce(true);
-    SourceCompressionTask sct(cx);
     RootedScript script(cx, frontend::CompileGlobalScript(cx, cx->tempLifoAlloc(),
-                                                          scopeKind, options, srcBuf, &sct));
+                                                          scopeKind, options, srcBuf));
     if (!script)
         return false;
 
@@ -4601,8 +4601,6 @@ Evaluate(JSContext* cx, ScopeKind scopeKind, HandleObject env,
 
     bool result = Execute(cx, script, *env,
                           options.noScriptRval ? nullptr : rval.address());
-    if (!sct.complete())
-        result = false;
 
     // After evaluation, the compiled script will not be run again.
     // script->ensureRanAnalysis allocated 1 analyze::Bytecode for every opcode
@@ -6105,7 +6103,7 @@ JS_GetRegExpFlags(JSContext* cx, HandleObject obj)
     AssertHeapIsIdle();
     CHECK_REQUEST(cx);
 
-    RegExpGuard shared(cx);
+    RootedRegExpShared shared(cx);
     if (!RegExpToShared(cx, obj, &shared))
         return false;
     return shared->getFlags();
@@ -6117,7 +6115,7 @@ JS_GetRegExpSource(JSContext* cx, HandleObject obj)
     AssertHeapIsIdle();
     CHECK_REQUEST(cx);
 
-    RegExpGuard shared(cx);
+    RootedRegExpShared shared(cx);
     if (!RegExpToShared(cx, obj, &shared))
         return nullptr;
     return shared->getSource();

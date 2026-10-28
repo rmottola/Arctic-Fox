@@ -319,9 +319,6 @@ class TenuredCell : public Cell
     static MOZ_ALWAYS_INLINE void writeBarrierPost(void* cellp, TenuredCell* prior,
                                                    TenuredCell* next);
 
-    // Default implementation for kinds that don't require finalization.
-    void finalize(FreeOp* fop) {}
-
     // Default implementation for kinds that don't require fixup.
     void fixupAfterMovingGC() {}
 
@@ -330,24 +327,39 @@ class TenuredCell : public Cell
 #endif
 };
 
-/* Cells are aligned to CellShift, so the largest tagged null pointer is: */
-const uintptr_t LargestTaggedNullCellPointer = (1 << CellShift) - 1;
+/* Cells are aligned to CellAlignShift, so the largest tagged null pointer is: */
+const uintptr_t LargestTaggedNullCellPointer = (1 << CellAlignShift) - 1;
+
+/*
+ * The minimum cell size ends up as twice the cell alignment because the mark
+ * bitmap contains one bit per CellBytesPerMarkBit bytes (which is equal to
+ * CellAlignBytes) and we need two mark bits per cell.
+ */
+const size_t MarkBitsPerCell = 2;
+const size_t MinCellSize = CellBytesPerMarkBit * MarkBitsPerCell;
 
 constexpr size_t
 DivideAndRoundUp(size_t numerator, size_t divisor) {
     return (numerator + divisor - 1) / divisor;
 }
 
-const size_t ArenaCellCount = ArenaSize / CellSize;
-static_assert(ArenaSize % CellSize == 0, "Arena size must be a multiple of cell size");
+static_assert(ArenaSize % CellAlignBytes == 0,
+              "Arena size must be a multiple of cell alignment");
 
 /*
- * The mark bitmap has one bit per each GC cell. For multi-cell GC things this
- * wastes space but allows to avoid expensive devisions by thing's size when
- * accessing the bitmap. In addition this allows to use some bits for colored
- * marking during the cycle GC.
+ * We sometimes use an index to refer to a cell in an arena. The index for a
+ * cell is found by dividing by the cell alignment so not all indicies refer to
+ * valid cells.
  */
-const size_t ArenaBitmapBits = ArenaCellCount;
+const size_t ArenaCellIndexBytes = CellAlignBytes;
+const size_t MaxArenaCellIndex = ArenaSize / CellAlignBytes;
+
+/*
+ * The mark bitmap has one bit per each possible cell start position. This
+ * wastes some space for larger GC things but allows us to avoid division by the
+ * cell's size when accessing the bitmap.
+ */
+const size_t ArenaBitmapBits = ArenaSize / CellBytesPerMarkBit;
 const size_t ArenaBitmapBytes = DivideAndRoundUp(ArenaBitmapBits, 8);
 const size_t ArenaBitmapWords = DivideAndRoundUp(ArenaBitmapBits, JS_BITS_PER_WORD);
 
@@ -1123,7 +1135,7 @@ AssertValidColor(const TenuredCell* thing, uint32_t color)
 {
 #ifdef DEBUG
     Arena* arena = thing->arena();
-    MOZ_ASSERT(color < arena->getThingSize() / CellSize);
+    MOZ_ASSERT(color < arena->getThingSize() / CellBytesPerMarkBit);
 #endif
 }
 
@@ -1159,7 +1171,7 @@ inline uintptr_t
 Cell::address() const
 {
     uintptr_t addr = uintptr_t(this);
-    MOZ_ASSERT(addr % CellSize == 0);
+    MOZ_ASSERT(addr % CellAlignBytes == 0);
     MOZ_ASSERT(Chunk::withinValidRange(addr));
     return addr;
 }
@@ -1168,7 +1180,7 @@ Chunk*
 Cell::chunk() const
 {
     uintptr_t addr = uintptr_t(this);
-    MOZ_ASSERT(addr % CellSize == 0);
+    MOZ_ASSERT(addr % CellAlignBytes == 0);
     addr &= ~ChunkMask;
     return reinterpret_cast<Chunk*>(addr);
 }

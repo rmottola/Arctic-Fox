@@ -788,7 +788,7 @@ MacroAssembler::nurseryAllocate(Register result, Register temp, gc::AllocKind al
     CompileZone* zone = GetJitContext()->compartment->zone();
     int thingSize = int(gc::Arena::thingSize(allocKind));
     int totalSize = thingSize + nDynamicSlots * sizeof(HeapSlot);
-    MOZ_ASSERT(totalSize % gc::CellSize == 0);
+    MOZ_ASSERT(totalSize % gc::CellAlignBytes == 0);
     loadPtr(AbsoluteAddress(zone->addressOfNurseryPosition()), result);
     computeEffectiveAddress(Address(result, totalSize), temp);
     branchPtr(Assembler::Below, AbsoluteAddress(zone->addressOfNurseryCurrentEnd()), temp, fail);
@@ -1700,11 +1700,10 @@ MacroAssembler::printf(const char* output)
 static void
 Printf1_(const char* output, uintptr_t value) {
     AutoEnterOOMUnsafeRegion oomUnsafe;
-    char* line = JS_sprintf_append(nullptr, output, value);
+    js::UniqueChars line = JS_sprintf_append(nullptr, output, value);
     if (!line)
         oomUnsafe.crash("OOM at masm.printf");
-    fprintf(stderr, "%s", line);
-    js_free(line);
+    fprintf(stderr, "%s", line.get());
 }
 
 void

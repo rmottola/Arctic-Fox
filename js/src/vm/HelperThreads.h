@@ -35,6 +35,7 @@ namespace js {
 
 class AutoLockHelperThreadState;
 class AutoUnlockHelperThreadState;
+class CompileError;
 class PromiseTask;
 struct HelperThread;
 struct ParseTask;
@@ -384,7 +385,7 @@ struct HelperThread
     void handleWasmWorkload(AutoLockHelperThreadState& locked);
     void handlePromiseTaskWorkload(AutoLockHelperThreadState& locked);
     void handleIonWorkload(AutoLockHelperThreadState& locked);
-    void handleParseWorkload(AutoLockHelperThreadState& locked, uintptr_t stackLimit);
+    void handleParseWorkload(AutoLockHelperThreadState& locked);
     void handleCompressionWorkload(AutoLockHelperThreadState& locked);
     void handleGCHelperWorkload(AutoLockHelperThreadState& locked);
     void handleGCParallelWorkload(AutoLockHelperThreadState& locked);
@@ -603,7 +604,7 @@ struct ParseTask
 
     // Any errors or warnings produced during compilation. These are reported
     // when finishing the script.
-    Vector<frontend::CompileError*, 0, SystemAllocPolicy> errors;
+    Vector<CompileError*, 0, SystemAllocPolicy> errors;
     bool overRecursed;
     bool outOfMemory;
 
@@ -674,10 +675,6 @@ struct SourceCompressionTask
 
     ScriptSource* ss;
 
-    // Atomic flag to indicate to a helper thread that it should abort
-    // compression on the source.
-    mozilla::Atomic<bool, mozilla::Relaxed> abort_;
-
     // Stores the result of the compression.
     enum ResultType {
         OOM,
@@ -692,7 +689,6 @@ struct SourceCompressionTask
       : helperThread(nullptr)
       , cx(cx)
       , ss(nullptr)
-      , abort_(false)
       , result(OOM)
     {}
 
@@ -703,7 +699,6 @@ struct SourceCompressionTask
 
     ResultType work();
     bool complete();
-    void abort() { abort_ = true; }
     bool active() const { return !!ss; }
     ScriptSource* source() { return ss; }
 };
