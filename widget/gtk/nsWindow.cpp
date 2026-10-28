@@ -2034,7 +2034,7 @@ ExtractExposeRegion(LayoutDeviceIntRegion& aRegion, cairo_t* cr)
   for (int i = 0; i < rects->num_rectangles; i++)  {
       const cairo_rectangle_t& r = rects->rectangles[i];
       aRegion.Or(aRegion, LayoutDeviceIntRect::Truncate(r.x, r.y, r.width, r.height));
-      LOGDRAW(("\t%d %d %d %d\n", r.x, r.y, r.width, r.height));
+      LOGDRAW(("\t%f %f %f %f\n", r.x, r.y, r.width, r.height));
   }
 
   cairo_rectangle_list_destroy(rects);

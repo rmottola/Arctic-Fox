@@ -43,7 +43,7 @@ ContainerParser::~ContainerParser() = default;
 MediaResult
 ContainerParser::IsInitSegmentPresent(MediaByteBuffer* aData)
 {
-  MSE_DEBUG(ContainerParser, "aLength=%u [%x%x%x%x]",
+  MSE_DEBUG(ContainerParser, "aLength=%" PRIuSIZE " [%x%x%x%x]",
             aData->Length(),
             aData->Length() > 0 ? (*aData)[0] : 0,
             aData->Length() > 1 ? (*aData)[1] : 0,
@@ -55,7 +55,7 @@ ContainerParser::IsInitSegmentPresent(MediaByteBuffer* aData)
 MediaResult
 ContainerParser::IsMediaSegmentPresent(MediaByteBuffer* aData)
 {
-  MSE_DEBUG(ContainerParser, "aLength=%u [%x%x%x%x]",
+  MSE_DEBUG(ContainerParser, "aLength=%" PRIuSIZE " [%x%x%x%x]",
             aData->Length(),
             aData->Length() > 0 ? (*aData)[0] : 0,
             aData->Length() > 1 ? (*aData)[1] : 0,
@@ -114,13 +114,15 @@ ContainerParser::MediaSegmentRange()
   return mCompleteMediaSegmentRange;
 }
 
-class WebMContainerParser : public ContainerParser {
+class WebMContainerParser : public ContainerParser
+{
 public:
   explicit WebMContainerParser(const MediaContainerType& aType)
     : ContainerParser(aType)
     , mParser(0)
     , mOffset(0)
-  {}
+  {
+  }
 
   static const unsigned NS_PER_USEC = 1000;
   static const unsigned USEC_PER_SEC = 1000000;
@@ -236,7 +238,7 @@ public:
         mCompleteInitSegmentRange = MediaByteRange(0, mParser.mInitEndOffset);
         char* buffer = reinterpret_cast<char*>(mInitData->Elements());
         mResource->ReadFromCache(buffer, 0, mParser.mInitEndOffset);
-        MSE_DEBUG(WebMContainerParser, "Stashed init of %u bytes.",
+        MSE_DEBUG(WebMContainerParser, "Stashed init of %" PRId64 " bytes.",
                   mParser.mInitEndOffset);
         mResource = nullptr;
       } else {
@@ -262,7 +264,7 @@ public:
 
     int32_t completeIdx = endIdx;
     while (completeIdx >= 0 && mOffset < mapping[completeIdx].mEndOffset) {
-      MSE_DEBUG(WebMContainerParser, "block is incomplete, missing: %lld",
+      MSE_DEBUG(WebMContainerParser, "block is incomplete, missing: %" PRId64,
                 mapping[completeIdx].mEndOffset - mOffset);
       completeIdx -= 1;
     }
@@ -318,7 +320,8 @@ public:
     aStart = mapping[0].mTimecode / NS_PER_USEC;
     aEnd = (mapping[completeIdx].mTimecode + frameDuration) / NS_PER_USEC;
 
-    MSE_DEBUG(WebMContainerParser, "[%lld, %lld] [fso=%lld, leo=%lld, l=%u processedIdx=%u fs=%lld]",
+    MSE_DEBUG(WebMContainerParser, "[%" PRId64 ", %" PRId64 "] [fso=%" PRId64
+              ", leo=%" PRId64 ", l=%" PRIuSIZE " processedIdx=%u fs=%" PRId64 "]",
               aStart, aEnd, mapping[0].mSyncOffset,
               mapping[completeIdx].mEndOffset, mapping.Length(), completeIdx,
               mCompleteMediaSegmentRange.mEnd);
@@ -502,7 +505,7 @@ public:
         }
         char* buffer = reinterpret_cast<char*>(mInitData->Elements());
         mResource->ReadFromCache(buffer, range.mStart, range.Length());
-        MSE_DEBUG(MP4ContainerParser ,"Stashed init of %u bytes.",
+        MSE_DEBUG(MP4ContainerParser ,"Stashed init of %" PRIu64 " bytes.",
                   range.Length());
       } else {
         MSE_DEBUG(MP4ContainerParser, "Incomplete init found.");
@@ -529,7 +532,7 @@ public:
     }
     aStart = compositionRange.start;
     aEnd = compositionRange.end;
-    MSE_DEBUG(MP4ContainerParser, "[%lld, %lld]",
+    MSE_DEBUG(MP4ContainerParser, "[%" PRId64 ", %" PRId64 "]",
               aStart, aEnd);
     return NS_OK;
   }
@@ -548,13 +551,16 @@ private:
 #endif // MOZ_FMP4
 
 #ifdef MOZ_FMP4
-class ADTSContainerParser : public ContainerParser {
+class ADTSContainerParser : public ContainerParser
+{
 public:
   explicit ADTSContainerParser(const MediaContainerType& aType)
     : ContainerParser(aType)
-  {}
+  {
+  }
 
-  typedef struct {
+  typedef struct
+  {
     size_t header_length; // Length of just the initialization data.
     size_t frame_length;  // Includes header_length;
     uint8_t aac_frames;   // Number of AAC frames in the ADTS frame.
@@ -679,7 +685,7 @@ public:
     // media segment.
     mCompleteMediaHeaderRange = mCompleteMediaSegmentRange;
 
-    MSE_DEBUG(ADTSContainerParser, "[%lld, %lld]",
+    MSE_DEBUG(ADTSContainerParser, "[%" PRId64 ", %" PRId64 "]",
               aStart, aEnd);
     // We don't update timestamps, regardless.
     return NS_ERROR_NOT_AVAILABLE;
@@ -697,8 +703,8 @@ public:
 /*static*/ ContainerParser*
 ContainerParser::CreateForMIMEType(const MediaContainerType& aType)
 {
-  if (aType.Type() == MEDIAMIMETYPE("video/webm")
-      || aType.Type() == MEDIAMIMETYPE("audio/webm")) {
+  if (aType.Type() == MEDIAMIMETYPE("video/webm") ||
+      aType.Type() == MEDIAMIMETYPE("audio/webm")) {
     return new WebMContainerParser(aType);
   }
 

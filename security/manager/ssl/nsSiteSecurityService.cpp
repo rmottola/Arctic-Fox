@@ -842,7 +842,7 @@ ParseSSSHeaders(uint32_t aType,
         return nsISiteSecurityService::ERROR_INVALID_MAX_AGE;
       }
 
-      SSSLOG(("SSS: parsed delta-seconds: %llu", maxAge));
+      SSSLOG(("SSS: parsed delta-seconds: %" PRIu64, maxAge));
     } else if (directive->mName.Length() == include_subd_var.Length() &&
                directive->mName.EqualsIgnoreCase(include_subd_var.get(),
                                                  include_subd_var.Length())) {

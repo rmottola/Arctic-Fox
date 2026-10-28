@@ -300,7 +300,7 @@ DecodedAudioDataSink::PopFrames(uint32_t aFrames)
 
   auto framesToPop = std::min(aFrames, mCursor->Available());
 
-  SINK_LOG_V("playing audio at time=%lld offset=%u length=%u",
+  SINK_LOG_V("playing audio at time=%" PRId64 " offset=%u length=%u",
              mCurrentData->mTime, mCurrentData->mFrames - mCursor->Available(), framesToPop);
 
   UniquePtr<AudioStream::Chunk> chunk =

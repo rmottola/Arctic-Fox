@@ -2217,8 +2217,8 @@ imgLoader::LoadImage(nsIURI* aURI,
 
     if (NS_FAILED(openRes)) {
       MOZ_LOG(gImgLog, LogLevel::Debug,
-             ("[this=%p] imgLoader::LoadImage -- AsyncOpen2() failed: 0x%x\n",
-              this, openRes));
+             ("[this=%p] imgLoader::LoadImage -- AsyncOpen2() failed: 0x%" PRIx32 "\n",
+              this, static_cast<uint32_t>(openRes)));
       request->CancelAndAbort(openRes);
       return openRes;
     }
@@ -2703,9 +2703,9 @@ ProxyListener::CheckListenerChain()
     rv = retargetableListener->CheckListenerChain();
   }
   MOZ_LOG(gImgLog, LogLevel::Debug,
-         ("ProxyListener::CheckListenerChain %s [this=%p listener=%p rv=%x]",
+         ("ProxyListener::CheckListenerChain %s [this=%p listener=%p rv=%" PRIx32 "]",
           (NS_SUCCEEDED(rv) ? "success" : "failure"),
-          this, (nsIStreamListener*)mDestListener, rv));
+          this, (nsIStreamListener*)mDestListener, static_cast<uint32_t>(rv)));
   return rv;
 }
 
@@ -2931,8 +2931,8 @@ imgCacheValidator::CheckListenerChain()
     rv = retargetableListener->CheckListenerChain();
   }
   MOZ_LOG(gImgLog, LogLevel::Debug,
-         ("[this=%p] imgCacheValidator::CheckListenerChain -- rv %d=%s",
-          this, NS_SUCCEEDED(rv) ? "succeeded" : "failed", rv));
+         ("[this=%p] imgCacheValidator::CheckListenerChain -- rv %" PRId32 "=%s",
+          this, static_cast<uint32_t>(rv), NS_SUCCEEDED(rv) ? "succeeded" : "failed"));
   return rv;
 }
 

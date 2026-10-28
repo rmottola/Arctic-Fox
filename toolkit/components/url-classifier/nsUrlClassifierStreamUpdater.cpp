@@ -56,9 +56,10 @@ static MOZ_FORMAT_PRINTF(1, 2) void TrimAndLog(const char* aFmt, ...)
     trimmed = EmptyString();
   }
 
+  // Use %s so we aren't exposing random strings to printf interpolation.
   MOZ_LOG(gUrlClassifierStreamUpdaterLog,
           mozilla::LogLevel::Debug,
-          (NS_ConvertUTF16toUTF8(trimmed).get()));
+          ("%s", NS_ConvertUTF16toUTF8(trimmed).get()));
 }
 
 // This class does absolutely nothing, except pass requests onto the DBService.

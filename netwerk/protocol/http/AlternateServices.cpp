@@ -451,8 +451,8 @@ private:
     }
     mTriedToValidate = true;
 
-    LOG(("AltSvcTransaction::MaybeValidate() %p reason=%x running=%d conn=%p write=%d",
-         this, reason, mRunning, mConnection.get(), mTriedToWrite));
+    LOG(("AltSvcTransaction::MaybeValidate() %p reason=%" PRIx32 " running=%d conn=%p write=%d",
+         this, static_cast<uint32_t>(reason), mRunning, mConnection.get(), mTriedToWrite));
 
     if (mTriedToWrite && reason == NS_BASE_STREAM_CLOSED) {
       // The normal course of events is to cause the transaction to fail with CLOSED
@@ -494,8 +494,8 @@ private:
 public:
   void Close(nsresult reason) override
   {
-    LOG(("AltSvcTransaction::Close() %p reason=%x running %d",
-         this, reason, mRunning));
+    LOG(("AltSvcTransaction::Close() %p reason=%" PRIx32 " running %d",
+         this, static_cast<uint32_t>(reason), mRunning));
 
     MaybeValidate(reason);
     if (!mMapping->Validated() && mConnection) {
@@ -507,7 +507,7 @@ public:
   nsresult ReadSegments(nsAHttpSegmentReader *reader,
                         uint32_t count, uint32_t *countRead) override
   {
-    LOG(("AltSvcTransaction::ReadSegements() %p\n"));
+    LOG(("AltSvcTransaction::ReadSegements() %p\n", this));
     mTriedToWrite = true;
     return NullHttpTransaction::ReadSegments(reader, count, countRead);
   }
@@ -707,8 +707,8 @@ TransactionObserver::Complete(nsHttpTransaction *aTrans, nsresult reason)
   mRanOnce = true;
 
   RefPtr<nsAHttpConnection> conn = aTrans->GetConnectionReference();
-  LOG(("TransactionObserver::Complete %p aTrans %p reason %x conn %p\n",
-       this, aTrans, reason, conn.get()));
+  LOG(("TransactionObserver::Complete %p aTrans %p reason %" PRIx32 " conn %p\n",
+       this, aTrans, static_cast<uint32_t>(reason), conn.get()));
   if (!conn) {
     return;
   }
@@ -766,7 +766,8 @@ NS_IMETHODIMP
 TransactionObserver::OnStopRequest(nsIRequest *aRequest, nsISupports *aContext, nsresult code)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  LOG(("TransactionObserver onStopRequest %p code %x\n", this, code));
+  LOG(("TransactionObserver onStopRequest %p code %" PRIx32 "\n",
+       this, static_cast<uint32_t>(code)));
   if (NS_SUCCEEDED(code)) {
     nsHttpResponseHead *hdrs = mChannel->GetResponseHead();
     LOG(("TransactionObserver onStopRequest %p http resp %d\n",

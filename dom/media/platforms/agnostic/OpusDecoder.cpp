@@ -177,7 +177,7 @@ OpusDataDecoder::ProcessDecode(MediaRawData* aSample)
   uint32_t frames_number = opus_packet_get_nb_frames(aSample->Data(),
                                                     aSample->Size());
   if (frames_number <= 0) {
-    OPUS_DEBUG("Invalid packet header: r=%ld length=%ld", frames_number,
+    OPUS_DEBUG("Invalid packet header: r=%" PRIu32 " length=%" PRIuSIZE, frames_number,
                aSample->Size());
     return DecodePromise::CreateAndReject(
       MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,

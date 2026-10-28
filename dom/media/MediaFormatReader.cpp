@@ -1326,7 +1326,7 @@ MediaFormatReader::RequestVideoData(bool aSkipToNextKeyframe,
   MOZ_DIAGNOSTIC_ASSERT(!mVideo.mSeekRequest.Exists()
                         || mVideo.mTimeThreshold.isSome());
   MOZ_DIAGNOSTIC_ASSERT(!IsSeeking(), "called mid-seek");
-  LOGV("RequestVideoData(%d, %lld)", aSkipToNextKeyframe, aTimeThreshold);
+  LOGV("RequestVideoData(%d, %" PRId64 ")", aSkipToNextKeyframe, aTimeThreshold);
 
   if (!HasVideo()) {
     LOG("called with no video track");
@@ -1367,8 +1367,9 @@ void
 MediaFormatReader::OnDemuxFailed(TrackType aTrack, const MediaResult& aError)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOG("Failed to demux %s, failure:%u",
-      aTrack == TrackType::kVideoTrack ? "video" : "audio", aError.Code());
+  LOG("Failed to demux %s, failure:%" PRIu32,
+      aTrack == TrackType::kVideoTrack ? "video" : "audio",
+      static_cast<uint32_t>(aError.Code()));
   auto& decoder = GetDecoderData(aTrack);
   decoder.mDemuxRequest.Complete();
   switch (aError.Code()) {
@@ -1421,7 +1422,7 @@ void
 MediaFormatReader::OnVideoDemuxCompleted(
   RefPtr<MediaTrackDemuxer::SamplesHolder> aSamples)
 {
-  LOGV("%d video samples demuxed (sid:%d)",
+  LOGV("%" PRIuSIZE " video samples demuxed (sid:%d)",
        aSamples->mSamples.Length(),
        aSamples->mSamples[0]->mTrackInfo
        ? aSamples->mSamples[0]->mTrackInfo->GetID()
@@ -1494,7 +1495,7 @@ void
 MediaFormatReader::OnAudioDemuxCompleted(
   RefPtr<MediaTrackDemuxer::SamplesHolder> aSamples)
 {
-  LOGV("%d audio samples demuxed (sid:%d)",
+  LOGV("%" PRIuSIZE " audio samples demuxed (sid:%d)",
        aSamples->mSamples.Length(),
        aSamples->mSamples[0]->mTrackInfo
        ? aSamples->mSamples[0]->mTrackInfo->GetID()
@@ -1511,7 +1512,7 @@ MediaFormatReader::NotifyNewOutput(
   MOZ_ASSERT(OnTaskQueue());
   auto& decoder = GetDecoderData(aTrack);
   for (auto& sample : aResults) {
-    LOGV("Received new %s sample time:%lld duration:%lld",
+    LOGV("Received new %s sample time:%" PRId64 " duration:%" PRId64,
         TrackTypeToStr(aTrack), sample->mTime, sample->mDuration);
     decoder.mOutput.AppendElement(sample);
     decoder.mNumSamplesOutput++;
@@ -1800,14 +1801,14 @@ MediaFormatReader::HandleDemuxedSamples(
                        TimeUnit::FromMicroseconds(sample->GetEndTime()));
         InternalSeekTarget seekTarget =
           decoder.mTimeThreshold.refOr(InternalSeekTarget(time, false));
-        LOG("Stream change occurred on a non-keyframe. Seeking to:%lld",
+        LOG("Stream change occurred on a non-keyframe. Seeking to:%" PRId64,
             sample->mTime);
         InternalSeek(aTrack, seekTarget);
       }
       return;
     }
 
-    LOGV("Input:%lld (dts:%lld kf:%d)",
+    LOGV("Input:%" PRId64 " (dts:%" PRId64 " kf:%d)",
          sample->mTime, sample->mTimecode, sample->mKeyframe);
     decoder.mNumSamplesInput++;
     decoder.mSizeOfQueue++;
@@ -1981,7 +1982,7 @@ MediaFormatReader::Update(TrackType aTrack)
 
   while (decoder.mOutput.Length()
          && decoder.mOutput[0]->mType == MediaData::NULL_DATA) {
-    LOGV("Dropping null data. Time: %lld", decoder.mOutput[0]->mTime);
+    LOGV("Dropping null data. Time: %" PRId64, decoder.mOutput[0]->mTime);
     decoder.mOutput.RemoveElementAt(0);
     decoder.mSizeOfQueue -= 1;
   }
@@ -2036,7 +2037,7 @@ MediaFormatReader::Update(TrackType aTrack)
           // We have completed draining the decoder following WaitingForData.
           // Set up the internal seek machinery to be able to resume from the
           // last sample decoded.
-          LOG("Seeking to last sample time: %lld",
+          LOG("Seeking to last sample time: %" PRId64,
               decoder.mLastSampleTime.ref().mStart.ToMicroseconds());
           InternalSeek(aTrack,
                        InternalSeekTarget(decoder.mLastSampleTime.ref(), true));
@@ -2108,7 +2109,8 @@ MediaFormatReader::Update(TrackType aTrack)
 
   bool needInput = NeedInput(decoder);
 
-  LOGV("Update(%s) ni=%d no=%d in:%llu out:%llu qs=%u decoding:%d flushing:%d "
+  LOGV("Update(%s) ni=%d no=%d in:%" PRIu64 " out:%" PRIu64
+       " qs=%u decoding:%d flushing:%d "
        "shutdown:%d pending:%u waiting:%d promise:%d sid:%u",
        TrackTypeToStr(aTrack), needInput, needOutput, decoder.mNumSamplesInput,
        decoder.mNumSamplesOutput, uint32_t(size_t(decoder.mSizeOfQueue)),
@@ -2151,7 +2153,7 @@ MediaFormatReader::ReturnOutput(MediaData* aData, TrackType aTrack)
 {
   MOZ_ASSERT(GetDecoderData(aTrack).HasPromise());
   MOZ_DIAGNOSTIC_ASSERT(aData->mType != MediaData::NULL_DATA);
-  LOG("Resolved data promise for %s [%lld, %lld]", TrackTypeToStr(aTrack),
+  LOG("Resolved data promise for %s [%" PRId64 ", %" PRId64 "]", TrackTypeToStr(aTrack),
       aData->mTime, aData->GetEndTime());
 
   if (aTrack == TrackInfo::kAudioTrack) {
@@ -2297,7 +2299,7 @@ void
 MediaFormatReader::SkipVideoDemuxToNextKeyFrame(media::TimeUnit aTimeThreshold)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOG("Skipping up to %lld", aTimeThreshold.ToMicroseconds());
+  LOG("Skipping up to %" PRId64, aTimeThreshold.ToMicroseconds());
 
   // We've reached SkipVideoDemuxToNextKeyFrame when our decoding is late.
   // As such we can drop all already decoded samples and discard all pending
@@ -2382,7 +2384,7 @@ MediaFormatReader::Seek(const SeekTarget& aTarget)
 {
   MOZ_ASSERT(OnTaskQueue());
 
-  LOG("aTarget=(%lld)", aTarget.GetTime().ToMicroseconds());
+  LOG("aTarget=(%" PRId64 ")", aTarget.GetTime().ToMicroseconds());
 
   MOZ_DIAGNOSTIC_ASSERT(mSeekPromise.IsEmpty());
   MOZ_DIAGNOSTIC_ASSERT(!mVideo.HasPromise());
@@ -2467,7 +2469,7 @@ void
 MediaFormatReader::OnSeekFailed(TrackType aTrack, const MediaResult& aError)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOGV("%s failure:%u", TrackTypeToStr(aTrack), aError.Code());
+  LOGV("%s failure:%" PRIu32, TrackTypeToStr(aTrack), static_cast<uint32_t>(aError.Code()));
   if (aTrack == TrackType::kVideoTrack) {
     mVideo.mSeekRequest.Complete();
   } else {
@@ -2518,7 +2520,7 @@ void
 MediaFormatReader::DoVideoSeek()
 {
   MOZ_ASSERT(mPendingSeekTime.isSome());
-  LOGV("Seeking video to %lld", mPendingSeekTime.ref().ToMicroseconds());
+  LOGV("Seeking video to %" PRId64, mPendingSeekTime.ref().ToMicroseconds());
   media::TimeUnit seekTime = mPendingSeekTime.ref();
   mVideo.mTrackDemuxer->Seek(seekTime)
     ->Then(OwnerThread(), __func__, this,
@@ -2531,7 +2533,7 @@ void
 MediaFormatReader::OnVideoSeekCompleted(media::TimeUnit aTime)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOGV("Video seeked to %lld", aTime.ToMicroseconds());
+  LOGV("Video seeked to %" PRId64, aTime.ToMicroseconds());
   mVideo.mSeekRequest.Complete();
 
   mPreviousDecodedKeyframeTime_us = sNoPreviousDecodedKeyframe;
@@ -2593,7 +2595,7 @@ MediaFormatReader::SetVideoDecodeThreshold()
     return;
   }
 
-  LOG("Set seek threshold to %lld", threshold.ToMicroseconds());
+  LOG("Set seek threshold to %" PRId64, threshold.ToMicroseconds());
   mVideo.mDecoder->SetSeekThreshold(threshold);
 }
 
@@ -2601,7 +2603,7 @@ void
 MediaFormatReader::DoAudioSeek()
 {
   MOZ_ASSERT(mPendingSeekTime.isSome());
-  LOGV("Seeking audio to %lld", mPendingSeekTime.ref().ToMicroseconds());
+  LOGV("Seeking audio to %" PRId64, mPendingSeekTime.ref().ToMicroseconds());
   media::TimeUnit seekTime = mPendingSeekTime.ref();
   mAudio.mTrackDemuxer->Seek(seekTime)
     ->Then(OwnerThread(), __func__, this,
@@ -2614,7 +2616,7 @@ void
 MediaFormatReader::OnAudioSeekCompleted(media::TimeUnit aTime)
 {
   MOZ_ASSERT(OnTaskQueue());
-  LOGV("Audio seeked to %lld", aTime.ToMicroseconds());
+  LOGV("Audio seeked to %" PRId64, aTime.ToMicroseconds());
   mAudio.mSeekRequest.Complete();
   mPendingSeekTime.reset();
   mSeekPromise.Resolve(aTime, __func__);

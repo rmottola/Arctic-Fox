@@ -8,8 +8,8 @@
 #include <vector>
 
 #include "mozilla/IntegerPrintfMacros.h"
-#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Move.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/SyncRunnable.h"
 #include "VideoConduit.h"
 #include "AudioConduit.h"

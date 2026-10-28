@@ -7,6 +7,7 @@
 #include "mozilla/EndianUtils.h"
 #include "mozilla/dom/TypedArray.h"
 #include "mozilla/HoldDropJSObjects.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Telemetry.h"
 
 #include "nsSocketTransport2.h"
@@ -1000,7 +1001,7 @@ SocketListenerProxyBackground::OnPacketReceivedRunnable::Run()
 
   FallibleTArray<uint8_t>& data = mMessage->GetDataAsTArray();
 
-  UDPSOCKET_LOG(("%s [this=%p], len %u", __FUNCTION__, this, data.Length()));
+  UDPSOCKET_LOG(("%s [this=%p], len %" PRIuSIZE, __FUNCTION__, this, data.Length()));
   nsCOMPtr<nsIUDPMessage> message = new UDPMessageProxy(&netAddr,
                                                         outputStream,
                                                         data);

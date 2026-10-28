@@ -150,7 +150,8 @@ TextTrackManager::AddTextTrack(TextTrackKind aKind, const nsAString& aLabel,
     return nullptr;
   }
   WEBVTT_LOG("%p AddTextTrack",this);
-  WEBVTT_LOGV("AddTextTrack kind %d Label %s Language %s",aKind,
+  WEBVTT_LOGV("AddTextTrack kind %" PRIu32 " Label %s Language %s",
+    static_cast<uint32_t>(aKind),
     NS_ConvertUTF16toUTF8(aLabel).get(), NS_ConvertUTF16toUTF8(aLanguage).get());
   RefPtr<TextTrack> track =
     mTextTracks->AddTextTrack(aKind, aLabel, aLanguage, aMode, aReadyState,
@@ -266,7 +267,7 @@ TextTrackManager::UpdateCueDisplay()
 
   if (activeCues.Length() > 0) {
     WEBVTT_LOG("UpdateCueDisplay ProcessCues");
-    WEBVTT_LOGV("UpdateCueDisplay activeCues.Length() %d",activeCues.Length());
+    WEBVTT_LOGV("UpdateCueDisplay activeCues.Length() %" PRIuSIZE, activeCues.Length());
     RefPtr<nsVariantCC> jsCues = new nsVariantCC();
 
     jsCues->SetAsArray(nsIDataType::VTYPE_INTERFACE,
@@ -395,7 +396,8 @@ TextTrackManager::PerformTrackSelection(TextTrackKind aTextTrackKinds[],
   // Step 3: If any TextTracks in candidates are showing then abort these steps.
   for (uint32_t i = 0; i < candidates.Length(); i++) {
     if (candidates[i]->Mode() == TextTrackMode::Showing) {
-      WEBVTT_LOGV("PerformTrackSelection Showing return kind %d",candidates[i]->Kind());
+      WEBVTT_LOGV("PerformTrackSelection Showing return kind %d",
+                  static_cast<int>(candidates[i]->Kind()));
       return;
     }
   }
@@ -407,7 +409,8 @@ TextTrackManager::PerformTrackSelection(TextTrackKind aTextTrackKinds[],
     if (TrackIsDefault(candidates[i]) &&
         candidates[i]->Mode() == TextTrackMode::Disabled) {
       candidates[i]->SetMode(TextTrackMode::Showing);
-      WEBVTT_LOGV("PerformTrackSelection set Showing kind %d", candidates[i]->Kind());
+      WEBVTT_LOGV("PerformTrackSelection set Showing kind %d",
+                  static_cast<int>(candidates[i]->Kind()));
       return;
     }
   }
