@@ -4199,6 +4199,7 @@ nsresult HTMLMediaElement::BindToTree(nsIDocument* aDocument, nsIContent* aParen
     // The preload action depends on the value of the autoplay attribute.
     // It's value may have changed, so update it.
     UpdatePreloadAction();
+    aDocument->AddMediaContent(this);
   }
 
   if (mDecoder) {
@@ -4434,6 +4435,9 @@ void HTMLMediaElement::UnbindFromTree(bool aDeep,
                                       bool aNullParent)
 {
   mUnboundFromTree = true;
+  if (OwnerDoc()) {
+    OwnerDoc()->RemoveMediaContent(this);
+  }
 
   nsGenericHTMLElement::UnbindFromTree(aDeep, aNullParent);
 
