@@ -37,6 +37,8 @@ using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::hal;
 
+static mozilla::LazyLogModule gAudioChannelLog("AudioChannel");
+
 namespace {
 
 // If true, any new AudioChannelAgent will be muted when created.
@@ -227,13 +229,9 @@ AudioChannelService::Get()
   return service.forget();
 }
 
-/* static */ PRLogModuleInfo*
+/* static */ LogModule*
 AudioChannelService::GetAudioChannelLog()
 {
-  static PRLogModuleInfo *gAudioChannelLog;
-  if (!gAudioChannelLog) {
-    gAudioChannelLog = PR_NewLogModule("AudioChannel");
-  }
   return gAudioChannelLog;
 }
 
