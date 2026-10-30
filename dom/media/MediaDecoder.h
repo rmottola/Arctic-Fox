@@ -369,6 +369,12 @@ private:
   // Called from HTMLMediaElement when testing of video decode suspend from mochitests.
   void SetForcedHidden(bool aForcedHidden);
 
+  // Mark the decoder as tainted, meaning suspend-video-decoder is disabled.
+  void SetSuspendTaint(bool aTaint);
+
+  // Returns true if the decoder can't participate in suspend-video-decoder.
+  bool HasSuspendTaint() const;
+
   /******
    * The following methods must only be called on the main
    * thread.
@@ -795,6 +801,10 @@ protected:
   // True if the decoder is visible.
   Canonical<bool> mIsVisible;
 
+  // True if the decoder has a suspend taint - meaning suspend-video-decoder is
+  // disabled.
+  Canonical<bool> mHasSuspendTaint;
+
 public:
   AbstractCanonical<media::NullableTimeUnit>* CanonicalDurationOrNull() override;
   AbstractCanonical<double>* CanonicalVolume() { return &mVolume; }
@@ -837,6 +847,7 @@ public:
     return &mDecoderPosition;
   }
   AbstractCanonical<bool>* CanonicalIsVisible() { return &mIsVisible; }
+  AbstractCanonical<bool>* CanonicalHasSuspendTaint() { return &mHasSuspendTaint; }
 
 private:
   // Notify owner when the audible state changed
