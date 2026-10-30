@@ -2150,11 +2150,12 @@ DecodingState::Enter()
 {
   MOZ_ASSERT(mMaster->mSentFirstFrameLoadedEvent);
 
-  if (!mMaster->mIsVisible
+  if (mMaster->mVideoDecodeMode == VideoDecodeMode::Suspend
       && !mMaster->mVideoDecodeSuspendTimer.IsScheduled()
       && !mMaster->mVideoDecodeSuspended) {
-    // If we are not visible and the timer is not schedule, it means the timer
-    // has timed out and we should suspend video decoding now if necessary.
+    // If the VideoDecodeMode is Suspend and the timer is not schedule, it means
+    // the timer has timed out and we should suspend video decoding now if
+    // necessary.
     HandleVideoSuspendTimeout();
   }
 
@@ -2530,7 +2531,6 @@ ShutdownState::Enter()
   master->mPlaybackBytesPerSecond.DisconnectIfConnected();
   master->mPlaybackRateReliable.DisconnectIfConnected();
   master->mDecoderPosition.DisconnectIfConnected();
-  master->mIsVisible.DisconnectIfConnected();
   master->mHasSuspendTaint.DisconnectIfConnected();
 
   master->mDuration.DisconnectAll();
@@ -2599,7 +2599,6 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
   INIT_MIRROR(mPlaybackBytesPerSecond, 0.0),
   INIT_MIRROR(mPlaybackRateReliable, true),
   INIT_MIRROR(mDecoderPosition, 0),
-  INIT_MIRROR(mIsVisible, true),
   INIT_MIRROR(mHasSuspendTaint, false),
   INIT_CANONICAL(mDuration, NullableTimeUnit()),
   INIT_CANONICAL(mIsShutdown, false),
@@ -2671,10 +2670,7 @@ MediaDecoderStateMachine::InitializationTask(MediaDecoder* aDecoder)
   mWatchManager.Watch(mPlayState, &MediaDecoderStateMachine::PlayStateChanged);
 
   if (MediaPrefs::MDSMSuspendBackgroundVideoEnabled()) {
-    mIsVisible.Connect(aDecoder->CanonicalIsVisible());
     mHasSuspendTaint.Connect(aDecoder->CanonicalHasSuspendTaint());
-    mWatchManager.Watch(mIsVisible,
-                        &MediaDecoderStateMachine::VisibilityChanged);
     mWatchManager.Watch(mHasSuspendTaint,
                         &MediaDecoderStateMachine::SuspendTaintChanged);
   }
@@ -2996,34 +2992,6 @@ void MediaDecoderStateMachine::PlayStateChanged()
   }
 
   mStateObj->HandlePlayStateChanged(mPlayState);
-}
-
-void MediaDecoderStateMachine::VisibilityChanged()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  DECODER_LOG("VisibilityChanged: mIsVisible=%d, mVideoDecodeSuspended=%c",
-              mIsVisible.Ref(), mVideoDecodeSuspended ? 'T' : 'F');
-
-  // Start timer to trigger suspended decoding state when going invisible.
-  if (!mIsVisible) {
-    TimeStamp target = TimeStamp::Now() + SuspendBackgroundVideoDelay();
-
-    RefPtr<MediaDecoderStateMachine> self = this;
-    mVideoDecodeSuspendTimer.Ensure(target,
-                                    [=]() { self->OnSuspendTimerResolved(); },
-                                    [] () { MOZ_DIAGNOSTIC_ASSERT(false); });
-    mOnPlaybackEvent.Notify(MediaEventType::StartVideoSuspendTimer);
-    return;
-  }
-
-  // Resuming from suspended decoding
-
-  // If suspend timer exists, destroy it.
-  CancelSuspendTimer();
-
-  if (mVideoDecodeSuspended) {
-    mStateObj->HandleResumeVideoDecoding();
-  }
 }
 
 void MediaDecoderStateMachine::SuspendTaintChanged()

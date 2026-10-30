@@ -806,9 +806,6 @@ protected:
   // back again.
   Canonical<int64_t> mDecoderPosition;
 
-  // True if the decoder is visible.
-  Canonical<bool> mIsVisible;
-
   // True if the decoder has a suspend taint - meaning suspend-video-decoder is
   // disabled.
   Canonical<bool> mHasSuspendTaint;
@@ -854,7 +851,6 @@ public:
   {
     return &mDecoderPosition;
   }
-  AbstractCanonical<bool>* CanonicalIsVisible() { return &mIsVisible; }
   AbstractCanonical<bool>* CanonicalHasSuspendTaint() { return &mHasSuspendTaint; }
 
 private:
