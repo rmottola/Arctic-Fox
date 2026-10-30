@@ -773,6 +773,8 @@ public:
 
   void RemoveMediaTracks() override;
 
+  already_AddRefed<GMPCrashHelper> CreateGMPCrashHelper() override;
+
 protected:
   virtual ~HTMLMediaElement();
 

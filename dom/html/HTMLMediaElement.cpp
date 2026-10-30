@@ -122,6 +122,8 @@ static mozilla::LazyLogModule gMediaElementEventsLog("nsMediaElementEvents");
 #include "mozilla/dom/VideoPlaybackQuality.h"
 #include "HTMLMediaElement.h"
 
+#include "GMPCrashHelper.h"
+
 using namespace mozilla::layers;
 using mozilla::net::nsMediaFragmentURIParser;
 
@@ -7345,6 +7347,32 @@ HTMLMediaElement::RemoveMediaTracks()
   }
 
   mMediaTracksConstructed = false;
+}
+
+class MediaElementGMPCrashHelper : public GMPCrashHelper
+{
+public:
+  explicit MediaElementGMPCrashHelper(HTMLMediaElement* aElement)
+    : mElement(aElement)
+  {
+    MOZ_ASSERT(NS_IsMainThread()); // WeakPtr isn't thread safe.
+  }
+  already_AddRefed<nsPIDOMWindowInner> GetPluginCrashedEventTarget() override
+  {
+    MOZ_ASSERT(NS_IsMainThread()); // WeakPtr isn't thread safe.
+    if (!mElement) {
+      return nullptr;
+    }
+    return do_AddRef(mElement->OwnerDoc()->GetInnerWindow());
+  }
+private:
+  WeakPtr<HTMLMediaElement> mElement;
+};
+
+already_AddRefed<GMPCrashHelper>
+HTMLMediaElement::CreateGMPCrashHelper()
+{
+  return MakeAndAddRef<MediaElementGMPCrashHelper>(this);
 }
 
 bool HasDebuggerPrivilege(JSContext* aCx, JSObject* aObj)
