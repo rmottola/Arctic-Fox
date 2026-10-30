@@ -1732,6 +1732,9 @@ private:
   nsTArray<nsResolveOrRejectPendingPlayPromisesRunner*> mPendingPlayPromisesRunners;
 };
 
+// Check if the context is chrome or has the debugger permission
+bool HasDebuggerPrivilege(JSContext* aCx, JSObject* aObj);
+
 } // namespace dom
 } // namespace mozilla
 
