@@ -7292,6 +7292,12 @@ HTMLMediaElement::NotifyDecoderActivityChanges() const
   }
 }
 
+nsIDocument*
+HTMLMediaElement::GetDocument() const
+{
+  return OwnerDoc();
+}
+
 bool HasDebuggerPrivilege(JSContext* aCx, JSObject* aObj)
 {
   return nsContentUtils::CallerHasPermission(aCx,

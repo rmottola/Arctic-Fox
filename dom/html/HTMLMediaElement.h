@@ -767,6 +767,8 @@ public:
   };
   void MarkAsContentSource(CallerAPI aAPI);
 
+  nsIDocument* GetDocument() const override;
+
 protected:
   virtual ~HTMLMediaElement();
 
