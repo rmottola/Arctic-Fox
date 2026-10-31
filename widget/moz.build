@@ -131,6 +131,8 @@ EXPORTS.mozilla.widget += [
     'IMEData.h',
     'InProcessCompositorWidget.h',
     'PuppetBidiKeyboard.h',
+    'Screen.h',
+    'ScreenManager.h',
     'WidgetMessageUtils.h',
     'WindowSurface.h'
 ]
@@ -163,6 +165,8 @@ UNIFIED_SOURCES += [
     'nsXPLookAndFeel.cpp',
     'PuppetBidiKeyboard.cpp',
     'PuppetWidget.cpp',
+    'Screen.cpp',
+    'ScreenManager.cpp',
     'ScreenProxy.cpp',
     'SharedWidgetUtils.cpp',
     'TextEventDispatcher.cpp',
