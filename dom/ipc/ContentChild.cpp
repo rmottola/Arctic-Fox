@@ -1730,8 +1730,7 @@ ContentChild::DeallocPParentToChildStreamChild(PParentToChildStreamChild* aActor
 }
 
 PScreenManagerChild*
-ContentChild::AllocPScreenManagerChild(uint32_t* aNumberOfScreens,
-                                       float* aSystemDefaultScale,
+ContentChild::AllocPScreenManagerChild(float* aSystemDefaultScale,
                                        bool* aSuccess)
 {
   // The ContentParent should never attempt to allocate the

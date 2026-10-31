@@ -1415,13 +1415,6 @@ PuppetScreenManager::ScreenForNativeWidget(void* aWidget,
 }
 
 NS_IMETHODIMP
-PuppetScreenManager::GetNumberOfScreens(uint32_t* aNumberOfScreens)
-{
-  *aNumberOfScreens = 1;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 PuppetScreenManager::GetSystemDefaultScale(float *aDefaultScale)
 {
   *aDefaultScale = 1.0f;
