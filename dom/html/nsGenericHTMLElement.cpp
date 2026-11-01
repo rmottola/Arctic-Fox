@@ -1207,8 +1207,9 @@ nsGenericHTMLElement::ParseScrollingValue(const nsAString& aString,
 }
 
 static inline void
-MapLangAttributeInto(const nsMappedAttributes* aAttributes, nsRuleData* aData)
+MapLangAttributeInto(const nsMappedAttributes* aAttributes, GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   if (!(aData->mSIDs & (NS_STYLE_INHERIT_BIT(Font) |
                         NS_STYLE_INHERIT_BIT(Text)))) {
     return;
@@ -1248,8 +1249,9 @@ MapLangAttributeInto(const nsMappedAttributes* aAttributes, nsRuleData* aData)
  */
 void
 nsGenericHTMLElement::MapCommonAttributesIntoExceptHidden(const nsMappedAttributes* aAttributes,
-                                                          nsRuleData* aData)
+                                                          GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   if (aData->mSIDs & NS_STYLE_INHERIT_BIT(UserInterface)) {
     nsCSSValue* userModify = aData->ValueForUserModify();
     if (userModify->GetUnit() == eCSSUnit_Null) {
@@ -1272,8 +1274,9 @@ nsGenericHTMLElement::MapCommonAttributesIntoExceptHidden(const nsMappedAttribut
 
 void
 nsGenericHTMLElement::MapCommonAttributesInto(const nsMappedAttributes* aAttributes,
-                                              nsRuleData* aData)
+                                              GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   MapCommonAttributesIntoExceptHidden(aAttributes, aData);
 
   if (aData->mSIDs & NS_STYLE_INHERIT_BIT(Display)) {
@@ -1336,13 +1339,14 @@ nsGenericHTMLElement::sBackgroundColorAttributeMap[] = {
 
 void
 nsGenericHTMLElement::MapImageAlignAttributeInto(const nsMappedAttributes* aAttributes,
-                                                 nsRuleData* aRuleData)
+                                                 GenericSpecifiedValues* aGenericData)
 {
-  if (aRuleData->mSIDs & NS_STYLE_INHERIT_BIT(Display)) {
+  nsRuleData* aData = aGenericData->AsRuleData();
+  if (aData->mSIDs & NS_STYLE_INHERIT_BIT(Display)) {
     const nsAttrValue* value = aAttributes->GetAttr(nsGkAtoms::align);
     if (value && value->Type() == nsAttrValue::eEnum) {
       int32_t align = value->GetEnumValue();
-      nsCSSValue* cssFloat = aRuleData->ValueForFloat();
+      nsCSSValue* cssFloat = aData->ValueForFloat();
       if (cssFloat->GetUnit() == eCSSUnit_Null) {
         if (align == NS_STYLE_TEXT_ALIGN_LEFT) {
           cssFloat->SetEnumValue(StyleFloat::Left);
@@ -1350,7 +1354,7 @@ nsGenericHTMLElement::MapImageAlignAttributeInto(const nsMappedAttributes* aAttr
           cssFloat->SetEnumValue(StyleFloat::Right);
         }
       }
-      nsCSSValue* verticalAlign = aRuleData->ValueForVerticalAlign();
+      nsCSSValue* verticalAlign = aData->ValueForVerticalAlign();
       if (verticalAlign->GetUnit() == eCSSUnit_Null) {
         switch (align) {
         case NS_STYLE_TEXT_ALIGN_LEFT:
@@ -1367,10 +1371,11 @@ nsGenericHTMLElement::MapImageAlignAttributeInto(const nsMappedAttributes* aAttr
 
 void
 nsGenericHTMLElement::MapDivAlignAttributeInto(const nsMappedAttributes* aAttributes,
-                                               nsRuleData* aRuleData)
+                                               GenericSpecifiedValues* aGenericData)
 {
-  if (aRuleData->mSIDs & NS_STYLE_INHERIT_BIT(Text)) {
-    nsCSSValue* textAlign = aRuleData->ValueForTextAlign();
+  nsRuleData* aData = aGenericData->AsRuleData();
+  if (aData->mSIDs & NS_STYLE_INHERIT_BIT(Text)) {
+    nsCSSValue* textAlign = aData->ValueForTextAlign();
     if (textAlign->GetUnit() == eCSSUnit_Null) {
       // align: enum
       const nsAttrValue* value = aAttributes->GetAttr(nsGkAtoms::align);
@@ -1383,8 +1388,9 @@ nsGenericHTMLElement::MapDivAlignAttributeInto(const nsMappedAttributes* aAttrib
 
 void
 nsGenericHTMLElement::MapImageMarginAttributeInto(const nsMappedAttributes* aAttributes,
-                                                  nsRuleData* aData)
+                                                  GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   if (!(aData->mSIDs & NS_STYLE_INHERIT_BIT(Margin)))
     return;
 
@@ -1431,8 +1437,9 @@ nsGenericHTMLElement::MapImageMarginAttributeInto(const nsMappedAttributes* aAtt
 
 void
 nsGenericHTMLElement::MapImageSizeAttributesInto(const nsMappedAttributes* aAttributes,
-                                                 nsRuleData* aData)
+                                                 GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   if (!(aData->mSIDs & NS_STYLE_INHERIT_BIT(Position)))
     return;
 
@@ -1459,8 +1466,9 @@ nsGenericHTMLElement::MapImageSizeAttributesInto(const nsMappedAttributes* aAttr
 
 void
 nsGenericHTMLElement::MapImageBorderAttributeInto(const nsMappedAttributes* aAttributes,
-                                                  nsRuleData* aData)
+                                                  GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   if (!(aData->mSIDs & NS_STYLE_INHERIT_BIT(Border)))
     return;
 
@@ -1515,8 +1523,9 @@ nsGenericHTMLElement::MapImageBorderAttributeInto(const nsMappedAttributes* aAtt
 
 void
 nsGenericHTMLElement::MapBackgroundInto(const nsMappedAttributes* aAttributes,
-                                        nsRuleData* aData)
+                                        GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   if (!(aData->mSIDs & NS_STYLE_INHERIT_BIT(Background)))
     return;
 
@@ -1543,8 +1552,9 @@ nsGenericHTMLElement::MapBackgroundInto(const nsMappedAttributes* aAttributes,
 
 void
 nsGenericHTMLElement::MapBGColorInto(const nsMappedAttributes* aAttributes,
-                                     nsRuleData* aData)
+                                     GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   if (!(aData->mSIDs & NS_STYLE_INHERIT_BIT(Background)))
     return;
 
@@ -1561,8 +1571,9 @@ nsGenericHTMLElement::MapBGColorInto(const nsMappedAttributes* aAttributes,
 
 void
 nsGenericHTMLElement::MapBackgroundAttributesInto(const nsMappedAttributes* aAttributes,
-                                                  nsRuleData* aData)
+                                                  GenericSpecifiedValues* aGenericData)
 {
+  nsRuleData* aData = aGenericData->AsRuleData();
   MapBackgroundInto(aAttributes, aData);
   MapBGColorInto(aAttributes, aData);
 }
