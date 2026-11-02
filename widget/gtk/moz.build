@@ -115,6 +115,7 @@ LOCAL_INCLUDES += [
     '/layout/xul',
     '/other-licenses/atk-1.0',
     '/widget',
+    '/widget/headless',
 ]
 
 if CONFIG['MOZ_X11']:

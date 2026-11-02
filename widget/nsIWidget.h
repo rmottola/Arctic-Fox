@@ -1868,6 +1868,9 @@ public:
     static already_AddRefed<nsIWidget>
     CreatePuppetWidget(TabChild* aTabChild);
 
+    static already_AddRefed<nsIWidget>
+    CreateHeadlessWidget();
+
     /**
      * Allocate and return a "plugin proxy widget", a subclass of PuppetWidget
      * used in wrapping a PPluginWidget connection for remote widgets. Note

@@ -77,7 +77,9 @@ bool gfxPlatformGtk::sUseFcFontList = false;
 
 gfxPlatformGtk::gfxPlatformGtk()
 {
-    gtk_init(nullptr, nullptr);
+    if (!gfxPlatform::IsHeadless()) {
+        gtk_init(nullptr, nullptr);
+    }
 
     sUseFcFontList = mozilla::Preferences::GetBool("gfx.font_rendering.fontconfig.fontlist.enabled");
     if (!sUseFcFontList && !sFontconfigUtils) {
@@ -87,7 +89,7 @@ gfxPlatformGtk::gfxPlatformGtk()
     mMaxGenericSubstitutions = UNINITIALIZED_VALUE;
 
 #ifdef MOZ_X11
-    if (XRE_IsParentProcess()) {
+    if (!gfxPlatform::IsHeadless() && XRE_IsParentProcess()) {
       if (GDK_IS_X11_DISPLAY(gdk_display_get_default()) &&
           mozilla::Preferences::GetBool("gfx.xrender.enabled"))
       {
@@ -106,7 +108,7 @@ gfxPlatformGtk::gfxPlatformGtk()
                      contentMask, BackendType::CAIRO);
 
 #ifdef MOZ_X11
-    if (GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+    if (gfxPlatform::IsHeadless() && GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
       mCompositorDisplay = XOpenDisplay(nullptr);
       MOZ_ASSERT(mCompositorDisplay, "Failed to create compositor display!");
     } else {
