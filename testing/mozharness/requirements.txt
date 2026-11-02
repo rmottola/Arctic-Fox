@@ -15,7 +15,7 @@ ordereddict==1.1
 paramiko==1.10.0
 pycrypto==2.6
 pyflakes==0.6.1
-pylint==0.27.0
+pylint==4.0.9
 simplejson==2.1.1
 unittest2==0.5.1
 virtualenv==1.5.1
