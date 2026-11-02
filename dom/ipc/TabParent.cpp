@@ -658,7 +658,8 @@ TabParent::InitRenderFrame()
 
       TextureFactoryIdentifier textureFactoryIdentifier;
       renderFrame->GetTextureFactoryIdentifier(&textureFactoryIdentifier);
-      Unused << SendInitRendering(textureFactoryIdentifier, layersId, renderFrame);
+      Unused << SendInitRendering(textureFactoryIdentifier, layersId,
+        renderFrame->IsLayersConnected(), renderFrame);
     }
   } else {
     // Otherwise, the child should have constructed the RenderFrame,
