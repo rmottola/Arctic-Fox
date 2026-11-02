@@ -1104,7 +1104,7 @@ protected:
   /**
    * Manages the internal data storage across type changes.
    */
-  void HandleTypeChange(uint8_t aNewType);
+  void HandleTypeChange(uint8_t aNewType, bool aNotify);
 
   /**
    * Sanitize the value of the element depending of its current type.
