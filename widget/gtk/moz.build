@@ -4,6 +4,15 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files("**"):
+    BUG_COMPONENT = ("Core", "Widget: Gtk")
+
+with Files("*CompositorWidget*"):
+    BUG_COMPONENT = ("Core", "Graphics")
+
+with Files("*WindowSurface*"):
+    BUG_COMPONENT = ("Core", "Graphics")
+
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gtk3':
     DIRS += ['mozgtk']
 
