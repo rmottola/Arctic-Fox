@@ -93,6 +93,7 @@
 #include "mozilla/Telemetry.h"
 #include "mozilla/TelemetryIPC.h"
 #include "mozilla/WebBrowserPersistDocumentParent.h"
+#include "mozilla/widget/ScreenManager.h"
 #include "mozilla/Unused.h"
 #include "nsAnonymousTemporaryFile.h"
 #include "nsAppRunner.h"
@@ -158,7 +159,6 @@
 #include "PreallocatedProcessManager.h"
 #include "ProcessPriorityManager.h"
 #include "SandboxHal.h"
-#include "ScreenManagerParent.h"
 #include "SourceSurfaceRawData.h"
 #include "TabParent.h"
 #include "URIUtils.h"
@@ -2151,6 +2151,9 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
     storage->GetAll(&entry.items());
     xpcomInit.dataStorage().AppendElement(Move(entry));
   }
+  // Must send screen info before send initialData
+  ScreenManager& screenManager = ScreenManager::GetSingleton();
+  screenManager.CopyScreensToRemote(this);
 
   Unused << SendSetXPCOMProcessAttributes(xpcomInit, initialData, lnfCache);
 
@@ -3079,20 +3082,6 @@ bool
 ContentParent::DeallocPParentToChildStreamParent(PParentToChildStreamParent* aActor)
 {
   return nsIContentParent::DeallocPParentToChildStreamParent(aActor);
-}
-
-PScreenManagerParent*
-ContentParent::AllocPScreenManagerParent(float* aSystemDefaultScale,
-                                         bool* aSuccess)
-{
-  return new ScreenManagerParent(aSystemDefaultScale, aSuccess);
-}
-
-bool
-ContentParent::DeallocPScreenManagerParent(PScreenManagerParent* aActor)
-{
-  delete aActor;
-  return true;
 }
 
 PPSMContentDownloaderParent*

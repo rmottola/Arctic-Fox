@@ -1318,13 +1318,6 @@ PuppetWidget::GetScreenDimensions()
 }
 
 NS_IMETHODIMP
-PuppetScreen::GetId(uint32_t *outId)
-{
-  *outId = 1;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 PuppetScreen::GetRect(int32_t *outLeft,  int32_t *outTop,
                       int32_t *outWidth, int32_t *outHeight)
 {
@@ -1369,14 +1362,6 @@ PuppetScreenManager::~PuppetScreenManager()
 }
 
 NS_IMETHODIMP
-PuppetScreenManager::ScreenForId(uint32_t aId,
-                                 nsIScreen** outScreen)
-{
-  NS_IF_ADDREF(*outScreen = mOneScreen.get());
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 PuppetScreenManager::GetPrimaryScreen(nsIScreen** outScreen)
 {
   NS_IF_ADDREF(*outScreen = mOneScreen.get());
@@ -1389,13 +1374,6 @@ PuppetScreenManager::ScreenForRect(int32_t inLeft,
                                    int32_t inWidth,
                                    int32_t inHeight,
                                    nsIScreen** outScreen)
-{
-  return GetPrimaryScreen(outScreen);
-}
-
-NS_IMETHODIMP
-PuppetScreenManager::ScreenForNativeWidget(void* aWidget,
-                                           nsIScreen** outScreen)
 {
   return GetPrimaryScreen(outScreen);
 }
