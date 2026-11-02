@@ -24,6 +24,8 @@
 #include "GeckoProfiler.h"
 #include "nsComponentManagerUtils.h"
 #include "nsITimer.h"
+#include "ScreenHelperWin.h"
+#include "mozilla/widget/ScreenManager.h"
 
 using namespace mozilla;
 using namespace mozilla::widget;
@@ -228,6 +230,12 @@ nsAppShell::Init()
   mEventWnd = CreateWindowW(kWindowClass, L"nsAppShell:EventWindow",
                            0, 0, 0, 10, 10, nullptr, nullptr, module, nullptr);
   NS_ENSURE_STATE(mEventWnd);
+
+  if (XRE_IsParentProcess()) {
+    ScreenManager& screenManager = ScreenManager::GetSingleton();
+    screenManager.SetHelper(mozilla::MakeUnique<ScreenHelperWin>());
+    ScreenHelperWin::RefreshScreens();
+  }
 
   return nsBaseAppShell::Init();
 }
