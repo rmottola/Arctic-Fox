@@ -132,7 +132,11 @@ MakeScreen(GdkScreen* aScreen, gint aMonitorNum)
   GdkRectangle monitor;
   GdkRectangle workarea;
   gdk_screen_get_monitor_geometry(aScreen, aMonitorNum, &monitor);
+#if (MOZ_WIDGET_GTK >= 3)
   gdk_screen_get_monitor_workarea(aScreen, aMonitorNum, &workarea);
+#else
+  workarea = monitor;
+#endif
   gint gdkScaleFactor = ScreenHelperGTK::GetGTKMonitorScaleFactor(aMonitorNum);
 
   // gdk_screen_get_monitor_geometry / workarea returns application pixels
