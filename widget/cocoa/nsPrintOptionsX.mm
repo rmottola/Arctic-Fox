@@ -8,6 +8,8 @@
 #include "nsIServiceManager.h"
 #include "nsPrintOptionsX.h"
 #include "nsPrintSettingsX.h"
+#include "nsIWebBrowserPrint.h"
+#include "nsCocoaUtils.h"
 
 #if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
 NSString *const NSPrintJobSavingFileNameExtensionHidden = @"NSPrintJobSavingFileNameExtensionHidden";
