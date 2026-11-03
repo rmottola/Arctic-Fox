@@ -3003,7 +3003,7 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 
   @media (-moz-os-version: windows-win10) {
     /* Draw XUL caption buttons and background on Win10 */
-    @media (-moz-windows-accent-color-applies: 0) {
+    @media (-moz-windows-accent-color-in-titlebar: 0) {
       /* Default styling for when no accent color is applied */
       #main-window:not(:-moz-window-inactive):not(:-moz-lwtheme) {
         background-color: white;
@@ -3049,7 +3049,7 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
       }
     }
     
-    @media (-moz-windows-accent-color-applies) {
+    @media (-moz-windows-accent-color-in-titlebar) {
       /* Styling for when an accent color is applied to the titlebar */
       #main-window:not(:-moz-window-inactive):not(:-moz-lwtheme) {
         background-color: -moz-win-accentcolor;
