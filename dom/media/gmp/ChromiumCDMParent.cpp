@@ -18,6 +18,8 @@
 namespace mozilla {
 namespace gmp {
 
+using namespace eme;
+
 ChromiumCDMParent::ChromiumCDMParent(GMPContentParent* aContentParent,
                                      uint32_t aPluginId)
   : mPluginId(aPluginId)
@@ -1006,7 +1008,7 @@ ChromiumCDMParent::Shutdown()
   mProxy = nullptr;
 
   for (RefPtr<DecryptJob>& decrypt : mDecrypts) {
-    decrypt->PostResult(AbortedErr);
+    decrypt->PostResult(eme::AbortedErr);
   }
   mDecrypts.Clear();
 
