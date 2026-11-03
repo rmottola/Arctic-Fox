@@ -99,10 +99,13 @@ private:
   HeadlessCompositorWidget* mCompositorWidget;
   // The size mode before entering fullscreen mode.
   nsSizeMode mLastSizeMode;
+  // The last size mode set while the window was visible.
+  nsSizeMode mEffectiveSizeMode;
   InputContext mInputContext;
   // In headless there is no window manager to track window bounds
   // across size mode changes, so we must track it to emulate.
   LayoutDeviceIntRect mRestoreBounds;
+  void ApplySizeModeSideEffects();
   // Similarly, we must track the active window ourselves in order
   // to dispatch (de)activation events properly.
   void RaiseWindow();
