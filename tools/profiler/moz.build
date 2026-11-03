@@ -11,6 +11,7 @@ if CONFIG['MOZ_GECKO_PROFILER']:
         'gecko/nsIProfileSaveEvent.idl',
     ]
     EXPORTS += [
+        'public/CrossProcessProfilerController.h',
         'public/ProfilerMarkers.h',
         'public/PseudoStack.h',
         'public/shared-libraries.h',
@@ -27,6 +28,7 @@ if CONFIG['MOZ_GECKO_PROFILER']:
         'core/ProfilerMarkers.cpp',
         'core/StackTop.cpp',
         'core/ThreadInfo.cpp',
+        'gecko/CrossProcessProfilerController.cpp',
         'gecko/nsProfiler.cpp',
         'gecko/nsProfilerFactory.cpp',
         'gecko/nsProfilerStartParams.cpp',
@@ -114,6 +116,7 @@ include('/ipc/chromium/chromium-config.mozbuild')
 
 EXPORTS += [
     'public/GeckoProfiler.h',
+    'public/ProfilerControllingProcess.h',
 ]
 
 if CONFIG['MOZ_TASK_TRACER']:
@@ -135,3 +138,6 @@ if CONFIG['GNU_CXX']:
         '-Wno-error=shadow',
         '-Wno-ignored-qualifiers', # due to use of breakpad headers
     ]
+
+with Files('**'):
+    BUG_COMPONENT = ('Core', 'Gecko Profiler')
