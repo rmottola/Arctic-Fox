@@ -158,7 +158,6 @@ public:
   }
 
 private:
-  nsresult Reset();
   nsresult LoadPrefixSet();
 
   virtual nsresult StoreToFile(nsIFile* aFile) = 0;
