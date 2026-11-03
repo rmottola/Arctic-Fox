@@ -9,6 +9,7 @@
 
 #include "mozilla/ipc/FileDescriptorSetParent.h"
 #include "mozilla/net/HttpChannelParent.h"
+#include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/net/NeckoParent.h"
@@ -1114,6 +1115,13 @@ HttpChannelParent::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
   MOZ_ASSERT(mChannel == chan,
              "HttpChannelParent getting OnStartRequest from a different nsHttpChannel instance");
 
+  // Send down any permissions which are relevant to this URL if we are
+  // performing a document load.
+  PContentParent* pcp = Manager()->Manager();
+  nsresult rv =
+    static_cast<ContentParent*>(pcp)->TransmitPermissionsFor(chan);
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
+
   nsHttpResponseHead *responseHead = chan->GetResponseHead();
   nsHttpRequestHead  *requestHead = chan->GetRequestHead();
   bool isFromCache = false;
@@ -1179,7 +1187,7 @@ HttpChannelParent::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
 
   // !!! We need to lock headers and please don't forget to unlock them !!!
   requestHead->Enter();
-  nsresult rv = NS_OK;
+  rv = NS_OK;
   if (mIPCClosed ||
       !SendOnStartRequest(channelStatus,
                           responseHead ? *responseHead : nsHttpResponseHead(),
