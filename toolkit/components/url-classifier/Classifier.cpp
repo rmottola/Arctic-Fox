@@ -709,7 +709,11 @@ Classifier::ApplyUpdatesBackground(nsTArray<TableUpdate*>* aUpdates,
         LOG(("Failed to copy in-use directory for update."));
         return rv;
       }
-      CopyInUseLookupCacheForUpdate(); // i.e. mNewLookupCaches will be setup.
+      rv = CopyInUseLookupCacheForUpdate(); // i.e. mNewLookupCaches will be setup.
+      if (NS_FAILED(rv)) {
+        LOG(("Failed to create lookup caches from copied files."));
+        return rv;
+      }
     }
 
     LOG(("Applying %" PRIuSIZE " table updates.", aUpdates->Length()));
@@ -1001,7 +1005,7 @@ Classifier::CopyInUseDirForUpdate()
   return NS_OK;
 }
 
-void
+nsresult
 Classifier::CopyInUseLookupCacheForUpdate()
 {
   MOZ_ASSERT(mNewLookupCaches.IsEmpty(), "Update intermediaries is forgotten to "
@@ -1012,8 +1016,12 @@ Classifier::CopyInUseLookupCacheForUpdate()
   // Another option is to NOT pre-open these LookupCaches and
   // do a "merge" instead of "swap" after update.
   for (auto c: mLookupCaches) {
-    Unused << GetLookupCacheForUpdate(c->TableName());
+    if (!GetLookupCacheForUpdate(c->TableName())) {
+      return NS_ERROR_FAILURE;
+    }
   }
+
+  return NS_OK;
 }
 
 nsresult
@@ -1317,20 +1325,14 @@ Classifier::UpdateCache(TableUpdate* aUpdate)
 LookupCache *
 Classifier::GetLookupCache(const nsACString& aTable, bool aForUpdate)
 {
-  if (aForUpdate) {
-    return GetLookupCacheFrom(aTable, mNewLookupCaches, mUpdatingDirectory);
-  }
-  return GetLookupCacheFrom(aTable, mLookupCaches, mRootStoreDirectory);
-}
+  nsTArray<LookupCache*>& lookupCaches = aForUpdate ? mNewLookupCaches
+                                                    : mLookupCaches;
+  auto& rootStoreDirectory = aForUpdate ? mUpdatingDirectory
+                                        : mRootStoreDirectory;
 
-LookupCache *
-Classifier::GetLookupCacheFrom(const nsACString& aTable,
-                               nsTArray<LookupCache*>& aLookupCaches,
-                               nsIFile* aRootStoreDirectory)
-{
-  for (uint32_t i = 0; i < aLookupCaches.Length(); i++) {
-    if (aLookupCaches[i]->TableName().Equals(aTable)) {
-      return aLookupCaches[i];
+  for (auto c: lookupCaches) {
+    if (c->TableName().Equals(aTable)) {
+      return c;
     }
   }
 
@@ -1340,9 +1342,9 @@ Classifier::GetLookupCacheFrom(const nsACString& aTable,
   UniquePtr<LookupCache> cache;
   nsCString provider = GetProvider(aTable);
   if (StringEndsWith(aTable, NS_LITERAL_CSTRING("-proto"))) {
-    cache = MakeUnique<LookupCacheV4>(aTable, provider, aRootStoreDirectory);
+    cache = MakeUnique<LookupCacheV4>(aTable, provider, rootStoreDirectory);
   } else {
-    cache = MakeUnique<LookupCacheV2>(aTable, provider, aRootStoreDirectory);
+    cache = MakeUnique<LookupCacheV2>(aTable, provider, rootStoreDirectory);
   }
 
   nsresult rv = cache->Init();
@@ -1350,14 +1352,28 @@ Classifier::GetLookupCacheFrom(const nsACString& aTable,
     return nullptr;
   }
   rv = cache->Open();
-  if (NS_FAILED(rv)) {
-    if (rv == NS_ERROR_FILE_CORRUPTED) {
-      Reset();
-    }
+  if (NS_SUCCEEDED(rv)) {
+    lookupCaches.AppendElement(cache.get());
+    return cache.release();
+  }
+
+  // At this point we failed to open LookupCache.
+  //
+  // GetLookupCache for update and for other usage will run on update thread
+  // and worker thread respectively (Bug 1339760). Removing stuff only in
+  // their own realms potentially increases the concurrency.
+
+  if (aForUpdate) {
+    // Remove intermediaries no matter if it's due to file corruption or not.
+    RemoveUpdateIntermediaries();
     return nullptr;
   }
-  aLookupCaches.AppendElement(cache.get());
-  return cache.release();
+
+  // Non-update case.
+  if (rv == NS_ERROR_FILE_CORRUPTED) {
+    Reset(); // Not including the update intermediaries.
+  }
+  return nullptr;
 }
 
 nsresult
