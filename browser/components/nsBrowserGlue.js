@@ -101,11 +101,11 @@ if (AppConstants.MOZ_CRASHREPORTER) {
 }
 
 XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
-  return Services.strings.createBundle('chrome://branding/locale/brand.properties');
+  return Services.strings.createBundle("chrome://branding/locale/brand.properties");
 });
 
 XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
-  return Services.strings.createBundle('chrome://browser/locale/browser.properties');
+  return Services.strings.createBundle("chrome://browser/locale/browser.properties");
 });
 
 // Seconds of idle before trying to create a bookmarks backup.
@@ -378,73 +378,12 @@ BrowserGlue.prototype = {
           }
         });
         break;
-      case "autocomplete-did-enter-text":
-        this._handleURLBarTelemetry(subject.QueryInterface(Ci.nsIAutoCompleteInput));
-        break;
       case "test-initialize-sanitizer":
         this._sanitizer.onStartup();
         break;
       case AddonWatcher.TOPIC_SLOW_ADDON_DETECTED:
         this._notifySlowAddon(data);
         break;
-    }
-  },
-
-  _handleURLBarTelemetry(input) {
-    if (!input ||
-        input.id != "urlbar" ||
-        input.inPrivateContext ||
-        input.popup.selectedIndex < 0) {
-      return;
-    }
-    let controller =
-      input.popup.view.QueryInterface(Ci.nsIAutoCompleteController);
-    let idx = input.popup.selectedIndex;
-    let value = controller.getValueAt(idx);
-    let action = input._parseActionUrl(value);
-    let actionType;
-    if (action) {
-      actionType =
-        action.type == "searchengine" && action.params.searchSuggestion ?
-          "searchsuggestion" :
-        action.type;
-    }
-    if (!actionType) {
-      let styles = new Set(controller.getStyleAt(idx).split(/\s+/));
-      let style = ["autofill", "tag", "bookmark"].find(s => styles.has(s));
-      actionType = style || "history";
-    }
-
-    Services.telemetry
-            .getHistogramById("FX_URLBAR_SELECTED_RESULT_INDEX")
-            .add(idx);
-
-    // Ideally this would be a keyed histogram and we'd just add(actionType),
-    // but keyed histograms aren't currently shown on the telemetry dashboard
-    // (bug 1151756).
-    //
-    // You can add values but don't change any of the existing values.
-    // Otherwise you'll break our data.
-    let buckets = {
-      autofill: 0,
-      bookmark: 1,
-      history: 2,
-      keyword: 3,
-      searchengine: 4,
-      searchsuggestion: 5,
-      switchtab: 6,
-      tag: 7,
-      visiturl: 8,
-      remotetab: 9,
-      extension: 10,
-    };
-    if (actionType in buckets) {
-      Services.telemetry
-              .getHistogramById("FX_URLBAR_SELECTED_RESULT_TYPE")
-              .add(buckets[actionType]);
-    } else {
-      Cu.reportError("Unknown FX_URLBAR_SELECTED_RESULT_TYPE type: " +
-                     actionType);
     }
   },
 
@@ -482,7 +421,6 @@ BrowserGlue.prototype = {
     os.addObserver(this, "restart-in-safe-mode", false);
     os.addObserver(this, "flash-plugin-hang", false);
     os.addObserver(this, "xpi-signature-changed", false);
-    os.addObserver(this, "autocomplete-did-enter-text", false);
 
     if (AppConstants.NIGHTLY_BUILD) {
       os.addObserver(this, AddonWatcher.TOPIC_SLOW_ADDON_DETECTED, false);
@@ -535,7 +473,6 @@ BrowserGlue.prototype = {
     os.removeObserver(this, "browser-search-engine-modified");
     os.removeObserver(this, "flash-plugin-hang");
     os.removeObserver(this, "xpi-signature-changed");
-    os.removeObserver(this, "autocomplete-did-enter-text");
   },
 
   _onAppDefaults: function BG__onAppDefaults() {
@@ -560,7 +497,7 @@ BrowserGlue.prototype = {
       let brandShortName = brandBundle.getString("brandShortName");
       let message = win.gNavigatorBundle.getFormattedString("addonwatch.slow", [addon.name, brandShortName]);
       let notificationBox = win.document.getElementById("global-notificationbox");
-      let notificationId = 'addon-slow:' + addonId;
+      let notificationId = "addon-slow:" + addonId;
       let notification = notificationBox.getNotificationWithValue(notificationId);
       if(notification) {
         notification.label = message;
@@ -2890,6 +2827,7 @@ var E10SAccessibilityCheck = {
     let options = {
       popupIconURL: "chrome://browser/skin/e10s-64@2x.png",
       learnMoreURL: Services.urlFormatter.formatURLPref("app.support.e10sAccessibilityUrl"),
+      persistent: true,
       persistWhileVisible: true,
       hideNotNow: true,
     };

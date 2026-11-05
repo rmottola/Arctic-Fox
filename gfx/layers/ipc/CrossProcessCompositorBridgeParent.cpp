@@ -22,6 +22,7 @@
 #include "mozilla/layers/PLayerTransactionParent.h"
 #include "mozilla/layers/RemoteContentController.h"
 #include "mozilla/layers/WebRenderBridgeParent.h"
+#include "mozilla/layers/WebRenderCompositableHolder.h"
 #include "mozilla/mozalloc.h"           // for operator new, etc
 #include "nsDebug.h"                    // for NS_ASSERTION, etc
 #include "nsTArray.h"                   // for nsTArray
@@ -88,7 +89,9 @@ CrossProcessCompositorBridgeParent::AllocPLayerTransactionParent(
     LayerTransactionParent* p = new LayerTransactionParent(lm, this, aId);
     p->AddIPDLReference();
     sIndirectLayerTrees[aId].mLayerTree = p;
-    p->SetPendingCompositorUpdates(state->mPendingCompositorUpdates);
+    if (state->mPendingCompositorUpdate) {
+      p->SetPendingCompositorUpdate(state->mPendingCompositorUpdate.value());
+    }
     return p;
   }
 
@@ -197,7 +200,8 @@ CrossProcessCompositorBridgeParent::DeallocPAPZParent(PAPZParent* aActor)
 
 PWebRenderBridgeParent*
 CrossProcessCompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::PipelineId& aPipelineId,
-                                                                TextureFactoryIdentifier* aTextureFactoryIdentifier)
+                                                                TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                                                                uint32_t *aIdNamespace)
 {
 #ifndef MOZ_ENABLE_WEBRENDER
   // Extra guard since this in the parent process and we don't want a malicious
@@ -217,12 +221,17 @@ CrossProcessCompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::Pipeli
   CompositorBridgeParent* cbp = sIndirectLayerTrees[pipelineHandle].mParent;
   WebRenderBridgeParent* root = sIndirectLayerTrees[cbp->RootLayerTreeId()].mWrBridge.get();
 
-  WebRenderBridgeParent* parent = new WebRenderBridgeParent(
-    this, aPipelineId, nullptr, root->GLContext(), root->WindowState(), root->Compositor());
+  WebRenderBridgeParent* parent = nullptr;
+  RefPtr<wr::WebRenderAPI> api = root->GetWebRenderAPI();
+  RefPtr<WebRenderCompositableHolder> holder = root->CompositableHolder();
+  parent = new WebRenderBridgeParent(this, aPipelineId, nullptr, root->CompositorScheduler(), Move(api), Move(holder));
+
   parent->AddRef(); // IPDL reference
   sIndirectLayerTrees[pipelineHandle].mCrossProcessParent = this;
   sIndirectLayerTrees[pipelineHandle].mWrBridge = parent;
-  *aTextureFactoryIdentifier = parent->Compositor()->GetTextureFactoryIdentifier();
+  *aTextureFactoryIdentifier = parent->GetTextureFactoryIdentifier();
+  *aIdNamespace = parent->GetIdNameSpace();
+
   return parent;
 }
 
@@ -319,8 +328,7 @@ CrossProcessCompositorBridgeParent::DidComposite(
     Unused << SendDidComposite(aId, layerTree->GetPendingTransactionId(), aCompositeStart, aCompositeEnd);
     layerTree->SetPendingTransactionId(0);
   } else if (WebRenderBridgeParent* wrbridge = sIndirectLayerTrees[aId].mWrBridge) {
-    Unused << SendDidComposite(aId, wrbridge->GetPendingTransactionId(), aCompositeStart, aCompositeEnd);
-    wrbridge->SetPendingTransactionId(0);
+    Unused << SendDidComposite(aId, wrbridge->FlushPendingTransactionIds(), aCompositeStart, aCompositeEnd);
   }
 }
 
@@ -459,16 +467,18 @@ CrossProcessCompositorBridgeParent::GetCompositionManager(LayerTransactionParent
 }
 
 mozilla::ipc::IPCResult
-CrossProcessCompositorBridgeParent::RecvAcknowledgeCompositorUpdate(const uint64_t& aLayersId)
+CrossProcessCompositorBridgeParent::RecvAcknowledgeCompositorUpdate(const uint64_t& aLayersId,
+                                                                    const uint64_t& aSeqNo)
 {
   MonitorAutoLock lock(*sIndirectLayerTreesLock);
   CompositorBridgeParent::LayerTreeState& state = sIndirectLayerTrees[aLayersId];
 
   if (LayerTransactionParent* ltp = state.mLayerTree) {
-    ltp->AcknowledgeCompositorUpdate();
+    ltp->AcknowledgeCompositorUpdate(aSeqNo);
   }
-  MOZ_ASSERT(state.mPendingCompositorUpdates > 0);
-  state.mPendingCompositorUpdates--;
+  if (state.mPendingCompositorUpdate == Some(aSeqNo)) {
+    state.mPendingCompositorUpdate = Nothing();
+  }
   return IPC_OK();
 }
 
@@ -501,7 +511,7 @@ CrossProcessCompositorBridgeParent::AllocPTextureParent(const SurfaceDescriptor&
 
   TextureFlags flags = aFlags;
 
-  if (!state || state->mPendingCompositorUpdates) {
+  if (!state || state->mPendingCompositorUpdate) {
     // The compositor was recreated, and we're receiving layers updates for a
     // a layer manager that will soon be discarded or invalidated. We can't
     // return null because this will mess up deserialization later and we'll

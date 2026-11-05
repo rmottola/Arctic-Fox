@@ -5,7 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 include protocol PBlob;
-include protocol PSendStream;
+include protocol PChildToParentStream;
+include protocol PParentToChildStream;
 include IPCStream;
 include ProtocolTypes;
 
@@ -14,6 +15,11 @@ using struct mozilla::void_t
 
 using struct mozilla::SerializedStructuredCloneBuffer
   from "ipc/IPCMessageUtils.h";
+
+using LayoutDeviceIntRect from "Units.h";
+using DesktopIntRect from "Units.h";
+using DesktopToLayoutDeviceScale from "Units.h";
+using CSSToLayoutDeviceScale from "Units.h";
 
 namespace mozilla {
 namespace dom {
@@ -181,6 +187,18 @@ struct IPCDataTransferItem
 struct IPCDataTransfer
 {
   IPCDataTransferItem[] items;
+};
+
+struct ScreenDetails {
+  LayoutDeviceIntRect rect;
+  DesktopIntRect rectDisplayPix;
+  LayoutDeviceIntRect availRect;
+  DesktopIntRect availRectDisplayPix;
+  int32_t pixelDepth;
+  int32_t colorDepth;
+  DesktopToLayoutDeviceScale contentsScaleFactor;
+  CSSToLayoutDeviceScale defaultCSSScaleFactor;
+  float dpi;
 };
 
 } // namespace dom

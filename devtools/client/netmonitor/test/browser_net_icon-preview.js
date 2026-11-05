@@ -17,6 +17,8 @@ add_task(function* () {
         gStore } = monitor.panelWin;
   let { RequestsMenu } = NetMonitorView;
 
+  RequestsMenu.lazyUpdate = false;
+
   let wait = waitForEvents();
   yield performRequests();
   yield wait;
@@ -28,7 +30,7 @@ add_task(function* () {
   info("Checking the image thumbnail when all items are sorted.");
   checkImageThumbnail();
 
-  gStore.dispatch(Actions.toggleFilterType("images"));
+  gStore.dispatch(Actions.toggleRequestFilterType("images"));
   info("Checking the image thumbnail when only images are shown.");
   checkImageThumbnail();
 

@@ -77,7 +77,7 @@ IdentityProviderService.prototype = {
 
     let err = "No provisioning flow found with id " + aProvId;
     log("ERROR:", err);
-    if (typeof aErrBack === 'function') {
+    if (typeof aErrBack === "function") {
       aErrBack(err);
     }
 
@@ -178,7 +178,6 @@ IdentityProviderService.prototype = {
     provFlow.caller = aCaller;
 
     let identity = provFlow.identity;
-    let frame = provFlow.provisioningFrame;
 
     // Determine recommended length of cert.
     let duration = this.certDuration;
@@ -381,7 +380,7 @@ IdentityProviderService.prototype = {
     let provId = authFlow.provId;
 
     // delete caller
-    delete authFlow['caller'];
+    delete authFlow["caller"];
     delete this._authenticationFlows[aAuthId];
 
     let provFlow = this.getProvisionFlow(provId);
@@ -412,7 +411,7 @@ IdentityProviderService.prototype = {
     let provId = authFlow.provId;
 
     // delete caller
-    delete authFlow['caller'];
+    delete authFlow["caller"];
     delete this._authenticationFlows[aAuthId];
 
     let provFlow = this.getProvisionFlow(provId);
@@ -469,17 +468,17 @@ IdentityProviderService.prototype = {
    * that may be attached to it.
    */
   _cleanUpProvisionFlow: function _cleanUpProvisionFlow(aProvId) {
-    log('_cleanUpProvisionFlow:', aProvId);
+    log("_cleanUpProvisionFlow:", aProvId);
     let prov = this._provisionFlows[aProvId];
 
     // Clean up the sandbox, if there is one.
     if (prov.provisioningSandbox) {
-      let sandbox = this._provisionFlows[aProvId]['provisioningSandbox'];
+      let sandbox = this._provisionFlows[aProvId]["provisioningSandbox"];
       if (sandbox.free) {
-        log('_cleanUpProvisionFlow: freeing sandbox');
+        log("_cleanUpProvisionFlow: freeing sandbox");
         sandbox.free();
       }
-      delete this._provisionFlows[aProvId]['provisioningSandbox'];
+      delete this._provisionFlows[aProvId]["provisioningSandbox"];
     }
 
     // Clean up a related authentication flow, if there is one.

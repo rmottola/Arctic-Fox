@@ -25,11 +25,13 @@ ToMediaDrmSessionType(dom::MediaKeySessionType aSessionType)
 MediaDrmCDMProxy::MediaDrmCDMProxy(dom::MediaKeys* aKeys,
                                    const nsAString& aKeySystem,
                                    bool aDistinctiveIdentifierRequired,
-                                   bool aPersistentStateRequired)
+                                   bool aPersistentStateRequired,
+                                   nsIEventTarget* aMainThread)
   : CDMProxy(aKeys,
              aKeySystem,
              aDistinctiveIdentifierRequired,
-             aPersistentStateRequired)
+             aPersistentStateRequired,
+             aMainThread)
   , mCDM(nullptr)
   , mShutdownCalled(false)
 {
@@ -53,7 +55,8 @@ MediaDrmCDMProxy::Init(PromiseId aPromiseId,
 
   EME_LOG("MediaDrmCDMProxy::Init (%s, %s) %s",
           NS_ConvertUTF16toUTF8(aOrigin).get(),
-          NS_ConvertUTF16toUTF8(aTopLevelOrigin).get());
+          NS_ConvertUTF16toUTF8(aTopLevelOrigin).get(),
+          NS_ConvertUTF16toUTF8(aName).get());
 
   // Create a thread to work with cdm.
   if (!mOwnerThread) {
@@ -98,6 +101,7 @@ MediaDrmCDMProxy::CreateSession(uint32_t aCreateSessionToken,
 
 void
 MediaDrmCDMProxy::LoadSession(PromiseId aPromiseId,
+                              dom::MediaKeySessionType aSessionType,
                               const nsAString& aSessionId)
 {
   // TODO: Implement LoadSession.
@@ -281,7 +285,7 @@ MediaDrmCDMProxy::OnRejectPromise(uint32_t aPromiseId,
   RejectPromise(aPromiseId, aDOMException, aMsg);
 }
 
-RefPtr<MediaDrmCDMProxy::DecryptPromise>
+RefPtr<DecryptPromise>
 MediaDrmCDMProxy::Decrypt(MediaRawData* aSample)
 {
   MOZ_ASSERT_UNREACHABLE("Fennec could not handle decrypting individually");
@@ -307,7 +311,7 @@ MediaDrmCDMProxy::RejectPromise(PromiseId aId, nsresult aCode,
   } else {
     nsCOMPtr<nsIRunnable> task(new RejectPromiseTask(this, aId, aCode,
                                                      aReason));
-    NS_DispatchToMainThread(task);
+    mMainThread->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
   }
 }
 
@@ -325,7 +329,7 @@ MediaDrmCDMProxy::ResolvePromise(PromiseId aId)
     task = NewRunnableMethod<PromiseId>(this,
                                         &MediaDrmCDMProxy::ResolvePromise,
                                         aId);
-    NS_DispatchToMainThread(task);
+    mMainThread->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
   }
 }
 
@@ -407,7 +411,7 @@ MediaDrmCDMProxy::md_Init(uint32_t aPromiseId)
     NewRunnableMethod<uint32_t>(this,
                                 &MediaDrmCDMProxy::OnCDMCreated,
                                 aPromiseId));
-  NS_DispatchToMainThread(task);
+  mMainThread->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
 }
 
 void

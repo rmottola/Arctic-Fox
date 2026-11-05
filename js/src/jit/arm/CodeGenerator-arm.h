@@ -236,8 +236,6 @@ class CodeGeneratorARM : public CodeGeneratorShared
     void visitWasmSelect(LWasmSelect* ins);
     void visitWasmReinterpret(LWasmReinterpret* ins);
     void emitWasmCall(LWasmCallBase* ins);
-    void visitWasmCall(LWasmCall* ins);
-    void visitWasmCallI64(LWasmCallI64* ins);
     void visitWasmLoad(LWasmLoad* ins);
     void visitWasmLoadI64(LWasmLoadI64* ins);
     void visitWasmUnalignedLoad(LWasmUnalignedLoad* ins);
@@ -247,10 +245,6 @@ class CodeGeneratorARM : public CodeGeneratorShared
     void visitWasmStoreI64(LWasmStoreI64* ins);
     void visitWasmUnalignedStore(LWasmUnalignedStore* ins);
     void visitWasmUnalignedStoreI64(LWasmUnalignedStoreI64* ins);
-    void visitWasmLoadGlobalVar(LWasmLoadGlobalVar* ins);
-    void visitWasmLoadGlobalVarI64(LWasmLoadGlobalVarI64* ins);
-    void visitWasmStoreGlobalVar(LWasmStoreGlobalVar* ins);
-    void visitWasmStoreGlobalVarI64(LWasmStoreGlobalVarI64* ins);
     void visitAsmJSLoadHeap(LAsmJSLoadHeap* ins);
     void visitAsmJSStoreHeap(LAsmJSStoreHeap* ins);
     void visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap* ins);

@@ -33,6 +33,10 @@ class CSSRuleList;
 class SRIMetadata;
 } // namespace dom
 
+namespace css {
+class Rule;
+}
+
 /**
  * Superclass for data common to CSSStyleSheet and ServoStyleSheet.
  */
@@ -57,9 +61,6 @@ public:
 
   css::SheetParsingMode ParsingMode() { return mParsingMode; }
   mozilla::dom::CSSStyleSheetParsingMode ParsingModeDOM();
-
-  // The document this style sheet is associated with.  May be null
-  nsIDocument* GetDocument() const { return mDocument; }
 
   /**
    * Whether the sheet is complete.
@@ -162,7 +163,7 @@ public:
   // The XPCOM SetDisabled is fine for WebIDL.
 
   // WebIDL CSSStyleSheet API
-  virtual nsIDOMCSSRule* GetDOMOwnerRule() const = 0;
+  virtual css::Rule* GetDOMOwnerRule() const = 0;
   dom::CSSRuleList* GetCssRules(nsIPrincipal& aSubjectPrincipal,
                                 ErrorResult& aRv);
   uint32_t InsertRule(const nsAString& aRule, uint32_t aIndex,

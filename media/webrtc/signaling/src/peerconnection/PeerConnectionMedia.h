@@ -20,13 +20,11 @@
 #include "signaling/src/jsep/JsepSession.h"
 #include "AudioSegment.h"
 
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
 #include "Layers.h"
 #include "VideoUtils.h"
 #include "ImageLayers.h"
 #include "VideoSegment.h"
 #include "MediaStreamTrack.h"
-#endif
 
 class nsIPrincipal;
 
@@ -143,11 +141,9 @@ public:
                             dom::MediaStreamTrack& aNewTrack,
                             const std::string& newTrackId);
 
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   void UpdateSinkIdentity_m(dom::MediaStreamTrack* aTrack,
                             nsIPrincipal* aPrincipal,
                             const PeerIdentity* aSinkIdentity);
-#endif
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(LocalSourceStreamInfo)
 
@@ -156,7 +152,6 @@ private:
       const std::string& trackId);
 };
 
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
 class RemoteTrackSource : public dom::MediaStreamTrackSource
 {
 public:
@@ -188,7 +183,6 @@ public:
 protected:
   virtual ~RemoteTrackSource() {}
 };
-#endif
 
 class RemoteSourceStreamInfo : public SourceStreamInfo {
   ~RemoteSourceStreamInfo() {}
@@ -205,9 +199,7 @@ class RemoteSourceStreamInfo : public SourceStreamInfo {
   void RemoveTrack(const std::string& trackId) override;
   void SyncPipeline(RefPtr<MediaPipelineReceive> aPipeline);
 
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   void UpdatePrincipal_m(nsIPrincipal* aPrincipal);
-#endif
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(RemoteSourceStreamInfo)
 
@@ -271,7 +263,8 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
 
   // Activate or remove ICE transports at the conclusion of offer/answer,
   // or when rollback occurs.
-  void ActivateOrRemoveTransports(const JsepSession& aSession);
+  void ActivateOrRemoveTransports(const JsepSession& aSession,
+                                  const bool forceIceTcp);
 
   // Start ICE checks.
   void StartIceChecks(const JsepSession& session);
@@ -292,6 +285,9 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
   // Process a trickle ICE candidate.
   void AddIceCandidate(const std::string& candidate, const std::string& mid,
                        uint32_t aMLine);
+
+  // Handle notifications of network online/offline events.
+  void UpdateNetworkState(bool online);
 
   // Handle complete media pipelines.
   nsresult UpdateMediaPipelines(const JsepSession& session);
@@ -335,7 +331,6 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
                         const std::string& aNewStreamId,
                         const std::string& aNewTrackId);
 
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
   // In cases where the peer isn't yet identified, we disable the pipeline (not
   // the stream, that would potentially affect others), so that it sends
   // black/silence.  Once the peer is identified, re-enable those streams.
@@ -348,7 +343,6 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
   // When we finally learn who is on the other end, we need to change the ownership
   // on streams
   void UpdateRemoteStreamPrincipals_m(nsIPrincipal* aPrincipal);
-#endif
 
   bool AnyCodecHasPluginID(uint64_t aPluginID);
 
@@ -411,13 +405,13 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
         static_cast<VideoSessionConduit*>(it->second.second.get()));
   }
 
+  void AddVideoConduit(size_t level, const RefPtr<VideoSessionConduit> &aConduit) {
+    mConduits[level] = std::make_pair(true, aConduit);
+  }
+
   // Add a conduit
   void AddAudioConduit(size_t level, const RefPtr<AudioSessionConduit> &aConduit) {
     mConduits[level] = std::make_pair(false, aConduit);
-  }
-
-  void AddVideoConduit(size_t level, const RefPtr<VideoSessionConduit> &aConduit) {
-    mConduits[level] = std::make_pair(true, aConduit);
   }
 
   // ICE state signals
@@ -433,6 +427,8 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
       SignalUpdateDefaultCandidate;
   sigslot::signal1<uint16_t>
       SignalEndOfLocalCandidates;
+
+  RefPtr<WebRtcCallWrapper> mCall;
 
  private:
   nsresult InitProxy();
@@ -475,6 +471,7 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
   void PerformOrEnqueueIceCtxOperation(nsIRunnable* runnable);
   void EnsureIceGathering_s(bool aDefaultRouteOnly, bool aProxyOnly);
   void StartIceChecks_s(bool aIsControlling,
+                        bool aIsOfferer,
                         bool aIsIceLite,
                         const std::vector<std::string>& aIceOptionsList);
 
@@ -490,6 +487,7 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
   void AddIceCandidate_s(const std::string& aCandidate, const std::string& aMid,
                          uint32_t aMLine);
 
+  void UpdateNetworkState_s(bool online);
 
   // ICE events
   void IceGatheringStateChange_s(NrIceCtx* ctx,

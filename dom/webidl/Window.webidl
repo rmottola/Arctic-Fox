@@ -23,7 +23,6 @@ interface IID;
 interface nsIBrowserDOMWindow;
 interface nsIMessageBroadcaster;
 interface nsIDOMCrypto;
-typedef any Transferable;
 
 // http://www.whatwg.org/specs/web-apps/current-work/
 [PrimaryGlobal, LegacyUnenumerableNamedProperties, NeedResolve]
@@ -84,7 +83,7 @@ typedef any Transferable;
   any showModalDialog(DOMString url, optional any argument, optional DOMString options = "");
 
   [Throws, CrossOriginCallable, NeedsSubjectPrincipal]
-  void postMessage(any message, DOMString targetOrigin, optional sequence<Transferable> transfer);
+  void postMessage(any message, DOMString targetOrigin, optional sequence<object> transfer = []);
 
   // also has obsolete members
 };
@@ -205,17 +204,6 @@ partial interface Window {
   [Throws, NeedsCallerType] attribute any outerWidth;
   [Throws, NeedsCallerType] attribute any outerHeight;
 };
-
-/**
- * Special function that gets the fill ratio from the compositor used for testing
- * and is an indicator that we're layerizing correctly.
- * This function will call the given callback current fill ratio for a
- * composited frame. We don't guarantee which frame fill ratios will be returned.
- */
-partial interface Window {
-  [ChromeOnly, Throws] void mozRequestOverfill(OverfillCallback callback);
-};
-callback OverfillCallback = void (unsigned long overfill);
 
 // https://dvcs.w3.org/hg/webperf/raw-file/tip/specs/RequestAnimationFrame/Overview.html
 partial interface Window {
@@ -482,6 +470,10 @@ partial interface Window {
   [Pref="dom.vr.enabled"]
   attribute EventHandler onvrdisplaydisconnect;
   [Pref="dom.vr.enabled"]
+  attribute EventHandler onvrdisplayactivate;
+  [Pref="dom.vr.enabled"]
+  attribute EventHandler onvrdisplaydeactivate;
+  [Pref="dom.vr.enabled"]
   attribute EventHandler onvrdisplaypresentchange;
 };
 
@@ -512,3 +504,40 @@ dictionary IdleRequestOptions {
 };
 
 callback IdleRequestCallback = void (IdleDeadline deadline);
+
+/**
+ * Similar to |isSecureContext|, but doesn't pay attention to whether the
+ * window's opener (if any) is a secure context or not.
+ *
+ * WARNING: Do not use this unless you are familiar with the issues that
+ * taking opener state into account is designed to address (or else you may
+ * introduce security issues).  If in doubt, use |isSecureContext|.  In
+ * particular do not use this to gate access to JavaScript APIs.
+ */
+partial interface Window {
+  [ChromeOnly] readonly attribute boolean isSecureContextIfOpenerIgnored;
+};
+
+partial interface Window {
+  /**
+   * Returns a list of locales that the application should be localized to.
+   *
+   * The result is a sorted list of valid locale IDs and it should be
+   * used for all APIs that accept list of locales, like ECMA402 and L10n APIs.
+   *
+   * This API always returns at least one locale.
+   *
+   * Example: ["en-US", "de", "pl", "sr-Cyrl", "zh-Hans-HK"]
+   */
+  [Func="IsChromeOrXBL"]
+  sequence<DOMString> getAppLocales();
+
+#ifdef ENABLE_INTL_API
+  /**
+   * Getter funcion for IntlUtils, which provides helper functions for
+   * localization.
+   */
+  [Throws, Func="IsChromeOrXBL"]
+  readonly attribute IntlUtils intlUtils;
+#endif
+};

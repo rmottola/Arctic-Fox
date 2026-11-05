@@ -14,7 +14,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "ExtensionManagement",
                                   "resource://gre/modules/ExtensionManagement.jsm");
 
 var {
-  ignoreEvent,
   SingletonEventManager,
 } = ExtensionUtils;
 
@@ -22,21 +21,35 @@ extensions.registerSchemaAPI("runtime", "addon_parent", context => {
   let {extension} = context;
   return {
     runtime: {
-      onStartup: ignoreEvent(context, "runtime.onStartup"),
+      onStartup: new SingletonEventManager(context, "runtime.onStartup", fire => {
+        if (context.incognito) {
+          // This event should not fire if we are operating in a private profile.
+          return () => {};
+        }
+        let listener = () => {
+          if (extension.startupReason === "APP_STARTUP") {
+            fire.sync();
+          }
+        };
+        extension.on("startup", listener);
+        return () => {
+          extension.off("startup", listener);
+        };
+      }).api(),
 
       onInstalled: new SingletonEventManager(context, "runtime.onInstalled", fire => {
         let listener = () => {
           switch (extension.startupReason) {
             case "APP_STARTUP":
               if (Extension.browserUpdated) {
-                fire({reason: "browser_update"});
+                fire.sync({reason: "browser_update"});
               }
               break;
             case "ADDON_INSTALL":
-              fire({reason: "install"});
+              fire.sync({reason: "install"});
               break;
             case "ADDON_UPGRADE":
-              fire({reason: "update"});
+              fire.sync({reason: "update"});
               break;
           }
         };
@@ -53,7 +66,7 @@ extensions.registerSchemaAPI("runtime", "addon_parent", context => {
           let details = {
             version: upgrade.version,
           };
-          context.runSafe(fire, details);
+          fire.sync(details);
         });
         return () => {
           AddonManager.removeUpgradeListener(instanceID);

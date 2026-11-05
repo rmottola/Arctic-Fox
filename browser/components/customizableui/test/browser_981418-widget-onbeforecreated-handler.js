@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 "use strict";
-const kWidgetId = 'test-981418-widget-onbeforecreated';
+const kWidgetId = "test-981418-widget-onbeforecreated";
 
 // Should be able to add broken view widget
 add_task(function* testAddOnBeforeCreatedWidget() {

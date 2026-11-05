@@ -101,11 +101,17 @@ protected:
   virtual bool
   DeallocPBroadcastChannelParent(PBroadcastChannelParent* aActor) override;
 
-  virtual PSendStreamParent*
-  AllocPSendStreamParent() override;
+  virtual PChildToParentStreamParent*
+  AllocPChildToParentStreamParent() override;
 
   virtual bool
-  DeallocPSendStreamParent(PSendStreamParent* aActor) override;
+  DeallocPChildToParentStreamParent(PChildToParentStreamParent* aActor) override;
+
+  virtual PParentToChildStreamParent*
+  AllocPParentToChildStreamParent() override;
+
+  virtual bool
+  DeallocPParentToChildStreamParent(PParentToChildStreamParent* aActor) override;
 
   virtual PServiceWorkerManagerParent*
   AllocPServiceWorkerManagerParent() override;
@@ -186,10 +192,6 @@ protected:
 
   virtual PFileSystemRequestParent*
   AllocPFileSystemRequestParent(const FileSystemParams&) override;
-
-  virtual mozilla::ipc::IPCResult
-  RecvPFileSystemRequestConstructor(PFileSystemRequestParent* aActor,
-                                    const FileSystemParams& aParams) override;
 
   virtual bool
   DeallocPFileSystemRequestParent(PFileSystemRequestParent*) override;

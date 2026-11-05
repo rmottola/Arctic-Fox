@@ -116,14 +116,14 @@ var gChromeMap = new Map();
 
 function getBaseUriForChromeUri(chromeUri) {
   let chromeFile = chromeUri + "gobbledygooknonexistentfile.reallynothere";
-  let uri = Services.io.newURI(chromeFile, null, null);
+  let uri = Services.io.newURI(chromeFile);
   let fileUri = gChromeReg.convertChromeURL(uri);
   return fileUri.resolve(".");
 }
 
 function parseManifest(manifestUri) {
   return fetchFile(manifestUri.spec).then(data => {
-    for (let line of data.split('\n')) {
+    for (let line of data.split("\n")) {
       let [type, ...argv] = line.split(/\s+/);
       let component;
       if (type == "content" || type == "skin") {
@@ -152,7 +152,7 @@ function convertToChromeUri(fileUri) {
     if (gChromeMap.has(baseUri)) {
       let chromeBaseUri = gChromeMap.get(baseUri);
       let chromeUri = `${chromeBaseUri}${path}`;
-      return Services.io.newURI(chromeUri, null, null);
+      return Services.io.newURI(chromeUri);
     }
   }
 }
@@ -199,7 +199,7 @@ function processCSSRules(sheet) {
         continue;
 
       // Make the url absolute and remove the ref.
-      let baseURI = Services.io.newURI(rule.parentStyleSheet.href, null, null);
+      let baseURI = Services.io.newURI(rule.parentStyleSheet.href);
       url = Services.io.newURI(url, null, baseURI).specIgnoringRef;
 
       // Store the image url along with the css file referencing it.
@@ -246,7 +246,7 @@ add_task(function* checkAllTheCSS() {
   let windowless = Services.appShell.createWindowlessBrowser();
   let iframe = windowless.document.createElementNS("http://www.w3.org/1999/xhtml", "html:iframe");
   windowless.document.documentElement.appendChild(iframe);
-  let iframeLoaded = once(iframe, 'load');
+  let iframeLoaded = once(iframe, "load");
   iframe.contentWindow.location = testFile;
   yield iframeLoaded;
   let doc = iframe.contentWindow.document;
@@ -349,7 +349,7 @@ add_task(function* checkAllTheCSS() {
 
   // Clean up to avoid leaks:
   iframe.remove();
-  doc.head.innerHTML = '';
+  doc.head.innerHTML = "";
   doc = null;
   iframe = null;
   windowless.close();

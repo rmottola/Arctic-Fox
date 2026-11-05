@@ -8,6 +8,8 @@
 #define jit_Ion_h
 
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/Move.h"
+#include "mozilla/Result.h"
 
 #include "jscntxt.h"
 #include "jscompartment.h"
@@ -28,14 +30,29 @@ enum MethodStatus
     Method_Compiled
 };
 
-enum AbortReason {
-    AbortReason_Alloc,
-    AbortReason_Inlining,
-    AbortReason_PreliminaryObjects,
-    AbortReason_Disable,
-    AbortReason_Error,
-    AbortReason_NoAbort
+enum class AbortReason {
+    Alloc,
+    Inlining,
+    PreliminaryObjects,
+    Disable,
+    Error,
+    NoAbort
 };
+
+template <typename V>
+using AbortReasonOr = mozilla::Result<V, AbortReason>;
+using mozilla::Ok;
+
+// This is the equivalent of the following, except that these are functions and
+// not types, which makes this syntax invalid:
+//     using Err = mozilla::MakeGenericErrorResult;
+template <typename E>
+inline mozilla::GenericErrorResult<E>
+Err(E&& aErrorValue)
+{
+    return mozilla::MakeGenericErrorResult(mozilla::Forward<E>(aErrorValue));
+}
+
 
 // A JIT context is needed to enter into either an JIT method or an instance
 // of a JIT compiler. It points to a temporary allocator and the active
@@ -46,7 +63,6 @@ class JitContext
 {
   public:
     JitContext(JSContext* cx, TempAllocator* temp);
-    JitContext(ExclusiveContext* cx, TempAllocator* temp);
     JitContext(CompileRuntime* rt, CompileCompartment* comp, TempAllocator* temp);
     JitContext(CompileRuntime* rt, TempAllocator* temp);
     explicit JitContext(CompileRuntime* rt);
@@ -54,7 +70,7 @@ class JitContext
     JitContext();
     ~JitContext();
 
-    // Running context when executing on the main thread. Not available during
+    // Running context when executing on the active thread. Not available during
     // compilation.
     JSContext* cx;
 
@@ -66,9 +82,6 @@ class JitContext
     CompileRuntime* runtime;
     CompileCompartment* compartment;
 
-    bool onMainThread() const {
-        return runtime && runtime->onMainThread();
-    }
     bool hasProfilingScripts() const {
         return runtime && !!runtime->profilingScripts();
     }
@@ -157,7 +170,7 @@ void FinishOffThreadBuilder(JSRuntime* runtime, IonBuilder* builder,
                             const AutoLockHelperThreadState& lock);
 
 void LinkIonScript(JSContext* cx, HandleScript calleescript);
-uint8_t* LazyLinkTopActivation(JSContext* cx);
+uint8_t* LazyLinkTopActivation();
 
 static inline bool
 IsIonEnabled(JSContext* cx)
@@ -177,7 +190,9 @@ IsIonInlinablePC(jsbytecode* pc) {
     // CALL, FUNCALL, FUNAPPLY, EVAL, NEW (Normal Callsites)
     // GETPROP, CALLPROP, and LENGTH. (Inlined Getters)
     // SETPROP, SETNAME, SETGNAME (Inlined Setters)
-    return IsCallPC(pc) || IsGetPropPC(pc) || IsSetPropPC(pc);
+    return (IsCallPC(pc) && !IsSpreadCallPC(pc)) ||
+           IsGetPropPC(pc) ||
+           IsSetPropPC(pc);
 }
 
 inline bool
@@ -205,7 +220,6 @@ bool OffThreadCompilationAvailable(JSContext* cx);
 
 void ForbidCompilation(JSContext* cx, JSScript* script);
 
-void PurgeCaches(JSScript* script);
 size_t SizeOfIonData(JSScript* script, mozilla::MallocSizeOf mallocSizeOf);
 void DestroyJitScripts(FreeOp* fop, JSScript* script);
 void TraceJitScripts(JSTracer* trc, JSScript* script);

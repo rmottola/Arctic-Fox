@@ -3,7 +3,7 @@ use super::*;
 use std::iter;
 
 /// Doc-comments are promoted to attributes that have `is_sugared_doc` = true
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Attribute {
     pub style: AttrStyle,
     pub value: MetaItem,
@@ -19,7 +19,7 @@ impl Attribute {
 /// Distinguishes between Attributes that decorate items and Attributes that
 /// are contained as statements within items. These two cases need to be
 /// distinguished for pretty-printing.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum AttrStyle {
     Outer,
     Inner,
@@ -28,7 +28,7 @@ pub enum AttrStyle {
 /// A compile-time attribute item.
 ///
 /// E.g. `#[test]`, `#[derive(..)]` or `#[feature = "foo"]`
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum MetaItem {
     /// Word meta item.
     ///
@@ -57,7 +57,7 @@ impl MetaItem {
 /// Possible values inside of compile-time attribute lists.
 ///
 /// E.g. the '..' in `#[name(..)]`.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum NestedMetaItem {
     /// A full MetaItem, for recursive meta items.
     MetaItem(MetaItem),
@@ -99,7 +99,7 @@ pub mod parsing {
     use super::*;
     use ident::parsing::ident;
     use lit::parsing::lit;
-    use space::{block_comment, whitespace};
+    use synom::space::{block_comment, whitespace};
 
     #[cfg(feature = "full")]
     named!(pub inner_attr -> Attribute, alt!(
@@ -159,7 +159,7 @@ pub mod parsing {
         |
         do_parse!(
             punct!("///") >>
-            not!(peek!(tag!("/"))) >>
+            not!(tag!("/")) >>
             content: take_until!("\n") >>
             (Attribute {
                 style: AttrStyle::Outer,

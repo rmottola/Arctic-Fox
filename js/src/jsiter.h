@@ -145,13 +145,10 @@ class ArrayIteratorObject : public JSObject
     static const Class class_;
 };
 
-class StringIteratorObject : public JSObject
-{
-  public:
-    static const Class class_;
-};
+ArrayIteratorObject*
+NewArrayIteratorObject(JSContext* cx, NewObjectKind newKind = GenericObject);
 
-class ListIteratorObject : public JSObject
+class StringIteratorObject : public JSObject
 {
   public:
     static const Class class_;
@@ -189,6 +186,9 @@ CloseIterator(JSContext* cx, HandleObject iterObj);
 bool
 UnwindIteratorForException(JSContext* cx, HandleObject obj);
 
+bool
+IteratorCloseForException(JSContext* cx, HandleObject obj);
+
 void
 UnwindIteratorForUncatchableException(JSContext* cx, JSObject* obj);
 
@@ -213,16 +213,18 @@ ThrowStopIteration(JSContext* cx);
 
 /*
  * Create an object of the form { value: VALUE, done: DONE }.
- * ES6 draft from 2013-09-05, section 25.4.3.4.
+ * ES 2017 draft 7.4.7.
  */
 extern JSObject*
-CreateItrResultObject(JSContext* cx, HandleValue value, bool done);
+CreateIterResultObject(JSContext* cx, HandleValue value, bool done);
 
 extern JSObject*
 InitLegacyIteratorClass(JSContext* cx, HandleObject obj);
 
 extern JSObject*
 InitStopIterationClass(JSContext* cx, HandleObject obj);
+
+enum class IteratorKind { Sync, Async };
 
 } /* namespace js */
 

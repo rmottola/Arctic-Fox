@@ -5,7 +5,7 @@
 
 var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
-var bsp = Cu.import("resource://gre/modules/CrashManager.jsm", this);
+var {CrashStore, CrashManager} = Cu.import("resource://gre/modules/CrashManager.jsm", {});
 Cu.import("resource://gre/modules/Promise.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
 Cu.import("resource://gre/modules/osfile.jsm", this);
@@ -214,6 +214,7 @@ add_task(function* test_main_crash_event_file() {
   yield ac.promiseInit();
   let theEnvironment = TelemetryEnvironment.currentEnvironment;
   let sessionId = "be66af2f-2ee5-4330-ae95-44462dfbdf0c";
+  let stackTraces = { status: "OK" };
 
   // To test proper escaping, add data to the environment with an embedded
   // double-quote
@@ -222,7 +223,8 @@ add_task(function* test_main_crash_event_file() {
   let m = yield getManager();
   const fileContent = "id1\nk1=v1\nk2=v2\n" +
     "TelemetryEnvironment=" + JSON.stringify(theEnvironment) + "\n" +
-    "TelemetrySessionId=" + sessionId;
+    "TelemetrySessionId=" + sessionId + "\n" +
+    "StackTraces=" + JSON.stringify(stackTraces) + "\n";
 
   yield m.createEventsFile("1", "crash.main.2", DUMMY_DATE, fileContent);
   let count = yield m.aggregateEventsFiles();
@@ -235,13 +237,16 @@ add_task(function* test_main_crash_event_file() {
   Assert.equal(crashes[0].metadata.k1, "v1");
   Assert.equal(crashes[0].metadata.k2, "v2");
   Assert.ok(crashes[0].metadata.TelemetryEnvironment);
-  Assert.equal(Object.getOwnPropertyNames(crashes[0].metadata).length, 4);
+  Assert.equal(Object.getOwnPropertyNames(crashes[0].metadata).length, 5);
   Assert.equal(crashes[0].metadata.TelemetrySessionId, sessionId);
+  Assert.ok(crashes[0].metadata.StackTraces);
   Assert.deepEqual(crashes[0].crashDate, DUMMY_DATE);
 
   let found = yield ac.promiseFindPing("crash", [
     [["payload", "hasCrashEnvironment"], true],
     [["payload", "metadata", "k1"], "v1"],
+    [["payload", "crashId"], "1"],
+    [["payload", "stackTraces", "status"], "OK"],
     [["payload", "sessionId"], sessionId],
   ]);
   Assert.ok(found, "Telemetry ping submitted for found crash");
@@ -254,25 +259,71 @@ add_task(function* test_main_crash_event_file() {
 add_task(function* test_main_crash_event_file_noenv() {
   let ac = new TelemetryArchiveTesting.Checker();
   yield ac.promiseInit();
+  const fileContent = crashId + "\n" +
+    "ProductName=" + productName + "\n" +
+    "ProductID=" + productId + "\n";
 
   let m = yield getManager();
-  yield m.createEventsFile("1", "crash.main.2", DUMMY_DATE, "id1\nk1=v3\nk2=v2");
+  yield m.createEventsFile(crashId, "crash.main.2", DUMMY_DATE, fileContent);
   let count = yield m.aggregateEventsFiles();
   Assert.equal(count, 1);
 
   let crashes = yield m.getCrashes();
   Assert.equal(crashes.length, 1);
-  Assert.equal(crashes[0].id, "id1");
+  Assert.equal(crashes[0].id, crashId);
   Assert.equal(crashes[0].type, "main-crash");
-  Assert.deepEqual(crashes[0].metadata, { k1: "v3", k2: "v2"});
+  Assert.deepEqual(crashes[0].metadata, {
+    ProductName: productName,
+    ProductID: productId
+  });
   Assert.deepEqual(crashes[0].crashDate, DUMMY_DATE);
 
   let found = yield ac.promiseFindPing("crash", [
     [["payload", "hasCrashEnvironment"], false],
-    [["payload", "metadata", "k1"], "v3"],
+    [["payload", "metadata", "ProductName"], productName],
+    [["payload", "metadata", "ProductID"], productId],
   ]);
   Assert.ok(found, "Telemetry ping submitted for found crash");
   Assert.ok(found.environment, "There is an environment");
+
+  count = yield m.aggregateEventsFiles();
+  Assert.equal(count, 0);
+});
+
+add_task(function* test_main_crash_event_file_override_ping_uuid() {
+  let ac = new TelemetryArchiveTesting.Checker();
+  yield ac.promiseInit();
+
+  let m = yield getManager();
+  const fileContent = crashId + "\n" +
+    "ProductName=" + productName + "\n" +
+    "ProductID=" + productId + "\n" +
+    "CrashPingUUID=" + crashPingUuid + "\n";
+
+  yield m.createEventsFile(crashId, "crash.main.2", DUMMY_DATE, fileContent);
+  let count = yield m.aggregateEventsFiles();
+  Assert.equal(count, 1);
+
+  let crashes = yield m.getCrashes();
+  Assert.equal(crashes.length, 1);
+  Assert.equal(crashes[0].id, crashId);
+  Assert.equal(crashes[0].type, "main-crash");
+  Assert.deepEqual(crashes[0].metadata, {
+    CrashPingUUID: crashPingUuid,
+    ProductName: productName,
+    ProductID: productId
+  });
+  Assert.deepEqual(crashes[0].crashDate, DUMMY_DATE);
+
+  let found = yield ac.promiseFindPing("crash", [
+    [["id"], crashPingUuid],
+    [["payload", "hasCrashEnvironment"], false],
+    [["payload", "metadata", "ProductName"], productName],
+    [["payload", "metadata", "ProductID"], productId],
+  ]);
+  Assert.ok(found, "Telemetry ping submitted for found crash");
+  Assert.equal(found.payload.metadata.CrashPingUUID, undefined,
+               "Crash ping UUID should be filtered out");
 
   count = yield m.aggregateEventsFiles();
   Assert.equal(count, 0);
@@ -339,7 +390,7 @@ add_task(function* test_high_water_mark() {
   }
 
   let count = yield m.aggregateEventsFiles();
-  Assert.equal(count, bsp.CrashStore.prototype.HIGH_WATER_DAILY_THRESHOLD + 1);
+  Assert.equal(count, CrashStore.prototype.HIGH_WATER_DAILY_THRESHOLD + 1);
 
   // Need to fetch again in case the first one was garbage collected.
   store = yield m._getStore();
@@ -433,6 +484,36 @@ add_task(function* test_addCrash() {
   Assert.equal(crash.crashDate, DUMMY_DATE_2);
   Assert.equal(crash.type, m.PROCESS_TYPE_CONTENT + "-" + m.CRASH_TYPE_HANG);
   Assert.ok(crash.isOfType(m.PROCESS_TYPE_CONTENT, m.CRASH_TYPE_HANG));
+});
+
+add_task(function* test_content_crash_ping() {
+  let ac = new TelemetryArchiveTesting.Checker();
+  yield ac.promiseInit();
+
+  let m = yield getManager();
+  let id = yield m.createDummyDump();
+  yield m.addCrash(m.PROCESS_TYPE_CONTENT, m.CRASH_TYPE_CRASH, id, DUMMY_DATE, {
+    StackTraces: stackTraces,
+    MinidumpSha256Hash: sha256Hash,
+    ThisShouldNot: "end-up-in-the-ping"
+  });
+  yield m._pingPromise;
+
+  let found = yield ac.promiseFindPing("crash", [
+    [["payload", "crashId"], id],
+    [["payload", "minidumpSha256Hash"], sha256Hash],
+    [["payload", "processType"], m.PROCESS_TYPE_CONTENT],
+    [["payload", "stackTraces", "status"], "OK"],
+  ]);
+  Assert.ok(found, "Telemetry ping submitted for content crash");
+
+  let hoursOnly = new Date(DUMMY_DATE);
+  hoursOnly.setSeconds(0);
+  hoursOnly.setMinutes(0);
+  Assert.equal(new Date(found.payload.crashTime).getTime(), hoursOnly.getTime());
+
+  Assert.equal(found.payload.metadata.ThisShouldNot, undefined,
+               "Non-whitelisted fields should be filtered out");
 });
 
 add_task(function* test_generateSubmissionID() {

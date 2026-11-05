@@ -65,9 +65,11 @@ enum class NetscapeStepUpPolicy : uint32_t;
 class PinningTelemetryInfo
 {
 public:
+  PinningTelemetryInfo() { Reset(); }
+
   // Should we accumulate pinning telemetry for the result?
   bool accumulateResult;
-  Telemetry::ID certPinningResultHistogram;
+  Telemetry::HistogramID certPinningResultHistogram;
   int32_t certPinningResultBucket;
   // Should we accumulate telemetry for the root?
   bool accumulateForRoot;
@@ -79,6 +81,8 @@ public:
 class CertificateTransparencyInfo
 {
 public:
+  CertificateTransparencyInfo() { Reset(); }
+
   // Was CT enabled?
   bool enabled;
   // Verification result of the processed SCTs.

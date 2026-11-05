@@ -540,7 +540,7 @@ var PageStyleHandler = {
         if (!currentStyleSheet.ownerNode ||
             // special-case style nodes, which have no href
             currentStyleSheet.ownerNode.nodeName.toLowerCase() != "style") {
-          URI = Services.io.newURI(currentStyleSheet.href, null, null);
+          URI = Services.io.newURI(currentStyleSheet.href);
         }
       } catch (e) {
         if (e.result != Cr.NS_ERROR_MALFORMED_URI) {
@@ -712,8 +712,8 @@ var WebBrowserChrome = {
   },
 
   // Try to reload the currently active or currently loading page in a new process.
-  reloadInFreshProcess(aDocShell, aURI, aReferrer, aTriggeringPrincipal) {
-    E10SUtils.redirectLoad(aDocShell, aURI, aReferrer, aTriggeringPrincipal, true);
+  reloadInFreshProcess(aDocShell, aURI, aReferrer, aTriggeringPrincipal, aLoadFlags) {
+    E10SUtils.redirectLoad(aDocShell, aURI, aReferrer, aTriggeringPrincipal, true, aLoadFlags);
     return true;
   },
 

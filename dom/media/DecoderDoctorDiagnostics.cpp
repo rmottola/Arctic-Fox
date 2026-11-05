@@ -24,10 +24,6 @@
 #include "FFmpegRuntimeLinker.h"
 #endif
 
-#if defined(XP_WIN)
-#include "mozilla/WindowsVersion.h"
-#endif
-
 static mozilla::LazyLogModule sDecoderDoctorLog("DecoderDoctor");
 #define DD_LOG(level, arg, ...) MOZ_LOG(sDecoderDoctorLog, level, (arg, ##__VA_ARGS__))
 #define DD_DEBUG(arg, ...) DD_LOG(mozilla::LogLevel::Debug, arg, ##__VA_ARGS__)
@@ -256,9 +252,6 @@ static const NotificationAndReportStringId sMediaWidevineNoWMF=
 static const NotificationAndReportStringId sMediaWMFNeeded =
   { dom::DecoderDoctorNotificationType::Platform_decoder_not_found,
     "MediaWMFNeeded" };
-static const NotificationAndReportStringId sMediaUnsupportedBeforeWindowsVista =
-  { dom::DecoderDoctorNotificationType::Platform_decoder_not_found,
-    "MediaUnsupportedBeforeWindowsVista" };
 static const NotificationAndReportStringId sMediaPlatformDecoderNotFound =
   { dom::DecoderDoctorNotificationType::Platform_decoder_not_found,
     "MediaPlatformDecoderNotFound" };
@@ -280,7 +273,6 @@ sAllNotificationsAndReportStringIds[] =
 {
   &sMediaWidevineNoWMF,
   &sMediaWMFNeeded,
-  &sMediaUnsupportedBeforeWindowsVista,
   &sMediaPlatformDecoderNotFound,
   &sMediaCannotPlayNoDecoders,
   &sMediaNoDecoders,
@@ -545,16 +537,9 @@ DecoderDoctorDocumentWatcher::SynthesizeAnalysis()
       // going through expected decoders from most to least desirable.
 #if defined(XP_WIN)
       if (!formatsRequiringWMF.IsEmpty()) {
-        if (IsVistaOrLater()) {
-          DD_INFO("DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - unplayable formats: %s -> Cannot play media because WMF was not found",
-                  this, mDocument, NS_ConvertUTF16toUTF8(formatsRequiringWMF).get());
-          ReportAnalysis(mDocument, sMediaWMFNeeded, false, formatsRequiringWMF);
-        } else {
-          DD_INFO("DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - unplayable formats: %s -> Cannot play media before Windows Vista",
-                  this, mDocument, NS_ConvertUTF16toUTF8(formatsRequiringWMF).get());
-          ReportAnalysis(mDocument, sMediaUnsupportedBeforeWindowsVista,
-                         false, formatsRequiringWMF);
-        }
+        DD_INFO("DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - unplayable formats: %s -> Cannot play media because WMF was not found",
+                this, mDocument, NS_ConvertUTF16toUTF8(formatsRequiringWMF).get());
+        ReportAnalysis(mDocument, sMediaWMFNeeded, false, formatsRequiringWMF);
         return;
       }
 #endif
@@ -836,8 +821,8 @@ DecoderDoctorDiagnostics::GetDescription() const
       }
       break;
     case eEvent:
-      s = nsPrintfCString("event domain %s result=%u",
-                          EventDomainString(mEvent.mDomain), mEvent.mResult);
+      s = nsPrintfCString("event domain %s result=%" PRIu32,
+                          EventDomainString(mEvent.mDomain), static_cast<uint32_t>(mEvent.mResult));
       break;
     default:
       MOZ_ASSERT_UNREACHABLE("Unexpected DiagnosticsType");

@@ -529,6 +529,6 @@ add_task(function* test_delete_buffering() {
 
 
 function run_test() {
-  initTestLogging('Trace');
+  initTestLogging("Trace");
   run_next_test();
 }

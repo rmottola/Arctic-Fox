@@ -14,10 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+with Files("**"):
+    BUG_COMPONENT = ("Core", "Widget: Gonk")
+
 EXPORTS += [
     'GeckoTouchDispatcher.h',
     'GonkPermission.h',
-    'OrientationObserver.h',
 ]
 
 DIRS += ['libdisplay', 'nativewindow']
@@ -66,7 +68,6 @@ SOURCES += [
     'nsScreenManagerGonk.cpp',
     'nsWidgetFactory.cpp',
     'nsWindow.cpp',
-    'OrientationObserver.cpp',
     'ProcessOrientation.cpp',
     'WidgetTraceEvent.cpp'
 ]

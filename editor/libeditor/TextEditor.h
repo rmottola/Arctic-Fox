@@ -77,7 +77,6 @@ public:
                   const nsAString& aValue) override;
 
   NS_IMETHOD GetDocumentIsEmpty(bool* aDocumentIsEmpty) override;
-  NS_IMETHOD GetIsDocumentEditable(bool* aIsDocumentEditable) override;
 
   NS_IMETHOD DeleteSelection(EDirection aAction,
                              EStripWrappers aStripWrappers) override;
@@ -130,7 +129,8 @@ public:
   virtual already_AddRefed<dom::EventTarget> GetDOMEventTarget() override;
 
   virtual nsresult BeginIMEComposition(WidgetCompositionEvent* aEvent) override;
-  virtual nsresult UpdateIMEComposition(nsIDOMEvent* aTextEvent) override;
+  virtual nsresult UpdateIMEComposition(
+                     WidgetCompositionEvent* aCompositionChangeEvet) override;
 
   virtual already_AddRefed<nsIContent> GetInputEventTargetContent() override;
 
@@ -209,11 +209,6 @@ protected:
    */
   nsresult SharedOutputString(uint32_t aFlags, bool* aIsCollapsed,
                               nsAString& aResult);
-
-  /**
-   * Small utility routine to test the eEditorReadonly bit.
-   */
-  bool IsModifiable();
 
   enum PasswordFieldAllowed
   {

@@ -35,6 +35,7 @@ this.LoginHelper = {
   debug: Services.prefs.getBoolPref("signon.debug"),
   formlessCaptureEnabled: Services.prefs.getBoolPref("signon.formlessCapture.enabled"),
   schemeUpgrades: Services.prefs.getBoolPref("signon.schemeUpgrades"),
+  insecureAutofill: Services.prefs.getBoolPref("signon.autofillForms.http"),
 
   createLogger(aLogPrefix) {
     let getMaxLogLevel = () => {
@@ -54,6 +55,7 @@ this.LoginHelper = {
       this.debug = Services.prefs.getBoolPref("signon.debug");
       this.formlessCaptureEnabled = Services.prefs.getBoolPref("signon.formlessCapture.enabled");
       this.schemeUpgrades = Services.prefs.getBoolPref("signon.schemeUpgrades");
+      this.insecureAutofill = Services.prefs.getBoolPref("signon.autofillForms.http");
       logger.maxLogLevel = getMaxLogLevel();
     }, false);
 
@@ -616,7 +618,7 @@ this.LoginHelper = {
   loginToVanillaObject(login) {
     let obj = {};
     for (let i in login.QueryInterface(Ci.nsILoginMetaInfo)) {
-      if (typeof login[i] !== 'function') {
+      if (typeof login[i] !== "function") {
         obj[i] = login[i];
       }
     }

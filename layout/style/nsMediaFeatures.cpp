@@ -305,8 +305,15 @@ static void
 GetDisplayMode(nsPresContext* aPresContext, const nsMediaFeature*,
                nsCSSValue& aResult)
 {
-  nsCOMPtr<nsISupports> container = aPresContext->GetRootPresContext()->
-    Document()->GetContainer();
+  nsCOMPtr<nsISupports> container;
+  if (aPresContext) {
+    // Calling GetRootPresContext() can be slow, so make sure to call it
+    // just once.
+    nsRootPresContext* root = aPresContext->GetRootPresContext();
+    if (root && root->Document()) {
+      container = root->Document()->GetContainer();
+    }
+  }
   nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(container);
   if (!baseWindow) {
     aResult.SetIntValue(NS_STYLE_DISPLAY_MODE_BROWSER, eCSSUnit_Enumerated);
@@ -694,6 +701,14 @@ nsMediaFeatures::features[] = {
     nsMediaFeature::eBoolInteger,
     nsMediaFeature::eNoRequirements,
     { &nsGkAtoms::mac_yosemite_theme },
+    GetSystemMetric
+  },
+  {
+    &nsGkAtoms::_moz_windows_accent_color_in_titlebar,
+    nsMediaFeature::eMinMaxNotAllowed,
+    nsMediaFeature::eBoolInteger,
+    nsMediaFeature::eNoRequirements,
+    { &nsGkAtoms::windows_accent_color_in_titlebar },
     GetSystemMetric
   },
   {

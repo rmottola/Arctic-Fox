@@ -10,18 +10,20 @@ void main(void) {
 #ifdef WR_FEATURE_TRANSFORM
     TransformVertexInfo vi = write_transform_vertex(prim.local_rect,
                                                     prim.local_clip_rect,
+                                                    prim.z,
                                                     prim.layer,
-                                                    prim.tile);
+                                                    prim.task);
     vLocalRect = vi.clipped_local_rect;
     vLocalPos = vi.local_pos;
 #else
     VertexInfo vi = write_vertex(prim.local_rect,
                                  prim.local_clip_rect,
+                                 prim.z,
                                  prim.layer,
-                                 prim.tile);
+                                 prim.task);
 #endif
 
 #ifdef WR_FEATURE_CLIP
-    write_clip(vi.global_clamped_pos, prim.clip_area);
+    write_clip(vi.screen_pos, prim.clip_area);
 #endif
 }

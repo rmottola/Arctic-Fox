@@ -17,6 +17,8 @@ function createWindowWithAddonId(addonId) {
 }
 
 add_task(function* test_eventpages() {
+  Service.init();
+
   const {getAPILevelForWindow, getAddonIdForWindow} = ExtensionManagement;
   const {NO_PRIVILEGES, FULL_PRIVILEGES} = ExtensionManagement.API_LEVELS;
   const FAKE_ADDON_ID = "fakeAddonId";

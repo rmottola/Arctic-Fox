@@ -18,7 +18,7 @@
 
 #include <fontconfig/fontconfig.h>
 #include "gfxPlatformGtk.h"
-#include "nsScreenGtk.h"
+#include "ScreenHelperGTK.h"
 
 #include "gtkdrawing.h"
 #include "nsStyleConsts.h"
@@ -870,13 +870,13 @@ GetSystemFontInfo(GtkWidget *aWidget,
 
     if (!pango_font_description_get_size_is_absolute(desc)) {
         // |size| is in pango-points, so convert to pixels.
-        size *= float(gfxPlatformGtk::GetDPI()) / POINTS_PER_INCH_FLOAT;
+        size *= float(gfxPlatformGtk::GetFontScaleDPI()) / POINTS_PER_INCH_FLOAT;
     }
 
     // Scale fonts up on HiDPI displays.
     // This would be done automatically with cairo, but we manually manage
     // the display scale for platform consistency.
-    size *= nsScreenGtk::GetGtkMonitorScaleFactor();
+    size *= ScreenHelperGTK::GetGTKMonitorScaleFactor();
 
     // |size| is now pixels
 
@@ -1145,33 +1145,29 @@ nsLookAndFeel::Init()
     sInfoText = GDK_RGBA_TO_NS_RGBA(color);
     ReleaseStyleContext(style);
 
-    // menu foreground & menu background
-    GtkWidget *accel_label = gtk_accel_label_new("M");
-    GtkWidget *menuitem = gtk_menu_item_new();
-    GtkWidget *menu = gtk_menu_new();
+    style = ClaimStyleContext(MOZ_GTK_MENUITEM);
+    {
+        GtkStyleContext* accelStyle =
+            CreateStyleForWidget(gtk_accel_label_new("M"), style);
+        gtk_style_context_get_color(accelStyle, GTK_STATE_FLAG_NORMAL, &color);
+        sMenuText = GDK_RGBA_TO_NS_RGBA(color);
+        gtk_style_context_get_color(accelStyle, GTK_STATE_FLAG_INSENSITIVE, &color);
+        sMenuTextInactive = GDK_RGBA_TO_NS_RGBA(color);
+        g_object_unref(accelStyle);
+    }
+    ReleaseStyleContext(style);
 
-    g_object_ref_sink(menu);
-
-    gtk_container_add(GTK_CONTAINER(menuitem), accel_label);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), menuitem);
-
-    style = gtk_widget_get_style_context(accel_label);
-    gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
-    sMenuText = GDK_RGBA_TO_NS_RGBA(color);
-    gtk_style_context_get_color(style, GTK_STATE_FLAG_INSENSITIVE, &color);
-    sMenuTextInactive = GDK_RGBA_TO_NS_RGBA(color);
-
-    style = gtk_widget_get_style_context(menu);
+    style = ClaimStyleContext(MOZ_GTK_MENUPOPUP);
     gtk_style_context_get_background_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sMenuBackground = GDK_RGBA_TO_NS_RGBA(color);
+    ReleaseStyleContext(style);
 
-    style = gtk_widget_get_style_context(menuitem);
+    style = ClaimStyleContext(MOZ_GTK_MENUITEM);
     gtk_style_context_get_background_color(style, GTK_STATE_FLAG_PRELIGHT, &color);
     sMenuHover = GDK_RGBA_TO_NS_RGBA(color);
     gtk_style_context_get_color(style, GTK_STATE_FLAG_PRELIGHT, &color);
     sMenuHoverText = GDK_RGBA_TO_NS_RGBA(color);
-
-    g_object_unref(menu);
+    ReleaseStyleContext(style);
 #endif
 
     // button styles
@@ -1182,9 +1178,6 @@ nsLookAndFeel::Init()
     GtkWidget *combobox = gtk_combo_box_new();
     GtkWidget *comboboxLabel = gtk_label_new("M");
     gtk_container_add(GTK_CONTAINER(combobox), comboboxLabel);
-#else
-    GtkWidget *combobox = gtk_combo_box_new_with_entry();
-    GtkWidget *comboboxLabel = gtk_bin_get_child(GTK_BIN(combobox));
 #endif
     GtkWidget *window = gtk_window_new(GTK_WINDOW_POPUP);
     GtkWidget *treeView = gtk_tree_view_new();
@@ -1198,7 +1191,9 @@ nsLookAndFeel::Init()
     gtk_container_add(GTK_CONTAINER(parent), button);
     gtk_container_add(GTK_CONTAINER(parent), treeView);
     gtk_container_add(GTK_CONTAINER(parent), linkButton);
+#if (MOZ_WIDGET_GTK == 2)
     gtk_container_add(GTK_CONTAINER(parent), combobox);
+#endif
     gtk_container_add(GTK_CONTAINER(parent), menuBar);
     gtk_menu_shell_append(GTK_MENU_SHELL(menuBar), menuBarItem);
     gtk_container_add(GTK_CONTAINER(window), parent);
@@ -1281,9 +1276,7 @@ nsLookAndFeel::Init()
     }
 #else
     // Text colors
-    style = gtk_widget_get_style_context(textView);
-    gtk_style_context_save(style);
-    gtk_style_context_add_class(style, GTK_STYLE_CLASS_VIEW);
+    style = ClaimStyleContext(MOZ_GTK_TEXT_VIEW);
     gtk_style_context_get_background_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sMozFieldBackground = GDK_RGBA_TO_NS_RGBA(color);
     gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
@@ -1298,26 +1291,34 @@ nsLookAndFeel::Init()
         static_cast<GtkStateFlags>(GTK_STATE_FLAG_FOCUSED|GTK_STATE_FLAG_SELECTED),
         &color);
     sTextSelectedText = GDK_RGBA_TO_NS_RGBA(color);
-    gtk_style_context_restore(style);
+    ReleaseStyleContext(style);
 
-    // Button text, background, border
-    style = gtk_widget_get_style_context(label);
-    gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
-    sButtonText = GDK_RGBA_TO_NS_RGBA(color);
-    gtk_style_context_get_color(style, GTK_STATE_FLAG_PRELIGHT, &color);
-    sButtonHoverText = GDK_RGBA_TO_NS_RGBA(color);
+    // Button text color
+    style = ClaimStyleContext(MOZ_GTK_BUTTON);
+    {
+        GtkStyleContext* labelStyle =
+            CreateStyleForWidget(gtk_label_new("M"), style);
+        gtk_style_context_get_color(labelStyle, GTK_STATE_FLAG_NORMAL, &color);
+        sButtonText = GDK_RGBA_TO_NS_RGBA(color);
+        gtk_style_context_get_color(labelStyle, GTK_STATE_FLAG_PRELIGHT, &color);
+        sButtonHoverText = GDK_RGBA_TO_NS_RGBA(color);
+        g_object_unref(labelStyle);
+    }
+    ReleaseStyleContext(style);
 
     // Combobox text color
-    style = gtk_widget_get_style_context(comboboxLabel);
+    style = ClaimStyleContext(MOZ_GTK_COMBOBOX_ENTRY_TEXTAREA);
     gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sComboBoxText = GDK_RGBA_TO_NS_RGBA(color);
+    ReleaseStyleContext(style);
 
     // Menubar text and hover text colors    
-    style = gtk_widget_get_style_context(menuBarItem);
+    style = ClaimStyleContext(MOZ_GTK_MENUBARITEM);
     gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sMenuBarText = GDK_RGBA_TO_NS_RGBA(color);
     gtk_style_context_get_color(style, GTK_STATE_FLAG_PRELIGHT, &color);
     sMenuBarHoverText = GDK_RGBA_TO_NS_RGBA(color);
+    ReleaseStyleContext(style);
 
     // GTK's guide to fancy odd row background colors:
     // 1) Check if a theme explicitly defines an odd row color
@@ -1325,7 +1326,7 @@ nsLookAndFeel::Init()
     //    slightly by a hardcoded value (gtkstyle.c)
     // 3) If neither are defined, take the base background color and
     //    darken that by a hardcoded value
-    style = gtk_widget_get_style_context(treeView);
+    style = ClaimStyleContext(MOZ_GTK_TREEVIEW);
 
     // Get odd row background color
     gtk_style_context_save(style);
@@ -1333,6 +1334,7 @@ nsLookAndFeel::Init()
     gtk_style_context_get_background_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sOddCellBackground = GDK_RGBA_TO_NS_RGBA(color);
     gtk_style_context_restore(style);
+    ReleaseStyleContext(style);
 
     gtk_widget_path_free(path);
 

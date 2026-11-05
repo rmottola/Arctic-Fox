@@ -211,11 +211,7 @@ public:
   virtual void
   FinishedWithResult(ExtendableEventResult aResult) = 0;
 
-  NS_IMETHOD_(MozExternalRefCountType)
-  AddRef() = 0;
-
-  NS_IMETHOD_(MozExternalRefCountType)
-  Release() = 0;
+  NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 };
 
 class KeepAliveHandler final : public WorkerHolder
@@ -537,7 +533,7 @@ public:
 nsresult
 ServiceWorkerPrivate::SendMessageEvent(JSContext* aCx,
                                        JS::Handle<JS::Value> aMessage,
-                                       const Optional<Sequence<JS::Value>>& aTransferable,
+                                       const Sequence<JSObject*>& aTransferable,
                                        UniquePtr<ServiceWorkerClientInfo>&& aClientInfo)
 {
   AssertIsOnMainThread();
@@ -548,17 +544,13 @@ ServiceWorkerPrivate::SendMessageEvent(JSContext* aCx,
   }
 
   JS::Rooted<JS::Value> transferable(aCx, JS::UndefinedHandleValue);
-  if (aTransferable.WasPassed()) {
-    const Sequence<JS::Value>& value = aTransferable.Value();
-    JS::HandleValueArray elements =
-      JS::HandleValueArray::fromMarkedLocation(value.Length(), value.Elements());
 
-    JSObject* array = JS_NewArrayObject(aCx, elements);
-    if (!array) {
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
-    transferable.setObject(*array);
+  rv = nsContentUtils::CreateJSValueFromSequenceOfObject(aCx, aTransferable,
+                                                         &transferable);
+  if (NS_WARN_IF(rv.Failed())) {
+    return rv.StealNSResult();
   }
+
   RefPtr<KeepAliveToken> token = CreateEventKeepAliveToken();
   RefPtr<SendMesssageEventRunnable> runnable =
     new SendMesssageEventRunnable(mWorkerPrivate, token, Move(aClientInfo));
@@ -1419,7 +1411,9 @@ public:
     nsCOMPtr<nsILoadInfo> loadInfo;
     rv = channel->GetLoadInfo(getter_AddRefs(loadInfo));
     NS_ENSURE_SUCCESS(rv, rv);
+    NS_ENSURE_STATE(loadInfo);
     mContentPolicyType = loadInfo->InternalContentPolicyType();
+
 
     nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel);
     MOZ_ASSERT(httpChannel, "How come we don't have an HTTP channel?");
@@ -1810,6 +1804,12 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
   info.mLoadGroup = aLoadGroup;
   info.mLoadFailedAsyncRunnable = aLoadFailedRunnable;
 
+  // If we are loading a script for a ServiceWorker then we must not
+  // try to intercept it.  If the interception matches the current
+  // ServiceWorker's scope then we could deadlock the load.
+  info.mLoadFlags = mInfo->GetLoadFlags() |
+                    nsIChannel::LOAD_BYPASS_SERVICE_WORKER;
+
   rv = info.mBaseURI->GetHost(info.mDomain);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -1822,25 +1822,30 @@ ServiceWorkerPrivate::SpawnWorkerIfNeeded(WakeUpReason aWhy,
   info.mStorageAllowed = access > nsContentUtils::StorageAccess::ePrivateBrowsing;
   info.mOriginAttributes = mInfo->GetOriginAttributes();
 
+  // The ServiceWorkerRegistration principal should never have any CSP
+  // set.  The CSP from the page that registered the SW should not be
+  // inherited.  Verify this is the case in non-release builds
+#if defined(DEBUG) || !defined(RELEASE_OR_BETA)
   nsCOMPtr<nsIContentSecurityPolicy> csp;
   rv = info.mPrincipal->GetCsp(getter_AddRefs(csp));
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
 
-  info.mCSP = csp;
-  if (info.mCSP) {
-    rv = info.mCSP->GetAllowsEval(&info.mReportCSPViolations,
-                                  &info.mEvalAllowed);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-  } else {
-    info.mEvalAllowed = true;
-    info.mReportCSPViolations = false;
-  }
+  MOZ_DIAGNOSTIC_ASSERT(!csp);
+#endif
+
+  // Default CSP permissions for now.  These will be overrided if necessary
+  // based on the script CSP headers during load in ScriptLoader.
+  info.mEvalAllowed = true;
+  info.mReportCSPViolations = false;
 
   WorkerPrivate::OverrideLoadInfoLoadGroup(info);
+
+  rv = info.SetPrincipalOnMainThread(info.mPrincipal, info.mLoadGroup);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
 
   AutoJSAPI jsapi;
   jsapi.Init();

@@ -79,9 +79,14 @@ enum class VRDisplayCapabilityFlags : uint16_t {
    */
   Cap_StageParameters = 1 << 7,
   /**
+   * Cap_MountDetection is set if the VRDisplay is capable of sensing when the
+   * user is wearing the device.
+   */
+  Cap_MountDetection = 1 << 8,
+  /**
    * Cap_All used for validity checking during IPC serialization
    */
-  Cap_All = (1 << 8) - 1
+  Cap_All = (1 << 9) - 1
 };
 
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(VRDisplayCapabilityFlags)
@@ -137,6 +142,7 @@ struct VRDisplayInfo
   const Point3D& GetEyeTranslation(uint32_t whichEye) const { return mEyeTranslation[whichEye]; }
   const VRFieldOfView& GetEyeFOV(uint32_t whichEye) const { return mEyeFOV[whichEye]; }
   bool GetIsConnected() const { return mIsConnected; }
+  bool GetIsMounted() const { return mIsMounted; }
   bool GetIsPresenting() const { return mIsPresenting; }
   const Size& GetStageSize() const { return mStageSize; }
   const Matrix4x4& GetSittingToStandingTransform() const { return mSittingToStandingTransform; }
@@ -155,6 +161,7 @@ struct VRDisplayInfo
   Point3D mEyeTranslation[VRDisplayInfo::NumEyes];
   IntSize mEyeResolution;
   bool mIsConnected;
+  bool mIsMounted;
   bool mIsPresenting;
   Size mStageSize;
   Matrix4x4 mSittingToStandingTransform;
@@ -166,6 +173,7 @@ struct VRDisplayInfo
            mCapabilityFlags == other.mCapabilityFlags &&
            mEyeResolution == other.mEyeResolution &&
            mIsConnected == other.mIsConnected &&
+           mIsMounted == other.mIsMounted &&
            mIsPresenting == other.mIsPresenting &&
            mEyeFOV[0] == other.mEyeFOV[0] &&
            mEyeFOV[1] == other.mEyeFOV[1] &&
@@ -196,7 +204,7 @@ struct VRHMDSensorState {
   }
 };
 
-class VRDisplayManager {
+class VRSystemManager {
 public:
   static uint32_t AllocateDisplayID();
 
@@ -204,15 +212,36 @@ protected:
   static Atomic<uint32_t> sDisplayBase;
 
 public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(VRDisplayManager)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(VRSystemManager)
 
   virtual bool Init() = 0;
   virtual void Destroy() = 0;
   virtual void GetHMDs(nsTArray<RefPtr<VRDisplayHost>>& aHMDResult) = 0;
+  virtual void HandleInput() = 0;
+  virtual void GetControllers(nsTArray<RefPtr<VRControllerHost>>& aControllerResult) = 0;
+  virtual void ScanForControllers() = 0;
+  virtual void RemoveControllers() = 0;
+  void NewButtonEvent(uint32_t aIndex, uint32_t aButton, bool aPressed);
+  void NewAxisMove(uint32_t aIndex, uint32_t aAxis, double aValue);
+  void NewPoseState(uint32_t aIndex, const dom::GamepadPoseState& aPose);
+  void AddGamepad(const char* aID, dom::GamepadMappingType aMapping,
+                  dom::GamepadHand aHand, uint32_t aNumButtons, uint32_t aNumAxes);
+  void RemoveGamepad(uint32_t aIndex);
 
 protected:
-  VRDisplayManager() { }
-  virtual ~VRDisplayManager() { }
+  VRSystemManager() : mControllerCount(0) { }
+  virtual ~VRSystemManager() { }
+
+  uint32_t mControllerCount;
+
+private:
+  virtual void HandleButtonPress(uint32_t aControllerIdx,
+                                 uint64_t aButtonPressed) = 0;
+  virtual void HandleAxisMove(uint32_t aControllerIdx, uint32_t aAxis,
+                              float aValue) = 0;
+  virtual void HandlePoseTracking(uint32_t aControllerIdx,
+                                  const dom::GamepadPoseState& aPose,
+                                  VRControllerHost* aController) = 0;
 };
 
 struct VRControllerInfo
@@ -243,42 +272,6 @@ struct VRControllerInfo
   bool operator!=(const VRControllerInfo& other) const {
     return !(*this == other);
   }
-};
-
-class VRControllerManager {
-public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(VRControllerManager)
-
-  static uint32_t AllocateControllerID();
-  virtual bool Init() = 0;
-  virtual void Destroy() = 0;
-  virtual void HandleInput() = 0;
-  virtual void GetControllers(nsTArray<RefPtr<VRControllerHost>>& aControllerResult) = 0;
-  virtual void ScanForDevices() = 0;
-  virtual void RemoveDevices() = 0;
-  void NewButtonEvent(uint32_t aIndex, uint32_t aButton, bool aPressed);
-  void NewAxisMove(uint32_t aIndex, uint32_t aAxis, double aValue);
-  void NewPoseState(uint32_t aIndex, const dom::GamepadPoseState& aPose);
-  void AddGamepad(const char* aID, dom::GamepadMappingType aMapping,
-                  dom::GamepadHand aHand, uint32_t aNumButtons, uint32_t aNumAxes);
-  void RemoveGamepad(uint32_t aIndex);
-
-protected:
-  VRControllerManager() : mInstalled(false), mControllerCount(0) {}
-  virtual ~VRControllerManager() {}
-
-  bool mInstalled;
-  uint32_t mControllerCount;
-  static Atomic<uint32_t> sControllerBase;
-
-private:
-  virtual void HandleButtonPress(uint32_t aControllerIdx,
-                                 uint64_t aButtonPressed) = 0;
-  virtual void HandleAxisMove(uint32_t aControllerIdx, uint32_t aAxis,
-                              float aValue) = 0;
-  virtual void HandlePoseTracking(uint32_t aControllerIdx,
-                                  const dom::GamepadPoseState& aPose,
-                                  VRControllerHost* aController) = 0;
 };
 
 } // namespace gfx

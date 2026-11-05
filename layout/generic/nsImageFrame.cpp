@@ -78,6 +78,7 @@
 #include "mozilla/Preferences.h"
 
 #include "mozilla/dom/Link.h"
+#include "SVGImageContext.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -1423,7 +1424,7 @@ nsImageFrame::DisplayAltFeedback(nsRenderingContext& aRenderingContext,
                   inner.y, size, size);
       result = nsLayoutUtils::DrawSingleImage(*gfx, PresContext(), imgCon,
         nsLayoutUtils::GetSamplingFilterForFrame(this), dest, aDirtyRect,
-        nullptr, aFlags);
+        /* no SVGImageContext */ Nothing(), aFlags);
     }
 
     // If we could not draw the icon, just draw some graffiti in the mean time.
@@ -1700,7 +1701,7 @@ nsImageFrame::PaintImage(nsRenderingContext& aRenderingContext, nsPoint aPt,
     nsLayoutUtils::DrawSingleImage(*aRenderingContext.ThebesContext(),
       PresContext(), aImage,
       nsLayoutUtils::GetSamplingFilterForFrame(this), dest, aDirtyRect,
-      nullptr, flags, &anchorPoint);
+      /* no SVGImageContext */ Nothing(), flags, &anchorPoint);
 
   nsImageMap* map = GetImageMap();
   if (map) {
@@ -2059,7 +2060,6 @@ nsImageFrame::GetCursor(const nsPoint& aPoint,
       RefPtr<nsStyleContext> areaStyle = 
         PresContext()->PresShell()->StyleSet()->
           ResolveStyleFor(area->AsElement(), StyleContext(),
-                          ConsumeStyleBehavior::DontConsume,
                           LazyComputeBehavior::Allow);
       FillCursorInformationFromStyle(areaStyle->StyleUserInterface(),
                                      aCursor);
@@ -2094,7 +2094,7 @@ nsImageFrame::AttributeChanged(int32_t aNameSpaceID,
 
 void
 nsImageFrame::OnVisibilityChange(Visibility aNewVisibility,
-                                 Maybe<OnNonvisible> aNonvisibleAction)
+                                 const Maybe<OnNonvisible>& aNonvisibleAction)
 {
   nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mContent);
   if (!imageLoader) {

@@ -15,6 +15,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "ReaderMode",
   "resource://gre/modules/ReaderMode.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
   "resource://gre/modules/BrowserUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "SelectContentHelper",
+  "resource://gre/modules/SelectContentHelper.jsm");
 
 var global = this;
 
@@ -68,7 +70,7 @@ var ClickEventHandler = {
 
   findNearestScrollableElement: function(aNode) {
     // this is a list of overflow property values that allow scrolling
-    const scrollingAllowed = ['scroll', 'auto'];
+    const scrollingAllowed = ["scroll", "auto"];
 
     // go upward in the DOM and find any parent element that has a overflow
     // area and can therefore be scrolled
@@ -83,11 +85,11 @@ var ClickEventHandler = {
       }
 
       var overflowx = this._scrollable.ownerDocument.defaultView
-                          .getComputedStyle(this._scrollable, '')
-                          .getPropertyValue('overflow-x');
+                          .getComputedStyle(this._scrollable)
+                          .getPropertyValue("overflow-x");
       var overflowy = this._scrollable.ownerDocument.defaultView
-                          .getComputedStyle(this._scrollable, '')
-                          .getPropertyValue('overflow-y');
+                          .getComputedStyle(this._scrollable)
+                          .getPropertyValue("overflow-y");
       // we already discarded non-multiline selects so allow vertical
       // scroll for multiline ones directly without checking for a
       // overflow property
@@ -199,13 +201,13 @@ var ClickEventHandler = {
     var actualScrollY = 0;
     // don't bother scrolling vertically when the scrolldir is only horizontal
     // and the other way around
-    if (this._scrolldir != 'EW') {
+    if (this._scrolldir != "EW") {
       var y = this.accelerate(this._screenY, this._startY) * timeCompensation;
       var desiredScrollY = this._scrollErrorY + y;
       actualScrollY = this.roundToZero(desiredScrollY);
       this._scrollErrorY = (desiredScrollY - actualScrollY);
     }
-    if (this._scrolldir != 'NS') {
+    if (this._scrolldir != "NS") {
       var x = this.accelerate(this._screenX, this._startX) * timeCompensation;
       var desiredScrollX = this._scrollErrorX + x;
       actualScrollX = this.roundToZero(desiredScrollX);
@@ -438,11 +440,10 @@ var Printing = {
   },
 
   receiveMessage(message) {
-    let objects = message.objects;
     let data = message.data;
     switch (message.name) {
       case "Printing:Preview:Enter": {
-        this.enterPrintPreview(Services.wm.getOuterWindowWithId(data.windowID), data.simplifiedMode);
+        this.enterPrintPreview(Services.wm.getOuterWindowWithId(data.windowID), data.simplifiedMode, data.defaultPrinterName);
         break;
       }
 
@@ -467,20 +468,20 @@ var Printing = {
       }
 
       case "Printing:Print": {
-        this.print(Services.wm.getOuterWindowWithId(data.windowID), data.simplifiedMode);
+        this.print(Services.wm.getOuterWindowWithId(data.windowID), data.simplifiedMode, data.defaultPrinterName);
         break;
       }
     }
   },
 
-  getPrintSettings() {
+  getPrintSettings(defaultPrinterName) {
     try {
       let PSSVC = Cc["@mozilla.org/gfx/printsettings-service;1"]
                     .getService(Ci.nsIPrintSettingsService);
 
       let printSettings = PSSVC.globalPrintSettings;
       if (!printSettings.printerName) {
-        printSettings.printerName = PSSVC.defaultPrinterName;
+        printSettings.printerName = defaultPrinterName;
       }
       // First get any defaults from the printer
       PSSVC.initPrintSettingsFromPrinter(printSettings.printerName,
@@ -618,7 +619,7 @@ var Printing = {
     });
   },
 
-  enterPrintPreview(contentWindow, simplifiedMode) {
+  enterPrintPreview(contentWindow, simplifiedMode, defaultPrinterName) {
     // We'll call this whenever we've finished reflowing the document, or if
     // we errored out while attempting to print preview (in which case, we'll
     // notify the parent that we've failed).
@@ -641,7 +642,7 @@ var Printing = {
     addEventListener("printPreviewUpdate", onPrintPreviewReady);
 
     try {
-      let printSettings = this.getPrintSettings();
+      let printSettings = this.getPrintSettings(defaultPrinterName);
 
       // If we happen to be on simplified mode, we need to set docURL in order
       // to generate header/footer content correctly, since simplified tab has
@@ -662,9 +663,8 @@ var Printing = {
     docShell.printPreview.exitPrintPreview();
   },
 
-  print(contentWindow, simplifiedMode) {
-    let printSettings = this.getPrintSettings();
-    let rv = Cr.NS_OK;
+  print(contentWindow, simplifiedMode, defaultPrinterName) {
+    let printSettings = this.getPrintSettings(defaultPrinterName);
 
     // If we happen to be on simplified mode, we need to set docURL in order
     // to generate header/footer content correctly, since simplified tab has
@@ -898,7 +898,7 @@ let WebChannelMessageToChromeListener = {
     let principal = e.target.nodePrincipal ? e.target.nodePrincipal : e.target.document.nodePrincipal;
 
     if (e.detail) {
-      if (typeof e.detail != 'string') {
+      if (typeof e.detail != "string") {
         // Check if the principal is one of the ones that's allowed to send
         // non-string values for e.detail.
         let objectsAllowed = this._getWhitelistedPrincipals().some(whitelisted =>
@@ -1013,8 +1013,10 @@ var AudioPlaybackListener = {
     if (topic === "audio-playback") {
       if (subject && subject.top == global.content) {
         let name = "AudioPlayback:";
-        if (data === "block") {
-          name += "Block";
+        if (data === "blockStart") {
+          name += "BlockStart";
+        } else if (data === "blockStop") {
+          name += "BlockStop";
         } else {
           name += (data === "active") ? "Start" : "Stop";
         }
@@ -1356,7 +1358,7 @@ var ViewSelectionSource = {
       tmp = tmp.replace(/^ +/, "");
       tmp = tmp.replace(/ +$/, "");
       if (tmp.length != 0) {
-        str += '<span class="text">' + this.unicodeToEntity(tmp) + '</span>';
+        str += '<span class="text">' + this.unicodeToEntity(tmp) + "</span>";
       }
       break;
     default:
@@ -1387,7 +1389,7 @@ var ViewSelectionSource = {
         var unichar = this._entityConverter
                           .ConvertToEntity(letter, entityVersion);
         var entity = unichar.substring(1); // extract '&'
-        return '&amp;<span class="entity">' + entity + '</span>';
+        return '&amp;<span class="entity">' + entity + "</span>";
       } catch (ex) {
         return letter;
       }
@@ -1755,3 +1757,21 @@ let DateTimePickerListener = {
 }
 
 DateTimePickerListener.init();
+
+addEventListener("mozshowdropdown", event => {
+  if (!event.isTrusted)
+    return;
+
+  if (!SelectContentHelper.open) {
+    new SelectContentHelper(event.target, {isOpenedViaTouch: false}, this);
+  }
+});
+
+addEventListener("mozshowdropdown-sourcetouch", event => {
+  if (!event.isTrusted)
+    return;
+
+  if (!SelectContentHelper.open) {
+    new SelectContentHelper(event.target, {isOpenedViaTouch: true}, this);
+  }
+});

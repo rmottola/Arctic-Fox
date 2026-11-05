@@ -31,6 +31,10 @@ class ProxyObject : public ShapedObject
                       "proxy object layout must match shadow interface");
     }
 
+    static JS::Result<ProxyObject*, JS::OOM&>
+    create(JSContext* cx, const js::Class* clasp, Handle<TaggedProto> proto,
+           js::gc::AllocKind allocKind, js::NewObjectKind newKind);
+
   public:
     static ProxyObject* New(JSContext* cx, const BaseProxyHandler* handler, HandleValue priv,
                             TaggedProto proto_, const ProxyOptions& options);
@@ -91,20 +95,17 @@ class ProxyObject : public ShapedObject
         // are "sane". They have to quack enough like proxies for us to belive
         // they should be treated as such.
 
-        // proxy_Trace is just a trivial wrapper around ProxyObject::trace for
-        // friend api exposure.
-
         // Proxy classes are not allowed to have call or construct hooks directly. Their
         // callability is instead decided by handler()->isCallable().
         return clasp->isProxy() &&
-               clasp->isTrace(proxy_Trace) &&
+               clasp->isTrace(ProxyObject::trace) &&
                !clasp->getCall() && !clasp->getConstruct();
     }
 
   public:
     static unsigned grayLinkExtraSlot(JSObject* obj);
 
-    void renew(JSContext* cx, const BaseProxyHandler* handler, const Value& priv);
+    void renew(const BaseProxyHandler* handler, const Value& priv);
 
     static void trace(JSTracer* trc, JSObject* obj);
 

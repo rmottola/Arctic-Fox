@@ -25,9 +25,6 @@ obj_construct(JSContext* cx, unsigned argc, JS::Value* vp);
 MOZ_MUST_USE bool
 obj_propertyIsEnumerable(JSContext* cx, unsigned argc, Value* vp);
 
-MOZ_MUST_USE bool
-obj_valueOf(JSContext* cx, unsigned argc, JS::Value* vp);
-
 PlainObject*
 ObjectCreateImpl(JSContext* cx, HandleObject proto, NewObjectKind newKind = GenericObject,
                  HandleObjectGroup group = nullptr);
@@ -51,8 +48,6 @@ obj_getOwnPropertyDescriptor(JSContext* cx, unsigned argc, JS::Value* vp);
 MOZ_MUST_USE bool
 obj_getPrototypeOf(JSContext* cx, unsigned argc, JS::Value* vp);
 
-MOZ_MUST_USE bool
-obj_hasOwnProperty(JSContext* cx, unsigned argc, JS::Value* vp);
 
 MOZ_MUST_USE bool
 obj_isExtensible(JSContext* cx, unsigned argc, JS::Value* vp);

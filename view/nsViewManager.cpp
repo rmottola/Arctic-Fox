@@ -17,6 +17,7 @@
 #include "nsIPluginWidget.h"
 #include "nsXULPopupManager.h"
 #include "nsIPresShell.h"
+#include "nsIPresShellInlines.h"
 #include "nsPresContext.h"
 #include "mozilla/StartupTimeline.h"
 #include "GeckoProfiler.h"
@@ -229,10 +230,9 @@ nsViewManager::SetWindowDimensions(nscoord aWidth, nscoord aHeight, bool aDelayR
       DoSetWindowDimensions(aWidth, aHeight);
     } else {
       mDelayedResize.SizeTo(aWidth, aHeight);
-      if (mPresShell && mPresShell->GetDocument()) {
-        nsIDocument* doc = mPresShell->GetDocument();
-        doc->SetNeedStyleFlush();
-        doc->SetNeedLayoutFlush();
+      if (mPresShell) {
+        mPresShell->SetNeedStyleFlush();
+        mPresShell->SetNeedLayoutFlush();
       }
     }
   }
@@ -406,7 +406,7 @@ nsViewManager::ProcessPendingUpdatesForView(nsView* aView,
     return; // presentation might have been torn down
   }
   if (aFlushDirtyRegion) {
-    profiler_tracing("Paint", "DisplayList", TRACING_INTERVAL_START);
+    GeckoProfilerTracingRAII tracer("Paint", "DisplayList");
     nsAutoScriptBlocker scriptBlocker;
     SetPainting(true);
     for (uint32_t i = 0; i < widgets.Length(); ++i) {
@@ -417,7 +417,6 @@ nsViewManager::ProcessPendingUpdatesForView(nsView* aView,
       }
     }
     SetPainting(false);
-    profiler_tracing("Paint", "DisplayList", TRACING_INTERVAL_END);
   }
 }
 
@@ -837,11 +836,7 @@ void nsViewManager::ReparentChildWidgets(nsView* aView, nsIWidget *aNewWidget)
     if (parentWidget) {
       // Child widget
       if (parentWidget != aNewWidget) {
-#ifdef DEBUG
-        nsresult rv =
-#endif
-          widget->SetParent(aNewWidget);
-        NS_ASSERTION(NS_SUCCEEDED(rv), "SetParent failed!");
+        widget->SetParent(aNewWidget);
       }
     } else {
       // Toplevel widget (popup, dialog, etc)

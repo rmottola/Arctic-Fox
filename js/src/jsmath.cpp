@@ -157,7 +157,7 @@ js::math_acos(JSContext* cx, unsigned argc, Value* vp)
     if (!ToNumber(cx, args[0], &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -192,7 +192,7 @@ js::math_asin(JSContext* cx, unsigned argc, Value* vp)
     if (!ToNumber(cx, args[0], &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -227,7 +227,7 @@ js::math_atan(JSContext* cx, unsigned argc, Value* vp)
     if (!ToNumber(cx, args[0], &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -346,7 +346,7 @@ js::math_cos(JSContext* cx, unsigned argc, Value* vp)
     if (!ToNumber(cx, args[0], &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -381,7 +381,7 @@ js::math_exp(JSContext* cx, unsigned argc, Value* vp)
     if (!ToNumber(cx, args[0], &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -499,7 +499,7 @@ js::math_log_handle(JSContext* cx, HandleValue val, MutableHandleValue res)
     if (!ToNumber(cx, val, &in))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -676,8 +676,8 @@ js::math_pow(JSContext* cx, unsigned argc, Value* vp)
     return math_pow_handle(cx, args.get(0), args.get(1), args.rval());
 }
 
-static uint64_t
-GenerateSeed()
+uint64_t
+js::GenerateRandomSeed()
 {
     uint64_t seed = 0;
 
@@ -692,7 +692,7 @@ GenerateSeed()
         close(fd);
     }
 #else
-# error "Platform needs to implement GenerateSeed()"
+# error "Platform needs to implement GenerateRandomSeed()"
 #endif
 
     // Also mix in PRMJ_Now() in case we couldn't read random bits from the OS.
@@ -704,8 +704,8 @@ js::GenerateXorShift128PlusSeed(mozilla::Array<uint64_t, 2>& seed)
 {
     // XorShift128PlusRNG must be initialized with a non-zero seed.
     do {
-        seed[0] = GenerateSeed();
-        seed[1] = GenerateSeed();
+        seed[0] = GenerateRandomSeed();
+        seed[1] = GenerateRandomSeed();
     } while (seed[0] == 0 && seed[1] == 0);
 }
 
@@ -830,7 +830,7 @@ js::math_sin_handle(JSContext* cx, HandleValue val, MutableHandleValue res)
     if (!ToNumber(cx, val, &in))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -893,7 +893,7 @@ js::math_sqrt_handle(JSContext* cx, HandleValue number, MutableHandleValue resul
     if (!ToNumber(cx, number, &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -941,7 +941,7 @@ js::math_tan(JSContext* cx, unsigned argc, Value* vp)
     if (!ToNumber(cx, args[0], &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
 
@@ -965,7 +965,7 @@ static bool math_function(JSContext* cx, unsigned argc, Value* vp)
     if (!ToNumber(cx, args[0], &x))
         return false;
 
-    MathCache* mathCache = cx->caches.getMathCache(cx);
+    MathCache* mathCache = cx->caches().getMathCache(cx);
     if (!mathCache)
         return false;
     double z = F(mathCache, x);
@@ -1372,7 +1372,8 @@ static const JSFunctionSpec math_static_methods[] = {
 JSObject*
 js::InitMathClass(JSContext* cx, HandleObject obj)
 {
-    RootedObject proto(cx, obj->as<GlobalObject>().getOrCreateObjectPrototype(cx));
+    Handle<GlobalObject*> global = obj.as<GlobalObject>();
+    RootedObject proto(cx, GlobalObject::getOrCreateObjectPrototype(cx, global));
     if (!proto)
         return nullptr;
     RootedObject Math(cx, NewObjectWithGivenProto(cx, &MathClass, proto, SingletonObject));

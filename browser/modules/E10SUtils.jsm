@@ -35,6 +35,10 @@ const NOT_REMOTE = null;
 // These must match any similar ones in ContentParent.h.
 const WEB_REMOTE_TYPE = "web";
 const FILE_REMOTE_TYPE = "file";
+const EXTENSION_REMOTE_TYPE = "extension";
+
+// This must start with the WEB_REMOTE_TYPE above.
+const LARGE_ALLOCATION_REMOTE_TYPE = "webLargeAllocation";
 const DEFAULT_REMOTE_TYPE = WEB_REMOTE_TYPE;
 
 function validatedWebRemoteType(aPreferredRemoteType) {
@@ -47,17 +51,24 @@ this.E10SUtils = {
   NOT_REMOTE,
   WEB_REMOTE_TYPE,
   FILE_REMOTE_TYPE,
+  EXTENSION_REMOTE_TYPE,
+  LARGE_ALLOCATION_REMOTE_TYPE,
 
-  canLoadURIInProcess: function(aURL, aProcess) {
+  canLoadURIInProcess(aURL, aProcess) {
     let remoteType = aProcess == Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT
                      ? DEFAULT_REMOTE_TYPE : NOT_REMOTE;
     return remoteType == this.getRemoteTypeForURI(aURL, true, remoteType);
   },
 
-  getRemoteTypeForURI: function(aURL, aMultiProcess,
-                                aPreferredRemoteType = DEFAULT_REMOTE_TYPE) {
+  getRemoteTypeForURI(aURL, aMultiProcess,
+                      aPreferredRemoteType = DEFAULT_REMOTE_TYPE,
+                      aLargeAllocation = false) {
     if (!aMultiProcess) {
       return NOT_REMOTE;
+    }
+
+    if (aLargeAllocation) {
+      return LARGE_ALLOCATION_REMOTE_TYPE;
     }
 
     // loadURI in browser.xml treats null as about:blank
@@ -88,7 +99,7 @@ this.E10SUtils = {
         return aPreferredRemoteType;
       }
 
-      let url = Services.io.newURI(aURL, null, null);
+      let url = Services.io.newURI(aURL);
       let module = getAboutModule(url);
       // If the module doesn't exist then an error page will be loading, that
       // should be ok to load in any process
@@ -114,7 +125,7 @@ this.E10SUtils = {
       try {
         // This can fail for invalid Chrome URIs, in which case we will end up
         // not loading anything anyway.
-        url = Services.io.newURI(aURL, null, null);
+        url = Services.io.newURI(aURL);
       } catch (ex) {
         return aPreferredRemoteType;
       }
@@ -134,7 +145,7 @@ this.E10SUtils = {
     }
 
     if (aURL.startsWith("moz-extension:")) {
-      return useRemoteWebExtensions ? WEB_REMOTE_TYPE : NOT_REMOTE;
+      return useRemoteWebExtensions ? EXTENSION_REMOTE_TYPE : NOT_REMOTE;
     }
 
     if (aURL.startsWith("view-source:")) {
@@ -158,7 +169,7 @@ this.E10SUtils = {
     // If we are in a Large-Allocation process, and it wouldn't be content visible
     // to change processes, we want to load into a new process so that we can throw
     // this one out.
-    if (aDocShell.inLargeAllocProcess &&
+    if (Services.appinfo.remoteType == LARGE_ALLOCATION_REMOTE_TYPE &&
         !aDocShell.awaitingLargeAlloc &&
         aDocShell.isOnlyToplevelInTabGroup) {
       return false;
@@ -168,7 +179,7 @@ this.E10SUtils = {
     return this.shouldLoadURIInThisProcess(aURI);
   },
 
-  redirectLoad(aDocShell, aURI, aReferrer, aTriggeringPrincipal, aFreshProcess) {
+  redirectLoad(aDocShell, aURI, aReferrer, aTriggeringPrincipal, aFreshProcess, aFlags) {
     // Retarget the load to the correct process
     let messageManager = aDocShell.QueryInterface(Ci.nsIInterfaceRequestor)
                                   .getInterface(Ci.nsIContentFrameMessageManager);
@@ -177,7 +188,7 @@ this.E10SUtils = {
     messageManager.sendAsyncMessage("Browser:LoadURI", {
       loadOptions: {
         uri: aURI.spec,
-        flags: Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
+        flags: aFlags || Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
         referrer: aReferrer ? aReferrer.spec : null,
         triggeringPrincipal: aTriggeringPrincipal
                              ? Utils.serializePrincipal(aTriggeringPrincipal)
@@ -189,7 +200,7 @@ this.E10SUtils = {
     return false;
   },
 
-  wrapHandlingUserInput: function(aWindow, aIsHandling, aCallback) {
+  wrapHandlingUserInput(aWindow, aIsHandling, aCallback) {
     var handlingUserInput;
     try {
       handlingUserInput = aWindow.QueryInterface(Ci.nsIInterfaceRequestor)

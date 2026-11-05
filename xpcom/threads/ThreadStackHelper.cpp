@@ -115,7 +115,7 @@ ThreadStackHelper::Shutdown()
 ThreadStackHelper::ThreadStackHelper()
   : mStackToFill(nullptr)
 #ifdef MOZ_THREADSTACKHELPER_PSEUDO
-  , mPseudoStack(mozilla_get_pseudo_stack())
+  , mPseudoStack(profiler_get_pseudo_stack())
 #ifdef MOZ_THREADSTACKHELPER_NATIVE
   , mContextToFill(nullptr)
 #endif
@@ -416,7 +416,7 @@ GetPathAfterComponent(const char* filename, const char (&component)[LEN]) {
 } // namespace
 
 const char*
-ThreadStackHelper::AppendJSEntry(const volatile StackEntry* aEntry,
+ThreadStackHelper::AppendJSEntry(const volatile js::ProfileEntry* aEntry,
                                  intptr_t& aAvailableBufferSize,
                                  const char* aPrevLabel)
 {
@@ -503,8 +503,8 @@ ThreadStackHelper::FillStackBuffer()
   intptr_t availableBufferSize = intptr_t(reservedBufferSize);
 
   // Go from front to back
-  const volatile StackEntry* entry = mPseudoStack->mStack;
-  const volatile StackEntry* end = entry + mPseudoStack->stackSize();
+  const volatile js::ProfileEntry* entry = mPseudoStack->mStack;
+  const volatile js::ProfileEntry* end = entry + mPseudoStack->stackSize();
   // Deduplicate identical, consecutive frames
   const char* prevLabel = nullptr;
   for (; reservedSize-- && entry != end; entry++) {

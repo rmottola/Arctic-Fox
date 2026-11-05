@@ -226,15 +226,15 @@ var snapshotFormatters = {
     let apzInfo = [];
     let formatApzInfo = function(info) {
       let out = [];
-      for (let type of ['Wheel', 'Touch', 'Drag']) {
-        let key = 'Apz' + type + 'Input';
+      for (let type of ["Wheel", "Touch", "Drag"]) {
+        let key = "Apz" + type + "Input";
 
         if (!(key in info))
           continue;
 
         delete info[key];
 
-        let message = localizedMsg([type.toLowerCase() + 'Enabled']);
+        let message = localizedMsg([type.toLowerCase() + "Enabled"]);
         out.push(message);
       }
 
@@ -419,7 +419,7 @@ var snapshotFormatters = {
     showGpu("gpu-2", "2");
 
     // Remove adapter keys.
-    for (let [prop, key] of adapterKeys) {
+    for (let [prop, /* key */] of adapterKeys) {
       delete data[prop];
       delete data[prop + "2"];
     }

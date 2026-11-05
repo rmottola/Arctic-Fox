@@ -304,6 +304,8 @@ private:
   // interface ID.
   void PopulateNetworkInterfaceId();
 
+  void UnsuppressEventHandlingAndResume();
+
 public:
   virtual void
   Send(JSContext* /*aCx*/, ErrorResult& aRv) override
@@ -692,6 +694,9 @@ protected:
   nsCOMPtr<nsITimer> mTimeoutTimer;
   void StartTimeoutTimer();
   void HandleTimeoutCallback();
+
+  nsCOMPtr<nsIDocument> mSuspendedDoc;
+  nsCOMPtr<nsIRunnable> mResumeTimeoutRunnable;
 
   nsCOMPtr<nsITimer> mSyncTimeoutTimer;
 

@@ -935,7 +935,7 @@ function sanitizeName(aName) {
 
   // Use a random name if our input had no valid characters.
   if (name.length < minLength)
-    name = Math.random().toString(36).replace(/^.*\./, '');
+    name = Math.random().toString(36).replace(/^.*\./, "");
 
   // Force max length.
   return name.substring(0, maxLength);
@@ -2564,6 +2564,7 @@ Engine.prototype = {
    * @param  options
    *         An object that must contain the following fields:
    *         {window} the content window for the window performing the search
+   *         {originAttributes} the originAttributes for performing the search
    *
    * @throws NS_ERROR_INVALID_ARG if options is omitted or lacks required
    *         elemeents
@@ -2582,12 +2583,26 @@ Engine.prototype = {
                            .getInterface(Components.interfaces.nsIWebNavigation)
                            .QueryInterface(Components.interfaces.nsILoadContext);
 
-    connector.speculativeConnect(searchURI, callbacks);
+    // Using the codebase principal which is constructed by the search URI
+    // and given originAttributes. If originAttributes are not given, we
+    // fallback to use the docShell's originAttributes.
+    let attrs = options.originAttributes;
+
+    if (!attrs) {
+      attrs = options.window.document
+                            .docShell
+                            .getOriginAttributes();
+    }
+
+    let principal = Services.scriptSecurityManager
+                            .createCodebasePrincipal(searchURI, attrs);
+
+    connector.speculativeConnect2(searchURI, principal, callbacks);
 
     if (this.supportsResponseType(URLTYPE_SUGGEST_JSON)) {
       let suggestURI = this.getSubmission("dummy", URLTYPE_SUGGEST_JSON).uri;
       if (suggestURI.prePath != searchURI.prePath)
-        connector.speculativeConnect(suggestURI, callbacks);
+        connector.speculativeConnect2(suggestURI, principal, callbacks);
     }
   },
 };
@@ -3684,6 +3699,20 @@ SearchService.prototype = {
         region = "default";
       }
       engineNames = searchSettings[region]["visibleDefaultEngines"];
+    }
+
+    // Remove any engine names that are supposed to be ignored.
+    // This pref is only allows in a partner distribution.
+    let branch = Services.prefs.getDefaultBranch(BROWSER_SEARCH_PREF);
+    if (isPartnerBuild() &&
+        branch.getPrefType("ignoredJAREngines") == branch.PREF_STRING) {
+      let ignoredJAREngines = branch.getCharPref("ignoredJAREngines")
+                                    .split(",");
+      let filteredEngineNames = engineNames.filter(e => !ignoredJAREngines.includes(e));
+      // Don't allow all engines to be hidden
+      if (filteredEngineNames.length > 0) {
+        engineNames = filteredEngineNames;
+      }
     }
 
     for (let name of engineNames) {

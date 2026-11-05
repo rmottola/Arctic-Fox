@@ -30,8 +30,8 @@ this.SessionHistory = Object.freeze({
     return SessionHistoryInternal.isEmpty(docShell);
   },
 
-  collect: function (docShell) {
-    return SessionHistoryInternal.collect(docShell);
+  collect: function (docShell, aFromIdx = -1) {
+    return SessionHistoryInternal.collect(docShell, aFromIdx);
   },
 
   restore: function (docShell, tabData) {
@@ -69,11 +69,15 @@ var SessionHistoryInternal = {
    *
    * @param docShell
    *        The docShell that owns the session history.
+   * @param aFromIdx
+   *        The starting local index to collect the history from.
+   * @return An object reprereseting a partial global history update.
    */
-  collect: function (docShell) {
+  collect: function (docShell, aFromIdx = -1) {
     let loadContext = docShell.QueryInterface(Ci.nsILoadContext);
     let webNavigation = docShell.QueryInterface(Ci.nsIWebNavigation);
     let history = webNavigation.sessionHistory.QueryInterface(Ci.nsISHistoryInternal);
+    let ihistory = history.QueryInterface(Ci.nsISHistory);
 
     let data = {entries: [], userContextId: loadContext.originAttributes.userContextId };
 
@@ -102,9 +106,29 @@ var SessionHistoryInternal = {
       // record it. For about:blank we explicitly want an empty array without
       // an 'index' property to denote that there are no history entries.
       if (uri != "about:blank" || (body && body.hasChildNodes())) {
-        data.entries.push({ url: uri });
+        data.entries.push({
+          url: uri,
+          triggeringPrincipal_base64: Utils.SERIALIZED_SYSTEMPRINCIPAL
+        });
         data.index = 1;
       }
+    }
+
+    // Check if we should discard some of the entries which didn't change
+    if (aFromIdx > -1) {
+      data.entries.splice(0, aFromIdx + 1);
+    }
+
+    // Transform the entries from local to global index space.
+    data.index += ihistory.globalIndexOffset;
+    data.fromIdx = aFromIdx + ihistory.globalIndexOffset;
+
+    // If we are not the most recent partialSHistory in our groupedSHistory, we
+    // need to make certain that we don't replace the entries from the following
+    // SHistories - so we replace only the number of entries which our SHistory
+    // takes up.
+    if (ihistory.globalIndexOffset + ihistory.count < ihistory.globalCount) {
+      data.toIdx = data.fromIdx + ihistory.count;
     }
 
     return data;
@@ -178,15 +202,34 @@ var SessionHistoryInternal = {
     }
 
     // Collect triggeringPrincipal data for the current history entry.
-    try {
-      let triggeringPrincipal = Utils.serializePrincipal(shEntry.triggeringPrincipal);
-      if (triggeringPrincipal) {
-        entry.triggeringPrincipal_b64 = triggeringPrincipal;
+    // Please note that before Bug 1297338 there was no concept of a
+    // principalToInherit. To remain backward/forward compatible we
+    // serialize the principalToInherit as triggeringPrincipal_b64.
+    // Once principalToInherit is well established (within FF55)
+    // we can update this code, remove triggeringPrincipal_b64 and
+    // just keep triggeringPrincipal_base64 as well as
+    // principalToInherit_base64;  see Bug 1301666.
+    if (shEntry.principalToInherit) {
+      try {
+        let principalToInherit = Utils.serializePrincipal(shEntry.principalToInherit);
+        if (principalToInherit) {
+          entry.triggeringPrincipal_b64 = principalToInherit;
+          entry.principalToInherit_base64 = principalToInherit;
+        }
+      } catch (e) {
+        debug(e);
       }
-    } catch (ex) {
-      // Not catching anything specific here, just possible errors
-      // from writeCompoundObject() and the like.
-      debug("Failed serializing triggeringPrincipal data: " + ex);
+    }
+
+    if (shEntry.triggeringPrincipal) {
+      try {
+        let triggeringPrincipal = Utils.serializePrincipal(shEntry.triggeringPrincipal);
+        if (triggeringPrincipal) {
+          entry.triggeringPrincipal_base64 = triggeringPrincipal;
+        }
+      } catch (e) {
+        debug(e);
+      }
     }
 
     entry.docIdentifier = shEntry.BFCacheEntry.ID;
@@ -375,8 +418,27 @@ var SessionHistoryInternal = {
       delete entry.owner_b64;
     }
 
-    if (entry.triggeringPrincipal_b64) {
+    // Before introducing the concept of principalToInherit we only had
+    // a triggeringPrincipal within every entry which basically is the
+    // equivalent of the new principalToInherit. To avoid compatibility
+    // issues, we first check if the entry has entries for
+    // triggeringPrincipal_base64 and principalToInherit_base64. If not
+    // we fall back to using the principalToInherit (which is stored
+    // as triggeringPrincipal_b64) as the triggeringPrincipal and
+    // the principalToInherit.
+    // FF55 will remove the triggeringPrincipal_b64, see Bug 1301666.
+    if (entry.triggeringPrincipal_base64 || entry.principalToInherit_base64) {
+      if (entry.triggeringPrincipal_base64) {
+        shEntry.triggeringPrincipal =
+          Utils.deserializePrincipal(entry.triggeringPrincipal_base64);
+      }
+      if (entry.principalToInherit_base64) {
+        shEntry.principalToInherit =
+          Utils.deserializePrincipal(entry.principalToInherit_base64);
+      }
+    } else if (entry.triggeringPrincipal_b64) {
       shEntry.triggeringPrincipal = Utils.deserializePrincipal(entry.triggeringPrincipal_b64);
+      shEntry.principalToInherit = shEntry.triggeringPrincipal;
     }
 
     if (entry.children && shEntry instanceof Ci.nsISHContainer) {

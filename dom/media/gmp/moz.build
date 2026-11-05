@@ -12,6 +12,9 @@ XPIDL_SOURCES += [
 ]
 
 EXPORTS += [
+    'ChromiumCDMParent.h',
+    'ChromiumCDMProxy.h',
+    'DecryptJob.h',
     'gmp-api/gmp-decryption.h',
     'gmp-api/gmp-entrypoints.h',
     'gmp-api/gmp-errors.h',
@@ -64,15 +67,22 @@ EXPORTS += [
     'GMPVideoi420FrameImpl.h',
     'GMPVideoPlaneImpl.h',
     'widevine-adapter/content_decryption_module.h',
+    'widevine-adapter/content_decryption_module_export.h',
 ]
 
 UNIFIED_SOURCES += [
+    'ChromiumCDMAdapter.cpp',
+    'ChromiumCDMChild.cpp',
+    'ChromiumCDMParent.cpp',
+    'ChromiumCDMProxy.cpp',
+    'DecryptJob.cpp',
     'GMPCDMCallbackProxy.cpp',
     'GMPCDMProxy.cpp',
     'GMPChild.cpp',
     'GMPContentChild.cpp',
     'GMPContentParent.cpp',
     'GMPCrashHelper.cpp',
+    'GMPCrashHelperHolder.cpp',
     'GMPDecryptorChild.cpp',
     'GMPDecryptorParent.cpp',
     'GMPDiskStorage.cpp',
@@ -108,6 +118,7 @@ DIRS += [
 
 IPDL_SOURCES += [
   'GMPTypes.ipdlh',
+  'PChromiumCDM.ipdl',
   'PGMP.ipdl',
   'PGMPContent.ipdl',
   'PGMPDecryptor.ipdl',

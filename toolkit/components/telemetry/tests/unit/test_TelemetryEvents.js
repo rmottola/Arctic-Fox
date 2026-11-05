@@ -9,17 +9,22 @@ function checkEventFormat(events) {
   Assert.ok(Array.isArray(events), "Events should be serialized to an array.");
   for (let e of events) {
     Assert.ok(Array.isArray(e), "Event should be an array.");
-    Assert.equal(e.length, 6, "Event should have 6 elements.");
+    Assert.greaterOrEqual(e.length, 4, "Event should have at least 4 elements.");
+    Assert.lessOrEqual(e.length, 6, "Event should have at most 6 elements.");
 
     Assert.equal(typeof(e[0]), "number", "Element 0 should be a number.");
     Assert.equal(typeof(e[1]), "string", "Element 1 should be a string.");
     Assert.equal(typeof(e[2]), "string", "Element 2 should be a string.");
     Assert.equal(typeof(e[3]), "string", "Element 3 should be a string.");
 
-    Assert.ok(e[4] === null || typeof(e[4]) == "string",
-              "Event element 4 should be null or a string.");
-    Assert.ok(e[5] === null || typeof(e[5]) == "object",
-              "Event element 4 should be null or an object.");
+    if (e.length > 4) {
+      Assert.ok(e[4] === null || typeof(e[4]) == "string",
+                "Event element 4 should be null or a string.");
+    }
+    if (e.length > 5) {
+      Assert.ok(e[5] === null || typeof(e[5]) == "object",
+                "Event element 5 should be null or an object.");
+    }
 
     let extra = e[5];
     if (extra) {
@@ -30,6 +35,50 @@ function checkEventFormat(events) {
     }
   }
 }
+
+add_task(function* test_recording_state() {
+  const events = [
+    ["telemetry.test", "test1", "object1"],
+    ["telemetry.test.second", "test", "object1"],
+  ];
+
+  // Both test categories should be off by default.
+  events.forEach(e => Telemetry.recordEvent(...e));
+  let snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.equal(Object.keys(snapshot).length, 0, "Should not have recorded any events.");
+
+  // Enable one test category and see that we record correctly.
+  Telemetry.setEventRecordingEnabled("telemetry.test", true);
+  events.forEach(e => Telemetry.recordEvent(...e));
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  Assert.equal(snapshot.default.length, 1, "Should have recorded one event.");
+  Assert.equal(snapshot.default[0][1], "telemetry.test", "Should have recorded one event in telemetry.test");
+
+  // Also enable the other test category and see that we record correctly.
+  Telemetry.setEventRecordingEnabled("telemetry.test.second", true);
+  events.forEach(e => Telemetry.recordEvent(...e));
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  Assert.equal(snapshot.default.length, 2, "Should have recorded two events.");
+  Assert.equal(snapshot.default[0][1], "telemetry.test", "Should have recorded one event in telemetry.test");
+  Assert.equal(snapshot.default[1][1], "telemetry.test.second", "Should have recorded one event in telemetry.test.second");
+
+  // Now turn of one category again and check that this works as expected.
+  Telemetry.setEventRecordingEnabled("telemetry.test", false);
+  events.forEach(e => Telemetry.recordEvent(...e));
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  Assert.equal(snapshot.default.length, 1, "Should have recorded one event.");
+  Assert.equal(snapshot.default[0][1], "telemetry.test.second", "Should have recorded one event in telemetry.test.second");
+});
+
+add_task(function* recording_setup() {
+  // Make sure both test categories are enabled for the remaining tests.
+  // Otherwise their event recording won't work.
+  Telemetry.setEventRecordingEnabled("telemetry.test", true);
+  Telemetry.setEventRecordingEnabled("telemetry.test.second", true);
+});
 
 add_task(function* test_recording() {
   Telemetry.clearEvents();
@@ -44,7 +93,7 @@ add_task(function* test_recording() {
     {optout: false, event: ["telemetry.test", "test1", "object1", null, {"key1": "value1"}]},
     {optout: false, event: ["telemetry.test", "test1", "object1", "value", {"key1": "value1", "key2": "value2"}]},
 
-    {optout: true,  event: ["telemetry.test", "test_optout", "object1"]},
+    {optout: true,  event: ["telemetry.test", "optout", "object1"]},
     {optout: false, event: ["telemetry.test.second", "test", "object1"]},
     {optout: false, event: ["telemetry.test.second", "test", "object1", null, {"key1": "value1"}]},
   ];
@@ -59,15 +108,23 @@ add_task(function* test_recording() {
     entry.tsAfter = Math.floor(Telemetry.msSinceProcessStart());
   }
 
+  // Strip off trailing null values to match the serialized events.
+  for (let entry of expected) {
+    let e = entry.event;
+    while ((e.length >= 3) && (e[e.length - 1] === null)) {
+      e.pop();
+    }
+  }
+
   // The following should not result in any recorded events.
   Assert.throws(() => Telemetry.recordEvent("unknown.category", "test1", "object1"),
-                /Error: Unknown event\./,
+                /Error: Unknown event: \["unknown.category", "test1", "object1"\]/,
                 "Should throw on unknown category.");
   Assert.throws(() => Telemetry.recordEvent("telemetry.test", "unknown", "object1"),
-                /Error: Unknown event\./,
+                /Error: Unknown event: \["telemetry.test", "unknown", "object1"\]/,
                 "Should throw on unknown method.");
   Assert.throws(() => Telemetry.recordEvent("telemetry.test", "test1", "unknown"),
-                /Error: Unknown event\./,
+                /Error: Unknown event: \["telemetry.test", "test1", "unknown"\]/,
                 "Should throw on unknown object.");
 
   let checkEvents = (events, expectedEvents) => {
@@ -111,31 +168,33 @@ add_task(function* test_clear() {
 
   // Check that events were recorded.
   // The events are cleared by passing the respective flag.
-  let events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
-  Assert.equal(events.length, 2 * COUNT, `Should have recorded ${2 * COUNT} events.`);
+  let snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  Assert.equal(snapshot.default.length, 2 * COUNT, `Should have recorded ${2 * COUNT} events.`);
 
   // Now the events should be cleared.
-  events = Telemetry.snapshotBuiltinEvents(OPTIN, false);
-  Assert.equal(events.length, 0, `Should have cleared the events.`);
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, false);
+  Assert.equal(Object.keys(snapshot).length, 0, `Should have cleared the events.`);
 });
 
 add_task(function* test_expiry() {
   Telemetry.clearEvents();
 
   // Recording call with event that is expired by version.
-  Telemetry.recordEvent("telemetry.test", "test_expired_version", "object1");
-  let events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
-  Assert.equal(events.length, 0, "Should not record event with expired version.");
+  Telemetry.recordEvent("telemetry.test", "expired_version", "object1");
+  let snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.equal(Object.keys(snapshot).length, 0, "Should not record event with expired version.");
 
   // Recording call with event that is expired by date.
-  Telemetry.recordEvent("telemetry.test", "test_expired_date", "object1");
-  events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
-  Assert.equal(events.length, 0, "Should not record event with expired date.");
+  Telemetry.recordEvent("telemetry.test", "expired_date", "object1");
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.equal(Object.keys(snapshot).length, 0, "Should not record event with expired date.");
 
   // Recording call with event that has expiry_version and expiry_date in the future.
-  Telemetry.recordEvent("telemetry.test", "test_not_expired_optout", "object1");
-  events = Telemetry.snapshotBuiltinEvents(OPTOUT, true);
-  Assert.equal(events.length, 1, "Should record event when date and version are not expired.");
+  Telemetry.recordEvent("telemetry.test", "not_expired_optout", "object1");
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTOUT, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  Assert.equal(snapshot.default.length, 1, "Should record event when date and version are not expired.");
 });
 
 add_task(function* test_invalidParams() {
@@ -143,37 +202,39 @@ add_task(function* test_invalidParams() {
 
   // Recording call with wrong type for value argument.
   Telemetry.recordEvent("telemetry.test", "test1", "object1", 1);
-  let events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
-  Assert.equal(events.length, 0, "Should not record event when value argument with invalid type is passed.");
+  let snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.equal(Object.keys(snapshot).length, 0, "Should not record event when value argument with invalid type is passed.");
 
   // Recording call with wrong type for extra argument.
   Telemetry.recordEvent("telemetry.test", "test1", "object1", null, "invalid");
-  events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
-  Assert.equal(events.length, 0, "Should not record event when extra argument with invalid type is passed.");
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.equal(Object.keys(snapshot).length, 0, "Should not record event when extra argument with invalid type is passed.");
 
   // Recording call with unknown extra key.
   Telemetry.recordEvent("telemetry.test", "test1", "object1", null, {"key3": "x"});
-  events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
-  Assert.equal(events.length, 0, "Should not record event when extra argument with invalid key is passed.");
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.equal(Object.keys(snapshot).length, 0, "Should not record event when extra argument with invalid key is passed.");
 
   // Recording call with invalid value type.
   Telemetry.recordEvent("telemetry.test", "test1", "object1", null, {"key3": 1});
-  events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
-  Assert.equal(events.length, 0, "Should not record event when extra argument with invalid value type is passed.");
+  snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.equal(Object.keys(snapshot).length, 0, "Should not record event when extra argument with invalid value type is passed.");
 });
 
 add_task(function* test_storageLimit() {
   Telemetry.clearEvents();
 
   // Record more events than the storage limit allows.
-  let LIMIT = 10000;
+  let LIMIT = 1000;
   let COUNT = LIMIT + 10;
   for (let i = 0; i < COUNT; ++i) {
     Telemetry.recordEvent("telemetry.test", "test1", "object1", String(i));
   }
 
   // Check that the right events were recorded.
-  let events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  let snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  let events = snapshot.default;
   Assert.equal(events.length, LIMIT, `Should have only recorded ${LIMIT} events`);
   Assert.ok(events.every((e, idx) => e[4] === String(idx)),
             "Should have recorded all events from before hitting the limit.");
@@ -183,7 +244,7 @@ add_task(function* test_valueLimits() {
   Telemetry.clearEvents();
 
   // Record values that are at or over the limits for string lengths.
-  let LIMIT = 100;
+  let LIMIT = 80;
   let expected = [
     ["telemetry.test", "test1", "object1", "a".repeat(LIMIT - 10), null],
     ["telemetry.test", "test1", "object1", "a".repeat(LIMIT     ), null],
@@ -199,15 +260,24 @@ add_task(function* test_valueLimits() {
   for (let event of expected) {
     Telemetry.recordEvent(...event);
     if (event[3]) {
-      event[3] = event[3].substr(0, 100);
+      event[3] = event[3].substr(0, LIMIT);
     }
     if (event[4]) {
-      event[4].key1 = event[4].key1.substr(0, 100);
+      event[4].key1 = event[4].key1.substr(0, LIMIT);
+    }
+  }
+
+  // Strip off trailing null values to match the serialized events.
+  for (let e of expected) {
+    while ((e.length >= 3) && (e[e.length - 1] === null)) {
+      e.pop();
     }
   }
 
   // Check that the right events were recorded.
-  let events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  let snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  let events = snapshot.default;
   Assert.equal(events.length, expected.length,
                "Should have recorded the expected number of events");
   for (let i = 0; i < expected.length; ++i) {
@@ -225,7 +295,9 @@ add_task(function* test_unicodeValues() {
   Telemetry.recordEvent("telemetry.test", "test1", "object1", null, {"key1": value});
 
   // Check that the values were correctly recorded.
-  let events = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  let snapshot = Telemetry.snapshotBuiltinEvents(OPTIN, true);
+  Assert.ok(("default" in snapshot), "Should have entry for main process.");
+  let events = snapshot.default;
   Assert.equal(events.length, 2, "Should have recorded 2 events.");
   Assert.equal(events[0][4], value, "Should have recorded the right value.");
   Assert.equal(events[1][5]["key1"], value, "Should have recorded the right extra value.");

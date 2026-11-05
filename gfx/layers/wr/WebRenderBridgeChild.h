@@ -31,9 +31,12 @@ public:
   explicit WebRenderBridgeChild(const wr::PipelineId& aPipelineId);
 
   void AddWebRenderCommand(const WebRenderCommand& aCmd);
+  void AddWebRenderCommands(const nsTArray<WebRenderCommand>& aCommands);
+  void AddWebRenderParentCommand(const WebRenderParentCommand& aCmd);
+  void AddWebRenderParentCommands(const nsTArray<WebRenderParentCommand>& aCommands);
 
   bool DPBegin(const  gfx::IntSize& aSize);
-  void DPEnd(bool aIsSync, uint64_t aTransactionId);
+  void DPEnd(const gfx::IntSize& aSize, bool aIsSync, uint64_t aTransactionId);
 
   CompositorBridgeChild* GetCompositorBridgeChild();
 
@@ -53,9 +56,11 @@ public:
   bool IPCOpen() const { return mIPCOpen && !mDestroyed; }
   bool IsDestroyed() const { return mDestroyed; }
 
-  void MarkSyncTransaction()
+  uint32_t GetNextResourceId() { return ++mResourceId; }
+  uint32_t GetNamespace() { return mIdNamespace; }
+  void SetNamespace(uint32_t aIdNamespace)
   {
-    mSyncTransaction = true;
+    mIdNamespace = aIdNamespace;
   }
 
 private:
@@ -64,6 +69,9 @@ private:
   ~WebRenderBridgeChild() {}
 
   uint64_t GetNextExternalImageId();
+
+  wr::BuiltDisplayList ProcessWebrenderCommands(const gfx::IntSize &aSize,
+                                                InfallibleTArray<WebRenderCommand>& aCommands);
 
   // CompositableForwarder
   void Connect(CompositableClient* aCompositable,
@@ -74,7 +82,7 @@ private:
                            const ThebesBufferData& aThebesBufferData,
                            const nsIntRegion& aUpdatedRegion) override;
   void ReleaseCompositable(const CompositableHandle& aHandle) override;
-  bool DestroyInTransaction(PTextureChild* aTexture, bool aSynchronously) override;
+  bool DestroyInTransaction(PTextureChild* aTexture) override;
   bool DestroyInTransaction(const CompositableHandle& aHandle);
   void RemoveTextureFromCompositable(CompositableClient* aCompositable,
                                      TextureClient* aTexture) override;
@@ -100,13 +108,18 @@ private:
     Release();
   }
 
-  bool AddOpDestroy(const OpDestroy& aOp, bool aSynchronously);
+  bool AddOpDestroy(const OpDestroy& aOp);
 
   nsTArray<WebRenderCommand> mCommands;
+  nsTArray<WebRenderParentCommand> mParentCommands;
   nsTArray<OpDestroy> mDestroyedActors;
   nsDataHashtable<nsUint64HashKey, CompositableClient*> mCompositables;
+  nsTArray<nsTArray<ReadLockInit>> mReadLocks;
+  uint64_t mReadLockSequenceNumber;
   bool mIsInTransaction;
-  bool mSyncTransaction;
+  uint32_t mIdNamespace;
+  uint32_t mResourceId;
+  wr::PipelineId mPipelineId;
 
   bool mIPCOpen;
   bool mDestroyed;

@@ -1568,6 +1568,12 @@ nsMemoryReporterManager::Init()
   RegisterStrongReporter(new DeadlockDetectorReporter());
 #endif
 
+#ifdef MOZ_GECKO_PROFILER
+  // We have to register this here rather than in profiler_init() because
+  // profiler_init() runs prior to nsMemoryReporterManager's creation.
+  RegisterStrongReporter(new GeckoProfilerReporter());
+#endif
+
 #ifdef MOZ_DMD
   RegisterStrongReporter(new mozilla::dmd::DMDReporter());
 #endif
@@ -1705,8 +1711,8 @@ nsMemoryReporterManager::StartGettingReports()
                                    s->mAnonymize, parentDMDFile,
                                    s->mFinishReporting, s->mFinishReportingData);
 
-  nsTArray<ContentParent*> childWeakRefs;
-  ContentParent::GetAll(childWeakRefs);
+  nsTArray<dom::ContentParent*> childWeakRefs;
+  dom::ContentParent::GetAll(childWeakRefs);
   if (!childWeakRefs.IsEmpty()) {
     // Request memory reports from child processes.  This happens
     // after the parent report so that the parent's main thread will

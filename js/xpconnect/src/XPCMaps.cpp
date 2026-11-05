@@ -43,7 +43,7 @@ HashNativeKey(const void* data)
 // implement JSObject2WrappedJSMap...
 
 void
-JSObject2WrappedJSMap::UpdateWeakPointersAfterGC(XPCJSContext* context)
+JSObject2WrappedJSMap::UpdateWeakPointersAfterGC()
 {
     // Check all wrappers and update their JSObject pointer if it has been
     // moved. Release any wrappers whose weakly held JSObject has died.
@@ -55,18 +55,6 @@ JSObject2WrappedJSMap::UpdateWeakPointersAfterGC(XPCJSContext* context)
 
         // Walk the wrapper chain and update all JSObjects.
         while (wrapper) {
-#ifdef DEBUG
-            if (!wrapper->IsSubjectToFinalization()) {
-                // If a wrapper is not subject to finalization then it roots its
-                // JS object.  If so, then it will not be about to be finalized
-                // and any necessary pointer update will have already happened
-                // when it was marked.
-                JSObject* obj = wrapper->GetJSObjectPreserveColor();
-                JSObject* prior = obj;
-                JS_UpdateWeakPointerAfterGCUnbarriered(&obj);
-                MOZ_ASSERT(obj == prior);
-            }
-#endif
             if (wrapper->IsSubjectToFinalization()) {
                 wrapper->UpdateObjectPointerAfterGC();
                 if (!wrapper->GetJSObjectPreserveColor())

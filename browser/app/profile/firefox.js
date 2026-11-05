@@ -582,7 +582,8 @@ pref("privacy.sanitize.migrateFx3Prefs",    false);
 
 pref("privacy.panicButton.enabled",         true);
 
-pref("privacy.firstparty.isolate",          false);
+pref("privacy.firstparty.isolate",                        false);
+pref("privacy.firstparty.isolate.restrict_opener_access", true);
 
 pref("network.proxy.share_proxy_settings",  false); // use the same proxy settings for all protocols
 
@@ -1022,12 +1023,6 @@ pref("browser.tabs.remote.autostart", false);
 pref("browser.tabs.remote.desktopbehavior", true);
 
 #if defined(XP_WIN) && defined(MOZ_SANDBOX)
-// When this pref is true the Windows process sandbox will set up dummy
-// interceptions and log to the browser console when calls fail in the sandboxed
-// process and also if they are subsequently allowed by the broker process.
-// This will require a restart.
-pref("security.sandbox.windows.log", false);
-
 // Controls whether and how the Windows NPAPI plugin process is sandboxed.
 // To get a different setting for a particular plugin replace "default", with
 // the plugin's nice file name, see: nsPluginTag::GetNiceFileName.
@@ -1064,6 +1059,13 @@ pref("security.sandbox.content.level", 1);
 // allow stack tracing.  This does not require a restart to take effect.
 pref("security.sandbox.windows.log.stackTraceDepth", 0);
 #endif
+
+// This controls the strength of the Windows GPU process sandbox.  Changes
+// will require restart.
+// For information on what the level number means, see
+// SetSecurityLevelForGPUProcess() in
+// security/sandbox/win/src/sandboxbroker/sandboxBroker.cpp
+pref("security.sandbox.gpu.level", 1);
 #endif
 
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX) && defined(MOZ_CONTENT_SANDBOX)
@@ -1116,6 +1118,12 @@ pref("security.sandbox.content.level", 2);
 // when a temporary writable file is required in a level 1 sandbox.
 pref("security.sandbox.content.tempDirSuffix", "");
 #endif
+#endif
+
+#if defined(MOZ_SANDBOX)
+// This pref determines if messages relevant to sandbox violations are
+// logged.
+pref("security.sandbox.logging.enabled", true);
 #endif
 
 // This pref governs whether we attempt to work around problems caused by
@@ -1631,6 +1639,9 @@ pref("browser.crashReports.unsubmittedCheck.autoSubmit", false);
 // controlling validation are located in /services/sync/services-sync.js
 pref("services.sync.validation.enabled", true);
 #endif
+
+// Preferences for the form autofill system extension
+pref("browser.formautofill.enabled", false);
 
 // ****************** domain-specific UAs ******************
 

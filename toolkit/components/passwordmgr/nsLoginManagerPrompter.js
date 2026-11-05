@@ -947,7 +947,7 @@ LoginManagerPrompter.prototype = {
       callback: () => {
         histogram.add(PROMPT_ADD_OR_UPDATE);
         if (histogramName == "PWMGR_PROMPT_REMEMBER_ACTION") {
-          Services.obs.notifyObservers(null, 'LoginStats:NewSavedPassword', null);
+          Services.obs.notifyObservers(null, "LoginStats:NewSavedPassword", null);
         }
         readDataFromUI();
         persistData();
@@ -978,9 +978,9 @@ LoginManagerPrompter.prototype = {
       mainAction,
       secondaryActions,
       {
-        timeout: Date.now() + 10000,
         displayURI: Services.io.newURI(login.hostname, null, null),
         persistWhileVisible: true,
+        persistent: true,
         passwordNotificationType: type,
         eventCallback: function(topic) {
           switch (topic) {

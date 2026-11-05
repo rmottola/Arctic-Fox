@@ -17,7 +17,7 @@ loader.lazyServiceGetter(this, "clipboardHelper",
                          "@mozilla.org/widget/clipboardhelper;1",
                          "nsIClipboardHelper");
 loader.lazyRequireGetter(this, "EventEmitter", "devtools/shared/event-emitter");
-loader.lazyRequireGetter(this, "AutocompletePopup", "devtools/client/shared/autocomplete-popup", true);
+loader.lazyRequireGetter(this, "AutocompletePopup", "devtools/client/shared/autocomplete-popup");
 loader.lazyRequireGetter(this, "ToolSidebar", "devtools/client/framework/sidebar", true);
 loader.lazyRequireGetter(this, "Messages", "devtools/client/webconsole/console-output", true);
 loader.lazyRequireGetter(this, "asyncStorage", "devtools/shared/async-storage");
@@ -612,11 +612,10 @@ JSTerm.prototype = {
       let document = options.targetElement.ownerDocument;
       let iframe = document.createElementNS(XHTML_NS, "iframe");
 
-      iframe.addEventListener("load", function onIframeLoad() {
-        iframe.removeEventListener("load", onIframeLoad, true);
+      iframe.addEventListener("load", function () {
         iframe.style.visibility = "visible";
         deferred.resolve(iframe.contentWindow);
-      }, true);
+      }, {capture: true, once: true});
 
       iframe.flex = 1;
       iframe.style.visibility = "hidden";

@@ -14,4 +14,12 @@ DIRS += [
 if 'a' in CONFIG['GRE_MILESTONE']:
     DIRS += [
         'flyweb',
+        'formautofill',
+    ]
+
+# Nightly-only system add-ons
+if CONFIG['NIGHTLY_BUILD']:
+    DIRS += [
+        'activity-stream',
+        'webcompat-reporter',
     ]

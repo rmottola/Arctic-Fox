@@ -177,8 +177,8 @@
 #include "nsPlaceholderFrame.h"
 #include "nsTransitionManager.h"
 #include "ChildIterator.h"
-#include "mozilla/RestyleManagerHandle.h"
-#include "mozilla/RestyleManagerHandleInlines.h"
+#include "mozilla/RestyleManager.h"
+#include "mozilla/RestyleManagerInlines.h"
 #include "nsIDOMHTMLElement.h"
 #include "nsIDragSession.h"
 #include "nsIFrameInlines.h"
@@ -795,6 +795,9 @@ nsIPresShell::nsIPresShell()
     , mReflowScheduled(false)
     , mSuppressInterruptibleReflows(false)
     , mScrollPositionClampingScrollPortSizeSet(false)
+    , mNeedLayoutFlush(true)
+    , mNeedStyleFlush(true)
+    , mNeedThrottledAnimationFlush(true)
     , mPresShellId(0)
     , mFontSizeInflationEmPerLine(0)
     , mFontSizeInflationMinTwips(0)
@@ -805,6 +808,7 @@ nsIPresShell::nsIPresShell()
     , mPaintingIsFrozen(false)
     , mFontSizeInflationEnabledIsDirty(false)
     , mIsNeverPainting(false)
+    , mInFlush(false)
   {}
 
 PresShell::PresShell()
@@ -940,6 +944,13 @@ PresShell::Init(nsIDocument* aDocument,
 
   mDocument = aDocument;
   mViewManager = aViewManager;
+
+  // mDocument is now set.  It might have a display document whose "need layout/
+  // style" flush flags are not set, but ours will be set.  To keep these
+  // consistent, call the flag setting functions to propagate those flags up
+  // to the display document.
+  SetNeedLayoutFlush();
+  SetNeedStyleFlush();
 
   // Create our frame constructor.
   mFrameConstructor = new nsCSSFrameConstructor(mDocument, this);
@@ -1150,6 +1161,11 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
 void
 PresShell::Destroy()
 {
+  // Do not add code before this line please!
+  if (mHaveShutDown) {
+    return;
+  }
+
   NS_ASSERTION(!nsContentUtils::IsSafeToRunScript(),
     "destroy called on presshell while scripts not blocked");
 
@@ -1162,7 +1178,8 @@ PresShell::Destroy()
     }
   }
   if (mPresContext) {
-    gfxUserFontSet* fs = mPresContext->GetUserFontSet();
+    const bool mayFlushUserFontSet = false;
+    gfxUserFontSet* fs = mPresContext->GetUserFontSet(mayFlushUserFontSet);
     if (fs) {
       uint32_t fontCount;
       uint64_t fontSize;
@@ -1183,9 +1200,6 @@ PresShell::Destroy()
     mReflowCountMgr = nullptr;
   }
 #endif
-
-  if (mHaveShutDown)
-    return;
 
   if (mZoomConstraintsClient) {
     mZoomConstraintsClient->Destroy();
@@ -2020,10 +2034,11 @@ PresShell::ResizeReflowIgnoreOverride(nscoord aWidth, nscoord aHeight, nscoord a
       }
     } else {
       RefPtr<nsRunnableMethod<PresShell> > resizeEvent =
-        NewRunnableMethod(this, &PresShell::FireResizeEvent);
+        NewRunnableMethod("PresShell::FireResizeEvent",
+                          this, &PresShell::FireResizeEvent);
       if (NS_SUCCEEDED(NS_DispatchToCurrentThread(resizeEvent))) {
         mResizeEvent = resizeEvent;
-        mDocument->SetNeedStyleFlush();
+        SetNeedStyleFlush();
       }
     }
   }
@@ -2769,7 +2784,7 @@ PresShell::FrameNeedsReflow(nsIFrame *aFrame, IntrinsicDirty aIntrinsicDirty,
         // we've hit a reflow root or the root frame
         if (!wasDirty) {
           mDirtyRoots.AppendElement(f);
-          mDocument->SetNeedLayoutFlush();
+          SetNeedLayoutFlush();
         }
 #ifdef DEBUG
         else {
@@ -2956,7 +2971,7 @@ PresShell::RecreateFramesFor(nsIContent* aContent)
 
   // Mark ourselves as not safe to flush while we're doing frame construction.
   ++mChangeNestCount;
-  RestyleManagerHandle restyleManager = mPresContext->RestyleManager();
+  RestyleManager* restyleManager = mPresContext->RestyleManager();
   nsresult rv = restyleManager->ProcessRestyledFrames(changeList);
   restyleManager->FlushOverflowChangedTracker();
   --mChangeNestCount;
@@ -3496,7 +3511,9 @@ PresShell::ScrollContentIntoView(nsIContent*              aContent,
   }
 
   // Flush layout and attempt to scroll in the process.
-  composedDoc->SetNeedLayoutFlush();
+  if (nsIPresShell* shell = composedDoc->GetShell()) {
+    shell->SetNeedLayoutFlush();
+  }
   composedDoc->FlushPendingNotifications(FlushType::InterruptibleLayout);
 
   // If mContentToScrollTo is non-null, that means we interrupted the reflow
@@ -3723,9 +3740,7 @@ PresShell::ScheduleViewManagerFlush(PaintType aType)
   if (presContext) {
     presContext->RefreshDriver()->ScheduleViewManagerFlush();
   }
-  if (mDocument) {
-    mDocument->SetNeedLayoutFlush();
-  }
+  SetNeedLayoutFlush();
 }
 
 bool
@@ -3743,7 +3758,8 @@ void
 PresShell::DispatchSynthMouseMove(WidgetGUIEvent* aEvent,
                                   bool aFlushOnHoverChange)
 {
-  RestyleManagerHandle restyleManager = mPresContext->RestyleManager();
+  GeckoProfilerTracingRAII tracer("Paint", "DispatchSynthMouseMove");
+  RestyleManager* restyleManager = mPresContext->RestyleManager();
   uint32_t hoverGenerationBefore =
     restyleManager->GetHoverGeneration();
   nsEventStatus status;
@@ -4063,11 +4079,11 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
   /**
    * VERY IMPORTANT: If you add some sort of new flushing to this
    * method, make sure to add the relevant SetNeedLayoutFlush or
-   * SetNeedStyleFlush calls on the document.
+   * SetNeedStyleFlush calls on the shell.
    */
   FlushType flushType = aFlush.mFlushType;
 
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   static const EnumeratedArray<FlushType,
                                FlushType::Count,
                                const char*> flushTypeNames = {
@@ -4097,6 +4113,12 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
 
   NS_ASSERTION(flushType >= FlushType::Frames, "Why did we get called?");
 
+  mNeedStyleFlush = false;
+  mNeedThrottledAnimationFlush =
+    mNeedThrottledAnimationFlush && !aFlush.mFlushAnimations;
+  mNeedLayoutFlush =
+    mNeedLayoutFlush && (flushType < FlushType::InterruptibleLayout);
+
   bool isSafeToFlush = IsSafeToFlush();
 
   // If layout could possibly trigger scripts, then it's only safe to flush if
@@ -4114,6 +4136,14 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
   bool didLayoutFlush = false;
   nsCOMPtr<nsIPresShell> kungFuDeathGrip;
   if (isSafeToFlush && viewManager) {
+    // Record that we are in a flush, so that our optimization in
+    // nsDocument::FlushPendingNotifications doesn't skip any re-entrant
+    // calls to us.  Otherwise, we might miss some needed flushes, since
+    // we clear mNeedStyleFlush / mNeedLayoutFlush here at the top of
+    // the function but we might not have done the work yet.
+    AutoRestore<bool> guard(mInFlush);
+    mInFlush = true;
+
     // Processing pending notifications can kill us, and some callers only
     // hold weak refs when calling FlushPendingNotifications().  :(
     kungFuDeathGrip = this;
@@ -4220,17 +4250,18 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
   }
 
   if (!didStyleFlush && flushType >= FlushType::Style && !mIsDestroying) {
-    mDocument->SetNeedStyleFlush();
+    SetNeedStyleFlush();
+    if (aFlush.mFlushAnimations) {
+      SetNeedThrottledAnimationFlush();
+    }
   }
 
-  if (!didLayoutFlush && !mIsDestroying &&
-      (flushType >=
-       (mSuppressInterruptibleReflows ? FlushType::Layout
-                                      : FlushType::InterruptibleLayout))) {
-    // We suppressed this flush due to mSuppressInterruptibleReflows or
-    // !isSafeToFlush, but the document thinks it doesn't
-    // need to flush anymore.  Let it know what's really going on.
-    mDocument->SetNeedLayoutFlush();
+  if (!didLayoutFlush && flushType >= FlushType::InterruptibleLayout &&
+      !mIsDestroying) {
+    // We suppressed this flush either due to it not being safe to flush,
+    // or due to mSuppressInterruptibleReflows.  Either way, the
+    // mNeedLayoutFlush flag needs to be re-set.
+    SetNeedLayoutFlush();
   }
 }
 
@@ -4573,7 +4604,7 @@ nsIPresShell::RestyleForCSSRuleChanges()
     return;
   }
 
-  RestyleManagerHandle restyleManager = mPresContext->RestyleManager();
+  RestyleManager* restyleManager = mPresContext->RestyleManager();
 
   if (mStyleSet->IsServo()) {
     // Tell Servo that the contents of style sheets have changed.
@@ -4852,8 +4883,8 @@ PresShell::ClipListToRange(nsDisplayListBuilder *aBuilder,
 
           DisplayItemClip newClip;
           newClip.SetTo(textRect);
-          newClip.IntersectWith(i->GetClip());
-          i->SetClip(aBuilder, newClip);
+          DisplayItemClipChain newClipChain = { newClip, i->GetActiveScrolledRoot(), nullptr };
+          i->IntersectClip(aBuilder, &newClipChain);
           itemToInsert = i;
         }
       }
@@ -5866,7 +5897,7 @@ NotifyCompositorOfVisibleRegionsChange(PresShell* aPresShell,
 
 /* static */ void
 PresShell::DecApproximateVisibleCount(VisibleFrames& aFrames,
-                                      Maybe<OnNonvisible> aNonvisibleAction
+                                      const Maybe<OnNonvisible>& aNonvisibleAction
                                         /* = Nothing() */)
 {
   for (auto iter = aFrames.Iter(); !iter.Done(); iter.Next()) {
@@ -5924,7 +5955,7 @@ PresShell::ClearApproximateFrameVisibilityVisited(nsView* aView, bool aClear)
 }
 
 void
-PresShell::ClearApproximatelyVisibleFramesList(Maybe<OnNonvisible> aNonvisibleAction
+PresShell::ClearApproximatelyVisibleFramesList(const Maybe<OnNonvisible>& aNonvisibleAction
                                                  /* = Nothing() */)
 {
   DecApproximateVisibleCount(mApproximatelyVisibleFrames, aNonvisibleAction);
@@ -6216,7 +6247,8 @@ PresShell::ScheduleApproximateFrameVisibilityUpdateNow()
   }
 
   RefPtr<nsRunnableMethod<PresShell> > ev =
-    NewRunnableMethod(this, &PresShell::UpdateApproximateFrameVisibility);
+    NewRunnableMethod("PresShell::UpdateApproximateFrameVisibility",
+                      this, &PresShell::UpdateApproximateFrameVisibility);
   if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
     mUpdateApproximateFrameVisibilityEvent = ev;
   }
@@ -7990,7 +8022,8 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
           // pointer lock.
           isHandlingUserInput = true;
           mPresContext->RecordInteractionTime(
-            nsPresContext::InteractionType::eKeyInteraction);
+            nsPresContext::InteractionType::eKeyInteraction,
+            aEvent->mTimeStamp);
         }
         break;
       }
@@ -7998,7 +8031,8 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
       case eMouseUp:
         isHandlingUserInput = true;
         mPresContext->RecordInteractionTime(
-          nsPresContext::InteractionType::eClickInteraction);
+          nsPresContext::InteractionType::eClickInteraction,
+          aEvent->mTimeStamp);
         break;
 
       case eDrop: {
@@ -8044,7 +8078,8 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
         EventStateManager::GetActiveEventStateManager() == manager);
 
       mPresContext->RecordInteractionTime(
-        nsPresContext::InteractionType::eMouseMoveInteraction);
+        nsPresContext::InteractionType::eMouseMoveInteraction,
+        aEvent->mTimeStamp);
     }
 
     nsAutoPopupStatePusher popupStatePusher(
@@ -8109,6 +8144,9 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
             mIsLastChromeOnlyEscapeKeyConsumed = true;
           }
         }
+      }
+      if (aEvent->mMessage == eKeyDown) {
+        mIsLastKeyDownCanceled = aEvent->mFlags.mDefaultPrevented;
       }
       break;
     }
@@ -8899,6 +8937,9 @@ PresShell::FireOrClearDelayedEvents(bool aFireEvents)
            !doc->EventHandlingSuppressed()) {
       nsAutoPtr<DelayedEvent> ev(mDelayedEvents[0].forget());
       mDelayedEvents.RemoveElementAt(0);
+      if (ev->IsKeyPressEvent() && mIsLastKeyDownCanceled) {
+        continue;
+      }
       ev->Dispatch();
     }
     if (!doc->EventHandlingSuppressed()) {
@@ -9087,10 +9128,12 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
     parent = nsLayoutUtils::GetCrossDocParentFrame(parent);
   }
 
+#ifdef MOZ_GECKO_PROFILER
   nsIURI *uri = mDocument->GetDocumentURI();
   PROFILER_LABEL_PRINTF("PresShell", "DoReflow",
     js::ProfileEntry::Category::GRAPHICS, "(%s)",
     uri ? uri->GetSpecOrDefault().get() : "N/A");
+#endif
 
   nsDocShell* docShell = static_cast<nsDocShell*>(GetPresContext()->GetDocShell());
   RefPtr<TimelineConsumers> timelines = TimelineConsumers::Get();
@@ -9248,7 +9291,7 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
 
     NS_ASSERTION(NS_SUBTREE_DIRTY(target), "Why is the target not dirty?");
     mDirtyRoots.AppendElement(target);
-    mDocument->SetNeedLayoutFlush();
+    SetNeedLayoutFlush();
 
     // Clear mFramesToDirty after we've done the NS_SUBTREE_DIRTY(target)
     // assertion so that if it fails it's easier to see what's going on.
@@ -9385,8 +9428,8 @@ PresShell::ProcessReflowCommands(bool aInterruptible)
       // reflow event just to have the flush revoke it.
       if (!mDirtyRoots.IsEmpty()) {
         MaybeScheduleReflow();
-        // And tell our document that we might need flushing
-        mDocument->SetNeedLayoutFlush();
+        // And record that we might need flushing
+        SetNeedLayoutFlush();
       }
     }
   }
@@ -9526,7 +9569,7 @@ PresShell::Observe(nsISupports* aSubject,
         {
           nsAutoScriptBlocker scriptBlocker;
           ++mChangeNestCount;
-          RestyleManagerHandle restyleManager = mPresContext->RestyleManager();
+          RestyleManager* restyleManager = mPresContext->RestyleManager();
           if (restyleManager->IsServo()) {
             MOZ_CRASH("stylo: PresShell::Observe(\"chrome-flush-skin-caches\") "
                       "not implemented for Servo-backed style system");
@@ -9702,6 +9745,12 @@ PresShell::DelayedKeyEvent::DelayedKeyEvent(WidgetKeyboardEvent* aEvent) :
   keyEvent->mFlags.mIsSynthesizedForTests = aEvent->mFlags.mIsSynthesizedForTests;
   keyEvent->mFlags.mIsSuppressedOrDelayed = true;
   mEvent = keyEvent;
+}
+
+bool
+PresShell::DelayedKeyEvent::IsKeyPressEvent()
+{
+  return mEvent->mMessage == eKeyPress;
 }
 
 // Start of DEBUG only code

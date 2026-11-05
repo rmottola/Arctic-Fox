@@ -40,7 +40,9 @@ function testSteps()
     installPackagedProfile("idbSubdirUpgrade" + i + "_profile");
 
     for (let params of openParams) {
-      let request = openDatabase(params);
+      let request = indexedDB.openForPrincipal(getPrincipal(params.url),
+                                               params.dbName,
+                                               params.dbVersion);
       request.onerror = errorHandler;
       request.onupgradeneeded = unexpectedSuccessHandler;
       request.onsuccess = grabEventAndContinueHandler;
@@ -53,7 +55,9 @@ function testSteps()
     yield undefined;
 
     for (let params of openParams) {
-      let request = openDatabase(params);
+      let request = indexedDB.openForPrincipal(getPrincipal(params.url),
+                                               params.dbName,
+                                               params.dbVersion);
       request.onerror = errorHandler;
       request.onupgradeneeded = unexpectedSuccessHandler;
       request.onsuccess = grabEventAndContinueHandler;

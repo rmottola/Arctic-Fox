@@ -16,7 +16,6 @@
 #include "mozilla/Unused.h"
 #include "nsArray.h"
 #include "nsCOMPtr.h"
-#include "nsCRT.h"
 #include "nsICertificateDialogs.h"
 #include "nsIClassInfoImpl.h"
 #include "nsIObjectInputStream.h"
@@ -1091,6 +1090,9 @@ NS_IMETHODIMP
 nsNSSCertificate::GetASN1Structure(nsIASN1Object** aASN1Structure)
 {
   NS_ENSURE_ARG_POINTER(aASN1Structure);
+  if (!NS_IsMainThread()) {
+    return NS_ERROR_NOT_SAME_THREAD;
+  }
   return CreateASN1Struct(aASN1Structure);
 }
 

@@ -36,9 +36,7 @@ public:
 
   void Discard() override;
 
-  RefPtr<SeekTaskPromise> Seek(const media::TimeUnit& aDuration) override;
-
-  bool NeedToResetMDSM() const override;
+  RefPtr<SeekTaskPromise> Seek() override;
 
   int64_t CalculateNewCurrentTime() const override;
 
@@ -54,7 +52,6 @@ public:
 
   void HandleNotWaited(const WaitForDataRejectValue& aRejection) override;
 
-private:
   ~NextFrameSeekTask();
 
   void RequestVideoData();

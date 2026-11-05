@@ -3,7 +3,8 @@
 Cu.import("resource://services-common/blocklist-updater.js");
 Cu.import("resource://testing-common/httpd.js");
 
-const { loadKinto } = Cu.import("resource://services-common/kinto-offline-client.js");
+const { Kinto } = Cu.import("resource://services-common/kinto-offline-client.js");
+const { FirefoxAdapter } = Cu.import("resource://services-common/kinto-storage-adapter.js");
 const { NetUtil } = Cu.import("resource://gre/modules/NetUtil.jsm", {});
 const { OneCRLBlocklistClient } = Cu.import("resource://services-common/blocklist-clients.js");
 
@@ -59,10 +60,6 @@ function* checkRecordCount(count) {
   const bucket = Services.prefs.getCharPref(PREF_BLOCKLIST_BUCKET);
   const collectionName =
       Services.prefs.getCharPref(PREF_BLOCKLIST_ONECRL_COLLECTION);
-
-  const Kinto = loadKinto();
-
-  const FirefoxAdapter = Kinto.adapters.FirefoxAdapter;
 
   const config = {
     remote: base,
@@ -133,7 +130,7 @@ add_task(function* test_check_signatures(){
                             sampled.status.statusText);
       // send the headers
       for (let headerLine of sampled.sampleHeaders) {
-        let headerElements = headerLine.split(':');
+        let headerElements = headerLine.split(":");
         response.setHeader(headerElements[0], headerElements[1].trimLeft());
       }
 
@@ -158,7 +155,7 @@ add_task(function* test_check_signatures(){
   let verifier = Cc["@mozilla.org/security/contentsignatureverifier;1"]
                    .createInstance(Ci.nsIContentSignatureVerifier);
 
-  const emptyData = '[]';
+  const emptyData = "[]";
   const emptySignature = "p384ecdsa=zbugm2FDitsHwk5-IWsas1PpWwY29f0Fg5ZHeqD8fzep7AVl2vfcaHA7LdmCZ28qZLOioGKvco3qT117Q4-HlqFTJM7COHzxGyU2MMJ0ZTnhJrPOC1fP3cVQjU1PTWi9";
   const name = "onecrl.content-signature.mozilla.org";
   ok(verifier.verifyContentSignature(emptyData, emptySignature,

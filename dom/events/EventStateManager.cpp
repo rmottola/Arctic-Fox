@@ -2843,6 +2843,18 @@ EventStateManager::PostHandleKeyboardEvent(WidgetKeyboardEvent* aKeyboardEvent,
     return;
   }
 
+  if (!dispatchedToContentProcess) {
+    // The widget expects a reply for every keyboard event. If the event wasn't
+    // dispatched to a content process (non-e10s or no content process
+    // running), we need to short-circuit here. Otherwise, we need to wait for
+    // the content process to handle the event.
+    aKeyboardEvent->mWidget->PostHandleKeyEvent(aKeyboardEvent);
+    if (aKeyboardEvent->DefaultPrevented()) {
+      aStatus = nsEventStatus_eConsumeNoDefault;
+      return;
+    }
+  }
+
   // XXX Currently, our automated tests don't support mKeyNameIndex.
   //     Therefore, we still need to handle this with keyCode.
   switch(aKeyboardEvent->mKeyCode) {
@@ -3325,6 +3337,20 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
   case eDragOver:
     {
       NS_ASSERTION(aEvent->mClass == eDragEventClass, "Expected a drag event");
+
+      // Check if the drag is occurring inside a scrollable area. If so, scroll
+      // the area when the mouse is near the edges.
+      if (mCurrentTarget && aEvent->mMessage == eDragOver) {
+        nsIFrame* checkFrame = mCurrentTarget;
+        while (checkFrame) {
+          nsIScrollableFrame* scrollFrame = do_QueryFrame(checkFrame);
+          // Break out so only the innermost scrollframe is scrolled.
+          if (scrollFrame && scrollFrame->DragScroll(aEvent)) {
+            break;
+          }
+          checkFrame = checkFrame->GetParent();
+        }
+      }
 
       nsCOMPtr<nsIDragSession> dragSession = nsContentUtils::GetDragSession();
       if (!dragSession)
@@ -4484,6 +4510,7 @@ EventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
   event.mModifiers = aDragEvent->mModifiers;
   event.buttons = aDragEvent->buttons;
   event.relatedTarget = aRelatedTarget;
+  event.pointerId = aDragEvent->pointerId;
   event.inputSource = aDragEvent->inputSource;
 
   mCurrentTargetContent = aTargetContent;
@@ -4643,6 +4670,7 @@ EventStateManager::InitAndDispatchClickEvent(WidgetMouseEvent* aEvent,
   event.mTimeStamp = aEvent->mTimeStamp;
   event.mFlags.mNoContentDispatch = aNoContentDispatch;
   event.button = aEvent->button;
+  event.pointerId = aEvent->pointerId;
   event.inputSource = aEvent->inputSource;
 
   return aPresShell->HandleEventWithTarget(&event, aCurrentTarget,
@@ -5560,7 +5588,7 @@ EventStateManager::WheelPrefs::OnPrefChanged(const char* aPrefName,
 EventStateManager::WheelPrefs::WheelPrefs()
 {
   Reset();
-  Preferences::RegisterCallback(OnPrefChanged, "mousewheel.", nullptr);
+  Preferences::RegisterPrefixCallback(OnPrefChanged, "mousewheel.");
   Preferences::AddBoolVarCache(&sWheelEventsEnabledOnPlugins,
                                "plugin.mousewheel.enabled",
                                true);
@@ -5568,7 +5596,7 @@ EventStateManager::WheelPrefs::WheelPrefs()
 
 EventStateManager::WheelPrefs::~WheelPrefs()
 {
-  Preferences::UnregisterCallback(OnPrefChanged, "mousewheel.", nullptr);
+  Preferences::UnregisterPrefixCallback(OnPrefChanged, "mousewheel.");
 }
 
 void

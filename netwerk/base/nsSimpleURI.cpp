@@ -48,7 +48,7 @@ nsSimpleURI::~nsSimpleURI()
 NS_IMPL_ADDREF(nsSimpleURI)
 NS_IMPL_RELEASE(nsSimpleURI)
 NS_INTERFACE_TABLE_HEAD(nsSimpleURI)
-NS_INTERFACE_TABLE(nsSimpleURI, nsIURI, nsIURIWithQuery, nsISerializable,
+NS_INTERFACE_TABLE(nsSimpleURI, nsIURI, nsISerializable,
                    nsIClassInfo, nsIMutable, nsIIPCSerializableURI)
 NS_INTERFACE_TABLE_TO_MAP_SEGUE
   if (aIID.Equals(kThisSimpleURIImplementationCID))
@@ -660,8 +660,7 @@ nsSimpleURI::GetAsciiSpec(nsACString &result)
     nsAutoCString buf;
     nsresult rv = GetSpec(buf);
     if (NS_FAILED(rv)) return rv;
-    NS_EscapeURL(buf, esc_OnlyNonASCII|esc_AlwaysCopy, result);
-    return NS_OK;
+    return NS_EscapeURL(buf, esc_OnlyNonASCII|esc_AlwaysCopy, result, fallible);
 }
 
 NS_IMETHODIMP
@@ -781,10 +780,6 @@ size_t
 nsSimpleURI::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const {
   return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
 }
-
-//----------------------------------------------------------------------------
-// nsSimpleURI::nsIURIWithQuery
-//----------------------------------------------------------------------------
 
 NS_IMETHODIMP
 nsSimpleURI::GetFilePath(nsACString& aFilePath)

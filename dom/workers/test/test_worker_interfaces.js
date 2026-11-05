@@ -26,6 +26,7 @@ var ecmaGlobals =
   [
     "Array",
     "ArrayBuffer",
+    "Atomics",
     "Boolean",
     "DataView",
     "Date",
@@ -70,6 +71,7 @@ var ecmaGlobals =
     "URIError",
     "WeakMap",
     "WeakSet",
+    "WebAssembly"
   ];
 // IMPORTANT: Do not change the list above without review from
 //            a JavaScript Engine peer!
@@ -105,6 +107,8 @@ var interfaceNamesInGlobalScope =
     "DOMStringList",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Event",
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    "EventSource",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "EventTarget",
 // IMPORTANT: Do not change this list without review from a DOM peer!

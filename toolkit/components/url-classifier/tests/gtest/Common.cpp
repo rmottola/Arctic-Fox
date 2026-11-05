@@ -20,6 +20,51 @@ void RunTestInNewThread(Function&& aFunction) {
   testingThread->Shutdown();
 }
 
+nsresult SyncApplyUpdates(Classifier* aClassifier,
+                          nsTArray<TableUpdate*>* aUpdates)
+{
+  // We need to spin a new thread specifically because the callback
+  // will be on the caller thread. If we call Classifier::AsyncApplyUpdates
+  // and wait on the same thread, this function will never return.
+
+  nsresult ret;
+  bool done = false;
+  auto onUpdateComplete = [&done, &ret](nsresult rv) {
+    ret = rv;
+    done = true;
+  };
+
+  nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([&]() {
+    nsresult rv = aClassifier->AsyncApplyUpdates(aUpdates, onUpdateComplete);
+    if (NS_FAILED(rv)) {
+      onUpdateComplete(rv);
+    }
+  });
+
+  nsCOMPtr<nsIThread> testingThread;
+  NS_NewNamedThread("ApplyUpdates", getter_AddRefs(testingThread));
+  if (!testingThread) {
+    return NS_ERROR_FAILURE;
+  }
+
+  testingThread->Dispatch(r, NS_DISPATCH_NORMAL);
+  while (!done) {
+    // NS_NewCheckSummedOutputStream in HashStore::WriteFile
+    // will synchronously init NS_CRYPTO_HASH_CONTRACTID on
+    // the main thread. As a result we have to keep processing
+    // pending event until |done| becomes true. If there's no
+    // more pending event, what we only can do is wait.
+    // Condition variable doesn't work here because instrusively
+    // notifying the from NS_NewCheckSummedOutputStream() or
+    // HashStore::WriteFile() is weird.
+    if (!NS_ProcessNextEvent(NS_GetCurrentThread(), false)) {
+      PR_Sleep(PR_MillisecondsToInterval(100));
+    }
+  }
+
+  return ret;
+}
+
 already_AddRefed<nsIFile>
 GetFile(const nsTArray<nsString>& path)
 {
@@ -53,9 +98,7 @@ void ApplyUpdate(nsTArray<TableUpdate*>& updates)
       ASSERT_TRUE(NS_SUCCEEDED(rv));
   }
 
-  RunTestInNewThread([&] () -> void {
-    classifier->ApplyUpdates(&updates);
-  });
+  SyncApplyUpdates(classifier.get(), &updates);
 }
 
 void ApplyUpdate(TableUpdate* update)
@@ -75,5 +118,42 @@ PrefixArrayToPrefixStringMap(const nsTArray<nsCString>& prefixArray,
     nsCString* prefixString = out.LookupOrAdd(prefix.Length());
     prefixString->Append(prefix.BeginReading(), prefix.Length());
   }
+}
+
+nsresult
+PrefixArrayToAddPrefixArrayV2(const nsTArray<nsCString>& prefixArray,
+                              AddPrefixArray& out)
+{
+  out.Clear();
+
+  for (size_t i = 0; i < prefixArray.Length(); i++) {
+    // Create prefix hash from string
+    Prefix hash;
+    static_assert(sizeof(hash.buf) == PREFIX_SIZE, "Prefix must be 4 bytes length");
+    memcpy(hash.buf, prefixArray[i].BeginReading(), PREFIX_SIZE);
+    MOZ_ASSERT(prefixArray[i].Length() == PREFIX_SIZE);
+
+    AddPrefix *add = out.AppendElement(fallible);
+    if (!add) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
+
+    add->addChunk = i;
+    add->prefix = hash;
+  }
+
+  return NS_OK;
+}
+
+nsCString
+GeneratePrefix(const nsCString& aFragment, uint8_t aLength)
+{
+  Completion complete;
+  nsCOMPtr<nsICryptoHash> cryptoHash = do_CreateInstance(NS_CRYPTO_HASH_CONTRACTID);
+  complete.FromPlaintext(aFragment, cryptoHash);
+
+  nsCString hash;
+  hash.Assign((const char *)complete.buf, aLength);
+  return hash;
 }
 

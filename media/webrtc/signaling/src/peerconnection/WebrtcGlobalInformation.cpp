@@ -34,7 +34,7 @@
 #include "runnable_utils.h"
 #include "PeerConnectionCtx.h"
 #include "PeerConnectionImpl.h"
-#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/system_wrappers/include/trace.h"
 
 static const char* logTag = "WebrtcGlobalInformation";
 
@@ -1081,7 +1081,7 @@ static void StoreLongTermICEStatisticsImpl_m(
     uint32_t candBitmask = GetCandidateIpAndTransportMask(&cand);
 
     // Note: shift values need to result in the above enum table
-    if (cand.mType.Value() == RTCStatsType::Localcandidate) {
+    if (cand.mType.Value() == RTCStatsType::Local_candidate) {
       candBitmask <<= kLocalShift;
     }
 
@@ -1102,9 +1102,9 @@ static void StoreLongTermICEStatisticsImpl_m(
     streamResults[streamId].candidateTypeBitpattern |= candBitmask;
   }
 
-  for (auto i = streamResults.begin(); i != streamResults.end(); ++i) {
-    Telemetry::RecordWebrtcIceCandidates(i->second.candidateTypeBitpattern,
-                                         i->second.streamSucceeded);
+  for (auto& streamResult : streamResults) {
+    Telemetry::RecordWebrtcIceCandidates(streamResult.second.candidateTypeBitpattern,
+                                         streamResult.second.streamSucceeded);
   }
 
   // Beyond ICE, accumulate telemetry for various PER_CALL settings here.

@@ -20,9 +20,8 @@
 #include "nspr.h"
 #include "nsJSPrincipals.h"
 #include "mozilla/BasePrincipal.h"
-#include "nsSystemPrincipal.h"
-#include "nsPrincipal.h"
-#include "nsNullPrincipal.h"
+#include "SystemPrincipal.h"
+#include "NullPrincipal.h"
 #include "DomainPolicy.h"
 #include "nsXPIDLString.h"
 #include "nsCRT.h"
@@ -292,18 +291,33 @@ nsScriptSecurityManager::GetChannelResultPrincipal(nsIChannel* aChannel,
 
     if (loadInfo) {
         if (!aIgnoreSandboxing && loadInfo->GetLoadingSandboxed()) {
-            RefPtr<nsNullPrincipal> prin;
-            if (loadInfo->LoadingPrincipal()) {
-              prin =
-                nsNullPrincipal::CreateWithInheritedAttributes(loadInfo->LoadingPrincipal());
-            } else {
-              OriginAttributes attrs;
-              loadInfo->GetOriginAttributes(&attrs);
-              attrs.StripAttributes(OriginAttributes::STRIP_ADDON_ID);
-              prin = nsNullPrincipal::Create(attrs);
+          MOZ_ALWAYS_TRUE(NS_SUCCEEDED(loadInfo->GetSandboxedLoadingPrincipal(aPrincipal)));
+          MOZ_ASSERT(*aPrincipal);
+            // if the new NullPrincipal (above) loads an iframe[srcdoc], we
+            // need to inherit an existing CSP to avoid bypasses (bug 1073952).
+            // We continue inheriting for nested frames with e.g., data: URLs.
+            if (loadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_SUBDOCUMENT) {
+              nsCOMPtr<nsIURI> uri;
+              aChannel->GetURI(getter_AddRefs(uri));
+              nsAutoCString URISpec;
+              uri->GetSpec(URISpec);
+              bool isData = (NS_SUCCEEDED(uri->SchemeIs("data", &isData)) && isData);
+              if (URISpec.EqualsLiteral("about:srcdoc") || isData) {
+                nsCOMPtr<nsIPrincipal> principalToInherit = loadInfo->PrincipalToInherit();
+                if (!principalToInherit) {
+                  principalToInherit = loadInfo->TriggeringPrincipal();
+                }
+                nsCOMPtr<nsIContentSecurityPolicy> originalCsp;
+                principalToInherit->GetCsp(getter_AddRefs(originalCsp));
+                // if the principalToInherit had a CSP,
+                // add it to the newly created NullPrincipal.
+                if (originalCsp) {
+                  nsresult rv = (*aPrincipal)->SetCsp(originalCsp);
+                  NS_ENSURE_SUCCESS(rv, rv);
+                }
+              }
             }
-            prin.forget(aPrincipal);
-            return NS_OK;
+          return NS_OK;
         }
 
         bool forceInherit = loadInfo->GetForceInheritPrincipal();
@@ -331,7 +345,7 @@ nsScriptSecurityManager::GetChannelResultPrincipal(nsIChannel* aChannel,
 
             nsCOMPtr<nsIURI> uri;
             nsresult rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
-            NS_ENSURE_SUCCESS(rv, rv); 
+            NS_ENSURE_SUCCESS(rv, rv);
             nsCOMPtr<nsIPrincipal> principalToInherit = loadInfo->PrincipalToInherit();
             if (!principalToInherit) {
               principalToInherit = loadInfo->TriggeringPrincipal();
@@ -348,20 +362,6 @@ nsScriptSecurityManager::GetChannelResultPrincipal(nsIChannel* aChannel,
         }
     }
     return GetChannelURIPrincipal(aChannel, aPrincipal);
-}
-
-nsresult
-nsScriptSecurityManager::MaybeSetAddonIdFromURI(OriginAttributes& aAttrs, nsIURI* aURI)
-{
-  nsAutoCString scheme;
-  nsresult rv = aURI->GetScheme(scheme);
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (scheme.EqualsLiteral("moz-extension") && GetAddonPolicyService()) {
-    rv = GetAddonPolicyService()->ExtensionURIToAddonId(aURI, aAttrs.mAddonId);
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
-
-  return NS_OK;
 }
 
 /* The principal of the URI that this channel is loading. This is never
@@ -399,11 +399,11 @@ nsScriptSecurityManager::GetChannelURIPrincipal(nsIChannel* aChannel,
 
     // For addons loadInfo might be null.
     if (loadInfo) {
-      attrs.Inherit(loadInfo->GetOriginAttributes());
+      attrs = loadInfo->GetOriginAttributes();
     }
-    rv = MaybeSetAddonIdFromURI(attrs, uri);
-    NS_ENSURE_SUCCESS(rv, rv);
-    nsCOMPtr<nsIPrincipal> prin = BasePrincipal::CreateCodebasePrincipal(uri, attrs);
+
+    nsCOMPtr<nsIPrincipal> prin =
+      BasePrincipal::CreateCodebasePrincipal(uri, attrs);
     prin.forget(aPrincipal);
     return *aPrincipal ? NS_OK : NS_ERROR_FAILURE;
 }
@@ -1105,7 +1105,7 @@ nsScriptSecurityManager::CreateNullPrincipal(JS::Handle<JS::Value> aOriginAttrib
   if (!aOriginAttributes.isObject() || !attrs.Init(aCx, aOriginAttributes)) {
       return NS_ERROR_INVALID_ARG;
   }
-  nsCOMPtr<nsIPrincipal> prin = nsNullPrincipal::Create(attrs);
+  nsCOMPtr<nsIPrincipal> prin = NullPrincipal::Create(attrs);
   prin.forget(aPrincipal);
   return NS_OK;
 }
@@ -1133,15 +1133,11 @@ nsScriptSecurityManager::
 {
   NS_ENSURE_STATE(aLoadContext);
   OriginAttributes docShellAttrs;
-  bool result = aLoadContext->GetOriginAttributes(docShellAttrs);;
+  bool result = aLoadContext->GetOriginAttributes(docShellAttrs);
   NS_ENSURE_TRUE(result, NS_ERROR_FAILURE);
 
-  OriginAttributes attrs;
-  attrs.Inherit(docShellAttrs);
-
-  nsresult rv = MaybeSetAddonIdFromURI(attrs, aURI);
-  NS_ENSURE_SUCCESS(rv, rv);
-  nsCOMPtr<nsIPrincipal> prin = BasePrincipal::CreateCodebasePrincipal(aURI, attrs);
+  nsCOMPtr<nsIPrincipal> prin =
+    BasePrincipal::CreateCodebasePrincipal(aURI, docShellAttrs);
   prin.forget(aPrincipal);
   return *aPrincipal ? NS_OK : NS_ERROR_FAILURE;
 }
@@ -1151,12 +1147,8 @@ nsScriptSecurityManager::GetDocShellCodebasePrincipal(nsIURI* aURI,
                                                       nsIDocShell* aDocShell,
                                                       nsIPrincipal** aPrincipal)
 {
-  OriginAttributes attrs;
-  attrs.Inherit(nsDocShell::Cast(aDocShell)->GetOriginAttributes());
-
-  nsresult rv = MaybeSetAddonIdFromURI(attrs, aURI);
-  NS_ENSURE_SUCCESS(rv, rv);
-  nsCOMPtr<nsIPrincipal> prin = BasePrincipal::CreateCodebasePrincipal(aURI, attrs);
+  nsCOMPtr<nsIPrincipal> prin =
+    BasePrincipal::CreateCodebasePrincipal(aURI, nsDocShell::Cast(aDocShell)->GetOriginAttributes());
   prin.forget(aPrincipal);
   return *aPrincipal ? NS_OK : NS_ERROR_FAILURE;
 }
@@ -1307,7 +1299,7 @@ nsresult nsScriptSecurityManager::Init()
     NS_ENSURE_SUCCESS(rv, rv);
 
     // Create our system principal singleton
-    RefPtr<nsSystemPrincipal> system = new nsSystemPrincipal();
+    RefPtr<SystemPrincipal> system = SystemPrincipal::Create();
 
     mSystemPrincipal = system;
 
@@ -1379,13 +1371,13 @@ nsScriptSecurityManager::InitStatics()
 // Currently this nsGenericFactory constructor is used only from FastLoad
 // (XPCOM object deserialization) code, when "creating" the system principal
 // singleton.
-nsSystemPrincipal *
+SystemPrincipal *
 nsScriptSecurityManager::SystemPrincipalSingletonConstructor()
 {
     nsIPrincipal *sysprin = nullptr;
     if (gScriptSecMan)
         NS_ADDREF(sysprin = gScriptSecMan->mSystemPrincipal);
-    return static_cast<nsSystemPrincipal*>(sysprin);
+    return static_cast<SystemPrincipal*>(sysprin);
 }
 
 struct IsWhitespace {
@@ -1472,6 +1464,8 @@ nsScriptSecurityManager::InitPrefs()
 
     // set observer callbacks in case the value of the prefs change
     Preferences::AddStrongObservers(this, kObservedPrefs);
+
+    OriginAttributes::InitPrefs();
 
     return NS_OK;
 }

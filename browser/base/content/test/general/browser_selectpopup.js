@@ -9,7 +9,8 @@ const XHTML_DTD = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www
 
 const PAGECONTENT =
   "<html xmlns='http://www.w3.org/1999/xhtml'>" +
-  "<body onload='gChangeEvents = 0;gInputEvents = 0; document.body.firstChild.focus()'><select oninput='gInputEvents++' onchange='gChangeEvents++'>" +
+  "<body onload='gChangeEvents = 0;gInputEvents = 0; gClickEvents = 0; document.body.firstChild.focus()'>" +
+  "<select oninput='gInputEvents++' onchange='gChangeEvents++' onclick='if (event.target == this) gClickEvents++'>" +
   "  <optgroup label='First Group'>" +
   "    <option value='One'>One</option>" +
   "    <option value='Two'>Two</option>" +
@@ -37,6 +38,21 @@ const PAGECONTENT_SMALL =
   "</select><select id='three'>" +
   "  <option value='Five'>Five</option>" +
   "  <option value='Six'>Six</option>" +
+  "</select></body></html>";
+
+const PAGECONTENT_GROUPS =
+  "<html>" +
+  "<body><select id='one'>" +
+  "  <optgroup label='Group 1'>" +
+  "    <option value='G1 O1'>G1 O1</option>" +
+  "    <option value='G1 O2'>G1 O2</option>" +
+  "    <option value='G1 O3'>G1 O3</option>" +
+  "  </optgroup>" +
+  "  <optgroup label='Group 2'>" +
+  "    <option value='G2 O1'>G2 O4</option>" +
+  "    <option value='G2 O2'>G2 O5</option>" +
+  "    <option value='Hidden' style='display: none;'>Hidden</option>" +
+  "  </optgroup>" +
   "</select></body></html>";
 
 const PAGECONTENT_SOMEHIDDEN =
@@ -146,6 +162,7 @@ function doSelectTests(contentType, dtd)
 
   is((yield getInputEvents()), 0, "Before closed - number of input events");
   is((yield getChangeEvents()), 0, "Before closed - number of change events");
+  is((yield getClickEvents()), 0, "Before closed - number of click events");
 
   EventUtils.synthesizeKey("a", { accelKey: true });
   yield ContentTask.spawn(gBrowser.selectedBrowser, { isWindows }, function(args) {
@@ -192,6 +209,14 @@ function doSelectTests(contentType, dtd)
 
   yield BrowserTestUtils.removeTab(tab);
 }
+
+add_task(function* setup() {
+  yield SpecialPowers.pushPrefEnv({
+    "set": [
+      ["dom.select_popup_in_parent.enabled", true],
+    ]
+  });
+});
 
 add_task(function*() {
   yield doSelectTests("text/html", "");
@@ -286,10 +311,9 @@ add_task(function*() {
           elem = content.document.getElementById(step[0]);
         }
 
-        changedWin.addEventListener("MozAfterPaint", function onPaint() {
-          changedWin.removeEventListener("MozAfterPaint", onPaint);
+        changedWin.addEventListener("MozAfterPaint", function() {
           resolve();
-        });
+        }, {once: true});
 
         elem.style = step[1];
       });
@@ -376,6 +400,78 @@ add_task(function* test_event_order() {
   });
 });
 
+function* performSelectSearchTests(win) {
+  let browser = win.gBrowser.selectedBrowser;
+  yield ContentTask.spawn(browser, null, function*() {
+    let doc = content.document;
+    let select = doc.getElementById("one");
+
+    for (var i = 0; i < 40; i++) {
+      select.add(new content.Option("Test" + i));
+    }
+
+    select.options[1].selected = true;
+    select.focus();
+  });
+
+  let selectPopup = win.document.getElementById("ContentSelectDropdown").menupopup;
+  yield openSelectPopup(selectPopup, false, "select", win);
+
+  let searchElement = selectPopup.querySelector("textbox");
+  searchElement.focus();
+
+  EventUtils.synthesizeKey("O", {}, win);
+  is(selectPopup.childNodes[2].hidden, false, "First option should be visible");
+  is(selectPopup.childNodes[3].hidden, false, "Second option should be visible");
+
+  EventUtils.synthesizeKey("3", {}, win);
+  is(selectPopup.childNodes[2].hidden, true, "First option should be hidden");
+  is(selectPopup.childNodes[3].hidden, true, "Second option should be hidden");
+  is(selectPopup.childNodes[4].hidden, false, "Third option should be visible");
+
+  EventUtils.synthesizeKey("Z", {}, win);
+  is(selectPopup.childNodes[4].hidden, true, "Third option should be hidden");
+  is(selectPopup.childNodes[1].hidden, true, "First group header should be hidden");
+
+  EventUtils.synthesizeKey("VK_BACK_SPACE", {}, win);
+  is(selectPopup.childNodes[4].hidden, false, "Third option should be visible");
+
+  EventUtils.synthesizeKey("VK_BACK_SPACE", {}, win);
+  is(selectPopup.childNodes[5].hidden, false, "Second group header should be visible");
+
+  EventUtils.synthesizeKey("VK_BACK_SPACE", {}, win);
+  EventUtils.synthesizeKey("O", {}, win);
+  EventUtils.synthesizeKey("5", {}, win);
+  is(selectPopup.childNodes[5].hidden, false, "Second group header should be visible");
+  is(selectPopup.childNodes[1].hidden, true, "First group header should be hidden");
+
+  EventUtils.synthesizeKey("VK_BACK_SPACE", {}, win);
+  is(selectPopup.childNodes[1].hidden, false, "First group header should be shown");
+
+  EventUtils.synthesizeKey("VK_BACK_SPACE", {}, win);
+  is(selectPopup.childNodes[8].hidden, true, "Option hidden by content should remain hidden");
+
+  yield hideSelectPopup(selectPopup, "escape", win);
+}
+
+// This test checks the functionality of search in select elements with groups
+// and a large number of options.
+add_task(function* test_select_search() {
+  yield SpecialPowers.pushPrefEnv({
+    set: [
+      ["dom.forms.selectSearch", true],
+    ],
+  });
+  const pageUrl = "data:text/html," + escape(PAGECONTENT_GROUPS);
+  let tab = yield BrowserTestUtils.openNewForegroundTab(gBrowser, pageUrl);
+
+  yield performSelectSearchTests(window);
+
+  yield BrowserTestUtils.removeTab(tab);
+
+  yield SpecialPowers.popPrefEnv();
+});
+
 // This test checks select elements with a large number of options to ensure that
 // the popup appears within the browser area.
 add_task(function* test_large_popup() {
@@ -405,7 +501,7 @@ add_task(function* test_large_popup() {
   // First, check that scrolling does not occur when the mouse is moved over the
   // anchor button but not the popup yet.
   EventUtils.synthesizeMouseAtPoint(popupRect.left + 5, popupRect.top - 10, { type: "mousemove" }, win);
-  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position after mousemove over button");
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position after mousemove over button should not change");
 
   EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.top + 10, { type: "mousemove" }, win);
 
@@ -421,10 +517,30 @@ add_task(function* test_large_popup() {
   // Releasing the mouse button and moving the mouse does not change the scroll position.
   scrollPos = selectPopup.scrollBox.scrollTop;
   EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 25, { type: "mouseup" }, win);
-  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mouseup");
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mouseup should not change");
 
   EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 20, { type: "mousemove" }, win);
-  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mouseup again");
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mousemove after mouseup should not change");
+
+  // Now check dragging with a mousedown on an item
+  let menuRect = selectPopup.childNodes[51].getBoundingClientRect();
+  EventUtils.synthesizeMouseAtPoint(menuRect.left + 5, menuRect.top + 5, { type: "mousedown" }, win);
+
+  // Dragging below the popup scrolls it down.
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 20, { type: "mousemove" }, win);
+  ok(selectPopup.scrollBox.scrollTop > scrollPos + 5, "scroll position at drag down from option");
+
+  // Dragging above the popup scrolls it up.
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.top - 20, { type: "mousemove" }, win);
+  ok(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at drag up from option");
+
+  scrollPos = selectPopup.scrollBox.scrollTop;
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 25, { type: "mouseup" }, win);
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mouseup from option should not change");
+
+  EventUtils.synthesizeMouseAtPoint(popupRect.left + 20, popupRect.bottom + 20, { type: "mousemove" }, win);
+  is(selectPopup.scrollBox.scrollTop, scrollPos, "scroll position at mousemove after mouseup should not change");
+
 
   yield hideSelectPopup(selectPopup, "escape", win);
 
@@ -483,11 +599,10 @@ add_task(function* test_mousemove_correcttarget() {
   yield popupShownPromise;
 
   yield new Promise(resolve => {
-    window.addEventListener("mousemove", function checkForMouseMove(event) {
-      window.removeEventListener("mousemove", checkForMouseMove, true);
+    window.addEventListener("mousemove", function(event) {
       is(event.target.localName.indexOf("menu"), 0, "mouse over menu");
       resolve();
-    }, true);
+    }, {capture: true, once: true});
 
     EventUtils.synthesizeMouseAtCenter(selectPopup.firstChild, { type: "mousemove" });
   });

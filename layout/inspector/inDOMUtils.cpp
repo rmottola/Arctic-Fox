@@ -253,13 +253,9 @@ inDOMUtils::GetCSSStyleRules(nsIDOMElement *aElement,
   for (nsRuleNode* ruleNode : Reversed(ruleNodes)) {
     RefPtr<Declaration> decl = do_QueryObject(ruleNode->GetRule());
     if (decl) {
-      RefPtr<mozilla::css::StyleRule> styleRule =
-        do_QueryObject(decl->GetOwningRule());
-      if (styleRule) {
-        nsCOMPtr<nsIDOMCSSRule> domRule = styleRule->GetDOMRule();
-        if (domRule) {
-          rules->AppendElement(domRule, /*weak =*/ false);
-        }
+      css::Rule* owningRule = decl->GetOwningRule();
+      if (owningRule) {
+        rules->AppendElement(owningRule, /*weak =*/ false);
       }
     }
   }
@@ -651,7 +647,6 @@ static void GetOtherValuesForProperty(const uint32_t aParserVariant,
   }
   if (aParserVariant & VARIANT_CALC) {
     InsertNoDuplicates(aArray, NS_LITERAL_STRING("calc"));
-    InsertNoDuplicates(aArray, NS_LITERAL_STRING("-moz-calc"));
   }
   if (aParserVariant & VARIANT_URL) {
     InsertNoDuplicates(aArray, NS_LITERAL_STRING("url"));
@@ -795,17 +790,17 @@ PropertySupportsVariant(nsCSSPropertyID aPropertyID, uint32_t aVariant)
       case eCSSProperty_scroll_snap_destination:
       case eCSSProperty_transform_origin:
       case eCSSProperty_perspective_origin:
-      case eCSSProperty__moz_outline_radius_topLeft:
-      case eCSSProperty__moz_outline_radius_topRight:
-      case eCSSProperty__moz_outline_radius_bottomLeft:
-      case eCSSProperty__moz_outline_radius_bottomRight:
+      case eCSSProperty__moz_outline_radius_topleft:
+      case eCSSProperty__moz_outline_radius_topright:
+      case eCSSProperty__moz_outline_radius_bottomleft:
+      case eCSSProperty__moz_outline_radius_bottomright:
         supported = VARIANT_LP;
         break;
 
-      case eCSSProperty_border_bottom_colors:
-      case eCSSProperty_border_left_colors:
-      case eCSSProperty_border_right_colors:
-      case eCSSProperty_border_top_colors:
+      case eCSSProperty__moz_border_bottom_colors:
+      case eCSSProperty__moz_border_left_colors:
+      case eCSSProperty__moz_border_right_colors:
+      case eCSSProperty__moz_border_top_colors:
         supported = VARIANT_COLOR;
         break;
 
@@ -1254,7 +1249,9 @@ inDOMUtils::GetCSSPseudoElementNames(uint32_t* aLength, char16_t*** aNames)
 
 NS_IMETHODIMP
 inDOMUtils::AddPseudoClassLock(nsIDOMElement *aElement,
-                               const nsAString &aPseudoClass)
+                               const nsAString &aPseudoClass,
+                               bool aEnabled,
+                               uint8_t aArgc)
 {
   EventStates state = GetStatesForPseudoClass(aPseudoClass);
   if (state.IsEmpty()) {
@@ -1264,7 +1261,7 @@ inDOMUtils::AddPseudoClassLock(nsIDOMElement *aElement,
   nsCOMPtr<mozilla::dom::Element> element = do_QueryInterface(aElement);
   NS_ENSURE_ARG_POINTER(element);
 
-  element->LockStyleStates(state);
+  element->LockStyleStates(state, aArgc > 0 ? aEnabled : true);
 
   return NS_OK;
 }
@@ -1300,7 +1297,7 @@ inDOMUtils::HasPseudoClassLock(nsIDOMElement *aElement,
   nsCOMPtr<mozilla::dom::Element> element = do_QueryInterface(aElement);
   NS_ENSURE_ARG_POINTER(element);
 
-  EventStates locks = element->LockedStyleStates();
+  EventStates locks = element->LockedStyleStates().mLocks;
 
   *_retval = locks.HasAllStates(state);
   return NS_OK;

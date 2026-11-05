@@ -12,7 +12,6 @@ extern crate serde_codegen_internals as internals;
 extern crate syntex;
 
 #[cfg(feature = "with-syntex")]
-#[macro_use]
 extern crate syntex_syntax as syntax;
 
 extern crate syn;
@@ -38,11 +37,11 @@ fn syntex_registry() -> syntex::Registry {
 
         impl fold::Folder for StripAttributeFolder {
             fn fold_attribute(&mut self, attr: ast::Attribute) -> Option<ast::Attribute> {
-                match attr.node.value.node {
-                    ast::MetaItemKind::List(ref n, _) if n == &"serde" => { return None; }
-                    _ => {}
+                if attr.value.name == "serde" {
+                    if let ast::MetaItemKind::List(..) = attr.value.node {
+                        return None;
+                    }
                 }
-
                 Some(attr)
             }
 
@@ -116,13 +115,12 @@ macro_rules! shim {
 
             use syntax::{attr, ast, visit};
             struct MarkSerdeAttributesUsed;
-            impl visit::Visitor for MarkSerdeAttributesUsed {
+            impl<'a> visit::Visitor<'a> for MarkSerdeAttributesUsed {
                 fn visit_attribute(&mut self, attr: &ast::Attribute) {
-                    match attr.node.value.node {
-                        ast::MetaItemKind::List(ref name, _) if name == "serde" => {
+                    if attr.value.name == "serde" {
+                        if let ast::MetaItemKind::List(..) = attr.value.node {
                             attr::mark_used(attr);
                         }
-                        _ => {}
                     }
                 }
             }
@@ -159,15 +157,15 @@ mod shim {
 #[cfg(feature = "with-syn")]
 #[doc(hidden)]
 /// Not public API. Use the serde_derive crate.
-pub fn expand_derive_serialize(item: &str) -> Result<String, String> {
+pub fn expand_derive_serialize(item: &str) -> Result<quote::Tokens, String> {
     let syn_item = syn::parse_macro_input(item).unwrap();
-    ser::expand_derive_serialize(&syn_item).map(|derive| derive.to_string())
+    ser::expand_derive_serialize(&syn_item)
 }
 
 #[cfg(feature = "with-syn")]
 #[doc(hidden)]
 /// Not public API. Use the serde_derive crate.
-pub fn expand_derive_deserialize(item: &str) -> Result<String, String> {
+pub fn expand_derive_deserialize(item: &str) -> Result<quote::Tokens, String> {
     let syn_item = syn::parse_macro_input(item).unwrap();
-    de::expand_derive_deserialize(&syn_item).map(|derive| derive.to_string())
+    de::expand_derive_deserialize(&syn_item)
 }

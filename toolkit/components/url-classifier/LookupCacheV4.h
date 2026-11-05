@@ -33,9 +33,12 @@ public:
                                     uint32_t aFreshnessGuarantee,
                                     bool* aConfirmed) override;
 
+  virtual bool IsEmpty() override;
+
   nsresult Build(PrefixStringMap& aPrefixMap);
 
   nsresult GetPrefixes(PrefixStringMap& aPrefixMap);
+  nsresult GetFixedLengthPrefixes(FallibleTArray<uint32_t>& aPrefixes);
 
   // ApplyUpdate will merge data stored in aTableUpdate with prefixes in aInputMap.
   nsresult ApplyUpdate(TableUpdateV4* aTableUpdate,

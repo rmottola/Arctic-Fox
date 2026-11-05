@@ -14,9 +14,7 @@ function test() {
 
   // Create foreground window
   let win2 = window.openDialog(location, "", "chrome,all,dialog=no", "about:blank");
-  win2.addEventListener("load", function onLoad() {
-    win2.removeEventListener("load", onLoad);
-
+  win2.addEventListener("load", function() {
     // Create background test tab
     let browser = gBrowser.addTab(TEST_URL).linkedBrowser;
 
@@ -30,7 +28,7 @@ function test() {
         btnStay.click();
       });
 
-      let appStartup = Cc['@mozilla.org/toolkit/app-startup;1'].
+      let appStartup = Cc["@mozilla.org/toolkit/app-startup;1"].
                          getService(Ci.nsIAppStartup);
       appStartup.quit(Ci.nsIAppStartup.eAttemptQuit);
       ok(seenDialog, "Should have seen a prompt dialog");
@@ -45,5 +43,5 @@ function test() {
       gBrowser.removeTab(gBrowser.selectedTab);
       executeSoon(finish);
     });
-  });
+  }, {once: true});
 }

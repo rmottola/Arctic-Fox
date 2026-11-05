@@ -471,6 +471,72 @@ promise_test(t => {
    'composed onto a underlying animation with fill:forwards during positive ' +
    'endDelay');
 
+promise_test(t => {
+  useTestRefreshMode(t);
+
+  var div = addDiv(t, { style: 'transform: translateX(100px)' });
+  div.animate({ transform: 'translateX(200px)' },
+              { duration: 100 * MS_PER_SEC, delay: 50 * MS_PER_SEC });
+
+  return waitForPaintsFlushed().then(() => {
+    SpecialPowers.DOMWindowUtils.advanceTimeAndRefresh(100 * MS_PER_SEC);
+
+    var transform =
+      SpecialPowers.DOMWindowUtils.getOMTAStyle(div, 'transform');
+    assert_matrix_equals(transform, 'matrix(1, 0, 0, 1, 150, 0)',
+      'Transform value for animation with positive delay should be composed ' +
+      'onto the base style');
+  });
+}, 'Transform value for animation with no keyframe at offset 0 and with ' +
+   'positive delay');
+
+promise_test(t => {
+  useTestRefreshMode(t);
+
+  var div = addDiv(t, { style: 'transform: translateX(100px)' });
+
+  div.animate([{ offset: 0, transform: 'translateX(200px)'}],
+              { duration: 100 * MS_PER_SEC,
+                iterationStart: 1,
+                iterationComposite: 'accumulate' });
+
+  return waitForPaintsFlushed().then(() => {
+    var transform =
+      SpecialPowers.DOMWindowUtils.getOMTAStyle(div, 'transform');
+    assert_matrix_equals(transform, 'matrix(1, 0, 0, 1, 300, 0)',
+      'Transform value for animation with no keyframe at offset 1 and its ' +
+      'iterationComposite is accumulate');
+  });
+}, 'Transform value for animation with no keyframe at offset 1 and its ' +
+   'iterationComposite is accumulate');
+
+promise_test(t => {
+  useTestRefreshMode(t);
+
+  var div = addDiv(t);
+  var lowerAnimation =
+    div.animate({ transform: [ 'translateX(100px)', 'translateX(200px)' ] },
+                100 * MS_PER_SEC);
+  var higherAnimation = div.animate({ transform: 'translateX(300px)' },
+                                    100 * MS_PER_SEC);
+
+  lowerAnimation.timeline = null;
+  // Set current time at 50% duration.
+  lowerAnimation.currentTime = 50 * MS_PER_SEC;
+
+  return waitForPaintsFlushed().then(() => {
+    SpecialPowers.DOMWindowUtils.advanceTimeAndRefresh(50 * MS_PER_SEC);
+
+    var transform =
+      SpecialPowers.DOMWindowUtils.getOMTAStyle(div, 'transform');
+    // (150px + 300px) * (50 * MS_PER_SEC / 100 * MS_PER_SEC) = 225px.
+    assert_matrix_equals(transform, 'matrix(1, 0, 0, 1, 225, 0)',
+      'Composed transform value should be composed onto the value of ' +
+      'lower-priority animation without timeline');
+  });
+}, 'Transform value for animation with no keyframe at offset 0 at 50% when ' +
+   'composed onto an animation without timeline');
+
 done();
 </script>
 </body>

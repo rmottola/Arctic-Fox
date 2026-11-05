@@ -23,6 +23,7 @@
 #include "mozilla/Telemetry.h"
 #include "nsArray.h"
 #include "nsArrayUtils.h"
+#include "nsCRT.h"
 #include "nsCharSeparatedTokenizer.h"
 #include "nsClientAuthRemember.h"
 #include "nsContentUtils.h"
@@ -1115,8 +1116,8 @@ retryDueToTLSIntolerance(PRErrorCode err, nsNSSSocketInfo* socketInfo)
     return false;
   }
 
-  Telemetry::ID pre;
-  Telemetry::ID post;
+  Telemetry::HistogramID pre;
+  Telemetry::HistogramID post;
   switch (range.max) {
     case SSL_LIBRARY_VERSION_TLS_1_3:
       pre = Telemetry::SSL_TLS13_INTOLERANCE_REASON_PRE;
@@ -2193,8 +2194,7 @@ ClientAuthDataRunnable::RunOnTargetThread()
   } else { // Not Auto => ask
     // Get the SSL Certificate
 
-    nsXPIDLCString hostname;
-    mSocketInfo->GetHostName(getter_Copies(hostname));
+    const nsACString& hostname = mSocketInfo->GetHostName();
 
     RefPtr<nsClientAuthRememberService> cars =
       mSocketInfo->SharedState().GetClientAuthRememberService();

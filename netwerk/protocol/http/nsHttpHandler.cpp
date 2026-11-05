@@ -168,6 +168,7 @@ nsHttpHandler::nsHttpHandler()
     , mCapabilities(NS_HTTP_ALLOW_KEEPALIVE)
     , mReferrerLevel(0xff) // by default we always send a referrer
     , mSpoofReferrerSource(false)
+    , mHideOnionReferrerSource(false)
     , mReferrerTrimmingPolicy(0)
     , mReferrerXOriginTrimmingPolicy(0)
     , mReferrerXOriginPolicy(0)
@@ -623,7 +624,7 @@ nsHttpHandler::Get32BitsOfPseudoRandom()
 void
 nsHttpHandler::NotifyObservers(nsIHttpChannel *chan, const char *event)
 {
-    LOG(("nsHttpHandler::NotifyObservers [chan=%x event=\"%s\"]\n", chan, event));
+    LOG(("nsHttpHandler::NotifyObservers [chan=%p event=\"%s\"]\n", chan, event));
     nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
     if (obsService)
         obsService->NotifyObservers(chan, event, nullptr);
@@ -893,7 +894,8 @@ nsHttpHandler::InitUserAgentComponents()
 #endif
     SInt32 majorVersion = nsCocoaFeatures::OSXVersionMajor();
     SInt32 minorVersion = nsCocoaFeatures::OSXVersionMinor();
-    mOscpu += nsPrintfCString(" %d.%d", majorVersion, minorVersion);
+    mOscpu += nsPrintfCString(" %d.%d", static_cast<int>(majorVersion),
+                              static_cast<int>(minorVersion));
 #elif defined (XP_UNIX)
     struct utsname name;
 
@@ -1114,6 +1116,12 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         rv = prefs->GetBoolPref(HTTP_PREF("referer.spoofSource"), &cVar);
         if (NS_SUCCEEDED(rv))
             mSpoofReferrerSource = cVar;
+    }
+
+    if (PREF_CHANGED(HTTP_PREF("referer.spoofOnionSource"))) {
+        rv = prefs->GetBoolPref(HTTP_PREF("referer.spoofOnionSource"), &cVar);
+        if (NS_SUCCEEDED(rv))
+            mHideOnionReferrerSource = cVar;
     }
 
     if (PREF_CHANGED(HTTP_PREF("referer.trimmingPolicy"))) {
@@ -2297,9 +2305,21 @@ nsHttpHandler::SpeculativeConnectInternal(nsIURI *aURI,
     uint32_t flags = 0;
     if (loadContext && loadContext->UsePrivateBrowsing())
         flags |= nsISocketProvider::NO_PERMANENT_STORAGE;
+
+    OriginAttributes originAttributes;
+    // If the principal is given, we use the originAttributes from this
+    // principal. Otherwise, we use the originAttributes from the
+    // loadContext.
+    if (aPrincipal) {
+        originAttributes = aPrincipal->OriginAttributesRef();
+    } else if (loadContext) {
+        loadContext->GetOriginAttributes(originAttributes);
+    }
+
     nsCOMPtr<nsIURI> clone;
     if (NS_SUCCEEDED(sss->IsSecureURI(nsISiteSecurityService::HEADER_HSTS,
-                                      aURI, flags, nullptr, &isStsHost)) &&
+                                      aURI, flags, originAttributes,
+                                      nullptr, &isStsHost)) &&
                                       isStsHost) {
         if (NS_SUCCEEDED(NS_GetSecureUpgradedURI(aURI,
                                                  getter_AddRefs(clone)))) {
@@ -2344,17 +2364,6 @@ nsHttpHandler::SpeculativeConnectInternal(nsIURI *aURI,
 
     nsAutoCString username;
     aURI->GetUsername(username);
-
-    OriginAttributes originAttributes;
-    // If the principal is given, we use the originAttributes from this
-    // principal. Otherwise, we use the originAttributes from the
-    // loadContext.
-    if (aPrincipal) {
-        originAttributes.Inherit(aPrincipal->OriginAttributesRef());
-    } else if (loadContext) {
-        loadContext->GetOriginAttributes(originAttributes);
-        originAttributes.StripAttributes(OriginAttributes::STRIP_ADDON_ID);
-    }
 
     auto *ci =
         new nsHttpConnectionInfo(host, port, EmptyCString(), username, nullptr,

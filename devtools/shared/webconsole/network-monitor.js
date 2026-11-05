@@ -37,6 +37,8 @@ const HTTP_TEMPORARY_REDIRECT = 307;
 
 // The maximum number of bytes a NetworkResponseListener can hold: 1 MB
 const RESPONSE_BODY_LIMIT = 1048576;
+// Exported for testing.
+exports.RESPONSE_BODY_LIMIT = RESPONSE_BODY_LIMIT;
 
 /**
  * Check if a given network request should be logged by a network monitor
@@ -598,7 +600,7 @@ NetworkResponseListener.prototype = {
       text: data || "",
     };
 
-    response.size = response.text.length;
+    response.size = this.bodySize;
     response.transferredSize = this.transferredSize;
 
     try {
@@ -1079,10 +1081,18 @@ NetworkMonitor.prototype = {
     }
 
     // Determine the cause and if this is an XHR request.
-    let causeType = channel.loadInfo.externalContentPolicyType;
-    let loadingPrincipal = channel.loadInfo.loadingPrincipal;
-    let causeUri = loadingPrincipal ? loadingPrincipal.URI : null;
+    let causeType = Ci.nsIContentPolicy.TYPE_OTHER;
+    let causeUri = null;
     let stacktrace;
+
+    if (channel.loadInfo) {
+      causeType = channel.loadInfo.externalContentPolicyType;
+      const { loadingPrincipal } = channel.loadInfo;
+      if (loadingPrincipal && loadingPrincipal.URI) {
+        causeUri = loadingPrincipal.URI.spec;
+      }
+    }
+
     // If this is the parent process, there is no stackTraceCollector - the stack
     // trace will be added in NetworkMonitorChild._onNewEvent.
     if (this.owner.stackTraceCollector) {
@@ -1090,8 +1100,8 @@ NetworkMonitor.prototype = {
     }
 
     event.cause = {
-      type: causeType,
-      loadingDocumentUri: causeUri ? causeUri.spec : null,
+      type: causeTypeToString(causeType),
+      loadingDocumentUri: causeUri,
       stacktrace
     };
 
@@ -1479,7 +1489,7 @@ NetworkMonitor.prototype = {
       Services.obs.removeObserver(this._httpResponseExaminer,
                                   "http-on-examine-cached-response");
       Services.obs.removeObserver(this._httpModifyExaminer,
-                                  "http-on-modify-request", false);
+                                  "http-on-modify-request");
     }
 
     Services.obs.removeObserver(this._serviceWorkerRequest,
@@ -2042,3 +2052,36 @@ function gSequenceId() {
   return gSequenceId.n++;
 }
 gSequenceId.n = 1;
+
+/**
+ * Convert a nsIContentPolicy constant to a display string
+ */
+const LOAD_CAUSE_STRINGS = {
+  [Ci.nsIContentPolicy.TYPE_INVALID]: "invalid",
+  [Ci.nsIContentPolicy.TYPE_OTHER]: "other",
+  [Ci.nsIContentPolicy.TYPE_SCRIPT]: "script",
+  [Ci.nsIContentPolicy.TYPE_IMAGE]: "img",
+  [Ci.nsIContentPolicy.TYPE_STYLESHEET]: "stylesheet",
+  [Ci.nsIContentPolicy.TYPE_OBJECT]: "object",
+  [Ci.nsIContentPolicy.TYPE_DOCUMENT]: "document",
+  [Ci.nsIContentPolicy.TYPE_SUBDOCUMENT]: "subdocument",
+  [Ci.nsIContentPolicy.TYPE_REFRESH]: "refresh",
+  [Ci.nsIContentPolicy.TYPE_XBL]: "xbl",
+  [Ci.nsIContentPolicy.TYPE_PING]: "ping",
+  [Ci.nsIContentPolicy.TYPE_XMLHTTPREQUEST]: "xhr",
+  [Ci.nsIContentPolicy.TYPE_OBJECT_SUBREQUEST]: "objectSubdoc",
+  [Ci.nsIContentPolicy.TYPE_DTD]: "dtd",
+  [Ci.nsIContentPolicy.TYPE_FONT]: "font",
+  [Ci.nsIContentPolicy.TYPE_MEDIA]: "media",
+  [Ci.nsIContentPolicy.TYPE_WEBSOCKET]: "websocket",
+  [Ci.nsIContentPolicy.TYPE_CSP_REPORT]: "csp",
+  [Ci.nsIContentPolicy.TYPE_XSLT]: "xslt",
+  [Ci.nsIContentPolicy.TYPE_BEACON]: "beacon",
+  [Ci.nsIContentPolicy.TYPE_FETCH]: "fetch",
+  [Ci.nsIContentPolicy.TYPE_IMAGESET]: "imageset",
+  [Ci.nsIContentPolicy.TYPE_WEB_MANIFEST]: "webManifest"
+};
+
+function causeTypeToString(causeType) {
+  return LOAD_CAUSE_STRINGS[causeType] || "unknown";
+}

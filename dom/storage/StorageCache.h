@@ -102,7 +102,7 @@ public:
 
   // The set of methods that are invoked by DOM storage web API.
   // We are passing the Storage object just to let the cache
-  // read properties like mPrincipal and mSessionOnly.
+  // read properties like mPrivate, mPrincipal and mSessionOnly.
   // Get* methods return error when load from the database has failed.
   nsresult GetLength(const Storage* aStorage, uint32_t* aRetval);
   nsresult GetKey(const Storage* aStorage, uint32_t index, nsAString& aRetval);
@@ -172,7 +172,7 @@ private:
 
 private:
   // Synchronously blocks until the cache is fully loaded from the database
-  void WaitForPreload(mozilla::Telemetry::ID aTelemetryID);
+  void WaitForPreload(mozilla::Telemetry::HistogramID aTelemetryID);
 
   // Helper to get one of the 3 data sets (regular, private, session)
   Data& DataSet(const Storage* aStorage);

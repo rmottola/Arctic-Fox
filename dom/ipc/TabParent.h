@@ -344,10 +344,6 @@ public:
   virtual bool
   DeallocPColorPickerParent(PColorPickerParent* aColorPicker) override;
 
-  virtual PDatePickerParent*
-  AllocPDatePickerParent(const nsString& aTitle, const nsString& aInitialDate) override;
-  virtual bool DeallocPDatePickerParent(PDatePickerParent* aDatePicker) override;
-
   virtual PDocAccessibleParent*
   AllocPDocAccessibleParent(PDocAccessibleParent*, const uint64_t&,
                             const uint32_t&, const IAccessibleHolder&) override;
@@ -454,17 +450,17 @@ public:
                     int32_t aCharCode, int32_t aModifiers,
                     bool aPreventDefault);
 
-  bool SendRealMouseEvent(mozilla::WidgetMouseEvent& event);
+  bool SendRealMouseEvent(mozilla::WidgetMouseEvent& aEvent);
 
   bool SendRealDragEvent(mozilla::WidgetDragEvent& aEvent,
                          uint32_t aDragAction,
                          uint32_t aDropEffect);
 
-  bool SendMouseWheelEvent(mozilla::WidgetWheelEvent& event);
+  bool SendMouseWheelEvent(mozilla::WidgetWheelEvent& aEvent);
 
-  bool SendRealKeyEvent(mozilla::WidgetKeyboardEvent& event);
+  bool SendRealKeyEvent(mozilla::WidgetKeyboardEvent& aEvent);
 
-  bool SendRealTouchEvent(WidgetTouchEvent& event);
+  bool SendRealTouchEvent(WidgetTouchEvent& aEvent);
 
   bool SendHandleTap(TapType aType,
                      const LayoutDevicePoint& aPoint,
@@ -512,9 +508,9 @@ public:
 
   bool HandleQueryContentEvent(mozilla::WidgetQueryContentEvent& aEvent);
 
-  bool SendCompositionEvent(mozilla::WidgetCompositionEvent& event);
+  bool SendCompositionEvent(mozilla::WidgetCompositionEvent& aEvent);
 
-  bool SendSelectionEvent(mozilla::WidgetSelectionEvent& event);
+  bool SendSelectionEvent(mozilla::WidgetSelectionEvent& aEvent);
 
   bool SendPasteTransferable(const IPCDataTransfer& aDataTransfer,
                              const bool& aIsPrivateData,
@@ -583,10 +579,6 @@ public:
 
   layout::RenderFrameParent* GetRenderFrame();
 
-  void AudioChannelChangeNotification(nsPIDOMWindowOuter* aWindow,
-                                      AudioChannel aAudioChannel,
-                                      float aVolume,
-                                      bool aMuted);
   bool SetRenderFrame(PRenderFrameParent* aRFParent);
   bool GetRenderFrameInfo(TextureFactoryIdentifier* aTextureFactoryIdentifier,
                           uint64_t* aLayersId);

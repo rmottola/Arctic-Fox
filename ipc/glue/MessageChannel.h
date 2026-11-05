@@ -130,7 +130,7 @@ class MessageChannel : HasResultCodes
     // Call aInvoke for each pending message until it returns false.
     // XXX: You must get permission from an IPC peer to use this function
     //      since it requires custom deserialization and re-orders events.
-    void PeekMessages(std::function<bool(const Message& aMsg)> aInvoke);
+    void PeekMessages(const std::function<bool(const Message& aMsg)>& aInvoke);
 
     // Misc. behavioral traits consumers can request for this channel
     enum ChannelFlags {
@@ -455,9 +455,7 @@ class MessageChannel : HasResultCodes
         public nsIRunnablePriority
     {
     public:
-        explicit MessageTask(MessageChannel* aChannel, Message&& aMessage)
-          : mChannel(aChannel), mMessage(Move(aMessage)), mScheduled(false)
-        {}
+        explicit MessageTask(MessageChannel* aChannel, Message&& aMessage);
 
         NS_DECL_ISUPPORTS_INHERITED
 

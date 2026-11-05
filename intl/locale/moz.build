@@ -16,6 +16,7 @@ else:
     DIRS += ['unix']
 
 XPIDL_SOURCES += [
+    'mozILocaleService.idl',
     'nsICollation.idl',
     'nsILocale.idl',
     'nsILocaleService.idl',
@@ -25,25 +26,37 @@ XPIDL_SOURCES += [
 XPIDL_MODULE = 'locale'
 
 EXPORTS += [
+    'DateTimeFormat.h',
     'nsCollation.h',
     'nsCollationCID.h',
-    'nsDateTimeFormatCID.h',
-    'nsIDateTimeFormat.h',
     'nsILanguageAtomService.h',
     'nsIPlatformCharset.h',
     'nsPosixLocale.h',
     'nsWin32Locale.h',
 ]
 
+EXPORTS.mozilla.intl += [
+    'LocaleService.h'
+]
+
 UNIFIED_SOURCES += [
+    'LocaleService.cpp',
     'nsCollation.cpp',
-    'nsIDateTimeFormat.cpp',
     'nsLanguageAtomService.cpp',
     'nsLocale.cpp',
     'nsLocaleService.cpp',
     'nsScriptableDateFormat.cpp',
     'nsUConvPropertySearch.cpp',
 ]
+
+if CONFIG['ENABLE_INTL_API']:
+    UNIFIED_SOURCES += [
+        'DateTimeFormatICU.cpp',
+    ]
+else:
+    UNIFIED_SOURCES += [
+        'DateTimeFormatUnix.cpp',
+    ]
 
 EXTRA_JS_MODULES += [
     'PluralForm.jsm',
@@ -66,3 +79,6 @@ GENERATED_FILES += [
 langgroups = GENERATED_FILES['langGroups.properties.h']
 langgroups.script = 'props2arrays.py'
 langgroups.inputs = ['langGroups.properties']
+
+if CONFIG['ENABLE_TESTS']:
+    DIRS += ['tests/gtest']

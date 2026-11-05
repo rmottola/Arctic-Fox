@@ -5,19 +5,17 @@ const DUMMY2 = "http://example.org/browser/toolkit/modules/tests/browser/dummy_p
 
 function waitForLoad(browser = gBrowser.selectedBrowser) {
   return new Promise(resolve => {
-    browser.addEventListener("load", function listener() {
-      browser.removeEventListener("load", listener, true);
+    browser.addEventListener("load", function() {
       resolve();
-    }, true);
+    }, {capture: true, once: true});
   });
 }
 
 function waitForPageShow(browser = gBrowser.selectedBrowser) {
   return new Promise(resolve => {
-    browser.addEventListener("pageshow", function listener() {
-      browser.removeEventListener("pageshow", listener, true);
+    browser.addEventListener("pageshow", function() {
       resolve();
-    }, true);
+    }, {capture: true, once: true});
   });
 }
 
@@ -129,7 +127,8 @@ add_task(function* test_badarguments() {
   try {
     browser.webNavigation.loadURI(DUMMY1,
                                   Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
-                                  null, {}, null);
+                                  null, {}, null,
+                                  SYSTEMPRINCIPAL);
     ok(false, "Should have seen an exception from trying to pass some postdata");
   }
   catch (e) {
@@ -139,7 +138,8 @@ add_task(function* test_badarguments() {
   try {
     browser.webNavigation.loadURI(DUMMY1,
                                   Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
-                                  null, null, {});
+                                  null, null, {},
+                                  SYSTEMPRINCIPAL);
     ok(false, "Should have seen an exception from trying to pass some headers");
   }
   catch (e) {

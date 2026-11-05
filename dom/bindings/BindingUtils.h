@@ -50,7 +50,7 @@ namespace mozilla {
 enum UseCounter : int16_t;
 
 namespace dom {
-template<typename DataType> class MozMap;
+template<typename KeyType, typename ValueType> class Record;
 
 nsresult
 UnwrapArgImpl(JSContext* cx, JS::Handle<JSObject*> src, const nsIID& iid,
@@ -815,15 +815,17 @@ MaybeWrapNonDOMObjectOrNullValue(JSContext* cx, JS::MutableHandle<JS::Value> rva
 MOZ_ALWAYS_INLINE bool
 MaybeWrapValue(JSContext* cx, JS::MutableHandle<JS::Value> rval)
 {
-  if (rval.isString()) {
-    return MaybeWrapStringValue(cx, rval);
+  if (rval.isGCThing()) {
+    if (rval.isString()) {
+      return MaybeWrapStringValue(cx, rval);
+    }
+    if (rval.isObject()) {
+      return MaybeWrapObjectValue(cx, rval);
+    }
+    MOZ_ASSERT(rval.isSymbol());
+    JS_MarkCrossZoneId(cx, SYMBOL_TO_JSID(rval.toSymbol()));
   }
-
-  if (!rval.isObject()) {
-    return true;
-  }
-
-  return MaybeWrapObjectValue(cx, rval);
+  return true;
 }
 
 namespace binding_detail {
@@ -1334,7 +1336,7 @@ template<class T>
 inline void
 UpdateWrapper(T* p, nsWrapperCache* cache, JSObject* obj, const JSObject* old)
 {
-  JS::AutoAssertGCCallback inCallback(obj);
+  JS::AutoAssertGCCallback inCallback;
   cache->UpdateWrapper(obj, old);
 }
 
@@ -1342,7 +1344,7 @@ template<class T>
 inline void
 UpdateWrapper(T* p, void*, JSObject* obj, const JSObject* old)
 {
-  JS::AutoAssertGCCallback inCallback(obj);
+  JS::AutoAssertGCCallback inCallback;
   nsWrapperCache* cache;
   CallQueryInterface(p, &cache);
   UpdateWrapper(p, cache, obj, old);
@@ -1529,7 +1531,7 @@ struct WrapNativeHelper
     JSObject* obj;
     if ((obj = cache->GetWrapper())) {
       // GetWrapper always unmarks gray.
-      MOZ_ASSERT(!JS::ObjectIsMarkedGray(obj));
+      MOZ_ASSERT(JS::ObjectIsNotGray(obj));
       return obj;
     }
 
@@ -1537,11 +1539,11 @@ struct WrapNativeHelper
     if (!CouldBeDOMBinding(parent)) {
       // WrapNativeFallback never returns a gray thing.
       obj = WrapNativeFallback<T>::Wrap(cx, parent, cache);
-      MOZ_ASSERT_IF(obj, !JS::ObjectIsMarkedGray(obj));
+      MOZ_ASSERT(JS::ObjectIsNotGray(obj));
     } else {
       // WrapObject never returns a gray thing.
       obj = parent->WrapObject(cx, nullptr);
-      MOZ_ASSERT_IF(obj, !JS::ObjectIsMarkedGray(obj));
+      MOZ_ASSERT(JS::ObjectIsNotGray(obj));
     }
 
     return obj;
@@ -1563,12 +1565,12 @@ struct WrapNativeHelper<T, false>
                    "Unexpected object in nsWrapperCache");
       obj = rootedObj;
 #endif
-      MOZ_ASSERT(!JS::ObjectIsMarkedGray(obj));
+      MOZ_ASSERT(JS::ObjectIsNotGray(obj));
       return obj;
     }
 
     obj = WrapNativeISupports(cx, parent, cache);
-    MOZ_ASSERT_IF(obj, !JS::ObjectIsMarkedGray(obj));
+    MOZ_ASSERT(JS::ObjectIsNotGray(obj));
     return obj;
   }
 };
@@ -1587,7 +1589,7 @@ FindAssociatedGlobal(JSContext* cx, T* p, nsWrapperCache* cache,
   if (!obj) {
     return nullptr;
   }
-  MOZ_ASSERT(!JS::ObjectIsMarkedGray(obj));
+  MOZ_ASSERT(JS::ObjectIsNotGray(obj));
 
   obj = js::GetGlobalForObjectCrossCompartment(obj);
 
@@ -1604,7 +1606,7 @@ FindAssociatedGlobal(JSContext* cx, T* p, nsWrapperCache* cache,
   JS::Rooted<JSObject*> rootedObj(cx, obj);
   JSObject* xblScope = xpc::GetXBLScope(cx, rootedObj);
   MOZ_ASSERT_IF(xblScope, JS_IsGlobalObject(xblScope));
-  MOZ_ASSERT_IF(xblScope, !JS::ObjectIsMarkedGray(xblScope));
+  MOZ_ASSERT(JS::ObjectIsNotGray(xblScope));
   return xblScope;
 }
 
@@ -1731,7 +1733,7 @@ template <class T>
 inline JSObject*
 GetCallbackFromCallbackObject(T* aObj)
 {
-  return aObj->Callback();
+  return aObj->CallbackOrNull();
 }
 
 // Helper for getting the callback JSObject* of a smart ptr around a
@@ -1899,11 +1901,30 @@ ConvertJSValueToString(JSContext* cx, JS::Handle<JS::Value> v,
   return AssignJSString(cx, result, s);
 }
 
-void
-NormalizeUSVString(JSContext* aCx, nsAString& aString);
+template<typename T>
+static inline bool
+ConvertJSValueToString(JSContext* cx, JS::Handle<JS::Value> v, T& result)
+{
+  return ConvertJSValueToString(cx, v, eStringify, eStringify, result);
+}
 
 void
-NormalizeUSVString(JSContext* aCx, binding_detail::FakeString& aString);
+NormalizeUSVString(nsAString& aString);
+
+void
+NormalizeUSVString(binding_detail::FakeString& aString);
+
+template<typename T>
+static inline bool
+ConvertJSValueToUSVString(JSContext* cx, JS::Handle<JS::Value> v, T& result)
+{
+  if (!ConvertJSValueToString(cx, v, eStringify, eStringify, result)) {
+    return false;
+  }
+
+  NormalizeUSVString(result);
+  return true;
+}
 
 template<typename T>
 inline bool
@@ -1929,6 +1950,13 @@ ConvertIdToString(JSContext* cx, JS::HandleId id, T& result, bool& isSymbol)
 bool
 ConvertJSValueToByteString(JSContext* cx, JS::Handle<JS::Value> v,
                            bool nullable, nsACString& result);
+
+inline bool
+ConvertJSValueToByteString(JSContext* cx, JS::Handle<JS::Value> v,
+                           nsACString& result)
+{
+  return ConvertJSValueToByteString(cx, v, false, result);
+}
 
 template<typename T>
 void DoTraceSequence(JSTracer* trc, FallibleTArray<T>& seq);
@@ -2065,31 +2093,26 @@ public:
   }
 };
 
-template<typename T>
-static void
-TraceMozMapValue(T* aValue, void* aClosure)
+template<typename K, typename V>
+void TraceRecord(JSTracer* trc, Record<K, V>& record)
 {
-  JSTracer* trc = static_cast<JSTracer*>(aClosure);
-  // Act like it's a one-element sequence to leverage all that infrastructure.
-  SequenceTracer<T>::TraceSequence(trc, aValue, aValue + 1);
+  for (auto& entry : record.Entries()) {
+    // Act like it's a one-element sequence to leverage all that infrastructure.
+    SequenceTracer<V>::TraceSequence(trc, &entry.mValue, &entry.mValue + 1);
+  }
 }
 
-template<typename T>
-void TraceMozMap(JSTracer* trc, MozMap<T>& map)
-{
-  map.EnumerateValues(TraceMozMapValue<T>, trc);
-}
-
-// sequence<MozMap>
-template<typename T>
-class SequenceTracer<MozMap<T>, false, false, false>
+// sequence<record>
+template<typename K, typename V>
+class SequenceTracer<Record<K, V>, false, false, false>
 {
   explicit SequenceTracer() = delete; // Should never be instantiated
 
 public:
-  static void TraceSequence(JSTracer* trc, MozMap<T>* seqp, MozMap<T>* end) {
+  static void TraceSequence(JSTracer* trc, Record<K, V>* seqp,
+                            Record<K, V>* end) {
     for (; seqp != end; ++seqp) {
-      seqp->EnumerateValues(TraceMozMapValue<T>, trc);
+      TraceRecord(trc, *seqp);
     }
   }
 };
@@ -2167,51 +2190,51 @@ public:
   SequenceType mSequenceType;
 };
 
-// Rooter class for MozMap; this is what we mostly use in the codegen.
-template<typename T>
-class MOZ_RAII MozMapRooter final : private JS::CustomAutoRooter
+// Rooter class for Record; this is what we mostly use in the codegen.
+template<typename K, typename V>
+class MOZ_RAII RecordRooter final : private JS::CustomAutoRooter
 {
 public:
-  MozMapRooter(JSContext *aCx, MozMap<T>* aMozMap
+  RecordRooter(JSContext *aCx, Record<K, V>* aRecord
                MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
     : JS::CustomAutoRooter(aCx MOZ_GUARD_OBJECT_NOTIFIER_PARAM_TO_PARENT),
-      mMozMap(aMozMap),
-      mMozMapType(eMozMap)
+      mRecord(aRecord),
+      mRecordType(eRecord)
   {
   }
 
-  MozMapRooter(JSContext *aCx, Nullable<MozMap<T>>* aMozMap
+  RecordRooter(JSContext *aCx, Nullable<Record<K, V>>* aRecord
                  MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
     : JS::CustomAutoRooter(aCx MOZ_GUARD_OBJECT_NOTIFIER_PARAM_TO_PARENT),
-      mNullableMozMap(aMozMap),
-      mMozMapType(eNullableMozMap)
+      mNullableRecord(aRecord),
+      mRecordType(eNullableRecord)
   {
   }
 
 private:
-  enum MozMapType {
-    eMozMap,
-    eNullableMozMap
+  enum RecordType {
+    eRecord,
+    eNullableRecord
   };
 
   virtual void trace(JSTracer *trc) override
   {
-    if (mMozMapType == eMozMap) {
-      TraceMozMap(trc, *mMozMap);
+    if (mRecordType == eRecord) {
+      TraceRecord(trc, *mRecord);
     } else {
-      MOZ_ASSERT(mMozMapType == eNullableMozMap);
-      if (!mNullableMozMap->IsNull()) {
-        TraceMozMap(trc, mNullableMozMap->Value());
+      MOZ_ASSERT(mRecordType == eNullableRecord);
+      if (!mNullableRecord->IsNull()) {
+        TraceRecord(trc, mNullableRecord->Value());
       }
     }
   }
 
   union {
-    MozMap<T>* mMozMap;
-    Nullable<MozMap<T>>* mNullableMozMap;
+    Record<K, V>* mRecord;
+    Nullable<Record<K, V>>* mNullableRecord;
   };
 
-  MozMapType mMozMapType;
+  RecordType mRecordType;
 };
 
 template<typename T>

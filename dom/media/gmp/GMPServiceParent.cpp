@@ -7,6 +7,7 @@
 #include "GMPService.h"
 #include "prio.h"
 #include "base/task.h"
+#include "mozilla/AbstractThread.h"
 #include "mozilla/Logging.h"
 #include "mozilla/dom/ContentParent.h"
 #include "GMPParent.h"
@@ -16,6 +17,7 @@
 #include "GeckoChildProcessHost.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/SyncRunnable.h"
 #include "nsXPCOMPrivate.h"
 #include "mozilla/Services.h"
@@ -350,10 +352,11 @@ GeckoMediaPluginServiceParent::EnsureInitialized() {
 }
 
 RefPtr<GetGMPContentParentPromise>
-GeckoMediaPluginServiceParent::GetContentParent(GMPCrashHelper* aHelper,
-                                               const nsACString& aNodeId,
-                                               const nsCString& aAPI,
-                                               const nsTArray<nsCString>& aTags)
+GeckoMediaPluginServiceParent::GetContentParent(
+  GMPCrashHelper* aHelper,
+  const nsACString& aNodeIdString,
+  const nsCString& aAPI,
+  const nsTArray<nsCString>& aTags)
 {
   RefPtr<AbstractThread> thread(GetAbstractGMPThread());
   if (!thread) {
@@ -364,14 +367,16 @@ GeckoMediaPluginServiceParent::GetContentParent(GMPCrashHelper* aHelper,
   PromiseHolder* rawHolder = new PromiseHolder();
   RefPtr<GeckoMediaPluginServiceParent> self(this);
   RefPtr<GetGMPContentParentPromise> promise = rawHolder->Ensure(__func__);
-  nsCString nodeId(aNodeId);
+  nsCString nodeIdString(aNodeIdString);
   nsTArray<nsCString> tags(aTags);
   nsCString api(aAPI);
   RefPtr<GMPCrashHelper> helper(aHelper);
-  EnsureInitialized()->Then(thread, __func__,
-    [self, tags, api, nodeId, helper, rawHolder]() -> void {
+  EnsureInitialized()->Then(
+    thread,
+    __func__,
+    [self, tags, api, nodeIdString, helper, rawHolder]() -> void {
       UniquePtr<PromiseHolder> holder(rawHolder);
-      RefPtr<GMPParent> gmp = self->SelectPluginForAPI(nodeId, api, tags);
+      RefPtr<GMPParent> gmp = self->SelectPluginForAPI(nodeIdString, api, tags);
       LOGD(("%s: %p returning %p for api %s", __FUNCTION__, (void *)self, (void *)gmp, api.get()));
       if (!gmp) {
         NS_WARNING("GeckoMediaPluginServiceParent::GetContentParentFrom failed");
@@ -388,6 +393,25 @@ GeckoMediaPluginServiceParent::GetContentParent(GMPCrashHelper* aHelper,
     });
 
   return promise;
+}
+
+RefPtr<GetGMPContentParentPromise>
+GeckoMediaPluginServiceParent::GetContentParent(
+  GMPCrashHelper* aHelper,
+  const NodeId& aNodeId,
+  const nsCString& aAPI,
+  const nsTArray<nsCString>& aTags)
+{
+  MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
+
+  nsCString nodeIdString;
+  nsresult rv = GetNodeId(
+    aNodeId.mOrigin, aNodeId.mTopLevelOrigin, aNodeId.mGMPName, nodeIdString);
+  if (NS_FAILED(rv)) {
+    return GetGMPContentParentPromise::CreateAndReject(NS_ERROR_FAILURE,
+                                                       __func__);
+  }
+  return GetContentParent(aHelper, nodeIdString, aAPI, aTags);
 }
 
 void
@@ -446,7 +470,7 @@ GeckoMediaPluginServiceParent::UnloadPlugins()
     Swap(plugins, mPlugins);
   }
 
-  LOGD(("%s::%s plugins:%u", __CLASS__, __FUNCTION__,
+  LOGD(("%s::%s plugins:%" PRIuSIZE, __CLASS__, __FUNCTION__,
         plugins.Length()));
 #ifdef DEBUG
   for (const auto& plugin : plugins) {
@@ -614,7 +638,9 @@ GeckoMediaPluginServiceParent::AsyncAddPluginDirectory(const nsAString& aDirecto
   return InvokeAsync<nsString&&>(
            thread, this, __func__,
            &GeckoMediaPluginServiceParent::AddOnGMPThread, dir)
-    ->ThenPromise(AbstractThread::MainThread(), __func__,
+    ->Then(
+      AbstractThread::MainThread(), // Non DocGroup-version for the task in parent.
+      __func__,
       [dir, self]() -> void {
         LOGD(("GeckoMediaPluginServiceParent::AsyncAddPluginDirectory %s succeeded",
               NS_ConvertUTF16toUTF8(dir).get()));
@@ -828,7 +854,8 @@ GeckoMediaPluginServiceParent::AddOnGMPThread(nsString aDirectory)
   nsCOMPtr<nsIFile> directory;
   nsresult rv = NS_NewLocalFile(aDirectory, false, getter_AddRefs(directory));
   if (NS_WARN_IF(NS_FAILED(rv))) {
-    LOGD(("%s::%s: failed to create nsIFile for dir=%s rv=%x", __CLASS__, __FUNCTION__, dir.get(), rv));
+    LOGD(("%s::%s: failed to create nsIFile for dir=%s rv=%" PRIx32,
+          __CLASS__, __FUNCTION__, dir.get(), static_cast<uint32_t>(rv)));
     return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
   }
 
@@ -839,7 +866,7 @@ GeckoMediaPluginServiceParent::AddOnGMPThread(nsString aDirectory)
   }
 
   RefPtr<GeckoMediaPluginServiceParent> self(this);
-  return gmp->Init(this, directory)->ThenPromise(thread, __func__,
+  return gmp->Init(this, directory)->Then(thread, __func__,
     [gmp, self, dir]() -> void {
       LOGD(("%s::%s: %s Succeeded", __CLASS__, __FUNCTION__, dir.get()));
       {
@@ -1475,7 +1502,7 @@ void
 GeckoMediaPluginServiceParent::ClearRecentHistoryOnGMPThread(PRTime aSince)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
-  LOGD(("%s::%s: since=%lld", __CLASS__, __FUNCTION__, (int64_t)aSince));
+  LOGD(("%s::%s: since=%" PRId64, __CLASS__, __FUNCTION__, (int64_t)aSince));
 
   struct MTimeFilter : public DirectoryFilter {
     explicit MTimeFilter(PRTime aSince)
@@ -1720,6 +1747,36 @@ GMPServiceParent::RecvLaunchGMP(const nsCString& aNodeId,
 
   *aOutRv = NS_OK;
   return IPC_OK();
+}
+
+mozilla::ipc::IPCResult
+GMPServiceParent::RecvLaunchGMPForNodeId(
+  const NodeIdData& aNodeId,
+  const nsCString& aApi,
+  nsTArray<nsCString>&& aTags,
+  nsTArray<ProcessId>&& aAlreadyBridgedTo,
+  uint32_t* aOutPluginId,
+  ProcessId* aOutId,
+  nsCString* aOutDisplayName,
+  Endpoint<PGMPContentParent>* aOutEndpoint,
+  nsresult* aOutRv)
+{
+  nsCString nodeId;
+  nsresult rv = mService->GetNodeId(
+    aNodeId.mOrigin(), aNodeId.mTopLevelOrigin(), aNodeId.mGMPName(), nodeId);
+  if (!NS_SUCCEEDED(rv)) {
+    *aOutRv = rv;
+    return IPC_OK();
+  }
+  return RecvLaunchGMP(nodeId,
+                       aApi,
+                       Move(aTags),
+                       Move(aAlreadyBridgedTo),
+                       aOutPluginId,
+                       aOutId,
+                       aOutDisplayName,
+                       aOutEndpoint,
+                       aOutRv);
 }
 
 mozilla::ipc::IPCResult

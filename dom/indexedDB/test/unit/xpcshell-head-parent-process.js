@@ -50,7 +50,6 @@ if (!this.runTest) {
 
       enableTesting();
       enableExperimental();
-      enableWasm();
     }
 
     Cu.importGlobalProperties(["indexedDB", "Blob", "File", "FileReader"]);
@@ -63,7 +62,6 @@ if (!this.runTest) {
 function finishTest()
 {
   if (SpecialPowers.isMainProcess()) {
-    resetWasm();
     resetExperimental();
     resetTesting();
 
@@ -123,16 +121,20 @@ function expectUncaughtException(expecting)
   // This is dummy for xpcshell test.
 }
 
-function ExpectError(name)
+function ExpectError(name, preventDefault)
 {
   this._name = name;
+  this._preventDefault = preventDefault;
 }
 ExpectError.prototype = {
   handleEvent: function(event)
   {
     do_check_eq(event.type, "error");
     do_check_eq(this._name, event.target.error.name);
-    event.preventDefault();
+    if (this._preventDefault) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     grabEventAndContinueHandler(event);
   }
 };
@@ -209,16 +211,6 @@ function enableTesting()
 function resetTesting()
 {
   SpecialPowers.clearUserPref("dom.indexedDB.testing");
-}
-
-function enableWasm()
-{
-  SpecialPowers.setBoolPref("javascript.options.wasm", true);
-}
-
-function resetWasm()
-{
-  SpecialPowers.clearUserPref("javascript.options.wasm");
 }
 
 function gc()

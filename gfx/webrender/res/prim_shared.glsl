@@ -3,10 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp sampler2DArray;
-#else
-precision mediump sampler2DArray;
+#if defined(GL_ES)
+    #if GL_ES == 1
+        #ifdef GL_FRAGMENT_PRECISION_HIGH
+        precision highp sampler2DArray;
+        #else
+        precision mediump sampler2DArray;
+        #endif
+    #endif
 #endif
 
 #define PST_TOP_LEFT     0
@@ -26,19 +30,8 @@ precision mediump sampler2DArray;
 #define UV_NORMALIZED    uint(0)
 #define UV_PIXEL         uint(1)
 
-// Border styles as defined in webrender_traits/types.rs
-#define BORDER_STYLE_NONE         0
-#define BORDER_STYLE_SOLID        1
-#define BORDER_STYLE_DOUBLE       2
-#define BORDER_STYLE_DOTTED       3
-#define BORDER_STYLE_DASHED       4
-#define BORDER_STYLE_HIDDEN       5
-#define BORDER_STYLE_GROOVE       6
-#define BORDER_STYLE_RIDGE        7
-#define BORDER_STYLE_INSET        8
-#define BORDER_STYLE_OUTSET       9
-
-#define MAX_STOPS_PER_ANGLE_GRADIENT 8
+#define EXTEND_MODE_CLAMP  0
+#define EXTEND_MODE_REPEAT 1
 
 uniform sampler2DArray sCache;
 
@@ -48,12 +41,8 @@ varying vec3 vClipMaskUv;
 #ifdef WR_VERTEX_SHADER
 
 #define VECS_PER_LAYER             13
-#define VECS_PER_RENDER_TASK        2
+#define VECS_PER_RENDER_TASK        3
 #define VECS_PER_PRIM_GEOM          2
-
-#define GRADIENT_HORIZONTAL     0
-#define GRADIENT_VERTICAL       1
-#define GRADIENT_ROTATED        2
 
 uniform sampler2D sLayers;
 uniform sampler2D sRenderTasks;
@@ -73,6 +62,7 @@ in int aClipTaskIndex;
 in int aLayerIndex;
 in int aElementIndex;
 in ivec2 aUserData;
+in int aZIndex;
 
 // get_fetch_uv is a macro to work around a macOS Intel driver parsing bug.
 // TODO: convert back to a function once the driver issues are resolved, if ever.
@@ -96,10 +86,53 @@ ivec2 get_fetch_uv_8(int index) {
     return get_fetch_uv(index, 8);
 }
 
+struct RectWithSize {
+    vec2 p0;
+    vec2 size;
+};
+
+struct RectWithEndpoint {
+    vec2 p0;
+    vec2 p1;
+};
+
+RectWithEndpoint to_rect_with_endpoint(RectWithSize rect) {
+    RectWithEndpoint result;
+    result.p0 = rect.p0;
+    result.p1 = rect.p0 + rect.size;
+
+    return result;
+}
+
+RectWithSize to_rect_with_size(RectWithEndpoint rect) {
+    RectWithSize result;
+    result.p0 = rect.p0;
+    result.size = rect.p1 - rect.p0;
+
+    return result;
+}
+
+vec2 clamp_rect(vec2 point, RectWithSize rect) {
+    return clamp(point, rect.p0, rect.p0 + rect.size);
+}
+
+vec2 clamp_rect(vec2 point, RectWithEndpoint rect) {
+    return clamp(point, rect.p0, rect.p1);
+}
+
+// Clamp 2 points at once.
+vec4 clamp_rect(vec4 points, RectWithSize rect) {
+    return clamp(points, rect.p0.xyxy, rect.p0.xyxy + rect.size.xyxy);
+}
+
+vec4 clamp_rect(vec4 points, RectWithEndpoint rect) {
+    return clamp(points, rect.p0.xyxy, rect.p1.xyxy);
+}
+
 struct Layer {
     mat4 transform;
     mat4 inv_transform;
-    vec4 local_clip_rect;
+    RectWithSize local_clip_rect;
     vec4 screen_vertices[4];
 };
 
@@ -124,7 +157,8 @@ Layer fetch_layer(int index) {
     layer.inv_transform[2] = texelFetchOffset(sLayers, uv0, 0, ivec2(6, 0));
     layer.inv_transform[3] = texelFetchOffset(sLayers, uv0, 0, ivec2(7, 0));
 
-    layer.local_clip_rect = texelFetchOffset(sLayers, uv1, 0, ivec2(0, 0));
+    vec4 clip_rect = texelFetchOffset(sLayers, uv1, 0, ivec2(0, 0));
+    layer.local_clip_rect = RectWithSize(clip_rect.xy, clip_rect.zw);
 
     layer.screen_vertices[0] = texelFetchOffset(sLayers, uv1, 0, ivec2(1, 0));
     layer.screen_vertices[1] = texelFetchOffset(sLayers, uv1, 0, ivec2(2, 0));
@@ -137,6 +171,7 @@ Layer fetch_layer(int index) {
 struct RenderTaskData {
     vec4 data0;
     vec4 data1;
+    vec4 data2;
 };
 
 RenderTaskData fetch_render_task(int index) {
@@ -146,28 +181,34 @@ RenderTaskData fetch_render_task(int index) {
 
     task.data0 = texelFetchOffset(sRenderTasks, uv, 0, ivec2(0, 0));
     task.data1 = texelFetchOffset(sRenderTasks, uv, 0, ivec2(1, 0));
+    task.data2 = texelFetchOffset(sRenderTasks, uv, 0, ivec2(2, 0));
 
     return task;
 }
 
-struct Tile {
-    vec4 screen_origin_task_origin;
-    vec4 size_target_index;
+struct AlphaBatchTask {
+    vec2 screen_space_origin;
+    vec2 render_target_origin;
+    vec2 size;
+    float render_target_layer_index;
 };
 
-Tile fetch_tile(int index) {
-    RenderTaskData task = fetch_render_task(index);
+AlphaBatchTask fetch_alpha_batch_task(int index) {
+    RenderTaskData data = fetch_render_task(index);
 
-    Tile tile;
-    tile.screen_origin_task_origin = task.data0;
-    tile.size_target_index = task.data1;
+    AlphaBatchTask task;
+    task.render_target_origin = data.data0.xy;
+    task.size = data.data0.zw;
+    task.screen_space_origin = data.data1.xy;
+    task.render_target_layer_index = data.data1.z;
 
-    return tile;
+    return task;
 }
 
 struct ClipArea {
     vec4 task_bounds;
     vec4 screen_origin_target_index;
+    vec4 inner_rect;
 };
 
 ClipArea fetch_clip_area(int index) {
@@ -176,10 +217,12 @@ ClipArea fetch_clip_area(int index) {
     if (index == 0x7FFFFFFF) { //special sentinel task index
         area.task_bounds = vec4(0.0, 0.0, 0.0, 0.0);
         area.screen_origin_target_index = vec4(0.0, 0.0, 0.0, 0.0);
+        area.inner_rect = vec4(0.0);
     } else {
         RenderTaskData task = fetch_render_task(index);
         area.task_bounds = task.data0;
         area.screen_origin_target_index = task.data1;
+        area.inner_rect = task.data2;
     }
 
     return area;
@@ -187,7 +230,7 @@ ClipArea fetch_clip_area(int index) {
 
 struct Gradient {
     vec4 start_end_point;
-    vec4 kind;
+    vec4 extend_mode;
 };
 
 Gradient fetch_gradient(int index) {
@@ -196,7 +239,7 @@ Gradient fetch_gradient(int index) {
     ivec2 uv = get_fetch_uv_2(index);
 
     gradient.start_end_point = texelFetchOffset(sData32, uv, 0, ivec2(0, 0));
-    gradient.kind = texelFetchOffset(sData32, uv, 0, ivec2(1, 0));
+    gradient.extend_mode = texelFetchOffset(sData32, uv, 0, ivec2(1, 0));
 
     return gradient;
 }
@@ -217,6 +260,22 @@ GradientStop fetch_gradient_stop(int index) {
     return stop;
 }
 
+struct RadialGradient {
+    vec4 start_end_center;
+    vec4 start_end_radius_extend_mode;
+};
+
+RadialGradient fetch_radial_gradient(int index) {
+    RadialGradient gradient;
+
+    ivec2 uv = get_fetch_uv_2(index);
+
+    gradient.start_end_center = texelFetchOffset(sData32, uv, 0, ivec2(0, 0));
+    gradient.start_end_radius_extend_mode = texelFetchOffset(sData32, uv, 0, ivec2(1, 0));
+
+    return gradient;
+}
+
 struct Glyph {
     vec4 offset;
 };
@@ -231,41 +290,17 @@ Glyph fetch_glyph(int index) {
     return glyph;
 }
 
-struct Border {
-    vec4 style;
-    vec4 widths;
-    vec4 colors[4];
-    vec4 radii[2];
-};
-
-Border fetch_border(int index) {
-    Border border;
-
-    ivec2 uv = get_fetch_uv_8(index);
-
-    border.style = texelFetchOffset(sData128, uv, 0, ivec2(0, 0));
-    border.widths = texelFetchOffset(sData128, uv, 0, ivec2(1, 0));
-    border.colors[0] = texelFetchOffset(sData128, uv, 0, ivec2(2, 0));
-    border.colors[1] = texelFetchOffset(sData128, uv, 0, ivec2(3, 0));
-    border.colors[2] = texelFetchOffset(sData128, uv, 0, ivec2(4, 0));
-    border.colors[3] = texelFetchOffset(sData128, uv, 0, ivec2(5, 0));
-    border.radii[0] = texelFetchOffset(sData128, uv, 0, ivec2(6, 0));
-    border.radii[1] = texelFetchOffset(sData128, uv, 0, ivec2(7, 0));
-
-    return border;
-}
-
-vec4 fetch_instance_geometry(int index) {
+RectWithSize fetch_instance_geometry(int index) {
     ivec2 uv = get_fetch_uv_1(index);
 
     vec4 rect = texelFetchOffset(sData16, uv, 0, ivec2(0, 0));
 
-    return rect;
+    return RectWithSize(rect.xy, rect.zw);
 }
 
 struct PrimitiveGeometry {
-    vec4 local_rect;
-    vec4 local_clip_rect;
+    RectWithSize local_rect;
+    RectWithSize local_clip_rect;
 };
 
 PrimitiveGeometry fetch_prim_geometry(int index) {
@@ -273,8 +308,10 @@ PrimitiveGeometry fetch_prim_geometry(int index) {
 
     ivec2 uv = get_fetch_uv(index, VECS_PER_PRIM_GEOM);
 
-    pg.local_rect = texelFetchOffset(sPrimGeometry, uv, 0, ivec2(0, 0));
-    pg.local_clip_rect = texelFetchOffset(sPrimGeometry, uv, 0, ivec2(1, 0));
+    vec4 local_rect = texelFetchOffset(sPrimGeometry, uv, 0, ivec2(0, 0));
+    pg.local_rect = RectWithSize(local_rect.xy, local_rect.zw);
+    vec4 local_clip_rect = texelFetchOffset(sPrimGeometry, uv, 0, ivec2(1, 0));
+    pg.local_clip_rect = RectWithSize(local_clip_rect.xy, local_clip_rect.zw);
 
     return pg;
 }
@@ -286,6 +323,7 @@ struct PrimitiveInstance {
     int clip_task_index;
     int layer_index;
     int sub_index;
+    int z;
     ivec2 user_data;
 };
 
@@ -299,6 +337,7 @@ PrimitiveInstance fetch_prim_instance() {
     pi.layer_index = aLayerIndex;
     pi.sub_index = aElementIndex;
     pi.user_data = aUserData;
+    pi.z = aZIndex;
 
     return pi;
 }
@@ -327,23 +366,24 @@ CachePrimitiveInstance fetch_cache_instance() {
 
 struct Primitive {
     Layer layer;
-    Tile tile;
     ClipArea clip_area;
-    vec4 local_rect;
-    vec4 local_clip_rect;
+    AlphaBatchTask task;
+    RectWithSize local_rect;
+    RectWithSize local_clip_rect;
     int prim_index;
     // when sending multiple primitives of the same type (e.g. border segments)
     // this index allows the vertex shader to recognize the difference
     int sub_index;
     ivec2 user_data;
+    float z;
 };
 
 Primitive load_primitive_custom(PrimitiveInstance pi) {
     Primitive prim;
 
     prim.layer = fetch_layer(pi.layer_index);
-    prim.tile = fetch_tile(pi.render_task_index);
     prim.clip_area = fetch_clip_area(pi.clip_task_index);
+    prim.task = fetch_alpha_batch_task(pi.render_task_index);
 
     PrimitiveGeometry pg = fetch_prim_geometry(pi.global_prim_index);
     prim.local_rect = pg.local_rect;
@@ -352,6 +392,7 @@ Primitive load_primitive_custom(PrimitiveInstance pi) {
     prim.prim_index = pi.specific_prim_index;
     prim.sub_index = pi.sub_index;
     prim.user_data = pi.user_data;
+    prim.z = float(pi.z);
 
     return prim;
 }
@@ -407,53 +448,50 @@ vec4 get_layer_pos(vec2 pos, Layer layer) {
     return untransform(pos, n, a, layer.inv_transform);
 }
 
-vec2 clamp_rect(vec2 point, vec4 rect) {
-    return clamp(point, rect.xy, rect.xy + rect.zw);
-}
-
-struct Rect {
-    vec2 p0;
-    vec2 p1;
-};
-
 struct VertexInfo {
-    Rect local_rect;
-    vec2 local_clamped_pos;
-    vec2 global_clamped_pos;
+    RectWithEndpoint local_rect;
+    vec2 local_pos;
+    vec2 screen_pos;
 };
 
-VertexInfo write_vertex(vec4 instance_rect,
-                        vec4 local_clip_rect,
+VertexInfo write_vertex(RectWithSize instance_rect,
+                        RectWithSize local_clip_rect,
+                        float z,
                         Layer layer,
-                        Tile tile) {
-    vec2 p0 = floor(0.5 + instance_rect.xy * uDevicePixelRatio) / uDevicePixelRatio;
-    vec2 p1 = floor(0.5 + (instance_rect.xy + instance_rect.zw) * uDevicePixelRatio) / uDevicePixelRatio;
+                        AlphaBatchTask task) {
+    RectWithEndpoint local_rect = to_rect_with_endpoint(instance_rect);
 
-    vec2 local_pos = mix(p0, p1, aPosition.xy);
+    // Select the corner of the local rect that we are processing.
+    vec2 local_pos = mix(local_rect.p0, local_rect.p1, aPosition.xy);
 
-    vec2 cp0 = floor(0.5 + local_clip_rect.xy * uDevicePixelRatio) / uDevicePixelRatio;
-    vec2 cp1 = floor(0.5 + (local_clip_rect.xy + local_clip_rect.zw) * uDevicePixelRatio) / uDevicePixelRatio;
-    local_pos = clamp(local_pos, cp0, cp1);
+    // xy = top left corner of the local rect, zw = position of current vertex.
+    vec4 local_p0_pos = vec4(local_rect.p0, local_pos);
 
-    local_pos = clamp_rect(local_pos, layer.local_clip_rect);
+    // Clamp to the two local clip rects.
+    local_p0_pos = clamp_rect(local_p0_pos, local_clip_rect);
+    local_p0_pos = clamp_rect(local_p0_pos, layer.local_clip_rect);
 
-    vec4 world_pos = layer.transform * vec4(local_pos, 0.0, 1.0);
+    // Transform the top corner and current vertex to world space.
+    vec4 world_p0 = layer.transform * vec4(local_p0_pos.xy, 0.0, 1.0);
+    world_p0.xyz /= world_p0.w;
+    vec4 world_pos = layer.transform * vec4(local_p0_pos.zw, 0.0, 1.0);
     world_pos.xyz /= world_pos.w;
 
-    vec2 device_pos = world_pos.xy * uDevicePixelRatio;
+    // Convert the world positions to device pixel space. xy=top left corner. zw=current vertex.
+    vec4 device_p0_pos = vec4(world_p0.xy, world_pos.xy) * uDevicePixelRatio;
 
-    vec2 clamped_pos = clamp(device_pos,
-                             tile.screen_origin_task_origin.xy,
-                             tile.screen_origin_task_origin.xy + tile.size_target_index.xy);
+    // Calculate the distance to snap the vertex by (snap top left corner).
+    vec2 snap_delta = device_p0_pos.xy - floor(device_p0_pos.xy + 0.5);
 
-    vec4 local_clamped_pos = layer.inv_transform * vec4(clamped_pos / uDevicePixelRatio, world_pos.z, 1);
-    local_clamped_pos.xyz /= local_clamped_pos.w;
+    // Apply offsets for the render task to get correct screen location.
+    vec2 final_pos = device_p0_pos.zw -
+                     snap_delta -
+                     task.screen_space_origin +
+                     task.render_target_origin;
 
-    vec2 final_pos = clamped_pos + tile.screen_origin_task_origin.zw - tile.screen_origin_task_origin.xy;
+    gl_Position = uTransform * vec4(final_pos, z, 1.0);
 
-    gl_Position = uTransform * vec4(final_pos, 0, 1);
-
-    VertexInfo vi = VertexInfo(Rect(p0, p1), local_clamped_pos.xy, clamped_pos.xy);
+    VertexInfo vi = VertexInfo(local_rect, local_p0_pos.zw, device_p0_pos.zw);
     return vi;
 }
 
@@ -461,16 +499,17 @@ VertexInfo write_vertex(vec4 instance_rect,
 
 struct TransformVertexInfo {
     vec3 local_pos;
-    vec2 global_clamped_pos;
+    vec2 screen_pos;
     vec4 clipped_local_rect;
 };
 
-TransformVertexInfo write_transform_vertex(vec4 instance_rect,
-                                           vec4 local_clip_rect,
+TransformVertexInfo write_transform_vertex(RectWithSize instance_rect,
+                                           RectWithSize local_clip_rect,
+                                           float z,
                                            Layer layer,
-                                           Tile tile) {
-    vec2 lp0_base = instance_rect.xy;
-    vec2 lp1_base = instance_rect.xy + instance_rect.zw;
+                                           AlphaBatchTask task) {
+    vec2 lp0_base = instance_rect.p0;
+    vec2 lp1_base = instance_rect.p0 + instance_rect.size;
 
     vec2 lp0 = clamp_rect(clamp_rect(lp0_base, local_clip_rect),
                           layer.local_clip_rect);
@@ -495,32 +534,21 @@ TransformVertexInfo write_transform_vertex(vec4 instance_rect,
     vec2 tp3 = t3.xy / t3.w;
 
     // compute a CSS space aligned bounding box
-    vec2 min_pos = min(min(tp0.xy, tp1.xy), min(tp2.xy, tp3.xy));
-    vec2 max_pos = max(max(tp0.xy, tp1.xy), max(tp2.xy, tp3.xy));
-
-    // clamp to the tile boundaries, in device space
-    vec2 min_pos_clamped = clamp(min_pos * uDevicePixelRatio,
-                                 tile.screen_origin_task_origin.xy,
-                                 tile.screen_origin_task_origin.xy + tile.size_target_index.xy);
-
-    vec2 max_pos_clamped = clamp(max_pos * uDevicePixelRatio,
-                                 tile.screen_origin_task_origin.xy,
-                                 tile.screen_origin_task_origin.xy + tile.size_target_index.xy);
+    vec2 min_pos = uDevicePixelRatio * min(min(tp0.xy, tp1.xy), min(tp2.xy, tp3.xy));
+    vec2 max_pos = uDevicePixelRatio * max(max(tp0.xy, tp1.xy), max(tp2.xy, tp3.xy));
 
     // compute the device space position of this vertex
-    vec2 clamped_pos = mix(min_pos_clamped,
-                           max_pos_clamped,
-                           aPosition.xy);
+    vec2 device_pos = mix(min_pos, max_pos, aPosition.xy);
 
     // compute the point position in side the layer, in CSS space
-    vec4 layer_pos = get_layer_pos(clamped_pos / uDevicePixelRatio, layer);
+    vec4 layer_pos = get_layer_pos(device_pos / uDevicePixelRatio, layer);
 
     // apply the task offset
-    vec2 final_pos = clamped_pos + tile.screen_origin_task_origin.zw - tile.screen_origin_task_origin.xy;
+    vec2 final_pos = device_pos - task.screen_space_origin + task.render_target_origin;
 
-    gl_Position = uTransform * vec4(final_pos, 0.0, 1.0);
+    gl_Position = uTransform * vec4(final_pos, z, 1.0);
 
-    return TransformVertexInfo(layer_pos.xyw, clamped_pos, clipped_local_rect);
+    return TransformVertexInfo(layer_pos.xyw, device_pos, clipped_local_rect);
 }
 
 #endif //WR_FEATURE_TRANSFORM
@@ -663,6 +691,6 @@ float do_clip() {
         vec4(vClipMaskUv.xy, vClipMaskUvBounds.zw));
     // check for the dummy bounds, which are given to the opaque objects
     return vClipMaskUvBounds.xy == vClipMaskUvBounds.zw ? 1.0:
-        all(inside) ? textureLod(sCache, vClipMaskUv, 0.0).a : 0.0;
+        all(inside) ? textureLod(sCache, vClipMaskUv, 0.0).r : 0.0;
 }
 #endif //WR_FRAGMENT_SHADER

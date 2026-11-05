@@ -6,12 +6,15 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use channel::{self, MsgSender, PayloadHelperMethods, PayloadSender};
 use offscreen_gl_context::{GLContextAttributes, GLLimits};
 use std::cell::Cell;
-use {ApiMsg, ColorF, DisplayListBuilder, Epoch};
-use {FontKey, IdNamespace, ImageFormat, ImageKey, NativeFontHandle, PipelineId};
+use {ApiMsg, ColorF, DisplayListBuilder, Epoch, ImageDescriptor};
+use {FontKey, IdNamespace, ImageKey, NativeFontHandle, PipelineId};
 use {RenderApiSender, ResourceId, ScrollEventPhase, ScrollLayerState, ScrollLocation, ServoScrollRootId};
-use {GlyphKey, GlyphDimensions, ImageData, WebGLContextId, WebGLCommand};
-use {DeviceIntSize, LayoutPoint, LayoutSize, WorldPoint};
+use {GlyphKey, GlyphDimensions, ImageData, WebGLContextId, WebGLCommand, TileSize};
+use {DeviceIntSize, DynamicProperties, LayoutPoint, LayoutSize, WorldPoint, PropertyBindingKey, PropertyBindingId};
+use {BuiltDisplayList, AuxiliaryLists};
 use VRCompositorCommand;
+use ExternalEvent;
+use std::marker::PhantomData;
 
 impl RenderApiSender {
     pub fn new(api_sender: MsgSender<ApiMsg>,
@@ -52,20 +55,19 @@ impl RenderApi {
         RenderApiSender::new(self.api_sender.clone(), self.payload_sender.clone())
     }
 
-    pub fn add_raw_font(&self, bytes: Vec<u8>) -> FontKey {
+    pub fn generate_font_key(&self) -> FontKey {
         let new_id = self.next_unique_id();
-        let key = FontKey::new(new_id.0, new_id.1);
-        let msg = ApiMsg::AddRawFont(key, bytes);
-        self.api_sender.send(msg).unwrap();
-        key
+        FontKey::new(new_id.0, new_id.1)
     }
 
-    pub fn add_native_font(&self, native_font_handle: NativeFontHandle) -> FontKey {
-        let new_id = self.next_unique_id();
-        let key = FontKey::new(new_id.0, new_id.1);
+    pub fn add_raw_font(&self, key: FontKey, bytes: Vec<u8>) {
+        let msg = ApiMsg::AddRawFont(key, bytes);
+        self.api_sender.send(msg).unwrap();
+    }
+
+    pub fn add_native_font(&self, key: FontKey, native_font_handle: NativeFontHandle) {
         let msg = ApiMsg::AddNativeFont(key, native_font_handle);
         self.api_sender.send(msg).unwrap();
-        key
     }
 
     /// Gets the dimensions for the supplied glyph keys
@@ -82,22 +84,19 @@ impl RenderApi {
     }
 
     /// Creates an `ImageKey`.
-    pub fn alloc_image(&self) -> ImageKey {
+    pub fn generate_image_key(&self) -> ImageKey {
         let new_id = self.next_unique_id();
         ImageKey::new(new_id.0, new_id.1)
     }
 
-    /// Adds an image and returns the corresponding `ImageKey`.
+    /// Adds an image identified by the `ImageKey`.
     pub fn add_image(&self,
-                     width: u32,
-                     height: u32,
-                     stride: Option<u32>,
-                     format: ImageFormat,
-                     data: ImageData) -> ImageKey {
-        let key = self.alloc_image();
-        let msg = ApiMsg::AddImage(key, width, height, stride, format, data);
+                     key: ImageKey,
+                     descriptor: ImageDescriptor,
+                     data: ImageData,
+                     tiling: Option<TileSize>) {
+        let msg = ApiMsg::AddImage(key, descriptor, data, tiling);
         self.api_sender.send(msg).unwrap();
-        key
     }
 
     /// Updates a specific image.
@@ -106,11 +105,9 @@ impl RenderApi {
     // TODO: Support changing dimensions (and format) during image update?
     pub fn update_image(&self,
                         key: ImageKey,
-                        width: u32,
-                        height: u32,
-                        format: ImageFormat,
+                        descriptor: ImageDescriptor,
                         bytes: Vec<u8>) {
-        let msg = ApiMsg::UpdateImage(key, width, height, format, bytes);
+        let msg = ApiMsg::UpdateImage(key, descriptor, bytes);
         self.api_sender.send(msg).unwrap();
     }
 
@@ -152,21 +149,24 @@ impl RenderApi {
     /// * `viewport_size`: The size of the viewport for this frame.
     /// * `display_list`: The root Display list used in this frame.
     /// * `auxiliary_lists`: Various items that the display lists and stacking contexts reference.
+    /// * `preserve_frame_state`: If a previous frame exists which matches this pipeline
+    ///                           id, this setting determines if frame state (such as scrolling
+    ///                           position) should be preserved for this new display list.
     ///
     /// [notifier]: trait.RenderNotifier.html#tymethod.new_frame_ready
     pub fn set_root_display_list(&self,
                                  background_color: Option<ColorF>,
                                  epoch: Epoch,
                                  viewport_size: LayoutSize,
-                                 builder: DisplayListBuilder) {
-        let pipeline_id = builder.pipeline_id;
-        let (display_list, auxiliary_lists) = builder.finalize();
+                                 (pipeline_id, display_list, auxiliary_lists): (PipelineId, BuiltDisplayList, AuxiliaryLists),
+                                 preserve_frame_state: bool) {
         let msg = ApiMsg::SetRootDisplayList(background_color,
                                              epoch,
                                              pipeline_id,
                                              viewport_size,
                                              display_list.descriptor().clone(),
-                                             *auxiliary_lists.descriptor());
+                                             *auxiliary_lists.descriptor(),
+                                             preserve_frame_state);
         self.api_sender.send(msg).unwrap();
 
         let mut payload = vec![];
@@ -232,14 +232,39 @@ impl RenderApi {
         self.api_sender.send(msg).unwrap();
     }
 
-    pub fn generate_frame(&self) {
-        let msg = ApiMsg::GenerateFrame;
+    /// Generate a new frame. Optionally, supply a list of animated
+    /// property bindings that should be used to resolve bindings
+    /// in the current display list.
+    pub fn generate_frame(&self, property_bindings: Option<DynamicProperties>) {
+        let msg = ApiMsg::GenerateFrame(property_bindings);
         self.api_sender.send(msg).unwrap();
     }
 
     pub fn send_vr_compositor_command(&self, context_id: WebGLContextId, command: VRCompositorCommand) {
         let msg = ApiMsg::VRCompositorCommand(context_id, command);
         self.api_sender.send(msg).unwrap();
+    }
+
+    pub fn send_external_event(&self, evt: ExternalEvent) {
+        let msg = ApiMsg::ExternalEvent(evt);
+        self.api_sender.send(msg).unwrap();
+    }
+
+    pub fn shut_down(&self) {
+        self.api_sender.send(ApiMsg::ShutDown).unwrap();
+    }
+
+    /// Create a new unique key that can be used for
+    /// animated property bindings.
+    pub fn generate_property_binding_key<T: Copy>(&self) -> PropertyBindingKey<T> {
+        let new_id = self.next_unique_id();
+        PropertyBindingKey {
+            id: PropertyBindingId {
+                namespace: new_id.0,
+                uid: new_id.1,
+            },
+            _phantom: PhantomData,
+        }
     }
 
     #[inline]
@@ -250,4 +275,3 @@ impl RenderApi {
         (namespace, id)
     }
 }
-

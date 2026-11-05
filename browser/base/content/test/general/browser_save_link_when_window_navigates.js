@@ -44,7 +44,7 @@ function triggerSave(aWindow, aCallback) {
     fileName = fp.defaultString;
     info("fileName: " + fileName);
     destFile.append(fileName);
-    MockFilePicker.returnFiles = [destFile];
+    MockFilePicker.setFiles([destFile]);
     MockFilePicker.filterIndex = 1; // kSaveAsType_URL
     info("done showCallback");
   };
@@ -61,7 +61,7 @@ function triggerSave(aWindow, aCallback) {
 
   function onUCTDialog(dialog) {
     function doLoad() {
-      content.document.querySelector('iframe').remove();
+      content.document.querySelector("iframe").remove();
     }
     testBrowser.messageManager.loadFrameScript("data:,(" + doLoad.toString() + ")()", false);
     executeSoon(continueDownloading);
@@ -103,9 +103,7 @@ var windowObserver = {
 
     let win = aSubject.QueryInterface(Ci.nsIDOMEventTarget);
 
-    win.addEventListener("load", function onLoad(event) {
-      win.removeEventListener("load", onLoad);
-
+    win.addEventListener("load", function(event) {
       if (win.location == UCT_URI) {
         SimpleTest.executeSoon(function() {
           if (windowObserver._callback) {
@@ -116,7 +114,7 @@ var windowObserver = {
           }
         });
       }
-    });
+    }, {once: true});
   }
 };
 

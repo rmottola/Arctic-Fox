@@ -276,9 +276,10 @@ mozilla::PrintfTarget::cvt_f(double d, const char* fmt0, const char* fmt1)
         }
     }
 #endif
-    SprintfLiteral(fout, fin, d);
+    size_t len = SprintfLiteral(fout, fin, d);
+    MOZ_ASSERT(len <= sizeof(fout));
 
-    return emit(fout, strlen(fout));
+    return emit(fout, len);
 }
 
 /*
@@ -534,6 +535,11 @@ BuildArgArray(const char* fmt, va_list ap, NumArgStateVector& nas)
     }
 
     return true;
+}
+
+mozilla::PrintfTarget::PrintfTarget()
+  : mEmitted(0)
+{
 }
 
 bool
@@ -878,10 +884,6 @@ mozilla::PrintfTarget::vprint(const char* fmt, va_list ap)
                 return false;
         }
     }
-
-    // Stuff trailing NUL
-    if (!emit("\0", 1))
-        return false;
 
     return true;
 }

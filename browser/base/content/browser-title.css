@@ -170,14 +170,14 @@
         text-align: left;
       }
       
-      @media (-moz-windows-accent-color-applies: 0) {
+      @media (-moz-windows-accent-color-in-titlebar: 0) {
         #main-window:not(:-moz-window-inactive):not(:-moz-lwtheme)::after {
           /* Default Windows 10 styling is white - apply black text styling */
           color: black;
         }
       }
       
-      @media (-moz-windows-accent-color-applies) {
+      @media (-moz-windows-accent-color-in-titlebar) {
         #main-window:not(:-moz-window-inactive):not(:-moz-lwtheme)::after {
           /* Accent color is applied - use the associated text styling */
           color: -moz-win-accentcolortext;

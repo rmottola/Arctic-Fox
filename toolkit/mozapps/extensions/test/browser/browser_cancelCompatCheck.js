@@ -66,36 +66,35 @@ function promise_observer(aTopic) {
 // @param aUpdateURL The real update URL to use after the add-ons are installed
 function promise_install_test_addons(aAddonList, aUpdateURL) {
   info("Starting add-on installs");
-  var installs = [];
   let deferred = Promise.defer();
 
   // Use a blank update URL
   Services.prefs.setCharPref(PREF_UPDATEURL, TESTROOT + "missing.rdf");
 
-  for (let addon of aAddonList) {
-    AddonManager.getInstallForURL(TESTROOT + "addons/" + addon.file + ".xpi", function(aInstall) {
-      installs.push(aInstall);
-    }, "application/x-xpinstall");
-  }
+  let installPromises = Promise.all(
+    aAddonList.map(addon => AddonManager.getInstallForURL(`${TESTROOT}addons/${addon.file}.xpi`,
+                                                          null, "application/x-xpinstall")));
 
-  var listener = {
-    installCount: 0,
+  installPromises.then(installs => {
+    var listener = {
+      installCount: 0,
 
-    onInstallEnded: function() {
-      this.installCount++;
-      if (this.installCount == installs.length) {
-        info("Done add-on installs");
-        // Switch to the test update URL
-        Services.prefs.setCharPref(PREF_UPDATEURL, aUpdateURL);
-        deferred.resolve();
+      onInstallEnded: function() {
+        this.installCount++;
+        if (this.installCount == installs.length) {
+          info("Done add-on installs");
+          // Switch to the test update URL
+          Services.prefs.setCharPref(PREF_UPDATEURL, aUpdateURL);
+          deferred.resolve();
+        }
       }
-    }
-  };
+    };
 
-  for (let install of installs) {
-    install.addListener(listener);
-    install.install();
-  }
+    for (let install of installs) {
+      install.addListener(listener);
+      install.install();
+    }
+  });
 
   return deferred.promise;
 }
@@ -166,10 +165,9 @@ function promise_open_compatibility_window(aInactiveAddonIds) {
 
     win.addEventListener("pageshow", page_shown);
     win.addEventListener("unload", function() {
-      win.removeEventListener("unload", arguments.callee);
       win.removeEventListener("pageshow", page_shown);
       dump("Compatibility dialog closed\n");
-    });
+    }, {once: true});
 
     deferred.resolve(win);
   });
@@ -179,9 +177,8 @@ function promise_open_compatibility_window(aInactiveAddonIds) {
 function promise_window_close(aWindow) {
   let deferred = Promise.defer();
   aWindow.addEventListener("unload", function() {
-    aWindow.removeEventListener("unload", arguments.callee);
     deferred.resolve(aWindow);
-  });
+  }, {once: true});
   return deferred.promise;
 }
 
@@ -192,11 +189,10 @@ function promise_page(aWindow, aPageId) {
     deferred.resolve(aWindow);
   } else {
     page.addEventListener("pageshow", function() {
-      page.removeEventListener("pageshow", arguments.callee);
       executeSoon(function() {
         deferred.resolve(aWindow);
       });
-    });
+    }, {once: true});
   }
   return deferred.promise;
 }

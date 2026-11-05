@@ -7,6 +7,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Sprintf.h"
 #include "XRemoteClient.h"
 #include "prmem.h"
@@ -208,7 +209,8 @@ XRemoteClient::SendCommandLine (const char *aProgram, const char *aUsername,
 
   XSetErrorHandler(sOldHandler);
 
-  MOZ_LOG(sRemoteLm, LogLevel::Debug, ("SendCommandInternal returning 0x%x\n", rv));
+  MOZ_LOG(sRemoteLm, LogLevel::Debug, ("SendCommandInternal returning 0x%" PRIx32 "\n",
+                                       static_cast<uint32_t>(rv)));
 
   return rv;
 }
@@ -642,14 +644,14 @@ XRemoteClient::DoSendCommandLine(Window aWindow, int32_t argc, char **argv,
     argvlen += len;
   }
 
-  int32_t* buffer = (int32_t*) malloc(argvlen + argc + 1 +
+  auto* buffer = (int32_t*) malloc(argvlen + argc + 1 +
                                       sizeof(int32_t) * (argc + 1));
   if (!buffer)
     return NS_ERROR_OUT_OF_MEMORY;
 
   buffer[0] = TO_LITTLE_ENDIAN32(argc);
 
-  char *bufend = (char*) (buffer + argc + 1);
+  auto *bufend = (char*) (buffer + argc + 1);
 
   bufend = estrcpy(cwdbuf, bufend);
 

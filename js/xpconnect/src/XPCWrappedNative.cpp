@@ -158,7 +158,7 @@ XPCWrappedNative::WrapNewGlobal(xpcObjectHelper& nativeHelper,
     nsISupports* identity = nativeHelper.GetCanonical();
 
     // The object should specify that it's meant to be global.
-    MOZ_ASSERT(nativeHelper.GetScriptableFlags() & nsIXPCScriptable::IS_GLOBAL_OBJECT);
+    MOZ_ASSERT(nativeHelper.GetScriptableFlags() & XPC_SCRIPTABLE_IS_GLOBAL_OBJECT);
 
     // We shouldn't be reusing globals.
     MOZ_ASSERT(!nativeHelper.GetWrapperCache() ||
@@ -280,7 +280,7 @@ XPCWrappedNative::GetNewOrUsed(xpcObjectHelper& helper,
 
     nsresult rv;
 
-    MOZ_ASSERT(!Scope->GetContext()->GCIsRunning(),
+    MOZ_ASSERT(!Scope->GetRuntime()->GCIsRunning(),
                "XPCWrappedNative::GetNewOrUsed called during GC");
 
     nsISupports* identity = helper.GetCanonical();
@@ -579,8 +579,8 @@ XPCWrappedNative::Destroy()
     }
 
     if (mIdentity) {
-        XPCJSContext* cx = GetContext();
-        if (cx && cx->GetDoingFinalization()) {
+        XPCJSRuntime* rt = GetRuntime();
+        if (rt && rt->GetDoingFinalization()) {
             DeferredFinalize(mIdentity.forget().take());
         } else {
             mIdentity = nullptr;
@@ -598,7 +598,7 @@ XPCWrappedNative::SetProto(XPCWrappedNativeProto* p)
     MOZ_ASSERT(HasProto());
 
     // Write barrier for incremental GC.
-    JSContext* cx = GetContext()->Context();
+    JSContext* cx = nsXPConnect::GetContextInstance()->Context();
     GetProto()->WriteBarrierPre(cx);
 
     mMaybeProto = p;
@@ -852,7 +852,7 @@ XPCWrappedNative::FlatJSObjectFinalized()
 
         // We also need to release any native pointers held...
         RefPtr<nsISupports> native = to->TakeNative();
-        if (native && GetContext()) {
+        if (native && GetRuntime()) {
             DeferredFinalize(native.forget().take());
         }
 
@@ -887,8 +887,8 @@ XPCWrappedNative::FlatJSObjectFinalized()
 void
 XPCWrappedNative::FlatJSObjectMoved(JSObject* obj, const JSObject* old)
 {
-    JS::AutoAssertGCCallback inCallback(obj);
-    MOZ_ASSERT(mFlatJSObject.unbarrieredGetPtr() == old);
+    JS::AutoAssertGCCallback inCallback;
+    MOZ_ASSERT(mFlatJSObject == old);
 
     nsWrapperCache* cache = nullptr;
     CallQueryInterface(mIdentity, &cache);
@@ -2259,7 +2259,7 @@ XPCJSObjectHolder::XPCJSObjectHolder(JSObject* obj)
     : mJSObj(obj)
 {
     MOZ_ASSERT(obj);
-    XPCJSContext::Get()->AddObjectHolderRoot(this);
+    XPCJSRuntime::Get()->AddObjectHolderRoot(this);
 }
 
 XPCJSObjectHolder::~XPCJSObjectHolder()

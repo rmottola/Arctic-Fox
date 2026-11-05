@@ -1075,7 +1075,7 @@ nsGIFDecoder2::SkipSubBlocks(const char* aData)
                                   nextSubBlockLength);
 }
 
-Maybe<Telemetry::ID>
+Maybe<Telemetry::HistogramID>
 nsGIFDecoder2::SpeedHistogram() const
 {
   return Some(Telemetry::IMAGE_DECODE_SPEED_GIF);

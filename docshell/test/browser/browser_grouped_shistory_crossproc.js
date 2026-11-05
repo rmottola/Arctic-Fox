@@ -6,22 +6,20 @@ add_task(function* () {
   // Wait for a process change and then fulfil the promise.
   function awaitProcessChange(browser) {
     return new Promise(resolve => {
-      browser.addEventListener("BrowserChangedProcess", function bcp(e) {
-        browser.removeEventListener("BrowserChangedProcess", bcp);
+      browser.addEventListener("BrowserChangedProcess", function(e) {
         ok(true, "The browser changed process!");
         resolve();
-      });
+      }, {once: true});
     });
   }
 
   // Wait for the given tab being closed.
   function awaitTabClose(tab) {
     return new Promise(resolve => {
-      tab.addEventListener("TabClose", function f() {
-        tab.removeEventListener("TabClose", f);
+      tab.addEventListener("TabClose", function() {
         ok(true, "The tab is being closed!\n");
         resolve();
-      });
+      }, {once: true});
     });
   }
 
@@ -34,8 +32,7 @@ add_task(function* () {
       isPrerendered: true,
     });
     yield BrowserTestUtils.browserLoaded(tab2.linkedBrowser);
-    browser1.frameLoader.appendPartialSessionHistoryAndSwap(
-      tab2.linkedBrowser.frameLoader);
+    browser1.frameLoader.appendPartialSHistoryAndSwap(tab2.linkedBrowser.frameLoader);
     yield awaitProcessChange(browser1);
 
     // Load a URI which will involve loading in the parent process
@@ -47,7 +44,7 @@ add_task(function* () {
     is(docshell.canGoForward, false, "canGoForward is correct");
     is(docshell.canGoBack, true, "canGoBack is correct");
     is(docshell.sessionHistory.count, 3, "Count is correct");
-    is(browser1.frameLoader.groupedSessionHistory, null,
+    is(browser1.frameLoader.groupedSHistory, null,
        "browser1's session history is now complete");
     yield tabClose;
   });

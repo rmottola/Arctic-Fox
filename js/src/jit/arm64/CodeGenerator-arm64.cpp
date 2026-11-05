@@ -620,7 +620,6 @@ getBase(U* mir)
 {
     switch (mir->base()) {
       case U::Heap: return HeapReg;
-      case U::Global: return GlobalReg;
     }
     return InvalidReg;
 }
@@ -635,18 +634,6 @@ void
 CodeGeneratorARM64::visitStoreTypedArrayElementStatic(LStoreTypedArrayElementStatic* ins)
 {
     MOZ_CRASH("CodeGeneratorARM64::visitStoreTypedArrayElementStatic");
-}
-
-void
-CodeGeneratorARM64::visitWasmCall(LWasmCall* ins)
-{
-    MOZ_CRASH("vistWasmCall");
-}
-
-void
-CodeGeneratorARM64::visitWasmCallI64(LWasmCallI64* ins)
-{
-    MOZ_CRASH("vistWasmCallI64");
 }
 
 void
@@ -695,18 +682,6 @@ void
 CodeGeneratorARM64::visitEffectiveAddress(LEffectiveAddress* ins)
 {
     MOZ_CRASH("visitEffectiveAddress");
-}
-
-void
-CodeGeneratorARM64::visitWasmLoadGlobalVar(LWasmLoadGlobalVar* ins)
-{
-    MOZ_CRASH("visitWasmLoadGlobalVar");
-}
-
-void
-CodeGeneratorARM64::visitWasmStoreGlobalVar(LWasmStoreGlobalVar* ins)
-{
-    MOZ_CRASH("visitWasmStoreGlobalVar");
 }
 
 void

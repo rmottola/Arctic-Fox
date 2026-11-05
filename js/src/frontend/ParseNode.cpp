@@ -190,6 +190,7 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
       case PNK_TRUE:
       case PNK_FALSE:
       case PNK_NULL:
+      case PNK_RAW_UNDEFINED:
       case PNK_ELISION:
       case PNK_GENERATOR:
       case PNK_NUMBER:
@@ -285,22 +286,24 @@ PushNodeChildren(ParseNode* pn, NodeStack* stack)
         return PushResult::Recyclable;
       }
 
-      // The left half is the expression being yielded.  The right half is
-      // internal goop: a name reference to the invisible '.generator' local
-      // variable, or an assignment of a PNK_GENERATOR node to the '.generator'
-      // local, for a synthesized, prepended initial yield.  Yum!
+      // The child is an assignment of a PNK_GENERATOR node to the
+      // '.generator' local, for a synthesized, prepended initial yield.
+      case PNK_INITIALYIELD: {
+        MOZ_ASSERT(pn->isArity(PN_UNARY));
+        MOZ_ASSERT(pn->pn_kid->isKind(PNK_ASSIGN) &&
+                   pn->pn_kid->pn_left->isKind(PNK_NAME) &&
+                   pn->pn_kid->pn_right->isKind(PNK_GENERATOR));
+        stack->push(pn->pn_kid);
+        return PushResult::Recyclable;
+      }
+
+      // The child is the expression being yielded.
       case PNK_YIELD_STAR:
       case PNK_YIELD:
       case PNK_AWAIT: {
-        MOZ_ASSERT(pn->isArity(PN_BINARY));
-        MOZ_ASSERT(pn->pn_right);
-        MOZ_ASSERT(pn->pn_right->isKind(PNK_NAME) ||
-                   (pn->pn_right->isKind(PNK_ASSIGN) &&
-                    pn->pn_right->pn_left->isKind(PNK_NAME) &&
-                    pn->pn_right->pn_right->isKind(PNK_GENERATOR)));
-        if (pn->pn_left)
-            stack->push(pn->pn_left);
-        stack->push(pn->pn_right);
+        MOZ_ASSERT(pn->isArity(PN_UNARY));
+        if (pn->pn_kid)
+            stack->push(pn->pn_kid);
         return PushResult::Recyclable;
       }
 
@@ -569,7 +572,7 @@ ParseNodeAllocator::allocNode()
 
 ParseNode*
 ParseNode::appendOrCreateList(ParseNodeKind kind, JSOp op, ParseNode* left, ParseNode* right,
-                              FullParseHandler* handler, ParseContext* pc)
+                              FullParseHandlerBase* handler, ParseContext* pc)
 {
     // The asm.js specification is written in ECMAScript grammar terms that
     // specify *only* a binary tree.  It's a royal pain to implement the asm.js
@@ -685,6 +688,7 @@ NullaryNode::dump()
       case PNK_TRUE:  fprintf(stderr, "#true");  break;
       case PNK_FALSE: fprintf(stderr, "#false"); break;
       case PNK_NULL:  fprintf(stderr, "#null");  break;
+      case PNK_RAW_UNDEFINED: fprintf(stderr, "#undefined"); break;
 
       case PNK_NUMBER: {
         ToCStringBuf cbuf;

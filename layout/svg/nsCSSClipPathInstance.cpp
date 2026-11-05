@@ -11,6 +11,7 @@
 #include "mozilla/dom/SVGSVGElement.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/PathHelpers.h"
+#include "mozilla/ShapeUtils.h"
 #include "nsCSSRendering.h"
 #include "nsIFrame.h"
 #include "nsRenderingContext.h"
@@ -104,25 +105,6 @@ nsCSSClipPathInstance::CreateClipPath(DrawTarget* aDrawTarget)
   return builder->Finish();
 }
 
-static void
-EnumerationToLength(nscoord& aCoord, int32_t aType,
-                    nscoord aCenter, nscoord aPosMin, nscoord aPosMax)
-{
-  nscoord dist1 = abs(aPosMin - aCenter);
-  nscoord dist2 = abs(aPosMax - aCenter);
-  switch (aType) {
-    case NS_RADIUS_FARTHEST_SIDE:
-      aCoord = dist1 > dist2 ? dist1 : dist2;
-      break;
-    case NS_RADIUS_CLOSEST_SIDE:
-      aCoord = dist1 > dist2 ? dist2 : dist1;
-      break;
-    default:
-      NS_NOTREACHED("unknown keyword");
-      break;
-  }
-}
-
 already_AddRefed<Path>
 nsCSSClipPathInstance::CreateClipPathCircle(DrawTarget* aDrawTarget,
                                             const nsRect& aRefBox)
@@ -136,31 +118,38 @@ nsCSSClipPathInstance::CreateClipPathCircle(DrawTarget* aDrawTarget,
   nsImageRenderer::ComputeObjectAnchorPoint(basicShape->GetPosition(),
                                             size, size,
                                             &topLeft, &anchor);
-  Point center = Point(anchor.x + aRefBox.x, anchor.y + aRefBox.y);
+  nsPoint center(anchor.x + aRefBox.x, anchor.y + aRefBox.y);
 
   const nsTArray<nsStyleCoord>& coords = basicShape->Coordinates();
   MOZ_ASSERT(coords.Length() == 1, "wrong number of arguments");
-  float referenceLength = sqrt((aRefBox.width * aRefBox.width +
-                                aRefBox.height * aRefBox.height) / 2.0);
   nscoord r = 0;
   if (coords[0].GetUnit() == eStyleUnit_Enumerated) {
-    nscoord horizontal, vertical;
-    EnumerationToLength(horizontal, coords[0].GetIntValue(),
-                        center.x, aRefBox.x, aRefBox.x + aRefBox.width);
-    EnumerationToLength(vertical, coords[0].GetIntValue(),
-                        center.y, aRefBox.y, aRefBox.y + aRefBox.height);
-    if (coords[0].GetIntValue() == NS_RADIUS_FARTHEST_SIDE) {
+    const auto styleShapeRadius = coords[0].GetEnumValue<StyleShapeRadius>();
+    nscoord horizontal =
+      ShapeUtils::ComputeShapeRadius(styleShapeRadius, center.x, aRefBox.x,
+                                     aRefBox.x + aRefBox.width);
+    nscoord vertical =
+      ShapeUtils::ComputeShapeRadius(styleShapeRadius, center.y, aRefBox.y,
+                                     aRefBox.y + aRefBox.height);
+    if (styleShapeRadius == StyleShapeRadius::FarthestSide) {
       r = horizontal > vertical ? horizontal : vertical;
     } else {
       r = horizontal < vertical ? horizontal : vertical;
     }
   } else {
-    r = nsRuleNode::ComputeCoordPercentCalc(coords[0], referenceLength);
+    // We resolve percent <shape-radius> value for circle() as defined here:
+    // https://drafts.csswg.org/css-shapes/#funcdef-circle
+    double referenceLength =
+      SVGContentUtils::ComputeNormalizedHypotenuse(aRefBox.width,
+                                                   aRefBox.height);
+    r = nsRuleNode::ComputeCoordPercentCalc(coords[0],
+                                            NSToCoordRound(referenceLength));
   }
 
   nscoord appUnitsPerDevPixel =
     mTargetFrame->PresContext()->AppUnitsPerDevPixel();
-  builder->Arc(center / appUnitsPerDevPixel, r / appUnitsPerDevPixel,
+  builder->Arc(Point(center.x, center.y) / appUnitsPerDevPixel,
+               r / appUnitsPerDevPixel,
                0, Float(2 * M_PI));
   builder->Close();
   return builder->Finish();
@@ -179,20 +168,24 @@ nsCSSClipPathInstance::CreateClipPathEllipse(DrawTarget* aDrawTarget,
   nsImageRenderer::ComputeObjectAnchorPoint(basicShape->GetPosition(),
                                             size, size,
                                             &topLeft, &anchor);
-  Point center = Point(anchor.x + aRefBox.x, anchor.y + aRefBox.y);
+  nsPoint center(anchor.x + aRefBox.x, anchor.y + aRefBox.y);
 
   const nsTArray<nsStyleCoord>& coords = basicShape->Coordinates();
   MOZ_ASSERT(coords.Length() == 2, "wrong number of arguments");
   nscoord rx = 0, ry = 0;
   if (coords[0].GetUnit() == eStyleUnit_Enumerated) {
-    EnumerationToLength(rx, coords[0].GetIntValue(),
-                        center.x, aRefBox.x, aRefBox.x + aRefBox.width);
+    rx = ShapeUtils::ComputeShapeRadius(coords[0].GetEnumValue<StyleShapeRadius>(),
+                                        center.x,
+                                        aRefBox.x,
+                                        aRefBox.x + aRefBox.width);
   } else {
     rx = nsRuleNode::ComputeCoordPercentCalc(coords[0], aRefBox.width);
   }
   if (coords[1].GetUnit() == eStyleUnit_Enumerated) {
-    EnumerationToLength(ry, coords[1].GetIntValue(),
-                        center.y, aRefBox.y, aRefBox.y + aRefBox.height);
+    ry = ShapeUtils::ComputeShapeRadius(coords[1].GetEnumValue<StyleShapeRadius>(),
+                                        center.y,
+                                        aRefBox.y,
+                                        aRefBox.y + aRefBox.height);
   } else {
     ry = nsRuleNode::ComputeCoordPercentCalc(coords[1], aRefBox.height);
   }
@@ -200,7 +193,7 @@ nsCSSClipPathInstance::CreateClipPathEllipse(DrawTarget* aDrawTarget,
   nscoord appUnitsPerDevPixel =
     mTargetFrame->PresContext()->AppUnitsPerDevPixel();
   EllipseToBezier(builder.get(),
-                  center / appUnitsPerDevPixel,
+                  Point(center.x, center.y) / appUnitsPerDevPixel,
                   Size(rx, ry) / appUnitsPerDevPixel);
   builder->Close();
   return builder->Finish();

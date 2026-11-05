@@ -7,17 +7,20 @@
 #ifndef frontend_SyntaxParseHandler_h
 #define frontend_SyntaxParseHandler_h
 
+#include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 
 #include <string.h>
 
+#include "jscntxt.h"
+
 #include "frontend/ParseNode.h"
-#include "frontend/TokenStream.h"
 
 namespace js {
+
 namespace frontend {
 
-template <typename ParseHandler>
+template <template <typename CharT> class ParseHandler, typename CharT>
 class Parser;
 
 // Parse handler used when processing the syntax in a block of code, to generate
@@ -30,12 +33,11 @@ class Parser;
 // several times faster than doing a full parse/emit, and lazy parsing improves
 // both performance and memory usage significantly when pages contain large
 // amounts of code that never executes (which happens often).
-class SyntaxParseHandler
+class SyntaxParseHandlerBase
 {
     // Remember the last encountered name or string literal during syntax parses.
     JSAtom* lastAtom;
     TokenPos lastStringPos;
-    TokenStream& tokenStream;
 
   public:
     enum Node {
@@ -170,11 +172,8 @@ class SyntaxParseHandler
     }
 
   public:
-    SyntaxParseHandler(ExclusiveContext* cx, LifoAlloc& alloc,
-                       TokenStream& tokenStream, Parser<SyntaxParseHandler>* syntaxParser,
-                       LazyScript* lazyOuterFunction)
-      : lastAtom(nullptr),
-        tokenStream(tokenStream)
+    SyntaxParseHandlerBase(JSContext* cx, LifoAlloc& alloc, LazyScript* lazyOuterFunction)
+      : lastAtom(nullptr)
     {}
 
     static Node null() { return NodeFailure; }
@@ -184,7 +183,7 @@ class SyntaxParseHandler
 
     void trace(JSTracer* trc) {}
 
-    Node newName(PropertyName* name, const TokenPos& pos, ExclusiveContext* cx) {
+    Node newName(PropertyName* name, const TokenPos& pos, JSContext* cx) {
         lastAtom = name;
         if (name == cx->names().arguments)
             return NodeUnparenthesizedArgumentsName;
@@ -224,6 +223,7 @@ class SyntaxParseHandler
 
     Node newThisLiteral(const TokenPos& pos, Node thisName) { return NodeGeneric; }
     Node newNullLiteral(const TokenPos& pos) { return NodeGeneric; }
+    Node newRawUndefinedLiteral(const TokenPos& pos) { return NodeGeneric; }
 
     template <class Boxer>
     Node newRegExp(RegExpObject* reobj, const TokenPos& pos, Boxer& boxer) { return NodeGeneric; }
@@ -238,6 +238,10 @@ class SyntaxParseHandler
 
     Node newTypeof(uint32_t begin, Node kid) {
         return NodeUnparenthesizedUnary;
+    }
+
+    Node newNullary(ParseNodeKind kind, JSOp op, const TokenPos& pos) {
+        return NodeGeneric;
     }
 
     Node newUnary(ParseNodeKind kind, JSOp op, uint32_t begin, Node kid) {
@@ -256,8 +260,6 @@ class SyntaxParseHandler
         return NodeGeneric;
     }
 
-    Node newBinary(ParseNodeKind kind, JSOp op = JSOP_NOP) { return NodeGeneric; }
-    Node newBinary(ParseNodeKind kind, Node left, JSOp op = JSOP_NOP) { return NodeGeneric; }
     Node newBinary(ParseNodeKind kind, Node left, Node right, JSOp op = JSOP_NOP) {
         return NodeGeneric;
     }
@@ -278,13 +280,13 @@ class SyntaxParseHandler
     MOZ_MUST_USE bool addSpreadElement(Node literal, uint32_t begin, Node inner) { return true; }
     void addArrayElement(Node literal, Node element) { }
 
-    Node newCall() { return NodeFunctionCall; }
-    Node newTaggedTemplate() { return NodeGeneric; }
+    Node newCall(const TokenPos& pos) { return NodeFunctionCall; }
+    Node newTaggedTemplate(const TokenPos& pos) { return NodeGeneric; }
 
     Node newObjectLiteral(uint32_t begin) { return NodeUnparenthesizedObject; }
     Node newClassMethodList(uint32_t begin) { return NodeGeneric; }
     Node newClassNames(Node outer, Node inner, const TokenPos& pos) { return NodeGeneric; }
-    Node newClass(Node name, Node heritage, Node methodBlock) { return NodeGeneric; }
+    Node newClass(Node name, Node heritage, Node methodBlock, const TokenPos& pos) { return NodeGeneric; }
 
     Node newNewTarget(Node newHolder, Node targetHolder) { return NodeGeneric; }
     Node newPosHolder(const TokenPos& pos) { return NodeGeneric; }
@@ -295,9 +297,9 @@ class SyntaxParseHandler
     MOZ_MUST_USE bool addShorthand(Node literal, Node name, Node expr) { return true; }
     MOZ_MUST_USE bool addObjectMethodDefinition(Node literal, Node name, Node fn, JSOp op) { return true; }
     MOZ_MUST_USE bool addClassMethodDefinition(Node literal, Node name, Node fn, JSOp op, bool isStatic) { return true; }
-    Node newYieldExpression(uint32_t begin, Node value, Node gen) { return NodeGeneric; }
-    Node newYieldStarExpression(uint32_t begin, Node value, Node gen) { return NodeGeneric; }
-    Node newAwaitExpression(uint32_t begin, Node value, Node gen) { return NodeGeneric; }
+    Node newYieldExpression(uint32_t begin, Node value) { return NodeGeneric; }
+    Node newYieldStarExpression(uint32_t begin, Node value) { return NodeGeneric; }
+    Node newAwaitExpression(uint32_t begin, Node value) { return NodeGeneric; }
 
     // Statements
 
@@ -306,6 +308,16 @@ class SyntaxParseHandler
     void addCaseStatementToList(Node list, Node stmt) {}
     MOZ_MUST_USE bool prependInitialYield(Node stmtList, Node gen) { return true; }
     Node newEmptyStatement(const TokenPos& pos) { return NodeEmptyStatement; }
+
+    Node newExportDeclaration(Node kid, const TokenPos& pos) {
+        return NodeGeneric;
+    }
+    Node newExportFromDeclaration(uint32_t begin, Node exportSpecSet, Node moduleSpec) {
+        return NodeGeneric;
+    }
+    Node newExportDefaultDeclaration(Node kid, Node maybeBinding, const TokenPos& pos) {
+        return NodeGeneric;
+    }
 
     Node newSetThis(Node thisName, Node value) { return value; }
 
@@ -321,6 +333,7 @@ class SyntaxParseHandler
     Node newContinueStatement(PropertyName* label, const TokenPos& pos) { return NodeGeneric; }
     Node newBreakStatement(PropertyName* label, const TokenPos& pos) { return NodeBreak; }
     Node newReturnStatement(Node expr, const TokenPos& pos) { return NodeReturn; }
+    Node newExpressionBody(Node expr) { return NodeReturn; }
     Node newWithStatement(uint32_t begin, Node expr, Node body) { return NodeGeneric; }
 
     Node newLabeledStatement(PropertyName* label, Node stmt, uint32_t begin) {
@@ -347,9 +360,9 @@ class SyntaxParseHandler
 
     void checkAndSetIsDirectRHSAnonFunction(Node pn) {}
 
-    Node newFunctionStatement() { return NodeFunctionDefinition; }
-    Node newFunctionExpression() { return NodeFunctionDefinition; }
-    Node newArrowFunction() { return NodeFunctionDefinition; }
+    Node newFunctionStatement(const TokenPos& pos) { return NodeFunctionDefinition; }
+    Node newFunctionExpression(const TokenPos& pos) { return NodeFunctionDefinition; }
+    Node newArrowFunction(const TokenPos& pos) { return NodeFunctionDefinition; }
 
     bool setComprehensionLambdaBody(Node pn, Node body) { return true; }
     void setFunctionFormalParametersAndBody(Node pn, Node kid) {}
@@ -389,32 +402,40 @@ class SyntaxParseHandler
     void setEndPosition(Node pn, Node oth) {}
     void setEndPosition(Node pn, uint32_t end) {}
 
-    void setPosition(Node pn, const TokenPos& pos) {}
-    TokenPos getPosition(Node pn) {
-        return tokenStream.currentToken().pos;
+    uint32_t getFunctionNameOffset(Node func, TokenStreamBase& ts) {
+        // XXX This offset isn't relevant to the offending function name.  But
+        //     we may not *have* that function name around, because of how lazy
+        //     parsing works -- the actual name could be outside
+        //     |tokenStream.userbuf|'s observed region.  So the current offset
+        //     is the best we can do.
+        return ts.currentToken().pos.begin;
     }
 
-    Node newList(ParseNodeKind kind, JSOp op = JSOP_NOP) {
+    Node newList(ParseNodeKind kind, const TokenPos& pos, JSOp op = JSOP_NOP) {
         MOZ_ASSERT(kind != PNK_VAR);
         MOZ_ASSERT(kind != PNK_LET);
         MOZ_ASSERT(kind != PNK_CONST);
         return NodeGeneric;
     }
+
+  private:
     Node newList(ParseNodeKind kind, uint32_t begin, JSOp op = JSOP_NOP) {
-        return newList(kind, op);
-    }
-    Node newList(ParseNodeKind kind, Node kid, JSOp op = JSOP_NOP) {
-        return newList(kind, op);
+        return newList(kind, TokenPos(begin, begin + 1), op);
     }
 
-    Node newDeclarationList(ParseNodeKind kind, JSOp op = JSOP_NOP) {
+    template<typename T>
+    Node newList(ParseNodeKind kind, const T& begin, JSOp op = JSOP_NOP) = delete;
+
+  public:
+    Node newList(ParseNodeKind kind, Node kid, JSOp op = JSOP_NOP) {
+        return newList(kind, TokenPos(), op);
+    }
+
+    Node newDeclarationList(ParseNodeKind kind, const TokenPos& pos, JSOp op = JSOP_NOP) {
         if (kind == PNK_VAR)
             return NodeVarDeclaration;
         MOZ_ASSERT(kind == PNK_LET || kind == PNK_CONST);
         return NodeLexicalDeclaration;
-    }
-    Node newDeclarationList(ParseNodeKind kind, Node kid, JSOp op = JSOP_NOP) {
-        return newDeclarationList(kind, op);
     }
 
     bool isDeclarationList(Node node) {
@@ -441,8 +462,8 @@ class SyntaxParseHandler
         return NodeUnparenthesizedName;
     }
 
-    Node newCatchList() {
-        return newList(PNK_CATCHLIST, JSOP_NOP);
+    Node newCatchList(const TokenPos& pos) {
+        return newList(PNK_CATCHLIST, pos, JSOP_NOP);
     }
 
     Node newCommaExpressionList(Node kid) {
@@ -457,6 +478,15 @@ class SyntaxParseHandler
                    list == NodeVarDeclaration ||
                    list == NodeLexicalDeclaration ||
                    list == NodeFunctionCall);
+    }
+
+    Node newNewExpression(uint32_t begin, Node ctor) {
+        Node newExpr = newList(PNK_NEW, begin, JSOP_NEW);
+        if (!newExpr)
+            return newExpr;
+
+        addList(newExpr, ctor);
+        return newExpr;
     }
 
     Node newAssignment(ParseNodeKind kind, Node lhs, Node rhs, JSOp op) {
@@ -546,22 +576,26 @@ class SyntaxParseHandler
                node == NodeParenthesizedName;
     }
 
-    bool isEvalAnyParentheses(Node node, ExclusiveContext* cx) {
+    bool isArgumentsAnyParentheses(Node node, JSContext* cx) {
+        return node == NodeUnparenthesizedArgumentsName || node == NodeParenthesizedArgumentsName;
+    }
+
+    bool isEvalAnyParentheses(Node node, JSContext* cx) {
         return node == NodeUnparenthesizedEvalName || node == NodeParenthesizedEvalName;
     }
 
-    const char* nameIsArgumentsEvalAnyParentheses(Node node, ExclusiveContext* cx) {
+    const char* nameIsArgumentsEvalAnyParentheses(Node node, JSContext* cx) {
         MOZ_ASSERT(isNameAnyParentheses(node),
                    "must only call this method on known names");
 
         if (isEvalAnyParentheses(node, cx))
             return js_eval_str;
-        if (node == NodeUnparenthesizedArgumentsName || node == NodeParenthesizedArgumentsName)
+        if (isArgumentsAnyParentheses(node, cx))
             return js_arguments_str;
         return nullptr;
     }
 
-    bool isAsyncKeyword(Node node, ExclusiveContext* cx) {
+    bool isAsyncKeyword(Node node, JSContext* cx) {
         return node == NodePotentialAsyncKeyword;
     }
 
@@ -591,13 +625,33 @@ class SyntaxParseHandler
         return false;
     }
     JSAtom* nextLazyClosedOverBinding() {
-        MOZ_CRASH("SyntaxParseHandler::canSkipLazyClosedOverBindings must return false");
+        MOZ_CRASH("SyntaxParseHandlerBase::canSkipLazyClosedOverBindings must return false");
     }
 
     void adjustGetToSet(Node node) {}
 
     void disableSyntaxParser() {
     }
+};
+
+template<typename CharT>
+class SyntaxParseHandler : public SyntaxParseHandlerBase
+{
+  public:
+    // Using frontend::SyntaxParseHandler versus SyntaxParseHandler shouldn't
+    // be necessary per C++11 [temp.local]p1: in template argument lists inside
+    // a template class, the template class name refers to the template (i.e.
+    // SyntaxParseHandler) and not to the particular instantiation of the
+    // template class (i.e. SyntaxParseHandler<CharT>).
+    //
+    // Unfortunately, some versions of clang and MSVC are buggy in this regard.
+    // So we refer to SyntaxParseHandler with a qualified name.
+    SyntaxParseHandler(JSContext* cx, LifoAlloc& alloc,
+                       Parser<frontend::SyntaxParseHandler, CharT>* syntaxParser,
+                       LazyScript* lazyOuterFunction)
+      : SyntaxParseHandlerBase(cx, alloc, lazyOuterFunction)
+    {}
+
 };
 
 } // namespace frontend

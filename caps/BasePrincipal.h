@@ -10,6 +10,7 @@
 #include "nsJSPrincipals.h"
 
 #include "mozilla/Attributes.h"
+#include "mozilla/dom/ChromeUtils.h"
 #include "mozilla/dom/ChromeUtilsBinding.h"
 #include "nsIScriptSecurityManager.h"
 
@@ -18,7 +19,7 @@ class nsIObjectOutputStream;
 class nsIObjectInputStream;
 class nsIURI;
 
-class nsExpandedPrincipal;
+class ExpandedPrincipal;
 
 namespace mozilla {
 
@@ -39,26 +40,18 @@ public:
     : OriginAttributesDictionary(aOther)
   {}
 
-  // This method 'clones' the OriginAttributes ignoring the addonId value becaue
-  // this is computed from the principal URI and never propagated.
-  void Inherit(const OriginAttributes& aAttrs);
-
   void SetFirstPartyDomain(const bool aIsTopLevelDocument, nsIURI* aURI);
+  void SetFirstPartyDomain(const bool aIsTopLevelDocument, const nsACString& aDomain);
 
   enum {
     STRIP_FIRST_PARTY_DOMAIN = 0x01,
-    STRIP_ADDON_ID = 0x02,
-    STRIP_USER_CONTEXT_ID = 0x04,
+    STRIP_USER_CONTEXT_ID = 0x02,
   };
 
   inline void StripAttributes(uint32_t aFlags)
   {
     if (aFlags & STRIP_FIRST_PARTY_DOMAIN) {
       mFirstPartyDomain.Truncate();
-    }
-
-    if (aFlags & STRIP_ADDON_ID) {
-      mAddonId.Truncate();
     }
 
     if (aFlags & STRIP_USER_CONTEXT_ID) {
@@ -70,7 +63,6 @@ public:
   {
     return mAppId == aOther.mAppId &&
            mInIsolatedMozBrowser == aOther.mInIsolatedMozBrowser &&
-           mAddonId == aOther.mAddonId &&
            mUserContextId == aOther.mUserContextId &&
            mPrivateBrowsingId == aOther.mPrivateBrowsingId &&
            mFirstPartyDomain == aOther.mFirstPartyDomain;
@@ -101,11 +93,30 @@ public:
   void SyncAttributesWithPrivateBrowsing(bool aInPrivateBrowsing);
 
   // check if "privacy.firstparty.isolate" is enabled.
-  static bool IsFirstPartyEnabled();
+  static inline bool IsFirstPartyEnabled()
+  {
+    return sFirstPartyIsolation;
+  }
+
+  // check if the access of window.opener across different FPDs is restricted.
+  // We only restrict the access of window.opener when first party isolation
+  // is enabled and "privacy.firstparty.isolate.restrict_opener_access" is on.
+  static inline bool IsRestrictOpenerAccessForFPI()
+  {
+    // We always want to restrict window.opener if first party isolation is
+    // disabled.
+    return !sFirstPartyIsolation || sRestrictedOpenerAccess;
+  }
 
   // returns true if the originAttributes suffix has mPrivateBrowsingId value
   // different than 0.
   static bool IsPrivateBrowsing(const nsACString& aOrigin);
+
+  static void InitPrefs();
+
+private:
+  static bool sFirstPartyIsolation;
+  static bool sRestrictedOpenerAccess;
 };
 
 class OriginAttributesPattern : public dom::OriginAttributesPatternDictionary
@@ -130,10 +141,6 @@ public:
     }
 
     if (mInIsolatedMozBrowser.WasPassed() && mInIsolatedMozBrowser.Value() != aAttrs.mInIsolatedMozBrowser) {
-      return false;
-    }
-
-    if (mAddonId.WasPassed() && mAddonId.Value() != aAttrs.mAddonId) {
       return false;
     }
 
@@ -162,11 +169,6 @@ public:
     if (mInIsolatedMozBrowser.WasPassed() &&
         aOther.mInIsolatedMozBrowser.WasPassed() &&
         mInIsolatedMozBrowser.Value() != aOther.mInIsolatedMozBrowser.Value()) {
-      return false;
-    }
-
-    if (mAddonId.WasPassed() && aOther.mAddonId.WasPassed() &&
-        mAddonId.Value() != aOther.mAddonId.Value()) {
       return false;
     }
 
@@ -199,7 +201,14 @@ public:
 class BasePrincipal : public nsJSPrincipals
 {
 public:
-  BasePrincipal();
+  enum PrincipalKind {
+    eNullPrincipal,
+    eCodebasePrincipal,
+    eExpandedPrincipal,
+    eSystemPrincipal
+  };
+
+  explicit BasePrincipal(PrincipalKind aKind);
 
   enum DocumentDomainConsideration { DontConsiderDocumentDomain, ConsiderDocumentDomain};
   bool Subsumes(nsIPrincipal* aOther, DocumentDomainConsideration aConsideration);
@@ -210,8 +219,10 @@ public:
   NS_IMETHOD EqualsConsideringDomain(nsIPrincipal* other, bool* _retval) final;
   NS_IMETHOD Subsumes(nsIPrincipal* other, bool* _retval) final;
   NS_IMETHOD SubsumesConsideringDomain(nsIPrincipal* other, bool* _retval) final;
+  NS_IMETHOD SubsumesConsideringDomainIgnoringFPD(nsIPrincipal* other, bool* _retval) final;
   NS_IMETHOD CheckMayLoad(nsIURI* uri, bool report, bool allowIfInheritsPrincipal) final;
   NS_IMETHOD GetCsp(nsIContentSecurityPolicy** aCsp) override;
+  NS_IMETHOD SetCsp(nsIContentSecurityPolicy* aCsp) override;
   NS_IMETHOD EnsureCSP(nsIDOMDocument* aDocument, nsIContentSecurityPolicy** aCSP) override;
   NS_IMETHOD GetPreloadCsp(nsIContentSecurityPolicy** aPreloadCSP) override;
   NS_IMETHOD EnsurePreloadCSP(nsIDOMDocument* aDocument, nsIContentSecurityPolicy** aCSP) override;
@@ -224,17 +235,12 @@ public:
   NS_IMETHOD GetOriginSuffix(nsACString& aOriginSuffix) final;
   NS_IMETHOD GetAppStatus(uint16_t* aAppStatus) final;
   NS_IMETHOD GetAppId(uint32_t* aAppStatus) final;
-  NS_IMETHOD GetAddonId(nsAString& aAddonId) final;
   NS_IMETHOD GetIsInIsolatedMozBrowserElement(bool* aIsInIsolatedMozBrowserElement) final;
   NS_IMETHOD GetUnknownAppId(bool* aUnknownAppId) final;
   NS_IMETHOD GetUserContextId(uint32_t* aUserContextId) final;
   NS_IMETHOD GetPrivateBrowsingId(uint32_t* aPrivateBrowsingId) final;
 
-  bool EqualsIgnoringAddonId(nsIPrincipal *aOther);
-
   virtual bool AddonHasPermission(const nsAString& aPerm);
-
-  virtual bool IsOnCSSUnprefixingWhitelist() override { return false; }
 
   virtual bool IsCodebasePrincipal() const { return false; };
 
@@ -243,22 +249,27 @@ public:
   CreateCodebasePrincipal(nsIURI* aURI, const OriginAttributes& aAttrs);
   static already_AddRefed<BasePrincipal> CreateCodebasePrincipal(const nsACString& aOrigin);
 
-  const OriginAttributes& OriginAttributesRef() override { return mOriginAttributes; }
+  const OriginAttributes& OriginAttributesRef() final { return mOriginAttributes; }
   uint32_t AppId() const { return mOriginAttributes.mAppId; }
   uint32_t UserContextId() const { return mOriginAttributes.mUserContextId; }
   uint32_t PrivateBrowsingId() const { return mOriginAttributes.mPrivateBrowsingId; }
   bool IsInIsolatedMozBrowserElement() const { return mOriginAttributes.mInIsolatedMozBrowser; }
 
-  enum PrincipalKind {
-    eNullPrincipal,
-    eCodebasePrincipal,
-    eExpandedPrincipal,
-    eSystemPrincipal
-  };
-
-  virtual PrincipalKind Kind() = 0;
+  PrincipalKind Kind() const { return mKind; }
 
   already_AddRefed<BasePrincipal> CloneStrippingUserContextIdAndFirstPartyDomain();
+
+  // Helper to check whether this principal is associated with an addon that
+  // allows unprivileged code to load aURI.  aExplicit == true will prevent
+  // use of all_urls permission, requiring the domain in its permissions.
+  bool AddonAllowsLoad(nsIURI* aURI, bool aExplicit = false);
+
+  // Call these to avoid the cost of virtual dispatch.
+  inline bool FastEquals(nsIPrincipal* aOther);
+  inline bool FastEqualsConsideringDomain(nsIPrincipal* aOther);
+  inline bool FastSubsumes(nsIPrincipal* aOther);
+  inline bool FastSubsumesConsideringDomain(nsIPrincipal* aOther);
+  inline bool FastSubsumesConsideringDomainIgnoringFPD(nsIPrincipal* aOther);
 
 protected:
   virtual ~BasePrincipal();
@@ -272,16 +283,116 @@ protected:
   // principal would allow the load ignoring any common behavior implemented in
   // BasePrincipal::CheckMayLoad.
   virtual bool MayLoadInternal(nsIURI* aURI) = 0;
-  friend class ::nsExpandedPrincipal;
+  friend class ::ExpandedPrincipal;
 
-  // Helper to check whether this principal is associated with an addon that
-  // allows unprivileged code to load aURI.
-  bool AddonAllowsLoad(nsIURI* aURI);
+  // This function should be called as the last step of the initialization of the
+  // principal objects.  It's typically called as the last step from the Init()
+  // method of the child classes.
+  void FinishInit();
 
   nsCOMPtr<nsIContentSecurityPolicy> mCSP;
   nsCOMPtr<nsIContentSecurityPolicy> mPreloadCSP;
+  nsCOMPtr<nsIAtom> mOriginNoSuffix;
+  nsCOMPtr<nsIAtom> mOriginSuffix;
   OriginAttributes mOriginAttributes;
+  PrincipalKind mKind;
+  bool mDomainSet;
 };
+
+inline bool
+BasePrincipal::FastEquals(nsIPrincipal* aOther)
+{
+  auto other = Cast(aOther);
+  if (Kind() != other->Kind()) {
+    // Principals of different kinds can't be equal.
+    return false;
+  }
+
+  // Two principals are considered to be equal if their origins are the same.
+  // If the two principals are codebase principals, their origin attributes
+  // (aka the origin suffix) must also match.
+  // If the two principals are null principals, they're only equal if they're
+  // the same object.
+  if (Kind() == eNullPrincipal || Kind() == eSystemPrincipal) {
+    return this == other;
+  }
+
+  if (mOriginNoSuffix) {
+    if (Kind() == eCodebasePrincipal) {
+      return mOriginNoSuffix == other->mOriginNoSuffix &&
+             mOriginSuffix == other->mOriginSuffix;
+    }
+
+    MOZ_ASSERT(Kind() == eExpandedPrincipal);
+    return mOriginNoSuffix == other->mOriginNoSuffix;
+  }
+
+  // If mOriginNoSuffix is null on one of our principals, we must fall back
+  // to the slow path.
+  return Subsumes(aOther, DontConsiderDocumentDomain) &&
+         other->Subsumes(this, DontConsiderDocumentDomain);
+}
+
+inline bool
+BasePrincipal::FastEqualsConsideringDomain(nsIPrincipal* aOther)
+{
+  // If neither of the principals have document.domain set, we use the fast path
+  // in Equals().  Otherwise, we fall back to the slow path below.
+  auto other = Cast(aOther);
+  if (!mDomainSet && !other->mDomainSet) {
+    return FastEquals(aOther);
+  }
+
+  return Subsumes(aOther, ConsiderDocumentDomain) &&
+         other->Subsumes(this, ConsiderDocumentDomain);
+}
+
+inline bool
+BasePrincipal::FastSubsumes(nsIPrincipal* aOther)
+{
+  // If two principals are equal, then they both subsume each other.
+  // We deal with two special cases first:
+  // Null principals only subsume each other if they are equal, and are only
+  // equal if they're the same object.
+  // Also, if mOriginNoSuffix is null, FastEquals falls back to the slow path
+  // using Subsumes, so we don't want to use it in that case to avoid an
+  // infinite recursion.
+  auto other = Cast(aOther);
+  if (Kind() == eNullPrincipal && other->Kind() == eNullPrincipal) {
+    return this == other;
+  }
+  if (mOriginNoSuffix && FastEquals(aOther)) {
+    return true;
+  }
+
+  // Otherwise, fall back to the slow path.
+  return Subsumes(aOther, DontConsiderDocumentDomain);
+}
+
+inline bool
+BasePrincipal::FastSubsumesConsideringDomain(nsIPrincipal* aOther)
+{
+  // If neither of the principals have document.domain set, we hand off to
+  // FastSubsumes() which has fast paths for some special cases. Otherwise, we fall
+  // back to the slow path below.
+  if (!mDomainSet && !Cast(aOther)->mDomainSet) {
+    return FastSubsumes(aOther);
+  }
+
+  return Subsumes(aOther, ConsiderDocumentDomain);
+}
+
+inline bool
+BasePrincipal::FastSubsumesConsideringDomainIgnoringFPD(nsIPrincipal* aOther)
+{
+  if (Kind() == eCodebasePrincipal &&
+      !dom::ChromeUtils::IsOriginAttributesEqualIgnoringFPD(
+            mOriginAttributes, Cast(aOther)->mOriginAttributes)) {
+    return false;
+  }
+
+ return SubsumesInternal(aOther, ConsiderDocumentDomain);
+}
 
 } // namespace mozilla
 

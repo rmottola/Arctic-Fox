@@ -151,10 +151,6 @@ public:
 
   RefPtr<ContentBridgeParent> mLastBridge;
 
-  PPluginModuleParent *
-  AllocPPluginModuleParent(mozilla::ipc::Transport* transport,
-                           base::ProcessId otherProcess) override;
-
   PContentBridgeParent*
   AllocPContentBridgeParent(mozilla::ipc::Transport* transport,
                             base::ProcessId otherProcess) override;
@@ -195,23 +191,10 @@ public:
 
   virtual bool DeallocPBrowserChild(PBrowserChild*) override;
 
-  virtual PDeviceStorageRequestChild*
-  AllocPDeviceStorageRequestChild(const DeviceStorageParams&) override;
-
-  virtual bool
-  DeallocPDeviceStorageRequestChild(PDeviceStorageRequestChild*) override;
-
   virtual PBlobChild*
   AllocPBlobChild(const BlobConstructorParams& aParams) override;
 
   virtual bool DeallocPBlobChild(PBlobChild* aActor) override;
-
-  virtual PCrashReporterChild*
-  AllocPCrashReporterChild(const mozilla::dom::NativeThreadId& id,
-                           const uint32_t& processType) override;
-
-  virtual bool
-  DeallocPCrashReporterChild(PCrashReporterChild*) override;
 
   virtual PHalChild* AllocPHalChild() override;
   virtual bool DeallocPHalChild(PHalChild*) override;
@@ -264,18 +247,14 @@ public:
 
   virtual bool DeallocPPrintingChild(PPrintingChild*) override;
 
-  virtual PSendStreamChild*
-  SendPSendStreamConstructor(PSendStreamChild*) override;
+  virtual PChildToParentStreamChild*
+  SendPChildToParentStreamConstructor(PChildToParentStreamChild*) override;
 
-  virtual PSendStreamChild* AllocPSendStreamChild() override;
-  virtual bool DeallocPSendStreamChild(PSendStreamChild*) override;
+  virtual PChildToParentStreamChild* AllocPChildToParentStreamChild() override;
+  virtual bool DeallocPChildToParentStreamChild(PChildToParentStreamChild*) override;
 
-  virtual PScreenManagerChild*
-  AllocPScreenManagerChild(uint32_t* aNumberOfScreens,
-                           float* aSystemDefaultScale,
-                           bool* aSuccess) override;
-
-  virtual bool DeallocPScreenManagerChild(PScreenManagerChild*) override;
+  virtual PParentToChildStreamChild* AllocPParentToChildStreamChild() override;
+  virtual bool DeallocPParentToChildStreamChild(PParentToChildStreamChild*) override;
 
   virtual PPSMContentDownloaderChild*
   AllocPPSMContentDownloaderChild( const uint32_t& aCertType) override;
@@ -417,11 +396,6 @@ public:
 
   virtual mozilla::ipc::IPCResult RecvLastPrivateDocShellDestroyed() override;
 
-  virtual mozilla::ipc::IPCResult RecvFilePathUpdate(const nsString& aStorageType,
-                                                     const nsString& aStorageName,
-                                                     const nsString& aPath,
-                                                     const nsCString& aReason) override;
-
   virtual mozilla::ipc::IPCResult
   RecvNotifyProcessPriorityChanged(const hal::ProcessPriority& aPriority) override;
 
@@ -469,7 +443,8 @@ public:
 
   virtual mozilla::ipc::IPCResult RecvEndDragSession(const bool& aDoneDrag,
                                                      const bool& aUserCancelled,
-                                                     const mozilla::LayoutDeviceIntPoint& aEndDragPoint) override;
+                                                     const mozilla::LayoutDeviceIntPoint& aEndDragPoint,
+                                                     const uint32_t& aKeyModifiers) override;
 
   virtual mozilla::ipc::IPCResult
   RecvPush(const nsCString& aScope,
@@ -493,6 +468,15 @@ public:
   virtual mozilla::ipc::IPCResult
   RecvNotifyPushSubscriptionModifiedObservers(const nsCString& aScope,
                                               const IPC::Principal& aPrincipal) override;
+
+  virtual mozilla::ipc::IPCResult RecvActivate(PBrowserChild* aTab) override;
+
+  virtual mozilla::ipc::IPCResult RecvDeactivate(PBrowserChild* aTab) override;
+
+  virtual mozilla::ipc::IPCResult RecvParentActivated(PBrowserChild* aTab, const bool& aActivated) override;
+
+  mozilla::ipc::IPCResult
+  RecvRefreshScreens(nsTArray<ScreenDetails>&& aScreens) override;
 
   // Get the directory for IndexedDB files. We query the parent for this and
   // cache the value
@@ -603,6 +587,13 @@ public:
                                 const StructuredCloneData& aInitialData,
                                 nsTArray<LookAndFeelInt>&& aLookAndFeelIntCache) override;
 
+  virtual mozilla::ipc::IPCResult
+  RecvProvideAnonymousTemporaryFile(const uint64_t& aID, const FileDescOrError& aFD) override;
+
+  mozilla::ipc::IPCResult
+  RecvSetPermissionsWithKey(const nsCString& aPermissionKey,
+                            nsTArray<IPC::Permission>&& aPerms) override;
+
 #if defined(XP_WIN) && defined(ACCESSIBILITY)
   bool
   SendGetA11yContentId();
@@ -643,7 +634,10 @@ public:
                       const nsAString& aFullPath, const nsAString& aType,
                       const nsAString& aName,
                       const Optional<int64_t>& aLastModified,
-                      bool aIsFromNsIFile);
+                      bool aExistenceCheck, bool aIsFromNsIFile);
+
+  typedef std::function<void(PRFileDesc*)> AnonymousTemporaryFileCallback;
+  nsresult AsyncOpenAnonymousTemporaryFile(const AnonymousTemporaryFileCallback& aCallback);
 
 private:
   static void ForceKillTimerCallback(nsITimer* aTimer, void* aClosure);
@@ -712,6 +706,9 @@ private:
   // Hashtable to keep track of the pending file creation.
   // These items are removed when RecvFileCreationResponse is received.
   nsRefPtrHashtable<nsIDHashKey, FileCreatorHelper> mFileCreationPending;
+
+
+  nsClassHashtable<nsUint64HashKey, AnonymousTemporaryFileCallback> mPendingAnonymousTemporaryFiles;
 
   bool mShuttingDown;
 

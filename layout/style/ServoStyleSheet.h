@@ -20,6 +20,7 @@ class ServoCSSRuleList;
 
 namespace css {
 class Loader;
+class Rule;
 }
 
 /**
@@ -32,6 +33,9 @@ public:
                   CORSMode aCORSMode,
                   net::ReferrerPolicy aReferrerPolicy,
                   const dom::SRIMetadata& aIntegrity);
+
+  NS_DECL_ISUPPORTS_INHERITED
+  NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(ServoStyleSheet, StyleSheet)
 
   bool HasRules() const;
 
@@ -71,7 +75,7 @@ public:
   // Can't be inline because we can't include ImportRule here.  And can't be
   // called GetOwnerRule because that would be ambiguous with the ImportRule
   // version.
-  nsIDOMCSSRule* GetDOMOwnerRule() const final;
+  css::Rule* GetDOMOwnerRule() const final;
 
   void WillDirty() {}
   void DidDirty() {}
@@ -89,6 +93,7 @@ protected:
 
 private:
   void DropSheet();
+  void DropRuleList();
 
   RefPtr<RawServoStyleSheet> mSheet;
   RefPtr<ServoCSSRuleList> mRuleList;

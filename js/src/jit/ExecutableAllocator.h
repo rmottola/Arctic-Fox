@@ -37,8 +37,12 @@
 #include "jsalloc.h"
 
 #include "jit/arm/Simulator-arm.h"
+#if defined(JS_CODEGEN_ARM64)
+#include "jit/arm64/vixl/Cpu-vixl.h"
+#endif
 #include "jit/mips32/Simulator-mips32.h"
 #include "jit/mips64/Simulator-mips64.h"
+#include "jit/ProcessExecutableMemory.h"
 #include "js/GCAPI.h"
 #include "js/HashTable.h"
 #include "js/Vector.h"
@@ -157,18 +161,11 @@ struct JitPoisonRange
 
 typedef Vector<JitPoisonRange, 0, SystemAllocPolicy> JitPoisonRangeVector;
 
-#define NON_WRITABLE_JIT_CODE 1
-
 class ExecutableAllocator
 {
-#ifdef XP_WIN
-    mozilla::Maybe<mozilla::non_crypto::XorShift128PlusRNG> randomNumberGenerator;
-#endif
     JSRuntime* rt_;
 
   public:
-    enum ProtectionSetting { Writable, Executable };
-
     explicit ExecutableAllocator(JSRuntime* rt);
     ~ExecutableAllocator();
 
@@ -177,18 +174,13 @@ class ExecutableAllocator
     // alloc() returns a pointer to some memory, and also (by reference) a
     // pointer to reference-counted pool. The caller owns a reference to the
     // pool; i.e. alloc() increments the count before returning the object.
-    void* alloc(size_t n, ExecutablePool** poolp, CodeKind type);
+    void* alloc(JSContext* cx, size_t n, ExecutablePool** poolp, CodeKind type);
 
     void releasePoolPages(ExecutablePool* pool);
 
     void addSizeOfCode(JS::CodeSizes* sizes) const;
 
-    static void initStatic();
-
   private:
-    static size_t pageSize;
-    static size_t largeAllocSize;
-
     static const size_t OVERSIZE_ALLOCATION = size_t(-1);
 
     static size_t roundUpAllocationSize(size_t request, size_t granularity);
@@ -196,7 +188,6 @@ class ExecutableAllocator
     // On OOM, this will return an Allocation where pages is nullptr.
     ExecutablePool::Allocation systemAlloc(size_t n);
     static void systemRelease(const ExecutablePool::Allocation& alloc);
-    void* computeRandomAllocationAddress();
 
     ExecutablePool* createPool(size_t n);
     ExecutablePool* poolForSize(size_t n);
@@ -207,42 +198,32 @@ class ExecutableAllocator
     MOZ_MUST_USE
     static bool makeWritable(void* start, size_t size)
     {
-#ifdef NON_WRITABLE_JIT_CODE
-        return reprotectRegion(start, size, Writable);
-#else
-        return true;
-#endif
+        return ReprotectRegion(start, size, ProtectionSetting::Writable);
     }
 
     MOZ_MUST_USE
     static bool makeExecutable(void* start, size_t size)
     {
-#ifdef NON_WRITABLE_JIT_CODE
-        return reprotectRegion(start, size, Executable);
-#else
-        return true;
-#endif
+        return ReprotectRegion(start, size, ProtectionSetting::Executable);
     }
 
     void makeAllWritable() {
-        reprotectAll(Writable);
+        reprotectAll(ProtectionSetting::Writable);
     }
     void makeAllExecutable() {
-        reprotectAll(Executable);
+        reprotectAll(ProtectionSetting::Executable);
     }
-
-    static unsigned initialProtectionFlags(ProtectionSetting protection);
 
     static void poisonCode(JSRuntime* rt, JitPoisonRangeVector& ranges);
 
-#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64) || defined(JS_SIMULATOR_ARM64)
+#if defined(JS_CODEGEN_X86) || defined(JS_CODEGEN_X64) || defined(JS_SIMULATOR_ARM64) || defined(JS_CODEGEN_NONE)
     static void cacheFlush(void*, size_t)
     {
     }
 #elif defined(JS_SIMULATOR_ARM) || defined(JS_SIMULATOR_MIPS32) || defined(JS_SIMULATOR_MIPS64)
     static void cacheFlush(void* code, size_t size)
     {
-        js::jit::Simulator::FlushICache(code, size);
+        js::jit::SimulatorProcess::FlushICache(code, size);
     }
 #elif defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     static void cacheFlush(void* code, size_t size)
@@ -299,7 +280,7 @@ class ExecutableAllocator
 #elif defined(JS_CODEGEN_ARM64) && (defined(__linux__) || defined(ANDROID)) && defined(__GNUC__)
     static void cacheFlush(void* code, size_t size)
     {
-	__clear_cache(code, (void *)((size_t)code + size));
+        vixl::CPU::EnsureIAndDCacheCoherency(code, size);
     }
 #elif defined(__sparc__)
     static void cacheFlush(void* code, size_t size)
@@ -311,11 +292,6 @@ class ExecutableAllocator
   private:
     ExecutableAllocator(const ExecutableAllocator&) = delete;
     void operator=(const ExecutableAllocator&) = delete;
-
-#ifdef NON_WRITABLE_JIT_CODE
-    MOZ_MUST_USE
-    static bool reprotectRegion(void*, size_t, ProtectionSetting);
-#endif
 
     void reprotectAll(ProtectionSetting);
 
@@ -330,16 +306,7 @@ class ExecutableAllocator
     typedef js::HashSet<ExecutablePool*, js::DefaultHasher<ExecutablePool*>, js::SystemAllocPolicy>
             ExecPoolHashSet;
     ExecPoolHashSet m_pools;    // All pools, just for stats purposes.
-
-    static size_t determinePageSize();
 };
-
-extern void*
-AllocateExecutableMemory(void* addr, size_t bytes, unsigned permissions, const char* tag,
-                         size_t pageSize);
-
-extern void
-DeallocateExecutableMemory(void* addr, size_t bytes, size_t pageSize);
 
 } // namespace jit
 } // namespace js

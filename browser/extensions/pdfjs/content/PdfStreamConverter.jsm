@@ -16,9 +16,9 @@
 /* globals Components, Services, XPCOMUtils, NetUtil, PrivateBrowsingUtils,
            dump, NetworkManager, PdfJsTelemetry, PdfjsContentUtils */
 
-'use strict';
+"use strict";
 
-var EXPORTED_SYMBOLS = ['PdfStreamConverter'];
+var EXPORTED_SYMBOLS = ["PdfStreamConverter"];
 
 const Cc = Components.classes;
 const Ci = Components.interfaces;
@@ -26,33 +26,33 @@ const Cr = Components.results;
 const Cu = Components.utils;
 // True only if this is the version of pdf.js that is included with firefox.
 const MOZ_CENTRAL = JSON.parse('true');
-const PDFJS_EVENT_ID = 'pdf.js.message';
-const PDF_CONTENT_TYPE = 'application/pdf';
-const PREF_PREFIX = 'pdfjs';
-const PDF_VIEWER_WEB_PAGE = 'resource://pdf.js/web/viewer.html';
+const PDFJS_EVENT_ID = "pdf.js.message";
+const PDF_CONTENT_TYPE = "application/pdf";
+const PREF_PREFIX = "pdfjs";
+const PDF_VIEWER_WEB_PAGE = "resource://pdf.js/web/viewer.html";
 const MAX_NUMBER_OF_PREFS = 50;
 const MAX_STRING_PREF_LENGTH = 128;
 
-Cu.import('resource://gre/modules/XPCOMUtils.jsm');
-Cu.import('resource://gre/modules/Services.jsm');
-Cu.import('resource://gre/modules/NetUtil.jsm');
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/NetUtil.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, 'NetworkManager',
-  'resource://pdf.js/PdfJsNetwork.jsm');
+XPCOMUtils.defineLazyModuleGetter(this, "NetworkManager",
+  "resource://pdf.js/PdfJsNetwork.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, 'PrivateBrowsingUtils',
-  'resource://gre/modules/PrivateBrowsingUtils.jsm');
+XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
+  "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, 'PdfJsTelemetry',
-  'resource://pdf.js/PdfJsTelemetry.jsm');
+XPCOMUtils.defineLazyModuleGetter(this, "PdfJsTelemetry",
+  "resource://pdf.js/PdfJsTelemetry.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, 'PdfjsContentUtils',
-  'resource://pdf.js/PdfjsContentUtils.jsm');
+XPCOMUtils.defineLazyModuleGetter(this, "PdfjsContentUtils",
+  "resource://pdf.js/PdfjsContentUtils.jsm");
 
 var Svc = {};
-XPCOMUtils.defineLazyServiceGetter(Svc, 'mime',
-                                   '@mozilla.org/mime;1',
-                                   'nsIMIMEService');
+XPCOMUtils.defineLazyServiceGetter(Svc, "mime",
+                                   "@mozilla.org/mime;1",
+                                   "nsIMIMEService");
 
 function getContainingBrowser(domWindow) {
   return domWindow.QueryInterface(Ci.nsIInterfaceRequestor)
@@ -63,7 +63,7 @@ function getContainingBrowser(domWindow) {
 
 function getFindBar(domWindow) {
   if (PdfjsContentUtils.isRemote) {
-    throw new Error('FindBar is not accessible from the content process.');
+    throw new Error("FindBar is not accessible from the content process.");
   }
   try {
     var browser = getContainingBrowser(domWindow);
@@ -107,7 +107,7 @@ function log(aMsg) {
   }
   var msg = 'PdfStreamConverter.js: ' + (aMsg.join ? aMsg.join('') : aMsg);
   Services.console.logStringMessage(msg);
-  dump(msg + '\n');
+  dump(msg + "\n");
 }
 
 function getDOMWindow(aChannel) {
@@ -119,9 +119,9 @@ function getDOMWindow(aChannel) {
 }
 
 function getLocalizedStrings(path) {
-  var stringBundle = Cc['@mozilla.org/intl/stringbundle;1'].
+  var stringBundle = Cc["@mozilla.org/intl/stringbundle;1"].
       getService(Ci.nsIStringBundleService).
-      createBundle('chrome://pdf.js/locale/' + path);
+      createBundle("chrome://pdf.js/locale/" + path);
 
   var map = {};
   var enumerator = stringBundle.getSimpleEnumeration();
@@ -235,10 +235,10 @@ function ChromeActions(domWindow, contentDispositionFilename) {
 }
 
 ChromeActions.prototype = {
-  isInPrivateBrowsing: function() {
+  isInPrivateBrowsing() {
     return PrivateBrowsingUtils.isContentWindowPrivate(this.domWindow);
   },
-  download: function(data, sendResponse) {
+  download(data, sendResponse) {
     var self = this;
     var originalUrl = data.originalUrl;
     var blobUrl = data.blobUrl || originalUrl;
@@ -246,13 +246,13 @@ ChromeActions.prototype = {
     // the original url.
     var originalUri = NetUtil.newURI(originalUrl);
     var filename = data.filename;
-    if (typeof filename !== 'string' ||
+    if (typeof filename !== "string" ||
         (!/\.pdf$/i.test(filename) && !data.isAttachment)) {
-      filename = 'document.pdf';
+      filename = "document.pdf";
     }
     var blobUri = NetUtil.newURI(blobUrl);
     var extHelperAppSvc =
-          Cc['@mozilla.org/uriloader/external-helper-app-service;1'].
+          Cc["@mozilla.org/uriloader/external-helper-app-service;1"].
              getService(Ci.nsIExternalHelperAppService);
 
     var docIsPrivate = this.isInPrivateBrowsing();
@@ -1016,9 +1016,9 @@ PdfStreamConverter.prototype = {
     // We can use the resource principal when data is fetched by the chrome,
     // e.g. useful for NoScript. Make make sure we reuse the origin attributes
     // from the request channel to keep isolation consistent.
-    var ssm = Cc['@mozilla.org/scriptsecuritymanager;1']
+    var ssm = Cc["@mozilla.org/scriptsecuritymanager;1"]
                 .getService(Ci.nsIScriptSecurityManager);
-    var uri = NetUtil.newURI(PDF_VIEWER_WEB_PAGE, null, null);
+    var uri = NetUtil.newURI(PDF_VIEWER_WEB_PAGE);
     var resourcePrincipal;
     resourcePrincipal =
       ssm.createCodebasePrincipal(uri, aRequest.loadInfo.originAttributes);
@@ -1027,7 +1027,7 @@ PdfStreamConverter.prototype = {
   },
 
   // nsIRequestObserver::onStopRequest
-  onStopRequest: function(aRequest, aContext, aStatusCode) {
+  onStopRequest(aRequest, aContext, aStatusCode) {
     if (!this.dataListener) {
       // Do nothing
       return;

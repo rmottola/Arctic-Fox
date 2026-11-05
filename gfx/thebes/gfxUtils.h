@@ -17,6 +17,7 @@
 #include "nsRegionFwd.h"
 #include "mozilla/gfx/Rect.h"
 #include "mozilla/CheckedInt.h"
+#include "mozilla/webrender/webrender_ffi.h"
 
 class gfxASurface;
 class gfxDrawable;
@@ -26,7 +27,10 @@ class nsIPresShell;
 
 namespace mozilla {
 namespace layers {
+class WebRenderBridgeChild;
+class GlyphArray;
 struct PlanarYCbCrData;
+class WebRenderCommand;
 } // namespace layers
 namespace image {
 class ImageRegion;
@@ -188,9 +192,6 @@ public:
     CopySurfaceToDataSourceSurfaceWithFormat(SourceSurface* aSurface,
                                              SurfaceFormat aFormat);
 
-    static const uint8_t sUnpremultiplyTable[256*256];
-    static const uint8_t sPremultiplyTable[256*256];
-
     /**
      * Return a color that can be used to identify a frame with a given frame number.
      * The colors will cycle after sNumFrameColors.  You can query colors 0 .. sNumFrameColors-1
@@ -313,6 +314,38 @@ SafeBytesForBitmap(uint32_t aWidth, uint32_t aHeight, unsigned aBytesPerPixel)
   CheckedInt<uint32_t> height = uint32_t(aHeight);
   return width * height * aBytesPerPixel;
 }
+
+class WebRenderGlyphHelper final {
+public:
+  WebRenderGlyphHelper()
+    : mFontData(nullptr)
+    , mFontDataLength(0)
+    , mIndex(0)
+    , mGlyphSize(0.0)
+  {
+  }
+
+  ~WebRenderGlyphHelper()
+  {
+    if (mFontData) {
+      free(mFontData);
+    }
+  }
+
+  void BuildWebRenderCommands(layers::WebRenderBridgeChild* aChild,
+                              nsTArray<layers::WebRenderCommand>& aCommands,
+                              const nsTArray<layers::GlyphArray>& aGlyphs,
+                              ScaledFont* aFont,
+                              const Point& aOffset,
+                              const Rect& aBounds,
+                              const Rect& aClip);
+
+public:
+  uint8_t* mFontData;
+  uint32_t mFontDataLength;
+  uint32_t mIndex;
+  float mGlyphSize;
+};
 
 } // namespace gfx
 } // namespace mozilla

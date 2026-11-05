@@ -91,6 +91,7 @@ class NrIceMediaStream;
 
 extern const char kNrIceTransportUdp[];
 extern const char kNrIceTransportTcp[];
+extern const char kNrIceTransportTls[];
 
 class NrIceStunServer {
  public:
@@ -190,6 +191,14 @@ class NrIceProxyServer {
 };
 
 class TestNat;
+
+class NrIceStats {
+ public:
+  uint16_t stun_retransmits;
+  uint16_t turn_401s;
+  uint16_t turn_403s;
+  uint16_t turn_438s;
+};
 
 class NrIceCtx {
  friend class NrIceCtxHandler;
@@ -312,11 +321,17 @@ class NrIceCtx {
   nsresult StartGathering(bool default_route_only, bool proxy_only);
 
   // Start checking
-  nsresult StartChecks();
+  nsresult StartChecks(bool offerer);
+
+  // Notify that the network has gone online/offline
+  void UpdateNetworkState(bool online);
 
   // Finalize the ICE negotiation. I.e., there will be no
   // more forking.
   nsresult Finalize();
+
+  void AccumulateStats(const NrIceStats& stats);
+  NrIceStats Destroy();
 
   // Are we trickling?
   bool generating_trickle() const { return trickle_; }
@@ -334,9 +349,7 @@ class NrIceCtx {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(NrIceCtx)
 
 private:
-  NrIceCtx(const std::string& name,
-           bool offerer,
-           Policy policy);
+  NrIceCtx(const std::string& name, Policy policy);
 
   virtual ~NrIceCtx();
 
@@ -373,6 +386,7 @@ private:
   GatheringState gathering_state_;
   const std::string name_;
   bool offerer_;
+  TimeStamp ice_start_time_;
   bool ice_controlling_set_;
   std::vector<RefPtr<NrIceMediaStream> > streams_;
   nr_ice_ctx *ctx_;

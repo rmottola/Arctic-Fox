@@ -24,6 +24,7 @@
 #include "Logging.h"
 #include "Tools.h"
 #include "DataSurfaceHelpers.h"
+#include "Swizzle.h"
 #include <algorithm>
 
 #ifdef USE_SKIA_GPU
@@ -112,12 +113,6 @@ ReleaseTemporarySurface(const void* aPixels, void* aContext)
   }
 }
 
-#ifdef IS_BIG_ENDIAN
-static const int kARGBAlphaOffset = 0;
-#else
-static const int kARGBAlphaOffset = 3;
-#endif
-
 static void
 WriteRGBXFormat(uint8_t* aData, const IntSize &aSize,
                 const int32_t aStride, SurfaceFormat aFormat)
@@ -126,20 +121,37 @@ WriteRGBXFormat(uint8_t* aData, const IntSize &aSize,
     return;
   }
 
-  int height = aSize.height;
-  int width = aSize.width * 4;
-
-  for (int row = 0; row < height; ++row) {
-    for (int column = 0; column < width; column += 4) {
-      aData[column + kARGBAlphaOffset] = 0xFF;
-    }
-    aData += aStride;
-  }
-
-  return;
+  SwizzleData(aData, aStride, SurfaceFormat::X8R8G8B8_UINT32,
+              aData, aStride, SurfaceFormat::A8R8G8B8_UINT32,
+              aSize);
 }
 
 #ifdef DEBUG
+static IntRect
+CalculateSurfaceBounds(const IntSize &aSize, const Rect* aBounds, const Matrix* aMatrix)
+{
+  IntRect surfaceBounds(IntPoint(0, 0), aSize);
+  if (!aBounds) {
+    return surfaceBounds;
+  }
+
+  MOZ_ASSERT(aMatrix);
+  Matrix inverse(*aMatrix);
+  if (!inverse.Invert()) {
+    return surfaceBounds;
+  }
+
+  IntRect bounds;
+  Rect sampledBounds = inverse.TransformBounds(*aBounds);
+  if (!sampledBounds.ToIntRect(&bounds)) {
+    return surfaceBounds;
+  }
+
+  return surfaceBounds.Intersect(bounds);
+}
+
+static const int kARGBAlphaOffset = SurfaceFormat::A8R8G8B8_UINT32 == SurfaceFormat::B8G8R8A8 ? 3 : 0;
+
 static bool
 VerifyRGBXFormat(uint8_t* aData, const IntSize &aSize, const int32_t aStride, SurfaceFormat aFormat)
 {
@@ -171,27 +183,32 @@ VerifyRGBXFormat(uint8_t* aData, const IntSize &aSize, const int32_t aStride, Su
 // Since checking every pixel is expensive, this only checks the four corners and center
 // of a surface that their alpha value is 0xFF.
 static bool
-VerifyRGBXCorners(uint8_t* aData, const IntSize &aSize, const int32_t aStride, SurfaceFormat aFormat)
+VerifyRGBXCorners(uint8_t* aData, const IntSize &aSize, const int32_t aStride, SurfaceFormat aFormat, const Rect* aBounds = nullptr, const Matrix* aMatrix = nullptr)
 {
   if (aFormat != SurfaceFormat::B8G8R8X8 || aSize.IsEmpty()) {
     return true;
   }
 
-  int height = aSize.height;
-  int width = aSize.width;
-  const int pixelSize = 4;
-  const int strideDiff = aStride - (width * pixelSize);
-  MOZ_ASSERT(width * pixelSize <= aStride);
+  IntRect bounds = CalculateSurfaceBounds(aSize, aBounds, aMatrix);
+  if (bounds.IsEmpty()) {
+    return true;
+  }
 
-  const int topLeft = 0;
-  const int topRight = width * pixelSize - pixelSize;
-  const int bottomRight = aStride * height - strideDiff - pixelSize;
-  const int bottomLeft = aStride * height - aStride;
+  const int height = bounds.height;
+  const int width = bounds.width;
+  const int pixelSize = 4;
+  MOZ_ASSERT(aSize.width * pixelSize <= aStride);
+
+  const int translation = bounds.y * aStride + bounds.x * pixelSize;
+  const int topLeft = translation;
+  const int topRight = topLeft + (width - 1) * pixelSize;
+  const int bottomLeft = translation + (height - 1) * aStride;
+  const int bottomRight = bottomLeft + (width - 1) * pixelSize;
 
   // Lastly the center pixel
-  int middleRowHeight = height / 2;
-  int middleRowWidth = (width / 2) * pixelSize;
-  const int middle = aStride * middleRowHeight + middleRowWidth;
+  const int middleRowHeight = height / 2;
+  const int middleRowWidth = (width / 2) * pixelSize;
+  const int middle = translation + aStride * middleRowHeight + middleRowWidth;
 
   const int offsets[] = { topLeft, topRight, bottomRight, bottomLeft, middle };
   for (int offset : offsets) {
@@ -199,7 +216,9 @@ VerifyRGBXCorners(uint8_t* aData, const IntSize &aSize, const int32_t aStride, S
         int row = offset / aStride;
         int column = (offset % aStride) / pixelSize;
         gfxCriticalError() << "RGBX corner pixel at (" << column << "," << row << ") in "
-                           << width << "x" << height << " surface is not opaque: "
+                           << aSize.width << "x" << aSize.height << " surface, bounded by "
+                           << "(" << bounds.x << "," << bounds.y << "," << width << ","
+                           << height << ") is not opaque: "
                            << int(aData[offset]) << ","
                            << int(aData[offset+1]) << ","
                            << int(aData[offset+2]) << ","
@@ -212,7 +231,7 @@ VerifyRGBXCorners(uint8_t* aData, const IntSize &aSize, const int32_t aStride, S
 #endif
 
 static sk_sp<SkImage>
-GetSkImageForSurface(SourceSurface* aSurface)
+GetSkImageForSurface(SourceSurface* aSurface, const Rect* aBounds = nullptr, const Matrix* aMatrix = nullptr)
 {
   if (!aSurface) {
     gfxDebug() << "Creating null Skia image from null SourceSurface";
@@ -239,7 +258,8 @@ GetSkImageForSurface(SourceSurface* aSurface)
 
   // Skia doesn't support RGBX surfaces so ensure that the alpha value is opaque white.
   MOZ_ASSERT(VerifyRGBXCorners(surf->GetData(), surf->GetSize(),
-                               surf->Stride(), surf->GetFormat()));
+                               surf->Stride(), surf->GetFormat(),
+                               aBounds, aMatrix));
   return image;
 }
 
@@ -366,12 +386,12 @@ SkImageIsMask(const sk_sp<SkImage>& aImage)
   if (aImage->peekPixels(&pixmap)) {
     return pixmap.colorType() == kAlpha_8_SkColorType;
 #ifdef USE_SKIA_GPU
-  } else if (GrTexture* tex = aImage->getTexture()) {
+  }
+  if (GrTexture* tex = aImage->getTexture()) {
     return GrPixelConfigIsAlphaOnly(tex->config());
 #endif
-  } else {
-    return false;
   }
+  return false;
 }
 
 static bool
@@ -411,7 +431,7 @@ ExtractAlphaForSurface(SourceSurface* aSurface)
 }
 
 static void
-SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0, Point aOffset = Point(0, 0))
+SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0, Point aOffset = Point(0, 0), const Rect* aBounds = nullptr)
 {
   switch (aPattern.GetType()) {
     case PatternType::COLOR: {
@@ -473,7 +493,11 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0, Po
     }
     case PatternType::SURFACE: {
       const SurfacePattern& pat = static_cast<const SurfacePattern&>(aPattern);
-      sk_sp<SkImage> image = GetSkImageForSurface(pat.mSurface);
+      sk_sp<SkImage> image = GetSkImageForSurface(pat.mSurface, aBounds, &pat.mMatrix);
+      if (!image) {
+        aPaint.setColor(SK_ColorTRANSPARENT);
+        break;
+      }
 
       SkMatrix mat;
       GfxMatrixToSkiaMatrix(pat.mMatrix, mat);
@@ -487,11 +511,7 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0, Po
       SkShader::TileMode xTileMode = ExtendModeToTileMode(pat.mExtendMode, Axis::X_AXIS);
       SkShader::TileMode yTileMode = ExtendModeToTileMode(pat.mExtendMode, Axis::Y_AXIS);
 
-      if (image) {
-        aPaint.setShader(image->makeShader(xTileMode, yTileMode, &mat));
-      } else {
-        aPaint.setColor(SK_ColorTRANSPARENT);
-      }
+      aPaint.setShader(image->makeShader(xTileMode, yTileMode, &mat));
 
       if (pat.mSamplingFilter == SamplingFilter::POINT) {
         aPaint.setFilterQuality(kNone_SkFilterQuality);
@@ -521,11 +541,11 @@ GetClipBounds(SkCanvas *aCanvas)
 }
 
 struct AutoPaintSetup {
-  AutoPaintSetup(SkCanvas *aCanvas, const DrawOptions& aOptions, const Pattern& aPattern, const Rect* aMaskBounds = nullptr, Point aOffset = Point(0, 0))
+  AutoPaintSetup(SkCanvas *aCanvas, const DrawOptions& aOptions, const Pattern& aPattern, const Rect* aMaskBounds = nullptr, Point aOffset = Point(0, 0), const Rect* aSourceBounds = nullptr)
     : mNeedsRestore(false), mAlpha(1.0)
   {
     Init(aCanvas, aOptions, aMaskBounds, false);
-    SetPaintPattern(mPaint, aPattern, mAlpha, aOffset);
+    SetPaintPattern(mPaint, aPattern, mAlpha, aOffset, aSourceBounds);
   }
 
   AutoPaintSetup(SkCanvas *aCanvas, const DrawOptions& aOptions, const Rect* aMaskBounds = nullptr, bool aForceGroup = false)
@@ -754,7 +774,7 @@ DrawTargetSkia::FillRect(const Rect &aRect,
 
   MarkChanged();
   SkRect rect = RectToSkRect(aRect);
-  AutoPaintSetup paint(mCanvas.get(), aOptions, aPattern, &aRect);
+  AutoPaintSetup paint(mCanvas.get(), aOptions, aPattern, &aRect, Point(0, 0), &aRect);
 
   mCanvas->drawRect(rect, paint.mPaint);
 }
@@ -1589,11 +1609,11 @@ DrawTargetSkia::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFor
 #endif
 
 #ifdef DEBUG
-  // Check that our SkCanvas isn't backed by vector storage such as PDF.  If it
-  // is then we want similar storage to avoid losing fidelity (if and when this
-  // DrawTarget is Snapshot()'ed, drawning a raster back into this DrawTarget
-  // will lose fidelity).
-  if (mCanvas->imageInfo().colorType() == kUnknown_SkColorType) {
+  if (!IsBackedByPixels(mCanvas.get())) {
+    // If our canvas is backed by vector storage such as PDF then we want to
+    // create a new DrawTarget with similar storage to avoid losing fidelity
+    // (fidelity will be lost if the returned DT is Snapshot()'ed and drawn
+    // back onto us since a raster will be drawn instead of vector commands).
     NS_WARNING("Not backed by pixels - we need to handle PDF backed SkCanvas");
   }
 #endif
@@ -1794,9 +1814,7 @@ DrawTargetSkia::Init(SkCanvas* aCanvas)
 
   // If the canvas is backed by pixels we clear it to be on the safe side.  If
   // it's not (for example, for PDF output) we don't.
-  bool isBackedByPixels = imageInfo.colorType() != kUnknown_SkColorType;
-  if (isBackedByPixels) {
-    // Note for PDF backed SkCanvas |alphaType == kUnknown_SkAlphaType|.
+  if (IsBackedByPixels(mCanvas.get())) {
     SkColor clearColor = imageInfo.isOpaque() ? SK_ColorBLACK : SK_ColorTRANSPARENT;
     mCanvas->clear(clearColor);
   }

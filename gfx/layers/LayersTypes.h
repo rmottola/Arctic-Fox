@@ -250,6 +250,7 @@ typedef gfx::Matrix4x4Typed<CSSTransformedLayerPixel, ParentLayerPixel> AsyncTra
 typedef Array<gfx::Color, 4> BorderColors;
 typedef Array<LayerSize, 4> BorderCorners;
 typedef Array<LayerCoord, 4> BorderWidths;
+typedef Array<uint8_t, 4> BorderStyles;
 
 // This is used to communicate Layers across IPC channels. The Handle is valid
 // for layers in the same PLayerTransaction. Handles are created by ClientLayerManager,
@@ -308,6 +309,38 @@ public:
   }
 private:
   uint64_t mHandle;
+};
+
+class ReadLockHandle
+{
+  friend struct IPC::ParamTraits<mozilla::layers::ReadLockHandle>;
+public:
+  ReadLockHandle() : mHandle(0)
+  {}
+  ReadLockHandle(const ReadLockHandle& aOther) : mHandle(aOther.mHandle)
+  {}
+  explicit ReadLockHandle(uint64_t aHandle) : mHandle(aHandle)
+  {}
+  bool IsValid() const {
+    return mHandle != 0;
+  }
+  explicit operator bool() const {
+    return IsValid();
+  }
+  bool operator ==(const ReadLockHandle& aOther) const {
+    return mHandle == aOther.mHandle;
+  }
+  uint64_t Value() const {
+    return mHandle;
+  }
+private:
+  uint64_t mHandle;
+};
+
+enum class ScrollDirection : uint32_t {
+  NONE,
+  VERTICAL,
+  HORIZONTAL
 };
 
 } // namespace layers

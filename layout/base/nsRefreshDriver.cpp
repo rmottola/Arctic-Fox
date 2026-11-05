@@ -46,9 +46,9 @@
 #include "nsNPAPIPluginInstance.h"
 #include "mozilla/dom/Performance.h"
 #include "mozilla/dom/WindowBinding.h"
+#include "mozilla/GeckoRestyleManager.h"
 #include "mozilla/RestyleManager.h"
-#include "mozilla/RestyleManagerHandle.h"
-#include "mozilla/RestyleManagerHandleInlines.h"
+#include "mozilla/RestyleManagerInlines.h"
 #include "Layers.h"
 #include "imgIContainer.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -311,18 +311,17 @@ protected:
 
     LOG("[%p] ticking drivers...", this);
     // RD is short for RefreshDriver
-    profiler_tracing("Paint", "RD", TRACING_INTERVAL_START);
+    GeckoProfilerTracingRAII tracer("Paint", "RD");
 
     TickRefreshDrivers(jsnow, now, mContentRefreshDrivers);
     TickRefreshDrivers(jsnow, now, mRootRefreshDrivers);
 
-    profiler_tracing("Paint", "RD", TRACING_INTERVAL_END);
     LOG("[%p] done.", this);
   }
 
   static void TickDriver(nsRefreshDriver* driver, int64_t jsnow, TimeStamp now)
   {
-    LOG(">> TickDriver: %p (jsnow: %lld)", driver, jsnow);
+    LOG(">> TickDriver: %p (jsnow: %" PRId64 ")", driver, jsnow);
     driver->Tick(jsnow, now);
   }
 
@@ -1095,8 +1094,6 @@ nsRefreshDriver::ChooseTimer() const
 
 nsRefreshDriver::nsRefreshDriver(nsPresContext* aPresContext)
   : mActiveTimer(nullptr),
-    mReflowCause(nullptr),
-    mStyleCause(nullptr),
     mPresContext(aPresContext),
     mRootRefresh(nullptr),
     mPendingTransaction(0),
@@ -1150,9 +1147,6 @@ nsRefreshDriver::~nsRefreshDriver()
     shell->InvalidatePresShellIfHidden();
   }
   mPresShellsToInvalidateIfHidden.Clear();
-
-  profiler_free_backtrace(mStyleCause);
-  profiler_free_backtrace(mReflowCause);
 }
 
 // Method for testing.  See nsIDOMWindowUtils.advanceTimeAndRefresh
@@ -1691,7 +1685,7 @@ nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime)
   mFrameRequestCallbackDocs.Clear();
 
   if (!frameRequestCallbacks.IsEmpty()) {
-    profiler_tracing("Paint", "Scripts", TRACING_INTERVAL_START);
+    GeckoProfilerTracingRAII tracer("Paint", "Scripts");
     for (const DocumentFrameCallbacks& docCallbacks : frameRequestCallbacks) {
       // XXXbz Bug 863140: GetInnerWindow can return the outer
       // window in some cases.
@@ -1709,7 +1703,6 @@ nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime)
         callback->Call(timeStamp);
       }
     }
-    profiler_tracing("Paint", "Scripts", TRACING_INTERVAL_END);
   }
 }
 
@@ -1820,7 +1813,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
       RunFrameRequestCallbacks(aNowTime);
 
       if (mPresContext && mPresContext->GetPresShell()) {
-        bool tracingStyleFlush = false;
+        Maybe<GeckoProfilerTracingRAII> tracingStyleFlush;
         AutoTArray<nsIPresShell*, 16> observers;
         observers.AppendElements(mStyleFlushObservers);
         for (uint32_t j = observers.Length();
@@ -1832,14 +1825,13 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
             continue;
 
           if (!tracingStyleFlush) {
-            tracingStyleFlush = true;
-            profiler_tracing("Paint", "Styles", mStyleCause, TRACING_INTERVAL_START);
+            tracingStyleFlush.emplace("Paint", "Styles", Move(mStyleCause));
             mStyleCause = nullptr;
           }
 
           nsCOMPtr<nsIPresShell> shellKungFuDeathGrip(shell);
           mStyleFlushObservers.RemoveElement(shell);
-          RestyleManagerHandle restyleManager =
+          RestyleManager* restyleManager =
             shell->GetPresContext()->RestyleManager();
           restyleManager->SetObservingRefreshDriver(false);
           shell->FlushPendingNotifications(ChangesToFlush(FlushType::Style, false));
@@ -1852,15 +1844,10 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
           }
           mNeedToRecomputeVisibility = true;
         }
-
-
-        if (tracingStyleFlush) {
-          profiler_tracing("Paint", "Styles", TRACING_INTERVAL_END);
-        }
       }
     } else if  (i == 1) {
       // This is the FlushType::Layout case.
-      bool tracingLayoutFlush = false;
+      Maybe<GeckoProfilerTracingRAII> tracingLayoutFlush;
       AutoTArray<nsIPresShell*, 16> observers;
       observers.AppendElements(mLayoutFlushObservers);
       for (uint32_t j = observers.Length();
@@ -1872,8 +1859,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
           continue;
 
         if (!tracingLayoutFlush) {
-          tracingLayoutFlush = true;
-          profiler_tracing("Paint", "Reflow", mReflowCause, TRACING_INTERVAL_START);
+          tracingLayoutFlush.emplace("Paint", "Reflow");
           mReflowCause = nullptr;
         }
 
@@ -1892,10 +1878,6 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
           presContext->NotifyFontFaceSetOnRefresh();
         }
         mNeedToRecomputeVisibility = true;
-      }
-
-      if (tracingLayoutFlush) {
-        profiler_tracing("Paint", "Reflow", TRACING_INTERVAL_END);
       }
     }
 
@@ -2056,6 +2038,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
   }
 
   if (notifyGC && nsContentUtils::XPConnect()) {
+    GeckoProfilerTracingRAII tracer("Paint", "NotifyDidPaint");
     nsContentUtils::XPConnect()->NotifyDidPaint();
     nsJSContext::NotifyDidPaint();
   }
@@ -2114,9 +2097,8 @@ nsRefreshDriver::FinishedWaitingForTransaction()
   if (mSkippedPaints &&
       !IsInRefresh() &&
       (ObserverCount() || ImageRequestCount())) {
-    profiler_tracing("Paint", "RD", TRACING_INTERVAL_START);
+    GeckoProfilerTracingRAII tracer("Paint", "RD");
     DoRefresh();
-    profiler_tracing("Paint", "RD", TRACING_INTERVAL_END);
   }
   mSkippedPaints = false;
   mWarningThreshold = 1;
@@ -2154,6 +2136,19 @@ nsRefreshDriver::RevokeTransactionId(uint64_t aTransactionId)
     FinishedWaitingForTransaction();
   }
   mPendingTransaction--;
+}
+
+void
+nsRefreshDriver::ClearPendingTransactions()
+{
+  mCompletedTransaction = mPendingTransaction;
+  mWaitingForTransaction = false;
+}
+
+void
+nsRefreshDriver::ResetInitialTransactionId(uint64_t aTransactionId)
+{
+  mCompletedTransaction = mPendingTransaction = aTransactionId;
 }
 
 mozilla::TimeStamp

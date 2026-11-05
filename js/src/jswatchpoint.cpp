@@ -11,6 +11,7 @@
 #include "jsfriendapi.h"
 
 #include "gc/Marking.h"
+#include "vm/Shape.h"
 
 #include "jsgcinlines.h"
 
@@ -63,7 +64,7 @@ WatchpointMap::watch(JSContext* cx, HandleObject obj, HandleId id,
 {
     MOZ_ASSERT(JSID_IS_STRING(id) || JSID_IS_INT(id) || JSID_IS_SYMBOL(id));
 
-    if (!obj->setWatched(cx))
+    if (!JSObject::setWatched(cx, obj))
         return false;
 
     Watchpoint w(handler, closure, false);
@@ -80,20 +81,10 @@ WatchpointMap::watch(JSContext* cx, HandleObject obj, HandleId id,
 }
 
 void
-WatchpointMap::unwatch(JSObject* obj, jsid id,
-                       JSWatchPointHandler* handlerp, JSObject** closurep)
+WatchpointMap::unwatch(JSObject* obj, jsid id)
 {
-    if (Map::Ptr p = map.lookup(WatchKey(obj, id))) {
-        if (handlerp)
-            *handlerp = p->value().handler;
-        if (closurep) {
-            // Read barrier to prevent an incorrectly gray closure from escaping the
-            // watchpoint. See the comment before UnmarkGrayChildren in gc/Marking.cpp
-            JS::ExposeObjectToActiveJS(p->value().closure);
-            *closurep = p->value().closure;
-        }
+    if (Map::Ptr p = map.lookup(WatchKey(obj, id)))
         map.remove(p);
-    }
 }
 
 void
@@ -153,7 +144,7 @@ WatchpointMap::markIteratively(GCMarker* marker)
         JSObject* priorKeyObj = entry.key().object;
         jsid priorKeyId(entry.key().id.get());
         bool objectIsLive =
-            IsMarked(const_cast<PreBarrieredObject*>(&entry.key().object));
+            IsMarked(marker->runtime(), const_cast<PreBarrieredObject*>(&entry.key().object));
         if (objectIsLive || entry.value().held) {
             if (!objectIsLive) {
                 TraceEdge(marker, const_cast<PreBarrieredObject*>(&entry.key().object),
@@ -166,7 +157,7 @@ WatchpointMap::markIteratively(GCMarker* marker)
                        JSID_IS_SYMBOL(priorKeyId));
             TraceEdge(marker, const_cast<PreBarrieredId*>(&entry.key().id), "WatchKey::id");
 
-            if (entry.value().closure && !IsMarked(&entry.value().closure)) {
+            if (entry.value().closure && !IsMarked(marker->runtime(), &entry.value().closure)) {
                 TraceEdge(marker, &entry.value().closure, "Watchpoint::closure");
                 marked = true;
             }
@@ -226,7 +217,7 @@ WatchpointMap::sweep()
 void
 WatchpointMap::traceAll(WeakMapTracer* trc)
 {
-    JSRuntime* rt = trc->context;
+    JSRuntime* rt = trc->context->runtime();
     for (CompartmentsIter comp(rt, SkipAtoms); !comp.done(); comp.next()) {
         if (WatchpointMap* wpmap = comp->watchpointMap)
             wpmap->trace(trc);

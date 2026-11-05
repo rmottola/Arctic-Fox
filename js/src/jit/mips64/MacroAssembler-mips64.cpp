@@ -1656,12 +1656,6 @@ MacroAssemblerMIPS64Compat::loadConstantFloat32(float f, FloatRegister dest)
 }
 
 void
-MacroAssemblerMIPS64Compat::loadConstantFloat32(wasm::RawF32 f, FloatRegister dest)
-{
-    ma_lis(dest, f);
-}
-
-void
 MacroAssemblerMIPS64Compat::loadInt32OrDouble(const Address& src, FloatRegister dest)
 {
     Label notInt32, end;
@@ -1709,15 +1703,6 @@ void
 MacroAssemblerMIPS64Compat::loadConstantDouble(double dp, FloatRegister dest)
 {
     ma_lid(dest, dp);
-}
-
-void
-MacroAssemblerMIPS64Compat::loadConstantDouble(wasm::RawF64 d, FloatRegister dest)
-{
-    ImmWord imm(d.bits());
-
-    ma_li(ScratchRegister, imm);
-    moveToDouble(ScratchRegister, dest);
 }
 
 Register
@@ -2093,7 +2078,7 @@ MacroAssemblerMIPS64Compat::handleFailureWithHandlerTail(void* handler)
     {
         Label skipProfilingInstrumentation;
         // Test if profiler enabled.
-        AbsoluteAddress addressOfEnabled(GetJitContext()->runtime->spsProfiler().addressOfEnabled());
+        AbsoluteAddress addressOfEnabled(GetJitContext()->runtime->geckoProfiler().addressOfEnabled());
         asMasm().branch32(Assembler::Equal, addressOfEnabled, Imm32(0),
                           &skipProfilingInstrumentation);
         profilerExitFrame();
@@ -2233,8 +2218,8 @@ MacroAssemblerMIPS64Compat::toggledCall(JitCode* target, bool enabled)
 void
 MacroAssemblerMIPS64Compat::profilerEnterFrame(Register framePtr, Register scratch)
 {
-    AbsoluteAddress activation(GetJitContext()->runtime->addressOfProfilingActivation());
-    loadPtr(activation, scratch);
+    asMasm().loadJSContext(scratch);
+    loadPtr(Address(scratch, offsetof(JSContext, profilingActivation_)), scratch);
     storePtr(framePtr, Address(scratch, JitActivation::offsetOfLastProfilingFrame()));
     storePtr(ImmPtr(nullptr), Address(scratch, JitActivation::offsetOfLastProfilingCallSite()));
 }
@@ -2302,6 +2287,7 @@ MacroAssembler::PopRegsInMaskIgnore(LiveRegisterSet set, LiveRegisterSet ignore)
 void
 MacroAssembler::setupUnalignedABICall(Register scratch)
 {
+    MOZ_ASSERT(!IsCompilingWasm(), "wasm should only use aligned ABI calls");
     setupABICall();
     dynamicAlignment_ = true;
 
@@ -2353,7 +2339,7 @@ MacroAssembler::callWithABIPre(uint32_t* stackAdjust, bool callFromWasm)
 }
 
 void
-MacroAssembler::callWithABIPost(uint32_t stackAdjust, MoveOp::Type result)
+MacroAssembler::callWithABIPost(uint32_t stackAdjust, MoveOp::Type result, bool callFromWasm)
 {
     // Restore ra value (as stored in callWithABIPre()).
     loadPtr(Address(StackPointer, stackAdjust - sizeof(intptr_t)), ra);

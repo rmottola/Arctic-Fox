@@ -43,7 +43,11 @@
 #include "nsISecurityConsoleMessage.h"
 #include "nsCOMArray.h"
 #include "mozilla/net/ChannelEventQueue.h"
+#include "mozilla/Move.h"
 #include "nsIThrottledInputChannel.h"
+#include "nsTArray.h"
+#include "nsCOMPtr.h"
+#include "mozilla/IntegerPrintfMacros.h"
 
 #define HTTP_BASE_CHANNEL_IID \
 { 0x9d5cde03, 0xe6e9, 0x4612, \
@@ -278,15 +282,19 @@ public:
                    const nsTArray<nsString>& aStringParams) override;
 
   void
+  FlushReportsToConsole(uint64_t aInnerWindowID,
+                        ReportAction aAction = ReportAction::Forget) override;
+
+  void
   FlushConsoleReports(nsIDocument* aDocument,
                       ReportAction aAction = ReportAction::Forget) override;
 
   void
-  FlushConsoleReports(nsIConsoleReportCollector* aCollector) override;
+  FlushConsoleReports(nsILoadGroup* aLoadGroup,
+                      ReportAction aAction = ReportAction::Forget) override;
 
   void
-  FlushReportsByWindowId(uint64_t aWindowId,
-                         ReportAction aAction = ReportAction::Forget) override;
+  FlushConsoleReports(nsIConsoleReportCollector* aCollector) override;
 
   void
   ClearConsoleReports() override;
@@ -347,8 +355,6 @@ public: /* Necko internal use only... */
     }
 
 protected:
-  nsCOMArray<nsISecurityConsoleMessage> mSecurityConsoleMessages;
-
   // Handle notifying listener, removing from loadgroup if request failed.
   void     DoNotifyListener();
   virtual void DoNotifyListenerCleanup() = 0;
@@ -408,18 +414,33 @@ protected:
   friend class PrivateBrowsingChannel<HttpBaseChannel>;
   friend class InterceptFailedOnStop;
 
-  nsCOMPtr<nsIURI>                  mURI;
-  nsCOMPtr<nsIURI>                  mOriginalURI;
-  nsCOMPtr<nsIURI>                  mDocumentURI;
+protected:
+  // this section is for main-thread-only object
+  // all the references need to be proxy released on main thread.
+  nsCOMPtr<nsIURI> mURI;
+  nsCOMPtr<nsIURI> mOriginalURI;
+  nsCOMPtr<nsIURI> mDocumentURI;
+  nsCOMPtr<nsILoadGroup> mLoadGroup;
+  nsCOMPtr<nsILoadInfo> mLoadInfo;
+  nsCOMPtr<nsIInterfaceRequestor> mCallbacks;
+  nsCOMPtr<nsIProgressEventSink> mProgressSink;
+  nsCOMPtr<nsIURI> mReferrer;
+  nsCOMPtr<nsIApplicationCache> mApplicationCache;
+  nsCOMPtr<nsIURI> mAPIRedirectToURI;
+  nsCOMPtr<nsIURI> mProxyURI;
+  nsCOMPtr<nsIPrincipal> mPrincipal;
+  nsCOMPtr<nsIURI> mTopWindowURI;
+
+private:
+  // Proxy release all members above on main thread.
+  void ReleaseMainThreadOnlyReferences();
+
+protected:
+  nsTArray<Pair<nsString, nsString>> mSecurityConsoleMessages;
+
   nsCOMPtr<nsIStreamListener>       mListener;
   nsCOMPtr<nsISupports>             mListenerContext;
-  nsCOMPtr<nsILoadGroup>            mLoadGroup;
   nsCOMPtr<nsISupports>             mOwner;
-  nsCOMPtr<nsILoadInfo>             mLoadInfo;
-  nsCOMPtr<nsIInterfaceRequestor>   mCallbacks;
-  nsCOMPtr<nsIProgressEventSink>    mProgressSink;
-  nsCOMPtr<nsIURI>                  mReferrer;
-  nsCOMPtr<nsIApplicationCache>     mApplicationCache;
 
   // An instance of nsHTTPCompressConv
   nsCOMPtr<nsIStreamListener>       mCompressListener;
@@ -501,11 +522,9 @@ protected:
   // Per channel transport window override (0 means no override)
   uint32_t                          mInitialRwin;
 
-  nsCOMPtr<nsIURI>                  mAPIRedirectToURI;
   nsAutoPtr<nsTArray<nsCString> >   mRedirectedCachekeys;
 
   uint32_t                          mProxyResolveFlags;
-  nsCOMPtr<nsIURI>                  mProxyURI;
 
   uint32_t                          mContentDispositionHint;
   nsAutoPtr<nsString>               mContentDispositionFilename;
@@ -536,10 +555,7 @@ protected:
   // so that the timing can still be queried from OnStopRequest
   TimingStruct                      mTransactionTimings;
 
-  nsCOMPtr<nsIPrincipal>            mPrincipal;
-
   bool                              mForcePending;
-  nsCOMPtr<nsIURI>                  mTopWindowURI;
 
   bool mCorsIncludeCredentials;
   uint32_t mCorsMode;
@@ -626,7 +642,8 @@ template <class T>
 nsresult HttpAsyncAborter<T>::AsyncAbort(nsresult status)
 {
   MOZ_LOG(gHttpLog, LogLevel::Debug,
-         ("HttpAsyncAborter::AsyncAbort [this=%p status=%x]\n", mThis, status));
+         ("HttpAsyncAborter::AsyncAbort [this=%p status=%" PRIx32 "]\n",
+          mThis, static_cast<uint32_t>(status)));
 
   mThis->mStatus = status;
 
@@ -669,6 +686,27 @@ nsresult HttpAsyncAborter<T>::AsyncCall(void (T::*funcPtr)(),
 
   return rv;
 }
+
+class ProxyReleaseRunnable final : public mozilla::Runnable
+{
+public:
+  explicit ProxyReleaseRunnable(nsTArray<nsCOMPtr<nsISupports>>&& aDoomed)
+    : Runnable("ProxyReleaseRunnable")
+    , mDoomed(Move(aDoomed))
+  {}
+
+  NS_IMETHOD
+  Run() override
+  {
+    mDoomed.Clear();
+    return NS_OK;
+  }
+
+private:
+  virtual ~ProxyReleaseRunnable() {}
+
+  nsTArray<nsCOMPtr<nsISupports>> mDoomed;
+};
 
 } // namespace net
 } // namespace mozilla

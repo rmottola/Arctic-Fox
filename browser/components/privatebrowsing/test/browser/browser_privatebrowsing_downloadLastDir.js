@@ -12,7 +12,7 @@ function test() {
     Cu.import("resource://gre/modules/DownloadLastDir.jsm", {}).DownloadLastDir;
   let MockFilePicker = SpecialPowers.MockFilePicker;
   let launcher = {
-    source: Services.io.newURI("http://test1.com/file", null, null)
+    source: Services.io.newURI("http://test1.com/file")
   };
 
   MockFilePicker.init(window);
@@ -55,7 +55,7 @@ function test() {
     is(gDownloadLastDir.file.path, aDisplayDir.path,
        "gDownloadLastDir should be the expected display dir");
 
-    MockFilePicker.returnFiles = [aFile];
+    MockFilePicker.setFiles([aFile]);
     MockFilePicker.displayDirectory = null;
 
     launcher.saveDestinationAvailable = function (file) {

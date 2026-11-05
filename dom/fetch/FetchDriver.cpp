@@ -13,7 +13,6 @@
 #include "nsIOutputStream.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
-#include "nsIHttpHeaderVisitor.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIThreadRetargetableRequest.h"
 #include "nsIUploadChannel2.h"
@@ -314,11 +313,21 @@ FetchDriver::HttpFetch()
     nsAutoCString contentType;
     ErrorResult result;
     mRequest->Headers()->GetFirst(NS_LITERAL_CSTRING("content-type"), contentType, result);
-    // This is an error because the Request constructor explicitly extracts and
-    // sets a content-type per spec.
+    // We don't actually expect "result" to have failed here: that only happens
+    // for invalid header names.  But if for some reason it did, just propagate
+    // it out.
     if (result.Failed()) {
       return result.StealNSResult();
     }
+
+    // Now contentType is the header that was set in mRequest->Headers(), or a
+    // void string if no header was set.
+#ifdef DEBUG
+    bool hasContentTypeHeader =
+      mRequest->Headers()->Has(NS_LITERAL_CSTRING("content-type"), result);
+    MOZ_ASSERT(!result.Failed());
+    MOZ_ASSERT_IF(!hasContentTypeHeader, contentType.IsVoid());
+#endif // DEBUG
 
     nsCOMPtr<nsIInputStream> bodyStream;
     mRequest->GetBody(getter_AddRefs(bodyStream));
@@ -339,7 +348,9 @@ FetchDriver::HttpFetch()
     AutoTArray<nsCString, 5> unsafeHeaders;
     mRequest->Headers()->GetUnsafeHeaders(unsafeHeaders);
     nsCOMPtr<nsILoadInfo> loadInfo = chan->GetLoadInfo();
-    loadInfo->SetCorsPreflightInfo(unsafeHeaders, false);
+    if (loadInfo) {
+      loadInfo->SetCorsPreflightInfo(unsafeHeaders, false);
+    }
   }
 
   rv = chan->AsyncOpen2(this);
@@ -404,38 +415,6 @@ FetchDriver::FailWithNetworkError()
   }
 }
 
-namespace {
-class FillResponseHeaders final : public nsIHttpHeaderVisitor {
-  InternalResponse* mResponse;
-
-  ~FillResponseHeaders()
-  { }
-public:
-  NS_DECL_ISUPPORTS
-
-  explicit FillResponseHeaders(InternalResponse* aResponse)
-    : mResponse(aResponse)
-  {
-  }
-
-  NS_IMETHOD
-  VisitHeader(const nsACString & aHeader, const nsACString & aValue) override
-  {
-    ErrorResult result;
-    mResponse->Headers()->Append(aHeader, aValue, result);
-    if (result.Failed()) {
-      NS_WARNING(nsPrintfCString("Fetch ignoring illegal header - '%s': '%s'",
-                                 PromiseFlatCString(aHeader).get(),
-                                 PromiseFlatCString(aValue).get()).get());
-      result.SuppressException();
-    }
-    return NS_OK;
-  }
-};
-
-NS_IMPL_ISUPPORTS(FillResponseHeaders, nsIHttpHeaderVisitor)
-} // namespace
-
 NS_IMETHODIMP
 FetchDriver::OnStartRequest(nsIRequest* aRequest,
                             nsISupports* aContext)
@@ -489,11 +468,7 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
 
     response = new InternalResponse(responseStatus, statusText);
 
-    RefPtr<FillResponseHeaders> visitor = new FillResponseHeaders(response);
-    rv = httpChannel->VisitResponseHeaders(visitor);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      NS_WARNING("Failed to visit all headers.");
-    }
+    response->Headers()->FillResponseHeaders(httpChannel);
 
     // If Content-Encoding or Transfer-Encoding headers are set, then the actual
     // Content-Length (which refer to the decoded data) is obscured behind the encodings.

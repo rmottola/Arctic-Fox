@@ -8,6 +8,7 @@
 
 // Keep others in (case-insensitive) order:
 #include "gfxDrawable.h"
+#include "gfxPrefs.h"
 #include "nsCSSAnonBoxes.h"
 #include "nsCSSClipPathInstance.h"
 #include "nsDisplayList.h"
@@ -26,6 +27,7 @@
 #include "mozilla/gfx/Point.h"
 #include "nsCSSRendering.h"
 #include "mozilla/Unused.h"
+#include "mozilla/GeckoRestyleManager.h"
 
 using namespace mozilla;
 using namespace mozilla::layers;
@@ -110,18 +112,28 @@ private:
     // property set, that would be bad, since then our GetVisualOverflowRect()
     // call would give us the post-effects, and post-transform, overflow rect.
     //
-    // With image masks, there is one more exception.
-    //
-    // In nsStyleImageLayers::Layer::CalcDifference, we do not add
-    // nsChangeHint_UpdateOverflow hint when image mask(not SVG mask) property
-    // value changed, since replace image mask does not cause layout change.
-    // So even if we apply a new mask image to this frame,
-    // PreEffectsBBoxProperty might still left empty.
-    NS_ASSERTION(nsSVGEffects::GetEffectProperties(aFrame).MightHaveNoneSVGMask() ||
+    // There are two more exceptions:
+    // 1. In nsStyleImageLayers::Layer::CalcDifference, we do not add
+    //    nsChangeHint_UpdateOverflow hint when image mask(not SVG mask)
+    //    property value changed, since replace image mask does not cause
+    //    layout change. So even if we apply a new mask image to this frame,
+    //    PreEffectsBBoxProperty might still left empty.
+    // 2. During restyling: before the last continuation is restyled, there
+    //    is no guarantee that every continuation carries a
+    //    PreEffectsBBoxProperty property.
+#ifdef DEBUG
+    nsIFrame* firstFrame =
+      nsLayoutUtils::FirstContinuationOrIBSplitSibling(aFrame);
+    bool mightHaveNoneSVGMask =
+      nsSVGEffects::GetEffectProperties(firstFrame).MightHaveNoneSVGMask();
+    bool inRestyle =
+      aFrame->PresContext()->RestyleManager()->IsInStyleRefresh();
+
+    NS_ASSERTION(mightHaveNoneSVGMask || inRestyle ||
                  aFrame->GetParent()->StyleContext()->GetPseudo() ==
                    nsCSSAnonBoxes::mozAnonymousBlock,
                  "How did we getting here, then?");
-
+#endif
     NS_ASSERTION(!aFrame->Properties().Get(
                    aFrame->PreTransformOverflowAreasProperty()),
                  "GetVisualOverflowRect() won't return the pre-effects rect!");
@@ -527,7 +539,7 @@ PaintMaskSurface(const PaintFramesParams& aParams,
                                                       i, compositionOp);
 
       result =
-        nsCSSRendering::PaintBackgroundWithSC(params, aSC,
+        nsCSSRendering::PaintStyleImageLayerWithSC(params, aSC,
                                               *aParams.frame->StyleBorder());
       if (result != DrawResult::SUCCESS) {
         return result;
@@ -771,6 +783,7 @@ nsSVGIntegrationUtils::PaintMask(const PaintFramesParams& aParams)
   nsSVGUtils::DetermineMaskUsage(aParams.frame, aParams.handleOpacity,
                                  maskUsage);
   MOZ_ASSERT(maskUsage.shouldGenerateMaskLayer ||
+             maskUsage.shouldApplyClipPath ||
              maskUsage.shouldGenerateClipMaskLayer);
 
   nsIFrame* frame = aParams.frame;
@@ -812,7 +825,7 @@ nsSVGIntegrationUtils::PaintMask(const PaintFramesParams& aParams)
   }
 
   // Paint clip-path onto ctx.
-  if (maskUsage.shouldGenerateClipMaskLayer) {
+  if (maskUsage.shouldGenerateClipMaskLayer || maskUsage.shouldApplyClipPath) {
     matSR.Restore();
     matSR.SetContext(&ctx);
 

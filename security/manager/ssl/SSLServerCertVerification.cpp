@@ -244,7 +244,7 @@ public:
 
   SSLServerCertVerificationResult(nsNSSSocketInfo* infoObject,
                                   PRErrorCode errorCode,
-                                  Telemetry::ID telemetryID = Telemetry::HistogramCount,
+                                  Telemetry::HistogramID telemetryID = Telemetry::HistogramCount,
                                   uint32_t telemetryValue = -1,
                                   SSLErrorMessageType errorMessageType =
                                       PlainErrorMessage);
@@ -255,7 +255,7 @@ private:
 public:
   const PRErrorCode mErrorCode;
   const SSLErrorMessageType mErrorMessageType;
-  const Telemetry::ID mTelemetryID;
+  const Telemetry::HistogramID mTelemetryID;
   const uint32_t mTelemetryValue;
 };
 
@@ -511,22 +511,34 @@ CertErrorRunnable::CheckCertOverrides()
     return new SSLServerCertVerificationResult(mInfoObject,
                                                mDefaultErrorCodeToReport);
   }
-  nsresult nsrv = sss->IsSecureHost(nsISiteSecurityService::HEADER_HSTS,
-                                    mInfoObject->GetHostName(),
-                                    mProviderFlags,
-                                    nullptr,
-                                    &strictTransportSecurityEnabled);
+  nsCOMPtr<nsIURI> uri;
+  nsresult nsrv = NS_NewURI(getter_AddRefs(uri),
+                            NS_LITERAL_CSTRING("https://") +
+                            mInfoObject->GetHostName());
+  if (NS_FAILED(nsrv)) {
+    MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
+            ("[%p][%p] Creating new URI failed\n", mFdForLogging, this));
+    return new SSLServerCertVerificationResult(mInfoObject,
+                                               mDefaultErrorCodeToReport);
+  }
+  nsrv = sss->IsSecureURI(nsISiteSecurityService::HEADER_HSTS,
+                          uri,
+                          mProviderFlags,
+                          mInfoObject->GetOriginAttributes(),
+                          nullptr,
+                          &strictTransportSecurityEnabled);
   if (NS_FAILED(nsrv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("[%p][%p] checking for HSTS failed\n", mFdForLogging, this));
     return new SSLServerCertVerificationResult(mInfoObject,
                                                mDefaultErrorCodeToReport);
   }
-  nsrv = sss->IsSecureHost(nsISiteSecurityService::HEADER_HPKP,
-                           mInfoObject->GetHostName(),
-                           mProviderFlags,
-                           nullptr,
-                           &hasPinningInformation);
+  nsrv = sss->IsSecureURI(nsISiteSecurityService::HEADER_HPKP,
+                          uri,
+                          mProviderFlags,
+                          mInfoObject->GetOriginAttributes(),
+                          nullptr,
+                          &hasPinningInformation);
   if (NS_FAILED(nsrv)) {
     MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
            ("[%p][%p] checking for HPKP failed\n", mFdForLogging, this));
@@ -1493,9 +1505,9 @@ SSLServerCertVerificationJob::Run()
   if (mInfoObject->isAlreadyShutDown()) {
     error = SEC_ERROR_USER_CANCELLED;
   } else {
-    Telemetry::ID successTelemetry
+    Telemetry::HistogramID successTelemetry
       = Telemetry::SSL_SUCCESFUL_CERT_VALIDATION_TIME_MOZILLAPKIX;
-    Telemetry::ID failureTelemetry
+    Telemetry::HistogramID failureTelemetry
       = Telemetry::SSL_INITIAL_FAILED_CERT_VALIDATION_TIME_MOZILLAPKIX;
 
     // Reset the error code here so we can detect if AuthCertificate fails to
@@ -1747,7 +1759,7 @@ AuthCertificateHook(void* arg, PRFileDesc* fd, PRBool checkSig, PRBool isServer)
 
 SSLServerCertVerificationResult::SSLServerCertVerificationResult(
         nsNSSSocketInfo* infoObject, PRErrorCode errorCode,
-        Telemetry::ID telemetryID, uint32_t telemetryValue,
+        Telemetry::HistogramID telemetryID, uint32_t telemetryValue,
         SSLErrorMessageType errorMessageType)
   : mInfoObject(infoObject)
   , mErrorCode(errorCode)

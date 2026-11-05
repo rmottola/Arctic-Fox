@@ -8,6 +8,7 @@
 #include "nsStreamUtils.h"
 #include "jsapi.h"
 #include "jsfriendapi.h"
+#include "mozilla/UniquePtrExtensions.h"
 
 NS_IMPL_ISUPPORTS(ArrayBufferInputStream, nsIArrayBufferInputStream, nsIInputStream);
 
@@ -34,9 +35,14 @@ ArrayBufferInputStream::SetData(JS::Handle<JS::Value> aBuffer,
 
   uint32_t buflen = JS_GetArrayBufferByteLength(arrayBuffer);
   uint32_t offset = std::min(buflen, aByteOffset);
-  mBufferLength = std::min(buflen - offset, aLength);
- 
-  mArrayBuffer = mozilla::MakeUnique<char[]>(mBufferLength);
+  uint32_t bufferLength = std::min(buflen - offset, aLength);
+
+  mArrayBuffer = mozilla::MakeUniqueFallible<char[]>(bufferLength);
+  if (!mArrayBuffer) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  mBufferLength = bufferLength;
 
   JS::AutoCheckCannotGC nogc;
   bool isShared;
@@ -89,13 +95,14 @@ ArrayBufferInputStream::ReadSegments(nsWriteSegmentFun writer, void *closure,
   while (mPos < mBufferLength) {
     uint32_t remaining = mBufferLength - mPos;
     MOZ_ASSERT(mArrayBuffer);
+
     uint32_t count = std::min(aCount, remaining);
     if (count == 0) {
       break;
     }
 
     uint32_t written;
-    nsresult rv = writer(this, closure, &mArrayBuffer[0] + mPos, 0, count, &written);
+    nsresult rv = writer(this, closure, &mArrayBuffer[0] + mPos, *result, count, &written);
     if (NS_FAILED(rv)) {
       // InputStreams do not propagate errors to caller.
       return NS_OK;

@@ -19,6 +19,23 @@ use ffi;
 pub use ffi::types::*;
 pub use ffi::*;
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum GlType {
+    Gl,
+    Gles,
+}
+
+impl Default for GlType {
+  #[cfg(target_os="android")]
+  fn default() -> GlType {
+    GlType::Gles
+  }
+  #[cfg(not(target_os="android"))]
+  fn default() -> GlType {
+    GlType::Gl
+  }
+}
+
 #[inline]
 pub fn buffer_data<T>(target: GLenum, data: &[T], usage: GLenum) {
     unsafe {
@@ -665,6 +682,31 @@ pub fn framebuffer_texture_layer(target: GLenum,
 }
 
 #[inline]
+pub fn blit_framebuffer(srcX0: GLint,
+                        srcY0: GLint,
+                        srcX1: GLint,
+                        srcY1: GLint,
+                        dstX0: GLint,
+                        dstY0: GLint,
+                        dstX1: GLint,
+                        dstY1: GLint,
+                        mask: GLbitfield,
+                        filter: GLenum) {
+    unsafe {
+        ffi::BlitFramebuffer(srcX0,
+                             srcY0,
+                             srcX1,
+                             srcY1,
+                             dstX0,
+                             dstY0,
+                             dstX1,
+                             dstY1,
+                             mask,
+                             filter);
+    }
+}
+
+#[inline]
 pub fn vertex_attrib_4f(index: GLuint,
                         x: GLfloat,
                         y: GLfloat,
@@ -705,6 +747,21 @@ pub fn vertex_attrib_pointer(index: GLuint,
                                  normalized as GLboolean,
                                  stride,
                                  offset as *const GLvoid)
+    }
+}
+
+#[inline]
+pub fn vertex_attrib_i_pointer(index: GLuint,
+                               size: GLint,
+                               type_: GLenum,
+                               stride: GLsizei,
+                               offset: GLuint) {
+    unsafe {
+        ffi::VertexAttribIPointer(index,
+                                  size,
+                                  type_,
+                                  stride,
+                                  offset as *const GLvoid)
     }
 }
 
@@ -881,6 +938,27 @@ pub fn is_shader(shader: GLuint) -> GLboolean {
 pub fn is_texture(texture: GLenum) -> GLboolean {
     unsafe {
         ffi::IsTexture(texture)
+    }
+}
+
+#[inline]
+pub fn is_framebuffer(framebuffer: GLenum) -> GLboolean {
+    unsafe {
+        ffi::IsFramebuffer(framebuffer)
+    }
+}
+
+#[inline]
+pub fn is_renderbuffer(renderbuffer: GLenum) -> GLboolean {
+    unsafe {
+        ffi::IsRenderbuffer(renderbuffer)
+    }
+}
+
+#[inline]
+pub fn check_frame_buffer_status(target: GLenum) -> GLenum {
+    unsafe {
+        ffi::CheckFramebufferStatus(target)
     }
 }
 
@@ -1430,7 +1508,7 @@ pub fn generate_mipmap(target: GLenum) {
 }
 
 #[inline]
-#[cfg(not(android))]
+#[cfg(not(target_os="android"))]
 pub fn insert_event_marker_ext(message: &str) {
     if ffi::InsertEventMarkerEXT::is_loaded() {
         unsafe {
@@ -1440,7 +1518,7 @@ pub fn insert_event_marker_ext(message: &str) {
 }
 
 #[inline]
-#[cfg(not(android))]
+#[cfg(not(target_os="android"))]
 pub fn push_group_marker_ext(message: &str) {
     if ffi::PushGroupMarkerEXT::is_loaded() {
         unsafe {
@@ -1450,7 +1528,7 @@ pub fn push_group_marker_ext(message: &str) {
 }
 
 #[inline]
-#[cfg(not(android))]
+#[cfg(not(target_os="android"))]
 pub fn pop_group_marker_ext() {
     if ffi::PopGroupMarkerEXT::is_loaded() {
         unsafe {

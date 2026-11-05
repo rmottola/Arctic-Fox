@@ -15,7 +15,7 @@ var promise = require("promise");
 var defer = require("devtools/shared/defer");
 var EventEmitter = require("devtools/shared/event-emitter");
 const {executeSoon} = require("devtools/shared/DevToolsUtils");
-var {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
+var KeyShortcuts = require("devtools/client/shared/key-shortcuts");
 var {Task} = require("devtools/shared/task");
 const {initCssProperties} = require("devtools/shared/fronts/css-properties");
 const nodeConstants = require("devtools/shared/dom-node-constants");
@@ -570,7 +570,7 @@ Inspector.prototype = {
     this.computedview = new ComputedViewTool(this, this.panelWin);
 
     if (Services.prefs.getBoolPref("devtools.layoutview.enabled")) {
-      const {LayoutView} = this.browserRequire("devtools/client/inspector/layout/layout");
+      const LayoutView = this.browserRequire("devtools/client/inspector/layout/layout");
       this.layoutview = new LayoutView(this, this.panelWin);
     }
 
@@ -614,7 +614,25 @@ Inspector.prototype = {
     this.sidebar.addTab(id, title, panel, selected);
   },
 
-  setupToolbar: function () {
+  /**
+   * Method to check whether the document is a HTML document and
+   * pickColorFromPage method is available or not.
+   * Returns a boolean value
+   */
+  supportsEyeDropper: Task.async(function* () {
+    let isInHTMLDocument = this.selection.nodeFront &&
+                            this.selection.nodeFront.isInHTMLDocument;
+    let pickColorAvailable = false;
+    try {
+      pickColorAvailable = yield this.target
+                                      .actorHasMethod("inspector", "pickColorFromPage");
+    } catch (e) {
+      console.error(e);
+    }
+    return isInHTMLDocument && pickColorAvailable;
+  }),
+
+  setupToolbar: Task.async(function* () {
     this.teardownToolbar();
 
     // Setup the sidebar toggle button.
@@ -637,26 +655,21 @@ Inspector.prototype = {
     this.addNodeButton.addEventListener("click", this.addNode);
 
     // Setup the eye-dropper icon if we're in an HTML document and we have actor support.
-    if (this.selection.nodeFront && this.selection.nodeFront.isInHTMLDocument) {
-      this.target.actorHasMethod("inspector", "pickColorFromPage").then(value => {
-        if (!value) {
-          return;
-        }
-
-        this.onEyeDropperDone = this.onEyeDropperDone.bind(this);
-        this.onEyeDropperButtonClicked = this.onEyeDropperButtonClicked.bind(this);
-        this.eyeDropperButton = this.panelDoc
+    let canShowEyeDropper = yield this.supportsEyeDropper();
+    if (canShowEyeDropper) {
+      this.onEyeDropperDone = this.onEyeDropperDone.bind(this);
+      this.onEyeDropperButtonClicked = this.onEyeDropperButtonClicked.bind(this);
+      this.eyeDropperButton = this.panelDoc
                                     .getElementById("inspector-eyedropper-toggle");
-        this.eyeDropperButton.disabled = false;
-        this.eyeDropperButton.title = INSPECTOR_L10N.getStr("inspector.eyedropper.label");
-        this.eyeDropperButton.addEventListener("click", this.onEyeDropperButtonClicked);
-      }, e => console.error(e));
+      this.eyeDropperButton.disabled = false;
+      this.eyeDropperButton.title = INSPECTOR_L10N.getStr("inspector.eyedropper.label");
+      this.eyeDropperButton.addEventListener("click", this.onEyeDropperButtonClicked);
     } else {
       let eyeDropperButton = this.panelDoc.getElementById("inspector-eyedropper-toggle");
       eyeDropperButton.disabled = true;
       eyeDropperButton.title = INSPECTOR_L10N.getStr("eyedropper.disabled.title");
     }
-  },
+  }),
 
   teardownToolbar: function () {
     this._sidebarToggle = null;
@@ -1362,7 +1375,7 @@ Inspector.prototype = {
     }
 
     if (this._markupFrame) {
-      this._markupFrame.parentNode.removeChild(this._markupFrame);
+      this._markupFrame.remove();
       this._markupFrame = null;
     }
 
@@ -1690,17 +1703,17 @@ Inspector.prototype = {
   },
 
   /**
-   * Initiate gcli screenshot command on selected node
+   * Initiate gcli screenshot command on selected node.
    */
   screenshotNode: function () {
-    CommandUtils.createRequisition(this._target, {
-      environment: CommandUtils.createEnvironment(this, "_target")
-    }).then(requisition => {
-      // Bug 1180314 -  CssSelector might contain white space so need to make sure it is
-      // passed to screenshot as a single parameter.  More work *might* be needed if
-      // CssSelector could contain escaped single- or double-quotes, backslashes, etc.
-      requisition.updateExec("screenshot --selector '" + this.selectionCssSelector + "'");
-    });
+    const command = Services.prefs.getBoolPref("devtools.screenshot.clipboard.enabled") ?
+      "screenshot --file --clipboard --selector" :
+      "screenshot --file --selector";
+    // Bug 1180314 -  CssSelector might contain white space so need to make sure it is
+    // passed to screenshot as a single parameter.  More work *might* be needed if
+    // CssSelector could contain escaped single- or double-quotes, backslashes, etc.
+    CommandUtils.executeOnTarget(this._target,
+      `${command} '${this.selectionCssSelector}'`);
   },
 
   /**

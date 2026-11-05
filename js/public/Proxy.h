@@ -32,7 +32,8 @@ using JS::PrivateValue;
 using JS::PropertyDescriptor;
 using JS::Value;
 
-class RegExpGuard;
+class RegExpShared;
+
 class JS_FRIEND_API(Wrapper);
 
 /*
@@ -328,7 +329,8 @@ class JS_FRIEND_API(BaseProxyHandler)
     virtual bool isArray(JSContext* cx, HandleObject proxy, JS::IsArrayAnswer* answer) const;
     virtual const char* className(JSContext* cx, HandleObject proxy) const;
     virtual JSString* fun_toString(JSContext* cx, HandleObject proxy, unsigned indent) const;
-    virtual bool regexp_toShared(JSContext* cx, HandleObject proxy, RegExpGuard* g) const;
+    virtual bool regexp_toShared(JSContext* cx, HandleObject proxy,
+                                 MutableHandle<js::RegExpShared*> shared) const;
     virtual bool boxedValue_unbox(JSContext* cx, HandleObject proxy, MutableHandleValue vp) const;
     virtual void trace(JSTracer* trc, JSObject* proxy) const;
     virtual void finalize(JSFreeOp* fop, JSObject* proxy) const;
@@ -380,6 +382,10 @@ struct ProxyValueArray
     {
         for (size_t i = 0; i < PROXY_EXTRA_SLOTS; i++)
             extraSlots[i] = JS::UndefinedValue();
+    }
+
+    static size_t offsetOfPrivateSlot() {
+        return offsetof(ProxyValueArray, privateSlot);
     }
 };
 
@@ -593,6 +599,15 @@ class JS_FRIEND_API(AutoEnterPolicy)
     inline void recordLeave() {}
 #endif
 
+  private:
+    // This operator needs to be deleted explicitly, otherwise Visual C++ will
+    // create it automatically when it is part of the export JS API. In that
+    // case, compile would fail because HandleId is not allowed to be assigned
+    // and consequently instantiation of assign operator of mozilla::Maybe
+    // would fail. See bug 1325351 comment 16. Copy constructor is removed at
+    // the same time for consistency.
+    AutoEnterPolicy(const AutoEnterPolicy&) = delete;
+    AutoEnterPolicy& operator=(const AutoEnterPolicy&) = delete;
 };
 
 #ifdef JS_DEBUG

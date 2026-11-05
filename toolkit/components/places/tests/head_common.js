@@ -110,7 +110,7 @@ function DBConn(aForceNewConnection) {
 
   // If the Places database connection has been closed, create a new connection.
   if (!gDBConn || aForceNewConnection) {
-    let file = Services.dirsvc.get('ProfD', Ci.nsIFile);
+    let file = Services.dirsvc.get("ProfD", Ci.nsIFile);
     file.append("places.sqlite");
     let dbConn = gDBConn = Services.storage.openDatabase(file);
 
@@ -232,7 +232,7 @@ function compareArrays(aArray1, aArray2) {
  */
 function clearDB() {
   try {
-    let file = Services.dirsvc.get('ProfD', Ci.nsIFile);
+    let file = Services.dirsvc.get("ProfD", Ci.nsIFile);
     file.append("places.sqlite");
     if (file.exists())
       file.remove(false);

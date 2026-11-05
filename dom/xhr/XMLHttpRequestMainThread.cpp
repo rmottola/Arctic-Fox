@@ -12,10 +12,12 @@
 #endif
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/CheckedInt.h"
+#include "mozilla/dom/BlobBinding.h"
 #include "mozilla/dom/BlobSet.h"
 #include "mozilla/dom/DocGroup.h"
 #include "mozilla/dom/DOMString.h"
 #include "mozilla/dom/File.h"
+#include "mozilla/dom/FileBinding.h"
 #include "mozilla/dom/FileCreatorHelper.h"
 #include "mozilla/dom/FetchUtil.h"
 #include "mozilla/dom/FormData.h"
@@ -322,26 +324,25 @@ XMLHttpRequestMainThread::SetRequestObserver(nsIRequestObserver* aObserver)
 NS_IMPL_CYCLE_COLLECTION_CLASS(XMLHttpRequestMainThread)
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(XMLHttpRequestMainThread)
-  bool isBlack = tmp->IsBlack();
-  if (isBlack || tmp->mWaitingForOnStopRequest) {
+  bool hasLiveWrapper = tmp->HasKnownLiveWrapper();
+  if (hasLiveWrapper || tmp->mWaitingForOnStopRequest) {
     if (tmp->mListenerManager) {
       tmp->mListenerManager->MarkForCC();
     }
-    if (!isBlack && tmp->PreservingWrapper()) {
-      // This marks the wrapper black.
-      tmp->GetWrapper();
+    if (!hasLiveWrapper && tmp->PreservingWrapper()) {
+      tmp->MarkWrapperLive();
     }
     return true;
   }
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(XMLHttpRequestMainThread)
-  return tmp->
-    IsBlackAndDoesNotNeedTracing(static_cast<DOMEventTargetHelper*>(tmp));
+  return tmp->HasKnownLiveWrapperAndDoesNotNeedTracing(
+    static_cast<DOMEventTargetHelper*>(tmp));
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(XMLHttpRequestMainThread)
-  return tmp->IsBlack();
+  return tmp->HasKnownLiveWrapper();
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(XMLHttpRequestMainThread,
@@ -874,6 +875,10 @@ XMLHttpRequestMainThread::IsCrossSiteCORSRequest() const
 
   nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
   MOZ_ASSERT(loadInfo);
+
+  if (!loadInfo) {
+    return false;
+  }
 
   return loadInfo->GetTainting() == LoadTainting::CORS;
 }
@@ -1616,7 +1621,9 @@ XMLHttpRequestMainThread::SetOriginAttributes(const OriginAttributesDictionary& 
 
   nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
   MOZ_ASSERT(loadInfo);
-  loadInfo->SetOriginAttributes(attrs);
+  if (loadInfo) {
+    loadInfo->SetOriginAttributes(attrs);
+  }
 }
 
 void
@@ -2115,7 +2122,10 @@ XMLHttpRequestMainThread::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
 
     nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
     MOZ_ASSERT(loadInfo);
-    bool isCrossSite = loadInfo->GetTainting() != LoadTainting::Basic;
+    bool isCrossSite = false;
+    if (loadInfo) {
+      isCrossSite = loadInfo->GetTainting() != LoadTainting::Basic;
+    }
 
     if (isCrossSite) {
       nsCOMPtr<nsIHTMLDocument> htmlDoc = do_QueryInterface(mResponseXML);
@@ -2381,6 +2391,10 @@ XMLHttpRequestMainThread::ChangeStateToDone()
     mTimeoutTimer->Cancel();
   }
 
+  if (mFlagSynchronous) {
+    UnsuppressEventHandlingAndResume();
+  }
+
   // Per spec, fire the last download progress event, if any,
   // before readystatechange=4/done. (Note that 0-sized responses
   // will have not sent a progress event yet, so one must be sent here).
@@ -2451,27 +2465,6 @@ XMLHttpRequestMainThread::CreateChannel()
     secFlags |= nsILoadInfo::SEC_COOKIES_OMIT;
   }
 
-  nsCOMPtr<nsIExpandedPrincipal> ep = do_QueryInterface(mPrincipal);
-  if (ep) {
-    // If we have an expanded principal, instead of using that, select the
-    // principal in the whitelist which can load our URL, and use that instead.
-    nsTArray<nsCOMPtr<nsIPrincipal>>* whitelist = nullptr;
-    ep->GetWhiteList(&whitelist);
-    if (!whitelist) {
-      return NS_ERROR_FAILURE;
-    }
-    MOZ_ASSERT(!(secFlags & nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_INHERITS));
-    bool dataInherits = (secFlags &
-      (nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS |
-       nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS)) != 0;
-    for (const auto& principal : *whitelist) {
-      if (NS_SUCCEEDED(principal->CheckMayLoad(mRequestURL, false, dataInherits))) {
-        mPrincipal = principal;
-        break;
-      }
-    }
-  }
-
   // Use the responsibleDocument if we have it, except for dedicated workers
   // where it will be the parent document, which is not the one we want to use.
   nsresult rv;
@@ -2508,6 +2501,37 @@ XMLHttpRequestMainThread::CreateChannel()
     if (timedChannel) {
       timedChannel->SetInitiatorType(NS_LITERAL_STRING("xmlhttprequest"));
     }
+  }
+
+  // Using the provided principal as the triggeringPrincipal is fine, since we
+  // want to be able to access any of the origins that the principal has access
+  // to during the security checks, but we don't want a document to inherit an
+  // expanded principal, so in that case we need to select the principal in the
+  // expanded principal's whitelist that can load our URL as principalToInherit.
+  nsCOMPtr<nsIPrincipal> resultingDocumentPrincipal(mPrincipal);
+  nsCOMPtr<nsIExpandedPrincipal> ep = do_QueryInterface(mPrincipal);
+  if (ep) {
+    nsTArray<nsCOMPtr<nsIPrincipal>>* whitelist = nullptr;
+    ep->GetWhiteList(&whitelist);
+    if (!whitelist) {
+      return NS_ERROR_FAILURE;
+    }
+    MOZ_ASSERT(!(secFlags & nsILoadInfo::SEC_REQUIRE_SAME_ORIGIN_DATA_INHERITS));
+    bool dataInherits = (secFlags &
+      (nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS |
+       nsILoadInfo::SEC_REQUIRE_CORS_DATA_INHERITS)) != 0;
+    for (const auto& principal : *whitelist) {
+      if (NS_SUCCEEDED(principal->CheckMayLoad(mRequestURL, false, dataInherits))) {
+        resultingDocumentPrincipal = principal;
+        break;
+      }
+    }
+  }
+
+  nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
+  if (loadInfo) {
+    rv = loadInfo->SetPrincipalToInherit(resultingDocumentPrincipal);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
 
   return NS_OK;
@@ -2613,7 +2637,9 @@ XMLHttpRequestMainThread::InitiateFetch(nsIInputStream* aUploadStream,
   // Not doing this for privileged system XHRs since those don't use CORS.
   if (!IsSystemXHR() && !mIsAnon && mFlagACwithCredentials) {
     nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
-    static_cast<net::LoadInfo*>(loadInfo.get())->SetIncludeCookiesSecFlag();
+    if (loadInfo) {
+      static_cast<net::LoadInfo*>(loadInfo.get())->SetIncludeCookiesSecFlag();
+    }
   }
 
   // Blocking gets are common enough out of XHR that we should mark
@@ -2674,8 +2700,10 @@ XMLHttpRequestMainThread::InitiateFetch(nsIInputStream* aUploadStream,
     nsTArray<nsCString> CORSUnsafeHeaders;
     mAuthorRequestHeaders.GetCORSUnsafeHeaders(CORSUnsafeHeaders);
     nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
-    loadInfo->SetCorsPreflightInfo(CORSUnsafeHeaders,
-                                   mFlagHadUploadListenersOnSend);
+    if (loadInfo) {
+      loadInfo->SetCorsPreflightInfo(CORSUnsafeHeaders,
+                                     mFlagHadUploadListenersOnSend);
+    }
   }
 
   // Hook us up to listen to redirects and the like. Only do this very late
@@ -2791,6 +2819,23 @@ XMLHttpRequestMainThread::Send(nsIVariant* aVariant)
 
   BodyExtractor<const nsAString> body(&string);
   return SendInternal(&body);
+}
+
+void
+XMLHttpRequestMainThread::UnsuppressEventHandlingAndResume()
+{
+  MOZ_ASSERT(mFlagSynchronous);
+
+  if (mSuspendedDoc) {
+    mSuspendedDoc->UnsuppressEventHandlingAndFireEvents(nsIDocument::eEvents,
+                                                         true);
+    mSuspendedDoc = nullptr;
+  }
+
+  if (mResumeTimeoutRunnable) {
+    NS_DispatchToCurrentThread(mResumeTimeoutRunnable);
+    mResumeTimeoutRunnable = nullptr;
+  }
 }
 
 nsresult
@@ -2912,17 +2957,15 @@ XMLHttpRequestMainThread::SendInternal(const BodyExtractorBase* aBody)
   if (mFlagSynchronous) {
     mFlagSyncLooping = true;
 
-    nsCOMPtr<nsIDocument> suspendedDoc;
-    nsCOMPtr<nsIRunnable> resumeTimeoutRunnable;
     if (GetOwner()) {
       if (nsCOMPtr<nsPIDOMWindowOuter> topWindow = GetOwner()->GetOuterWindow()->GetTop()) {
         if (nsCOMPtr<nsPIDOMWindowInner> topInner = topWindow->GetCurrentInnerWindow()) {
-          suspendedDoc = topWindow->GetExtantDoc();
-          if (suspendedDoc) {
-            suspendedDoc->SuppressEventHandling(nsIDocument::eEvents);
+          mSuspendedDoc = topWindow->GetExtantDoc();
+          if (mSuspendedDoc) {
+            mSuspendedDoc->SuppressEventHandling(nsIDocument::eEvents);
           }
           topInner->Suspend();
-          resumeTimeoutRunnable = new nsResumeTimeoutsEvent(topInner);
+          mResumeTimeoutRunnable = new nsResumeTimeoutsEvent(topInner);
         }
       }
     }
@@ -2936,7 +2979,7 @@ XMLHttpRequestMainThread::SendInternal(const BodyExtractorBase* aBody)
     }
 
     if (NS_SUCCEEDED(rv)) {
-      nsAutoSyncOperation sync(suspendedDoc);
+      nsAutoSyncOperation sync(mSuspendedDoc);
       nsIThread *thread = NS_GetCurrentThread();
       while (mFlagSyncLooping) {
         if (!NS_ProcessNextEvent(thread)) {
@@ -2953,14 +2996,7 @@ XMLHttpRequestMainThread::SendInternal(const BodyExtractorBase* aBody)
       CancelSyncTimeoutTimer();
     }
 
-    if (suspendedDoc) {
-      suspendedDoc->UnsuppressEventHandlingAndFireEvents(nsIDocument::eEvents,
-                                                         true);
-    }
-
-    if (resumeTimeoutRunnable) {
-      NS_DispatchToCurrentThread(resumeTimeoutRunnable);
-    }
+    UnsuppressEventHandlingAndResume();
   } else {
     // Now that we've successfully opened the channel, we can change state.  Note
     // that this needs to come after the AsyncOpen() and rv check, because this

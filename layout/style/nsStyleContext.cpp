@@ -5,6 +5,8 @@
 
 /* the interface (to internal code) for retrieving computed style data */
 
+#include "nsStyleContext.h"
+
 #include "CSSVariableImageTable.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Maybe.h"
@@ -24,8 +26,6 @@
 #include "nsIPresShell.h"
 
 #include "nsRuleNode.h"
-#include "nsStyleContext.h"
-#include "mozilla/StyleAnimationValue.h"
 #include "GeckoProfiler.h"
 #include "nsIDocument.h"
 #include "nsPrintfCString.h"
@@ -960,7 +960,8 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
 #undef GET_UNIQUE_STYLE_DATA
 }
 
-template<class StyleContextLike>
+template<class StyleContextLike,
+         nsStyleContext::NeutralChangeHandling aNeutralChangeHandling>
 nsChangeHint
 nsStyleContext::CalcStyleDifferenceInternal(StyleContextLike* aNewContext,
                                             nsChangeHint aParentHintsNotHandledForDescendants,
@@ -970,6 +971,10 @@ nsStyleContext::CalcStyleDifferenceInternal(StyleContextLike* aNewContext,
   PROFILER_LABEL("nsStyleContext", "CalcStyleDifference",
     js::ProfileEntry::Category::CSS);
 
+  // See the comment in CalcStyleDifference(ServoComputedValues*, ...) to
+  // understand why we need to manually handle the neutral change in Servo.
+  MOZ_ASSERT_IF(mSource.IsServoComputedValues(),
+                aNeutralChangeHandling == NeutralChangeHandling::Retain);
   MOZ_ASSERT(NS_IsHintSubset(aParentHintsNotHandledForDescendants,
                              nsChangeHint_Hints_NotHandledForDescendants),
              "caller is passing inherited hints, but shouldn't be");
@@ -1169,82 +1174,18 @@ nsStyleContext::CalcStyleDifferenceInternal(StyleContextLike* aNewContext,
     // |thisVis| (including this function if we skip one of these checks
     // due to change being true already or due to the old style context
     // not having a style-if-visited), but not the other way around.
-    if (PeekStyleColor()) {
-      if (thisVis->StyleColor()->mColor !=
-          otherVis->StyleColor()->mColor) {
-        change = true;
-      }
+#define STYLE_FIELD(name_) thisVisStruct->name_ != otherVisStruct->name_ ||
+#define STYLE_STRUCT(name_, fields_)                                    \
+    if (!change && PeekStyle##name_()) {                                \
+      const nsStyle##name_* thisVisStruct = thisVis->Style##name_();    \
+      const nsStyle##name_* otherVisStruct = otherVis->Style##name_();  \
+      if (MOZ_FOR_EACH(STYLE_FIELD, (), fields_) false) {               \
+        change = true;                                                  \
+      }                                                                 \
     }
-
-    // NB: Calling Peek on |this|, not |thisVis| (see above).
-    if (!change && PeekStyleBackground()) {
-      if (thisVis->StyleBackground()->mBackgroundColor !=
-          otherVis->StyleBackground()->mBackgroundColor) {
-        change = true;
-      }
-    }
-
-    // NB: Calling Peek on |this|, not |thisVis| (see above).
-    if (!change && PeekStyleBorder()) {
-      const nsStyleBorder *thisVisBorder = thisVis->StyleBorder();
-      const nsStyleBorder *otherVisBorder = otherVis->StyleBorder();
-      NS_FOR_CSS_SIDES(side) {
-        if (thisVisBorder->mBorderColor[side] !=
-            otherVisBorder->mBorderColor[side]) {
-          change = true;
-          break;
-        }
-      }
-    }
-
-    // NB: Calling Peek on |this|, not |thisVis| (see above).
-    if (!change && PeekStyleOutline()) {
-      const nsStyleOutline *thisVisOutline = thisVis->StyleOutline();
-      const nsStyleOutline *otherVisOutline = otherVis->StyleOutline();
-      if (thisVisOutline->mOutlineColor != otherVisOutline->mOutlineColor) {
-        change = true;
-      }
-    }
-
-    // NB: Calling Peek on |this|, not |thisVis| (see above).
-    if (!change && PeekStyleColumn()) {
-      const nsStyleColumn *thisVisColumn = thisVis->StyleColumn();
-      const nsStyleColumn *otherVisColumn = otherVis->StyleColumn();
-      if (thisVisColumn->mColumnRuleColor != otherVisColumn->mColumnRuleColor) {
-        change = true;
-      }
-    }
-
-    // NB: Calling Peek on |this|, not |thisVis| (see above).
-    if (!change && PeekStyleText()) {
-      const nsStyleText* thisVisText = thisVis->StyleText();
-      const nsStyleText* otherVisText = otherVis->StyleText();
-      if (thisVisText->mTextEmphasisColor != otherVisText->mTextEmphasisColor ||
-          thisVisText->mWebkitTextFillColor != otherVisText->mWebkitTextFillColor ||
-          thisVisText->mWebkitTextStrokeColor != otherVisText->mWebkitTextStrokeColor) {
-        change = true;
-      }
-    }
-
-    // NB: Calling Peek on |this|, not |thisVis| (see above).
-    if (!change && PeekStyleTextReset()) {
-      const nsStyleTextReset *thisVisTextReset = thisVis->StyleTextReset();
-      const nsStyleTextReset *otherVisTextReset = otherVis->StyleTextReset();
-      if (thisVisTextReset->mTextDecorationColor !=
-          otherVisTextReset->mTextDecorationColor) {
-        change = true;
-      }
-    }
-
-    // NB: Calling Peek on |this|, not |thisVis| (see above).
-    if (!change && PeekStyleSVG()) {
-      const nsStyleSVG *thisVisSVG = thisVis->StyleSVG();
-      const nsStyleSVG *otherVisSVG = otherVis->StyleSVG();
-      if (thisVisSVG->mFill != otherVisSVG->mFill ||
-          thisVisSVG->mStroke != otherVisSVG->mStroke) {
-        change = true;
-      }
-    }
+#include "nsCSSVisitedDependentPropList.h"
+#undef STYLE_STRUCT
+#undef STYLE_FIELD
 
     if (change) {
       hint |= nsChangeHint_RepaintFrame;
@@ -1279,7 +1220,9 @@ nsStyleContext::CalcStyleDifferenceInternal(StyleContextLike* aNewContext,
 
   MOZ_ASSERT(NS_IsHintSubset(hint, nsChangeHint_AllHints),
              "Added a new hint without bumping AllHints?");
-  return hint & ~nsChangeHint_NeutralChange;
+  return aNeutralChangeHandling == NeutralChangeHandling::Strip
+           ? (hint & ~nsChangeHint_NeutralChange)
+           : hint;
 }
 
 nsChangeHint
@@ -1288,8 +1231,9 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aNewContext,
                                     uint32_t* aEqualStructs,
                                     uint32_t* aSamePointerStructs)
 {
-  return CalcStyleDifferenceInternal(aNewContext, aParentHintsNotHandledForDescendants,
-                                     aEqualStructs, aSamePointerStructs);
+  return CalcStyleDifferenceInternal<nsStyleContext, NeutralChangeHandling::Strip>
+    (aNewContext, aParentHintsNotHandledForDescendants, aEqualStructs,
+     aSamePointerStructs);
 }
 
 class MOZ_STACK_CLASS FakeStyleContext
@@ -1325,9 +1269,15 @@ nsStyleContext::CalcStyleDifference(const ServoComputedValues* aNewComputedValue
                                     uint32_t* aEqualStructs,
                                     uint32_t* aSamePointerStructs)
 {
+  // NB: Servo uses the presence of a change hint to determine whether it should
+  // generate a new nsStyleContext.
+  //
+  // Given that, we can't strip the neutral change hint here, since it may
+  // provoke errors like bug 1330874.
   FakeStyleContext newContext(aNewComputedValues);
-  return CalcStyleDifferenceInternal(&newContext, aParentHintsNotHandledForDescendants,
-                                     aEqualStructs, aSamePointerStructs);
+  return CalcStyleDifferenceInternal<FakeStyleContext, NeutralChangeHandling::Retain>(
+      &newContext, aParentHintsNotHandledForDescendants, aEqualStructs,
+      aSamePointerStructs);
 }
 
 #ifdef DEBUG
@@ -1452,87 +1402,62 @@ nsStyleContext::Arena()
   return PresContext()->PresShell();
 }
 
-static inline void
-ExtractAnimationValue(nsCSSPropertyID aProperty,
-                      nsStyleContext* aStyleContext,
-                      StyleAnimationValue& aResult)
+template<typename Func>
+static nscolor
+GetVisitedDependentColorInternal(nsStyleContext* aSc, Func aColorFunc)
 {
-  DebugOnly<bool> success =
-    StyleAnimationValue::ExtractComputedValue(aProperty, aStyleContext,
-                                              aResult);
-  MOZ_ASSERT(success,
-             "aProperty must be extractable by StyleAnimationValue");
-}
-
-static Maybe<nscolor>
-ExtractColor(nsCSSPropertyID aProperty,
-             nsStyleContext *aStyleContext)
-{
-  StyleAnimationValue val;
-  ExtractAnimationValue(aProperty, aStyleContext, val);
-  switch (val.GetUnit()) {
-    case StyleAnimationValue::eUnit_Color:
-      return Some(val.GetCSSValueValue()->GetColorValue());
-    case StyleAnimationValue::eUnit_CurrentColor:
-      return Some(aStyleContext->StyleColor()->mColor);
-    case StyleAnimationValue::eUnit_ComplexColor:
-      return Some(aStyleContext->StyleColor()->
-                  CalcComplexColor(val.GetStyleComplexColorValue()));
-    default:
-      return Nothing();
+  nscolor colors[2];
+  colors[0] = aColorFunc(aSc);
+  if (nsStyleContext* visitedStyle = aSc->GetStyleIfVisited()) {
+    colors[1] = aColorFunc(visitedStyle);
+    return nsStyleContext::
+      CombineVisitedColors(colors, aSc->RelevantLinkVisited());
   }
+  return colors[0];
 }
 
 static nscolor
-ExtractColorLenient(nsCSSPropertyID aProperty,
-                    nsStyleContext *aStyleContext)
+ExtractColor(nsStyleContext* aContext, const nscolor& aColor)
 {
-  return ExtractColor(aProperty, aStyleContext).valueOr(NS_RGBA(0, 0, 0, 0));
+  return aColor;
 }
+
+static nscolor
+ExtractColor(nsStyleContext* aContext, const StyleComplexColor& aColor)
+{
+  return aContext->StyleColor()->CalcComplexColor(aColor);
+}
+
+static nscolor
+ExtractColor(nsStyleContext* aContext, const nsStyleSVGPaint& aPaintServer)
+{
+  return aPaintServer.Type() == eStyleSVGPaintType_Color
+    ? aPaintServer.GetColor() : NS_RGBA(0, 0, 0, 0);
+}
+
+#define STYLE_FIELD(struct_, field_) aField == &struct_::field_ ||
+#define STYLE_STRUCT(name_, fields_)                                          \
+  template<> nscolor                                                          \
+  nsStyleContext::GetVisitedDependentColor(                                   \
+    decltype(nsStyle##name_::MOZ_ARG_1 fields_) nsStyle##name_::* aField)     \
+  {                                                                           \
+    MOZ_ASSERT(MOZ_FOR_EACH(STYLE_FIELD, (nsStyle##name_,), fields_) false,   \
+               "Getting visited-dependent color for a field in nsStyle"#name_ \
+               " which is not listed in nsCSSVisitedDependentPropList.h");    \
+    return GetVisitedDependentColorInternal(this,                             \
+                                            [aField](nsStyleContext* sc) {    \
+      return ExtractColor(sc, sc->Style##name_()->*aField);                   \
+    });                                                                       \
+  }
+#include "nsCSSVisitedDependentPropList.h"
+#undef STYLE_STRUCT
+#undef STYLE_FIELD
 
 struct ColorIndexSet {
   uint8_t colorIndex, alphaIndex;
 };
 
 static const ColorIndexSet gVisitedIndices[2] = { { 0, 0 }, { 1, 0 } };
-
-nscolor
-nsStyleContext::GetVisitedDependentColor(nsCSSPropertyID aProperty)
-{
-  NS_ASSERTION(aProperty == eCSSProperty_color ||
-               aProperty == eCSSProperty_background_color ||
-               aProperty == eCSSProperty_border_top_color ||
-               aProperty == eCSSProperty_border_right_color ||
-               aProperty == eCSSProperty_border_bottom_color ||
-               aProperty == eCSSProperty_border_left_color ||
-               aProperty == eCSSProperty_outline_color ||
-               aProperty == eCSSProperty_column_rule_color ||
-               aProperty == eCSSProperty_text_decoration_color ||
-               aProperty == eCSSProperty_text_emphasis_color ||
-               aProperty == eCSSProperty__webkit_text_fill_color ||
-               aProperty == eCSSProperty__webkit_text_stroke_color ||
-               aProperty == eCSSProperty_fill ||
-               aProperty == eCSSProperty_stroke,
-               "we need to add to nsStyleContext::CalcStyleDifference");
-
-  bool isPaintProperty = aProperty == eCSSProperty_fill ||
-                         aProperty == eCSSProperty_stroke;
-
-  nscolor colors[2];
-  colors[0] = isPaintProperty ? ExtractColorLenient(aProperty, this)
-                              : ExtractColor(aProperty, this).value();
-
-  nsStyleContext *visitedStyle = this->GetStyleIfVisited();
-  if (!visitedStyle) {
-    return colors[0];
-  }
-
-  colors[1] = isPaintProperty ? ExtractColorLenient(aProperty, visitedStyle)
-                              : ExtractColor(aProperty, visitedStyle).value();
-
-  return nsStyleContext::CombineVisitedColors(colors,
-                                              this->RelevantLinkVisited());
-}
 
 /* static */ nscolor
 nsStyleContext::CombineVisitedColors(nscolor *aColors, bool aLinkIsVisited)

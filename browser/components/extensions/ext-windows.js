@@ -12,7 +12,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
-  EventManager,
+  SingletonEventManager,
   promiseObserved,
 } = ExtensionUtils;
 
@@ -26,15 +26,15 @@ extensions.registerSchemaAPI("windows", "addon_parent", context => {
     windows: {
       onCreated:
       new WindowEventManager(context, "windows.onCreated", "domwindowopened", (fire, window) => {
-        fire(WindowManager.convert(extension, window));
+        fire.async(WindowManager.convert(extension, window));
       }).api(),
 
       onRemoved:
       new WindowEventManager(context, "windows.onRemoved", "domwindowclosed", (fire, window) => {
-        fire(WindowManager.getId(window));
+        fire.async(WindowManager.getId(window));
       }).api(),
 
-      onFocusChanged: new EventManager(context, "windows.onFocusChanged", fire => {
+      onFocusChanged: new SingletonEventManager(context, "windows.onFocusChanged", fire => {
         // Keep track of the last windowId used to fire an onFocusChanged event
         let lastOnFocusChangedWindowId;
 
@@ -45,7 +45,7 @@ extensions.registerSchemaAPI("windows", "addon_parent", context => {
             let window = Services.focus.activeWindow;
             let windowId = window ? WindowManager.getId(window) : WindowManager.WINDOW_ID_NONE;
             if (windowId !== lastOnFocusChangedWindowId) {
-              fire(windowId);
+              fire.async(windowId);
               lastOnFocusChangedWindowId = windowId;
             }
           });
@@ -162,13 +162,12 @@ extensions.registerSchemaAPI("windows", "addon_parent", context => {
         // TODO: focused, type
 
         return new Promise(resolve => {
-          window.addEventListener("load", function listener() {
-            window.removeEventListener("load", listener);
+          window.addEventListener("load", function() {
             if (["maximized", "normal"].includes(createData.state)) {
               window.document.documentElement.setAttribute("sizemode", createData.state);
             }
             resolve(promiseObserved("browser-delayed-startup-finished", win => win == window));
-          });
+          }, {once: true});
         }).then(() => {
           // Some states only work after delayed-startup-finished
           if (["minimized", "fullscreen", "docked"].includes(createData.state)) {

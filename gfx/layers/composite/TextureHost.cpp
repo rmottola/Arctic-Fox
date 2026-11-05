@@ -81,11 +81,6 @@ public:
 
   uint64_t GetSerial() const { return mSerial; }
 
-  virtual mozilla::ipc::IPCResult RecvDestroySync() override {
-    DestroyIfNeeded();
-    return IPC_OK();
-  }
-
   HostIPCAllocator* mSurfaceAllocator;
   RefPtr<TextureHost> mTextureHost;
   // mSerial is unique in TextureClient's process.
@@ -562,6 +557,18 @@ TextureHost::DeserializeReadLock(const ReadLockDescriptor& aDesc,
   // side should not have been able to write into this texture and send a new lock!
   MOZ_ASSERT(!mReadLock);
   mReadLock = lock.forget();
+}
+
+void
+TextureHost::SetReadLock(TextureReadLock* aReadLock)
+{
+  if (!aReadLock) {
+    return;
+  }
+  // If mReadLock is not null it means we haven't unlocked it yet and the content
+  // side should not have been able to write into this texture and send a new lock!
+  MOZ_ASSERT(!mReadLock);
+  mReadLock = aReadLock;
 }
 
 void

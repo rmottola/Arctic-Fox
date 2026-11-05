@@ -5,6 +5,7 @@
 
 #include "GMPVideoDecoderParent.h"
 #include "mozilla/Logging.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Unused.h"
 #include "nsAutoRef.h"
 #include "nsThreadUtils.h"
@@ -14,6 +15,7 @@
 #include "GMPContentParent.h"
 #include "GMPMessageUtils.h"
 #include "mozilla/gmp/GMPTypes.h"
+#include "nsPrintfCString.h"
 
 namespace mozilla {
 
@@ -122,15 +124,27 @@ GMPVideoDecoderParent::InitDecode(const GMPVideoCodec& aCodecSettings,
   return NS_OK;
 }
 
+static nsCString
+CryptoInfo(const GMPUniquePtr<GMPVideoEncodedFrame>& aInputFrame)
+{
+  const GMPEncryptedBufferMetadata* crypto = aInputFrame->GetDecryptionData();
+  if (!crypto) {
+    return EmptyCString();
+  }
+  return nsPrintfCString(" kid=%s",
+                         ToHexString(crypto->KeyId(), crypto->KeyIdSize()).get());
+}
+
 nsresult
 GMPVideoDecoderParent::Decode(GMPUniquePtr<GMPVideoEncodedFrame> aInputFrame,
                               bool aMissingFrames,
                               const nsTArray<uint8_t>& aCodecSpecificInfo,
                               int64_t aRenderTimeMs)
 {
-  LOGV(("GMPVideoDecoderParent[%p]::Decode() timestamp=%lld keyframe=%d",
+  LOGV(("GMPVideoDecoderParent[%p]::Decode() timestamp=%lld keyframe=%d%s",
         this, aInputFrame->TimeStamp(),
-        aInputFrame->FrameType() == kGMPKeyFrame));
+        aInputFrame->FrameType() == kGMPKeyFrame,
+        CryptoInfo(aInputFrame).get()));
 
   if (!mIsOpen) {
     LOGE(("GMPVideoDecoderParent[%p]::Decode() ERROR; dead GMPVideoDecoder", this));
@@ -307,7 +321,7 @@ mozilla::ipc::IPCResult
 GMPVideoDecoderParent::RecvDecoded(const GMPVideoi420FrameData& aDecodedFrame)
 {
   --mFrameCount;
-  LOGV(("GMPVideoDecoderParent[%p]::RecvDecoded() timestamp=%lld frameCount=%d",
+  LOGV(("GMPVideoDecoderParent[%p]::RecvDecoded() timestamp=%" PRId64 " frameCount=%d",
     this, aDecodedFrame.mTimestamp(), mFrameCount));
 
   if (!mCallback) {
@@ -316,7 +330,8 @@ GMPVideoDecoderParent::RecvDecoded(const GMPVideoi420FrameData& aDecodedFrame)
 
   if (!GMPVideoi420FrameImpl::CheckFrameData(aDecodedFrame)) {
     LOGE(("GMPVideoDecoderParent[%p]::RecvDecoded() "
-       "timestamp=%lld decoded frame corrupt, ignoring"));
+          "timestamp=%" PRId64 " decoded frame corrupt, ignoring",
+          this, aDecodedFrame.mTimestamp()));
     return IPC_FAIL_NO_REASON(this);
   }
   auto f = new GMPVideoi420FrameImpl(aDecodedFrame, &mVideoHost);

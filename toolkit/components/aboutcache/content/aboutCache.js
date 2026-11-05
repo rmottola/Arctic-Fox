@@ -5,9 +5,9 @@
 // First, parse and save the incoming arguments ("?storage=name&context=key")
 // Note: window.location.search doesn't work with nsSimpleURIs used for about:* addresses.
 var search = window.location.href.match(/^.*\?(.*)$/);
-var searchParams = new URLSearchParams(search ? search[1] : '');
-var storage = searchParams.get('storage');
-var cacheContext = searchParams.get('context');
+var searchParams = new URLSearchParams(search ? search[1] : "");
+var storage = searchParams.get("storage");
+var cacheContext = searchParams.get("context");
 
 // The context is in a format as used by the HTTP cache v2 back end
 if (cacheContext)

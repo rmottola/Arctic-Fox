@@ -10,7 +10,7 @@ const URL = "http://mochi.test:8888/browser/browser/base/content/test/general/of
 
 registerCleanupFunction(function() {
   // Clean up after ourself
-  let uri = Services.io.newURI(URL, null, null);
+  let uri = Services.io.newURI(URL);
   let principal = Services.scriptSecurityManager.createCodebasePrincipal(uri, {});
   Services.perms.removeFromPrincipal(principal, "offline-app");
   Services.prefs.clearUserPref("offline-apps.quota.warn");
@@ -62,18 +62,17 @@ function test() {
     });
     gotCached.then(function() {
       // We got cached - now we should have provoked the quota warning.
-      let notification = PopupNotifications.getNotification('offline-app-usage');
+      let notification = PopupNotifications.getNotification("offline-app-usage");
       ok(notification, "have offline-app-usage notification");
       // select the default action - this should cause the preferences
       // tab to open - which we track via an "Initialized" event.
       PopupNotifications.panel.firstElementChild.button.click();
       let newTabBrowser = gBrowser.getBrowserForTab(gBrowser.selectedTab);
-      newTabBrowser.addEventListener("Initialized", function PrefInit() {
-        newTabBrowser.removeEventListener("Initialized", PrefInit, true);
+      newTabBrowser.addEventListener("Initialized", function() {
         executeSoon(function() {
           checkInContentPreferences(newTabBrowser.contentWindow);
         })
-      }, true);
+      }, {capture: true, once: true});
     });
     onCachedAttached.then(function() {
       Services.prefs.setIntPref("offline-apps.quota.warn", 1);
@@ -87,9 +86,8 @@ function test() {
 
 function promiseNotification() {
   return new Promise(resolve => {
-    PopupNotifications.panel.addEventListener("popupshown", function onShown() {
-      PopupNotifications.panel.removeEventListener("popupshown", onShown);
+    PopupNotifications.panel.addEventListener("popupshown", function() {
       resolve();
-    });
+    }, {once: true});
   });
 }

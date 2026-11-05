@@ -10,10 +10,22 @@
 #include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/widget/CompositorWidget.h"
-#include "base/task.h"
 
 namespace mozilla {
 namespace wr {
+
+WrExternalImage LockExternalImage(void* aObj, WrExternalImageId aId)
+{
+  return WrExternalImage { WrExternalImageIdType::TEXTURE_HANDLE, 0.0f, 0.0f, 0.0f, 0.0f, 0 };
+}
+
+void UnlockExternalImage(void* aObj, WrExternalImageId aId)
+{
+}
+
+void ReleaseExternalImage(void* aObj, WrExternalImageId aId)
+{
+}
 
 RendererOGL::RendererOGL(RefPtr<RenderThread>&& aThread,
                          RefPtr<gl::GLContext>&& aGL,
@@ -21,12 +33,12 @@ RendererOGL::RendererOGL(RefPtr<RenderThread>&& aThread,
                          wr::WindowId aWindowId,
                          WrRenderer* aWrRenderer,
                          layers::CompositorBridgeParentBase* aBridge)
-: mThread(aThread)
-, mGL(aGL)
-, mWidget(aWidget)
-, mWrRenderer(aWrRenderer)
-, mBridge(aBridge)
-, mWindowId(aWindowId)
+  : mThread(aThread)
+  , mGL(aGL)
+  , mWidget(aWidget)
+  , mWrRenderer(aWrRenderer)
+  , mBridge(aBridge)
+  , mWindowId(aWindowId)
 {
   MOZ_ASSERT(mThread);
   MOZ_ASSERT(mGL);
@@ -39,13 +51,18 @@ RendererOGL::RendererOGL(RefPtr<RenderThread>&& aThread,
 RendererOGL::~RendererOGL()
 {
   MOZ_COUNT_DTOR(RendererOGL);
-#ifdef MOZ_ENABLE_WEBRENDER
-  // Need to wrap this in an ifdef otherwise VC++ emits a warning (treated as error)
-  // in the non-webrender targets.
-  // We should be able to remove this #ifdef if/when we remove the
-  // MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE annotations in webrender.h
   wr_renderer_delete(mWrRenderer);
-#endif
+}
+
+WrExternalImageHandler
+RendererOGL::GetExternalImageHandler()
+{
+  return WrExternalImageHandler {
+    this,
+    LockExternalImage,
+    UnlockExternalImage,
+    ReleaseExternalImage,
+  };
 }
 
 void
@@ -54,17 +71,9 @@ RendererOGL::Update()
   wr_renderer_update(mWrRenderer);
 }
 
-static void
-NotifyDidRender(layers::CompositorBridgeParentBase* aBridge, uint64_t aTransactionId, TimeStamp aStart, TimeStamp aEnd)
-{
-
-}
-
 bool
-RendererOGL::Render(uint64_t aTransactionId)
+RendererOGL::Render()
 {
-  TimeStamp start = TimeStamp::Now();
-
   if (!mGL->MakeCurrent()) {
     gfxCriticalNote << "Failed to make render context current, can't draw.";
     return false;
@@ -93,14 +102,8 @@ RendererOGL::Render(uint64_t aTransactionId)
   mWidget->DrawWindowOverlay(&widgetContext, LayoutDeviceIntRect());
   mWidget->PostRender(&widgetContext);
 
-  // TODO: Flush pending actions such as texture deletions/unlocks.
-
-  TimeStamp end = TimeStamp::Now();
-
-  layers::CompositorThreadHolder::Loop()->PostTask(NewRunnableFunction(
-    &NotifyDidRender,
-    mBridge, aTransactionId, start, end
-  ));
+  // TODO: Flush pending actions such as texture deletions/unlocks and
+  //       textureHosts recycling.
 
   return true;
 }
@@ -111,5 +114,11 @@ RendererOGL::SetProfilerEnabled(bool aEnabled)
   wr_renderer_set_profiler_enabled(mWrRenderer, aEnabled);
 }
 
+WrRenderedEpochs*
+RendererOGL::FlushRenderedEpochs()
+{
+  return wr_renderer_flush_rendered_epochs(mWrRenderer);
 }
-}
+
+} // namespace wr
+} // namespace mozilla

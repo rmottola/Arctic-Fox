@@ -284,10 +284,10 @@ void HandleException(ResumeFromException* rfe);
 
 void EnsureBareExitFrame(JSContext* cx, JitFrameLayout* frame);
 
-void TraceJitActivations(JSRuntime* rt, JSTracer* trc);
+void TraceJitActivations(JSContext* cx, const CooperatingContext& target, JSTracer* trc);
 
 JSCompartment*
-TopmostIonActivationCompartment(JSRuntime* rt);
+TopmostIonActivationCompartment(JSContext* cx);
 
 void UpdateJitActivationsForMinorGC(JSRuntime* rt, JSTracer* trc);
 
@@ -455,7 +455,7 @@ class RectifierFrameLayout : public JitFrameLayout
     }
 };
 
-class IonAccessorICFrameLayout : public CommonFrameLayout
+class IonICCallFrameLayout : public CommonFrameLayout
 {
   protected:
     // Pointer to root the stub's JitCode.
@@ -466,7 +466,7 @@ class IonAccessorICFrameLayout : public CommonFrameLayout
         return &stubCode_;
     }
     static size_t Size() {
-        return sizeof(IonAccessorICFrameLayout);
+        return sizeof(IonICCallFrameLayout);
     }
 };
 
@@ -1035,11 +1035,8 @@ GetPcScript(JSContext* cx, JSScript** scriptRes, jsbytecode** pcRes);
 CalleeToken
 TraceCalleeToken(JSTracer* trc, CalleeToken token);
 
-// The minimum stack size is two. Two slots are needed because INITGLEXICAL
-// (stack depth 1) is compiled as a SETPROP (stack depth 2) on the global
-// lexical scope. Baseline also requires one slot for this/argument type
-// checks.
-static const uint32_t MinJITStackSize = 2;
+// Baseline requires one slot for this/argument type checks.
+static const uint32_t MinJITStackSize = 1;
 
 } /* namespace jit */
 } /* namespace js */

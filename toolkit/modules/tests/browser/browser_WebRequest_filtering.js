@@ -110,9 +110,8 @@ add_task(function* filter_types() {
 
 function waitForLoad(browser = gBrowser.selectedBrowser) {
   return new Promise(resolve => {
-    browser.addEventListener("load", function listener() {
-      browser.removeEventListener("load", listener, true);
+    browser.addEventListener("load", function() {
       resolve();
-    }, true);
+    }, {capture: true, once: true});
   });
 }

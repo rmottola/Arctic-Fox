@@ -977,12 +977,14 @@ case "$target" in
             dnl VS2012+ defaults to -arch:SSE2. We want to target nothing
             dnl more recent, so set that explicitly here unless another
             dnl target arch has already been set.
+            changequote(,)
             if test -z `echo $CFLAGS | grep -i [-/]arch:`; then
               CFLAGS="$CFLAGS -arch:SSE2"
             fi
             if test -z `echo $CXXFLAGS | grep -i [-/]arch:`; then
               CXXFLAGS="$CXXFLAGS -arch:SSE2"
             fi
+            changequote([,])
             SSE_FLAGS="-arch:SSE"
             SSE2_FLAGS="-arch:SSE2"
             dnl MSVC allows the use of intrinsics without any flags
@@ -1204,6 +1206,10 @@ case "$target" in
     if test "$LIBRUNPATH"; then
         DSO_LDOPTS="-R$LIBRUNPATH $DSO_LDOPTS"
     fi
+    ;;
+
+*-solaris*)
+    MOZ_FIX_LINK_PATHS=
     ;;
 
 esac
@@ -1792,26 +1798,6 @@ if test "$GNU_CC"; then
   fi
 
   TARGET_COMPILER_ABI="${TARGET_COMPILER_ABI-${ARM_ABI_PREFIX}gcc3}"
-fi
-
-dnl Check to see if we can resolve ambiguity with |using|.
-AC_CACHE_CHECK(whether the C++ \"using\" keyword resolves ambiguity,
-               ac_cv_cpp_ambiguity_resolving_using,
-               [AC_TRY_COMPILE(class X {
-                                 public: int go(const X&) {return 3;}
-                                         int jo(const X&) {return 3;}
-                               };
-                               class Y : public X {
-                                 public:  int go(int) {return 2;}
-                                          int jo(int) {return 2;}
-                                          using X::jo;
-                                 private: using X::go;
-                               };,
-                               X x; Y y; y.jo(x);,
-                               ac_cv_cpp_ambiguity_resolving_using=yes,
-                               ac_cv_cpp_ambiguity_resolving_using=no)])
-if test "$ac_cv_cpp_ambiguity_resolving_using" = yes ; then
-   AC_DEFINE(HAVE_CPP_AMBIGUITY_RESOLVING_USING)
 fi
 
 dnl See if a dynamic_cast to void* gives the most derived object.
@@ -4478,7 +4464,9 @@ dnl ========================================================
 dnl = Enable using the clang plugin to build
 dnl ========================================================
 
+if test -n "$COMPILE_ENVIRONMENT"; then
 MOZ_CONFIG_CLANG_PLUGIN
+fi # COMPILE_ENVIRONMENT
 
 dnl ========================================================
 dnl = Enable stripping of libs & executables
@@ -5750,6 +5738,7 @@ if test "$ACCESSIBILITY" -a "$MOZ_ENABLE_GTK" ; then
     AC_DEFINE_UNQUOTED(ATK_REV_VERSION, $ATK_REV_VERSION)
 fi
 
+AC_SUBST(MOZ_DEV_EDITION)
 if test -n "$MOZ_DEV_EDITION"; then
     AC_DEFINE(MOZ_DEV_EDITION)
 fi
@@ -5777,7 +5766,6 @@ dnl ========================================================
 dnl The following defines are used by xpcom
 _NON_GLOBAL_ACDEFINES="$_NON_GLOBAL_ACDEFINES
 CPP_THROW_NEW
-HAVE_CPP_AMBIGUITY_RESOLVING_USING
 HAVE_CPP_DYNAMIC_CAST_TO_VOID_PTR
 HAVE_CPP_PARTIAL_SPECIALIZATION
 HAVE_GETPAGESIZE

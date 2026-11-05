@@ -21,12 +21,12 @@ namespace gl {
 class GLContext;
 }
 
-namespace widget {
-class CompositorWidget;
-}
-
 namespace layers {
 class CompositorBridgeParentBase;
+}
+
+namespace widget {
+class CompositorWidget;
 }
 
 namespace wr {
@@ -38,29 +38,40 @@ namespace wr {
 /// on the render thread instead of the compositor thread.
 class RendererOGL
 {
+  friend WrExternalImage LockExternalImage(void* aObj, WrExternalImageId aId);
+  friend void UnlockExternalImage(void* aObj, WrExternalImageId aId);
+  friend void ReleaseExternalImage(void* aObj, WrExternalImageId aId);
+
 public:
-  /// Render thread only.
+  WrExternalImageHandler GetExternalImageHandler();
+
+  /// This can be called on the render thread only.
   void Update();
 
-  /// Render thread only.
-  bool Render(uint64_t aTransactionId);
+  /// This can be called on the render thread only.
+  bool Render();
 
-  /// Render thread only.
+  /// This can be called on the render thread only.
   bool RenderToTarget(gfx::DrawTarget& aTarget);
 
-  /// Render thread only.
+  /// This can be called on the render thread only.
   void SetProfilerEnabled(bool aEnabled);
 
-  /// Render thread only.
+  /// This can be called on the render thread only.
   ~RendererOGL();
 
-  /// Render thread only.
+  /// This can be called on the render thread only.
   RendererOGL(RefPtr<RenderThread>&& aThread,
               RefPtr<gl::GLContext>&& aGL,
               RefPtr<widget::CompositorWidget>&&,
               wr::WindowId aWindowId,
               WrRenderer* aWrRenderer,
               layers::CompositorBridgeParentBase* aBridge);
+
+  layers::CompositorBridgeParentBase* GetCompositorBridge() { return mBridge; }
+
+  WrRenderedEpochs* FlushRenderedEpochs();
+
 protected:
 
   RefPtr<RenderThread> mThread;
@@ -71,8 +82,7 @@ protected:
   wr::WindowId mWindowId;
 };
 
-}
-}
-
+} // namespace wr
+} // namespace mozilla
 
 #endif

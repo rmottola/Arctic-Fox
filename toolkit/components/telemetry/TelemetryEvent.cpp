@@ -14,6 +14,7 @@
 #include "mozilla/Unused.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/Pair.h"
 #include "jsapi.h"
 #include "nsJSUtils.h"
 #include "nsXULAppAPI.h"
@@ -22,20 +23,26 @@
 #include "TelemetryCommon.h"
 #include "TelemetryEvent.h"
 #include "TelemetryEventData.h"
+#include "ipc/TelemetryIPCAccumulator.h"
 
 using mozilla::StaticMutex;
 using mozilla::StaticMutexAutoLock;
 using mozilla::ArrayLength;
 using mozilla::Maybe;
 using mozilla::Nothing;
-using mozilla::Pair;
 using mozilla::StaticAutoPtr;
+using mozilla::TimeStamp;
 using mozilla::Telemetry::Common::AutoHashtable;
 using mozilla::Telemetry::Common::IsExpiredVersion;
 using mozilla::Telemetry::Common::CanRecordDataset;
 using mozilla::Telemetry::Common::IsInDataset;
 using mozilla::Telemetry::Common::MsSinceProcessStart;
 using mozilla::Telemetry::Common::LogToBrowserConsole;
+using mozilla::Telemetry::Common::CanRecordInProcess;
+using mozilla::Telemetry::EventExtraEntry;
+using mozilla::Telemetry::ChildEventData;
+
+namespace TelemetryIPCAccumulator = mozilla::TelemetryIPCAccumulator;
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -87,13 +94,13 @@ static_assert(kEventCount < kExpiredEventId, "Should not overflow.");
 // This is the hard upper limit on the number of event records we keep in storage.
 // If we cross this limit, we will drop any further event recording until elements
 // are removed from storage.
-const uint32_t kMaxEventRecords = 10000;
+const uint32_t kMaxEventRecords = 1000;
 // Maximum length of any passed value string, in UTF8 byte sequence length.
-const uint32_t kMaxValueByteLength = 100;
+const uint32_t kMaxValueByteLength = 80;
 // Maximum length of any string value in the extra dictionary, in UTF8 byte sequence length.
-const uint32_t kMaxExtraValueByteLength = 100;
+const uint32_t kMaxExtraValueByteLength = 80;
 
-typedef nsDataHashtable<nsCStringHashKey, uint32_t> EventMapType;
+typedef nsDataHashtable<nsCStringHashKey, uint32_t> StringUintMap;
 typedef nsClassHashtable<nsCStringHashKey, nsCString> StringMap;
 
 enum class RecordEventResult {
@@ -101,14 +108,11 @@ enum class RecordEventResult {
   UnknownEvent,
   InvalidExtraKey,
   StorageLimitReached,
+  ExpiredEvent,
+  WrongProcess,
 };
 
-struct ExtraEntry {
-  const nsCString key;
-  const nsCString value;
-};
-
-typedef nsTArray<ExtraEntry> ExtraArray;
+typedef nsTArray<EventExtraEntry> ExtraArray;
 
 class EventRecord {
 public:
@@ -249,60 +253,99 @@ bool gInitDone = false;
 bool gCanRecordBase;
 bool gCanRecordExtended;
 
-// The Name -> ID cache map.
-EventMapType gEventNameIDMap(kEventCount);
+// The EventName -> EventID cache map.
+StringUintMap gEventNameIDMap(kEventCount);
 
-// The main event storage. Events are inserted here in recording order.
-StaticAutoPtr<nsTArray<EventRecord>> gEventRecords;
+// The CategoryName -> CategoryID cache map.
+StringUintMap gCategoryNameIDMap;
+
+// This tracks the IDs of the categories for which recording is enabled.
+nsTHashtable<nsUint32HashKey> gEnabledCategories;
+
+// The main event storage. Events are inserted here, keyed by process id and
+// in recording order.
+typedef nsTArray<EventRecord> EventRecordArray;
+nsClassHashtable<nsUint32HashKey, EventRecordArray> gEventRecords;
 
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 //
-// PRIVATE: thread-unsafe helpers for event recording.
+// PRIVATE: thread-safe helpers for event recording.
 
 namespace {
 
 bool
-CanRecordEvent(const StaticMutexAutoLock& lock, const CommonEventInfo& info)
+CanRecordEvent(const StaticMutexAutoLock& lock, const CommonEventInfo& info,
+               GeckoProcessType process)
 {
   if (!gCanRecordBase) {
     return false;
   }
 
-  return CanRecordDataset(info.dataset, gCanRecordBase, gCanRecordExtended);
+  if (!CanRecordDataset(info.dataset, gCanRecordBase, gCanRecordExtended)) {
+    return false;
+  }
+
+  if (!CanRecordInProcess(info.record_in_processes, process)) {
+    return false;
+  }
+
+  return gEnabledCategories.GetEntry(info.category_offset);
+}
+
+EventRecordArray*
+GetEventRecordsForProcess(const StaticMutexAutoLock& lock, GeckoProcessType processType)
+{
+  EventRecordArray* eventRecords = nullptr;
+  if (!gEventRecords.Get(processType, &eventRecords)) {
+    eventRecords = new EventRecordArray();
+    gEventRecords.Put(processType, eventRecords);
+  }
+  return eventRecords;
+}
+
+bool
+GetEventId(const StaticMutexAutoLock& lock, const nsACString& category,
+           const nsACString& method, const nsACString& object,
+           uint32_t* eventId)
+{
+  MOZ_ASSERT(eventId);
+  const nsCString& name = UniqueEventName(category, method, object);
+  return gEventNameIDMap.Get(name, eventId);
 }
 
 RecordEventResult
-RecordEvent(const StaticMutexAutoLock& lock, double timestamp,
-            const nsACString& category, const nsACString& method,
-            const nsACString& object, const Maybe<nsCString>& value,
-            const ExtraArray& extra)
+RecordEvent(const StaticMutexAutoLock& lock, GeckoProcessType processType,
+            double timestamp, const nsACString& category,
+            const nsACString& method, const nsACString& object,
+            const Maybe<nsCString>& value, const ExtraArray& extra)
 {
+  EventRecordArray* eventRecords = GetEventRecordsForProcess(lock, processType);
+
   // Apply hard limit on event count in storage.
-  if (gEventRecords->Length() >= kMaxEventRecords) {
+  if (eventRecords->Length() >= kMaxEventRecords) {
     return RecordEventResult::StorageLimitReached;
   }
 
   // Look up the event id.
-  const nsCString& name = UniqueEventName(category, method, object);
   uint32_t eventId;
-  if (!gEventNameIDMap.Get(name, &eventId)) {
+  if (!GetEventId(lock, category, method, object, &eventId)) {
     return RecordEventResult::UnknownEvent;
   }
 
-  // If the event is expired, silently drop this call.
+  // If the event is expired or not enabled for this process, we silently drop this call.
   // We don't want recording for expired probes to be an error so code doesn't
   // have to be removed at a specific time or version.
   // Even logging warnings would become very noisy.
   if (eventId == kExpiredEventId) {
-    return RecordEventResult::Ok;
+    return RecordEventResult::ExpiredEvent;
   }
 
   // Check whether we can record this event.
   const CommonEventInfo& common = gEventInfo[eventId].common_info;
-  if (!CanRecordEvent(lock, common)) {
+  if (!CanRecordEvent(lock, common, processType)) {
     return RecordEventResult::Ok;
   }
 
@@ -319,8 +362,130 @@ RecordEvent(const StaticMutexAutoLock& lock, double timestamp,
   }
 
   // Add event record.
-  gEventRecords->AppendElement(EventRecord(timestamp, eventId, value, extra));
+  eventRecords->AppendElement(EventRecord(timestamp, eventId, value, extra));
   return RecordEventResult::Ok;
+}
+
+RecordEventResult
+ShouldRecordChildEvent(const StaticMutexAutoLock& lock, const nsACString& category,
+                       const nsACString& method, const nsACString& object)
+{
+  uint32_t eventId;
+  if (!GetEventId(lock, category, method, object, &eventId)) {
+    return RecordEventResult::UnknownEvent;
+  }
+
+  if (eventId == kExpiredEventId) {
+    return RecordEventResult::ExpiredEvent;
+  }
+
+  const auto processes = gEventInfo[eventId].common_info.record_in_processes;
+  if (!CanRecordInProcess(processes, XRE_GetProcessType())) {
+    return RecordEventResult::WrongProcess;
+  }
+
+  return RecordEventResult::Ok;
+}
+
+} // anonymous namespace
+
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+//
+// PRIVATE: thread-unsafe helpers for event handling.
+
+namespace {
+
+nsresult
+SerializeEventsArray(const EventRecordArray& events,
+                    JSContext* cx,
+                    JS::MutableHandleObject result)
+{
+  // We serialize the events to a JS array.
+  JS::RootedObject eventsArray(cx, JS_NewArrayObject(cx, events.Length()));
+  if (!eventsArray) {
+    return NS_ERROR_FAILURE;
+  }
+
+  for (uint32_t i = 0; i < events.Length(); ++i) {
+    const EventRecord& record = events[i];
+    const EventInfo& info = gEventInfo[record.EventId()];
+
+    // Each entry is an array of one of the forms:
+    // [timestamp, category, method, object, value]
+    // [timestamp, category, method, object, null, extra]
+    // [timestamp, category, method, object, value, extra]
+    JS::AutoValueVector items(cx);
+
+    // Add timestamp.
+    JS::Rooted<JS::Value> val(cx);
+    if (!items.append(JS::NumberValue(floor(record.Timestamp())))) {
+      return NS_ERROR_FAILURE;
+    }
+
+    // Add category, method, object.
+    const char* strings[] = {
+      info.common_info.category(),
+      info.method(),
+      info.object(),
+    };
+    for (const char* s : strings) {
+      const NS_ConvertUTF8toUTF16 wide(s);
+      if (!items.append(JS::StringValue(JS_NewUCStringCopyN(cx, wide.Data(), wide.Length())))) {
+        return NS_ERROR_FAILURE;
+      }
+    }
+
+    // Add the optional string value only when needed.
+    // When the value field is empty and extra is not set, we can save a little space that way.
+    // We still need to submit a null value if extra is set, to match the form:
+    // [ts, category, method, object, null, extra]
+    if (record.Value()) {
+      const NS_ConvertUTF8toUTF16 wide(record.Value().value());
+      if (!items.append(JS::StringValue(JS_NewUCStringCopyN(cx, wide.Data(), wide.Length())))) {
+        return NS_ERROR_FAILURE;
+      }
+    } else if (!record.Extra().IsEmpty()) {
+      if (!items.append(JS::NullValue())) {
+        return NS_ERROR_FAILURE;
+      }
+    }
+
+    // Add the optional extra dictionary.
+    // To save a little space, only add it when it is not empty.
+    if (!record.Extra().IsEmpty()) {
+      JS::RootedObject obj(cx, JS_NewPlainObject(cx));
+      if (!obj) {
+        return NS_ERROR_FAILURE;
+      }
+
+      // Add extra key & value entries.
+      const ExtraArray& extra = record.Extra();
+      for (uint32_t i = 0; i < extra.Length(); ++i) {
+        const NS_ConvertUTF8toUTF16 wide(extra[i].value);
+        JS::Rooted<JS::Value> value(cx);
+        value.setString(JS_NewUCStringCopyN(cx, wide.Data(), wide.Length()));
+
+        if (!JS_DefineProperty(cx, obj, extra[i].key.get(), value, JSPROP_ENUMERATE)) {
+          return NS_ERROR_FAILURE;
+        }
+      }
+      val.setObject(*obj);
+
+      if (!items.append(val)) {
+        return NS_ERROR_FAILURE;
+      }
+    }
+
+    // Add the record to the events array.
+    JS::RootedObject itemsArray(cx, JS_NewArrayObject(cx, items));
+    if (!JS_DefineElement(cx, eventsArray, i, itemsArray, JSPROP_ENUMERATE)) {
+      return NS_ERROR_FAILURE;
+    }
+  }
+
+  result.set(eventsArray);
+  return NS_OK;
 }
 
 } // anonymous namespace
@@ -352,8 +517,6 @@ TelemetryEvent::InitializeGlobalState(bool aCanRecordBase, bool aCanRecordExtend
   gCanRecordBase = aCanRecordBase;
   gCanRecordExtended = aCanRecordExtended;
 
-  gEventRecords = new nsTArray<EventRecord>();
-
   // Populate the static event name->id cache. Note that the event names are
   // statically allocated and come from the automatically generated TelemetryEventData.h.
   const uint32_t eventCount = static_cast<uint32_t>(mozilla::Telemetry::EventID::EventCount);
@@ -361,18 +524,24 @@ TelemetryEvent::InitializeGlobalState(bool aCanRecordBase, bool aCanRecordExtend
     const EventInfo& info = gEventInfo[i];
     uint32_t eventId = i;
 
-    // If this event is expired, mark it with a special event id.
-    // This avoids doing expensive expiry checks at runtime.
+    // If this event is expired or not recorded in this process, mark it with
+    // a special event id.
+    // This avoids doing repeated checks at runtime.
     if (IsExpiredVersion(info.common_info.expiration_version()) ||
         IsExpiredDate(info.common_info.expiration_day)) {
       eventId = kExpiredEventId;
     }
 
     gEventNameIDMap.Put(UniqueEventName(info), eventId);
+    if (!gCategoryNameIDMap.Contains(nsDependentCString(info.common_info.category()))) {
+      gCategoryNameIDMap.Put(nsDependentCString(info.common_info.category()),
+                             info.common_info.category_offset);
+    }
   }
 
 #ifdef DEBUG
   gEventNameIDMap.MarkImmutable();
+  gCategoryNameIDMap.MarkImmutable();
 #endif
   gInitDone = true;
 }
@@ -387,8 +556,9 @@ TelemetryEvent::DeInitializeGlobalState()
   gCanRecordExtended = false;
 
   gEventNameIDMap.Clear();
-  gEventRecords->Clear();
-  gEventRecords = nullptr;
+  gCategoryNameIDMap.Clear();
+  gEnabledCategories.Clear();
+  gEventRecords.Clear();
 
   gInitDone = false;
 }
@@ -407,25 +577,31 @@ TelemetryEvent::SetCanRecordExtended(bool b) {
 }
 
 nsresult
+TelemetryEvent::RecordChildEvents(GeckoProcessType aProcessType,
+                                  const nsTArray<mozilla::Telemetry::ChildEventData>& aEvents)
+{
+  MOZ_ASSERT(XRE_IsParentProcess());
+  StaticMutexAutoLock locker(gTelemetryEventsMutex);
+  for (uint32_t i = 0; i < aEvents.Length(); ++i) {
+    const mozilla::Telemetry::ChildEventData e = aEvents[i];
+
+    // Timestamps from child processes are absolute. We fix them up here to be
+    // relative to the main process start time.
+    // This allows us to put events from all processes on the same timeline.
+    bool inconsistent = false;
+    double relativeTimestamp = (e.timestamp - TimeStamp::ProcessCreation(inconsistent)).ToMilliseconds();
+
+    ::RecordEvent(locker, aProcessType, relativeTimestamp, e.category, e.method, e.object, e.value, e.extra);
+  }
+  return NS_OK;
+}
+
+nsresult
 TelemetryEvent::RecordEvent(const nsACString& aCategory, const nsACString& aMethod,
                             const nsACString& aObject, JS::HandleValue aValue,
                             JS::HandleValue aExtra, JSContext* cx,
                             uint8_t optional_argc)
 {
-  // Currently only recording in the parent process is supported.
-  if (!XRE_IsParentProcess()) {
-    return NS_OK;
-  }
-
-  // Get the current time.
-  double timestamp = -1;
-  nsresult rv = MsSinceProcessStart(&timestamp);
-  if (NS_FAILED(rv)) {
-    LogToBrowserConsole(nsIScriptError::warningFlag,
-                        NS_LITERAL_STRING("Failed to get time since process start."));
-    return NS_OK;
-  }
-
   // Check value argument.
   if ((optional_argc > 0) && !aValue.isNull() && !aValue.isString()) {
     LogToBrowserConsole(nsIScriptError::warningFlag,
@@ -499,7 +675,7 @@ TelemetryEvent::RecordEvent(const nsACString& aCategory, const nsACString& aMeth
         TruncateToByteLength(str, kMaxExtraValueByteLength);
       }
 
-      extra.AppendElement(ExtraEntry{NS_ConvertUTF16toUTF8(key), str});
+      extra.AppendElement(EventExtraEntry{NS_ConvertUTF16toUTF8(key), str});
     }
   }
 
@@ -507,21 +683,41 @@ TelemetryEvent::RecordEvent(const nsACString& aCategory, const nsACString& aMeth
   // While the lock is being held, no complex calls like JS calls can be made,
   // as all of these could record Telemetry, which would result in deadlock.
   RecordEventResult res;
-  {
+  if (!XRE_IsParentProcess()) {
+    {
+      StaticMutexAutoLock lock(gTelemetryEventsMutex);
+      res = ::ShouldRecordChildEvent(lock, aCategory, aMethod, aObject);
+    }
+
+    if (res == RecordEventResult::Ok) {
+      TelemetryIPCAccumulator::RecordChildEvent(TimeStamp::NowLoRes(), aCategory,
+                                                aMethod, aObject, value, extra);
+    }
+  } else {
     StaticMutexAutoLock lock(gTelemetryEventsMutex);
 
     if (!gInitDone) {
       return NS_ERROR_FAILURE;
     }
 
-    res = ::RecordEvent(lock, timestamp, aCategory, aMethod, aObject, value, extra);
+    // Get the current time.
+    double timestamp = -1;
+    if (NS_WARN_IF(NS_FAILED(MsSinceProcessStart(&timestamp)))) {
+      return NS_ERROR_FAILURE;
+    }
+
+    res = ::RecordEvent(lock, GeckoProcessType_Default, timestamp, aCategory, aMethod, aObject, value, extra);
   }
 
   // Trigger warnings or errors where needed.
   switch (res) {
-    case RecordEventResult::UnknownEvent:
-      JS_ReportErrorASCII(cx, "Unknown event.");
+    case RecordEventResult::UnknownEvent: {
+      JS_ReportErrorASCII(cx, R"(Unknown event: ["%s", "%s", "%s"])",
+                          PromiseFlatCString(aCategory).get(),
+                          PromiseFlatCString(aMethod).get(),
+                          PromiseFlatCString(aObject).get());
       return NS_ERROR_INVALID_ARG;
+    }
     case RecordEventResult::InvalidExtraKey:
       LogToBrowserConsole(nsIScriptError::warningFlag,
                           NS_LITERAL_STRING("Invalid extra key for event."));
@@ -539,8 +735,18 @@ nsresult
 TelemetryEvent::CreateSnapshots(uint32_t aDataset, bool aClear, JSContext* cx,
                                 uint8_t optional_argc, JS::MutableHandleValue aResult)
 {
-  // Extract the events from storage.
-  nsTArray<EventRecord> events;
+  if (!XRE_IsParentProcess()) {
+    return NS_ERROR_FAILURE;
+  }
+
+  // Creating a JS snapshot of the events is a two-step process:
+  // (1) Lock the storage and copy the events into function-local storage.
+  // (2) Serialize the events into JS.
+  // We can't hold a lock for (2) because we will run into deadlocks otherwise
+  // from JS recording Telemetry.
+
+  // (1) Extract the events from storage with a lock held.
+  nsTArray<mozilla::Pair<const char*, EventRecordArray>> processEvents;
   {
     StaticMutexAutoLock locker(gTelemetryEventsMutex);
 
@@ -548,103 +754,51 @@ TelemetryEvent::CreateSnapshots(uint32_t aDataset, bool aClear, JSContext* cx,
       return NS_ERROR_FAILURE;
     }
 
-    uint32_t len = gEventRecords->Length();
-    for (uint32_t i = 0; i < len; ++i) {
-      const EventRecord& record = (*gEventRecords)[i];
-      const EventInfo& info = gEventInfo[record.EventId()];
+    for (auto iter = gEventRecords.Iter(); !iter.Done(); iter.Next()) {
+      const EventRecordArray* eventStorage = static_cast<EventRecordArray*>(iter.Data());
+      EventRecordArray events;
 
-      if (IsInDataset(info.common_info.dataset, aDataset)) {
-        events.AppendElement(record);
+      const uint32_t len = eventStorage->Length();
+      for (uint32_t i = 0; i < len; ++i) {
+        const EventRecord& record = (*eventStorage)[i];
+        const EventInfo& info = gEventInfo[record.EventId()];
+
+        if (IsInDataset(info.common_info.dataset, aDataset)) {
+          events.AppendElement(record);
+        }
+      }
+
+      if (events.Length()) {
+        const char* processName = XRE_ChildProcessTypeToString(GeckoProcessType(iter.Key()));
+        processEvents.AppendElement(mozilla::MakePair(processName, events));
       }
     }
 
     if (aClear) {
-      gEventRecords->Clear();
+      gEventRecords.Clear();
     }
   }
 
-  // We serialize the events to a JS array.
-  JS::RootedObject eventsArray(cx, JS_NewArrayObject(cx, events.Length()));
-  if (!eventsArray) {
+  // (2) Serialize the events to a JS object.
+  JS::RootedObject rootObj(cx, JS_NewPlainObject(cx));
+  if (!rootObj) {
     return NS_ERROR_FAILURE;
   }
 
-  for (uint32_t i = 0; i < events.Length(); ++i) {
-    const EventRecord& record = events[i];
-    const EventInfo& info = gEventInfo[record.EventId()];
-
-    // Each entry is an array of the form:
-    // [timestamp, category, method, object, value, extra]
-    JS::RootedObject itemsArray(cx, JS_NewArrayObject(cx, 6));
-    if (!itemsArray) {
+  const uint32_t processLength = processEvents.Length();
+  for (uint32_t i = 0; i < processLength; ++i)
+  {
+    JS::RootedObject eventsArray(cx);
+    if (NS_FAILED(SerializeEventsArray(processEvents[i].second(), cx, &eventsArray))) {
       return NS_ERROR_FAILURE;
     }
 
-    // Add timestamp.
-    JS::Rooted<JS::Value> val(cx);
-    uint32_t itemIndex = 0;
-    val.setDouble(floor(record.Timestamp()));
-    if (!JS_DefineElement(cx, itemsArray, itemIndex++, val, JSPROP_ENUMERATE)) {
-      return NS_ERROR_FAILURE;
-    }
-
-    // Add category, method, object.
-    const char* strings[] = {
-      info.common_info.category(),
-      info.method(),
-      info.object(),
-    };
-    for (uint32_t s = 0; s < ArrayLength(strings); ++s) {
-      const NS_ConvertUTF8toUTF16 wide(strings[s]);
-      val.setString(JS_NewUCStringCopyN(cx, wide.Data(), wide.Length()));
-      if (!JS_DefineElement(cx, itemsArray, itemIndex++, val, JSPROP_ENUMERATE)) {
-        return NS_ERROR_FAILURE;
-      }
-    }
-
-    // Add the optional string value.
-    if (!record.Value()) {
-      val.setNull();
-    } else {
-      const NS_ConvertUTF8toUTF16 wide(record.Value().value());
-      val.setString(JS_NewUCStringCopyN(cx, wide.Data(), wide.Length()));
-    }
-    if (!JS_DefineElement(cx, itemsArray, itemIndex++, val, JSPROP_ENUMERATE)) {
-      return NS_ERROR_FAILURE;
-    }
-
-    // Add the optional extra dictionary.
-    if (record.Extra().IsEmpty()) {
-      val.setNull();
-    } else {
-      JS::RootedObject obj(cx, JS_NewPlainObject(cx));
-      if (!obj) {
-        return NS_ERROR_FAILURE;
-      }
-
-      const ExtraArray& extra = record.Extra();
-      for (uint32_t i = 0; i < extra.Length(); ++i) {
-        const NS_ConvertUTF8toUTF16 wide(extra[i].value);
-        JS::Rooted<JS::Value> value(cx);
-        value.setString(JS_NewUCStringCopyN(cx, wide.Data(), wide.Length()));
-
-        if (!JS_DefineProperty(cx, obj, extra[i].key.get(), value, JSPROP_ENUMERATE)) {
-          return NS_ERROR_FAILURE;
-        }
-      }
-      val.setObject(*obj);
-    }
-    if (!JS_DefineElement(cx, itemsArray, itemIndex++, val, JSPROP_ENUMERATE)) {
-      return NS_ERROR_FAILURE;
-    }
-
-    // Add the record to the events array.
-    if (!JS_DefineElement(cx, eventsArray, i, itemsArray, JSPROP_ENUMERATE)) {
+    if (!JS_DefineProperty(cx, rootObj, processEvents[i].first(), eventsArray, JSPROP_ENUMERATE)) {
       return NS_ERROR_FAILURE;
     }
   }
 
-  aResult.setObject(*eventsArray);
+  aResult.setObject(*rootObj);
   return NS_OK;
 }
 
@@ -660,7 +814,26 @@ TelemetryEvent::ClearEvents()
     return;
   }
 
-  gEventRecords->Clear();
+  gEventRecords.Clear();
+}
+
+void
+TelemetryEvent::SetEventRecordingEnabled(const nsACString& category, bool enabled)
+{
+  StaticMutexAutoLock locker(gTelemetryEventsMutex);
+
+  uint32_t categoryId;
+  if (!gCategoryNameIDMap.Get(category, &categoryId)) {
+    LogToBrowserConsole(nsIScriptError::warningFlag,
+                        NS_LITERAL_STRING("Unkown category for SetEventRecordingEnabled."));
+    return;
+  }
+
+  if (enabled) {
+    gEnabledCategories.PutEntry(categoryId);
+  } else {
+    gEnabledCategories.RemoveEntry(categoryId);
+  }
 }
 
 size_t
@@ -669,15 +842,29 @@ TelemetryEvent::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf)
   StaticMutexAutoLock locker(gTelemetryEventsMutex);
   size_t n = 0;
 
-  n += gEventRecords->ShallowSizeOfIncludingThis(aMallocSizeOf);
-  for (uint32_t i = 0; i < gEventRecords->Length(); ++i) {
-    n += (*gEventRecords)[i].SizeOfExcludingThis(aMallocSizeOf);
+
+  n += gEventRecords.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  for (auto iter = gEventRecords.Iter(); !iter.Done(); iter.Next()) {
+    EventRecordArray* eventRecords = static_cast<EventRecordArray*>(iter.Data());
+    n += eventRecords->ShallowSizeOfIncludingThis(aMallocSizeOf);
+
+    const uint32_t len = eventRecords->Length();
+    for (uint32_t i = 0; i < len; ++i) {
+      n += (*eventRecords)[i].SizeOfExcludingThis(aMallocSizeOf);
+    }
   }
 
   n += gEventNameIDMap.ShallowSizeOfExcludingThis(aMallocSizeOf);
   for (auto iter = gEventNameIDMap.ConstIter(); !iter.Done(); iter.Next()) {
     n += iter.Key().SizeOfExcludingThisIfUnshared(aMallocSizeOf);
   }
+
+  n += gCategoryNameIDMap.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  for (auto iter = gCategoryNameIDMap.ConstIter(); !iter.Done(); iter.Next()) {
+    n += iter.Key().SizeOfExcludingThisIfUnshared(aMallocSizeOf);
+  }
+
+  n += gEnabledCategories.ShallowSizeOfExcludingThis(aMallocSizeOf);
 
   return n;
 }

@@ -44,6 +44,12 @@ using mozilla::TimeDuration;
  */
 JS_STATIC_ASSERT(JS::gcreason::NUM_TELEMETRY_REASONS >= JS::gcreason::NUM_REASONS);
 
+static inline decltype(mozilla::MakeEnumeratedRange(PHASE_FIRST, PHASE_LIMIT))
+AllPhases()
+{
+    return mozilla::MakeEnumeratedRange(PHASE_FIRST, PHASE_LIMIT);
+}
+
 const char*
 js::gcstats::ExplainInvocationKind(JSGCInvocationKind gckind)
 {
@@ -114,6 +120,8 @@ struct ExtraPhaseInfo
     // Index into the set of parallel arrays of timing data, for parents with
     // at least one multi-parented child
     size_t dagSlot;
+
+    ExtraPhaseInfo() : depth(0), dagSlot(0) {}
 };
 
 static const Phase PHASE_NO_PARENT = PHASE_LIMIT;
@@ -156,10 +164,9 @@ static const PhaseInfo phases[] = {
             { PHASE_SWEEP_MARK_GRAY, "Mark Gray", PHASE_SWEEP_MARK, 15 },
             { PHASE_SWEEP_MARK_GRAY_WEAK, "Mark Gray and Weak", PHASE_SWEEP_MARK, 16 },
         { PHASE_FINALIZE_START, "Finalize Start Callbacks", PHASE_SWEEP, 17 },
-            { PHASE_WEAK_ZONEGROUP_CALLBACK, "Per-Slice Weak Callback", PHASE_FINALIZE_START, 57 },
+            { PHASE_WEAK_ZONES_CALLBACK, "Per-Slice Weak Callback", PHASE_FINALIZE_START, 57 },
             { PHASE_WEAK_COMPARTMENT_CALLBACK, "Per-Compartment Weak Callback", PHASE_FINALIZE_START, 58 },
         { PHASE_SWEEP_ATOMS, "Sweep Atoms", PHASE_SWEEP, 18 },
-        { PHASE_SWEEP_SYMBOL_REGISTRY, "Sweep Symbol Registry", PHASE_SWEEP, 19 },
         { PHASE_SWEEP_COMPARTMENTS, "Sweep Compartments", PHASE_SWEEP, 20 },
             { PHASE_SWEEP_DISCARD_CODE, "Sweep Discard Code", PHASE_SWEEP_COMPARTMENTS, 21 },
             { PHASE_SWEEP_INNER_VIEWS, "Sweep Inner Views", PHASE_SWEEP_COMPARTMENTS, 22 },
@@ -177,6 +184,7 @@ static const PhaseInfo phases[] = {
         { PHASE_SWEEP_STRING, "Sweep String", PHASE_SWEEP, 34 },
         { PHASE_SWEEP_SCRIPT, "Sweep Script", PHASE_SWEEP, 35 },
         { PHASE_SWEEP_SCOPE, "Sweep Scope", PHASE_SWEEP, 59 },
+        { PHASE_SWEEP_REGEXP_SHARED, "Sweep RegExpShared", PHASE_SWEEP, 61 },
         { PHASE_SWEEP_SHAPE, "Sweep Shape", PHASE_SWEEP, 36 },
         { PHASE_SWEEP_JITCODE, "Sweep JIT code", PHASE_SWEEP, 37 },
         { PHASE_FINALIZE_END, "Finalize End Callback", PHASE_SWEEP, 38 },
@@ -204,14 +212,14 @@ static const PhaseInfo phases[] = {
         { PHASE_MARK_COMPARTMENTS, "Mark Compartments", PHASE_MARK_ROOTS, 54 },
     { PHASE_PURGE_SHAPE_TABLES, "Purge ShapeTables", PHASE_NO_PARENT, 60 },
 
-    { PHASE_LIMIT, nullptr, PHASE_NO_PARENT, 60 }
+    { PHASE_LIMIT, nullptr, PHASE_NO_PARENT, 61 }
 
-    // Current number of telemetryBuckets is 60. If you insert new phases
+    // Current number of telemetryBuckets is 61. If you insert new phases
     // somewhere, start at that number and count up. Do not change any existing
     // numbers.
 };
 
-static ExtraPhaseInfo phaseExtra[PHASE_LIMIT] = { { 0, 0 } };
+static mozilla::EnumeratedArray<Phase, PHASE_LIMIT, ExtraPhaseInfo> phaseExtra;
 
 // Mapping from all nodes with a multi-parented child to a Vector of all
 // multi-parented children and their descendants. (Single-parented children will
@@ -238,7 +246,7 @@ struct AllPhaseIterator {
     // subtree nodes.
     mozilla::Vector<Phase, 0, SystemAllocPolicy>::Range descendants;
 
-    explicit AllPhaseIterator(const Statistics::PhaseTimeTable table)
+    explicit AllPhaseIterator()
       : current(0)
       , baseLevel(0)
       , activeSlot(PHASE_DAG_NONE)
@@ -272,13 +280,14 @@ struct AllPhaseIterator {
             return;
         }
 
-        if (phaseExtra[current].dagSlot != PHASE_DAG_NONE) {
+        auto phase = Phase(current);
+        if (phaseExtra[phase].dagSlot != PHASE_DAG_NONE) {
             // The current phase has a shared subtree. Load them up into
             // 'descendants' and advance to the first child.
-            activeSlot = phaseExtra[current].dagSlot;
+            activeSlot = phaseExtra[phase].dagSlot;
             descendants = dagDescendants[activeSlot].all();
             MOZ_ASSERT(!descendants.empty());
-            baseLevel += phaseExtra[current].depth + 1;
+            baseLevel += phaseExtra[phase].depth + 1;
             return;
         }
 
@@ -344,18 +353,19 @@ Join(const FragmentVector& fragments, const char* separator = "") {
 }
 
 static TimeDuration
-SumChildTimes(size_t phaseSlot, Phase phase, const Statistics::PhaseTimeTable phaseTimes)
+SumChildTimes(size_t phaseSlot, Phase phase, const Statistics::PhaseTimeTable& phaseTimes)
 {
     // Sum the contributions from single-parented children.
     TimeDuration total = 0;
     size_t depth = phaseExtra[phase].depth;
-    for (unsigned i = phase + 1; i < PHASE_LIMIT && phaseExtra[i].depth > depth; i++) {
+    for (unsigned i = phase + 1; i < PHASE_LIMIT && phaseExtra[Phase(i)].depth > depth; i++) {
         if (phases[i].parent == phase)
-            total += phaseTimes[phaseSlot][i];
+            total += phaseTimes[phaseSlot][Phase(i)];
     }
 
     // Sum the contributions from multi-parented children.
     size_t dagSlot = phaseExtra[phase].dagSlot;
+    MOZ_ASSERT(dagSlot <= Statistics::MaxMultiparentPhases - 1);
     if (dagSlot != PHASE_DAG_NONE) {
         for (auto edge : dagChildEdges) {
             if (edge.parent == phase)
@@ -449,13 +459,13 @@ Statistics::formatCompactSummaryMessage() const
 }
 
 UniqueChars
-Statistics::formatCompactSlicePhaseTimes(const PhaseTimeTable phaseTimes) const
+Statistics::formatCompactSlicePhaseTimes(const PhaseTimeTable& phaseTimes) const
 {
     static const TimeDuration MaxUnaccountedTime = TimeDuration::FromMicroseconds(100);
 
     FragmentVector fragments;
     char buffer[128];
-    for (AllPhaseIterator iter(phaseTimes); !iter.done(); iter.advance()) {
+    for (AllPhaseIterator iter; !iter.done(); iter.advance()) {
         Phase phase;
         size_t dagSlot;
         size_t level;
@@ -576,14 +586,14 @@ Statistics::formatDetailedSliceDescription(unsigned i, const SliceData& slice)
 }
 
 UniqueChars
-Statistics::formatDetailedPhaseTimes(const PhaseTimeTable phaseTimes)
+Statistics::formatDetailedPhaseTimes(const PhaseTimeTable& phaseTimes)
 {
     static const char* LevelToIndent[] = { "", "  ", "    ", "      " };
     static const TimeDuration MaxUnaccountedChildTime = TimeDuration::FromMicroseconds(50);
 
     FragmentVector fragments;
     char buffer[128];
-    for (AllPhaseIterator iter(phaseTimes); !iter.done(); iter.advance()) {
+    for (AllPhaseIterator iter; !iter.done(); iter.advance()) {
         Phase phase;
         size_t dagSlot;
         size_t level;
@@ -766,11 +776,11 @@ FilterJsonKey(const char*const buffer)
 }
 
 UniqueChars
-Statistics::formatJsonPhaseTimes(const PhaseTimeTable phaseTimes)
+Statistics::formatJsonPhaseTimes(const PhaseTimeTable& phaseTimes)
 {
     FragmentVector fragments;
     char buffer[128];
-    for (AllPhaseIterator iter(phaseTimes); !iter.done(); iter.advance()) {
+    for (AllPhaseIterator iter; !iter.done(); iter.advance()) {
         Phase phase;
         size_t dagSlot;
         iter.get(&phase, &dagSlot);
@@ -802,11 +812,8 @@ Statistics::Statistics(JSRuntime* rt)
     enableProfiling_(false),
     sliceCount_(0)
 {
-    PodArrayZero(phaseTotals);
-    PodArrayZero(counts);
-    PodArrayZero(phaseStartTimes);
-    for (auto& phaseTime : phaseTimes)
-        PodArrayZero(phaseTime);
+    for (auto& count : counts)
+        count = 0;
 
     const char* env = getenv("MOZ_GCTIMER");
     if (env) {
@@ -846,11 +853,13 @@ Statistics::~Statistics()
 /* static */ bool
 Statistics::initialize()
 {
-    for (size_t i = 0; i < PHASE_LIMIT; i++) {
+#ifdef DEBUG
+    for (auto i : AllPhases()) {
         MOZ_ASSERT(phases[i].index == i);
-        for (size_t j = 0; j < PHASE_LIMIT; j++)
+        for (auto j : AllPhases())
             MOZ_ASSERT_IF(i != j, phases[i].telemetryBucket != phases[j].telemetryBucket);
     }
+#endif
 
     // Create a static table of descendants for every phase with multiple
     // children. This assumes that all descendants come linearly in the
@@ -879,7 +888,7 @@ Statistics::initialize()
     mozilla::Vector<Phase, 0, SystemAllocPolicy> stack;
     if (!stack.append(PHASE_LIMIT)) // Dummy entry to avoid special-casing the first node
         return false;
-    for (int i = 0; i < PHASE_LIMIT; i++) {
+    for (auto i : AllPhases()) {
         if (phases[i].parent == PHASE_NO_PARENT ||
             phases[i].parent == PHASE_MULTI_PARENTS)
         {
@@ -889,7 +898,7 @@ Statistics::initialize()
                 stack.popBack();
         }
         phaseExtra[i].depth = stack.length();
-        if (!stack.append(Phase(i)))
+        if (!stack.append(i))
             return false;
     }
 
@@ -957,11 +966,11 @@ LongestPhaseSelfTime(const Statistics::PhaseTimeTable& times)
     TimeDuration selfTimes[PHASE_LIMIT];
 
     // Start with total times, including children's times.
-    for (size_t i = 0; i < PHASE_LIMIT; ++i)
-        selfTimes[i] = SumPhase(Phase(i), times);
+    for (auto i : AllPhases())
+        selfTimes[i] = SumPhase(i, times);
 
     // Subtract out the children's times.
-    for (size_t i = 0; i < PHASE_LIMIT; ++i) {
+    for (auto i : AllPhases()) {
         Phase parent = phases[i].parent;
         if (parent == PHASE_MULTI_PARENTS) {
             // Subtract out only the time for the children specific to this
@@ -969,6 +978,7 @@ LongestPhaseSelfTime(const Statistics::PhaseTimeTable& times)
             for (auto edge : dagChildEdges) {
                 if (edge.parent == parent) {
                     size_t dagSlot = phaseExtra[edge.parent].dagSlot;
+                    MOZ_ASSERT(dagSlot <= Statistics::MaxMultiparentPhases - 1);
                     CheckSelfTime(parent, edge.child, times, selfTimes, times[dagSlot][edge.child]);
                     MOZ_ASSERT(selfTimes[parent] >= times[dagSlot][edge.child]);
                     selfTimes[parent] -= times[dagSlot][edge.child];
@@ -976,17 +986,17 @@ LongestPhaseSelfTime(const Statistics::PhaseTimeTable& times)
             }
         } else if (parent != PHASE_NO_PARENT) {
             MOZ_ASSERT(selfTimes[parent] >= selfTimes[i]);
-            CheckSelfTime(parent, Phase(i), times, selfTimes, selfTimes[i]);
+            CheckSelfTime(parent, i, times, selfTimes, selfTimes[i]);
             selfTimes[parent] -= selfTimes[i];
         }
     }
 
     TimeDuration longestTime = 0;
     Phase longestPhase = PHASE_NONE;
-    for (size_t i = 0; i < PHASE_LIMIT; ++i) {
+    for (auto i : AllPhases()) {
         if (selfTimes[i] > longestTime) {
             longestTime = selfTimes[i];
-            longestPhase = Phase(i);
+            longestPhase = i;
         }
     }
 
@@ -1025,7 +1035,7 @@ void
 Statistics::endGC()
 {
     for (auto j : IntegerRange(NumTimingArrays)) {
-        for (int i = 0; i < PHASE_LIMIT; i++)
+        for (auto i : AllPhases())
             phaseTotals[j][i] += phaseTimes[j][i];
     }
 
@@ -1073,7 +1083,7 @@ Statistics::beginNurseryCollection(JS::gcreason::Reason reason)
 {
     count(STAT_MINOR_GC);
     if (nurseryCollectionCallback) {
-        (*nurseryCollectionCallback)(runtime->contextFromMainThread(),
+        (*nurseryCollectionCallback)(TlsContext.get(),
                                      JS::GCNurseryProgress::GC_NURSERY_COLLECTION_START,
                                      reason);
     }
@@ -1083,7 +1093,7 @@ void
 Statistics::endNurseryCollection(JS::gcreason::Reason reason)
 {
     if (nurseryCollectionCallback) {
-        (*nurseryCollectionCallback)(runtime->contextFromMainThread(),
+        (*nurseryCollectionCallback)(TlsContext.get(),
                                      JS::GCNurseryProgress::GC_NURSERY_COLLECTION_END,
                                      reason);
     }
@@ -1099,8 +1109,12 @@ Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
     if (first)
         beginGC(gckind);
 
-    SliceData data(budget, reason, TimeStamp::Now(), GetPageFaultCount(), runtime->gc.state());
-    if (!slices.append(data)) {
+    if (!slices.emplaceBack(budget,
+                            reason,
+                            TimeStamp::Now(),
+                            GetPageFaultCount(),
+                            runtime->gc.state()))
+    {
         // If we are OOM, set a flag to indicate we have missing slice data.
         aborted = true;
         return;
@@ -1111,7 +1125,7 @@ Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
     // Slice callbacks should only fire for the outermost level.
     bool wasFullGC = zoneStats.isCollectingAllZones();
     if (sliceCallback)
-        (*sliceCallback)(runtime->contextFromMainThread(),
+        (*sliceCallback)(TlsContext.get(),
                          first ? JS::GC_CYCLE_BEGIN : JS::GC_SLICE_BEGIN,
                          JS::GCDescription(!wasFullGC, gckind, reason));
 }
@@ -1157,14 +1171,15 @@ Statistics::endSlice()
     if (!aborted) {
         bool wasFullGC = zoneStats.isCollectingAllZones();
         if (sliceCallback)
-            (*sliceCallback)(runtime->contextFromMainThread(),
+            (*sliceCallback)(TlsContext.get(),
                              last ? JS::GC_CYCLE_END : JS::GC_SLICE_END,
                              JS::GCDescription(!wasFullGC, gckind, slices.back().reason));
     }
 
     // Do this after the slice callback since it uses these values.
     if (last) {
-        PodArrayZero(counts);
+        for (auto& count : counts)
+            count = 0;
 
         // Clear the timers at the end of a GC because we accumulate time in
         // between GCs for some (which come before PHASE_GC_BEGIN in the list.)
@@ -1262,8 +1277,11 @@ Statistics::beginPhase(Phase phase)
     phaseNesting[phaseNestingDepth] = phase;
     phaseNestingDepth++;
 
-    if (phases[phase].parent == PHASE_MULTI_PARENTS)
+    if (phases[phase].parent == PHASE_MULTI_PARENTS) {
+        MOZ_ASSERT(parent != PHASE_NO_PARENT);
         activeDagSlot = phaseExtra[parent].dagSlot;
+    }
+    MOZ_ASSERT(activeDagSlot <= MaxMultiparentPhases - 1);
 
     phaseStartTimes[phase] = TimeStamp::Now();
 }
@@ -1370,7 +1388,12 @@ Statistics::maybePrintProfileHeaders()
     static int printedHeader = 0;
     if ((printedHeader++ % 200) == 0) {
         printProfileHeader();
-        runtime->gc.nursery.printProfileHeader();
+        for (ZoneGroupsIter group(runtime); !group.done(); group.next()) {
+            if (group->nursery().enableProfiling()) {
+                Nursery::printProfileHeader();
+                break;
+            }
+        }
     }
 }
 

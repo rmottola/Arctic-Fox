@@ -12,10 +12,10 @@
 #include "nsAppShellSingleton.h"
 #include "mozilla/ModuleUtils.h"
 #include "mozilla/WidgetUtils.h"
+#include "mozilla/widget/ScreenManager.h"
 #include "nsIServiceManager.h"
 #include "nsIdleServiceWin.h"
 #include "nsLookAndFeel.h"
-#include "nsScreenManagerWin.h"
 #include "nsSound.h"
 #include "WinMouseScrollHandler.h"
 #include "KeyboardLayout.h"
@@ -107,9 +107,9 @@ ColorPickerConstructor(nsISupports *aOuter, REFNSIID aIID,
   return picker->QueryInterface(aIID, aResult);
 }
 
-NS_GENERIC_FACTORY_CONSTRUCTOR(nsScreenManagerWin)
+NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(ScreenManager, ScreenManager::GetAddRefedSingleton)
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIdleServiceWin, nsIdleServiceWin::GetInstance)
-NS_GENERIC_FACTORY_CONSTRUCTOR(nsClipboard)
+NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsIClipboard, nsClipboard::GetInstance)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsClipboardHelper)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsSound)
 NS_GENERIC_FACTORY_CONSTRUCTOR(WinTaskbar)
@@ -176,12 +176,12 @@ static const mozilla::Module::CIDEntry kWidgetCIDs[] = {
   { &kNS_FILEPICKER_CID, false, nullptr, FilePickerConstructor, Module::MAIN_PROCESS_ONLY },
   { &kNS_COLORPICKER_CID, false, nullptr, ColorPickerConstructor, Module::MAIN_PROCESS_ONLY },
   { &kNS_APPSHELL_CID, false, nullptr, nsAppShellConstructor, Module::ALLOW_IN_GPU_PROCESS },
-  { &kNS_SCREENMANAGER_CID, false, nullptr, nsScreenManagerWinConstructor,
+  { &kNS_SCREENMANAGER_CID, false, nullptr, ScreenManagerConstructor,
     Module::MAIN_PROCESS_ONLY },
   { &kNS_GFXINFO_CID, false, nullptr, GfxInfoConstructor },
   { &kNS_THEMERENDERER_CID, false, nullptr, NS_NewNativeTheme },
   { &kNS_IDLE_SERVICE_CID, false, nullptr, nsIdleServiceWinConstructor },
-  { &kNS_CLIPBOARD_CID, false, nullptr, nsClipboardConstructor, Module::MAIN_PROCESS_ONLY },
+  { &kNS_CLIPBOARD_CID, false, nullptr, nsIClipboardConstructor, Module::MAIN_PROCESS_ONLY },
   { &kNS_CLIPBOARDHELPER_CID, false, nullptr, nsClipboardHelperConstructor },
   { &kNS_SOUND_CID, false, nullptr, nsSoundConstructor, Module::MAIN_PROCESS_ONLY },
   { &kNS_TRANSFERABLE_CID, false, nullptr, nsTransferableConstructor },

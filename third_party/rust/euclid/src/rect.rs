@@ -38,7 +38,7 @@ impl<T: HeapSizeOf, U> HeapSizeOf for TypedRect<T, U> {
 }
 
 impl<T: Copy + Deserialize, U> Deserialize for TypedRect<T, U> {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         let (origin, size) = try!(Deserialize::deserialize(deserializer));
@@ -47,7 +47,7 @@ impl<T: Copy + Deserialize, U> Deserialize for TypedRect<T, U> {
 }
 
 impl<T: Serialize, U> Serialize for TypedRect<T, U> {
-    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         (&self.origin, &self.size).serialize(serializer)
@@ -214,6 +214,31 @@ where T: Copy + Clone + Zero + PartialOrd + PartialEq + Add<T, Output=T> + Sub<T
     #[inline]
     pub fn translate_by_size(&self, size: &TypedSize2D<T, U>) -> TypedRect<T, U> {
         self.translate(&TypedPoint2D::new(size.width, size.height))
+    }
+
+    /// Returns the smallest rectangle containing the four points.
+    pub fn from_points(points: &[TypedPoint2D<T, U>]) -> Self {
+        if points.len() == 0 {
+            return TypedRect::zero();
+        }
+        let (mut min_x, mut min_y) = (points[0].x, points[0].y);
+        let (mut max_x, mut max_y) = (min_x, min_y);
+        for point in &points[1..] {
+            if point.x < min_x {
+                min_x = point.x
+            }
+            if point.x > max_x {
+                max_x = point.x
+            }
+            if point.y < min_y {
+                min_y = point.y
+            }
+            if point.y > max_y {
+                max_y = point.y
+            }
+        }
+        TypedRect::new(TypedPoint2D::new(min_x, min_y),
+                       TypedSize2D::new(max_x - min_x, max_y - min_y))
     }
 }
 
@@ -402,6 +427,10 @@ impl<T: NumCast + Copy, Unit> TypedRect<T, Unit> {
     }
 }
 
+/// Shorthand for TypedRect::new(TypedPoint2D::new(x, y), TypedSize2D::new(w, h)).
+pub fn rect<T: Copy, U>(x: T, y: T, w: T, h: T) -> TypedRect<T, U> {
+    TypedRect::new(TypedPoint2D::new(x, y), TypedSize2D::new(w, h))
+}
 
 #[cfg(test)]
 mod tests {

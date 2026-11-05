@@ -346,27 +346,30 @@ Element::Blur(mozilla::ErrorResult& aError)
 EventStates
 Element::StyleStateFromLocks() const
 {
-  EventStates locks = LockedStyleStates();
-  EventStates state = mState | locks;
+  StyleStateLocks locksAndValues = LockedStyleStates();
+  EventStates locks = locksAndValues.mLocks;
+  EventStates values = locksAndValues.mValues;
+  EventStates state = (mState & ~locks) | (locks & values);
 
-  if (locks.HasState(NS_EVENT_STATE_VISITED)) {
+  if (state.HasState(NS_EVENT_STATE_VISITED)) {
     return state & ~NS_EVENT_STATE_UNVISITED;
   }
-  if (locks.HasState(NS_EVENT_STATE_UNVISITED)) {
+  if (state.HasState(NS_EVENT_STATE_UNVISITED)) {
     return state & ~NS_EVENT_STATE_VISITED;
   }
+
   return state;
 }
 
-EventStates
+Element::StyleStateLocks
 Element::LockedStyleStates() const
 {
-  EventStates* locks =
-    static_cast<EventStates*>(GetProperty(nsGkAtoms::lockedStyleStates));
+  StyleStateLocks* locks =
+    static_cast<StyleStateLocks*>(GetProperty(nsGkAtoms::lockedStyleStates));
   if (locks) {
     return *locks;
   }
-  return EventStates();
+  return StyleStateLocks();
 }
 
 void
@@ -383,21 +386,26 @@ Element::NotifyStyleStateChange(EventStates aStates)
 }
 
 void
-Element::LockStyleStates(EventStates aStates)
+Element::LockStyleStates(EventStates aStates, bool aEnabled)
 {
-  EventStates* locks = new EventStates(LockedStyleStates());
+  StyleStateLocks* locks = new StyleStateLocks(LockedStyleStates());
 
-  *locks |= aStates;
+  locks->mLocks |= aStates;
+  if (aEnabled) {
+    locks->mValues |= aStates;
+  } else {
+    locks->mValues &= ~aStates;
+  }
 
   if (aStates.HasState(NS_EVENT_STATE_VISITED)) {
-    *locks &= ~NS_EVENT_STATE_UNVISITED;
+    locks->mLocks &= ~NS_EVENT_STATE_UNVISITED;
   }
   if (aStates.HasState(NS_EVENT_STATE_UNVISITED)) {
-    *locks &= ~NS_EVENT_STATE_VISITED;
+    locks->mLocks &= ~NS_EVENT_STATE_VISITED;
   }
 
   SetProperty(nsGkAtoms::lockedStyleStates, locks,
-              nsINode::DeleteProperty<EventStates>);
+              nsINode::DeleteProperty<StyleStateLocks>);
   SetHasLockedStyleStates();
 
   NotifyStyleStateChange(aStates);
@@ -406,18 +414,18 @@ Element::LockStyleStates(EventStates aStates)
 void
 Element::UnlockStyleStates(EventStates aStates)
 {
-  EventStates* locks = new EventStates(LockedStyleStates());
+  StyleStateLocks* locks = new StyleStateLocks(LockedStyleStates());
 
-  *locks &= ~aStates;
+  locks->mLocks &= ~aStates;
 
-  if (locks->IsEmpty()) {
+  if (locks->mLocks.IsEmpty()) {
     DeleteProperty(nsGkAtoms::lockedStyleStates);
     ClearHasLockedStyleStates();
     delete locks;
   }
   else {
     SetProperty(nsGkAtoms::lockedStyleStates, locks,
-                nsINode::DeleteProperty<EventStates>);
+                nsINode::DeleteProperty<StyleStateLocks>);
   }
 
   NotifyStyleStateChange(aStates);
@@ -426,12 +434,12 @@ Element::UnlockStyleStates(EventStates aStates)
 void
 Element::ClearStyleStateLocks()
 {
-  EventStates locks = LockedStyleStates();
+  StyleStateLocks locks = LockedStyleStates();
 
   DeleteProperty(nsGkAtoms::lockedStyleStates);
   ClearHasLockedStyleStates();
 
-  NotifyStyleStateChange(locks);
+  NotifyStyleStateChange(locks.mLocks);
 }
 
 bool
@@ -2005,9 +2013,24 @@ Element::IsInteractiveHTMLContent(bool aIgnoreTabindex) const
 }
 
 DeclarationBlock*
-Element::GetInlineStyleDeclaration()
+Element::GetInlineStyleDeclaration() const
 {
+  if (!MayHaveStyle()) {
+    return nullptr;
+  }
+  const nsAttrValue* attrVal = mAttrsAndChildren.GetAttr(nsGkAtoms::style);
+
+  if (attrVal && attrVal->Type() == nsAttrValue::eCSSDeclaration) {
+    return attrVal->GetCSSDeclarationValue();
+  }
+
   return nullptr;
+}
+
+const nsMappedAttributes*
+Element::GetMappedAttributes() const
+{
+  return mAttrsAndChildren.GetMapped();
 }
 
 nsresult
@@ -2147,17 +2170,20 @@ Element::DispatchClickEvent(nsPresContext* aPresContext,
   event.mRefPoint = aSourceEvent->mRefPoint;
   uint32_t clickCount = 1;
   float pressure = 0;
+  uint32_t pointerId = 0; // Use the default value here.
   uint16_t inputSource = 0;
   WidgetMouseEvent* sourceMouseEvent = aSourceEvent->AsMouseEvent();
   if (sourceMouseEvent) {
     clickCount = sourceMouseEvent->mClickCount;
     pressure = sourceMouseEvent->pressure;
+    pointerId = sourceMouseEvent->pointerId;
     inputSource = sourceMouseEvent->inputSource;
   } else if (aSourceEvent->mClass == eKeyboardEventClass) {
     inputSource = nsIDOMMouseEvent::MOZ_SOURCE_KEYBOARD;
   }
   event.pressure = pressure;
   event.mClickCount = clickCount;
+  event.pointerId = pointerId;
   event.inputSource = inputSource;
   event.mModifiers = aSourceEvent->mModifiers;
   if (aExtraEventFlags) {

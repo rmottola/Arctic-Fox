@@ -991,23 +991,6 @@ HTMLEditor::IsVisBreak(nsINode* aNode)
 }
 
 NS_IMETHODIMP
-HTMLEditor::GetIsDocumentEditable(bool* aIsDocumentEditable)
-{
-  NS_ENSURE_ARG_POINTER(aIsDocumentEditable);
-
-  nsCOMPtr<nsIDOMDocument> doc = GetDOMDocument();
-  *aIsDocumentEditable = doc && IsModifiable();
-
-  return NS_OK;
-}
-
-bool
-HTMLEditor::IsModifiable()
-{
-  return !IsReadonly();
-}
-
-NS_IMETHODIMP
 HTMLEditor::UpdateBaseURL()
 {
   nsCOMPtr<nsIDocument> doc = GetDocument();
@@ -5177,23 +5160,22 @@ HTMLEditor::OurWindowHasFocus()
 }
 
 bool
-HTMLEditor::IsAcceptableInputEvent(nsIDOMEvent* aEvent)
+HTMLEditor::IsAcceptableInputEvent(WidgetGUIEvent* aGUIEvent)
 {
-  if (!EditorBase::IsAcceptableInputEvent(aEvent)) {
+  if (!EditorBase::IsAcceptableInputEvent(aGUIEvent)) {
     return false;
   }
 
   // While there is composition, all composition events in its top level window
   // are always fired on the composing editor.  Therefore, if this editor has
   // composition, the composition events should be handled in this editor.
-  if (mComposition && aEvent->WidgetEventPtr()->AsCompositionEvent()) {
+  if (mComposition && aGUIEvent->AsCompositionEvent()) {
     return true;
   }
 
   NS_ENSURE_TRUE(mDocWeak, false);
 
-  nsCOMPtr<nsIDOMEventTarget> target;
-  aEvent->GetTarget(getter_AddRefs(target));
+  nsCOMPtr<nsIDOMEventTarget> target = aGUIEvent->GetDOMEventTarget();
   NS_ENSURE_TRUE(target, false);
 
   nsCOMPtr<nsIDocument> document = do_QueryReferent(mDocWeak);
@@ -5217,8 +5199,7 @@ HTMLEditor::IsAcceptableInputEvent(nsIDOMEvent* aEvent)
 
   // If the event is a mouse event, we need to check if the target content is
   // the focused editing host or its descendant.
-  nsCOMPtr<nsIDOMMouseEvent> mouseEvent = do_QueryInterface(aEvent);
-  if (mouseEvent) {
+  if (aGUIEvent->AsMouseEventBase()) {
     nsIContent* editingHost = GetActiveEditingHost();
     // If there is no active editing host, we cannot handle the mouse event
     // correctly.

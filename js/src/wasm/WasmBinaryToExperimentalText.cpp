@@ -27,6 +27,7 @@
 #include "vm/StringBuffer.h"
 #include "wasm/WasmAST.h"
 #include "wasm/WasmBinaryToAST.h"
+#include "wasm/WasmDebug.h"
 #include "wasm/WasmTextUtils.h"
 #include "wasm/WasmTypes.h"
 
@@ -164,13 +165,12 @@ PrintInt64(WasmPrintContext& c, int64_t num)
 }
 
 static bool
-PrintDouble(WasmPrintContext& c, RawF64 num)
+PrintDouble(WasmPrintContext& c, double d)
 {
-    double d = num.fp();
     if (IsNegativeZero(d))
         return c.buffer.append("-0.0");
     if (IsNaN(d))
-        return RenderNaN(c.sb(), num);
+        return RenderNaN(c.sb(), d);
     if (IsInfinite(d)) {
         if (d > 0)
             return c.buffer.append("infinity");
@@ -192,12 +192,11 @@ PrintDouble(WasmPrintContext& c, RawF64 num)
 }
 
 static bool
-PrintFloat32(WasmPrintContext& c, RawF32 num)
+PrintFloat32(WasmPrintContext& c, float f)
 {
-    float f = num.fp();
     if (IsNaN(f))
-        return RenderNaN(c.sb(), num) && c.buffer.append(".f");
-    return PrintDouble(c, RawF64(double(f))) &&
+        return RenderNaN(c.sb(), f) && c.buffer.append(".f");
+    return PrintDouble(c, double(f)) &&
            c.buffer.append("f");
 }
 
@@ -1709,9 +1708,6 @@ PrintFunctionBody(WasmPrintContext& c, AstFunc& func, const AstModule::SigVector
     const AstSig* sig = sigs[func.sig().index()];
     c.indent++;
 
-    size_t startExprIndex = c.maybeSourceMap ? c.maybeSourceMap->exprlocs().length() : 0;
-    uint32_t startLineno = c.buffer.lineno();
-
     uint32_t argsNum = sig->args().length();
     uint32_t localsNum = func.vars().length();
     if (localsNum > 0) {
@@ -1748,11 +1744,8 @@ PrintFunctionBody(WasmPrintContext& c, AstFunc& func, const AstModule::SigVector
 
     c.indent--;
 
-    size_t endExprIndex = c.maybeSourceMap ? c.maybeSourceMap->exprlocs().length() : 0;
-    uint32_t endLineno = c.buffer.lineno();
-
     if (c.maybeSourceMap) {
-        if (!c.maybeSourceMap->functionlocs().emplaceBack(startExprIndex, endExprIndex, startLineno, endLineno))
+        if (!c.maybeSourceMap->exprlocs().emplaceBack(c.buffer.lineno(), c.buffer.column(), func.endOffset()))
             return false;
     }
     return true;

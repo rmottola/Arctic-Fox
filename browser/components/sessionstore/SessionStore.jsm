@@ -361,6 +361,34 @@ this.SessionStore = {
     }
     return number <= FORMAT_VERSION;
   },
+
+  /**
+   * Filters out not worth-saving tabs from a given browser state object.
+   *
+   * @param aState (object)
+   *        The browser state for which we remove worth-saving tabs.
+   *        The given object will be modified.
+   */
+  keepOnlyWorthSavingTabs: function (aState) {
+    for (let i = aState.windows.length - 1; i >= 0; i--) {
+      let win = aState.windows[i];
+      for (let j = win.tabs.length - 1; j >= 0; j--) {
+        let tab = win.tabs[j];
+        if (!SessionStoreInternal._shouldSaveTab(tab)) {
+          win.tabs.splice(j, 1);
+          if (win.selected > j) {
+            win.selected--;
+          }
+        }
+      }
+      if (!win.tabs.length) {
+        aState.windows.splice(i, 1);
+        if (aState.selectedWindow > i) {
+          aState.selectedWindow--;
+        }
+      }
+    }
+  },
 };
 
 // Freeze the SessionStore object. We don't want anyone to modify it.
@@ -553,12 +581,14 @@ var SessionStoreInternal = {
               // replace the crashed session with a restore-page-only session
               let url = "about:sessionrestore";
               let formdata = {id: {sessionData: state}, url};
-              state = { windows: [{ tabs: [{ entries: [{url}], formdata }] }] };
+              let entry = {url, triggeringPrincipal_base64: Utils.SERIALIZED_SYSTEMPRINCIPAL };
+              state = { windows: [{ tabs: [{ entries: [entry], formdata }] }] };
             } else if (this._hasSingleTabWithURL(state.windows,
                                                  "about:welcomeback")) {
               // On a single about:welcomeback URL that crashed, replace about:welcomeback
               // with about:sessionrestore, to make clear to the user that we crashed.
               state.windows[0].tabs[0].entries[0].url = "about:sessionrestore";
+              state.windows[0].tabs[0].entries[0].triggeringPrincipal_base64 = Utils.SERIALIZED_SYSTEMPRINCIPAL;
             }
           }
 
@@ -930,6 +960,18 @@ var SessionStoreInternal = {
           this.resetEpoch(target);
         }
         break;
+      case "BrowserWillChangeProcess":
+        let promise = TabStateFlusher.flush(target);
+        target.frameLoader.addProcessChangeBlockingPromise(promise);
+        break;
+      case "BrowserChangedProcess":
+        let newEpoch = 1 + Math.max(this.getCurrentEpoch(target),
+                                    this.getCurrentEpoch(aEvent.otherBrowser));
+        this.setCurrentEpoch(target, newEpoch);
+        target.messageManager.sendAsyncMessage("SessionStore:becomeActiveProcess", {
+          epoch: newEpoch
+        });
+        break;
       default:
         throw new Error(`unhandled event ${aEvent.type}?`);
     }
@@ -996,6 +1038,8 @@ var SessionStoreInternal = {
 
     // Keep track of a browser's latest frameLoader.
     aWindow.gBrowser.addEventListener("XULFrameLoaderCreated", this);
+    aWindow.gBrowser.addEventListener("BrowserChangedProcess", this);
+    aWindow.gBrowser.addEventListener("BrowserWillChangeProcess", this);
   },
 
   /**
@@ -1250,6 +1294,8 @@ var SessionStoreInternal = {
     }, this);
 
     aWindow.gBrowser.removeEventListener("XULFrameLoaderCreated", this);
+    aWindow.gBrowser.removeEventListener("BrowserChangedProcess", this);
+    aWindow.gBrowser.removeEventListener("BrowserWillChangeProcess", this);
 
     let winData = this._windows[aWindow.__SSi];
 
@@ -3391,7 +3437,7 @@ var SessionStoreInternal = {
     // process, or we have a browser with a grouped session history (as we don't
     // support restoring into browsers with grouped session histories directly).
     let newFrameloader =
-      aReloadInFreshProcess || !!browser.frameLoader.groupedSessionHistory;
+      aReloadInFreshProcess || !!browser.frameLoader.groupedSHistory;
     let isRemotenessUpdate =
       tabbrowser.updateBrowserRemotenessByURL(browser, uri, {
         freshProcess: aReloadInFreshProcess,
@@ -3913,8 +3959,27 @@ var SessionStoreInternal = {
            !(aTabState.entries.length == 1 &&
                 (aTabState.entries[0].url == "about:blank" ||
                  aTabState.entries[0].url == "about:newtab" ||
+                 aTabState.entries[0].url == "about:printpreview" ||
                  aTabState.entries[0].url == "about:privatebrowsing") &&
                  !aTabState.userTypedValue);
+  },
+
+  /**
+   * Determine if the tab state we're passed is something we should keep to be
+   * reopened at session restore. This is used when we are saving the current
+   * session state to disk. This method is very similar to _shouldSaveTabState,
+   * however, "about:blank" and "about:newtab" tabs will still be saved to disk.
+   *
+   * @param aTabState
+   *        The current tab state
+   * @returns boolean
+   */
+  _shouldSaveTab: function ssi_shouldSaveTab(aTabState) {
+    // If the tab has one of the following transient about: history entry,
+    // then we don't actually want to write this tab's data to disk.
+    return aTabState.entries.length &&
+           !(aTabState.entries[0].url == "about:printpreview" ||
+             aTabState.entries[0].url == "about:privatebrowsing");
   },
 
   /**
@@ -4274,6 +4339,14 @@ var SessionStoreInternal = {
     let next = this.getCurrentEpoch(browser) + 1;
     this._browserEpochs.set(browser.permanentKey, next);
     return next;
+  },
+
+  /**
+   * Manually set the epoch to a given value.
+   */
+  setCurrentEpoch(aBrowser, aEpoch) {
+    this._browserEpochs.set(aBrowser.permanentKey, aEpoch);
+    return aEpoch;
   },
 
   /**

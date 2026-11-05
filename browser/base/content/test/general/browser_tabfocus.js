@@ -215,10 +215,9 @@ add_task(function*() {
   let switchWaiter;
   if (gMultiProcessBrowser) {
     switchWaiter = new Promise((resolve, reject) => {
-      gBrowser.addEventListener("TabSwitchDone", function listener() {
-        gBrowser.removeEventListener("TabSwitchDone", listener);
+      gBrowser.addEventListener("TabSwitchDone", function() {
         executeSoon(resolve);
-      });
+      }, {once: true});
     });
   }
 
@@ -317,11 +316,10 @@ add_task(function*() {
   gURLBar.focus();
 
   yield new Promise((resolve, reject) => {
-    window.addEventListener("pageshow", function navigationOccured(event) {
-      window.removeEventListener("pageshow", navigationOccured, true);
+    window.addEventListener("pageshow", function(event) {
       resolve();
-    }, true);
-    document.getElementById('Browser:Back').doCommand();
+    }, {capture: true, once: true});
+    document.getElementById("Browser:Back").doCommand();
   });
 
   is(window.document.activeElement, gURLBar.inputField, "urlbar still focused after navigating back");

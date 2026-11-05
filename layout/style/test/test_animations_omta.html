@@ -1854,7 +1854,7 @@ addAsyncAnimTest(function *() {
   omta_is("transform", { tx: 25 }, RunningOn.Compositor,
           "dynamic rule change test, @keyframes deleteRule");
   done_div();
-  dyn_sheet_elt.parentNode.removeChild(dyn_sheet_elt);
+  dyn_sheet_elt.remove();
   dyn_sheet_elt = null;
   dyn_sheet = null;
 });

@@ -3,10 +3,6 @@
 
 "use strict";
 
-var {DebuggerServer} = require("devtools/server/main");
-var longString = (new Array(DebuggerServer.LONG_STRING_LENGTH + 4)).join("a");
-var initialString = longString.substring(0, DebuggerServer.LONG_STRING_INITIAL_LENGTH);
-
 // Console API
 
 const consoleApiCommands = [
@@ -153,6 +149,10 @@ pageError.set("Reference Error", `
   }
 
   foo()
+`);
+
+pageError.set("Redeclaration Error", `
+  let a, a;
 `);
 
 module.exports = {

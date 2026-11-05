@@ -171,7 +171,7 @@ NS_INTERFACE_MAP_END
 CustomElementRegistry::IsCustomElementEnabled(JSContext* aCx, JSObject* aObject)
 {
   return Preferences::GetBool("dom.webcomponents.customelements.enabled") ||
-         Preferences::GetBool("dom.webcomponents.enabled");
+         nsContentUtils::IsWebComponentsEnabled();
 }
 
 /* static */ already_AddRefed<CustomElementRegistry>
@@ -600,7 +600,7 @@ CustomElementRegistry::Define(const nsAString& aName,
   }
 
   JSContext *cx = jsapi.cx();
-  JS::Rooted<JSObject*> constructor(cx, aFunctionConstructor.Callable());
+  JS::Rooted<JSObject*> constructor(cx, aFunctionConstructor.CallableOrNull());
 
   /**
    * 1. If IsConstructor(constructor) is false, then throw a TypeError and abort

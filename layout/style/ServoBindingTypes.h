@@ -8,8 +8,11 @@
 #define mozilla_ServoBindingTypes_h
 
 #include "mozilla/RefPtr.h"
+#include "mozilla/ServoTypes.h"
 #include "mozilla/UniquePtr.h"
+#include "nsTArray.h"
 
+struct RawServoAnimationValue;
 struct RawServoStyleSet;
 
 #define SERVO_ARC_TYPE(name_, type_) struct type_;
@@ -22,11 +25,14 @@ namespace dom {
 class Element;
 class StyleChildrenIterator;
 } // namespace dom
+struct Keyframe;
+struct PropertyStyleAnimationValuePair;
 } // namespace mozilla
 
 class nsCSSValue;
 class nsIDocument;
 class nsINode;
+class nsPresContext;
 
 using mozilla::dom::StyleChildrenIterator;
 using mozilla::ServoElementSnapshot;
@@ -34,6 +40,10 @@ using mozilla::ServoElementSnapshot;
 typedef nsINode RawGeckoNode;
 typedef mozilla::dom::Element RawGeckoElement;
 typedef nsIDocument RawGeckoDocument;
+typedef nsPresContext RawGeckoPresContext;
+typedef nsTArray<mozilla::Keyframe> RawGeckoKeyframeList;
+typedef nsTArray<mozilla::PropertyStyleAnimationValuePair> RawGeckoAnimationValueList;
+typedef nsTArray<const RawServoAnimationValue*> RawServoAnimationValueBorrowedList;
 
 // We have these helper types so that we can directly generate
 // things like &T or Borrowed<T> on the Rust side in the function, providing
@@ -58,6 +68,7 @@ typedef nsIDocument RawGeckoDocument;
 #define SERVO_ARC_TYPE(name_, type_)         \
   DECL_NULLABLE_BORROWED_REF_TYPE_FOR(type_) \
   DECL_BORROWED_REF_TYPE_FOR(type_)          \
+  DECL_BORROWED_MUT_REF_TYPE_FOR(type_)      \
   struct MOZ_MUST_USE_TYPE type_##Strong     \
   {                                          \
     type_* mPtr;                             \
@@ -100,6 +111,11 @@ DECL_BORROWED_MUT_REF_TYPE_FOR(StyleChildrenIterator)
 DECL_BORROWED_MUT_REF_TYPE_FOR(ServoElementSnapshot)
 DECL_BORROWED_REF_TYPE_FOR(nsCSSValue)
 DECL_BORROWED_MUT_REF_TYPE_FOR(nsCSSValue)
+DECL_OWNED_REF_TYPE_FOR(RawGeckoPresContext)
+DECL_BORROWED_REF_TYPE_FOR(RawGeckoPresContext)
+DECL_BORROWED_MUT_REF_TYPE_FOR(RawGeckoAnimationValueList)
+DECL_BORROWED_REF_TYPE_FOR(RawServoAnimationValueBorrowedList)
+DECL_BORROWED_MUT_REF_TYPE_FOR(RawGeckoKeyframeList)
 
 #undef DECL_ARC_REF_TYPE_FOR
 #undef DECL_OWNED_REF_TYPE_FOR
@@ -127,18 +143,22 @@ DECL_BORROWED_MUT_REF_TYPE_FOR(nsCSSValue)
 #include "mozilla/ServoArcTypeList.h"
 #undef SERVO_ARC_TYPE
 
-extern "C" void Servo_StyleSet_Drop(RawServoStyleSetOwned ptr);
-
-namespace mozilla {
-template<>
-class DefaultDelete<RawServoStyleSet>
-{
-public:
-  void operator()(RawServoStyleSet* aPtr) const
-  {
-    Servo_StyleSet_Drop(aPtr);
+#define DEFINE_BOXED_TYPE(name_, type_)                     \
+  extern "C" void Servo_##name_##_Drop(type_##Owned ptr);   \
+  namespace mozilla {                                       \
+  template<>                                                \
+  class DefaultDelete<type_>                                \
+  {                                                         \
+  public:                                                   \
+    void operator()(type_* aPtr) const                      \
+    {                                                       \
+      Servo_##name_##_Drop(aPtr);                           \
+    }                                                       \
+  };                                                        \
   }
-};
-}
+
+DEFINE_BOXED_TYPE(StyleSet, RawServoStyleSet);
+
+#undef DEFINE_BOXED_TYPE
 
 #endif // mozilla_ServoBindingTypes_h

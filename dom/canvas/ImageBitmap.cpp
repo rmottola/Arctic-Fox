@@ -12,11 +12,11 @@
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRunnable.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/Swizzle.h"
 #include "ImageBitmapColorUtils.h"
 #include "ImageBitmapUtils.h"
 #include "ImageUtils.h"
 #include "imgTools.h"
-#include "libyuv.h"
 
 using namespace mozilla::gfx;
 using namespace mozilla::layers;
@@ -272,10 +272,9 @@ CreateImageFromRawData(const gfx::IntSize& aSize,
     return nullptr;
   }
 
-  libyuv::ABGRToARGB(rgbaMap.mData, rgbaMap.mStride,
-                     bgraMap.mData, bgraMap.mStride,
-                     bgraDataSurface->GetSize().width,
-                     bgraDataSurface->GetSize().height);
+  SwizzleData(rgbaMap.mData, rgbaMap.mStride, SurfaceFormat::R8G8B8A8,
+              bgraMap.mData, bgraMap.mStride, SurfaceFormat::B8G8R8A8,
+              bgraDataSurface->GetSize());
 
   rgbaDataSurface->Unmap();
   bgraDataSurface->Unmap();
@@ -641,7 +640,9 @@ ImageBitmap::PrepareForDrawTarget(gfx::DrawTarget* aTarget)
     DataSourceSurface::MappedSurface srcMap;
     DataSourceSurface::MappedSurface dstMap;
 
-    if (!dstSurface->Map(DataSourceSurface::MapType::READ_WRITE, &dstMap)) {
+    if (dstSurface->Map(DataSourceSurface::MapType::READ_WRITE, &dstMap)) {
+      srcMap = dstMap;
+    } else {
       srcSurface = dstSurface;
       if (!srcSurface->Map(DataSourceSurface::READ, &srcMap)) {
         gfxCriticalError() << "Failed to map source surface for premultiplying alpha.";
@@ -657,46 +658,9 @@ ImageBitmap::PrepareForDrawTarget(gfx::DrawTarget* aTarget)
       }
     }
 
-    uint8_t rIndex = 0;
-    uint8_t gIndex = 0;
-    uint8_t bIndex = 0;
-    uint8_t aIndex = 0;
-
-    if (mSurface->GetFormat() == SurfaceFormat::R8G8B8A8) {
-      rIndex = 0;
-      gIndex = 1;
-      bIndex = 2;
-      aIndex = 3;
-    } else if (mSurface->GetFormat() == SurfaceFormat::B8G8R8A8) {
-      rIndex = 2;
-      gIndex = 1;
-      bIndex = 0;
-      aIndex = 3;
-    } else if (mSurface->GetFormat() == SurfaceFormat::A8R8G8B8) {
-      rIndex = 1;
-      gIndex = 2;
-      bIndex = 3;
-      aIndex = 0;
-    }
-
-    for (int i = 0; i < dstSurface->GetSize().height; ++i) {
-      uint8_t* bufferPtr = dstMap.mData + dstMap.mStride * i;
-      uint8_t* srcBufferPtr = srcSurface ? srcMap.mData + srcMap.mStride * i : bufferPtr;
-      for (int i = 0; i < dstSurface->GetSize().width; ++i) {
-        uint8_t r = *(srcBufferPtr+rIndex);
-        uint8_t g = *(srcBufferPtr+gIndex);
-        uint8_t b = *(srcBufferPtr+bIndex);
-        uint8_t a = *(srcBufferPtr+aIndex);
-
-        *(bufferPtr+rIndex) = gfxUtils::sPremultiplyTable[a * 256 + r];
-        *(bufferPtr+gIndex) = gfxUtils::sPremultiplyTable[a * 256 + g];
-        *(bufferPtr+bIndex) = gfxUtils::sPremultiplyTable[a * 256 + b];
-        *(bufferPtr+aIndex) = a;
-
-        bufferPtr += 4;
-        srcBufferPtr += 4;
-      }
-    }
+    PremultiplyData(srcMap.mData, srcMap.mStride, mSurface->GetFormat(),
+                    dstMap.mData, dstMap.mStride, mSurface->GetFormat(),
+                    dstSurface->GetSize());
 
     dstSurface->Unmap();
     if (srcSurface) {
@@ -916,7 +880,7 @@ ImageBitmap::CreateInternal(nsIGlobalObject* aGlobal, HTMLCanvasElement& aCanvas
        aCanvasEl.GetCurrentContextType() == CanvasContextType::WebGL2) &&
       aCropRect.isSome()) {
     // The _surface_ must be a DataSourceSurface.
-    MOZ_ASSERT(surface->GetType() == SurfaceType::DATA,
+    MOZ_ASSERT(surface->IsDataSourceSurface(),
                "The snapshot SourceSurface from WebGL rendering contest is not \
                DataSourceSurface.");
     RefPtr<DataSourceSurface> dataSurface = surface->GetDataSurface();
@@ -1518,6 +1482,7 @@ ImageBitmap::Create(nsIGlobalObject* aGlobal, const ImageBitmapSource& aSrc,
     return promise.forget();
   } else {
     aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+    return nullptr;
   }
 
   if (!aRv.Failed()) {
@@ -1727,13 +1692,13 @@ protected:
     } else if (JS_IsArrayBufferViewObject(mBuffer)) {
       js::GetArrayBufferViewLengthAndData(mBuffer, &bufferLength, &isSharedMemory, &bufferData);
     } else {
-      error.Throw(NS_ERROR_NOT_IMPLEMENTED);
+      error.ThrowWithCustomCleanup(NS_ERROR_NOT_IMPLEMENTED);
       mPromise->MaybeReject(error);
       return;
     }
 
     if (NS_WARN_IF(!bufferData) || NS_WARN_IF(!bufferLength)) {
-      error.Throw(NS_ERROR_NOT_AVAILABLE);
+      error.ThrowWithCustomCleanup(NS_ERROR_NOT_AVAILABLE);
       mPromise->MaybeReject(error);
       return;
     }
@@ -1743,7 +1708,7 @@ protected:
       mImageBitmap->MappedDataLength(mFormat, error);
 
     if (((int32_t)bufferLength - mOffset) < neededBufferLength) {
-      error.Throw(NS_ERROR_DOM_INDEX_SIZE_ERR);
+      error.ThrowWithCustomCleanup(NS_ERROR_DOM_INDEX_SIZE_ERR);
       mPromise->MaybeReject(error);
       return;
     }

@@ -21,11 +21,13 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/AutoRestore.h"
 #include "mozilla/Casting.h"
+#include "mozilla/CycleCollectedJSRuntime.h"
 #include "mozilla/EndianUtils.h"
 #include "mozilla/LazyIdleThread.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/SnappyCompressOutputStream.h"
 #include "mozilla/SnappyUncompressInputStream.h"
 #include "mozilla/StaticPtr.h"
@@ -34,6 +36,7 @@
 #include "mozilla/UniquePtrExtensions.h"
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/File.h"
+#include "mozilla/dom/FileBlobImpl.h"
 #include "mozilla/dom/StructuredCloneTags.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/dom/filehandle/ActorsParent.h"
@@ -164,7 +167,7 @@ static_assert(JS_STRUCTURED_CLONE_VERSION == 8,
               "Need to update the major schema version.");
 
 // Major schema version. Bump for almost everything.
-const uint32_t kMajorSchemaVersion = 25;
+const uint32_t kMajorSchemaVersion = 26;
 
 // Minor schema version. Should almost always be 0 (maybe bump on release
 // branches if we have to).
@@ -242,6 +245,7 @@ const uint32_t kFileCopyBufferSize = 32768;
 #define JOURNAL_DIRECTORY_NAME "journals"
 
 const char kFileManagerDirectoryNameSuffix[] = ".files";
+const char kSQLiteSuffix[] = ".sqlite";
 const char kSQLiteJournalSuffix[] = ".sqlite-journal";
 const char kSQLiteSHMSuffix[] = ".sqlite-shm";
 const char kSQLiteWALSuffix[] = ".sqlite-wal";
@@ -582,9 +586,9 @@ ClampResultCode(nsresult aResultCode)
       return NS_ERROR_DOM_INDEXEDDB_CONSTRAINT_ERR;
     default:
 #ifdef DEBUG
-      nsPrintfCString message("Converting non-IndexedDB error code (0x%X) to "
+      nsPrintfCString message("Converting non-IndexedDB error code (0x%" PRIX32 ") to "
                               "NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR",
-                              aResultCode);
+                              static_cast<uint32_t>(aResultCode));
       NS_WARNING(message.get());
 #else
       ;
@@ -4132,6 +4136,110 @@ UpgradeSchemaFrom24_0To25_0(mozIStorageConnection* aConnection)
   return NS_OK;
 }
 
+class StripObsoleteOriginAttributesFunction final
+  : public mozIStorageFunction
+{
+public:
+  NS_DECL_ISUPPORTS
+
+private:
+  ~StripObsoleteOriginAttributesFunction()
+  { }
+
+  NS_IMETHOD
+  OnFunctionCall(mozIStorageValueArray* aArguments,
+                 nsIVariant** aResult) override
+  {
+    MOZ_ASSERT(aArguments);
+    MOZ_ASSERT(aResult);
+
+    PROFILER_LABEL("IndexedDB",
+                   "StripObsoleteOriginAttributesFunction::OnFunctionCall",
+                   js::ProfileEntry::Category::STORAGE);
+
+#ifdef DEBUG
+  {
+    uint32_t argCount;
+    MOZ_ALWAYS_SUCCEEDS(aArguments->GetNumEntries(&argCount));
+    MOZ_ASSERT(argCount == 1);
+
+    int32_t type;
+    MOZ_ALWAYS_SUCCEEDS(aArguments->GetTypeOfIndex(0, &type));
+    MOZ_ASSERT(type == mozIStorageValueArray::VALUE_TYPE_TEXT);
+  }
+#endif
+
+    nsCString origin;
+    nsresult rv = aArguments->GetUTF8String(0, origin);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    // Deserialize and re-serialize to automatically drop any obsolete origin
+    // attributes.
+    OriginAttributes oa;
+
+    nsCString originNoSuffix;
+    bool ok = oa.PopulateFromOrigin(origin, originNoSuffix);
+    if (NS_WARN_IF(!ok)) {
+      return NS_ERROR_FAILURE;
+    }
+
+    nsCString suffix;
+    oa.CreateSuffix(suffix);
+
+    nsCOMPtr<nsIVariant> result =
+      new mozilla::storage::UTF8TextVariant(originNoSuffix + suffix);
+
+    result.forget(aResult);
+    return NS_OK;
+  }
+};
+
+nsresult
+UpgradeSchemaFrom25_0To26_0(mozIStorageConnection* aConnection)
+{
+  AssertIsOnIOThread();
+  MOZ_ASSERT(aConnection);
+
+  PROFILER_LABEL("IndexedDB",
+                 "UpgradeSchemaFrom25_0To26_0",
+                 js::ProfileEntry::Category::STORAGE);
+
+  NS_NAMED_LITERAL_CSTRING(functionName, "strip_obsolete_attributes");
+
+  nsCOMPtr<mozIStorageFunction> stripObsoleteAttributes =
+    new StripObsoleteOriginAttributesFunction();
+
+  nsresult rv = aConnection->CreateFunction(functionName,
+                                            /* aNumArguments */ 1,
+                                            stripObsoleteAttributes);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  rv = aConnection->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+    "UPDATE DATABASE "
+      "SET origin = strip_obsolete_attributes(origin) "
+      "WHERE origin LIKE '%^%';"
+  ));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  rv = aConnection->RemoveFunction(functionName);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  rv = aConnection->SetSchemaVersion(MakeSchemaVersion(26, 0));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  return NS_OK;
+}
+
 nsresult
 GetDatabaseFileURL(nsIFile* aDatabaseFile,
                    PersistenceType aPersistenceType,
@@ -4556,7 +4664,7 @@ CreateStorageConnection(nsIFile* aDBFile,
       // Set the page size first.
       if (kSQLitePageSizeOverride) {
         rv = connection->ExecuteSimpleSQL(
-          nsPrintfCString("PRAGMA page_size = %lu;", kSQLitePageSizeOverride)
+          nsPrintfCString("PRAGMA page_size = %" PRIu32 ";", kSQLitePageSizeOverride)
         );
         if (NS_WARN_IF(NS_FAILED(rv))) {
           return rv;
@@ -4638,7 +4746,7 @@ CreateStorageConnection(nsIFile* aDBFile,
       }
     } else  {
       // This logic needs to change next time we change the schema!
-      static_assert(kSQLiteSchemaVersion == int32_t((25 << 4) + 0),
+      static_assert(kSQLiteSchemaVersion == int32_t((26 << 4) + 0),
                     "Upgrade function needed due to schema version increase.");
 
       while (schemaVersion != kSQLiteSchemaVersion) {
@@ -4686,6 +4794,8 @@ CreateStorageConnection(nsIFile* aDBFile,
           rv = UpgradeSchemaFrom23_0To24_0(connection);
         } else if (schemaVersion == MakeSchemaVersion(24, 0)) {
           rv = UpgradeSchemaFrom24_0To25_0(connection);
+        } else if (schemaVersion == MakeSchemaVersion(25, 0)) {
+          rv = UpgradeSchemaFrom25_0To26_0(connection);
         } else {
           IDB_WARNING("Unable to open IndexedDB database, no upgrade path is "
                       "available!");
@@ -4792,7 +4902,7 @@ CreateStorageConnection(nsIFile* aDBFile,
           // Successfully set to rollback journal mode so changing the page size
           // is possible with a VACUUM.
           rv = connection->ExecuteSimpleSQL(
-            nsPrintfCString("PRAGMA page_size = %lu;", kSQLitePageSizeOverride)
+            nsPrintfCString("PRAGMA page_size = %" PRIu32 ";", kSQLitePageSizeOverride)
           );
           if (NS_WARN_IF(NS_FAILED(rv))) {
             return rv;
@@ -5134,7 +5244,7 @@ public:
   ~AutoSavepoint();
 
   nsresult
-  Start(const TransactionBase* aConnection);
+  Start(const TransactionBase* aTransaction);
 
   nsresult
   Commit();
@@ -5719,6 +5829,11 @@ public:
   SerialNumber() const
   {
     return mSerialNumber;
+  }
+
+  nsCString GetThreadName() const
+  {
+    return nsPrintfCString("IndexedDB #%" PRIu32, mSerialNumber);
   }
 
 private:
@@ -6666,6 +6781,13 @@ class DatabaseFile final
 {
   friend class Database;
 
+  // mBlobImpl's ownership lifecycle:
+  // - Initialized on the background thread at creation time.  Then
+  //   responsibility is handed off to the connection thread.
+  // - Checked and used by the connection thread to generate a stream to write
+  //   the blob to disk by an add/put operation.
+  // - Cleared on the connection thread once the file has successfully been
+  //   written to disk.
   RefPtr<BlobImpl> mBlobImpl;
   RefPtr<FileInfo> mFileInfo;
 
@@ -6678,16 +6800,6 @@ public:
     AssertIsOnBackgroundThread();
 
     return mFileInfo;
-  }
-
-  /**
-   * Is there a blob available to provide an input stream?  This may be called
-   * on any thread under current lifecycle constraints.
-   */
-  bool
-  HasBlobImpl() const
-  {
-    return (bool)mBlobImpl;
   }
 
   /**
@@ -6729,10 +6841,17 @@ public:
   already_AddRefed<nsIInputStream>
   GetBlockingInputStream(ErrorResult &rv) const;
 
+  /**
+   * To be called upon successful copying of the stream GetBlockingInputStream()
+   * returned so that we won't try and redundantly write the file to disk in the
+   * future.  This is a separate step from GetBlockingInputStream() because
+   * the write could fail due to quota errors that happen now but that might
+   * not happen in a future attempt.
+   */
   void
-  ClearInputStream()
+  WriteSucceededClearBlobImpl()
   {
-    AssertIsOnBackgroundThread();
+    MOZ_ASSERT(!IsOnBackgroundThread());
 
     mBlobImpl = nullptr;
   }
@@ -6768,8 +6887,8 @@ private:
 already_AddRefed<nsIInputStream>
 DatabaseFile::GetBlockingInputStream(ErrorResult &rv) const
 {
-  // We should only be called from a database I/O thread, not the background
-  // thread.  The background thread should call HasBlobImpl().
+  // We should only be called from our DB connection thread, not the background
+  // thread.
   MOZ_ASSERT(!IsOnBackgroundThread());
 
   if (!mBlobImpl) {
@@ -7471,7 +7590,6 @@ protected:
   nsCString mDatabaseId;
   nsString mDatabaseFilePath;
   State mState;
-  bool mIsApp;
   bool mEnforcingQuota;
   const bool mDeleting;
   bool mBlockedDatabaseOpen;
@@ -8315,8 +8433,6 @@ class ObjectStoreAddOrPutRequestOp final
 
   FallibleTArray<StoredFileInfo> mStoredFileInfos;
 
-  RefPtr<FileManager> mFileManager;
-
   Key mResponse;
   const nsCString mGroup;
   const nsCString mOrigin;
@@ -8356,11 +8472,9 @@ struct ObjectStoreAddOrPutRequestOp::StoredFileInfo final
   // still have a stream for us to write.
   nsCOMPtr<nsIInputStream> mInputStream;
   StructuredCloneFile::FileType mType;
-  bool mCopiedSuccessfully;
 
   StoredFileInfo()
     : mType(StructuredCloneFile::eBlob)
-    , mCopiedSuccessfully(false)
   {
     AssertIsOnBackgroundThread();
 
@@ -9081,14 +9195,14 @@ private:
 };
 
 class BlobImplStoredFile final
-  : public BlobImplFile
+  : public FileBlobImpl
 {
   RefPtr<FileInfo> mFileInfo;
   const bool mSnapshot;
 
 public:
   BlobImplStoredFile(nsIFile* aFile, FileInfo* aFileInfo, bool aSnapshot)
-    : BlobImplFile(aFile)
+    : FileBlobImpl(aFile)
     , mFileInfo(aFileInfo)
     , mSnapshot(aSnapshot)
   {
@@ -9228,6 +9342,9 @@ public:
   GetType() override;
 
   nsresult
+  UpgradeStorageFrom1_0To2_0(nsIFile* aDirectory) override;
+
+  nsresult
   InitOrigin(PersistenceType aPersistenceType,
              const nsACString& aGroup,
              const nsACString& aOrigin,
@@ -9275,6 +9392,13 @@ private:
   GetDirectory(PersistenceType aPersistenceType,
                const nsACString& aOrigin,
                nsIFile** aDirectory);
+
+  nsresult
+  GetDatabaseFilenames(nsIFile* aDirectory,
+                       UsageInfo* aUsageInfo,
+                       bool aForUpgrade,
+                       nsTArray<nsString>& aSubdirsToProcess,
+                       nsTHashtable<nsStringHashKey>& aDatabaseFilename);
 
   nsresult
   GetUsageForDirectoryInternal(nsIFile* aDirectory,
@@ -10034,24 +10158,21 @@ DeserializeStructuredCloneFiles(FileManager* aFileManager,
 }
 
 bool
-GetDatabaseBaseFilename(const nsAString& aFilename,
-                        nsDependentSubstring& aDatabaseBaseFilename)
+GetBaseFilename(const nsAString& aFilename,
+                const nsAString& aSuffix,
+                nsDependentSubstring& aBaseFilename)
 {
   MOZ_ASSERT(!aFilename.IsEmpty());
-  MOZ_ASSERT(aDatabaseBaseFilename.IsEmpty());
+  MOZ_ASSERT(aBaseFilename.IsEmpty());
 
-  NS_NAMED_LITERAL_STRING(sqlite, ".sqlite");
-
-  if (!StringEndsWith(aFilename, sqlite) ||
-      aFilename.Length() == sqlite.Length()) {
+  if (!StringEndsWith(aFilename, aSuffix) ||
+      aFilename.Length() == aSuffix.Length()) {
     return false;
   }
 
-  MOZ_ASSERT(aFilename.Length() > sqlite.Length());
+  MOZ_ASSERT(aFilename.Length() > aSuffix.Length());
 
-  aDatabaseBaseFilename.Rebind(aFilename,
-                               0,
-                               aFilename.Length() - sqlite.Length());
+  aBaseFilename.Rebind(aFilename, 0, aFilename.Length() - aSuffix.Length());
   return true;
 }
 
@@ -12615,7 +12736,7 @@ ConnectionPool::ShutdownThread(ThreadInfo& aThreadInfo)
   nsCOMPtr<nsIThread> thread;
   aThreadInfo.mThread.swap(thread);
 
-  IDB_DEBUG_LOG(("ConnectionPool shutting down thread %lu",
+  IDB_DEBUG_LOG(("ConnectionPool shutting down thread %" PRIu32,
                  runnable->SerialNumber()));
 
   // This should clean up the thread with the profiler.
@@ -12710,10 +12831,13 @@ ConnectionPool::ScheduleTransaction(TransactionInfo* aTransactionInfo,
         RefPtr<ThreadRunnable> runnable = new ThreadRunnable();
 
         nsCOMPtr<nsIThread> newThread;
-        if (NS_SUCCEEDED(NS_NewThread(getter_AddRefs(newThread), runnable))) {
+        nsresult rv =
+          NS_NewNamedThread(runnable->GetThreadName(),
+                            getter_AddRefs(newThread), runnable);
+        if (NS_SUCCEEDED(rv)) {
           MOZ_ASSERT(newThread);
 
-          IDB_DEBUG_LOG(("ConnectionPool created thread %lu",
+          IDB_DEBUG_LOG(("ConnectionPool created thread %" PRIu32,
                          runnable->SerialNumber()));
 
           dbInfo->mThreadInfo.mThread.swap(newThread);
@@ -13423,10 +13547,6 @@ nsresult
 ConnectionPool::
 ThreadRunnable::Run()
 {
-#ifdef MOZ_ENABLE_PROFILER_SPS
-  char stackTopGuess;
-#endif // MOZ_ENABLE_PROFILER_SPS
-
   MOZ_ASSERT(!IsOnBackgroundThread());
   MOZ_ASSERT(mContinueRunning);
 
@@ -13436,18 +13556,6 @@ ThreadRunnable::Run()
   }
 
   mFirstRun = false;
-
-  {
-    // Scope for the thread name. Both PR_SetCurrentThreadName() and
-    // profiler_register_thread() copy the string so we don't need to keep it.
-    const nsPrintfCString threadName("IndexedDB #%lu", mSerialNumber);
-
-    PR_SetCurrentThreadName(threadName.get());
-
-#ifdef MOZ_ENABLE_PROFILER_SPS
-    profiler_register_thread(threadName.get(), &stackTopGuess);
-#endif // MOZ_ENABLE_PROFILER_SPS
-  }
 
   {
     // Scope for the profiler label.
@@ -13489,10 +13597,6 @@ ThreadRunnable::Run()
 #endif // DEBUG
     }
   }
-
-#ifdef MOZ_ENABLE_PROFILER_SPS
-  profiler_unregister_thread();
-#endif // MOZ_ENABLE_PROFILER_SPS
 
   return NS_OK;
 }
@@ -17097,7 +17201,6 @@ Cursor::RecvContinue(const CursorRequestParams& aParams)
 FileManager::FileManager(PersistenceType aPersistenceType,
                          const nsACString& aGroup,
                          const nsACString& aOrigin,
-                         bool aIsApp,
                          const nsAString& aDatabaseName,
                          bool aEnforcingQuota)
   : mPersistenceType(aPersistenceType)
@@ -17105,7 +17208,6 @@ FileManager::FileManager(PersistenceType aPersistenceType,
   , mOrigin(aOrigin)
   , mDatabaseName(aDatabaseName)
   , mLastFileId(0)
-  , mIsApp(aIsApp)
   , mEnforcingQuota(aEnforcingQuota)
   , mInvalidated(false)
 { }
@@ -17645,7 +17747,7 @@ FileManager::GetUsage(nsIFile* aDirectory, uint64_t* aUsage)
  ******************************************************************************/
 
 NS_IMPL_ISUPPORTS_INHERITED(BlobImplStoredFile,
-                            BlobImplFile,
+                            FileBlobImpl,
                             BlobImplStoredFile)
 
 /*******************************************************************************
@@ -17721,12 +17823,103 @@ QuotaClient::GetType()
   return QuotaClient::IDB;
 }
 
-struct FileManagerInitInfo
+nsresult
+QuotaClient::UpgradeStorageFrom1_0To2_0(nsIFile* aDirectory)
 {
-  nsCOMPtr<nsIFile> mDirectory;
-  nsCOMPtr<nsIFile> mDatabaseFile;
-  nsCOMPtr<nsIFile> mDatabaseWALFile;
-};
+  AssertIsOnIOThread();
+  MOZ_ASSERT(aDirectory);
+
+  AutoTArray<nsString, 20> subdirsToProcess;
+  nsTHashtable<nsStringHashKey> databaseFilenames(20);
+  nsresult rv = GetDatabaseFilenames(aDirectory,
+                                     nullptr,
+                                     /* aForUpgrade */ true,
+                                     subdirsToProcess,
+                                     databaseFilenames);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  const NS_ConvertASCIItoUTF16 filesSuffix(
+    kFileManagerDirectoryNameSuffix,
+    LiteralStringLength(kFileManagerDirectoryNameSuffix));
+
+  for (uint32_t count = subdirsToProcess.Length(), i = 0; i < count; i++) {
+    const nsString& subdirName = subdirsToProcess[i];
+
+    // If the directory has the correct suffix then it should exist in
+    // databaseFilenames.
+    nsDependentSubstring subdirNameBase;
+    if (GetBaseFilename(subdirName, filesSuffix, subdirNameBase)) {
+      Unused << NS_WARN_IF(!databaseFilenames.GetEntry(subdirNameBase));
+
+      continue;
+    }
+
+    // The directory didn't have the right suffix but we might need to rename
+    // it. Check to see if we have a database that references this directory.
+    nsString subdirNameWithSuffix;
+    if (databaseFilenames.GetEntry(subdirName)) {
+      subdirNameWithSuffix = subdirName + filesSuffix;
+    } else {
+      // Windows doesn't allow a directory to end with a dot ('.'), so we have
+      // to check that possibility here too.
+      // We do this on all platforms, because the origin directory may have
+      // been created on Windows and now accessed on different OS.
+      nsString subdirNameWithDot = subdirName + NS_LITERAL_STRING(".");
+      if (NS_WARN_IF(!databaseFilenames.GetEntry(subdirNameWithDot))) {
+        continue;
+      }
+      subdirNameWithSuffix = subdirNameWithDot + filesSuffix;
+    }
+
+    // We do have a database that uses this directory so we should rename it
+    // now. However, first check to make sure that we're not overwriting
+    // something else.
+    nsCOMPtr<nsIFile> subdir;
+    rv = aDirectory->Clone(getter_AddRefs(subdir));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    rv = subdir->Append(subdirNameWithSuffix);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    bool exists;
+    rv = subdir->Exists(&exists);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    if (exists) {
+      IDB_REPORT_INTERNAL_ERR();
+      return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
+    }
+
+    rv = aDirectory->Clone(getter_AddRefs(subdir));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    rv = subdir->Append(subdirName);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    DebugOnly<bool> isDirectory;
+    MOZ_ASSERT(NS_SUCCEEDED(subdir->IsDirectory(&isDirectory)));
+    MOZ_ASSERT(isDirectory);
+
+    rv = subdir->RenameTo(nullptr, subdirNameWithSuffix);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+  }
+
+  return NS_OK;
+}
 
 nsresult
 QuotaClient::InitOrigin(PersistenceType aPersistenceType,
@@ -17748,12 +17941,12 @@ QuotaClient::InitOrigin(PersistenceType aPersistenceType,
   // and also get the usage.
 
   AutoTArray<nsString, 20> subdirsToProcess;
-  nsTArray<nsCOMPtr<nsIFile>> unknownFiles;
-  nsTHashtable<nsStringHashKey> validSubdirs(20);
-  AutoTArray<FileManagerInitInfo, 20> initInfos;
-
-  nsCOMPtr<nsISimpleEnumerator> entries;
-  rv = directory->GetDirectoryEntries(getter_AddRefs(entries));
+  nsTHashtable<nsStringHashKey> databaseFilenames(20);
+  rv = GetDatabaseFilenames(directory,
+                            aUsageInfo,
+                            /* aForUpgrade */ false,
+                            subdirsToProcess,
+                            databaseFilenames);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -17762,73 +17955,28 @@ QuotaClient::InitOrigin(PersistenceType aPersistenceType,
     kFileManagerDirectoryNameSuffix,
     LiteralStringLength(kFileManagerDirectoryNameSuffix));
 
-  const NS_ConvertASCIItoUTF16 journalSuffix(
-    kSQLiteJournalSuffix,
-    LiteralStringLength(kSQLiteJournalSuffix));
-  const NS_ConvertASCIItoUTF16 shmSuffix(kSQLiteSHMSuffix,
-                                         LiteralStringLength(kSQLiteSHMSuffix));
+  for (uint32_t count = subdirsToProcess.Length(), i = 0; i < count; i++) {
+    const nsString& subdirName = subdirsToProcess[i];
+
+    // The directory must have the correct suffix.
+    nsDependentSubstring subdirNameBase;
+    if (NS_WARN_IF(!GetBaseFilename(subdirName, filesSuffix, subdirNameBase))) {
+      return NS_ERROR_UNEXPECTED;
+    }
+
+    // The directory base must exist in databaseFilenames.
+    if (NS_WARN_IF(!databaseFilenames.GetEntry(subdirNameBase))) {
+      return NS_ERROR_UNEXPECTED;
+    }
+  }
+
+  const NS_ConvertASCIItoUTF16 sqliteSuffix(kSQLiteSuffix,
+                                            LiteralStringLength(kSQLiteSuffix));
   const NS_ConvertASCIItoUTF16 walSuffix(kSQLiteWALSuffix,
                                          LiteralStringLength(kSQLiteWALSuffix));
 
-  bool hasMore;
-  while (NS_SUCCEEDED((rv = entries->HasMoreElements(&hasMore))) &&
-         hasMore &&
-         (!aUsageInfo || !aUsageInfo->Canceled())) {
-    nsCOMPtr<nsISupports> entry;
-    rv = entries->GetNext(getter_AddRefs(entry));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    nsCOMPtr<nsIFile> file = do_QueryInterface(entry);
-    MOZ_ASSERT(file);
-
-    nsString leafName;
-    rv = file->GetLeafName(leafName);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    bool isDirectory;
-    rv = file->IsDirectory(&isDirectory);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    if (isDirectory) {
-      if (!StringEndsWith(leafName, filesSuffix) ||
-          !validSubdirs.GetEntry(leafName)) {
-        subdirsToProcess.AppendElement(leafName);
-      }
-      continue;
-    }
-
-    // Skip Desktop Service Store (.DS_Store) files. These files are only used
-    // on Mac OS X, but the profile can be shared across different operating
-    // systems, so we check it on all platforms.
-    if (leafName.EqualsLiteral(DSSTORE_FILE_NAME)) {
-      continue;
-    }
-
-    // Skip SQLite temporary files. These files take up space on disk but will
-    // be deleted as soon as the database is opened, so we don't count them
-    // towards quota.
-    if (StringEndsWith(leafName, journalSuffix) ||
-        StringEndsWith(leafName, shmSuffix)) {
-      continue;
-    }
-
-    // The SQLite WAL file does count towards quota, but it is handled below
-    // once we find the actual database file.
-    if (StringEndsWith(leafName, walSuffix)) {
-      continue;
-    }
-
-    nsDependentSubstring dbBaseFilename;
-    if (!GetDatabaseBaseFilename(leafName, dbBaseFilename)) {
-      unknownFiles.AppendElement(file);
-      continue;
-    }
+  for (auto iter = databaseFilenames.ConstIter(); !iter.Done(); iter.Next()) {
+    auto& databaseFilename = iter.Get()->GetKey();
 
     nsCOMPtr<nsIFile> fmDirectory;
     rv = directory->Clone(getter_AddRefs(fmDirectory));
@@ -17836,9 +17984,18 @@ QuotaClient::InitOrigin(PersistenceType aPersistenceType,
       return rv;
     }
 
-    nsString fmDirectoryBaseName = dbBaseFilename + filesSuffix;
+    rv = fmDirectory->Append(databaseFilename + filesSuffix);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
 
-    rv = fmDirectory->Append(fmDirectoryBaseName);
+    nsCOMPtr<nsIFile> databaseFile;
+    rv = directory->Clone(getter_AddRefs(databaseFile));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    rv = databaseFile->Append(databaseFilename + sqliteSuffix);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -17850,115 +18007,25 @@ QuotaClient::InitOrigin(PersistenceType aPersistenceType,
         return rv;
       }
 
-      rv = walFile->Append(dbBaseFilename + walSuffix);
+      rv = walFile->Append(databaseFilename + walSuffix);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
       }
     }
 
-    FileManagerInitInfo* initInfo = initInfos.AppendElement();
-    initInfo->mDirectory.swap(fmDirectory);
-    initInfo->mDatabaseFile.swap(file);
-    initInfo->mDatabaseWALFile.swap(walFile);
-
-    validSubdirs.PutEntry(fmDirectoryBaseName);
-  }
-
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
-  }
-
-  for (uint32_t count = subdirsToProcess.Length(), i = 0; i < count; i++) {
-    const nsString& subdirName = subdirsToProcess[i];
-
-    // If the directory has the correct suffix then it must exist in
-    // validSubdirs.
-    if (StringEndsWith(subdirName, filesSuffix)) {
-      if (NS_WARN_IF(!validSubdirs.GetEntry(subdirName))) {
-        return NS_ERROR_UNEXPECTED;
-      }
-
-      continue;
-    }
-
-    // The directory didn't have the right suffix but we might need to rename
-    // it. Check to see if we have a database that references this directory.
-    nsString subdirNameWithSuffix = subdirName + filesSuffix;
-    if (!validSubdirs.GetEntry(subdirNameWithSuffix)) {
-      // Windows doesn't allow a directory to end with a dot ('.'), so we have
-      // to check that possibility here too.
-      // We do this on all platforms, because the origin directory may have
-      // been created on Windows and now accessed on different OS.
-      subdirNameWithSuffix = subdirName + NS_LITERAL_STRING(".") + filesSuffix;
-      if (NS_WARN_IF(!validSubdirs.GetEntry(subdirNameWithSuffix))) {
-        return NS_ERROR_UNEXPECTED;
-      }
-    }
-
-    // We do have a database that uses this directory so we should rename it
-    // now. However, first check to make sure that we're not overwriting
-    // something else.
-    nsCOMPtr<nsIFile> subdir;
-    rv = directory->Clone(getter_AddRefs(subdir));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    rv = subdir->Append(subdirNameWithSuffix);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    bool exists;
-    rv = subdir->Exists(&exists);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    if (exists) {
-      IDB_REPORT_INTERNAL_ERR();
-      return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-    }
-
-    rv = directory->Clone(getter_AddRefs(subdir));
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    rv = subdir->Append(subdirName);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    DebugOnly<bool> isDirectory;
-    MOZ_ASSERT(NS_SUCCEEDED(subdir->IsDirectory(&isDirectory)));
-    MOZ_ASSERT(isDirectory);
-
-    rv = subdir->RenameTo(nullptr, subdirNameWithSuffix);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-  }
-
-  for (uint32_t count = initInfos.Length(), i = 0; i < count; i++) {
-    FileManagerInitInfo& initInfo = initInfos[i];
-    MOZ_ASSERT(initInfo.mDirectory);
-    MOZ_ASSERT(initInfo.mDatabaseFile);
-    MOZ_ASSERT_IF(aUsageInfo, initInfo.mDatabaseWALFile);
-
-    rv = FileManager::InitDirectory(initInfo.mDirectory,
-                                    initInfo.mDatabaseFile,
+    rv = FileManager::InitDirectory(fmDirectory,
+                                    databaseFile,
                                     aPersistenceType,
                                     aGroup,
                                     aOrigin,
-                                    TelemetryIdForFile(initInfo.mDatabaseFile));
+                                    TelemetryIdForFile(databaseFile));
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
 
     if (aUsageInfo && !aUsageInfo->Canceled()) {
       int64_t fileSize;
-      rv = initInfo.mDatabaseFile->GetFileSize(&fileSize);
+      rv = databaseFile->GetFileSize(&fileSize);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
       }
@@ -17967,7 +18034,7 @@ QuotaClient::InitOrigin(PersistenceType aPersistenceType,
 
       aUsageInfo->AppendToDatabaseUsage(uint64_t(fileSize));
 
-      rv = initInfo.mDatabaseWALFile->GetFileSize(&fileSize);
+      rv = walFile->GetFileSize(&fileSize);
       if (NS_SUCCEEDED(rv)) {
         MOZ_ASSERT(fileSize >= 0);
         aUsageInfo->AppendToDatabaseUsage(uint64_t(fileSize));
@@ -17977,41 +18044,13 @@ QuotaClient::InitOrigin(PersistenceType aPersistenceType,
       }
 
       uint64_t usage;
-      rv = FileManager::GetUsage(initInfo.mDirectory, &usage);
+      rv = FileManager::GetUsage(fmDirectory, &usage);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
       }
 
       aUsageInfo->AppendToFileUsage(usage);
     }
-  }
-
-  // We have to do this after file manager initialization.
-  if (!unknownFiles.IsEmpty()) {
-#ifdef DEBUG
-    for (uint32_t count = unknownFiles.Length(), i = 0; i < count; i++) {
-      nsCOMPtr<nsIFile>& unknownFile = unknownFiles[i];
-
-      nsString leafName;
-      MOZ_ALWAYS_SUCCEEDS(unknownFile->GetLeafName(leafName));
-
-      MOZ_ASSERT(!StringEndsWith(leafName, journalSuffix));
-      MOZ_ASSERT(!StringEndsWith(leafName, shmSuffix));
-      MOZ_ASSERT(!StringEndsWith(leafName, walSuffix));
-
-      nsString path;
-      MOZ_ALWAYS_SUCCEEDS(unknownFile->GetPath(path));
-      MOZ_ASSERT(!path.IsEmpty());
-
-      nsPrintfCString warning(R"(Refusing to open databases for "%s" because )"
-                              R"(an unexpected file exists in the storage )"
-                              R"(area: "%s")",
-                              PromiseFlatCString(aOrigin).get(),
-                              NS_ConvertUTF16toUTF8(path).get());
-      NS_WARNING(warning.get());
-    }
-#endif
-    return NS_ERROR_UNEXPECTED;
   }
 
   return NS_OK;
@@ -18216,6 +18255,109 @@ QuotaClient::GetDirectory(PersistenceType aPersistenceType,
   }
 
   directory.forget(aDirectory);
+  return NS_OK;
+}
+
+nsresult
+QuotaClient::GetDatabaseFilenames(
+                              nsIFile* aDirectory,
+                              UsageInfo* aUsageInfo,
+                              bool aForUpgrade,
+                              nsTArray<nsString>& aSubdirsToProcess,
+                              nsTHashtable<nsStringHashKey>& aDatabaseFilenames)
+{
+  AssertIsOnIOThread();
+
+  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsresult rv = aDirectory->GetDirectoryEntries(getter_AddRefs(entries));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  const NS_ConvertASCIItoUTF16 sqliteSuffix(kSQLiteSuffix,
+                                            LiteralStringLength(kSQLiteSuffix));
+  const NS_ConvertASCIItoUTF16 journalSuffix(
+    kSQLiteJournalSuffix,
+    LiteralStringLength(kSQLiteJournalSuffix));
+  const NS_ConvertASCIItoUTF16 shmSuffix(kSQLiteSHMSuffix,
+                                         LiteralStringLength(kSQLiteSHMSuffix));
+  const NS_ConvertASCIItoUTF16 walSuffix(kSQLiteWALSuffix,
+                                         LiteralStringLength(kSQLiteWALSuffix));
+
+  bool hasMore;
+  while (NS_SUCCEEDED((rv = entries->HasMoreElements(&hasMore))) &&
+         hasMore &&
+         (!aUsageInfo || !aUsageInfo->Canceled())) {
+    nsCOMPtr<nsISupports> entry;
+    rv = entries->GetNext(getter_AddRefs(entry));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    nsCOMPtr<nsIFile> file = do_QueryInterface(entry);
+    MOZ_ASSERT(file);
+
+    nsString leafName;
+    rv = file->GetLeafName(leafName);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    bool isDirectory;
+    rv = file->IsDirectory(&isDirectory);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    if (isDirectory) {
+      aSubdirsToProcess.AppendElement(leafName);
+      continue;
+    }
+
+    // Skip Desktop Service Store (.DS_Store) files. These files are only used
+    // on Mac OS X, but the profile can be shared across different operating
+    // systems, so we check it on all platforms.
+    if (leafName.EqualsLiteral(DSSTORE_FILE_NAME)) {
+      continue;
+    }
+
+    // Skip SQLite temporary files. These files take up space on disk but will
+    // be deleted as soon as the database is opened, so we don't count them
+    // towards quota.
+    if (StringEndsWith(leafName, journalSuffix) ||
+        StringEndsWith(leafName, shmSuffix)) {
+      continue;
+    }
+
+    // The SQLite WAL file does count towards quota, but it is handled below
+    // once we find the actual database file.
+    if (StringEndsWith(leafName, walSuffix)) {
+      continue;
+    }
+
+    nsDependentSubstring leafNameBase;
+    if (!GetBaseFilename(leafName, sqliteSuffix, leafNameBase)) {
+      nsString path;
+      MOZ_ALWAYS_SUCCEEDS(file->GetPath(path));
+      MOZ_ASSERT(!path.IsEmpty());
+
+      nsPrintfCString warning(R"(An unexpected file exists in the storage )"
+                              R"(area: "%s")",
+                              NS_ConvertUTF16toUTF8(path).get());
+      NS_WARNING(warning.get());
+      if (!aForUpgrade) {
+        return NS_ERROR_UNEXPECTED;
+      }
+      continue;
+    }
+
+    aDatabaseFilenames.PutEntry(leafNameBase);
+  }
+
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
   return NS_OK;
 }
 
@@ -18656,14 +18798,12 @@ Maintenance::DirectoryWork()
 
           int64_t dummyTimeStamp;
           nsCString dummySuffix;
-          bool dummyIsApp;
           if (NS_WARN_IF(NS_FAILED(
                 quotaManager->GetDirectoryMetadata2(originDir,
                                                     &dummyTimeStamp,
                                                     dummySuffix,
                                                     group,
-                                                    origin,
-                                                    &dummyIsApp)))) {
+                                                    origin)))) {
             // Not much we can do here...
             continue;
           }
@@ -19483,6 +19623,7 @@ AutoProgressHandler::OnProgress(mozIStorageConnection* aConnection,
 
 NS_IMPL_ISUPPORTS(CompressDataBlobsFunction, mozIStorageFunction)
 NS_IMPL_ISUPPORTS(EncodeKeysFunction, mozIStorageFunction)
+NS_IMPL_ISUPPORTS(StripObsoleteOriginAttributesFunction, mozIStorageFunction);
 
 #if !defined(MOZ_B2G)
 
@@ -19496,7 +19637,6 @@ UpgradeFileIdsFunction::Init(nsIFile* aFMDirectory,
     new FileManager(PERSISTENCE_TYPE_INVALID,
                     EmptyCString(),
                     EmptyCString(),
-                    false,
                     EmptyString(),
                     false);
 
@@ -20745,7 +20885,6 @@ FactoryOp::FactoryOp(Factory* aFactory,
   , mContentParent(Move(aContentParent))
   , mCommonParams(aCommonParams)
   , mState(State::Initial)
-  , mIsApp(false)
   , mEnforcingQuota(true)
   , mDeleting(aDeleting)
   , mBlockedDatabaseOpen(false)
@@ -21094,13 +21233,12 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
     }
 
     if (State::Initial == mState) {
-      QuotaManager::GetInfoForChrome(&mSuffix, &mGroup, &mOrigin, &mIsApp);
+      QuotaManager::GetInfoForChrome(&mSuffix, &mGroup, &mOrigin);
 
-      MOZ_ASSERT(!QuotaManager::IsFirstPromptRequired(persistenceType, mOrigin,
-                                                      mIsApp));
+      MOZ_ASSERT(
+        QuotaManager::IsOriginWhitelistedForPersistentStorage(mOrigin));
 
-      mEnforcingQuota =
-        QuotaManager::IsQuotaEnforced(persistenceType, mOrigin, mIsApp);
+      mEnforcingQuota = false;
     }
 
     *aPermission = PermissionRequestBase::kPermissionAllowed;
@@ -21119,30 +21257,28 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
   nsCString suffix;
   nsCString group;
   nsCString origin;
-  bool isApp;
   rv = QuotaManager::GetInfoFromPrincipal(principal,
                                           &suffix,
                                           &group,
-                                          &origin,
-                                          &isApp);
+                                          &origin);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
 
-#ifdef IDB_MOBILE
-  if (persistenceType == PERSISTENCE_TYPE_PERSISTENT &&
-      !QuotaManager::IsOriginWhitelistedForPersistentStorage(origin) &&
-      !isApp) {
-    return NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR;
-  }
-#endif
-
   PermissionRequestBase::PermissionValue permission;
 
-  if (QuotaManager::IsFirstPromptRequired(persistenceType, origin, isApp)) {
-    rv = PermissionRequestBase::GetCurrentPermission(principal, &permission);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
+  if (persistenceType == PERSISTENCE_TYPE_PERSISTENT) {
+    if (QuotaManager::IsOriginWhitelistedForPersistentStorage(origin)) {
+      permission = PermissionRequestBase::kPermissionAllowed;
+    } else {
+#ifdef IDB_MOBILE
+      return NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR;
+#else
+      rv = PermissionRequestBase::GetCurrentPermission(principal, &permission);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return rv;
+      }
+#endif
     }
   } else {
     permission = PermissionRequestBase::kPermissionAllowed;
@@ -21153,10 +21289,8 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
     mSuffix = suffix;
     mGroup = group;
     mOrigin = origin;
-    mIsApp = isApp;
 
-    mEnforcingQuota =
-      QuotaManager::IsQuotaEnforced(persistenceType, mOrigin, mIsApp);
+    mEnforcingQuota = persistenceType != PERSISTENCE_TYPE_PERSISTENT;
   }
 
   *aPermission = permission;
@@ -21313,7 +21447,6 @@ FactoryOp::OpenDirectory()
   quotaManager->OpenDirectory(persistenceType,
                               mGroup,
                               mOrigin,
-                              mIsApp,
                               Client::IDB,
                               /* aExclusive */ false,
                               this);
@@ -21568,7 +21701,6 @@ OpenDatabaseOp::DoDatabaseWork()
                                             mSuffix,
                                             mGroup,
                                             mOrigin,
-                                            mIsApp,
                                             getter_AddRefs(dbDirectory));
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
@@ -21692,7 +21824,6 @@ OpenDatabaseOp::DoDatabaseWork()
     fileManager = new FileManager(persistenceType,
                                   mGroup,
                                   mOrigin,
-                                  mIsApp,
                                   databaseName,
                                   mEnforcingQuota);
 
@@ -21763,8 +21894,9 @@ OpenDatabaseOp::LoadDatabaseInformation(mozIStorageConnection* aConnection)
     return rv;
   }
 
-  if (mOrigin != origin) {
-    NS_WARNING("Origins don't match!");
+  // We can't just compare these strings directly. See bug 1339081 comment 69.
+  if (NS_WARN_IF(!QuotaManager::AreOriginsEqualOnDisk(mOrigin, origin))) {
+    return NS_ERROR_FILE_CORRUPTED;
   }
 
   int64_t version;
@@ -26167,10 +26299,6 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
       return false;
     }
 
-    RefPtr<FileManager> fileManager =
-      aTransaction->GetDatabase()->GetFileManager();
-    MOZ_ASSERT(fileManager);
-
     for (uint32_t index = 0; index < count; index++) {
       const FileAddInfo& fileAddInfo = fileAddInfos[index];
 
@@ -26196,10 +26324,6 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
 
           storedFileInfo->mFileInfo = storedFileInfo->mFileActor->GetFileInfo();
           MOZ_ASSERT(storedFileInfo->mFileInfo);
-
-          if (storedFileInfo->mFileActor->HasBlobImpl() && !mFileManager) {
-            mFileManager = fileManager;
-          }
 
           storedFileInfo->mType = StructuredCloneFile::eBlob;
           break;
@@ -26234,10 +26358,6 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
           storedFileInfo->mFileInfo = storedFileInfo->mFileActor->GetFileInfo();
           MOZ_ASSERT(storedFileInfo->mFileInfo);
 
-          if (storedFileInfo->mFileActor->HasBlobImpl() && !mFileManager) {
-            mFileManager = fileManager;
-          }
-
           storedFileInfo->mType = fileAddInfo.type();
           break;
         }
@@ -26252,12 +26372,11 @@ ObjectStoreAddOrPutRequestOp::Init(TransactionBase* aTransaction)
     StoredFileInfo* storedFileInfo = mStoredFileInfos.AppendElement(fallible);
     MOZ_ASSERT(storedFileInfo);
 
-    if (!mFileManager) {
-      mFileManager = aTransaction->GetDatabase()->GetFileManager();
-      MOZ_ASSERT(mFileManager);
-    }
+    RefPtr<FileManager> fileManager =
+      aTransaction->GetDatabase()->GetFileManager();
+    MOZ_ASSERT(fileManager);
 
-    storedFileInfo->mFileInfo = mFileManager->GetNewFileInfo();
+    storedFileInfo->mFileInfo = fileManager->GetNewFileInfo();
 
     storedFileInfo->mInputStream =
       new SCInputStream(mParams.cloneInfo().data().data);
@@ -26274,7 +26393,6 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
   MOZ_ASSERT(aConnection);
   aConnection->AssertIsOnConnectionThread();
   MOZ_ASSERT(aConnection->GetStorageConnection());
-  MOZ_ASSERT_IF(mFileManager, !mStoredFileInfos.IsEmpty());
 
   PROFILER_LABEL("IndexedDB",
                  "ObjectStoreAddOrPutRequestOp::DoDatabaseWork",
@@ -26451,19 +26569,10 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
     }
   }
 
-  Maybe<FileHelper> fileHelper;
-
-  if (mFileManager) {
-    fileHelper.emplace(mFileManager);
-
-    rv = fileHelper->Init();
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      IDB_REPORT_INTERNAL_ERR();
-      return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-    }
-  }
-
   if (!mStoredFileInfos.IsEmpty()) {
+    // Moved outside the loop to allow it to be cached when demanded by the
+    // first write.  (We may have mStoredFileInfos without any required writes.)
+    Maybe<FileHelper> fileHelper;
     nsAutoString fileIds;
 
     for (uint32_t count = mStoredFileInfos.Length(), index = 0;
@@ -26477,8 +26586,7 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
       //   MUST be non-null.
       // - This is a reference to a Blob that may or may not have already been
       //   written to disk.  storedFileInfo.mFileActor MUST be non-null, but
-      //   its HasBlobImpl() may return false and so GetBlockingInputStream may
-      //   return null (so don't assert on them).
+      //   its GetBlockingInputStream may return null (so don't assert on them).
       // - It's a mutable file.  No writing will be performed.
       MOZ_ASSERT(storedFileInfo.mInputStream || storedFileInfo.mFileActor ||
                  storedFileInfo.mType == StructuredCloneFile::eMutableFile);
@@ -26497,6 +26605,19 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
       }
 
       if (inputStream) {
+        if (fileHelper.isNothing()) {
+          RefPtr<FileManager> fileManager =
+            Transaction()->GetDatabase()->GetFileManager();
+          MOZ_ASSERT(fileManager);
+
+          fileHelper.emplace(fileManager);
+          rv = fileHelper->Init();
+          if (NS_WARN_IF(NS_FAILED(rv))) {
+            IDB_REPORT_INTERNAL_ERR();
+            return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
+          }
+        }
+
         RefPtr<FileInfo>& fileInfo = storedFileInfo.mFileInfo;
 
         nsCOMPtr<nsIFile> file = fileHelper->GetFile(fileInfo);
@@ -26533,7 +26654,9 @@ ObjectStoreAddOrPutRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
           return rv;
         }
 
-        storedFileInfo.mCopiedSuccessfully = true;
+        if (storedFileInfo.mFileActor) {
+          storedFileInfo.mFileActor->WriteSucceededClearBlobImpl();
+        }
       }
 
       if (index) {
@@ -26617,23 +26740,7 @@ ObjectStoreAddOrPutRequestOp::Cleanup()
 {
   AssertIsOnOwningThread();
 
-  if (!mStoredFileInfos.IsEmpty()) {
-    for (uint32_t count = mStoredFileInfos.Length(), index = 0;
-         index < count;
-         index++) {
-      StoredFileInfo& storedFileInfo = mStoredFileInfos[index];
-
-      MOZ_ASSERT_IF(storedFileInfo.mType == StructuredCloneFile::eMutableFile,
-                    !storedFileInfo.mCopiedSuccessfully);
-
-      RefPtr<DatabaseFile>& fileActor = storedFileInfo.mFileActor;
-      if (fileActor && storedFileInfo.mCopiedSuccessfully) {
-        fileActor->ClearInputStream();
-      }
-    }
-
-    mStoredFileInfos.Clear();
-  }
+  mStoredFileInfos.Clear();
 
   NormalTransactionOp::Cleanup();
 }
@@ -27509,6 +27616,11 @@ IndexGetRequestOp::DoDatabaseWork(DatabaseConnection* aConnection)
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
+
+    if (cloneInfo->mHasPreprocessInfo) {
+      IDB_WARNING("Preprocessing for indexes not yet implemented!");
+      return NS_ERROR_NOT_IMPLEMENTED;
+    }
   }
 
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -27885,6 +27997,11 @@ CursorOpBase::PopulateResponseFromStatement(
         return rv;
       }
 
+      if (cloneInfo.mHasPreprocessInfo) {
+        IDB_WARNING("Preprocessing for cursors not yet implemented!");
+        return NS_ERROR_NOT_IMPLEMENTED;
+      }
+
       if (aInitializeResponse) {
         mResponse = nsTArray<ObjectStoreCursorResponse>();
       } else {
@@ -27926,6 +28043,11 @@ CursorOpBase::PopulateResponseFromStatement(
                                                    &cloneInfo);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
+      }
+
+      if (cloneInfo.mHasPreprocessInfo) {
+        IDB_WARNING("Preprocessing for cursors not yet implemented!");
+        return NS_ERROR_NOT_IMPLEMENTED;
       }
 
       MOZ_ASSERT(aInitializeResponse);

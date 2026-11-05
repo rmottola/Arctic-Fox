@@ -84,9 +84,15 @@ PrintingParent::ShowPrintDialog(PBrowserParent* aParent,
                                 const PrintData& aData,
                                 PrintData* aResult)
 {
-  nsCOMPtr<nsPIDOMWindowOuter> parentWin = DOMWindowFromBrowserParent(aParent);
-  if (!parentWin) {
-    return NS_ERROR_FAILURE;
+  // If aParent is null this call is just being used to get print settings from
+  // the printer for print preview.
+  bool isPrintPreview = !aParent;
+  nsCOMPtr<nsPIDOMWindowOuter> parentWin;
+  if (aParent) {
+    parentWin = DOMWindowFromBrowserParent(aParent);
+    if (!parentWin) {
+      return NS_ERROR_FAILURE;
+    }
   }
 
   nsCOMPtr<nsIPrintingPromptService> pps(do_GetService("@mozilla.org/embedcomp/printingprompt-service;1"));
@@ -123,14 +129,24 @@ PrintingParent::ShowPrintDialog(PBrowserParent* aParent,
   rv = settings->SetPrintSilent(printSilently);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  // If we are printing silently then we just need to initialize the print
-  // settings with anything specific from the printer.
-  if (printSilently ||
-      Preferences::GetBool("print.always_print_silent", printSilently)) {
-    nsXPIDLString printerName;
-    rv = settings->GetPrinterName(getter_Copies(printerName));
-    NS_ENSURE_SUCCESS(rv, rv);
+  nsXPIDLString printerName;
+  settings->GetPrinterName(getter_Copies(printerName));
+#ifdef MOZ_X11
+  // Requesting the default printer name on Linux has been removed in the child,
+  // because it was causing a sandbox violation (see Bug 1329216).
+  // If no printer name is set at this point, use the print settings service
+  // to get the default printer name.
+  if (printerName.IsEmpty()) {
+    mPrintSettingsSvc->GetDefaultPrinterName(getter_Copies(printerName));
+    settings->SetPrinterName(printerName);
+  }
+  mPrintSettingsSvc->InitPrintSettingsFromPrinter(printerName, settings);
+#endif
 
+  // If this is for print preview or we are printing silently then we just need
+  // to initialize the print settings with anything specific from the printer.
+  if (isPrintPreview || printSilently ||
+      Preferences::GetBool("print.always_print_silent", printSilently)) {
     settings->SetIsInitializedFromPrinter(false);
     mPrintSettingsSvc->InitPrintSettingsFromPrinter(printerName, settings);
   } else {
@@ -138,8 +154,13 @@ PrintingParent::ShowPrintDialog(PBrowserParent* aParent,
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
-  rv = SerializeAndEnsureRemotePrintJob(settings, nullptr, remotePrintJob,
-                                        aResult);
+  if (isPrintPreview) {
+    // For print preview we don't want a RemotePrintJob just the settings.
+    rv = mPrintSettingsSvc->SerializeToPrintData(settings, nullptr, aResult);
+  } else {
+    rv = SerializeAndEnsureRemotePrintJob(settings, nullptr, remotePrintJob,
+                                          aResult);
+  }
 
   return rv;
 }

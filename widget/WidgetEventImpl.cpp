@@ -12,6 +12,7 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
+#include "nsIDOMEventTarget.h"
 #include "nsPrintfCString.h"
 
 namespace mozilla {
@@ -423,6 +424,39 @@ WidgetEvent::IsAllowedToDispatchInSystemGroup() const
 }
 
 /******************************************************************************
+ * mozilla::WidgetEvent
+ *
+ * Misc methods.
+ ******************************************************************************/
+
+static dom::EventTarget*
+GetTargetForDOMEvent(nsIDOMEventTarget* aTarget)
+{
+  return aTarget ? aTarget->GetTargetForDOMEvent() : nullptr;
+}
+
+dom::EventTarget*
+WidgetEvent::GetDOMEventTarget() const
+{
+  return GetTargetForDOMEvent(mTarget);
+}
+
+dom::EventTarget*
+WidgetEvent::GetCurrentDOMEventTarget() const
+{
+  return GetTargetForDOMEvent(mCurrentTarget);
+}
+
+dom::EventTarget*
+WidgetEvent::GetOriginalDOMEventTarget() const
+{
+  if (mOriginalTarget) {
+    return GetTargetForDOMEvent(mOriginalTarget);
+  }
+  return GetDOMEventTarget();
+}
+
+/******************************************************************************
  * mozilla::WidgetInputEvent
  ******************************************************************************/
 
@@ -823,12 +857,12 @@ WidgetKeyboardEvent::ComputeLocationFromCodeValue(CodeNameIndex aCodeNameIndex)
     case CODE_NAME_INDEX_ControlLeft:
     case CODE_NAME_INDEX_OSLeft:
     case CODE_NAME_INDEX_ShiftLeft:
-      return nsIDOMKeyEvent::DOM_KEY_LOCATION_LEFT;
+      return eKeyLocationLeft;
     case CODE_NAME_INDEX_AltRight:
     case CODE_NAME_INDEX_ControlRight:
     case CODE_NAME_INDEX_OSRight:
     case CODE_NAME_INDEX_ShiftRight:
-      return nsIDOMKeyEvent::DOM_KEY_LOCATION_RIGHT;
+      return eKeyLocationRight;
     case CODE_NAME_INDEX_Numpad0:
     case CODE_NAME_INDEX_Numpad1:
     case CODE_NAME_INDEX_Numpad2:
@@ -857,9 +891,9 @@ WidgetKeyboardEvent::ComputeLocationFromCodeValue(CodeNameIndex aCodeNameIndex)
     case CODE_NAME_INDEX_NumpadParenLeft:
     case CODE_NAME_INDEX_NumpadParenRight:
     case CODE_NAME_INDEX_NumpadSubtract:
-      return nsIDOMKeyEvent::DOM_KEY_LOCATION_NUMPAD;
+      return eKeyLocationNumpad;
     default:
-      return nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD;
+      return eKeyLocationStandard;
   }
 }
 

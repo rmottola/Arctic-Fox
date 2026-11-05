@@ -65,8 +65,8 @@ NS_IMPL_QUERY_INTERFACE0(MediaResource)
 ChannelMediaResource::ChannelMediaResource(MediaResourceCallback* aCallback,
                                            nsIChannel* aChannel,
                                            nsIURI* aURI,
-                                           const nsACString& aContentType)
-  : BaseMediaResource(aCallback, aChannel, aURI, aContentType),
+                                           const MediaContainerType& aContainerType)
+  : BaseMediaResource(aCallback, aChannel, aURI, aContainerType),
     mOffset(0),
     mReopenOnError(false),
     mIgnoreClose(false),
@@ -358,7 +358,7 @@ ChannelMediaResource::ParseContentRangeHeader(nsIHttpChannel * aHttpChan,
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
-  CMLOG("Received bytes [%lld] to [%lld] of [%lld] for decoder[%p]",
+  CMLOG("Received bytes [%" PRId64 "] to [%" PRId64 "] of [%" PRId64 "] for decoder[%p]",
         aRangeStart, aRangeEnd, aRangeTotal, mCallback.get());
 
   return NS_OK;
@@ -440,7 +440,7 @@ ChannelMediaResource::CopySegmentToCache(nsIInputStream *aInStream,
   closure->mResource->mCallback->NotifyDataArrived();
 
   // Keep track of where we're up to.
-  RESOURCE_LOG("%p [ChannelMediaResource]: CopySegmentToCache at mOffset [%lld] add "
+  RESOURCE_LOG("%p [ChannelMediaResource]: CopySegmentToCache at mOffset [%" PRId64 "] add "
                "[%d] bytes for decoder[%p]",
                closure->mResource, closure->mResource->mOffset, aCount,
                closure->mResource->mCallback.get());
@@ -837,9 +837,7 @@ ChannelMediaResource::RecreateChannel()
   // the channel to avoid a sniffing failure, which would be expected because we
   // are probably seeking in the middle of the bitstream, and sniffing relies
   // on the presence of a magic number at the beginning of the stream.
-  NS_ASSERTION(!GetContentType().IsEmpty(),
-      "When recreating a channel, we should know the Content-Type.");
-  mChannel->SetContentType(GetContentType());
+  mChannel->SetContentType(GetContentType().OriginalString());
   mSuspendAgent.NotifyChannelOpened(mChannel);
 
   // Tell the cache to reset the download status when the channel is reopened.
@@ -866,7 +864,8 @@ ChannelMediaResource::CacheClientNotifyDataReceived()
     return;
 
   mDataReceivedEvent =
-    NewNonOwningRunnableMethod(this, &ChannelMediaResource::DoNotifyDataReceived);
+    NewNonOwningRunnableMethod("ChannelMediaResource::DoNotifyDataReceived",
+                               this, &ChannelMediaResource::DoNotifyDataReceived);
   NS_DispatchToMainThread(mDataReceivedEvent.get());
 }
 
@@ -897,7 +896,7 @@ ChannelMediaResource::CacheClientSeek(int64_t aOffset, bool aResume)
 {
   NS_ASSERTION(NS_IsMainThread(), "Don't call on non-main thread");
 
-  CMLOG("CacheClientSeek requested for aOffset [%lld] for decoder [%p]",
+  CMLOG("CacheClientSeek requested for aOffset [%" PRId64 "] for decoder [%p]",
         aOffset, mCallback.get());
 
   CloseChannel();
@@ -1111,8 +1110,8 @@ public:
   FileMediaResource(MediaResourceCallback* aCallback,
                     nsIChannel* aChannel,
                     nsIURI* aURI,
-                    const nsACString& aContentType) :
-    BaseMediaResource(aCallback, aChannel, aURI, aContentType),
+                    const MediaContainerType& aContainerType) :
+    BaseMediaResource(aCallback, aChannel, aURI, aContainerType),
     mSize(-1),
     mLock("FileMediaResource.mLock"),
     mSizeInitialized(false)
@@ -1497,15 +1496,19 @@ MediaResource::Create(MediaResourceCallback* aCallback, nsIChannel* aChannel)
   nsresult rv = NS_GetFinalChannelURI(aChannel, getter_AddRefs(uri));
   NS_ENSURE_SUCCESS(rv, nullptr);
 
-  nsAutoCString contentType;
-  aChannel->GetContentType(contentType);
+  nsAutoCString contentTypeString;
+  aChannel->GetContentType(contentTypeString);
+  Maybe<MediaContainerType> containerType = MakeMediaContainerType(contentTypeString);
+  if (!containerType) {
+    return nullptr;
+  }
 
   nsCOMPtr<nsIFileChannel> fc = do_QueryInterface(aChannel);
   RefPtr<MediaResource> resource;
   if (fc || IsBlobURI(uri)) {
-    resource = new FileMediaResource(aCallback, aChannel, uri, contentType);
+    resource = new FileMediaResource(aCallback, aChannel, uri, *containerType);
   } else {
-    resource = new ChannelMediaResource(aCallback, aChannel, uri, contentType);
+    resource = new ChannelMediaResource(aCallback, aChannel, uri, *containerType);
   }
   return resource.forget();
 }

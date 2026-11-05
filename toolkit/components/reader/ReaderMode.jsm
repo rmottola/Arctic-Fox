@@ -8,15 +8,28 @@ this.EXPORTED_SYMBOLS = ["ReaderMode"];
 
 const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
+// Constants for telemetry.
+const DOWNLOAD_SUCCESS = 0;
+const DOWNLOAD_ERROR_XHR = 1;
+const DOWNLOAD_ERROR_NO_DOC = 2;
+
+const PARSE_SUCCESS = 0;
+const PARSE_ERROR_TOO_MANY_ELEMENTS = 1;
+const PARSE_ERROR_WORKER = 2;
+const PARSE_ERROR_NO_ARTICLE = 3;
+
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 Cu.importGlobalProperties(["XMLHttpRequest"]);
 
 XPCOMUtils.defineLazyModuleGetter(this, "CommonUtils", "resource://services-common/utils.js");
+XPCOMUtils.defineLazyModuleGetter(this, "Messaging", "resource://gre/modules/Messaging.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "OS", "resource://gre/modules/osfile.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderWorker", "resource://gre/modules/reader/ReaderWorker.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task", "resource://gre/modules/Task.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "TelemetryStopwatch", "resource://gre/modules/TelemetryStopwatch.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "LanguageDetector", "resource:///modules/translation/LanguageDetector.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "Readability", function() {
   let scope = {};
@@ -24,6 +37,8 @@ XPCOMUtils.defineLazyGetter(this, "Readability", function() {
   Services.scriptloader.loadSubScript("resource://gre/modules/reader/Readability.js", scope);
   return scope["Readability"];
 });
+
+const gIsFirefoxDesktop = Services.appinfo.ID == "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}";
 
 this.ReaderMode = {
   // Version of the cache schema.
@@ -129,17 +144,26 @@ this.ReaderMode = {
       return null;
     }
 
+    let outerHash = "";
+    try {
+      let uriObj = Services.io.newURI(url, null, null);
+      url = uriObj.specIgnoringRef;
+      outerHash = uriObj.ref;
+    } catch (ex) { /* ignore, use the raw string */ }
+
     let searchParams = new URLSearchParams(url.substring("about:reader?".length));
     if (!searchParams.has("url")) {
       return null;
     }
-    let encodedURL = searchParams.get("url");
-    try {
-      return decodeURIComponent(encodedURL);
-    } catch (e) {
-      Cu.reportError("Error decoding original URL: " + e);
-      return encodedURL;
+    let originalUrl = searchParams.get("url");
+    if (outerHash) {
+      try {
+        let uriObj = Services.io.newURI(originalUrl, null, null);
+        uriObj = Services.io.newURI('#' + outerHash, null, uriObj);
+        originalUrl = uriObj.spec;
+      } catch (ex) {}
     }
+    return originalUrl;
   },
 
   /**
@@ -180,13 +204,14 @@ this.ReaderMode = {
    * @resolves JS object representing the article, or null if no article is found.
    */
   parseDocument: Task.async(function* (doc) {
-    let uri = Services.io.newURI(doc.documentURI, null, null);
-    if (!this._shouldCheckUri(uri)) {
+    let documentURI = Services.io.newURI(doc.documentURI, null, null);
+    let baseURI = Services.io.newURI(doc.baseURI, null, null);
+    if (!this._shouldCheckUri(documentURI) || !this._shouldCheckUri(baseURI, true)) {
       this.log("Reader mode disabled for URI");
       return null;
     }
 
-    return yield this._readerParse(uri, doc);
+    return yield this._readerParse(baseURI, doc);
   }),
 
   /**
@@ -197,12 +222,18 @@ this.ReaderMode = {
    * @resolves JS object representing the article, or null if no article is found.
    */
   downloadAndParseDocument: Task.async(function* (url) {
-    let uri = Services.io.newURI(url, null, null);
     let doc = yield this._downloadDocument(url);
+    let uri = Services.io.newURI(doc.baseURI, null, null);
+    if (!this._shouldCheckUri(uri, true)) {
+      this.log("Reader mode disabled for URI");
+      return null;
+    }
+
     return yield this._readerParse(uri, doc);
   }),
 
   _downloadDocument: function (url) {
+    let histogram = Services.telemetry.getHistogramById("READER_MODE_DOWNLOAD_RESULT");
     return new Promise((resolve, reject) => {
       let xhr = new XMLHttpRequest();
       xhr.open("GET", url, true);
@@ -211,10 +242,16 @@ this.ReaderMode = {
       xhr.onload = evt => {
         if (xhr.status !== 200) {
           reject("Reader mode XHR failed with status: " + xhr.status);
+          histogram.add(DOWNLOAD_ERROR_XHR);
           return;
         }
 
         let doc = xhr.responseXML;
+        if (!doc) {
+          reject("Reader mode XHR didn't return a document");
+          histogram.add(DOWNLOAD_ERROR_NO_DOC);
+          return;
+        }
 
         // Manually follow a meta refresh tag if one exists.
         let meta = doc.querySelector("meta[http-equiv=refresh]");
@@ -242,7 +279,25 @@ this.ReaderMode = {
             }
           }
         }
+        let responseURL = xhr.responseURL;
+        let givenURL = url;
+        // Convert these to real URIs to make sure the escaping (or lack
+        // thereof) is identical:
+        try {
+          responseURL = Services.io.newURI(responseURL, null, null).specIgnoringRef;
+        } catch (ex) { /* Ignore errors - we'll use what we had before */ }
+        try {
+          givenURL = Services.io.newURI(givenURL, null, null).specIgnoringRef;
+        } catch (ex) { /* Ignore errors - we'll use what we had before */ }
+
+        if (responseURL != givenURL) {
+          // We were redirected without a meta refresh tag.
+          // Force redirect to the correct place:
+          reject({newURL: xhr.responseURL});
+          return;
+        }
         resolve(doc);
+        histogram.add(DOWNLOAD_SUCCESS);
       }
       xhr.send();
     });
@@ -281,7 +336,17 @@ this.ReaderMode = {
     let array = new TextEncoder().encode(JSON.stringify(article));
     let path = this._toHashedPath(article.url);
     yield this._ensureCacheDir();
-    yield OS.File.writeAtomic(path, array, { tmpPath: path + ".tmp" });
+    return OS.File.writeAtomic(path, array, { tmpPath: path + ".tmp" })
+      .then(success => {
+        OS.File.stat(path).then(info => {
+          return Messaging.sendRequest({
+            type: "Reader:AddedToCache",
+            url: article.url,
+            size: info.size,
+            path: path,
+          });
+        });
+      });
   }),
 
   /**
@@ -302,14 +367,35 @@ this.ReaderMode = {
       dump("Reader: " + msg);
   },
 
-  _shouldCheckUri: function (uri) {
-    if ((uri.prePath + "/") === uri.spec) {
-      this.log("Not parsing home page: " + uri.spec);
+  _blockedHosts: [
+    "mail.google.com",
+    "github.com",
+    "pinterest.com",
+    "reddit.com",
+    "twitter.com",
+    "youtube.com",
+  ],
+
+  _shouldCheckUri: function (uri, isBaseUri = false) {
+    if (!(uri.schemeIs("http") || uri.schemeIs("https"))) {
+      this.log("Not parsing URI scheme: " + uri.scheme);
       return false;
     }
 
-    if (!(uri.schemeIs("http") || uri.schemeIs("https") || uri.schemeIs("file"))) {
-      this.log("Not parsing URI scheme: " + uri.scheme);
+    try {
+      uri.QueryInterface(Ci.nsIURL);
+    } catch (ex) {
+      // If this doesn't work, presumably the URL is not well-formed or something
+      return false;
+    }
+    // Sadly, some high-profile pages have false positives, so bail early for those:
+    let asciiHost = uri.asciiHost;
+    if (!isBaseUri && this._blockedHosts.some(blockedHost => asciiHost.endsWith(blockedHost))) {
+      return false;
+    }
+
+    if (!isBaseUri && (!uri.filePath || uri.filePath == "/")) {
+      this.log("Not parsing home page: " + uri.spec);
       return false;
     }
 
@@ -320,16 +406,18 @@ this.ReaderMode = {
    * Attempts to parse a document into an article. Heavy lifting happens
    * in readerWorker.js.
    *
-   * @param uri The article URI.
+   * @param uri The base URI of the article.
    * @param doc The document to parse.
    * @return {Promise}
    * @resolves JS object representing the article, or null if no article is found.
    */
   _readerParse: Task.async(function* (uri, doc) {
+    let histogram = Services.telemetry.getHistogramById("READER_MODE_PARSE_RESULT");
     if (this.parseNodeLimit) {
       let numTags = doc.getElementsByTagName("*").length;
       if (numTags > this.parseNodeLimit) {
         this.log("Aborting parse for " + uri.spec + "; " + numTags + " elements found");
+        histogram.add(PARSE_ERROR_TOO_MANY_ELEMENTS);
         return null;
       }
     }
@@ -344,17 +432,19 @@ this.ReaderMode = {
 
     let serializer = Cc["@mozilla.org/xmlextras/xmlserializer;1"].
                      createInstance(Ci.nsIDOMSerializer);
-    let serializedDoc = yield Promise.resolve(serializer.serializeToString(doc));
+    let serializedDoc = serializer.serializeToString(doc);
 
     let article = null;
     try {
       article = yield ReaderWorker.post("parseDocument", [uriParam, serializedDoc]);
     } catch (e) {
       Cu.reportError("Error in ReaderWorker: " + e);
+      histogram.add(PARSE_ERROR_WORKER);
     }
 
     if (!article) {
       this.log("Worker did not return an article");
+      histogram.add(PARSE_ERROR_NO_ARTICLE);
       return null;
     }
 
@@ -365,6 +455,14 @@ this.ReaderMode = {
     let flags = Ci.nsIDocumentEncoder.OutputSelectionOnly | Ci.nsIDocumentEncoder.OutputAbsoluteLinks;
     article.title = Cc["@mozilla.org/parserutils;1"].getService(Ci.nsIParserUtils)
                                                     .convertToPlainText(article.title, flags, 0);
+    if (gIsFirefoxDesktop) {
+      yield this._assignLanguage(article);
+      this._maybeAssignTextDirection(article);
+    }
+
+    this._assignReadTime(article);
+
+    histogram.add(PARSE_SUCCESS);
     return article;
   }),
 
@@ -412,5 +510,73 @@ this.ReaderMode = {
       }
       return undefined;
     });
-  }
+  },
+
+  /**
+   * Sets a global language string value if the result is confident
+   *
+   * @return Promise
+   * @resolves when the language is detected
+   */
+  _assignLanguage(article) {
+    return LanguageDetector.detectLanguage(article.textContent).then(result => {
+      article.language = result.confident ? result.language : null;
+    });
+  },
+
+  _maybeAssignTextDirection(article) {
+    // TODO: Remove the hardcoded language codes below once bug 1320265 is resolved.
+    if (!article.dir && ["ar", "fa", "he", "ug", "ur"].includes(article.language)) {
+      article.dir = "rtl";
+    }
+  },
+
+  /**
+   * Assigns the estimated reading time range of the article to the article object.
+   *
+   * @param article the article object to assign the reading time estimate to.
+   */
+  _assignReadTime(article) {
+    let lang = article.language || "en";
+    const readingSpeed = this._getReadingSpeedForLanguage(lang);
+    const charactersPerMinuteLow = readingSpeed.cpm - readingSpeed.variance;
+    const charactersPerMinuteHigh = readingSpeed.cpm + readingSpeed.variance;
+    const length = article.length;
+
+    article.readingTimeMinsSlow = Math.ceil(length / charactersPerMinuteLow);
+    article.readingTimeMinsFast  = Math.ceil(length / charactersPerMinuteHigh);
+  },
+
+  /**
+   * Returns the reading speed of a selection of languages with likely variance.
+   *
+   * Reading speed estimated from a study done on reading speeds in various languages.
+   * study can be found here: http://iovs.arvojournals.org/article.aspx?articleid=2166061
+   *
+   * @return object with characters per minute and variance. Defaults to English
+   *         if no suitable language is found in the collection.
+   */
+  _getReadingSpeedForLanguage(lang) {
+    const readingSpeed = new Map([
+      [ "en", {cpm: 987,  variance: 118 } ],
+      [ "ar", {cpm: 612,  variance: 88 } ],
+      [ "de", {cpm: 920,  variance: 86 } ],
+      [ "es", {cpm: 1025, variance: 127 } ],
+      [ "fi", {cpm: 1078, variance: 121 } ],
+      [ "fr", {cpm: 998,  variance: 126 } ],
+      [ "he", {cpm: 833,  variance: 130 } ],
+      [ "it", {cpm: 950,  variance: 140 } ],
+      [ "jw", {cpm: 357,  variance: 56 } ],
+      [ "nl", {cpm: 978,  variance: 143 } ],
+      [ "pl", {cpm: 916,  variance: 126 } ],
+      [ "pt", {cpm: 913,  variance: 145 } ],
+      [ "ru", {cpm: 986,  variance: 175 } ],
+      [ "sk", {cpm: 885,  variance: 145 } ],
+      [ "sv", {cpm: 917,  variance: 156 } ],
+      [ "tr", {cpm: 1054, variance: 156 } ],
+      [ "zh", {cpm: 255,  variance: 29 } ],
+    ]);
+
+    return readingSpeed.get(lang) || readingSpeed.get("en");
+  },
 };

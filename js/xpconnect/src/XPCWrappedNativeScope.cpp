@@ -10,7 +10,7 @@
 #include "XPCWrapper.h"
 #include "nsContentUtils.h"
 #include "nsCycleCollectionNoteRootCallback.h"
-#include "nsPrincipal.h"
+#include "ExpandedPrincipal.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Preferences.h"
 #include "nsIAddonInterposition.h"
@@ -290,18 +290,20 @@ XPCWrappedNativeScope::EnsureContentXBLScope(JSContext* cx)
     options.proto = global;
     options.sameZoneAs = global;
 
-    // Use an nsExpandedPrincipal to create asymmetric security.
+    // Use an ExpandedPrincipal to create asymmetric security.
     nsIPrincipal* principal = GetPrincipal();
     MOZ_ASSERT(!nsContentUtils::IsExpandedPrincipal(principal));
     nsTArray<nsCOMPtr<nsIPrincipal>> principalAsArray(1);
     principalAsArray.AppendElement(principal);
-    nsCOMPtr<nsIExpandedPrincipal> ep =
-        new nsExpandedPrincipal(principalAsArray,
-                                principal->OriginAttributesRef());
+    RefPtr<ExpandedPrincipal> ep =
+        ExpandedPrincipal::Create(principalAsArray,
+                                  principal->OriginAttributesRef());
 
     // Create the sandbox.
     RootedValue v(cx);
-    nsresult rv = CreateSandboxObject(cx, &v, ep, options);
+    nsresult rv = CreateSandboxObject(cx, &v,
+                                      static_cast<nsIExpandedPrincipal*>(ep),
+                                      options);
     NS_ENSURE_SUCCESS(rv, nullptr);
     mContentXBLScope = &v.toObject();
 
@@ -485,7 +487,7 @@ XPCWrappedNativeScope::~XPCWrappedNativeScope()
 
 // static
 void
-XPCWrappedNativeScope::TraceWrappedNativesInAllScopes(JSTracer* trc, XPCJSContext* cx)
+XPCWrappedNativeScope::TraceWrappedNativesInAllScopes(JSTracer* trc)
 {
     // Do JS::TraceEdge for all wrapped natives with external references, as
     // well as any DOM expando objects.
@@ -514,8 +516,7 @@ SuspectDOMExpandos(JSObject* obj, nsCycleCollectionNoteRootCallback& cb)
 
 // static
 void
-XPCWrappedNativeScope::SuspectAllWrappers(XPCJSContext* cx,
-                                          nsCycleCollectionNoteRootCallback& cb)
+XPCWrappedNativeScope::SuspectAllWrappers(nsCycleCollectionNoteRootCallback& cb)
 {
     for (XPCWrappedNativeScope* cur = gScopes; cur; cur = cur->mNext) {
         for (auto i = cur->mWrappedNativeMap->Iter(); !i.Done(); i.Next()) {
@@ -531,7 +532,7 @@ XPCWrappedNativeScope::SuspectAllWrappers(XPCJSContext* cx,
 
 // static
 void
-XPCWrappedNativeScope::UpdateWeakPointersAfterGC(XPCJSContext* cx)
+XPCWrappedNativeScope::UpdateWeakPointersAfterGC()
 {
     // If this is called from the finalization callback in JSGC_MARK_END then
     // JSGC_FINALIZE_END must always follow it calling

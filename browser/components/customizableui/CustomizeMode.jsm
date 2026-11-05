@@ -446,7 +446,7 @@ CustomizeMode.prototype = {
       yield this._doTransition(false);
       this.removeLWTStyling();
 
-      Services.obs.removeObserver(this, "lightweight-theme-window-updated", false);
+      Services.obs.removeObserver(this, "lightweight-theme-window-updated");
 
       if (this.browser.selectedTab == gTab) {
         if (gTab.linkedBrowser.currentURI.spec == "about:blank") {
@@ -1326,7 +1326,7 @@ CustomizeMode.prototype = {
 
   openAddonsManagerThemes: function(aEvent) {
     aEvent.target.parentNode.parentNode.hidePopup();
-    this.window.BrowserOpenAddonsMgr('addons://list/theme');
+    this.window.BrowserOpenAddonsMgr("addons://list/theme");
   },
 
   getMoreThemes: function(aEvent) {
@@ -1699,7 +1699,7 @@ CustomizeMode.prototype = {
         } else {
           // Check if the aDraggedItem is hovered past the first half of dragOverItem
           let window = dragOverItem.ownerGlobal;
-          let direction = window.getComputedStyle(dragOverItem, null).direction;
+          let direction = window.getComputedStyle(dragOverItem).direction;
           let itemRect = dragOverItem.getBoundingClientRect();
           let dropTargetCenter = itemRect.left + (itemRect.width / 2);
           let existingDir = dragOverItem.getAttribute("dragover");
@@ -2028,7 +2028,7 @@ CustomizeMode.prototype = {
         if (makeSpaceImmediately) {
           aItem.setAttribute("notransition", "true");
         }
-        aItem.style[prop] = width + 'px';
+        aItem.style[prop] = width + "px";
         aItem.style.removeProperty(otherProp);
         if (makeSpaceImmediately) {
           // Force a layout flush:

@@ -20,8 +20,9 @@ typedef TrackInfo::TrackType TrackType;
 using media::TimeUnit;
 using media::TimeIntervals;
 
-MediaSourceDemuxer::MediaSourceDemuxer()
+MediaSourceDemuxer::MediaSourceDemuxer(AbstractThread* aAbstractMainThread)
   : mTaskQueue(new AutoTaskQueue(GetMediaThreadPool(MediaThreadType::PLAYBACK),
+                                 aAbstractMainThread,
                                  /* aSupportsTailDispatch = */ false))
   , mMonitor("MediaSourceDemuxer")
 {
@@ -253,7 +254,7 @@ MediaSourceDemuxer::GetMozDebugReaderData(nsACString& aString)
   result += nsPrintfCString("Dumping data for demuxer %p:\n", this);
   if (mAudioTrack) {
     result += nsPrintfCString("\tDumping Audio Track Buffer(%s): - mLastAudioTime: %f\n"
-                              "\t\tNumSamples:%u Size:%u Evictable:%u NextGetSampleIndex:%u NextInsertionIndex:%d\n",
+                              "\t\tNumSamples:%" PRIuSIZE " Size:%u Evictable:%u NextGetSampleIndex:%u NextInsertionIndex:%d\n",
                               mAudioTrack->mAudioTracks.mInfo->mMimeType.get(),
                               mAudioTrack->mAudioTracks.mNextSampleTime.ToSeconds(),
                               mAudioTrack->mAudioTracks.mBuffers[0].Length(),
@@ -267,7 +268,7 @@ MediaSourceDemuxer::GetMozDebugReaderData(nsACString& aString)
   }
   if (mVideoTrack) {
     result += nsPrintfCString("\tDumping Video Track Buffer(%s) - mLastVideoTime: %f\n"
-                              "\t\tNumSamples:%u Size:%u Evictable:%u NextGetSampleIndex:%u NextInsertionIndex:%d\n",
+                              "\t\tNumSamples:%" PRIuSIZE " Size:%u Evictable:%u NextGetSampleIndex:%u NextInsertionIndex:%d\n",
                               mVideoTrack->mVideoTracks.mInfo->mMimeType.get(),
                               mVideoTrack->mVideoTracks.mNextSampleTime.ToSeconds(),
                               mVideoTrack->mVideoTracks.mBuffers[0].Length(),
@@ -290,10 +291,9 @@ MediaSourceTrackDemuxer::MediaSourceTrackDemuxer(MediaSourceDemuxer* aParent,
   , mType(aType)
   , mMonitor("MediaSourceTrackDemuxer")
   , mReset(true)
-  , mPreRoll(
-      TimeUnit::FromMicroseconds(
-        OpusDataDecoder::IsOpus(mParent->GetTrackInfo(mType)->mMimeType)
-          ? 80000 : 0))
+  , mPreRoll(TimeUnit::FromMicroseconds(
+      OpusDataDecoder::IsOpus(mParent->GetTrackInfo(mType)->mMimeType) ? 80000
+                                                                       : 0))
 {
 }
 

@@ -29,6 +29,9 @@
 
 #include "gfxVROculus.h"
 
+#include "mozilla/dom/GamepadEventTypes.h"
+#include "mozilla/dom/GamepadBinding.h"
+
 /** XXX The DX11 objects and quad blitting could be encapsulated
  *    into a separate object if either Oculus starts supporting
  *     non-Windows platforms or the blit is needed by other HMD\
@@ -49,6 +52,7 @@ using namespace mozilla;
 using namespace mozilla::gfx;
 using namespace mozilla::gfx::impl;
 using namespace mozilla::layers;
+using namespace mozilla::dom;
 
 namespace {
 
@@ -331,6 +335,7 @@ VRDisplayOculus::VRDisplayOculus(ovrSession aSession)
 
   mDisplayInfo.mDisplayName.AssignLiteral("Oculus VR HMD");
   mDisplayInfo.mIsConnected = true;
+  mDisplayInfo.mIsMounted = false;
 
   mDesc = ovr_GetHmdDesc(aSession);
 
@@ -344,6 +349,7 @@ VRDisplayOculus::VRDisplayOculus(ovrSession aSession)
     mDisplayInfo.mCapabilityFlags |= VRDisplayCapabilityFlags::Cap_LinearAcceleration;
   }
   mDisplayInfo.mCapabilityFlags |= VRDisplayCapabilityFlags::Cap_External;
+  mDisplayInfo.mCapabilityFlags |= VRDisplayCapabilityFlags::Cap_MountDetection;
   mDisplayInfo.mCapabilityFlags |= VRDisplayCapabilityFlags::Cap_Present;
 
   mFOVPort[VRDisplayInfo::Eye_Left] = mDesc.DefaultEyeFov[ovrEye_Left];
@@ -465,6 +471,7 @@ VRDisplayOculus::GetSensorState(double timeOffset)
     result.linearAcceleration[2] = pose.LinearAcceleration.z;
   }
   result.flags |= VRDisplayCapabilityFlags::Cap_External;
+  result.flags |= VRDisplayCapabilityFlags::Cap_MountDetection;
   result.flags |= VRDisplayCapabilityFlags::Cap_Present;
 
   return result;
@@ -618,8 +625,8 @@ VRDisplayOculus::StopPresentation()
   }
 }
 
-/*static*/ already_AddRefed<VRDisplayManagerOculus>
-VRDisplayManagerOculus::Create()
+/*static*/ already_AddRefed<VRSystemManagerOculus>
+VRSystemManagerOculus::Create()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -632,12 +639,12 @@ VRDisplayManagerOculus::Create()
     return nullptr;
   }
 
-  RefPtr<VRDisplayManagerOculus> manager = new VRDisplayManagerOculus();
+  RefPtr<VRSystemManagerOculus> manager = new VRSystemManagerOculus();
   return manager.forget();
 }
 
 bool
-VRDisplayManagerOculus::Init()
+VRSystemManagerOculus::Init()
 {
   if (!mOculusInitialized) {
     nsIThread* thread = nullptr;
@@ -662,7 +669,7 @@ VRDisplayManagerOculus::Init()
 }
 
 void
-VRDisplayManagerOculus::Destroy()
+VRSystemManagerOculus::Destroy()
 {
   if (mOculusInitialized) {
     MOZ_ASSERT(NS_GetCurrentThread() == mOculusThread);
@@ -676,7 +683,7 @@ VRDisplayManagerOculus::Destroy()
 }
 
 void
-VRDisplayManagerOculus::GetHMDs(nsTArray<RefPtr<VRDisplayHost>>& aHMDResult)
+VRSystemManagerOculus::GetHMDs(nsTArray<RefPtr<VRDisplayHost>>& aHMDResult)
 {
   if (!mOculusInitialized) {
     return;
@@ -695,6 +702,7 @@ VRDisplayManagerOculus::GetHMDs(nsTArray<RefPtr<VRDisplayHost>>& aHMDResult)
     ovrGraphicsLuid luid;
     ovrResult orv = ovr_Create(&session, &luid);
     if (orv == ovrSuccess) {
+      mSession = session;
       mHMDInfo = new VRDisplayOculus(session);
     }
   }
@@ -702,6 +710,45 @@ VRDisplayManagerOculus::GetHMDs(nsTArray<RefPtr<VRDisplayHost>>& aHMDResult)
   if (mHMDInfo) {
     aHMDResult.AppendElement(mHMDInfo);
   }
+}
+
+void
+VRSystemManagerOculus::HandleInput()
+{
+}
+
+void
+VRSystemManagerOculus::HandleButtonPress(uint32_t aControllerIdx,
+                                         uint64_t aButtonPressed)
+{
+}
+
+void
+VRSystemManagerOculus::HandleAxisMove(uint32_t aControllerIdx, uint32_t aAxis,
+                                      float aValue)
+{
+}
+
+void
+VRSystemManagerOculus::HandlePoseTracking(uint32_t aControllerIdx,
+                                          const GamepadPoseState& aPose,
+                                          VRControllerHost* aController)
+{
+}
+
+void
+VRSystemManagerOculus::GetControllers(nsTArray<RefPtr<VRControllerHost>>& aControllerResult)
+{
+}
+
+void
+VRSystemManagerOculus::ScanForControllers()
+{
+}
+
+void
+VRSystemManagerOculus::RemoveControllers()
+{
 }
 
 already_AddRefed<CompositingRenderTargetD3D11>
@@ -893,4 +940,5 @@ VRDisplayOculus::NotifyVSync()
   ovrSessionStatus sessionStatus;
   ovrResult ovr = ovr_GetSessionStatus(mSession, &sessionStatus);
   mDisplayInfo.mIsConnected = (ovr == ovrSuccess && sessionStatus.HmdPresent);
+  mDisplayInfo.mIsMounted = (ovr == ovrSuccess && sessionStatus.HmdMounted);
 }

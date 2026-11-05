@@ -18,6 +18,7 @@ Cu.import("resource://gre/modules/TelemetrySession.jsm", this);
 Cu.import("resource://gre/modules/TelemetryStorage.jsm", this);
 Cu.import("resource://gre/modules/TelemetryEnvironment.jsm", this);
 Cu.import("resource://gre/modules/TelemetrySend.jsm", this);
+Cu.import("resource://gre/modules/TelemetryUtils.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
 Cu.import("resource://gre/modules/Preferences.jsm");
@@ -41,8 +42,6 @@ const APP_NAME = "XPCShell";
 
 const IGNORE_HISTOGRAM_TO_CLONE = "MEMORY_HEAP_ALLOCATED";
 const IGNORE_CLONED_HISTOGRAM = "test::ignore_me_also";
-const ADDON_NAME = "Telemetry test addon";
-const ADDON_HISTOGRAM = "addon-histogram";
 // Add some unicode characters here to ensure that sending them works correctly.
 const SHUTDOWN_TIME = 10000;
 const FAILED_PROFILE_LOCK_ATTEMPTS = 2;
@@ -74,19 +73,6 @@ XPCOMUtils.defineLazyGetter(this, "DATAREPORTING_PATH", function() {
 var gClientID = null;
 var gMonotonicNow = 0;
 
-function generateUUID() {
-  let str = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator).generateUUID().toString();
-  // strip {}
-  return str.substring(1, str.length - 1);
-}
-
-function truncateDateToDays(date) {
-  return new Date(date.getFullYear(),
-                  date.getMonth(),
-                  date.getDate(),
-                  0, 0, 0, 0);
-}
-
 function sendPing() {
   TelemetrySession.gatherStartup();
   if (PingServer.started) {
@@ -111,11 +97,6 @@ function fakeIdleNotification(topic) {
 function setupTestData() {
 
   Services.startup.interrupted = true;
-  Telemetry.registerAddonHistogram(ADDON_NAME, ADDON_HISTOGRAM,
-                                   Telemetry.HISTOGRAM_LINEAR,
-                                   1, 5, 6);
-  let h1 = Telemetry.getAddonHistogram(ADDON_NAME, ADDON_HISTOGRAM);
-  h1.add(1);
   let h2 = Telemetry.getHistogramById("TELEMETRY_TEST_COUNT");
   h2.add();
 
@@ -380,13 +361,8 @@ function checkPayload(payload, reason, successfulPings, savedPings) {
   // Telemetry doesn't touch a memory reporter with these units that's
   // available on all platforms.
 
-  Assert.ok('MEMORY_JS_GC_HEAP' in payload.histograms); // UNITS_BYTES
-  Assert.ok('MEMORY_JS_COMPARTMENTS_SYSTEM' in payload.histograms); // UNITS_COUNT
-
-  // We should have included addon histograms.
-  Assert.ok("addonHistograms" in payload);
-  Assert.ok(ADDON_NAME in payload.addonHistograms);
-  Assert.ok(ADDON_HISTOGRAM in payload.addonHistograms[ADDON_NAME]);
+  Assert.ok("MEMORY_JS_GC_HEAP" in payload.histograms); // UNITS_BYTES
+  Assert.ok("MEMORY_JS_COMPARTMENTS_SYSTEM" in payload.histograms); // UNITS_COUNT
 
   Assert.ok(("mainThread" in payload.slowSQL) &&
                 ("otherThreads" in payload.slowSQL));
@@ -526,8 +502,8 @@ add_task(function* test_simplePing() {
   PingServer.start();
   Preferences.set(PREF_SERVER, "http://localhost:" + PingServer.port);
 
-  let now = new Date(2020, 1, 1, 12, 0, 0);
-  let expectedDate = new Date(2020, 1, 1, 0, 0, 0);
+  let now = new Date(2020, 1, 1, 12, 5, 6);
+  let expectedDate = new Date(2020, 1, 1, 12, 0, 0);
   fakeNow(now);
   gMonotonicNow = fakeMonotonicNow(gMonotonicNow + 5000);
 
@@ -558,7 +534,7 @@ add_task(function* test_simplePing() {
   Assert.equal(payload.info.subsessionLength, SESSION_DURATION_IN_MINUTES * 60);
 
   // Restore the UUID generator so we don't mess with other tests.
-  fakeGenerateUUID(generateUUID, generateUUID);
+  fakeGenerateUUID(TelemetryUtils.generateUUID, TelemetryUtils.generateUUID);
 });
 
 // Saves the current session histograms, reloads them, performs a ping
@@ -665,7 +641,7 @@ add_task(function* test_checkSubsessionHistograms() {
   }
 
   let now = new Date(2020, 1, 1, 12, 0, 0);
-  let expectedDate = new Date(2020, 1, 1, 0, 0, 0);
+  let expectedDate = new Date(2020, 1, 1, 12, 0, 0);
   fakeNow(now);
   yield TelemetryController.testReset();
 
@@ -897,7 +873,7 @@ add_task(function* test_dailyCollection() {
   }
 
   let now = new Date(2030, 1, 1, 12, 0, 0);
-  let nowDay = new Date(2030, 1, 1, 0, 0, 0);
+  let nowHour = new Date(2030, 1, 1, 12, 0, 0);
   let schedulerTickCallback = null;
 
   PingServer.clearRequests();
@@ -926,8 +902,8 @@ add_task(function* test_dailyCollection() {
   keyed.add("b", 1);
 
   // Make sure the daily ping gets triggered.
-  let expectedDate = nowDay;
-  now = futureDate(nowDay, MS_IN_ONE_DAY);
+  let expectedDate = nowHour;
+  now = futureDate(nowHour, MS_IN_ONE_DAY);
   fakeNow(now);
 
   Assert.ok(!!schedulerTickCallback);
@@ -1136,7 +1112,7 @@ add_task(function* test_environmentChange() {
 
   // Trigger and collect environment-change ping.
   gMonotonicNow = fakeMonotonicNow(gMonotonicNow + 10 * MILLISECONDS_PER_MINUTE);
-  let startDay = truncateDateToDays(now);
+  let startHour = TelemetryUtils.truncateToHours(now);
   now = fakeNow(futureDate(now, 10 * MILLISECONDS_PER_MINUTE));
 
   Preferences.set(PREF_TEST, 1);
@@ -1147,13 +1123,13 @@ add_task(function* test_environmentChange() {
   Assert.equal(ping.environment.settings.userPrefs[PREF_TEST], undefined);
   Assert.equal(ping.payload.info.reason, REASON_ENVIRONMENT_CHANGE);
   let subsessionStartDate = new Date(ping.payload.info.subsessionStartDate);
-  Assert.equal(subsessionStartDate.toISOString(), startDay.toISOString());
+  Assert.equal(subsessionStartDate.toISOString(), startHour.toISOString());
 
   Assert.equal(ping.payload.histograms[COUNT_ID].sum, 1);
   Assert.equal(ping.payload.keyedHistograms[KEYED_ID]["a"].sum, 1);
 
   // Trigger and collect another ping. The histograms should be reset.
-  startDay = truncateDateToDays(now);
+  startHour = TelemetryUtils.truncateToHours(now);
   gMonotonicNow = fakeMonotonicNow(gMonotonicNow + 10 * MILLISECONDS_PER_MINUTE);
   now = fakeNow(futureDate(now, 10 * MILLISECONDS_PER_MINUTE));
 
@@ -1165,7 +1141,7 @@ add_task(function* test_environmentChange() {
   Assert.equal(ping.environment.settings.userPrefs[PREF_TEST], 1);
   Assert.equal(ping.payload.info.reason, REASON_ENVIRONMENT_CHANGE);
   subsessionStartDate = new Date(ping.payload.info.subsessionStartDate);
-  Assert.equal(subsessionStartDate.toISOString(), startDay.toISOString());
+  Assert.equal(subsessionStartDate.toISOString(), startHour.toISOString());
 
   Assert.equal(ping.payload.histograms[COUNT_ID].sum, 0);
   Assert.ok(!(KEYED_ID in ping.payload.keyedHistograms));
@@ -1357,7 +1333,7 @@ add_task(function* test_invalidSessionData() {
   yield TelemetryController.testShutdown();
 
   // Restore the UUID generator so we don't mess with other tests.
-  fakeGenerateUUID(generateUUID, generateUUID);
+  fakeGenerateUUID(TelemetryUtils.generateUUID, TelemetryUtils.generateUUID);
 
   // Load back the serialised session data.
   let data = yield CommonUtils.readJSON(dataFilePath);
@@ -1679,8 +1655,12 @@ add_task(function* test_schedulerNothingDue() {
 add_task(function* test_pingExtendedStats() {
   const EXTENDED_PAYLOAD_FIELDS = [
     "chromeHangs", "threadHangStats", "log", "slowSQL", "fileIOReports", "lateWrites",
-    "addonHistograms", "addonDetails", "UIMeasurements", "webrtc"
+    "addonDetails", "webrtc"
   ];
+
+  if (AppConstants.platform == "android") {
+    EXTENDED_PAYLOAD_FIELDS.push("UIMeasurements");
+  }
 
   // Reset telemetry and disable sending extended statistics.
   yield TelemetryStorage.testClearPendingPings();

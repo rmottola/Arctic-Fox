@@ -5,12 +5,15 @@
 
 #include "CompositorWidgetParent.h"
 
+#include "mozilla/Unused.h"
+#include "mozilla/widget/PlatformWidgetTypes.h"
+
 namespace mozilla {
 namespace widget {
 
 CompositorWidgetParent::CompositorWidgetParent(const CompositorWidgetInitData& aInitData,
                                                const layers::CompositorOptions& aOptions)
- : WinCompositorWidget(aInitData, aOptions)
+ : WinCompositorWidget(aInitData.get_WinCompositorWidgetInitData(), aOptions)
 {
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_GPU);
 }
@@ -57,9 +60,9 @@ void
 CompositorWidgetParent::ObserveVsync(VsyncObserver* aObserver)
 {
   if (aObserver) {
-    SendObserveVsync();
+    Unused << SendObserveVsync();
   } else {
-    SendUnobserveVsync();
+    Unused << SendUnobserveVsync();
   }
   mVsyncObserver = aObserver;
 }

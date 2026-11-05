@@ -29,7 +29,7 @@ var gSearchPane = {
     this.buildDefaultEngineDropDown();
 
     let addEnginesLink = document.getElementById("addEngines");
-    let searchEnginesURL = Services.wm.getMostRecentWindow('navigator:browser')
+    let searchEnginesURL = Services.wm.getMostRecentWindow("navigator:browser")
                                       .BrowserSearch.searchEnginesURL;
     addEnginesLink.setAttribute("href", searchEnginesURL);
 
@@ -42,7 +42,7 @@ var gSearchPane = {
 
     Services.obs.addObserver(this, "browser-search-engine-modified", false);
     window.addEventListener("unload", () => {
-      Services.obs.removeObserver(this, "browser-search-engine-modified", false);
+      Services.obs.removeObserver(this, "browser-search-engine-modified");
     });
 
     this._initAutocomplete();

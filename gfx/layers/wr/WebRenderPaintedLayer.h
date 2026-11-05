@@ -8,6 +8,7 @@
 
 #include "Layers.h"
 #include "mozilla/layers/ContentClient.h"
+#include "mozilla/layers/WebRenderBridgeChild.h"
 #include "WebRenderLayerManager.h"
 #include "mozilla/webrender/WebRenderTypes.h"
 
@@ -51,9 +52,11 @@ public:
 
   Layer* GetLayer() override { return this; }
   void RenderLayer() override;
-  void PaintThebes();
+  void PaintThebes(nsTArray<ReadbackProcessor::Update>* aReadbackUpdates);
   void RenderLayerWithReadback(ReadbackProcessor *aReadback);
   RefPtr<ContentClient> mContentClient;
+  RefPtr<ImageContainer> mImageContainer;
+  RefPtr<ImageClient> mImageClient;
 };
 
 } // namespace layers

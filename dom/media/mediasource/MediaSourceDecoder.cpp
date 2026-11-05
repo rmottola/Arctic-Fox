@@ -44,7 +44,7 @@ MediaDecoderStateMachine*
 MediaSourceDecoder::CreateStateMachine()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  mDemuxer = new MediaSourceDemuxer();
+  mDemuxer = new MediaSourceDemuxer(AbstractMainThread());
   mReader = new MediaFormatReader(this, mDemuxer, GetVideoFrameContainer());
   return new MediaDecoderStateMachine(this, mReader);
 }
@@ -269,8 +269,8 @@ MediaSourceDecoder::NextFrameBufferedStatus()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (!mMediaSource ||
-      mMediaSource->ReadyState() == dom::MediaSourceReadyState::Closed) {
+  if (!mMediaSource
+      || mMediaSource->ReadyState() == dom::MediaSourceReadyState::Closed) {
     return MediaDecoderOwner::NEXT_FRAME_UNAVAILABLE;
   }
 
@@ -284,8 +284,8 @@ MediaSourceDecoder::NextFrameBufferedStatus()
     currentPosition
     + media::TimeUnit::FromMicroseconds(DEFAULT_NEXT_FRAME_AVAILABLE_BUFFERED));
   return buffered.ContainsStrict(ClampIntervalToEnd(interval))
-    ? MediaDecoderOwner::NEXT_FRAME_AVAILABLE
-    : MediaDecoderOwner::NEXT_FRAME_UNAVAILABLE;
+         ? MediaDecoderOwner::NEXT_FRAME_AVAILABLE
+         : MediaDecoderOwner::NEXT_FRAME_UNAVAILABLE;
 }
 
 bool

@@ -14,16 +14,16 @@ EXPORTS += [
 
 UNIFIED_SOURCES += [
     'ExportHelpers.cpp',
-    'nsScriptError.cpp',
-    'nsScriptErrorWithStack.cpp',
     'nsXPConnect.cpp',
     'Sandbox.cpp',
     'XPCCallContext.cpp',
+    'XPCComponents.cpp',
     'XPCConvert.cpp',
     'XPCDebug.cpp',
     'XPCException.cpp',
     'XPCJSContext.cpp',
     'XPCJSID.cpp',
+    'XPCJSRuntime.cpp',
     'XPCJSWeakReference.cpp',
     'XPCLocale.cpp',
     'XPCLog.cpp',
@@ -44,11 +44,6 @@ UNIFIED_SOURCES += [
     'XPCWrapper.cpp',
 ]
 
-# XPCComponents.cpp cannot be built in unified mode because it uses plarena.h.
-SOURCES += [
-    'XPCComponents.cpp',
-]
-
 include('/ipc/chromium/chromium-config.mozbuild')
 
 FINAL_LIBRARY = 'xul'
@@ -58,6 +53,7 @@ LOCAL_INCLUDES += [
     '../wrappers',
     '/caps',
     '/dom/base',
+    '/dom/bindings',
     '/dom/html',
     '/dom/svg',
     '/dom/workers',

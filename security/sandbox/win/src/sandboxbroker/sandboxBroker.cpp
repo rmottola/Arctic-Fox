@@ -9,6 +9,7 @@
 #include "base/win/windows_version.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Logging.h"
+#include "mozilla/NSPRLogModulesParser.h"
 #include "sandbox/win/src/sandbox.h"
 #include "sandbox/win/src/security_level.h"
 
@@ -70,6 +71,38 @@ SandboxBroker::LaunchApp(const wchar_t *aPath,
                      sandbox::TargetPolicy::FILES_ALLOW_ANY, tempPath);
   }
 #endif
+
+  // Enable the child process to write log files when setup
+  wchar_t const* logFileName = _wgetenv(L"MOZ_LOG_FILE");
+  char const* logFileModules = getenv("MOZ_LOG");
+  if (logFileName && logFileModules) {
+    bool rotate = false;
+    NSPRLogModulesParser(logFileModules,
+      [&rotate](const char* aName, LogLevel aLevel, int32_t aValue) mutable {
+        if (strcmp(aName, "rotate") == 0) {
+          // Less or eq zero means to turn rotate off.
+          rotate = aValue > 0;
+        }
+      }
+    );
+
+    if (rotate) {
+      wchar_t logFileNameWild[MAX_PATH + 2];
+      _snwprintf(logFileNameWild, sizeof(logFileNameWild), L"%s.?", logFileName);
+
+      mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
+                       sandbox::TargetPolicy::FILES_ALLOW_ANY, logFileNameWild);
+    } else {
+      mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
+                       sandbox::TargetPolicy::FILES_ALLOW_ANY, logFileName);
+    }
+  }
+
+  logFileName = _wgetenv(L"NSPR_LOG_FILE");
+  if (logFileName) {
+    mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
+                     sandbox::TargetPolicy::FILES_ALLOW_ANY, logFileName);
+  }
 
   // Ceate the sandboxed process
   PROCESS_INFORMATION targetInfo = {0};
@@ -216,8 +249,119 @@ SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel,
                             L"Section");
   MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
                      "With these static arguments AddRule should never fail, what happened?");
+
+  // The content process needs to be able to duplicate semaphore handles,
+  // to the broker process and other child processes.
+  result = mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_HANDLES,
+                            sandbox::TargetPolicy::HANDLES_DUP_BROKER,
+                            L"Semaphore");
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "With these static arguments AddRule should never fail, what happened?");
+  result = mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_HANDLES,
+                            sandbox::TargetPolicy::HANDLES_DUP_ANY,
+                            L"Semaphore");
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "With these static arguments AddRule should never fail, what happened?");
 }
 #endif
+
+void
+SandboxBroker::SetSecurityLevelForGPUProcess(int32_t aSandboxLevel)
+{
+  MOZ_RELEASE_ASSERT(mPolicy, "mPolicy must be set before this call.");
+
+  sandbox::JobLevel jobLevel;
+  sandbox::TokenLevel accessTokenLevel;
+  sandbox::IntegrityLevel initialIntegrityLevel;
+  sandbox::IntegrityLevel delayedIntegrityLevel;
+
+  // The setting of these levels is pretty arbitrary, but they are a useful (if
+  // crude) tool while we are tightening the policy. Gaps are left to try and
+  // avoid changing their meaning.
+  MOZ_RELEASE_ASSERT(aSandboxLevel >= 1, "Should not be called with aSandboxLevel < 1");
+  if (aSandboxLevel >= 2) {
+    jobLevel = sandbox::JOB_NONE;
+    accessTokenLevel = sandbox::USER_LIMITED;
+    initialIntegrityLevel = sandbox::INTEGRITY_LEVEL_LOW;
+    delayedIntegrityLevel = sandbox::INTEGRITY_LEVEL_LOW;
+  } else if (aSandboxLevel == 1) {
+    jobLevel = sandbox::JOB_NONE;
+    accessTokenLevel = sandbox::USER_NON_ADMIN;
+    initialIntegrityLevel = sandbox::INTEGRITY_LEVEL_LOW;
+    delayedIntegrityLevel = sandbox::INTEGRITY_LEVEL_LOW;
+  }
+
+  sandbox::ResultCode result = mPolicy->SetJobLevel(jobLevel,
+                                                    0 /* ui_exceptions */);
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "Setting job level failed, have you set memory limit when jobLevel == JOB_NONE?");
+
+  // If the delayed access token is not restricted we don't want the initial one
+  // to be either, because it can interfere with running from a network drive.
+  sandbox::TokenLevel initialAccessTokenLevel =
+    (accessTokenLevel == sandbox::USER_UNPROTECTED ||
+     accessTokenLevel == sandbox::USER_NON_ADMIN)
+    ? sandbox::USER_UNPROTECTED : sandbox::USER_RESTRICTED_SAME_ACCESS;
+
+  result = mPolicy->SetTokenLevel(initialAccessTokenLevel, accessTokenLevel);
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "Lockdown level cannot be USER_UNPROTECTED or USER_LAST if initial level was USER_RESTRICTED_SAME_ACCESS");
+
+  result = mPolicy->SetIntegrityLevel(initialIntegrityLevel);
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "SetIntegrityLevel should never fail, what happened?");
+  result = mPolicy->SetDelayedIntegrityLevel(delayedIntegrityLevel);
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "SetDelayedIntegrityLevel should never fail, what happened?");
+
+  sandbox::MitigationFlags mitigations =
+    sandbox::MITIGATION_BOTTOM_UP_ASLR |
+    sandbox::MITIGATION_HEAP_TERMINATE |
+    sandbox::MITIGATION_SEHOP |
+    sandbox::MITIGATION_DEP_NO_ATL_THUNK |
+    sandbox::MITIGATION_DEP;
+
+  result = mPolicy->SetProcessMitigations(mitigations);
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "Invalid flags for SetProcessMitigations.");
+
+  mitigations =
+    sandbox::MITIGATION_STRICT_HANDLE_CHECKS |
+    sandbox::MITIGATION_DLL_SEARCH_ORDER;
+
+  result = mPolicy->SetDelayedProcessMitigations(mitigations);
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "Invalid flags for SetDelayedProcessMitigations.");
+
+  // Add the policy for the client side of a pipe. It is just a file
+  // in the \pipe\ namespace. We restrict it to pipes that start with
+  // "chrome." so the sandboxed process cannot connect to system services.
+  result = mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
+                            sandbox::TargetPolicy::FILES_ALLOW_ANY,
+                            L"\\??\\pipe\\chrome.*");
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "With these static arguments AddRule should never fail, what happened?");
+
+  // Add the policy for the client side of the crash server pipe.
+  result = mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
+                            sandbox::TargetPolicy::FILES_ALLOW_ANY,
+                            L"\\??\\pipe\\gecko-crash-server-pipe.*");
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "With these static arguments AddRule should never fail, what happened?");
+
+  // The process needs to be able to duplicate shared memory handles,
+  // which are Section handles, to the broker process and other child processes.
+  result = mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_HANDLES,
+                            sandbox::TargetPolicy::HANDLES_DUP_BROKER,
+                            L"Section");
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "With these static arguments AddRule should never fail, what happened?");
+  result = mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_HANDLES,
+                            sandbox::TargetPolicy::HANDLES_DUP_ANY,
+                            L"Section");
+  MOZ_RELEASE_ASSERT(sandbox::SBOX_ALL_OK == result,
+                     "With these static arguments AddRule should never fail, what happened?");
+}
 
 #define SANDBOX_ENSURE_SUCCESS(result, message) \
   do { \

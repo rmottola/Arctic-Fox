@@ -243,8 +243,7 @@ MediaSource::AddSourceBuffer(const nsAString& aType, ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return nullptr;
   }
-  const nsACString& mimeType = containerType->Type().AsString();
-  RefPtr<SourceBuffer> sourceBuffer = new SourceBuffer(this, mimeType);
+  RefPtr<SourceBuffer> sourceBuffer = new SourceBuffer(this, *containerType);
   if (!sourceBuffer) {
     aRv.Throw(NS_ERROR_FAILURE); // XXX need a better error here
     return nullptr;
@@ -336,7 +335,7 @@ void
 MediaSource::EndOfStream(const MediaResult& aError)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MSE_API("EndOfStream(aError=%d)", aError.Code());
+  MSE_API("EndOfStream(aError=%" PRId32")", static_cast<uint32_t>(aError.Code()));
 
   SetReadyState(MediaSourceReadyState::Ended);
   mSourceBuffers->Ended();
@@ -455,6 +454,7 @@ MediaSource::MediaSource(nsPIDOMWindowInner* aWindow)
   : DOMEventTargetHelper(aWindow)
   , mDecoder(nullptr)
   , mPrincipal(nullptr)
+  , mAbstractMainThread(GetOwnerGlobal()->AbstractMainThreadFor(TaskCategory::Other))
   , mReadyState(MediaSourceReadyState::Closed)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -475,7 +475,8 @@ MediaSource::SetReadyState(MediaSourceReadyState aState)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aState != mReadyState);
-  MSE_DEBUG("SetReadyState(aState=%d) mReadyState=%d", aState, mReadyState);
+  MSE_DEBUG("SetReadyState(aState=%" PRIu32 ") mReadyState=%" PRIu32,
+            static_cast<uint32_t>(aState), static_cast<uint32_t>(mReadyState));
 
   MediaSourceReadyState oldState = mReadyState;
   mReadyState = aState;

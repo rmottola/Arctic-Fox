@@ -245,10 +245,28 @@
  * example, write
  *
  *   MOZ_MUST_USE int foo();
- *
  * or
- *
  *   MOZ_MUST_USE int foo() { return 42; }
+ *
+ * MOZ_MUST_USE is most appropriate for functions where the return value is
+ * some kind of success/failure indicator -- often |nsresult|, |bool| or |int|
+ * -- because these functions are most commonly the ones that have missing
+ * checks. There are three cases of note.
+ *
+ * - Fallible functions whose return values should always be checked. For
+ *   example, a function that opens a file should always be checked because any
+ *   subsequent operations on the file will fail if opening it fails. Such
+ *   functions should be given a MOZ_MUST_USE annotation.
+ *
+ * - Fallible functions whose return value need not always be checked. For
+ *   example, a function that closes a file might not be checked because it's
+ *   common that no further operations would be performed on the file. Such
+ *   functions do not need a MOZ_MUST_USE annotation.
+ *
+ * - Infallible functions, i.e. ones that always return a value indicating
+ *   success. These do not need a MOZ_MUST_USE annotation. Ideally, they would
+ *   be converted to not return a success/failure indicator, though sometimes
+ *   interface constraints prevent this.
  */
 #if defined(__GNUC__) || defined(__clang__)
 #  define MOZ_MUST_USE __attribute__ ((warn_unused_result))
@@ -492,9 +510,18 @@
  *   be used with types which are intended to be implicitly constructed into other
  *   other types before being assigned to variables.
  * MOZ_REQUIRED_BASE_METHOD: Applies to virtual class method declarations.
- *  Sometimes derived classes override methods that need to be called by their
- *  overridden counterparts. This marker indicates that the marked method must
- *  be called by the method that it overrides.
+ *   Sometimes derived classes override methods that need to be called by their
+ *   overridden counterparts. This marker indicates that the marked method must
+ *   be called by the method that it overrides.
+ * MOZ_MUST_RETURN_FROM_CALLER: Applies to function or method declarations.
+ *   Callers of the annotated function/method must return from that function
+ *   within the calling block using an explicit `return` statement.
+ *   Only calls to Constructors, references to local and member variables,
+ *   and calls to functions or methods marked as MOZ_MAY_CALL_AFTER_MUST_RETURN
+ *   may be made after the MUST_RETURN_FROM_CALLER call.
+ * MOZ_MAY_CALL_AFTER_MUST_RETURN: Applies to function or method declarations.
+ *   Calls to these methods may be made in functions after calls a
+ *   MOZ_MUST_RETURN_FROM_CALLER function or method.
  */
 #ifdef MOZ_CLANG_PLUGIN
 #  define MOZ_MUST_OVERRIDE __attribute__((annotate("moz_must_override")))
@@ -532,6 +559,10 @@
     __attribute__((annotate("moz_non_param")))
 #  define MOZ_REQUIRED_BASE_METHOD \
     __attribute__((annotate("moz_required_base_method")))
+#  define MOZ_MUST_RETURN_FROM_CALLER \
+    __attribute__((annotate("moz_must_return_from_caller")))
+#  define MOZ_MAY_CALL_AFTER_MUST_RETURN \
+    __attribute__((annotate("moz_may_call_after_must_return")))
 /*
  * It turns out that clang doesn't like void func() __attribute__ {} without a
  * warning, so use pragmas to disable the warning. This code won't work on GCC
@@ -568,6 +599,8 @@
 #  define MOZ_NON_PARAM /* nothing */
 #  define MOZ_NON_AUTOABLE /* nothing */
 #  define MOZ_REQUIRED_BASE_METHOD /* nothing */
+#  define MOZ_MUST_RETURN_FROM_CALLER /* nothing */
+#  define MOZ_MAY_CALL_AFTER_MUST_RETURN /* nothing */
 #endif /* MOZ_CLANG_PLUGIN */
 
 #define MOZ_RAII MOZ_NON_TEMPORARY_CLASS MOZ_STACK_CLASS

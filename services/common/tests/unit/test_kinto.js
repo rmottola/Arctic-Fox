@@ -2,6 +2,7 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 Cu.import("resource://services-common/kinto-offline-client.js");
+Cu.import("resource://services-common/kinto-storage-adapter.js");
 Cu.import("resource://testing-common/httpd.js");
 
 const BinaryInputStream = Components.Constructor("@mozilla.org/binaryinputstream;1",
@@ -10,8 +11,6 @@ const BinaryInputStream = Components.Constructor("@mozilla.org/binaryinputstream
 var server;
 
 // set up what we need to make storage adapters
-const Kinto = loadKinto();
-const FirefoxAdapter = Kinto.adapters.FirefoxAdapter;
 const kintoFilename = "kinto.sqlite";
 
 let kintoClient;
@@ -292,7 +291,7 @@ add_task(function* test_kinto_sync(){
                              sampled.status.statusText);
       // send the headers
       for (let headerLine of sampled.sampleHeaders) {
-        let headerElements = headerLine.split(':');
+        let headerElements = headerLine.split(":");
         response.setHeader(headerElements[0], headerElements[1].trimLeft());
       }
       response.setHeader("Date", (new Date()).toUTCString());

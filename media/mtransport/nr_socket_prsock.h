@@ -121,8 +121,7 @@ public:
   virtual int cancel(int how);
 
   // nsISupport reference counted interface
-  NS_IMETHOD_(MozExternalRefCountType) AddRef(void) = 0;
-  NS_IMETHOD_(MozExternalRefCountType) Release(void) = 0;
+  NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 
   uint32_t poll_flags() {
     return poll_flags_;
@@ -370,7 +369,8 @@ private:
   void connect_i(const nsACString &remote_addr,
                  uint16_t remote_port,
                  const nsACString &local_addr,
-                 uint16_t local_port);
+                 uint16_t local_port,
+                 const nsACString &tls_host);
   void write_i(nsAutoPtr<InfallibleTArray<uint8_t>> buf,
                uint32_t tracking_number);
   void close_i();

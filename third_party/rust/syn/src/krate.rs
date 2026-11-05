@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Crate {
     pub shebang: Option<String>,
     pub attrs: Vec<Attribute>,
@@ -29,7 +29,7 @@ pub mod parsing {
 
     named!(shebang -> String, do_parse!(
         tag!("#!") >>
-        not!(peek!(tag!("["))) >>
+        not!(tag!("[")) >>
         content: take_until!("\n") >>
         (format!("#!{}", content))
     ));

@@ -189,17 +189,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         push(Operand(addr));
     }
 
-    void moveValue(const Value& val, Register dest) {
-        movWithPatch(ImmWord(val.asRawBits()), dest);
-        writeDataRelocation(val);
-    }
-    void moveValue(const Value& src, const ValueOperand& dest) {
-        moveValue(src, dest.valueReg());
-    }
-    void moveValue(const ValueOperand& src, const ValueOperand& dest) {
-        if (src.valueReg() != dest.valueReg())
-            movq(src.valueReg(), dest.valueReg());
-    }
     void boxValue(JSValueType type, Register src, Register dest);
 
     Condition testUndefined(Condition cond, Register tag) {
@@ -563,6 +552,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     void loadPtr(const Address& address, Register dest) {
         movq(Operand(address), dest);
     }
+    void load64(const Address& address, Register dest) {
+        movq(Operand(address), dest);
+    }
     void loadPtr(const Operand& src, Register dest) {
         movq(src, dest);
     }
@@ -606,6 +598,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         movq(scratch, Operand(address));
     }
     void storePtr(Register src, const Address& address) {
+        movq(src, Operand(address));
+    }
+    void store64(Register src, const Address& address) {
         movq(src, Operand(address));
     }
     void storePtr(Register src, const BaseIndex& address) {
@@ -701,7 +696,7 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         emitSet(cond, dest);
     }
 
-    void boxDouble(FloatRegister src, const ValueOperand& dest) {
+    void boxDouble(FloatRegister src, const ValueOperand& dest, FloatRegister) {
         vmovq(src, dest.valueReg());
     }
     void boxNonDouble(JSValueType type, Register src, const ValueOperand& dest) {
@@ -788,6 +783,9 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
             andq(src, dest);
         }
     }
+    void unboxNonDouble(const Address& src, Register dest) {
+        unboxNonDouble(Operand(src), dest);
+    }
 
     void unboxString(const ValueOperand& src, Register dest) { unboxNonDouble(src, dest); }
     void unboxString(const Operand& src, Register dest) { unboxNonDouble(src, dest); }
@@ -854,8 +852,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
 
     void loadConstantDouble(double d, FloatRegister dest);
     void loadConstantFloat32(float f, FloatRegister dest);
-    void loadConstantDouble(wasm::RawF64 d, FloatRegister dest);
-    void loadConstantFloat32(wasm::RawF32 f, FloatRegister dest);
 
     void loadConstantSimd128Int(const SimdConstant& v, FloatRegister dest);
     void loadConstantSimd128Float(const SimdConstant& v, FloatRegister dest);
@@ -877,8 +873,7 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
                                      Label* oolRejoin, FloatRegister tempDouble);
 
     void loadWasmGlobalPtr(uint32_t globalDataOffset, Register dest) {
-        CodeOffset label = loadRipRelativeInt64(dest);
-        append(wasm::GlobalAccess(label, globalDataOffset));
+        loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, globalArea) + globalDataOffset), dest);
     }
     void loadWasmPinnedRegsFromTls() {
         loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, memoryBase)), HeapReg);

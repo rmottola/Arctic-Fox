@@ -149,6 +149,7 @@ EXPORTS.mozilla.layers += [
     'composite/ContentHost.h',
     'composite/FrameUniformityData.h',
     'composite/GPUVideoTextureHost.h',
+    'composite/ImageComposite.h',
     'composite/ImageHost.h',
     'composite/ImageLayerComposite.h',
     'composite/LayerManagerComposite.h',
@@ -190,6 +191,7 @@ EXPORTS.mozilla.layers += [
     'ipc/UiCompositorControllerParent.h',
     'ipc/VideoBridgeChild.h',
     'ipc/VideoBridgeParent.h',
+    'LayerAttributes.h',
     'LayerMetricsWrapper.h',
     'LayersTypes.h',
     'opengl/CompositingRenderTargetOGL.h',
@@ -200,12 +202,17 @@ EXPORTS.mozilla.layers += [
     'opengl/TextureHostOGL.h',
     'PersistentBufferProvider.h',
     'RenderTrace.h',
+    'SourceSurfaceSharedData.h',
+    'SourceSurfaceVolatileData.h',
     'TextureWrapperImage.h',
     'TransactionIdAllocator.h',
     'wr/WebRenderBridgeChild.h',
     'wr/WebRenderBridgeParent.h',
-    'wr/WebRenderCompositorOGL.h',
+    'wr/WebRenderCompositableHolder.h',
+    'wr/WebRenderDisplayItemLayer.h',
+    'wr/WebRenderImageHost.h',
     'wr/WebRenderLayerManager.h',
+    'wr/WebRenderLayersLogging.h',
     'wr/WebRenderMessageUtils.h',
 ]
 
@@ -284,6 +291,7 @@ UNIFIED_SOURCES += [
     'basic/BasicColorLayer.cpp',
     'basic/BasicCompositor.cpp',
     'basic/BasicContainerLayer.cpp',
+    'basic/BasicDisplayItemLayer.cpp',
     'basic/BasicImages.cpp',
     'basic/BasicLayerManager.cpp',
     'basic/BasicLayersImpl.cpp',
@@ -322,6 +330,7 @@ UNIFIED_SOURCES += [
     'composite/FPSCounter.cpp',
     'composite/FrameUniformityData.cpp',
     'composite/GPUVideoTextureHost.cpp',
+    'composite/ImageComposite.cpp',
     'composite/ImageHost.cpp',
     'composite/ImageLayerComposite.cpp',
     'composite/LayerManagerComposite.cpp',
@@ -377,16 +386,21 @@ UNIFIED_SOURCES += [
     'RenderTrace.cpp',
     'RotatedBuffer.cpp',
     'ShareableCanvasLayer.cpp',
+    'SourceSurfaceSharedData.cpp',
+    'SourceSurfaceVolatileData.cpp',
     'TextureWrapperImage.cpp',
     'wr/WebRenderBorderLayer.cpp',
     'wr/WebRenderBridgeChild.cpp',
     'wr/WebRenderBridgeParent.cpp',
     'wr/WebRenderCanvasLayer.cpp',
     'wr/WebRenderColorLayer.cpp',
-    'wr/WebRenderCompositorOGL.cpp',
+    'wr/WebRenderCompositableHolder.cpp',
     'wr/WebRenderContainerLayer.cpp',
+    'wr/WebRenderDisplayItemLayer.cpp',
+    'wr/WebRenderImageHost.cpp',
     'wr/WebRenderImageLayer.cpp',
     'wr/WebRenderLayerManager.cpp',
+    'wr/WebRenderLayersLogging.cpp',
     'wr/WebRenderPaintedLayer.cpp',
     'wr/WebRenderTextLayer.cpp',
 ]
@@ -438,7 +452,7 @@ LOCAL_INCLUDES += [
     '/docshell/base',  # for nsDocShell.h
     '/layout/base',    # for TouchManager.h
     '/layout/generic', # for nsTextFrame.h
-    '/media/libyuv/include', # for libyuv.h
+    '/media/libyuv/libyuv/include', # for libyuv.h
 ]
 
 FINAL_LIBRARY = 'xul'

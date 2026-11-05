@@ -145,6 +145,12 @@ this.TabCrashHandler = {
 
     let browser = message.target.browser;
 
+    if (message.data.autoSubmit) {
+      // The user has opted in to autosubmitted backlogged
+      // crash reports in the future.
+      UnsubmittedCrashHandler.autoSubmit = true;
+    }
+
     let childID = this.browserMap.get(browser.permanentKey);
     let dumpID = this.childMap.get(childID);
     if (!dumpID)
@@ -259,13 +265,21 @@ this.TabCrashHandler = {
       return;
     }
 
+    let requestAutoSubmit = !UnsubmittedCrashHandler.autoSubmit;
     let sendReport = this.prefs.getBoolPref("sendReport");
     let includeURL = this.prefs.getBoolPref("includeURL");
     let emailMe = this.prefs.getBoolPref("emailMe");
 
-    let data = { hasReport: true, sendReport, includeURL, emailMe };
+    let data = {
+      hasReport: true,
+      sendReport,
+      includeURL,
+      emailMe,
+      requestAutoSubmit,
+    };
+
     if (emailMe) {
-      data.email = this.prefs.getCharPref("email", "");
+      data.email = this.prefs.getCharPref("email");
     }
 
     // Make sure to only count once even if there are multiple windows
@@ -338,9 +352,9 @@ this.PluginCrashReporter = {
   },
 
   uninit() {
-    Services.obs.removeObserver(this, "plugin-crashed", false);
-    Services.obs.removeObserver(this, "gmp-plugin-crash", false);
-    Services.obs.removeObserver(this, "profile-after-change", false);
+    Services.obs.removeObserver(this, "plugin-crashed");
+    Services.obs.removeObserver(this, "gmp-plugin-crash");
+    Services.obs.removeObserver(this, "profile-after-change");
     this.initialized = false;
   },
 

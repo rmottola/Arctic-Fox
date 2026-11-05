@@ -31,7 +31,7 @@ class StringBuffer;
 
 template <AllowGC allowGC>
 extern JSString*
-ConcatStrings(ExclusiveContext* cx,
+ConcatStrings(JSContext* cx,
               typename MaybeRooted<JSString*, allowGC>::HandleType left,
               typename MaybeRooted<JSString*, allowGC>::HandleType right);
 
@@ -130,10 +130,10 @@ extern const char*
 ValueToPrintable(JSContext* cx, const Value&, JSAutoByteString* bytes, bool asSource = false);
 
 extern UniqueChars
-DuplicateString(ExclusiveContext* cx, const char* s);
+DuplicateString(JSContext* cx, const char* s);
 
 extern UniqueTwoByteChars
-DuplicateString(ExclusiveContext* cx, const char16_t* s);
+DuplicateString(JSContext* cx, const char16_t* s);
 
 /*
  * These variants do not report OOMs, you must arrange for OOMs to be reported
@@ -157,7 +157,7 @@ DuplicateString(const char16_t* s, size_t n);
  */
 template <AllowGC allowGC>
 extern JSString*
-ToStringSlow(ExclusiveContext* cx, typename MaybeRooted<Value, allowGC>::HandleType arg);
+ToStringSlow(JSContext* cx, typename MaybeRooted<Value, allowGC>::HandleType arg);
 
 /*
  * Convert the given value to a string.  This method includes an inline
@@ -282,7 +282,7 @@ SubstringKernel(JSContext* cx, HandleString str, int32_t beginInt, int32_t lengt
  * appended, but it is not included in the length.
  */
 extern char16_t*
-InflateString(ExclusiveContext* cx, const char* bytes, size_t* length);
+InflateString(JSContext* cx, const char* bytes, size_t* length);
 
 /*
  * Inflate bytes to JS chars in an existing buffer. 'dst' must be large
@@ -372,13 +372,13 @@ str_trimLeft(JSContext* cx, unsigned argc, Value* vp);
 extern bool
 str_trimRight(JSContext* cx, unsigned argc, Value* vp);
 
+#if !EXPOSE_INTL_API
 extern bool
 str_toLocaleLowerCase(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool
 str_toLocaleUpperCase(JSContext* cx, unsigned argc, Value* vp);
 
-#if !EXPOSE_INTL_API
 extern bool
 str_localeCompare(JSContext* cx, unsigned argc, Value* vp);
 #else
@@ -470,6 +470,9 @@ FileEscapedString(FILE* fp, const char* chars, size_t length, uint32_t quote)
     return res;
 }
 
+bool
+EncodeURI(JSContext* cx, StringBuffer& sb, const char* chars, size_t length);
+
 JSObject*
 str_split_string(JSContext* cx, HandleObjectGroup group, HandleString str, HandleString sep,
                  uint32_t limit);
@@ -481,6 +484,12 @@ str_flat_replace_string(JSContext *cx, HandleString string, HandleString pattern
 JSString*
 str_replace_string_raw(JSContext* cx, HandleString string, HandleString pattern,
                        HandleString replacement);
+
+extern JSString*
+StringToLowerCase(JSContext* cx, HandleLinearString string);
+
+extern JSString*
+StringToUpperCase(JSContext* cx, HandleLinearString string);
 
 extern bool
 StringConstructor(JSContext* cx, unsigned argc, Value* vp);

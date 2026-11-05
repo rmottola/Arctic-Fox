@@ -17,8 +17,13 @@ XPCOMUtils.defineLazyModuleGetter(this, "NarrateControls", "resource://gre/modul
 XPCOMUtils.defineLazyModuleGetter(this, "Rect", "resource://gre/modules/Geometry.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task", "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "UITelemetry", "resource://gre/modules/UITelemetry.jsm");
+XPCOMUtils.defineLazyServiceGetter(this, "gChromeRegistry",
+                                   "@mozilla.org/chrome/chrome-registry;1", Ci.nsIXULChromeRegistry);
+XPCOMUtils.defineLazyModuleGetter(this, "PluralForm", "resource://gre/modules/PluralForm.jsm");
 
 var gStrings = Services.strings.createBundle("chrome://global/locale/aboutReader.properties");
+
+const gIsFirefoxDesktop = Services.appinfo.ID == "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}";
 
 var AboutReader = function(mm, win, articlePromise) {
   let url = this._getOriginalUrl(win);
@@ -45,6 +50,9 @@ var AboutReader = function(mm, win, articlePromise) {
     .getInterface(Ci.nsIDOMWindowUtils).currentInnerWindowID;
 
   this._article = null;
+  this._languagePromise = new Promise(resolve => {
+    this._foundLanguage = resolve;
+  });
 
   if (articlePromise) {
     this._articlePromise = articlePromise;
@@ -53,6 +61,7 @@ var AboutReader = function(mm, win, articlePromise) {
   this._headerElementRef = Cu.getWeakReference(doc.getElementById("reader-header"));
   this._domainElementRef = Cu.getWeakReference(doc.getElementById("reader-domain"));
   this._titleElementRef = Cu.getWeakReference(doc.getElementById("reader-title"));
+  this._readTimeElementRef = Cu.getWeakReference(doc.getElementById("reader-estimated-time"));
   this._creditsElementRef = Cu.getWeakReference(doc.getElementById("reader-credits"));
   this._contentElementRef = Cu.getWeakReference(doc.getElementById("moz-reader-content"));
   this._toolbarElementRef = Cu.getWeakReference(doc.getElementById("reader-toolbar"));
@@ -73,7 +82,6 @@ var AboutReader = function(mm, win, articlePromise) {
   this._setupStyleDropdown();
   this._setupButton("close-button", this._onReaderClose.bind(this), "aboutReader.toolbar.close");
 
-  const gIsFirefoxDesktop = Services.appinfo.ID == "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}";
   if (gIsFirefoxDesktop) {
     // we're ready for any external setup, send a signal for that.
     this._mm.sendAsyncMessage("Reader:OnSetup");
@@ -81,9 +89,11 @@ var AboutReader = function(mm, win, articlePromise) {
 
   let colorSchemeValues = JSON.parse(Services.prefs.getCharPref("reader.color_scheme.values"));
   let colorSchemeOptions = colorSchemeValues.map((value) => {
-    return { name: gStrings.GetStringFromName("aboutReader.colorScheme." + value),
-             value: value,
-             itemClass: value + "-button" };
+    return {
+      name: gStrings.GetStringFromName("aboutReader.colorScheme." + value),
+      value,
+      itemClass: value + "-button"
+    };
   });
 
   let colorScheme = Services.prefs.getCharPref("reader.color_scheme");
@@ -114,7 +124,7 @@ var AboutReader = function(mm, win, articlePromise) {
   this._setupLineHeightButtons();
 
   if (win.speechSynthesis && Services.prefs.getBoolPref("narrate.enabled")) {
-    new NarrateControls(mm, win);
+    new NarrateControls(mm, win, this._languagePromise);
   }
 
   this._loadArticle();
@@ -144,6 +154,10 @@ AboutReader.prototype = {
 
   get _titleElement() {
     return this._titleElementRef.get();
+  },
+
+  get _readTimeElement() {
+    return this._readTimeElementRef.get();
   },
 
   get _creditsElement() {
@@ -234,9 +248,9 @@ AboutReader.prototype = {
     switch (aEvent.type) {
       case "click":
         let target = aEvent.target;
-        if (target.classList.contains('dropdown-toggle')) {
+        if (target.classList.contains("dropdown-toggle")) {
           this._toggleDropdownClicked(aEvent);
-        } else if (!target.closest('.dropdown-popup')) {
+        } else if (!target.closest(".dropdown-popup")) {
           this._closeDropdowns();
         }
         break;
@@ -250,7 +264,7 @@ AboutReader.prototype = {
         this._updateImageMargins();
         if (this._isToolbarVertical) {
           this._win.setTimeout(() => {
-            for (let dropdown of this._doc.querySelectorAll('.dropdown.open')) {
+            for (let dropdown of this._doc.querySelectorAll(".dropdown.open")) {
               this._updatePopupPosition(dropdown);
             }
           }, 0);
@@ -283,7 +297,7 @@ AboutReader.prototype = {
       return;
     }
 
-    Services.obs.removeObserver(this, "inner-window-destroyed", false);
+    Services.obs.removeObserver(this, "inner-window-destroyed");
 
     this._mm.removeMessageListener("Reader:CloseDropdown", this);
     this._mm.removeMessageListener("Reader:AddButton", this);
@@ -667,11 +681,11 @@ AboutReader.prototype = {
 
     let doc = this._doc;
 
-    let link = doc.createElement('link');
-    link.rel = 'shortcut icon';
+    let link = doc.createElement("link");
+    link.rel = "shortcut icon";
     link.href = faviconUrl;
 
-    doc.getElementsByTagName('head')[0].appendChild(link);
+    doc.getElementsByTagName("head")[0].appendChild(link);
   },
 
   _updateImageMargins: function() {
@@ -709,12 +723,44 @@ AboutReader.prototype = {
   },
 
   _maybeSetTextDirection: function Read_maybeSetTextDirection(article) {
-    if (!article.dir)
-      return;
+    if (article.dir) {
+      // Set "dir" attribute on content
+      this._contentElement.setAttribute("dir", article.dir);
+      this._headerElement.setAttribute("dir", article.dir);
 
-    // Set "dir" attribute on content
-    this._contentElement.setAttribute("dir", article.dir);
-    this._headerElement.setAttribute("dir", article.dir);
+      // The native locale could be set differently than the article's text direction.
+      var localeDirection = gChromeRegistry.isLocaleRTL("global") ? "rtl" : "ltr";
+      this._readTimeElement.setAttribute("dir", localeDirection);
+      this._readTimeElement.style.textAlign = article.dir == "rtl" ? "right" : "left";
+    }
+  },
+
+  _fixLocalLinks() {
+    // We need to do this because preprocessing the content through nsIParserUtils
+    // gives back a DOM with a <base> element. That influences how these URLs get
+    // resolved, making them no longer match the document URI (which is
+    // about:reader?url=...). To fix this, make all the hash URIs absolute. This
+    // is hacky, but the alternative of removing the base element has potential
+    // security implications if Readability has not successfully made all the URLs
+    // absolute, so we pick just fixing these in-document links explicitly.
+    let localLinks = this._contentElement.querySelectorAll("a[href^='#']");
+    for (let localLink of localLinks) {
+      // Have to get the attribute because .href provides an absolute URI.
+      localLink.href = this._doc.documentURI + localLink.getAttribute("href");
+    }
+  },
+
+  _formatReadTime(slowEstimate, fastEstimate) {
+    let displayStringKey = "aboutReader.estimatedReadTimeRange1";
+
+    // only show one reading estimate when they are the same value
+    if (slowEstimate == fastEstimate) {
+      displayStringKey = "aboutReader.estimatedReadTimeValue1";
+    }
+
+    return PluralForm.get(slowEstimate, gStrings.GetStringFromName(displayStringKey))
+      .replace("#1", fastEstimate)
+      .replace("#2", slowEstimate);
   },
 
   _showError: function() {
@@ -758,6 +804,7 @@ AboutReader.prototype = {
     this._creditsElement.textContent = article.byline;
 
     this._titleElement.textContent = article.title;
+    this._readTimeElement.textContent = this._formatReadTime(article.readingTimeMinsSlow, article.readingTimeMinsFast);
     this._doc.title = article.title;
 
     this._headerElement.style.display = "block";
@@ -768,13 +815,17 @@ AboutReader.prototype = {
       false, articleUri, this._contentElement);
     this._contentElement.innerHTML = "";
     this._contentElement.appendChild(contentFragment);
+    this._fixLocalLinks();
     this._maybeSetTextDirection(article);
+    this._foundLanguage(article.language);
 
     this._contentElement.style.display = "block";
     this._updateImageMargins();
 
     this._requestFavicon();
     this._doc.body.classList.add("loaded");
+
+    this._goToReference(articleUri.ref);
 
     Services.obs.notifyObservers(this._win, "AboutReader:Ready", "");
 
@@ -958,6 +1009,15 @@ AboutReader.prototype = {
     // Trigger BackPressListener cleanup in Android.
     if (openDropdowns.length) {
       this._mm.sendAsyncMessage("Reader:DropdownClosed", this.viewId);
+    }
+  },
+
+  /*
+   * Scroll reader view to a reference
+   */
+  _goToReference(ref) {
+    if (ref) {
+      this._win.location.hash = ref;
     }
   }
 };

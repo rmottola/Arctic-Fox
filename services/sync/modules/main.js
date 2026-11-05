@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-this.EXPORTED_SYMBOLS = ['Weave'];
+this.EXPORTED_SYMBOLS = ["Weave"];
 
 this.Weave = {};
 Components.utils.import("resource://services-sync/constants.js", Weave);
@@ -11,7 +11,7 @@ var lazies = {
   "notifications.js":     ["Notifications", "Notification", "NotificationButton"],
   "service.js":           ["Service"],
   "status.js":            ["Status"],
-  "util.js":              ['Utils', 'Svc']
+  "util.js":              ["Utils", "Svc"]
 };
 
 function lazyImport(module, dest, props) {

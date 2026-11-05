@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-this.EXPORTED_SYMBOLS = ['BookmarksEngine', "PlacesItem", "Bookmark",
+this.EXPORTED_SYMBOLS = ["BookmarksEngine", "PlacesItem", "Bookmark",
                          "BookmarkFolder", "BookmarkQuery",
                          "Livemark", "BookmarkSeparator"];
 
@@ -1272,6 +1272,7 @@ BookmarksTracker.prototype = {
   },
 
   _ensureMobileQuery: function _ensureMobileQuery() {
+    Services.prefs.setBoolPref("browser.bookmarks.showMobileBookmarks", true);
     let find = val =>
       PlacesUtils.annotations.getItemsWithAnnotation(ORGANIZERQUERY_ANNO, {}).filter(
         id => PlacesUtils.annotations.getItemAnnotation(id, ORGANIZERQUERY_ANNO) == val

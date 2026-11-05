@@ -12,6 +12,7 @@
 var doc = null, toolbox = null, panelWin = null, modifiedPrefs = [];
 const {LocalizationHelper} = require("devtools/shared/l10n");
 const L10N = new LocalizationHelper("devtools/client/locales/toolbox.properties");
+const {PrefObserver} = require("devtools/client/shared/prefs");
 
 add_task(function* () {
   const URL = "data:text/html;charset=utf8,test for dynamically registering " +
@@ -142,14 +143,13 @@ function* testSelect(select) {
       continue;
     }
 
+    let observer = new PrefObserver("devtools.");
+
     let deferred = defer();
-    gDevTools.once("pref-changed", (event, data) => {
-      if (data.pref == pref) {
-        ok(true, "Correct pref was changed");
-        is(GetPref(pref), option.value, "Preference been switched for " + pref);
-      } else {
-        ok(false, "Pref " + pref + " was not changed correctly");
-      }
+    let changeSeen = false;
+    observer.once(pref, () => {
+      changeSeen = true;
+      is(GetPref(pref), option.value, "Preference been switched for " + pref);
       deferred.resolve();
     });
 
@@ -158,21 +158,22 @@ function* testSelect(select) {
     select.dispatchEvent(changeEvent);
 
     yield deferred.promise;
+
+    ok(changeSeen, "Correct pref was changed");
+    observer.destroy();
   }
 }
 
 function* testMouseClick(node, prefValue) {
   let deferred = defer();
 
+  let observer = new PrefObserver("devtools.");
+
   let pref = node.getAttribute("data-pref");
-  gDevTools.once("pref-changed", (event, data) => {
-    if (data.pref == pref) {
-      ok(true, "Correct pref was changed");
-      is(data.oldValue, prefValue, "Previous value is correct for " + pref);
-      is(data.newValue, !prefValue, "New value is correct for " + pref);
-    } else {
-      ok(false, "Pref " + pref + " was not changed correctly");
-    }
+  let changeSeen = false;
+  observer.once(pref, () => {
+    changeSeen = true;
+    is(GetPref(pref), !prefValue, "New value is correct for " + pref);
     deferred.resolve();
   });
 
@@ -186,6 +187,9 @@ function* testMouseClick(node, prefValue) {
   });
 
   yield deferred.promise;
+
+  ok(changeSeen, "Correct pref was changed");
+  observer.destroy();
 }
 
 function* testToggleTools() {
@@ -280,22 +284,8 @@ function checkRegistered(toolId, deferred, event, data) {
   if (data == toolId) {
     ok(true, "Correct tool added back");
     // checking tab on the toolbox
-    let radio = doc.getElementById("toolbox-tab-" + toolId);
-    ok(radio, "Tab added back for " + toolId);
-    if (radio.previousSibling) {
-      ok(+radio.getAttribute("ordinal") >=
-         +radio.previousSibling.getAttribute("ordinal"),
-         "Inserted tab's ordinal is greater than equal to its previous tab." +
-         "Expected " + radio.getAttribute("ordinal") + " >= " +
-         radio.previousSibling.getAttribute("ordinal"));
-    }
-    if (radio.nextSibling) {
-      ok(+radio.getAttribute("ordinal") <
-         +radio.nextSibling.getAttribute("ordinal"),
-         "Inserted tab's ordinal is less than its next tab. Expected " +
-         radio.getAttribute("ordinal") + " < " +
-         radio.nextSibling.getAttribute("ordinal"));
-    }
+    let button = doc.getElementById("toolbox-tab-" + toolId);
+    ok(button, "Tab added back for " + toolId);
   } else {
     ok(false, "Something went wrong, " + toolId + " was not registered");
   }

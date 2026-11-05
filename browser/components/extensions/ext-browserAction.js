@@ -18,7 +18,7 @@ Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 
 var {
-  EventManager,
+  SingletonEventManager,
   IconDetails,
 } = ExtensionUtils;
 
@@ -91,6 +91,7 @@ BrowserAction.prototype = {
         view.setAttribute("flex", "1");
 
         document.getElementById("PanelUI-multiView").appendChild(view);
+        document.addEventListener("popupshowing", this);
       },
 
       onDestroyed: document => {
@@ -100,6 +101,7 @@ BrowserAction.prototype = {
           CustomizableUI.hidePanelForNode(view);
           view.remove();
         }
+        document.removeEventListener("popupshowing", this);
       },
 
       onCreated: node => {
@@ -225,6 +227,21 @@ BrowserAction.prototype = {
               this.clearPopup();
             }
           }
+        }
+        break;
+
+      case "popupshowing":
+        const menu = event.target;
+        const trigger = menu.triggerNode;
+        const node = window.document.getElementById(this.id);
+        const contexts = ["toolbar-context-menu", "customizationPanelItemContextMenu"];
+
+        if (contexts.includes(menu.id) && node && isAncestorOrSelf(node, trigger)) {
+          global.actionContextMenu({
+            extension: this.extension,
+            onBrowserAction: true,
+            menu: menu,
+          });
         }
         break;
     }
@@ -429,10 +446,10 @@ extensions.registerSchemaAPI("browserAction", "addon_parent", context => {
   let {extension} = context;
   return {
     browserAction: {
-      onClicked: new EventManager(context, "browserAction.onClicked", fire => {
+      onClicked: new SingletonEventManager(context, "browserAction.onClicked", fire => {
         let listener = () => {
           let tab = TabManager.activeTab;
-          fire(TabManager.convert(extension, tab));
+          fire.async(TabManager.convert(extension, tab));
         };
         BrowserAction.for(extension).on("click", listener);
         return () => {

@@ -23,10 +23,15 @@
 
 namespace js {
 
-namespace jit { class MacroAssembler; class Label; }
+namespace jit {
+    class MacroAssembler;
+    class Label;
+    enum ABIFunctionType;
+}
 
 namespace wasm {
 
+class ExitReason;
 class FuncExport;
 class FuncImport;
 
@@ -36,14 +41,18 @@ GenerateEntry(jit::MacroAssembler& masm, const FuncExport& fe);
 extern FuncOffsets
 GenerateImportFunction(jit::MacroAssembler& masm, const FuncImport& fi, SigIdDesc sigId);
 
-extern ProfilingOffsets
+extern CallableOffsets
 GenerateImportInterpExit(jit::MacroAssembler& masm, const FuncImport& fi, uint32_t funcImportIndex,
                          jit::Label* throwLabel);
 
-extern ProfilingOffsets
+extern CallableOffsets
 GenerateImportJitExit(jit::MacroAssembler& masm, const FuncImport& fi, jit::Label* throwLabel);
 
-extern ProfilingOffsets
+extern CallableOffsets
+GenerateBuiltinThunk(jit::MacroAssembler& masm, jit::ABIFunctionType abiType, ExitReason exitReason,
+                     void* func);
+
+extern CallableOffsets
 GenerateTrapExit(jit::MacroAssembler& masm, Trap trap, jit::Label* throwLabel);
 
 extern Offsets
@@ -57,6 +66,10 @@ GenerateInterruptExit(jit::MacroAssembler& masm, jit::Label* throwLabel);
 
 extern Offsets
 GenerateThrowStub(jit::MacroAssembler& masm, jit::Label* throwLabel);
+
+extern Offsets
+GenerateDebugTrapStub(jit::MacroAssembler& masm, jit::Label* throwLabel);
+
 
 } // namespace wasm
 } // namespace js

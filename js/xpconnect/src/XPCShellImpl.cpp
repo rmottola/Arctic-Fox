@@ -34,6 +34,7 @@
 #include "nsJSUtils.h"
 #include "gfxPrefs.h"
 #include "nsIXULRuntime.h"
+#include "GeckoProfiler.h"
 
 #include "base/histogram.h"
 
@@ -1192,11 +1193,11 @@ public:
 NS_IMPL_ISUPPORTS(TestGlobal, nsIXPCTestNoisy, nsIXPCScriptable)
 
 // The nsIXPCScriptable map declaration that will generate stubs for us...
-#define XPC_MAP_CLASSNAME           TestGlobal
-#define XPC_MAP_QUOTED_CLASSNAME   "TestGlobal"
-#define XPC_MAP_FLAGS               nsIXPCScriptable::USE_JSSTUB_FOR_ADDPROPERTY |\
-                                    nsIXPCScriptable::USE_JSSTUB_FOR_DELPROPERTY |\
-                                    nsIXPCScriptable::USE_JSSTUB_FOR_SETPROPERTY
+#define XPC_MAP_CLASSNAME         TestGlobal
+#define XPC_MAP_QUOTED_CLASSNAME "TestGlobal"
+#define XPC_MAP_FLAGS (XPC_SCRIPTABLE_USE_JSSTUB_FOR_ADDPROPERTY |\
+                       XPC_SCRIPTABLE_USE_JSSTUB_FOR_DELPROPERTY |\
+                       XPC_SCRIPTABLE_USE_JSSTUB_FOR_SETPROPERTY)
 #include "xpc_map_end.h" /* This will #undef the above */
 
 NS_IMETHODIMP TestGlobal::Squawk() {return NS_OK;}
@@ -1302,8 +1303,11 @@ XRE_XPCShellMain(int argc, char** argv, char** envp,
 
     // A initializer to initialize histogram collection
     // used by telemetry.
-    UniquePtr<base::StatisticsRecorder> telStats =
-       MakeUnique<base::StatisticsRecorder>();
+    auto telStats =
+       mozilla::MakeUnique<base::StatisticsRecorder>();
+
+    char aLocal;
+    profiler_init(&aLocal);
 
     if (PR_GetEnv("MOZ_CHAOSMODE")) {
         ChaosFeature feature = ChaosFeature::Any;
@@ -1522,7 +1526,7 @@ XRE_XPCShellMain(int argc, char** argv, char** envp,
         // Make the default XPCShell global use a fresh zone (rather than the
         // System Zone) to improve cross-zone test coverage.
         JS::CompartmentOptions options;
-        options.creationOptions().setZone(JS::FreshZone);
+        options.creationOptions().setNewZoneInSystemZoneGroup();
         if (xpc::SharedMemoryEnabled())
             options.creationOptions().setSharedMemoryAndAtomicsEnabled(true);
         options.behaviors().setVersion(JSVERSION_LATEST);
@@ -1651,6 +1655,10 @@ XRE_XPCShellMain(int argc, char** argv, char** envp,
     if (CrashReporter::GetEnabled())
         CrashReporter::UnsetExceptionHandler();
 #endif
+
+    // This must precede NS_LogTerm(), otherwise xpcshell return non-zero
+    // during some tests, which causes failures.
+    profiler_shutdown();
 
     NS_LogTerm();
 

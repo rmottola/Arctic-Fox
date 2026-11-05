@@ -141,9 +141,15 @@ LinkData::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const
 Module::serializedSize(size_t* maybeBytecodeSize, size_t* maybeCompiledSize) const
 {
     if (maybeBytecodeSize)
-        *maybeBytecodeSize = SerializedPodVectorSize(bytecode_->bytes);
+        *maybeBytecodeSize = bytecode_->bytes.length();
 
-    if (maybeCompiledSize) {
+    // The compiled debug code must not be saved, set compiled size to 0,
+    // so Module::assumptionsMatch will return false during assumptions
+    // deserialization.
+    if (maybeCompiledSize && metadata_->debugEnabled)
+        *maybeCompiledSize = 0;
+
+    if (maybeCompiledSize && !metadata_->debugEnabled) {
         *maybeCompiledSize = assumptions_.serializedSize() +
                              SerializedPodVectorSize(code_) +
                              linkData_.serializedSize() +
@@ -164,13 +170,19 @@ Module::serialize(uint8_t* maybeBytecodeBegin, size_t maybeBytecodeSize,
 
     if (maybeBytecodeBegin) {
         // Bytecode deserialization is not guarded by Assumptions and thus must not
-        // change incompatibly between builds.
+        // change incompatibly between builds. Thus, for simplicity, the format
+        // of the bytecode file is simply a .wasm file (thus, backwards
+        // compatibility is ensured by backwards compatibility of the wasm
+        // binary format).
 
-        uint8_t* bytecodeEnd = SerializePodVector(maybeBytecodeBegin, bytecode_->bytes);
+        const Bytes& bytes = bytecode_->bytes;
+        uint8_t* bytecodeEnd = WriteBytes(maybeBytecodeBegin, bytes.begin(), bytes.length());
         MOZ_RELEASE_ASSERT(bytecodeEnd == maybeBytecodeBegin + maybeBytecodeSize);
     }
 
-    if (maybeCompiledBegin) {
+    MOZ_ASSERT_IF(maybeCompiledBegin && metadata_->debugEnabled, maybeCompiledSize == 0);
+
+    if (maybeCompiledBegin && !metadata_->debugEnabled) {
         // Assumption must be serialized at the beginning of the compiled bytes so
         // that compiledAssumptionsMatch can detect a build-id mismatch before any
         // other decoding occurs.
@@ -204,14 +216,10 @@ Module::deserialize(const uint8_t* bytecodeBegin, size_t bytecodeSize,
                     Metadata* maybeMetadata)
 {
     MutableBytes bytecode = js_new<ShareableBytes>();
-    if (!bytecode)
+    if (!bytecode || !bytecode->bytes.initLengthUninitialized(bytecodeSize))
         return nullptr;
 
-    const uint8_t* bytecodeEnd = DeserializePodVector(bytecodeBegin, &bytecode->bytes);
-    if (!bytecodeEnd)
-        return nullptr;
-
-    MOZ_RELEASE_ASSERT(bytecodeEnd == bytecodeBegin + bytecodeSize);
+    memcpy(bytecode->bytes.begin(), bytecodeBegin, bytecodeSize);
 
     Assumptions assumptions;
     const uint8_t* cursor = assumptions.deserialize(compiledBegin, compiledSize);
@@ -344,15 +352,15 @@ wasm::DeserializeModule(PRFileDesc* bytecodeFile, PRFileDesc* maybeCompiledFile,
                                    compiledMapping.get(), compiledInfo.size);
     }
 
+    // Since the compiled file's assumptions don't match, we must recompile from
+    // bytecode. The bytecode file format is simply that of a .wasm (see
+    // Module::serialize).
+
     MutableBytes bytecode = js_new<ShareableBytes>();
-    if (!bytecode)
+    if (!bytecode || !bytecode->bytes.initLengthUninitialized(bytecodeInfo.size))
         return nullptr;
 
-    const uint8_t* bytecodeEnd = DeserializePodVector(bytecodeMapping.get(), &bytecode->bytes);
-    if (!bytecodeEnd)
-        return nullptr;
-
-    MOZ_RELEASE_ASSERT(bytecodeEnd == bytecodeMapping.get() + bytecodeInfo.size);
+    memcpy(bytecode->bytes.begin(), bytecodeMapping.get(), bytecodeInfo.size);
 
     ScriptedCaller scriptedCaller;
     scriptedCaller.filename = Move(filename);
@@ -432,11 +440,11 @@ Module::extractCode(JSContext* cx, MutableHandleValue vp)
             if (!JS_DefineProperty(cx, segment, "funcIndex", value, JSPROP_ENUMERATE))
                 return false;
 
-            value.setNumber((uint32_t)p.funcNonProfilingEntry());
+            value.setNumber((uint32_t)p.funcNormalEntry());
             if (!JS_DefineProperty(cx, segment, "funcBodyBegin", value, JSPROP_ENUMERATE))
                 return false;
 
-            value.setNumber((uint32_t)p.funcProfilingEpilogue());
+            value.setNumber((uint32_t)p.end());
             if (!JS_DefineProperty(cx, segment, "funcBodyEnd", value, JSPROP_ENUMERATE))
                 return false;
         }
@@ -481,8 +489,6 @@ Module::initSegments(JSContext* cx,
 
     for (const ElemSegment& seg : elemSegments_) {
         uint32_t numElems = seg.elemCodeRangeIndices.length();
-        if (!numElems)
-            continue;
 
         uint32_t tableLength = tables[seg.tableIndex]->length();
         uint32_t offset = EvaluateInitExpr(globalImports, seg.offset);
@@ -496,9 +502,6 @@ Module::initSegments(JSContext* cx,
 
     if (memoryObj) {
         for (const DataSegment& seg : dataSegments_) {
-            if (!seg.length)
-                continue;
-
             uint32_t memoryLength = memoryObj->buffer().byteLength();
             uint32_t offset = EvaluateInitExpr(globalImports, seg.offset);
 
@@ -518,7 +521,6 @@ Module::initSegments(JSContext* cx,
     for (const ElemSegment& seg : elemSegments_) {
         Table& table = *tables[seg.tableIndex];
         uint32_t offset = EvaluateInitExpr(globalImports, seg.offset);
-        bool profilingEnabled = instance.code().profilingEnabled();
         const CodeRangeVector& codeRanges = metadata().codeRanges;
         uint8_t* codeBase = instance.codeBase();
 
@@ -536,9 +538,7 @@ Module::initSegments(JSContext* cx,
             } else {
                 const CodeRange& cr = codeRanges[seg.elemCodeRangeIndices[i]];
                 uint32_t entryOffset = table.isTypedFunction()
-                                       ? profilingEnabled
-                                         ? cr.funcProfilingEntry()
-                                         : cr.funcNonProfilingEntry()
+                                       ? cr.funcNormalEntry()
                                        : cr.funcTableEntry();
                 table.set(offset + i, codeBase + entryOffset, instance);
             }
@@ -601,8 +601,8 @@ Module::instantiateFunctions(JSContext* cx, Handle<FunctionVector> funcImports) 
 }
 
 static bool
-CheckLimits(JSContext* cx, uint32_t declaredMin, Maybe<uint32_t> declaredMax, uint32_t actualLength,
-            Maybe<uint32_t> actualMax, bool isAsmJS, const char* kind)
+CheckLimits(JSContext* cx, uint32_t declaredMin, const Maybe<uint32_t>& declaredMax, uint32_t actualLength,
+            const Maybe<uint32_t>& actualMax, bool isAsmJS, const char* kind)
 {
     if (isAsmJS) {
         MOZ_ASSERT(actualLength >= declaredMin);
@@ -766,10 +766,9 @@ GetGlobalExport(JSContext* cx, const GlobalDescVector& globals, uint32_t globalI
         return true;
       }
       case ValType::F32: {
-        float f = val.f32().fp();
+        float f = val.f32();
         if (JitOptions.wasmTestMode && IsNaN(f)) {
-            uint32_t bits = val.f32().bits();
-            RootedObject obj(cx, CreateCustomNaNObject(cx, (float*)&bits));
+            RootedObject obj(cx, CreateCustomNaNObject(cx, &f));
             if (!obj)
                 return false;
             jsval.set(ObjectValue(*obj));
@@ -779,10 +778,9 @@ GetGlobalExport(JSContext* cx, const GlobalDescVector& globals, uint32_t globalI
         return true;
       }
       case ValType::F64: {
-        double d = val.f64().fp();
+        double d = val.f64();
         if (JitOptions.wasmTestMode && IsNaN(d)) {
-            uint64_t bits = val.f64().bits();
-            RootedObject obj(cx, CreateCustomNaNObject(cx, (double*)&bits));
+            RootedObject obj(cx, CreateCustomNaNObject(cx, &d));
             if (!obj)
                 return false;
             jsval.set(ObjectValue(*obj));
@@ -819,7 +817,10 @@ CreateExportObject(JSContext* cx,
         return true;
     }
 
-    exportObj.set(JS_NewPlainObject(cx));
+    if (metadata.isAsmJS())
+        exportObj.set(NewBuiltinClassInstance<PlainObject>(cx));
+    else
+        exportObj.set(NewObjectWithGivenProto<PlainObject>(cx, nullptr));
     if (!exportObj)
         return false;
 
@@ -851,6 +852,11 @@ CreateExportObject(JSContext* cx,
             return false;
     }
 
+    if (!metadata.isAsmJS()) {
+        if (!JS_FreezeObject(cx, exportObj))
+            return false;
+    }
+
     return true;
 }
 
@@ -875,27 +881,47 @@ Module::instantiate(JSContext* cx,
     if (!instantiateTable(cx, &table, &tables))
         return false;
 
+    // The CodeSegment does not hold on to the bytecode, see comment below.
+
+    auto codeSegment = CodeSegment::create(cx, code_, bytecode_, linkData_, *metadata_);
+    if (!codeSegment)
+        return false;
+
+    auto globalSegment = GlobalSegment::create(linkData_.globalDataLength);
+    if (!globalSegment)
+        return false;
+
     // To support viewing the source of an instance (Instance::createText), the
     // instance must hold onto a ref of the bytecode (keeping it alive). This
     // wastes memory for most users, so we try to only save the source when a
     // developer actually cares: when the compartment is debuggable (which is
-    // true when the web console is open) or a names section is present (since
-    // this going to be stripped for non-developer builds).
+    // true when the web console is open), has code compiled with debug flag
+    // enabled or a names section is present (since this going to be stripped
+    // for non-developer builds).
 
     const ShareableBytes* maybeBytecode = nullptr;
-    if (cx->compartment()->isDebuggee() || !metadata_->funcNames.empty())
+    if (cx->compartment()->isDebuggee() || metadata_->debugEnabled ||
+        !metadata_->funcNames.empty())
+    {
         maybeBytecode = bytecode_.get();
+    }
 
-    auto codeSegment = CodeSegment::create(cx, code_, linkData_, *metadata_, memory);
-    if (!codeSegment)
-        return false;
-
-    auto code = cx->make_unique<Code>(Move(codeSegment), *metadata_, maybeBytecode);
+    SharedCode code(js_new<Code>(Move(codeSegment), *metadata_, maybeBytecode));
     if (!code)
         return false;
 
+    // The debug object must be present even when debugging is not enabled: It
+    // provides the lazily created source text for the program, even if that
+    // text is a placeholder message when debugging is not enabled.
+
+    auto debug = cx->make_unique<DebugState>(code, *metadata_, maybeBytecode);
+    if (!debug)
+        return false;
+
     instance.set(WasmInstanceObject::create(cx,
-                                            Move(code),
+                                            code,
+                                            Move(debug),
+                                            Move(globalSegment),
                                             memory,
                                             Move(tables),
                                             funcImports,

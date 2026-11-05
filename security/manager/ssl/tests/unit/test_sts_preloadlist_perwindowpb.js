@@ -110,14 +110,19 @@ function test_part1() {
   //     |-- subdomain.bugzilla.mozilla.org                          IS sts host
   //     |   `-- another.subdomain.bugzilla.mozilla.org              IS sts host
   //     `-- sibling.bugzilla.mozilla.org                            IS sts host
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "bugzilla.mozilla.org", 0));
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "subdomain.bugzilla.mozilla.org", 0));
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "sibling.bugzilla.mozilla.org", 0));
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "another.subdomain.bugzilla.mozilla.org", 0));
+  ok(gSSService.isSecureURI(Ci.nsISiteSecurityService.HEADER_HSTS,
+                            Services.io.newURI("https://bugzilla.mozilla.org"),
+                            0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://subdomain.bugzilla.mozilla.org"), 0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://sibling.bugzilla.mozilla.org"), 0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://another.subdomain.bugzilla.mozilla.org"),
+       0));
 
   gSSService.processHeader(Ci.nsISiteSecurityService.HEADER_HSTS, uri,
                            "max-age=1000", sslStatus, 0);
@@ -126,12 +131,16 @@ function test_part1() {
   //     |-- subdomain.bugzilla.mozilla.org (include subdomains is false) IS sts host
   //     |   `-- another.subdomain.bugzilla.mozilla.org              IS NOT sts host
   //     `-- sibling.bugzilla.mozilla.org                            IS sts host
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "subdomain.bugzilla.mozilla.org", 0));
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "sibling.bugzilla.mozilla.org", 0));
-  ok(!gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                              "another.subdomain.bugzilla.mozilla.org", 0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://subdomain.bugzilla.mozilla.org"), 0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://sibling.bugzilla.mozilla.org"), 0));
+  ok(!gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://another.subdomain.bugzilla.mozilla.org"),
+       0));
 
   // Test that an expired non-private browsing entry results in correctly
   // identifying a host that is on the preload list as no longer sts.
@@ -207,16 +216,19 @@ function test_private_browsing1() {
 
 function test_private_browsing2() {
   // if this test gets this far, it means there's a private browsing service
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "bugzilla.mozilla.org", 0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://bugzilla.mozilla.org"), 0));
   // the bugzilla.mozilla.org entry has includeSubdomains set
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "subdomain.bugzilla.mozilla.org", 0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://subdomain.bugzilla.mozilla.org"), 0));
 
   // Now that we're out of private browsing mode, we need to make sure
   // we've "forgotten" that we "forgot" this site's sts status.
-  ok(gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HSTS,
-                             "login.persona.org", 0));
+  ok(gSSService.isSecureURI(
+       Ci.nsISiteSecurityService.HEADER_HSTS,
+       Services.io.newURI("https://login.persona.org"), 0));
 
   run_next_test();
 }

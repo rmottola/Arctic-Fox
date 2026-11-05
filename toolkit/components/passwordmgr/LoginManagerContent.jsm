@@ -14,6 +14,7 @@ const PASSWORD_INPUT_ADDED_COALESCING_THRESHOLD_MS = 1;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
+Cu.import("resource://gre/modules/InsecurePasswordUtils.jsm");
 Cu.import("resource://gre/modules/Promise.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "DeferredTask", "resource://gre/modules/DeferredTask.jsm");
@@ -25,12 +26,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "LoginRecipesContent",
 XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
                                   "resource://gre/modules/LoginHelper.jsm");
 
-XPCOMUtils.defineLazyServiceGetter(this, "gContentSecurityManager",
-                                   "@mozilla.org/contentsecuritymanager;1",
-                                   "nsIContentSecurityManager");
-XPCOMUtils.defineLazyServiceGetter(this, "gScriptSecurityManager",
-                                   "@mozilla.org/scriptsecuritymanager;1",
-                                   "nsIScriptSecurityManager");
 XPCOMUtils.defineLazyServiceGetter(this, "gNetUtil",
                                    "@mozilla.org/network/util;1",
                                    "nsINetUtil");
@@ -395,11 +390,10 @@ var LoginManagerContent = {
       log("Arming the DeferredTask we just created since document.readyState == 'complete'");
       deferredTask.arm();
     } else {
-      window.addEventListener("DOMContentLoaded", function armPasswordAddedTask() {
-        window.removeEventListener("DOMContentLoaded", armPasswordAddedTask);
+      window.addEventListener("DOMContentLoaded", function() {
         log("Arming the onDOMInputPasswordAdded DeferredTask due to DOMContentLoaded");
         deferredTask.arm();
-      });
+      }, {once: true});
     }
   },
 
@@ -457,18 +451,17 @@ var LoginManagerContent = {
     log("_detectInsecureFormLikes", topWindow.location.href);
 
     // Returns true if this window or any subframes have insecure login forms.
-    let hasInsecureLoginForms = (thisWindow, parentIsInsecure) => {
+    let hasInsecureLoginForms = (thisWindow) => {
       let doc = thisWindow.document;
-      let isInsecure = parentIsInsecure || !this.isDocumentSecure(doc);
       let hasLoginForm = this.stateForDocument(doc).loginFormRootElements.size > 0;
-      return (hasLoginForm && isInsecure) ||
+      return (hasLoginForm && !thisWindow.isSecureContext) ||
              Array.some(thisWindow.frames,
-                        frame => hasInsecureLoginForms(frame, isInsecure));
+                        frame => hasInsecureLoginForms(frame));
     };
 
     let messageManager = messageManagerFromWindow(topWindow);
     messageManager.sendAsyncMessage("RemoteLogins:insecureLoginFormPresent", {
-      hasInsecureLoginForms: hasInsecureLoginForms(topWindow, false),
+      hasInsecureLoginForms: hasInsecureLoginForms(topWindow),
     });
   },
 
@@ -926,6 +919,7 @@ var LoginManagerContent = {
       MULTIPLE_LOGINS: 7,
       NO_AUTOFILL_FORMS: 8,
       AUTOCOMPLETE_OFF: 9,
+      INSECURE: 10,
     };
 
     function recordAutofillResult(result) {
@@ -979,6 +973,14 @@ var LoginManagerContent = {
       if (passwordField.disabled || passwordField.readOnly) {
         log("not filling form, password field disabled or read-only");
         recordAutofillResult(AUTOFILL_RESULT.PASSWORD_DISABLED_READONLY);
+        return;
+      }
+
+      // Prevent autofilling insecure forms.
+      if (!userTriggered && !LoginHelper.insecureAutofill &&
+          !InsecurePasswordUtils.isFormSecure(form)) {
+        log("not filling form since it's insecure");
+        recordAutofillResult(AUTOFILL_RESULT.INSECURE);
         return;
       }
 
@@ -1170,41 +1172,6 @@ var LoginManagerContent = {
         disabled: newPasswordField && (newPasswordField.disabled || newPasswordField.readOnly),
       },
     };
-  },
-
-  /**
-   * Returns true if the provided document principal and URI are such that the
-   * page using them can safely host password fields.
-   *
-   * This means the page can't be easily tampered with because it is sent over
-   * an encrypted channel or is a local resource that never hits the network.
-   *
-   * The system principal, codebase principals with secure schemes like "https",
-   * and local schemes like "resource" and "file" are all considered secure. If
-   * the page is sandboxed, then the document URI is checked instead.
-   *
-   * @param document
-   *        The document whose principal and URI are to be considered.
-   */
-  isDocumentSecure(document) {
-    let principal = document.nodePrincipal;
-    if (principal.isSystemPrincipal) {
-      return true;
-    }
-
-    // Fall back to the document URI for sandboxed documents that do not have
-    // the allow-same-origin flag, as they have a null principal instead of a
-    // codebase principal. Here there are still some cases that are considered
-    // insecure while they are secure, for example sandboxed documents created
-    // using a "javascript:" or "data:" URI from an HTTPS page. See bug 1162772
-    // for defining "window.isSecureContext", that may help in these cases.
-    if (!principal.isCodebasePrincipal) {
-      principal =
-        gScriptSecurityManager.getCodebasePrincipal(document.documentURIObject);
-    }
-
-    // These checks include "file", "resource", HTTPS, and HTTP to "localhost".
-    return gContentSecurityManager.isOriginPotentiallyTrustworthy(principal);
   },
 };
 

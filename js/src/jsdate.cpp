@@ -354,7 +354,19 @@ MakeDate(double day, double time)
 JS_PUBLIC_API(double)
 JS::MakeDate(double year, unsigned month, unsigned day)
 {
+    MOZ_ASSERT(month <= 11);
+    MOZ_ASSERT(day >= 1 && day <= 31);
+
     return ::MakeDate(MakeDay(year, month, day), 0);
+}
+
+JS_PUBLIC_API(double)
+JS::MakeDate(double year, unsigned month, unsigned day, double time)
+{
+    MOZ_ASSERT(month <= 11);
+    MOZ_ASSERT(day >= 1 && day <= 31);
+
+    return ::MakeDate(MakeDay(year, month, day), time);
 }
 
 JS_PUBLIC_API(double)
@@ -2804,6 +2816,17 @@ date_toLocaleFormat_impl(JSContext* cx, const CallArgs& args)
 {
     Rooted<DateObject*> dateObj(cx, &args.thisv().toObject().as<DateObject>());
 
+#if EXPOSE_INTL_API
+    if (!cx->compartment()->warnedAboutDateToLocaleFormat) {
+        if (!JS_ReportErrorFlagsAndNumberASCII(cx, JSREPORT_WARNING, GetErrorMessage, nullptr,
+                                               JSMSG_DEPRECATED_TOLOCALEFORMAT))
+        {
+            return false;
+        }
+        cx->compartment()->warnedAboutDateToLocaleFormat = true;
+    }
+#endif
+
     if (args.length() == 0) {
         /*
          * Use '%#c' for windows, because '%c' is backward-compatible and non-y2k
@@ -2969,7 +2992,7 @@ date_toPrimitive(JSContext* cx, unsigned argc, Value* vp)
     JSType hint;
     if (!GetFirstArgumentAsTypeHint(cx, args, &hint))
         return false;
-    if (hint == JSTYPE_VOID)
+    if (hint == JSTYPE_UNDEFINED)
         hint = JSTYPE_STRING;
 
     args.rval().set(args.thisv());
@@ -3225,7 +3248,7 @@ js::DateConstructor(JSContext* cx, unsigned argc, Value* vp)
 static JSObject*
 CreateDatePrototype(JSContext* cx, JSProtoKey key)
 {
-    return cx->global()->createBlankPrototype(cx, &DateObject::protoClass_);
+    return GlobalObject::createBlankPrototype(cx, cx->global(), &DateObject::protoClass_);
 }
 
 static bool

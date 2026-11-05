@@ -775,13 +775,8 @@ nsStandardURL::BuildNormalizedSpec(const char *spec)
         // #ref
 
         if (mRef.mLen >= 0) {
-            if (nsContentUtils::EncodeDecodeURLHash()) {
-                approxLen += 1 + encoder.EncodeSegmentCount(spec, mRef, esc_Ref,
-                                                            encRef, useEncRef);
-            } else {
-                approxLen += 1 + mRef.mLen;
-                useEncRef = false;
-            }
+            approxLen += 1 + encoder.EncodeSegmentCount(spec, mRef, esc_Ref,
+                                                        encRef, useEncRef);
         }
     }
 
@@ -1254,7 +1249,6 @@ NS_IMPL_RELEASE(nsStandardURL)
 NS_INTERFACE_MAP_BEGIN(nsStandardURL)
     NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIStandardURL)
     NS_INTERFACE_MAP_ENTRY(nsIURI)
-    NS_INTERFACE_MAP_ENTRY(nsIURIWithQuery)
     NS_INTERFACE_MAP_ENTRY(nsIURL)
     NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIFileURL, mSupportsFileURL)
     NS_INTERFACE_MAP_ENTRY(nsIStandardURL)
@@ -1415,6 +1409,8 @@ nsStandardURL::GetAsciiSpec(nsACString &result)
 
     result = Substring(mSpec, 0, mScheme.mLen + 3);
 
+    // This is left fallible as this entire function is expected to be
+    // infallible.
     NS_EscapeURL(Userpass(true), esc_OnlyNonASCII | esc_AlwaysCopy, result);
 
     // get the hostport
@@ -1422,6 +1418,8 @@ nsStandardURL::GetAsciiSpec(nsACString &result)
     MOZ_ALWAYS_SUCCEEDS(GetAsciiHostPort(hostport));
     result += hostport;
 
+    // This is left fallible as this entire function is expected to be
+    // infallible.
     NS_EscapeURL(Path(), esc_OnlyNonASCII | esc_AlwaysCopy, result);
     CALL_RUST_GETTER_STR(result, GetAsciiSpec, result);
     return NS_OK;
@@ -2979,16 +2977,14 @@ nsStandardURL::SetRef(const nsACString &input)
     // If precent encoding is necessary, `ref` will point to `buf`'s content.
     // `buf` needs to outlive any use of the `ref` pointer.
     nsAutoCString buf;
-    if (nsContentUtils::EncodeDecodeURLHash()) {
-        // encode ref if necessary
-        bool encoded;
-        GET_SEGMENT_ENCODER(encoder);
-        encoder.EncodeSegmentCount(ref, URLSegment(0, refLen), esc_Ref,
-                                   buf, encoded);
-        if (encoded) {
-            ref = buf.get();
-            refLen = buf.Length();
-        }
+    // encode ref if necessary
+    bool encoded;
+    GET_SEGMENT_ENCODER(encoder);
+    encoder.EncodeSegmentCount(ref, URLSegment(0, refLen), esc_Ref,
+                               buf, encoded);
+    if (encoded) {
+        ref = buf.get();
+        refLen = buf.Length();
     }
 
     int32_t shift = ReplaceSegment(mRef.mPos, mRef.mLen, ref, refLen);

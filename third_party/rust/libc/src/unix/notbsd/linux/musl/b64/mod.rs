@@ -114,6 +114,13 @@ s! {
         pub msg_flags: ::c_int,
     }
 
+    pub struct cmsghdr {
+        pub cmsg_len: ::socklen_t,
+        pub __pad1: ::c_int,
+        pub cmsg_level: ::c_int,
+        pub cmsg_type: ::c_int,
+    }
+
     pub struct sem_t {
         __val: [::c_int; 8],
     }
@@ -218,6 +225,7 @@ pub const ENOPROTOOPT: ::c_int = 92;
 pub const EPROTONOSUPPORT: ::c_int = 93;
 pub const ESOCKTNOSUPPORT: ::c_int = 94;
 pub const EOPNOTSUPP: ::c_int = 95;
+pub const ENOTSUP: ::c_int = EOPNOTSUPP;
 pub const EPFNOSUPPORT: ::c_int = 96;
 pub const EAFNOSUPPORT: ::c_int = 97;
 pub const EADDRINUSE: ::c_int = 98;

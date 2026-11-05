@@ -26,13 +26,14 @@
 #include "mozilla/layers/TransactionIdAllocator.h"
 #include "nsIWidget.h"                  // For plugin window configuration information structs
 
+class nsDisplayListBuilder;
+
 namespace mozilla {
 namespace layers {
 
 class ClientPaintedLayer;
 class CompositorBridgeChild;
 class ImageLayer;
-class PLayerChild;
 class FrameUniformityData;
 
 class ClientLayerManager final : public LayerManager
@@ -84,6 +85,7 @@ public:
   virtual void SetRoot(Layer* aLayer) override;
 
   virtual void Mutated(Layer* aLayer) override;
+  virtual void MutatedSimple(Layer* aLayer) override;
 
   virtual already_AddRefed<PaintedLayer> CreatePaintedLayer() override;
   virtual already_AddRefed<PaintedLayer> CreatePaintedLayerWithHint(PaintedLayerCreationHint aHint) override;
@@ -96,7 +98,8 @@ public:
   virtual already_AddRefed<BorderLayer> CreateBorderLayer() override;
   virtual already_AddRefed<RefLayer> CreateRefLayer() override;
 
-  virtual void UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier) override;
+  virtual void UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier,
+											  uint64_t aDeviceResetSeqNo) override;
   virtual TextureFactoryIdentifier GetTextureFactoryIdentifier() override
   {
     return AsShadowForwarder()->GetTextureFactoryIdentifier();
@@ -157,7 +160,7 @@ public:
 
   CompositorBridgeChild* GetRemoteRenderer();
 
-  CompositorBridgeChild* GetCompositorBridgeChild();
+  virtual CompositorBridgeChild* GetCompositorBridgeChild() override;
 
   // Disable component alpha layers with the software compositor.
   virtual bool ShouldAvoidComponentAlphaLayers() override { return !IsCompositingCheap(); }
@@ -177,8 +180,6 @@ public:
 
   virtual void Composite() override;
   virtual void GetFrameUniformity(FrameUniformityData* aFrameUniformityData) override;
-  virtual bool RequestOverfill(mozilla::dom::OverfillCallback* aCallback) override;
-  virtual void RunOverfillCallback(const uint32_t aOverfill) override;
 
   virtual void DidComposite(uint64_t aTransactionId,
                             const mozilla::TimeStamp& aCompositeStart,
@@ -221,10 +222,7 @@ public:
   // Get a copy of the compositor-side APZ test data for our layers ID.
   void GetCompositorSideAPZTestData(APZTestData* aData) const;
 
-  virtual void SetTransactionIdAllocator(TransactionIdAllocator* aAllocator) override
-  {
-     mTransactionIdAllocator = aAllocator;
-  }
+  virtual void SetTransactionIdAllocator(TransactionIdAllocator* aAllocator) override;
 
   float RequestProperty(const nsAString& aProperty) override;
 
@@ -289,8 +287,6 @@ private:
                               void* aCallbackData,
                               EndTransactionFlags);
 
-  bool DependsOnStaleDevice() const;
-
   LayerRefArray mKeepAlive;
 
   nsIWidget* mWidget;
@@ -332,10 +328,13 @@ private:
   // Incremented in BeginTransaction(), but not for repeat transactions.
   uint32_t mPaintSequenceNumber;
 
+  // A sequence number for checking whether we have not yet acknowledged
+  // a device reset.
+  uint64_t mDeviceResetSequenceNumber;
+
   APZTestData mApzTestData;
 
   RefPtr<ShadowLayerForwarder> mForwarder;
-  AutoTArray<dom::OverfillCallback*,0> mOverfillCallbacks;
   mozilla::TimeStamp mTransactionStart;
 
   nsTArray<DidCompositeObserver*> mDidCompositeObservers;
@@ -380,9 +379,9 @@ public:
   }
 };
 
-// Create a shadow layer (PLayerChild) for aLayer, if we're forwarding
-// our layer tree to a parent process.  Record the new layer creation
-// in the current open transaction as a side effect.
+// Create a LayerHandle for aLayer, if we're forwarding our layer tree
+// to a parent process.  Record the new layer creation in the current
+// open transaction as a side effect.
 template<typename CreatedMethod> void
 CreateShadowFor(ClientLayer* aLayer,
                 ClientLayerManager* aMgr,

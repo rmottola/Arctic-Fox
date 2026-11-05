@@ -94,26 +94,6 @@ LookupCache::UpdateRootDirHandle(nsIFile* aNewRootStoreDirectory)
 }
 
 nsresult
-LookupCache::Reset()
-{
-  LOG(("LookupCache resetting"));
-
-  nsCOMPtr<nsIFile> prefixsetFile;
-  nsresult rv = mStoreDirectory->Clone(getter_AddRefs(prefixsetFile));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = prefixsetFile->AppendNative(mTableName + NS_LITERAL_CSTRING(PREFIXSET_SUFFIX));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = prefixsetFile->Remove(false);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  ClearAll();
-
-  return NS_OK;
-}
-
-nsresult
 LookupCache::AddCompletionsToCache(AddCompleteArray& aAddCompletes)
 {
   for (uint32_t i = 0; i < aAddCompletes.Length(); i++) {
@@ -369,9 +349,6 @@ LookupCache::LoadPrefixSet()
     LOG(("stored PrefixSet exists, loading from disk"));
     rv = LoadFromFile(psFile);
     if (NS_FAILED(rv)) {
-      if (rv == NS_ERROR_FILE_CORRUPTED) {
-        Reset();
-      }
       return rv;
     }
     mPrimed = true;
@@ -468,6 +445,14 @@ LookupCacheV2::IsHashEntryConfirmed(const Completion& aEntry,
     // Considered completion as unsafe if its table is up-to-date.
     *aConfirmed = (now - age) < aFreshnessGuarantee;
   }
+}
+
+bool
+LookupCacheV2::IsEmpty()
+{
+  bool isEmpty;
+  mPrefixSet->IsEmpty(&isEmpty);
+  return isEmpty;
 }
 
 nsresult

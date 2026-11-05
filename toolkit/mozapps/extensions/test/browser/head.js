@@ -170,7 +170,7 @@ registerCleanupFunction(function() {
   checkOpenWindows("Addons:Compatibility");
   checkOpenWindows("Addons:Install");
 
-  return new Promise((resolve, reject) => AddonManager.getAllInstalls(resolve))
+  return AddonManager.getAllInstalls()
     .then(aInstalls => {
       for (let install of aInstalls) {
         if (install instanceof MockInstall)
@@ -368,9 +368,8 @@ function wait_for_view_load(aManagerWindow, aCallback, aForceWait, aLongerTimeou
   }
 
   aManagerWindow.document.addEventListener("ViewChanged", function() {
-    aManagerWindow.document.removeEventListener("ViewChanged", arguments.callee);
     log_exceptions(aCallback, aManagerWindow);
-  });
+  }, {once: true});
 }
 
 function wait_for_manager_load(aManagerWindow, aCallback) {
@@ -381,9 +380,8 @@ function wait_for_manager_load(aManagerWindow, aCallback) {
 
   info("Waiting for initialization");
   aManagerWindow.document.addEventListener("Initialized", function() {
-    aManagerWindow.document.removeEventListener("Initialized", arguments.callee);
     log_exceptions(aCallback, aManagerWindow);
-  });
+  }, {once: true});
 }
 
 function open_manager(aView, aCallback, aLoadCallback, aLongerTimeout) {
@@ -480,11 +478,10 @@ function wait_for_window_open(aCallback) {
       let domwindow = aWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                              .getInterface(Ci.nsIDOMWindow);
       domwindow.addEventListener("load", function() {
-        domwindow.removeEventListener("load", arguments.callee);
         executeSoon(function() {
           aCallback(domwindow);
         });
-      });
+      }, {once: true});
     },
 
     onCloseWindow: function(aWindow) {
@@ -506,12 +503,12 @@ function formatDate(aDate) {
   const locale = Cc["@mozilla.org/chrome/chrome-registry;1"]
                  .getService(Ci.nsIXULChromeRegistry)
                  .getSelectedLocale("global", true);
-  const dtOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const dtOptions = { year: "numeric", month: "long", day: "numeric" };
   return aDate.toLocaleDateString(locale, dtOptions);
 }
 
 function is_hidden(aElement) {
-  var style = aElement.ownerDocument.defaultView.getComputedStyle(aElement, "");
+  var style = aElement.ownerDocument.defaultView.getComputedStyle(aElement);
   if (style.display == "none")
     return true;
   if (style.visibility != "visible")
@@ -569,9 +566,8 @@ function CategoryUtilities(aManagerWindow) {
 
   var self = this;
   this.window.addEventListener("unload", function() {
-    self.window.removeEventListener("unload", arguments.callee);
     self.window = null;
-  });
+  }, {once: true});
 }
 
 CategoryUtilities.prototype = {

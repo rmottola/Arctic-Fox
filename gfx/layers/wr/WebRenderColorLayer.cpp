@@ -5,8 +5,10 @@
 
 #include "WebRenderColorLayer.h"
 
-#include "LayersLogging.h"
+#include "WebRenderLayersLogging.h"
+#include "gfxPrefs.h"
 #include "mozilla/webrender/webrender_ffi.h"
+#include "mozilla/webrender/WebRenderTypes.h"
 #include "mozilla/layers/WebRenderBridgeChild.h"
 
 namespace mozilla {
@@ -17,30 +19,54 @@ WebRenderColorLayer::RenderLayer()
 {
   WrScrollFrameStackingContextGenerator scrollFrames(this);
 
+  gfx::Matrix4x4 transform = GetTransform();
   LayerIntRegion visibleRegion = GetVisibleRegion();
   LayerIntRect bounds = visibleRegion.GetBounds();
-  Rect rect = RelativeToVisible(IntRectToRect(bounds.ToUnknownRect()));
+  Rect rect(0, 0, bounds.width, bounds.height);
   Rect clip;
   if (GetClipRect().isSome()) {
-      clip = RelativeToTransformedVisible(IntRectToRect(GetClipRect().ref().ToUnknownRect()));
+      clip = RelativeToVisible(transform.Inverse().TransformBounds(IntRectToRect(GetClipRect().ref().ToUnknownRect())));
   } else {
       clip = rect;
   }
-  if (gfxPrefs::LayersDump()) printf_stderr("ColorLayer %p using rect:%s clip:%s\n", this, Stringify(rect).c_str(), Stringify(clip).c_str());
 
+  gfx::Rect relBounds = VisibleBoundsRelativeToParent();
+  if (!transform.IsIdentity()) {
+    // WR will only apply the 'translate' of the transform, so we need to do the scale/rotation manually.
+    gfx::Matrix4x4 boundTransform = transform;
+    boundTransform._41 = 0.0f;
+    boundTransform._42 = 0.0f;
+    boundTransform._43 = 0.0f;
+    relBounds.MoveTo(boundTransform.TransformPoint(relBounds.TopLeft()));
+  }
 
-  gfx::Matrix4x4 transform;// = GetTransform();
-  gfx::Rect relBounds = TransformedVisibleBoundsRelativeToParent();
   gfx::Rect overflow(0, 0, relBounds.width, relBounds.height);
+  WrMixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetMixBlendMode());
 
   Maybe<WrImageMask> mask = buildMaskLayer();
 
-  WrBridge()->AddWebRenderCommand(
-      OpDPPushStackingContext(wr::ToWrRect(relBounds), wr::ToWrRect(overflow), mask, transform, FrameMetrics::NULL_SCROLL_ID));
-  WrBridge()->AddWebRenderCommand(
-    OpDPPushRect(wr::ToWrRect(rect), wr::ToWrRect(clip), mColor.r, mColor.g, mColor.b, mColor.a));
+  if (gfxPrefs::LayersDump()) {
+    printf_stderr("ColorLayer %p using bounds=%s, overflow=%s, transform=%s, rect=%s, clip=%s, mix-blend-mode=%s\n",
+                  this->GetLayer(),
+                  Stringify(relBounds).c_str(),
+                  Stringify(overflow).c_str(),
+                  Stringify(transform).c_str(),
+                  Stringify(rect).c_str(),
+                  Stringify(clip).c_str(),
+                  Stringify(mixBlendMode).c_str());
+  }
 
-  if (gfxPrefs::LayersDump()) printf_stderr("ColorLayer %p using %s as bounds, %s as overflow, %s for transform\n", this, Stringify(relBounds).c_str(), Stringify(overflow).c_str(), Stringify(transform).c_str());
+  WrBridge()->AddWebRenderCommand(
+      OpDPPushStackingContext(wr::ToWrRect(relBounds),
+                              wr::ToWrRect(overflow),
+                              mask,
+                              1.0f,
+                              GetAnimations(),
+                              transform,
+                              mixBlendMode,
+                              FrameMetrics::NULL_SCROLL_ID));
+  WrBridge()->AddWebRenderCommand(
+    OpDPPushRect(wr::ToWrRect(rect), wr::ToWrRect(clip), wr::ToWrColor(mColor)));
   WrBridge()->AddWebRenderCommand(OpDPPopStackingContext());
 }
 

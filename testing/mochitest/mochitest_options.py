@@ -425,13 +425,6 @@ class MochitestArguments(ArgumentContainer):
           "help": "Dump a DMD log after each test in the directory specified "
                   "by --dump-output-directory.",
           }],
-        [["--slowscript"],
-         {"action": "store_true",
-          "default": False,
-          "help": "Do not set the JS_DISABLE_SLOW_SCRIPT_SIGNALS env variable; "
-                  "when not set, recoverable but misleading SIGSEGV instances "
-                  "may occur in Ion/Odin JIT code.",
-          }],
         [["--screenshot-on-fail"],
          {"action": "store_true",
           "default": False,
@@ -531,6 +524,12 @@ class MochitestArguments(ArgumentContainer):
         [["--marionette-socket-timeout"],
          {"default": None,
           "help": "Timeout while waiting to receive a message from the marionette server.",
+          "suppress": True,
+          }],
+        [["--failure-pattern-file"],
+         {"default": None,
+          "dest": "failure_pattern_file",
+          "help": "File describes all failure patterns of the tests.",
           "suppress": True,
           }],
     ]

@@ -55,13 +55,6 @@ NextFrameSeekTask::Discard()
   mIsDiscarded = true;
 }
 
-bool
-NextFrameSeekTask::NeedToResetMDSM() const
-{
-  AssertOwnerThread();
-  return false;
-}
-
 int64_t
 NextFrameSeekTask::CalculateNewCurrentTime() const
 {
@@ -238,7 +231,7 @@ DiscardFrames(MediaQueue<MediaData>& aQueue, const Function& aCompare)
 }
 
 RefPtr<NextFrameSeekTask::SeekTaskPromise>
-NextFrameSeekTask::Seek(const media::TimeUnit&)
+NextFrameSeekTask::Seek()
 {
   AssertOwnerThread();
 

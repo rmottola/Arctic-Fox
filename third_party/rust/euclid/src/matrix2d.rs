@@ -11,7 +11,6 @@ use super::{UnknownUnit, Radians};
 use num::{One, Zero};
 use point::TypedPoint2D;
 use rect::TypedRect;
-use size::TypedSize2D;
 use std::ops::{Add, Mul, Div, Sub};
 use std::marker::PhantomData;
 use approxeq::ApproxEq;
@@ -100,15 +99,9 @@ impl<T: Copy, Src, Dst> TypedMatrix2D<T, Src, Dst> {
 }
 
 impl<T, Src, Dst> TypedMatrix2D<T, Src, Dst>
-where T: Copy + Clone +
-         Add<T, Output=T> +
-         Mul<T, Output=T> +
-         Div<T, Output=T> +
-         Sub<T, Output=T> +
-         Trig +
-         PartialOrd +
-         One + Zero  {
-
+where T: Copy +
+         PartialEq +
+         One + Zero {
     pub fn identity() -> TypedMatrix2D<T, Src, Dst> {
         let (_0, _1) = (Zero::zero(), One::one());
         TypedMatrix2D::row_major(
@@ -117,6 +110,24 @@ where T: Copy + Clone +
            _0, _0
         )
     }
+
+    // Intentional not public, because it checks for exact equivalence
+    // while most consumers will probably want some sort of approximate
+    // equivalence to deal with floating-point errors.
+    fn is_identity(&self) -> bool {
+        *self == TypedMatrix2D::identity()
+    }
+}
+
+impl<T, Src, Dst> TypedMatrix2D<T, Src, Dst>
+where T: Copy + Clone +
+         Add<T, Output=T> +
+         Mul<T, Output=T> +
+         Div<T, Output=T> +
+         Sub<T, Output=T> +
+         Trig +
+         PartialOrd +
+         One + Zero  {
 
     /// Returns the multiplication of the two matrices such that mat's transformation
     /// applies after self's transformation.
@@ -214,28 +225,12 @@ where T: Copy + Clone +
     /// matrix.
     #[inline]
     pub fn transform_rect(&self, rect: &TypedRect<T, Src>) -> TypedRect<T, Dst> {
-        let top_left = self.transform_point(&rect.origin);
-        let top_right = self.transform_point(&rect.top_right());
-        let bottom_left = self.transform_point(&rect.bottom_left());
-        let bottom_right = self.transform_point(&rect.bottom_right());
-        let (mut min_x, mut min_y) = (top_left.x, top_left.y);
-        let (mut max_x, mut max_y) = (min_x, min_y);
-        for point in &[top_right, bottom_left, bottom_right] {
-            if point.x < min_x {
-                min_x = point.x
-            }
-            if point.x > max_x {
-                max_x = point.x
-            }
-            if point.y < min_y {
-                min_y = point.y
-            }
-            if point.y > max_y {
-                max_y = point.y
-            }
-        }
-        TypedRect::new(TypedPoint2D::new(min_x, min_y),
-                       TypedSize2D::new(max_x - min_x, max_y - min_y))
+        TypedRect::from_points(&[
+            self.transform_point(&rect.origin),
+            self.transform_point(&rect.top_right()),
+            self.transform_point(&rect.bottom_left()),
+            self.transform_point(&rect.bottom_right()),
+        ])
     }
 
     /// Computes and returns the determinant of this matrix.
@@ -294,9 +289,16 @@ impl<T: ApproxEq<T>, Src, Dst> TypedMatrix2D<T, Src, Dst> {
     }
 }
 
-impl<T: Copy + fmt::Debug, Src, Dst> fmt::Debug for TypedMatrix2D<T, Src, Dst> {
+impl<T: Copy + fmt::Debug, Src, Dst> fmt::Debug for TypedMatrix2D<T, Src, Dst>
+where T: Copy + fmt::Debug +
+         PartialEq +
+         One + Zero {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.to_row_major_array().fmt(f)
+        if self.is_identity() {
+            write!(f, "[I]")
+        } else {
+            self.to_row_major_array().fmt(f)
+        }
     }
 }
 
@@ -417,5 +419,13 @@ mod test {
         use std::mem::size_of;
         assert_eq!(size_of::<Matrix2D<f32>>(), 6*size_of::<f32>());
         assert_eq!(size_of::<Matrix2D<f64>>(), 6*size_of::<f64>());
+    }
+
+    #[test]
+    pub fn test_is_identity() {
+        let m1 = Matrix2D::identity();
+        assert!(m1.is_identity());
+        let m2 = m1.post_translated(0.1, 0.0);
+        assert!(!m2.is_identity());
     }
 }

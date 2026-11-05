@@ -137,6 +137,7 @@ class mozilla::gl::SkiaGLGlue : public GenericAtomicRefCounted {
 #include "SoftwareVsyncSource.h"
 #include "nscore.h" // for NS_FREE_PERMANENT_DATA
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/dom/TouchEvent.h"
 #include "gfxVR.h"
 #include "VRManagerChild.h"
 #include "mozilla/gfx/GPUParent.h"
@@ -503,7 +504,6 @@ gfxPlatform::gfxPlatform()
   , mTilesInfoCollector(this, &gfxPlatform::GetTilesSupportInfo)
   , mCompositorBackend(layers::LayersBackend::LAYERS_NONE)
   , mScreenDepth(0)
-  , mDeviceCounter(0)
 {
     mAllowDownloadableFonts = UNINITIALIZED_VALUE;
     mFallbackUsesCmaps = UNINITIALIZED_VALUE;
@@ -764,7 +764,7 @@ gfxPlatform::Init()
     TexturePoolOGL::Init();
 #endif
 
-    Preferences::RegisterCallbackAndCall(RecordingPrefChanged, "gfx.2d.recording", nullptr);
+    Preferences::RegisterCallbackAndCall(RecordingPrefChanged, "gfx.2d.recording");
 
     CreateCMSOutputProfile();
 
@@ -835,6 +835,18 @@ gfxPlatform::InitMoz2DLogging()
     cfg.mMaxAllocSize = gfxPrefs::MaxAllocSize();
 
     gfx::Factory::Init(cfg);
+}
+
+/* static */ bool
+gfxPlatform::IsHeadless()
+{
+    static bool initialized = false;
+    static bool headless = false;
+    if (!initialized) {
+      initialized = true;
+      headless = PR_GetEnv("MOZ_HEADLESS");
+    }
+    return headless;
 }
 
 static bool sLayersIPCIsUp = false;
@@ -942,7 +954,7 @@ gfxPlatform::InitLayersIPC()
 
     if (XRE_IsParentProcess())
     {
-        if (gfxPrefs::WebRenderEnabled()) {
+        if (gfxVars::UseWebRender()) {
             wr::RenderThread::Start();
         }
         layers::CompositorThreadHolder::Start();
@@ -973,7 +985,7 @@ gfxPlatform::ShutdownLayersIPC()
 #endif // defined(MOZ_WIDGET_ANDROID)
         // This has to happen after shutting down the child protocols.
         layers::CompositorThreadHolder::Shutdown();
-        if (gfxPrefs::WebRenderEnabled()) {
+        if (gfxVars::UseWebRender()) {
             wr::RenderThread::ShutDown();
         }
     } else {
@@ -1430,11 +1442,9 @@ gfxPlatform::CreateDrawTargetForBackend(BackendType aBackend, const IntSize& aSi
     if (!surf || surf->CairoStatus()) {
       return nullptr;
     }
-
     return CreateDrawTargetForSurface(surf, aSize);
-  } else {
-    return Factory::CreateDrawTarget(aBackend, aSize, aFormat);
   }
+  return Factory::CreateDrawTarget(aBackend, aSize, aFormat);
 }
 
 already_AddRefed<DrawTarget>
@@ -2220,6 +2230,7 @@ gfxPlatform::InitAcceleration()
                                          nullptr,
                                          Preferences::ExactMatch);
     InitGPUProcessPrefs();
+    InitWebRenderConfig();
   }
 }
 
@@ -2229,11 +2240,6 @@ gfxPlatform::InitGPUProcessPrefs()
   // We want to hide this from about:support, so only set a default if the
   // pref is known to be true.
   if (!gfxPrefs::GPUProcessEnabled() && !gfxPrefs::GPUProcessForceEnabled()) {
-    return;
-  }
-
-  // XXX disable GPU proces when webrender is enabled for now.
-  if (gfxPrefs::WebRenderEnabled()) {
     return;
   }
 
@@ -2258,6 +2264,13 @@ gfxPlatform::InitGPUProcessPrefs()
     gpuProc.UserForceEnable("User force-enabled via pref");
   }
 
+  if (IsHeadless()) {
+    gpuProc.ForceDisable(
+      FeatureStatus::Blocked,
+      "Headless mode is enabled",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_HEADLESS_MODE"));
+    return;
+  }
   if (InSafeMode()) {
     gpuProc.ForceDisable(
       FeatureStatus::Blocked,
@@ -2304,11 +2317,56 @@ gfxPlatform::InitCompositorAccelerationPrefs()
     feature.UserForceEnable("Force-enabled by pref");
   }
 
-  // Safe mode trumps everything.
+  // Safe and headless modes override everything.
   if (InSafeMode()) {
     feature.ForceDisable(FeatureStatus::Blocked, "Acceleration blocked by safe-mode",
                          NS_LITERAL_CSTRING("FEATURE_FAILURE_COMP_SAFEMODE"));
   }
+  if (IsHeadless()) {
+    feature.ForceDisable(FeatureStatus::Blocked, "Acceleration blocked by headless mode",
+                         NS_LITERAL_CSTRING("FEATURE_FAILURE_COMP_HEADLESSMODE"));
+  }
+}
+
+void
+gfxPlatform::InitWebRenderConfig()
+{
+  FeatureState& featureWebRender = gfxConfig::GetFeature(Feature::WEBRENDER);
+
+  featureWebRender.EnableByDefault();
+
+  if (!Preferences::GetBool("gfx.webrender.enabled", false)) {
+    featureWebRender.UserDisable(
+      "User disabled WebRender",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_WEBRENDER_DISABLED"));
+  }
+
+  // WebRender relies on the GPU process when on Windows
+#ifdef XP_WIN
+  if (!gfxConfig::IsEnabled(Feature::GPU_PROCESS)) {
+    featureWebRender.ForceDisable(
+      FeatureStatus::Unavailable,
+      "GPU Process is disabled",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_GPU_PROCESS_DISABLED"));
+  }
+#endif
+
+  if (InSafeMode()) {
+    featureWebRender.ForceDisable(
+      FeatureStatus::Unavailable,
+      "Safe-mode is enabled",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_SAFE_MODE"));
+  }
+
+#ifndef MOZ_ENABLE_WEBRENDER
+  featureWebRender.ForceDisable(
+    FeatureStatus::Unavailable,
+    "Build doesn't include WebRender",
+    NS_LITERAL_CSTRING("FEATURE_FAILURE_NO_WEBRENDER"));
+#endif
+
+  // gfxFeature is not usable in the GPU process, so we use gfxVars to transmit this feature
+  gfxVars::SetUseWebRender(gfxConfig::IsEnabled(Feature::WEBRENDER));
 }
 
 bool
@@ -2475,12 +2533,6 @@ gfxPlatform::AsyncPanZoomEnabled()
   if (!BrowserTabsRemoteAutostart()) {
     return false;
   }
-#ifdef MOZ_ENABLE_WEBRENDER
-  // For webrender hacking we have a special pref to disable APZ even with e10s
-  if (!gfxPrefs::APZAllowWithWebRender()) {
-    return false;
-  }
-#endif // MOZ_ENABLE_WEBRENDER
 #endif
 #ifdef MOZ_WIDGET_ANDROID
   return true;
@@ -2546,6 +2598,18 @@ gfxPlatform::NotifyCompositorCreated(LayersBackend aBackend)
   }));
 }
 
+/* static */ void
+gfxPlatform::NotifyGPUProcessDisabled()
+{
+  if (gfxConfig::IsEnabled(Feature::WEBRENDER)) {
+    gfxConfig::GetFeature(Feature::WEBRENDER).ForceDisable(
+      FeatureStatus::Unavailable,
+      "GPU Process is disabled",
+      NS_LITERAL_CSTRING("FEATURE_FAILURE_GPU_PROCESS_DISABLED"));
+    gfxVars::SetUseWebRender(false);
+  }
+}
+
 void
 gfxPlatform::FetchAndImportContentDeviceData()
 {
@@ -2590,15 +2654,15 @@ gfxPlatform::ImportGPUDeviceData(const mozilla::gfx::GPUDeviceData& aData)
 }
 
 bool
+gfxPlatform::SupportsApzTouchInput() const
+{
+  return dom::TouchEvent::PrefEnabled(nullptr);
+}
+
+bool
 gfxPlatform::SupportsApzDragInput() const
 {
   return gfxPrefs::APZDragEnabled();
-}
-
-void
-gfxPlatform::BumpDeviceCounter()
-{
-  mDeviceCounter++;
 }
 
 void

@@ -6,8 +6,18 @@
 using namespace mozilla;
 using namespace mozilla::safebrowsing;
 
+namespace mozilla {
+namespace safebrowsing {
+    class Classifier;
+}
+}
+
 template<typename Function>
 void RunTestInNewThread(Function&& aFunction);
+
+// Synchronously apply updates by calling Classifier::AsyncApplyUpdates.
+nsresult SyncApplyUpdates(Classifier* aClassifier,
+                          nsTArray<TableUpdate*>* aUpdates);
 
 // Return nsIFile with root directory - NS_APP_USER_PROFILE_50_DIR
 // Sub-directories are passed in path argument.
@@ -24,3 +34,8 @@ void ApplyUpdate(TableUpdate* update);
 void PrefixArrayToPrefixStringMap(const nsTArray<nsCString>& prefixArray,
                                   PrefixStringMap& out);
 
+nsresult PrefixArrayToAddPrefixArrayV2(const nsTArray<nsCString>& prefixArray,
+                                       AddPrefixArray& out);
+
+// Generate a hash prefix from string
+nsCString GeneratePrefix(const nsCString& aFragment, uint8_t aLength);

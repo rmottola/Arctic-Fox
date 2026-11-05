@@ -11,10 +11,10 @@
 namespace mozilla {
 namespace image {
 
+
 #if defined(PR_LOGGING)
-static PRLogModuleInfo *gWEBPLog = PR_NewLogModule("WEBPDecoder");
-static PRLogModuleInfo *gWEBPDecoderAccountingLog =
-                        PR_NewLogModule("WEBPDecoderAccounting");
+static LazyLogModule gWEBPLog("WEBPDecoder");
+static LazyLogModule gWEBPDecoderAccountingLog("WEBPDecoderAccounting");
 #else
 #define gWEBPlog
 #define gWEBPDecoderAccountingLog

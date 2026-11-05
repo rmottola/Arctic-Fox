@@ -28,7 +28,7 @@ class ImageContainer;
 } // namespace layers
 
 class MediaByteBuffer;
-class SharedTrackInfo;
+class TrackInfoSharedPtr;
 
 // AlignedBuffer:
 // Memory allocations are fallibles. Methods return a boolean indicating if
@@ -66,7 +66,8 @@ public:
     , mLength(0)
     , mBuffer(nullptr)
     , mCapacity(0)
-  {}
+  {
+  }
 
   explicit AlignedBuffer(size_t aLength)
     : mData(nullptr)
@@ -90,7 +91,8 @@ public:
 
   AlignedBuffer(const AlignedBuffer& aOther)
     : AlignedBuffer(aOther.Data(), aOther.Length())
-  {}
+  {
+  }
 
   AlignedBuffer(AlignedBuffer&& aOther)
     : mData(aOther.mData)
@@ -220,6 +222,10 @@ private:
   // Returns false if memory couldn't be allocated.
   bool EnsureCapacity(size_t aLength)
   {
+    if (!aLength) {
+      // No need to allocate a buffer yet.
+      return true;
+    }
     const CheckedInt<size_t> sizeNeeded =
       CheckedInt<size_t>(aLength) * sizeof(Type) + AlignmentPaddingSize();
 
@@ -266,12 +272,14 @@ typedef AlignedBuffer<int16_t> AlignedShortBuffer;
 typedef AlignedBuffer<AudioDataValue> AlignedAudioBuffer;
 
 // Container that holds media samples.
-class MediaData {
+class MediaData
+{
 public:
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaData)
 
-  enum Type {
+  enum Type
+  {
     AUDIO_DATA = 0,
     VIDEO_DATA,
     RAW_DATA,
@@ -290,7 +298,8 @@ public:
     , mDuration(aDuration)
     , mFrames(aFrames)
     , mKeyframe(false)
-  {}
+  {
+  }
 
   // Type of contained data.
   const Type mType;
@@ -344,25 +353,29 @@ protected:
     , mDuration(0)
     , mFrames(aFrames)
     , mKeyframe(false)
-  {}
+  {
+  }
 
-  virtual ~MediaData() {}
+  virtual ~MediaData() { }
 
 };
 
 // NullData is for decoder generating a sample which doesn't need to be
 // rendered.
-class NullData : public MediaData {
+class NullData : public MediaData
+{
 public:
   NullData(int64_t aOffset, int64_t aTime, int64_t aDuration)
     : MediaData(NULL_DATA, aOffset, aTime, aDuration, 0)
-  {}
+  {
+  }
 
   static const Type sType = NULL_DATA;
 };
 
 // Holds chunk a decoded audio frames.
-class AudioData : public MediaData {
+class AudioData : public MediaData
+{
 public:
 
   AudioData(int64_t aOffset,
@@ -375,7 +388,9 @@ public:
     : MediaData(sType, aOffset, aTime, aDuration, aFrames)
     , mChannels(aChannels)
     , mRate(aRate)
-    , mAudioData(Move(aData)) {}
+    , mAudioData(Move(aData))
+  {
+  }
 
   static const Type sType = AUDIO_DATA;
   static const char* sTypeName;
@@ -407,7 +422,7 @@ public:
   AlignedAudioBuffer mAudioData;
 
 protected:
-  ~AudioData() {}
+  ~AudioData() { }
 };
 
 namespace layers {
@@ -418,7 +433,8 @@ class PlanarYCbCrImage;
 class VideoInfo;
 
 // Holds a decoded video frame, in YCbCr format. These are queued in the reader.
-class VideoData : public MediaData {
+class VideoData : public MediaData
+{
 public:
   typedef gfx::IntRect IntRect;
   typedef gfx::IntSize IntSize;
@@ -433,8 +449,10 @@ public:
   //   0 = Y
   //   1 = Cb
   //   2 = Cr
-  struct YCbCrBuffer {
-    struct Plane {
+  struct YCbCrBuffer
+  {
+    struct Plane
+    {
       uint8_t* mData;
       uint32_t mWidth;
       uint32_t mHeight;
@@ -447,10 +465,11 @@ public:
     YUVColorSpace mYUVColorSpace = YUVColorSpace::BT601;
   };
 
-  class Listener {
+  class Listener
+  {
   public:
     virtual void OnSentToCompositor() = 0;
-    virtual ~Listener() {}
+    virtual ~Listener() { }
   };
 
   // Constructs a VideoData object. If aImage is nullptr, creates a new Image
@@ -463,64 +482,55 @@ public:
   // problem with the input data (e.g. negative stride).
 
 
-  // Creates a new VideoData containing a deep copy of aBuffer. May use aContainer
-  // to allocate an Image to hold the copied data.
-  static already_AddRefed<VideoData> CreateAndCopyData(const VideoInfo& aInfo,
-                                                       ImageContainer* aContainer,
-                                                       int64_t aOffset,
-                                                       int64_t aTime,
-                                                       int64_t aDuration,
-                                                       const YCbCrBuffer &aBuffer,
-                                                       bool aKeyframe,
-                                                       int64_t aTimecode,
-                                                       const IntRect& aPicture);
+  // Creates a new VideoData containing a deep copy of aBuffer. May use
+  // aContainer to allocate an Image to hold the copied data.
+  static already_AddRefed<VideoData> CreateAndCopyData(
+    const VideoInfo& aInfo,
+    ImageContainer* aContainer,
+    int64_t aOffset,
+    int64_t aTime,
+    int64_t aDuration,
+    const YCbCrBuffer& aBuffer,
+    bool aKeyframe,
+    int64_t aTimecode,
+    const IntRect& aPicture);
 
-  static already_AddRefed<VideoData> CreateAndCopyIntoTextureClient(const VideoInfo& aInfo,
-                                                                    int64_t aOffset,
-                                                                    int64_t aTime,
-                                                                    int64_t aDuration,
-                                                                    layers::TextureClient* aBuffer,
-                                                                    bool aKeyframe,
-                                                                    int64_t aTimecode,
-                                                                    const IntRect& aPicture);
+  static already_AddRefed<VideoData> CreateAndCopyData(
+    const VideoInfo& aInfo,
+    ImageContainer* aContainer,
+    int64_t aOffset,
+    int64_t aTime,
+    int64_t aDuration,
+    const YCbCrBuffer& aBuffer,
+    const YCbCrBuffer::Plane& aAlphaPlane,
+    bool aKeyframe,
+    int64_t aTimecode,
+    const IntRect& aPicture);
 
-  static already_AddRefed<VideoData> CreateFromImage(const VideoInfo& aInfo,
-                                                     int64_t aOffset,
-                                                     int64_t aTime,
-                                                     int64_t aDuration,
-                                                     const RefPtr<Image>& aImage,
-                                                     bool aKeyframe,
-                                                     int64_t aTimecode,
-                                                     const IntRect& aPicture);
+  static already_AddRefed<VideoData> CreateAndCopyIntoTextureClient(
+    const VideoInfo& aInfo,
+    int64_t aOffset,
+    int64_t aTime,
+    int64_t aDuration,
+    layers::TextureClient* aBuffer,
+    bool aKeyframe,
+    int64_t aTimecode,
+    const IntRect& aPicture);
 
-  // Creates a new VideoData identical to aOther, but with a different
-  // specified duration. All data from aOther is copied into the new
-  // VideoData. The new VideoData's mImage field holds a reference to
-  // aOther's mImage, i.e. the Image is not copied. This function is useful
-  // in reader backends that can't determine the duration of a VideoData
-  // until the next frame is decoded, i.e. it's a way to change the const
-  // duration field on a VideoData.
-  static already_AddRefed<VideoData> ShallowCopyUpdateDuration(const VideoData* aOther,
-                                                               int64_t aDuration);
-
-  // Creates a new VideoData identical to aOther, but with a different
-  // specified timestamp. All data from aOther is copied into the new
-  // VideoData, as ShallowCopyUpdateDuration() does.
-  static already_AddRefed<VideoData> ShallowCopyUpdateTimestamp(const VideoData* aOther,
-                                                                int64_t aTimestamp);
-
-  // Creates a new VideoData identical to aOther, but with a different
-  // specified timestamp and duration. All data from aOther is copied
-  // into the new VideoData, as ShallowCopyUpdateDuration() does.
-  static already_AddRefed<VideoData>
-  ShallowCopyUpdateTimestampAndDuration(const VideoData* aOther, int64_t aTimestamp,
-                                        int64_t aDuration);
+  static already_AddRefed<VideoData> CreateFromImage(
+    const IntSize& aDisplay,
+    int64_t aOffset,
+    int64_t aTime,
+    int64_t aDuration,
+    const RefPtr<Image>& aImage,
+    bool aKeyframe,
+    int64_t aTimecode);
 
   // Initialize PlanarYCbCrImage. Only When aCopyData is true,
   // video data is copied to PlanarYCbCrImage.
   static bool SetVideoDataToImage(PlanarYCbCrImage* aVideoImage,
                                   const VideoInfo& aInfo,
-                                  const YCbCrBuffer &aBuffer,
+                                  const YCbCrBuffer& aBuffer,
                                   const IntRect& aPicture,
                                   bool aCopyData);
 
@@ -548,6 +558,9 @@ public:
   void MarkSentToCompositor();
   bool IsSentToCompositor() { return mSentToCompositor; }
 
+  void UpdateDuration(int64_t aDuration);
+  void UpdateTimestamp(int64_t aTimestamp);
+
 protected:
   ~VideoData();
 
@@ -558,7 +571,7 @@ protected:
 class CryptoTrack
 {
 public:
-  CryptoTrack() : mValid(false), mMode(0), mIVSize(0) {}
+  CryptoTrack() : mValid(false), mMode(0), mIVSize(0) { }
   bool mValid;
   int32_t mMode;
   int32_t mIVSize;
@@ -625,7 +638,8 @@ private:
   MediaRawData* mTarget;
 };
 
-class MediaRawData : public MediaData {
+class MediaRawData : public MediaData
+{
 public:
   MediaRawData();
   MediaRawData(const uint8_t* aData, size_t aSize);
@@ -657,7 +671,7 @@ public:
   // trimmed.
   uint32_t mDiscardPadding = 0;
 
-  RefPtr<SharedTrackInfo> mTrackInfo;
+  RefPtr<TrackInfoSharedPtr> mTrackInfo;
 
   // Return a deep copy or nullptr if out of memory.
   virtual already_AddRefed<MediaRawData> Clone() const;
@@ -678,13 +692,14 @@ private:
 };
 
   // MediaByteBuffer is a ref counted infallible TArray.
-class MediaByteBuffer : public nsTArray<uint8_t> {
+class MediaByteBuffer : public nsTArray<uint8_t>
+{
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaByteBuffer);
   MediaByteBuffer() = default;
-  explicit MediaByteBuffer(size_t aCapacity) : nsTArray<uint8_t>(aCapacity) {}
+  explicit MediaByteBuffer(size_t aCapacity) : nsTArray<uint8_t>(aCapacity) { }
 
 private:
-  ~MediaByteBuffer() {}
+  ~MediaByteBuffer() { }
 };
 
 } // namespace mozilla

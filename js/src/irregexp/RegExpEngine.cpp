@@ -33,6 +33,7 @@
 #include "irregexp/NativeRegExpMacroAssembler.h"
 #include "irregexp/RegExpCharacters.h"
 #include "irregexp/RegExpMacroAssembler.h"
+#include "jit/ExecutableAllocator.h"
 #include "jit/JitCommon.h"
 
 #include "irregexp/RegExpCharacters-inl.h"
@@ -1219,7 +1220,10 @@ LoopChoiceNode::FilterASCII(int depth, bool ignore_case, bool unicode)
 void
 Analysis::EnsureAnalyzed(RegExpNode* that)
 {
-    JS_CHECK_RECURSION(cx, failASCII("Stack overflow"); return);
+    if (!CheckRecursionLimit(cx)) {
+        failASCII("Stack overflow");
+        return;
+    }
 
     if (that->info()->been_analyzed || that->info()->being_analyzed)
         return;
@@ -1696,7 +1700,7 @@ IsNativeRegExpEnabled(JSContext* cx)
 }
 
 RegExpCode
-irregexp::CompilePattern(JSContext* cx, RegExpShared* shared, RegExpCompileData* data,
+irregexp::CompilePattern(JSContext* cx, HandleRegExpShared shared, RegExpCompileData* data,
                          HandleLinearString sample, bool is_global, bool ignore_case,
                          bool is_ascii, bool match_only, bool force_bytecode, bool sticky,
                          bool unicode)
@@ -1777,13 +1781,17 @@ irregexp::CompilePattern(JSContext* cx, RegExpShared* shared, RegExpCompileData*
     Maybe<InterpretedRegExpMacroAssembler> interpreted_assembler;
 
     RegExpMacroAssembler* assembler;
-    if (IsNativeRegExpEnabled(cx) && !force_bytecode) {
+    if (IsNativeRegExpEnabled(cx) &&
+        !force_bytecode &&
+        jit::CanLikelyAllocateMoreExecutableMemory() &&
+        shared->getSource()->length() < 32 * 1024)
+    {
         NativeRegExpMacroAssembler::Mode mode =
             is_ascii ? NativeRegExpMacroAssembler::ASCII
                      : NativeRegExpMacroAssembler::CHAR16;
 
         ctx.emplace(cx, (jit::TempAllocator*) nullptr);
-        native_assembler.emplace(&alloc, shared, cx->runtime(), mode, (data->capture_count + 1) * 2);
+        native_assembler.emplace(cx, &alloc, shared, mode, (data->capture_count + 1) * 2);
         assembler = native_assembler.ptr();
     } else {
         interpreted_assembler.emplace(&alloc, shared, (data->capture_count + 1) * 2);
@@ -2473,7 +2481,11 @@ BoyerMooreLookahead::EmitSkipInstructions(RegExpMacroAssembler* masm)
 bool
 BoyerMooreLookahead::CheckOverRecursed()
 {
-    JS_CHECK_RECURSION(compiler()->cx(), compiler()->SetRegExpTooBig(); return false);
+    if (!CheckRecursionLimit(compiler()->cx())) {
+        compiler()->SetRegExpTooBig();
+        return false;
+    }
+
     return true;
 }
 

@@ -19,13 +19,14 @@
 #include "nsIEncodedChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIForcePendingChannel.h"
-#include "mozilla/ipc/InputStreamUtils.h"
+#include "mozilla/ipc/IPCStreamUtils.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "mozilla/Unused.h"
 #include "SerializedLoadContext.h"
 #include "nsIContentPolicy.h"
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/LoadInfo.h"
+#include "mozilla/dom/ContentParent.h"
 
 using namespace mozilla::dom;
 using namespace mozilla::ipc;
@@ -117,7 +118,7 @@ bool
 FTPChannelParent::DoAsyncOpen(const URIParams& aURI,
                               const uint64_t& aStartPos,
                               const nsCString& aEntityID,
-                              const OptionalInputStreamParams& aUploadStream,
+                              const OptionalIPCStream& aUploadStream,
                               const OptionalLoadInfoArgs& aLoadInfoArgs)
 {
   nsresult rv;
@@ -170,8 +171,7 @@ FTPChannelParent::DoAsyncOpen(const URIParams& aURI,
   if (NS_FAILED(rv))
     return SendFailedAsyncOpen(rv);
 
-  nsTArray<mozilla::ipc::FileDescriptor> fds;
-  nsCOMPtr<nsIInputStream> upload = DeserializeInputStream(aUploadStream, fds);
+  nsCOMPtr<nsIInputStream> upload = DeserializeIPCStream(aUploadStream);
   if (upload) {
     // contentType and contentLength are ignored
     rv = ftpChan->SetUploadStream(upload, EmptyCString(), 0);
@@ -208,7 +208,7 @@ FTPChannelParent::ConnectChannel(const uint32_t& channelId)
   if (NS_SUCCEEDED(rv))
     mChannel = channel;
 
-  LOG(("  found channel %p, rv=%08x", mChannel.get(), rv));
+  LOG(("  found channel %p, rv=%08" PRIx32, mChannel.get(), static_cast<uint32_t>(rv)));
 
   return true;
 }
@@ -458,6 +458,13 @@ FTPChannelParent::OnStartRequest(nsIRequest* aRequest, nsISupports* aContext)
   MOZ_ASSERT(chan);
   NS_ENSURE_TRUE(chan, NS_ERROR_UNEXPECTED);
 
+  // Send down any permissions which are relevant to this URL if we are
+  // performing a document load.
+  PContentParent* pcp = Manager()->Manager();
+  DebugOnly<nsresult> rv =
+    static_cast<ContentParent*>(pcp)->TransmitPermissionsFor(chan);
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
+
   int64_t contentLength;
   chan->GetContentLength(&contentLength);
   nsCString contentType;
@@ -498,8 +505,8 @@ FTPChannelParent::OnStopRequest(nsIRequest* aRequest,
                                 nsISupports* aContext,
                                 nsresult aStatusCode)
 {
-  LOG(("FTPChannelParent::OnStopRequest: [this=%p status=%ul]\n",
-       this, aStatusCode));
+  LOG(("FTPChannelParent::OnStopRequest: [this=%p status=%" PRIu32 "]\n",
+       this, static_cast<uint32_t>(aStatusCode)));
 
   if (mDivertingFromChild) {
     MOZ_RELEASE_ASSERT(mDivertToListener,

@@ -27,6 +27,7 @@
 #include "mozilla/IOInterposer.h"
 #include "mozilla/Services.h"
 #include "mozilla/Tokenizer.h"
+#include "GeckoProfiler.h"
 
 // How long we collect write oprerations
 // before they are flushed to the database
@@ -37,7 +38,7 @@
 #define MAX_WAL_SIZE_BYTES 512 * 1024
 
 // Current version of the database schema
-#define CURRENT_SCHEMA_VERSION 1
+#define CURRENT_SCHEMA_VERSION 2
 
 namespace mozilla {
 namespace dom {
@@ -339,6 +340,7 @@ StorageDBThread::SetDefaultPriority()
 void
 StorageDBThread::ThreadFunc(void* aArg)
 {
+  AutoProfilerRegister registerThread("localStorage DB");
   PR_SetCurrentThreadName("localStorage DB");
   mozilla::IOInterposer::RegisterCurrentThread();
 

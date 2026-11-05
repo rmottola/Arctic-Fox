@@ -25,6 +25,7 @@
 #include "vm/StringBuffer.h"
 #include "wasm/WasmAST.h"
 #include "wasm/WasmBinaryToAST.h"
+#include "wasm/WasmDebug.h"
 #include "wasm/WasmTextUtils.h"
 #include "wasm/WasmTypes.h"
 
@@ -101,11 +102,10 @@ RenderInt64(WasmRenderContext& c, int64_t num)
 }
 
 static bool
-RenderDouble(WasmRenderContext& c, RawF64 num)
+RenderDouble(WasmRenderContext& c, double d)
 {
-    double d = num.fp();
     if (IsNaN(d))
-        return RenderNaN(c.sb(), num);
+        return RenderNaN(c.sb(), d);
     if (IsNegativeZero(d))
         return c.buffer.append("-0");
     if (IsInfinite(d)) {
@@ -117,12 +117,11 @@ RenderDouble(WasmRenderContext& c, RawF64 num)
 }
 
 static bool
-RenderFloat32(WasmRenderContext& c, RawF32 num)
+RenderFloat32(WasmRenderContext& c, float f)
 {
-    float f = num.fp();
     if (IsNaN(f))
-        return RenderNaN(c.sb(), num);
-    return RenderDouble(c, RawF64(double(f)));
+        return RenderNaN(c.sb(), f);
+    return RenderDouble(c, double(f));
 }
 
 static bool
@@ -1379,20 +1378,22 @@ RenderGlobalSection(WasmRenderContext& c, const AstModule& module)
 }
 
 static bool
-RenderResizableMemory(WasmRenderContext& c, Limits memory)
+RenderResizableMemory(WasmRenderContext& c, const Limits& memory)
 {
     if (!c.buffer.append("(memory "))
         return false;
 
-    MOZ_ASSERT(memory.initial % PageSize == 0);
-    memory.initial /= PageSize;
+    Limits resizedMemory = memory;
 
-    if (memory.maximum) {
-        MOZ_ASSERT(*memory.maximum % PageSize == 0);
-        *memory.maximum /= PageSize;
+    MOZ_ASSERT(resizedMemory.initial % PageSize == 0);
+    resizedMemory.initial /= PageSize;
+
+    if (resizedMemory.maximum) {
+        MOZ_ASSERT(*resizedMemory.maximum % PageSize == 0);
+        *resizedMemory.maximum /= PageSize;
     }
 
-    if (!RenderLimits(c, memory))
+    if (!RenderLimits(c, resizedMemory))
         return false;
 
     return c.buffer.append(")");
@@ -1531,9 +1532,6 @@ RenderFunctionBody(WasmRenderContext& c, AstFunc& func, const AstModule::SigVect
 {
     const AstSig* sig = sigs[func.sig().index()];
 
-    size_t startExprIndex = c.maybeSourceMap ? c.maybeSourceMap->exprlocs().length() : 0;
-    uint32_t startLineno = c.buffer.lineno();
-
     uint32_t argsNum = sig->args().length();
     uint32_t localsNum = func.vars().length();
     if (localsNum > 0) {
@@ -1566,12 +1564,8 @@ RenderFunctionBody(WasmRenderContext& c, AstFunc& func, const AstModule::SigVect
             return false;
     }
 
-    size_t endExprIndex = c.maybeSourceMap ? c.maybeSourceMap->exprlocs().length() : 0;
-    uint32_t endLineno = c.buffer.lineno();
-
     if (c.maybeSourceMap) {
-        if (!c.maybeSourceMap->functionlocs().emplaceBack(startExprIndex, endExprIndex,
-                                                          startLineno, endLineno))
+        if (!c.maybeSourceMap->exprlocs().emplaceBack(c.buffer.lineno(), c.buffer.column(), func.endOffset()))
             return false;
     }
 
@@ -1746,7 +1740,8 @@ RenderModule(WasmRenderContext& c, AstModule& module)
 // Top-level functions
 
 bool
-wasm::BinaryToText(JSContext* cx, const uint8_t* bytes, size_t length, StringBuffer& buffer, GeneratedSourceMap* sourceMap)
+wasm::BinaryToText(JSContext* cx, const uint8_t* bytes, size_t length, StringBuffer& buffer,
+                   GeneratedSourceMap* sourceMap /* = nullptr */)
 {
     LifoAlloc lifo(AST_LIFO_DEFAULT_CHUNK_SIZE);
 

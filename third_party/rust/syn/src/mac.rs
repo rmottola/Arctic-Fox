@@ -6,7 +6,7 @@ use super::*;
 ///
 /// NB: the additional ident for a `macro_rules`-style macro is actually
 /// stored in the enclosing item. Oog.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Mac {
     pub path: Path,
     pub tts: Vec<TokenTree>,
@@ -24,7 +24,7 @@ pub struct Mac {
 ///
 /// The RHS of an MBE macro is the only place `SubstNt`s are substituted.
 /// Nothing special happens to misnamed or misplaced `SubstNt`s.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum TokenTree {
     /// A single token
     Token(Token),
@@ -32,7 +32,7 @@ pub enum TokenTree {
     Delimited(Delimited),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Delimited {
     /// The type of delimiter
     pub delim: DelimToken,
@@ -40,7 +40,7 @@ pub struct Delimited {
     pub tts: Vec<TokenTree>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Token {
     // Expression-operator symbols.
     Eq,
@@ -84,7 +84,7 @@ pub enum Token {
     DocComment(String),
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum BinOpToken {
     Plus,
     Minus,
@@ -99,7 +99,7 @@ pub enum BinOpToken {
 }
 
 /// A delimiter token
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum DelimToken {
     /// A round parenthesis: `(` or `)`
     Paren,
@@ -114,16 +114,17 @@ pub mod parsing {
     use super::*;
     use Lifetime;
     use generics::parsing::lifetime;
-    use ident::parsing::{ident, word};
+    use ident::parsing::word;
     use lit::parsing::lit;
-    use space::{block_comment, whitespace};
+    use synom::space::{block_comment, whitespace};
+    use ty::parsing::path;
 
     named!(pub mac -> Mac, do_parse!(
-        name: ident >>
+        what: path >>
         punct!("!") >>
         body: delimited >>
         (Mac {
-            path: name.into(),
+            path: what,
             tts: vec![TokenTree::Delimited(body)],
         })
     ));
@@ -150,7 +151,7 @@ pub mod parsing {
         ) => { |tts| Delimited { delim: DelimToken::Brace, tts: tts } }
     ));
 
-    named!(token_tree -> TokenTree, alt!(
+    named!(pub token_tree -> TokenTree, alt!(
         map!(token, TokenTree::Token)
         |
         map!(delimited, TokenTree::Delimited)
@@ -282,7 +283,7 @@ pub mod parsing {
         |
         do_parse!(
             punct!("///") >>
-            not!(peek!(tag!("/"))) >>
+            not!(tag!("/")) >>
             content: take_until!("\n") >>
             (format!("///{}", content))
         )

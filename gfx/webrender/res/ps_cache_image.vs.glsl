@@ -11,8 +11,9 @@ void main(void) {
 
     VertexInfo vi = write_vertex(prim.local_rect,
                                  prim.local_clip_rect,
+                                 prim.z,
                                  prim.layer,
-                                 prim.tile);
+                                 prim.task);
 
     RenderTaskData child_task = fetch_render_task(prim.user_data.x);
     vUv.z = child_task.data1.x;
@@ -21,7 +22,7 @@ void main(void) {
     vec2 uv0 = child_task.data0.xy / texture_size;
     vec2 uv1 = (child_task.data0.xy + child_task.data0.zw) / texture_size;
 
-    vec2 f = (vi.local_clamped_pos - prim.local_rect.xy) / prim.local_rect.zw;
+    vec2 f = (vi.local_pos - prim.local_rect.p0) / prim.local_rect.size;
 
     vUv.xy = mix(uv0, uv1, f);
 }

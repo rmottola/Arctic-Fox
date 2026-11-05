@@ -9,9 +9,10 @@
 #include <new>
 #include <stdint.h>
 
-#include "mozilla/Alignment.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Move.h"
+#include "mozilla/OperatorNewExtensions.h"
+#include "mozilla/TemplateLib.h"
 #include "mozilla/TypeTraits.h"
 
 #ifndef mozilla_Variant_h
@@ -23,6 +24,22 @@ template<typename... Ts>
 class Variant;
 
 namespace detail {
+
+// Nth<N, types...>::Type is the Nth type (0-based) in the list of types Ts.
+template<size_t N, typename... Ts>
+struct Nth;
+
+template<typename T, typename... Ts>
+struct Nth<0, T, Ts...>
+{
+  using Type = T;
+};
+
+template<size_t N, typename T, typename... Ts>
+struct Nth<N, T, Ts...>
+{
+  using Type = typename Nth<N - 1, Ts...>::Type;
+};
 
 template <typename...>
 struct FirstTypeIsInRest;
@@ -50,22 +67,6 @@ struct TypesAreDistinct<First, Rest...>
   static constexpr bool value =
     !FirstTypeIsInRest<First, Rest...>::value &&
     TypesAreDistinct<Rest...>::value;
-};
-
-// MaxSizeOf computes the maximum sizeof(T) for each T in Ts.
-
-template<typename T, typename... Ts>
-struct MaxSizeOf
-{
-  static const size_t size = sizeof(T) > MaxSizeOf<Ts...>::size
-    ? sizeof(T)
-    : MaxSizeOf<Ts...>::size;
-};
-
-template<typename T>
-struct MaxSizeOf<T>
-{
-  static const size_t size = sizeof(T);
 };
 
 // The `IsVariant` helper is used in conjunction with static_assert and
@@ -195,31 +196,31 @@ struct VariantImplementation<Tag, N, T>
 
   template<typename Variant>
   static void copyConstruct(void* aLhs, const Variant& aRhs) {
-    new (aLhs) T(aRhs.template as<T>());
+    ::new (KnownNotNull, aLhs) T(aRhs.template as<N>());
   }
 
   template<typename Variant>
   static void moveConstruct(void* aLhs, Variant&& aRhs) {
-    new (aLhs) T(aRhs.template extract<T>());
+    ::new (KnownNotNull, aLhs) T(aRhs.template extract<N>());
   }
 
   template<typename Variant>
   static void destroy(Variant& aV) {
-    aV.template as<T>().~T();
+    aV.template as<N>().~T();
   }
 
   template<typename Variant>
   static bool
   equal(const Variant& aLhs, const Variant& aRhs) {
-      return aLhs.template as<T>() == aRhs.template as<T>();
+      return aLhs.template as<N>() == aRhs.template as<N>();
   }
 
   template<typename Matcher, typename ConcreteVariant>
   static auto
   match(Matcher&& aMatcher, ConcreteVariant& aV)
-    -> decltype(aMatcher.match(aV.template as<T>()))
+    -> decltype(aMatcher.match(aV.template as<N>()))
   {
-    return aMatcher.match(aV.template as<T>());
+    return aMatcher.match(aV.template as<N>());
   }
 };
 
@@ -237,8 +238,8 @@ struct VariantImplementation<Tag, N, T, Ts...>
 
   template<typename Variant>
   static void copyConstruct(void* aLhs, const Variant& aRhs) {
-    if (aRhs.template is<T>()) {
-      new (aLhs) T(aRhs.template as<T>());
+    if (aRhs.template is<N>()) {
+      ::new (KnownNotNull, aLhs) T(aRhs.template as<N>());
     } else {
       Next::copyConstruct(aLhs, aRhs);
     }
@@ -246,17 +247,17 @@ struct VariantImplementation<Tag, N, T, Ts...>
 
   template<typename Variant>
   static void moveConstruct(void* aLhs, Variant&& aRhs) {
-    if (aRhs.template is<T>()) {
-      new (aLhs) T(aRhs.template extract<T>());
+    if (aRhs.template is<N>()) {
+      ::new (KnownNotNull, aLhs) T(aRhs.template extract<N>());
     } else {
-      Next::moveConstruct(aLhs, aRhs);
+      Next::moveConstruct(aLhs, Move(aRhs));
     }
   }
 
   template<typename Variant>
   static void destroy(Variant& aV) {
-    if (aV.template is<T>()) {
-      aV.template as<T>().~T();
+    if (aV.template is<N>()) {
+      aV.template as<N>().~T();
     } else {
       Next::destroy(aV);
     }
@@ -264,9 +265,9 @@ struct VariantImplementation<Tag, N, T, Ts...>
 
   template<typename Variant>
   static bool equal(const Variant& aLhs, const Variant& aRhs) {
-    if (aLhs.template is<T>()) {
-      MOZ_ASSERT(aRhs.template is<T>());
-      return aLhs.template as<T>() == aRhs.template as<T>();
+    if (aLhs.template is<N>()) {
+      MOZ_ASSERT(aRhs.template is<N>());
+      return aLhs.template as<N>() == aRhs.template as<N>();
     } else {
       return Next::equal(aLhs, aRhs);
     }
@@ -275,10 +276,10 @@ struct VariantImplementation<Tag, N, T, Ts...>
   template<typename Matcher, typename ConcreteVariant>
   static auto
   match(Matcher&& aMatcher, ConcreteVariant& aV)
-    -> decltype(aMatcher.match(aV.template as<T>()))
+    -> decltype(aMatcher.match(aV.template as<N>()))
   {
-    if (aV.template is<T>()) {
-      return aMatcher.match(aV.template as<T>());
+    if (aV.template is<N>()) {
+      return aMatcher.match(aV.template as<N>());
     } else {
       // If you're seeing compilation errors here like "no matching
       // function for call to 'match'" then that means that the
@@ -364,12 +365,15 @@ struct AsVariantTemporary
  *     Variant<char, uint32_t> v1 = Foo();  // v1 holds char('x').
  *
  * All access to the contained value goes through type-safe accessors.
+ * Either the stored type, or the type index may be provided.
  *
  *     void
  *     Foo(Variant<A, B, C> v)
  *     {
  *       if (v.is<A>()) {
  *         A& ref = v.as<A>();
+ *         ...
+ *       } else (v.is<1>()) { // Same as v.is<B> in this case.
  *         ...
  *       } else {
  *         ...
@@ -397,8 +401,8 @@ struct AsVariantTemporary
  *     auto ptr = v.extract<UniquePtr<A>>();
  *
  * Finally, you can exhaustively match on the contained variant and branch into
- * different code paths depending which type is contained. This is preferred to
- * manually checking every variant type T with is<T>() because it provides
+ * different code paths depending on which type is contained. This is preferred
+ * to manually checking every variant type T with is<T>() because it provides
  * compile-time checking that you handled every type, rather than runtime
  * assertion failures.
  *
@@ -452,24 +456,42 @@ struct AsVariantTemporary
  *
  *       ...
  *     };
+ *
+ * Because Variant must be aligned suitable to hold any value stored within it,
+ * and because |alignas| requirements don't affect platform ABI with respect to
+ * how parameters are laid out in memory, Variant can't be used as the type of a
+ * function parameter.  Pass Variant to functions by pointer or reference
+ * instead.
  */
 template<typename... Ts>
-class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS Variant
+class MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS MOZ_NON_PARAM Variant
 {
-  static_assert(detail::TypesAreDistinct<Ts...>::value, "Variant with duplicate types is not supported");
+  static_assert(detail::TypesAreDistinct<Ts...>::value,
+                "Variant with duplicate types is not supported");
+
   using Tag = typename detail::VariantTag<Ts...>::Type;
   using Impl = detail::VariantImplementation<Tag, 0, Ts...>;
-  using RawData = AlignedStorage<detail::MaxSizeOf<Ts...>::size>;
+
+  static constexpr size_t RawDataAlignment = tl::Max<alignof(Ts)...>::value;
+  static constexpr size_t RawDataSize = tl::Max<sizeof(Ts)...>::value;
 
   // Raw storage for the contained variant value.
-  RawData raw;
+  alignas(RawDataAlignment) unsigned char rawData[RawDataSize];
 
   // Each type is given a unique tag value that lets us keep track of the
   // contained variant value's type.
   Tag tag;
 
+  // Some versions of GCC treat it as a -Wstrict-aliasing violation (ergo a
+  // -Werror compile error) to reinterpret_cast<> |rawData| to |T*|, even
+  // through |void*|.  Placing the latter cast in these separate functions
+  // breaks the chain such that affected GCC versions no longer warn/error.
   void* ptr() {
-    return reinterpret_cast<void*>(&raw);
+    return rawData;
+  }
+
+  const void* ptr() const {
+    return rawData;
   }
 
 public:
@@ -483,7 +505,7 @@ public:
   explicit Variant(RefT&& aT)
     : tag(Impl::template tag<T>())
   {
-    new (ptr()) T(Forward<RefT>(aT));
+    ::new (KnownNotNull, ptr()) T(Forward<RefT>(aT));
   }
 
   /**
@@ -496,7 +518,7 @@ public:
   MOZ_IMPLICIT Variant(detail::AsVariantTemporary<RefT>&& aValue)
     : tag(Impl::template tag<T>())
   {
-    new (ptr()) T(Move(aValue.mValue));
+    ::new (KnownNotNull, ptr()) T(Move(aValue.mValue));
   }
 
   /** Copy construction. */
@@ -517,7 +539,7 @@ public:
   Variant& operator=(const Variant& aRhs) {
     MOZ_ASSERT(&aRhs != this, "self-assign disallowed");
     this->~Variant();
-    new (this) Variant(aRhs);
+    ::new (KnownNotNull, this) Variant(aRhs);
     return *this;
   }
 
@@ -525,16 +547,16 @@ public:
   Variant& operator=(Variant&& aRhs) {
     MOZ_ASSERT(&aRhs != this, "self-assign disallowed");
     this->~Variant();
-    new (this) Variant(Move(aRhs));
+    ::new (KnownNotNull, this) Variant(Move(aRhs));
     return *this;
   }
 
   /** Move assignment from AsVariant(). */
-  template <typename T>
+  template<typename T>
   Variant& operator=(detail::AsVariantTemporary<T>&& aValue)
   {
     this->~Variant();
-    new (this) Variant(Move(aValue));
+    ::new (KnownNotNull, this) Variant(Move(aValue));
     return *this;
   }
 
@@ -549,6 +571,14 @@ public:
     static_assert(detail::IsVariant<T, Ts...>::value,
                   "provided a type not found in this Variant's type list");
     return Impl::template tag<T>() == tag;
+  }
+
+  template<size_t N>
+  bool is() const
+  {
+    static_assert(N < sizeof...(Ts),
+                  "provided an index outside of this Variant's type list");
+    return N == size_t(tag);
   }
 
   /**
@@ -575,8 +605,17 @@ public:
   T& as() {
     static_assert(detail::IsVariant<T, Ts...>::value,
                   "provided a type not found in this Variant's type list");
-    MOZ_ASSERT(is<T>());
-    return *reinterpret_cast<T*>(&raw);
+    MOZ_RELEASE_ASSERT(is<T>());
+    return *static_cast<T*>(ptr());
+  }
+
+  template<size_t N>
+  typename detail::Nth<N, Ts...>::Type& as()
+  {
+    static_assert(N < sizeof...(Ts),
+                  "provided an index outside of this Variant's type list");
+    MOZ_RELEASE_ASSERT(is<N>());
+    return *static_cast<typename detail::Nth<N, Ts...>::Type*>(ptr());
   }
 
   /** Immutable const reference. */
@@ -584,8 +623,17 @@ public:
   const T& as() const {
     static_assert(detail::IsVariant<T, Ts...>::value,
                   "provided a type not found in this Variant's type list");
-    MOZ_ASSERT(is<T>());
-    return *reinterpret_cast<const T*>(&raw);
+    MOZ_RELEASE_ASSERT(is<T>());
+    return *static_cast<const T*>(ptr());
+  }
+
+  template<size_t N>
+  const typename detail::Nth<N, Ts...>::Type& as() const
+  {
+    static_assert(N < sizeof...(Ts),
+                  "provided an index outside of this Variant's type list");
+    MOZ_RELEASE_ASSERT(is<N>());
+    return *static_cast<const typename detail::Nth<N, Ts...>::Type*>(ptr());
   }
 
   /**
@@ -600,6 +648,15 @@ public:
                   "provided a type not found in this Variant's type list");
     MOZ_ASSERT(is<T>());
     return T(Move(as<T>()));
+  }
+
+  template<size_t N>
+  typename detail::Nth<N, Ts...>::Type extract()
+  {
+    static_assert(N < sizeof...(Ts),
+                  "provided an index outside of this Variant's type list");
+    MOZ_RELEASE_ASSERT(is<N>());
+    return typename detail::Nth<N, Ts...>::Type(Move(as<N>()));
   }
 
   // Exhaustive matching of all variant types on the contained value.

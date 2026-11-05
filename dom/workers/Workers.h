@@ -254,10 +254,12 @@ struct WorkerLoadInfo
 
   nsAutoPtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
   nsCString mDomain;
+  nsString mOrigin; // Derived from mPrincipal; can be used on worker thread.
 
   nsString mServiceWorkerCacheName;
 
   ChannelInfo mChannelInfo;
+  nsLoadFlags mLoadFlags;
 
   uint64_t mWindowID;
   uint64_t mServiceWorkerID;
@@ -276,6 +278,32 @@ struct WorkerLoadInfo
   ~WorkerLoadInfo();
 
   void StealFrom(WorkerLoadInfo& aOther);
+
+  nsresult
+  SetPrincipalOnMainThread(nsIPrincipal* aPrincipal, nsILoadGroup* aLoadGroup);
+
+  nsresult
+  GetPrincipalAndLoadGroupFromChannel(nsIChannel* aChannel,
+                                      nsIPrincipal** aPrincipalOut,
+                                      nsILoadGroup** aLoadGroupOut);
+
+  nsresult
+  SetPrincipalFromChannel(nsIChannel* aChannel);
+
+#if defined(DEBUG) || !defined(RELEASE_OR_BETA)
+  bool
+  FinalChannelPrincipalIsValid(nsIChannel* aChannel);
+
+  bool
+  PrincipalIsValid() const;
+#endif
+
+  bool
+  ProxyReleaseMainThreadObjects(WorkerPrivate* aWorkerPrivate);
+
+  bool
+  ProxyReleaseMainThreadObjects(WorkerPrivate* aWorkerPrivate,
+                                nsCOMPtr<nsILoadGroup>& aLoadGroupToCancel);
 };
 
 // All of these are implemented in RuntimeService.cpp

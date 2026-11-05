@@ -458,7 +458,6 @@ gfxWindowsPlatform::HandleDeviceReset()
 
   InitializeDevices();
   UpdateANGLEConfig();
-  BumpDeviceCounter();
   return true;
 }
 
@@ -1950,13 +1949,6 @@ gfxWindowsPlatform::CreateHardwareVsyncSource()
 
   RefPtr<VsyncSource> d3dVsyncSource = new D3DVsyncSource();
   return d3dVsyncSource.forget();
-}
-
-bool
-gfxWindowsPlatform::SupportsApzTouchInput() const
-{
-  int value = gfxPrefs::TouchEventsEnabled();
-  return value == 1 || value == 2;
 }
 
 void

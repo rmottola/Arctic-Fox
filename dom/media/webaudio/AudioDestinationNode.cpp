@@ -158,8 +158,8 @@ public:
     // Create the input buffer
     ErrorResult rv;
     RefPtr<AudioBuffer> renderedBuffer =
-      AudioBuffer::Create(context, mNumberOfChannels, mLength, mSampleRate,
-                          mBuffer.forget(), rv);
+      AudioBuffer::Create(context->GetOwner(), mNumberOfChannels, mLength,
+                          mSampleRate, mBuffer.forget(), rv);
     if (rv.Failed()) {
       rv.SuppressException();
       return;
@@ -262,7 +262,8 @@ public:
       RefPtr<InputMutedRunnable> runnable =
         new InputMutedRunnable(aStream, newInputMuted);
       aStream->Graph()->
-        DispatchToMainThreadAfterStreamStateUpdate(runnable.forget());
+        DispatchToMainThreadAfterStreamStateUpdate(mAbstractMainThread,
+                                                   runnable.forget());
     }
   }
 
@@ -506,6 +507,11 @@ AudioDestinationNode::WindowVolumeChanged(float aVolume, bool aMuted)
     return NS_OK;
   }
 
+  MOZ_LOG(AudioChannelService::GetAudioChannelLog(), LogLevel::Debug,
+         ("AudioDestinationNode, WindowVolumeChanged, "
+          "this = %p, aVolume = %f, aMuted = %s\n",
+          this, aVolume, aMuted ? "true" : "false"));
+
   float volume = aMuted ? 0.0 : aVolume;
   mStream->SetAudioOutputVolume(&gWebAudioOutputKey, volume);
   return NS_OK;
@@ -523,10 +529,11 @@ AudioDestinationNode::WindowSuspendChanged(nsSuspendedTypes aSuspend)
     return NS_OK;
   }
 
+  MOZ_LOG(AudioChannelService::GetAudioChannelLog(), LogLevel::Debug,
+         ("AudioDestinationNode, WindowSuspendChanged, "
+          "this = %p, aSuspend = %s\n", this, SuspendTypeToStr(aSuspend)));
+
   mAudioChannelSuspended = suspended;
-  Context()->DispatchTrustedEvent(!suspended ?
-    NS_LITERAL_STRING("mozinterruptend") :
-    NS_LITERAL_STRING("mozinterruptbegin"));
 
   DisabledTrackMode disabledMode = suspended ? DisabledTrackMode::SILENCE_BLACK
                                              : DisabledTrackMode::ENABLED;

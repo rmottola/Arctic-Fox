@@ -7,7 +7,10 @@
 #include "nsThreadUtils.h"
 #include "mozilla/webrender/RendererOGL.h"
 #include "mozilla/widget/CompositorWidget.h"
+#include "mozilla/layers/CompositorThread.h"
+#include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/StaticPtr.h"
+#include "base/task.h"
 
 namespace mozilla {
 namespace wr {
@@ -15,7 +18,7 @@ namespace wr {
 static StaticRefPtr<RenderThread> sRenderThread;
 
 RenderThread::RenderThread(base::Thread* aThread)
-: mThread(aThread)
+  : mThread(aThread)
 {
 
 }
@@ -104,7 +107,7 @@ RenderThread::GetRenderer(wr::WindowId aWindowId)
     return nullptr;
   }
 
-  return &*it->second;
+  return it->second.get();
 }
 
 void
@@ -134,20 +137,6 @@ RenderThread::NewScrollFrameReady(wr::WindowId aWindowId, bool aCompositeNeeded)
 }
 
 void
-RenderThread::PipelineSizeChanged(wr::WindowId aWindowId, uint64_t aPipelineId, float aWidth, float aHeight)
-{
-  if (!IsInRenderThread()) {
-    Loop()->PostTask(NewRunnableMethod<wr::WindowId, uint64_t, float, float>(
-      this, &RenderThread::PipelineSizeChanged,
-      aWindowId, aPipelineId, aWidth, aHeight
-    ));
-    return;
-  }
-
-  UpdateAndRender(aWindowId);
-}
-
-void
 RenderThread::RunEvent(wr::WindowId aWindowId, UniquePtr<RendererEvent> aEvent)
 {
   if (!IsInRenderThread()) {
@@ -162,6 +151,19 @@ RenderThread::RunEvent(wr::WindowId aWindowId, UniquePtr<RendererEvent> aEvent)
   aEvent = nullptr;
 }
 
+static void
+NotifyDidRender(layers::CompositorBridgeParentBase* aBridge,
+                WrRenderedEpochs* aEpochs,
+                TimeStamp aStart,
+                TimeStamp aEnd)
+{
+  WrPipelineId pipeline;
+  WrEpoch epoch;
+  while (wr_rendered_epochs_next(aEpochs, &pipeline, &epoch)) {
+    aBridge->NotifyDidCompositeToPipeline(pipeline, epoch, aStart, aEnd);
+  }
+  wr_rendered_epochs_delete(aEpochs);
+}
 
 void
 RenderThread::UpdateAndRender(wr::WindowId aWindowId)
@@ -175,19 +177,25 @@ RenderThread::UpdateAndRender(wr::WindowId aWindowId)
   }
 
   auto& renderer = it->second;
-
-  // TODO: WebRender has the notion of epoch and gecko has transaction ids.
-  // They mostly mean the same thing but I'm not sure they are produced the same
-  // way. We need to merge the two or have a way to associate transaction ids with
-  // epochs to wire everything up properly.
-  auto transactionId = 0;
-
   renderer->Update();
-  renderer->Render(transactionId);
+
+  TimeStamp start = TimeStamp::Now();
+
+  renderer->Render();
+
+  TimeStamp end = TimeStamp::Now();
+
+  auto epochs = renderer->FlushRenderedEpochs();
+  layers::CompositorThreadHolder::Loop()->PostTask(NewRunnableFunction(
+    &NotifyDidRender,
+    renderer->GetCompositorBridge(),
+    epochs,
+    start, end
+  ));
 }
 
-} // namespace
-} // namespace
+} // namespace wr
+} // namespace mozilla
 
 extern "C" {
 
@@ -200,15 +208,6 @@ void wr_notifier_new_scroll_frame_ready(WrWindowId aWindowId, bool aCompositeNee
 {
   mozilla::wr::RenderThread::Get()->NewScrollFrameReady(mozilla::wr::WindowId(aWindowId),
                                                         aCompositeNeeded);
-}
-
-void wr_notifier_pipeline_size_changed(WrWindowId aWindowId,
-                                       uint64_t aPipelineId,
-                                       float aWidth,
-                                       float aHeight)
-{
-  mozilla::wr::RenderThread::Get()->PipelineSizeChanged(mozilla::wr::WindowId(aWindowId),
-                                                        aPipelineId, aWidth, aHeight);
 }
 
 void wr_notifier_external_event(WrWindowId aWindowId, size_t aRawEvent)

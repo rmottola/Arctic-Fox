@@ -40,7 +40,7 @@ XPCOMUtils.defineLazyGetter(this, "gCryptoHash", function() {
 XPCOMUtils.defineLazyGetter(this, "gUnicodeConverter", function() {
   let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
                     .createInstance(Ci.nsIScriptableUnicodeConverter);
-  converter.charset = 'utf8';
+  converter.charset = "utf8";
   return converter;
 });
 
@@ -192,11 +192,11 @@ var DirectoryLinksProvider = {
     let matchOS;
     try {
       matchOS = Services.prefs.getBoolPref(PREF_MATCH_OS_LOCALE);
-    }
-    catch (e) {}
+    } catch (e) {}
 
     if (matchOS) {
-      return Services.locale.getLocaleComponentForUserAgent();
+      return Cc["@mozilla.org/intl/ospreferences;1"].
+             getService(Ci.mozIOSPreferences).getSystemLocale();
     }
 
     try {
@@ -205,13 +205,11 @@ var DirectoryLinksProvider = {
       if (locale) {
         return locale.data;
       }
-    }
-    catch (e) {}
+    } catch (e) {}
 
     try {
       return Services.prefs.getCharPref(PREF_SELECTED_LOCALE);
-    }
-    catch (e) {}
+    } catch (e) {}
 
     return "en-US";
   },
@@ -595,7 +593,7 @@ var DirectoryLinksProvider = {
     let scheme = "", base = "";
     try {
       // A malformed url will not be allowed
-      let uri = Services.io.newURI(url, null, null);
+      let uri = Services.io.newURI(url);
       scheme = uri.scheme;
 
       // URIs without base domains will be allowed
@@ -608,11 +606,11 @@ var DirectoryLinksProvider = {
 
   _escapeChars(text) {
     let charMap = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
     };
 
     return text.replace(/[&<>"']/g, (character) => charMap[character]);

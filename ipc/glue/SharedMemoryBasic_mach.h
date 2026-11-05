@@ -44,7 +44,7 @@ public:
 
   SharedMemoryBasic();
 
-  virtual bool SetHandle(const Handle& aHandle) override;
+  virtual bool SetHandle(const Handle& aHandle, OpenRights aRights) override;
 
   virtual bool Create(size_t aNbytes) override;
 
@@ -84,6 +84,8 @@ private:
   mach_port_t mPort;
   // Pointer to mapped region, null if unmapped.
   void *mMemory;
+  // Access rights to map an existing region with.
+  OpenRights mOpenRights;
 };
 
 } // namespace ipc

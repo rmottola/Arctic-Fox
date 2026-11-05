@@ -28,10 +28,10 @@ this.PluginContent = function(global) {
 }
 
 const FLASH_MIME_TYPE = "application/x-shockwave-flash";
-const REPLACEMENT_STYLE_SHEET = Services.io.newURI("chrome://pluginproblem/content/pluginReplaceBinding.css", null, null);
+const REPLACEMENT_STYLE_SHEET = Services.io.newURI("chrome://pluginproblem/content/pluginReplaceBinding.css");
 
 PluginContent.prototype = {
-  init: function(global) {
+  init(global) {
     this.global = global;
     // Need to hold onto the content window or else it'll get destroyed
     this.content = this.global.content;
@@ -539,11 +539,11 @@ PluginContent.prototype = {
 
       case "PluginInstantiated":
         let key = this._getPluginInfo(plugin).pluginTag.niceName;
-        Services.telemetry.getKeyedHistogramById('PLUGIN_ACTIVATION_COUNT').add(key);
+        Services.telemetry.getKeyedHistogramById("PLUGIN_ACTIVATION_COUNT").add(key);
         shouldShowNotification = true;
         let pluginRect = plugin.getBoundingClientRect();
         if (pluginRect.width <= 5 && pluginRect.height <= 5) {
-          Services.telemetry.getHistogramById('PLUGIN_TINY_CONTENT').add(1);
+          Services.telemetry.getHistogramById("PLUGIN_TINY_CONTENT").add(1);
         }
         break;
     }
@@ -737,8 +737,8 @@ PluginContent.prototype = {
     let overlay = this.getPluginUI(plugin, "main");
     // Have to check that the target is not the link to update the plugin
     if (!(event.originalTarget instanceof contentWindow.HTMLAnchorElement) &&
-        (event.originalTarget.getAttribute('anonid') != 'closeIcon') &&
-        !overlay.hasAttribute('dismissed') &&
+        (event.originalTarget.getAttribute("anonid") != "closeIcon") &&
+        !overlay.hasAttribute("dismissed") &&
         event.button == 0 &&
         event.isTrusted) {
       this._showClickToPlayNotification(plugin, true);

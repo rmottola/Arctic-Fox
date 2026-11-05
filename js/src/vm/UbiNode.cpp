@@ -310,6 +310,7 @@ template JS::Zone* TracerConcrete<js::LazyScript>::zone() const;
 template JS::Zone* TracerConcrete<js::Shape>::zone() const;
 template JS::Zone* TracerConcrete<js::BaseShape>::zone() const;
 template JS::Zone* TracerConcrete<js::ObjectGroup>::zone() const;
+template JS::Zone* TracerConcrete<js::RegExpShared>::zone() const;
 template JS::Zone* TracerConcrete<js::Scope>::zone() const;
 template JS::Zone* TracerConcrete<JS::Symbol>::zone() const;
 template JS::Zone* TracerConcrete<JSString>::zone() const;
@@ -321,7 +322,7 @@ TracerConcrete<Referent>::edges(JSContext* cx, bool wantNames) const {
     if (!range)
         return nullptr;
 
-    if (!range->init(cx, ptr, JS::MapTypeToTraceKind<Referent>::kind, wantNames))
+    if (!range->init(cx->runtime(), ptr, JS::MapTypeToTraceKind<Referent>::kind, wantNames))
         return nullptr;
 
     return UniquePtr<EdgeRange>(range.release());
@@ -332,6 +333,7 @@ template UniquePtr<EdgeRange> TracerConcrete<js::LazyScript>::edges(JSContext* c
 template UniquePtr<EdgeRange> TracerConcrete<js::Shape>::edges(JSContext* cx, bool wantNames) const;
 template UniquePtr<EdgeRange> TracerConcrete<js::BaseShape>::edges(JSContext* cx, bool wantNames) const;
 template UniquePtr<EdgeRange> TracerConcrete<js::ObjectGroup>::edges(JSContext* cx, bool wantNames) const;
+template UniquePtr<EdgeRange> TracerConcrete<js::RegExpShared>::edges(JSContext* cx, bool wantNames) const;
 template UniquePtr<EdgeRange> TracerConcrete<js::Scope>::edges(JSContext* cx, bool wantNames) const;
 template UniquePtr<EdgeRange> TracerConcrete<JS::Symbol>::edges(JSContext* cx, bool wantNames) const;
 template UniquePtr<EdgeRange> TracerConcrete<JSString>::edges(JSContext* cx, bool wantNames) const;
@@ -396,6 +398,7 @@ const char16_t Concrete<js::Shape>::concreteTypeName[] = u"js::Shape";
 const char16_t Concrete<js::BaseShape>::concreteTypeName[] = u"js::BaseShape";
 const char16_t Concrete<js::ObjectGroup>::concreteTypeName[] = u"js::ObjectGroup";
 const char16_t Concrete<js::Scope>::concreteTypeName[] = u"js::Scope";
+const char16_t Concrete<js::RegExpShared>::concreteTypeName[] = u"js::RegExpShared";
 
 namespace JS {
 namespace ubi {
@@ -411,11 +414,11 @@ RootList::RootList(JSContext* cx, Maybe<AutoCheckCannotGC>& noGC, bool wantNames
 bool
 RootList::init()
 {
-    EdgeVectorTracer tracer(cx, &edges, wantNames);
+    EdgeVectorTracer tracer(cx->runtime(), &edges, wantNames);
     js::TraceRuntime(&tracer);
     if (!tracer.okay)
         return false;
-    noGC.emplace(cx);
+    noGC.emplace();
     return true;
 }
 
@@ -423,7 +426,7 @@ bool
 RootList::init(CompartmentSet& debuggees)
 {
     EdgeVector allRootEdges;
-    EdgeVectorTracer tracer(cx, &allRootEdges, wantNames);
+    EdgeVectorTracer tracer(cx->runtime(), &allRootEdges, wantNames);
 
     ZoneSet debuggeeZones;
     if (!debuggeeZones.init())
@@ -455,7 +458,7 @@ RootList::init(CompartmentSet& debuggees)
             return false;
     }
 
-    noGC.emplace(cx);
+    noGC.emplace();
     return true;
 }
 

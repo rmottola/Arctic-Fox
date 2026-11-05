@@ -41,6 +41,14 @@ enum
 
 namespace mozilla {
 
+enum : uint32_t
+{
+  eKeyLocationStandard = nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD,
+  eKeyLocationLeft     = nsIDOMKeyEvent::DOM_KEY_LOCATION_LEFT,
+  eKeyLocationRight    = nsIDOMKeyEvent::DOM_KEY_LOCATION_RIGHT,
+  eKeyLocationNumpad   = nsIDOMKeyEvent::DOM_KEY_LOCATION_NUMPAD
+};
+
 const nsCString GetDOMKeyCodeName(uint32_t aKeyCode);
 
 namespace dom {
@@ -108,14 +116,14 @@ protected:
     , mKeyCode(0)
     , mCharCode(0)
     , mPseudoCharCode(0)
-    , mLocation(nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD)
+    , mLocation(eKeyLocationStandard)
     , mAccessKeyForwardedToChild(false)
     , mUniqueId(0)
 #ifdef XP_MACOSX
     , mNativeModifierFlags(0)
     , mNativeKeyCode(0)
 #endif // #ifdef XP_MACOSX
-    , mKeyNameIndex(mozilla::KEY_NAME_INDEX_Unidentified)
+    , mKeyNameIndex(KEY_NAME_INDEX_Unidentified)
     , mCodeNameIndex(CODE_NAME_INDEX_UNKNOWN)
     , mInputMethodAppState(eNotHandled)
     , mIsChar(false)
@@ -137,14 +145,14 @@ public:
     , mKeyCode(0)
     , mCharCode(0)
     , mPseudoCharCode(0)
-    , mLocation(nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD)
+    , mLocation(eKeyLocationStandard)
     , mAccessKeyForwardedToChild(false)
     , mUniqueId(0)
 #ifdef XP_MACOSX
     , mNativeModifierFlags(0)
     , mNativeKeyCode(0)
 #endif // #ifdef XP_MACOSX
-    , mKeyNameIndex(mozilla::KEY_NAME_INDEX_Unidentified)
+    , mKeyNameIndex(KEY_NAME_INDEX_Unidentified)
     , mCodeNameIndex(CODE_NAME_INDEX_UNKNOWN)
     , mInputMethodAppState(eNotHandled)
     , mIsChar(false)
@@ -227,16 +235,14 @@ public:
   // This stores mCharCode value of keypress event which is fired with same
   // key value and same modifier state.
   uint32_t mPseudoCharCode;
-  // One of nsIDOMKeyEvent::DOM_KEY_LOCATION_*
+  // One of eKeyLocation*
   uint32_t mLocation;
   // True if accesskey handling was forwarded to the child via
   // TabParent::HandleAccessKey. In this case, parent process menu access key
   // handling should be delayed until it is determined that there exists no
   // overriding access key in the content process.
   bool mAccessKeyForwardedToChild;
-  // Unique id associated with a keydown / keypress event. Used in identifing
-  // keypress events for removal from async event dispatch queue in metrofx
-  // after preventDefault is called on keydown events. It's ok if this wraps
+  // Unique id associated with a keydown / keypress event. It's ok if this wraps
   // over long periods.
   uint32_t mUniqueId;
 
@@ -340,8 +346,8 @@ public:
 
   /**
    * ComputeLocationFromCodeValue() returns one of .mLocation value
-   * (nsIDOMKeyEvent::DOM_KEY_LOCATION_*) which is the most preferred value
-   * for the specified specified code value.
+   * (eKeyLocation*) which is the most preferred value for the specified code
+   * value.
    */
   static uint32_t ComputeLocationFromCodeValue(CodeNameIndex aCodeNameIndex);
 

@@ -39,19 +39,25 @@ enum {
 };
 
 enum SourceEventType {
-  Unknown = 0,
-  Touch,
-  Mouse,
-  Key,
-  Bluetooth,
-  Unixsocket,
-  Wifi
+#define SOURCE_EVENT_NAME(x) x,
+#include "SourceEventTypeMap.h"
+#undef SOURCE_EVENT_NAME
 };
 
-class AutoSourceEvent
+class AutoSaveCurTraceInfo
+{
+  uint64_t mSavedTaskId;
+  uint64_t mSavedSourceEventId;
+  SourceEventType mSavedSourceEventType;
+public:
+  AutoSaveCurTraceInfo();
+  ~AutoSaveCurTraceInfo();
+};
+
+class AutoSourceEvent : public AutoSaveCurTraceInfo
 {
 public:
-  AutoSourceEvent(SourceEventType aType);
+  explicit AutoSourceEvent(SourceEventType aType);
   ~AutoSourceEvent();
 };
 
@@ -60,14 +66,14 @@ void ShutdownTaskTracer();
 
 // Add a label to the currently running task, aFormat is the message to log,
 // followed by corresponding parameters.
-void AddLabel(const char* aFormat, ...);
+void AddLabel(const char* aFormat, ...) MOZ_FORMAT_PRINTF(1, 2);
 
 void StartLogging();
 void StopLogging();
 UniquePtr<nsTArray<nsCString>> GetLoggedData(TimeStamp aStartTime);
 
 // Returns the timestamp when Task Tracer is enabled in this process.
-const PRTime GetStartTime();
+PRTime GetStartTime();
 
 /**
  * Internal functions.
@@ -82,6 +88,17 @@ CreateTracedRunnable(already_AddRefed<nsIRunnable>&& aRunnable);
 void FreeTraceInfo();
 
 const char* GetJSLabelPrefix();
+
+void GetCurTraceInfo(uint64_t* aOutSourceEventId, uint64_t* aOutParentTaskId,
+                     SourceEventType* aOutSourceEventType);
+
+class AutoScopedLabel
+{
+  char* mLabel;
+public:
+  explicit AutoScopedLabel(const char* aFormat, ...);
+  ~AutoScopedLabel();
+};
 
 } // namespace tasktracer
 } // namespace mozilla.

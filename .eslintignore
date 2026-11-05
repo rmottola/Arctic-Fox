@@ -27,7 +27,6 @@ hal/**
 image/**
 intl/**
 ipc/**
-js/**
 layout/**
 media/**
 memory/**
@@ -85,7 +84,6 @@ devtools/client/framework/**
 !devtools/client/framework/selection.js
 !devtools/client/framework/toolbox.js
 devtools/client/jsonview/lib/**
-devtools/client/memory/**
 devtools/client/netmonitor/test/**
 devtools/client/netmonitor/har/test/**
 devtools/client/projecteditor/**
@@ -117,17 +115,12 @@ devtools/server/actors/**
 !devtools/server/actors/highlighters/eye-dropper.js
 !devtools/server/actors/webbrowser.js
 !devtools/server/actors/webextension.js
-!devtools/server/actors/styles.js
+!devtools/server/actors/webextension-inspected-window.js
 !devtools/server/actors/string.js
+!devtools/server/actors/styles.js
+!devtools/server/actors/tab.js
 !devtools/server/actors/csscoverage.js
-devtools/shared/*.js
-!devtools/shared/async-storage.js
-!devtools/shared/async-utils.js
-!devtools/shared/defer.js
-!devtools/shared/event-emitter.js
-!devtools/shared/indentation.js
-!devtools/shared/loader-plugin-raw.jsm
-!devtools/shared/task.js
+!devtools/server/tests/browser/browser_webextension_inspected_window.js
 devtools/shared/client/**
 devtools/shared/discovery/**
 devtools/shared/heapsnapshot/**
@@ -167,6 +160,17 @@ devtools/client/sourceeditor/codemirror/**/*.js
 devtools/client/sourceeditor/tern/*
 devtools/client/sourceeditor/test/codemirror/*
 devtools/client/inspector/markup/test/lib_*
+
+# Exclude everything but self-hosted JS
+js/ductwork/**
+js/examples/**
+js/ipc/**
+js/public/**
+js/xpconnect/**
+js/src/devtools/**
+js/src/octane/**
+js/src/jit-test/**
+js/src/tests/**
 
 # mobile/android/ exclusions
 mobile/android/chrome/content

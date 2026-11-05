@@ -1023,10 +1023,10 @@ nsCSSValue::AppendCircleOrEllipseToString(nsCSSKeyword aFunctionId,
   // closest-side is the default, so we don't need to
   // output it if all values are closest-side.
   if (array->Item(1).GetUnit() == eCSSUnit_Enumerated &&
-      array->Item(1).GetIntValue() == NS_RADIUS_CLOSEST_SIDE &&
+      StyleShapeRadius(array->Item(1).GetIntValue()) == StyleShapeRadius::ClosestSide &&
       (aFunctionId == eCSSKeyword_circle ||
        (array->Item(2).GetUnit() == eCSSUnit_Enumerated &&
-        array->Item(2).GetIntValue() == NS_RADIUS_CLOSEST_SIDE))) {
+        StyleShapeRadius(array->Item(2).GetIntValue()) == StyleShapeRadius::ClosestSide))) {
     hasRadii = false;
   } else {
     AppendPositionCoordinateToString(array->Item(1), aProperty,
@@ -3204,8 +3204,8 @@ nsCSSCornerSizes::Reset()
   }
 }
 
-static_assert(NS_CORNER_TOP_LEFT == 0 && NS_CORNER_TOP_RIGHT == 1 &&
-              NS_CORNER_BOTTOM_RIGHT == 2 && NS_CORNER_BOTTOM_LEFT == 3,
+static_assert(eCornerTopLeft == 0 && eCornerTopRight == 1 &&
+              eCornerBottomRight == 2 && eCornerBottomLeft == 3,
               "box corner constants not tl/tr/br/bl == 0/1/2/3");
 
 /* static */ const nsCSSCornerSizes::corner_type

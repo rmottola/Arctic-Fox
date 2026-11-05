@@ -5,26 +5,22 @@
 
 #include "nsFieldSetFrame.h"
 
-#include "mozilla/gfx/2D.h"
-#include "nsCSSAnonBoxes.h"
-#include "nsLayoutUtils.h"
-#include "nsLegendFrame.h"
-#include "nsCSSRendering.h"
 #include <algorithm>
-#include "nsIFrame.h"
-#include "nsPresContext.h"
-#include "mozilla/RestyleManager.h"
-#include "nsGkAtoms.h"
-#include "nsStyleConsts.h"
-#include "nsDisplayList.h"
-#include "nsRenderingContext.h"
-#include "nsIScrollableFrame.h"
+#include "mozilla/gfx/2D.h"
 #include "mozilla/Likely.h"
 #include "mozilla/Maybe.h"
+#include "nsCSSAnonBoxes.h"
+#include "nsCSSRendering.h"
+#include "nsDisplayList.h"
+#include "nsGkAtoms.h"
+#include "nsIFrameInlines.h"
+#include "nsLayoutUtils.h"
+#include "nsLegendFrame.h"
+#include "nsRenderingContext.h"
+#include "nsStyleConsts.h"
 
 using namespace mozilla;
 using namespace mozilla::gfx;
-using namespace mozilla::image;
 using namespace mozilla::layout;
 
 nsContainerFrame*
@@ -89,21 +85,18 @@ nsFieldSetFrame::GetLegend() const
   return mFrames.FirstChild();
 }
 
-class nsDisplayFieldSetBorderBackground : public nsDisplayItem {
+class nsDisplayFieldSetBorder : public nsDisplayItem {
 public:
-  nsDisplayFieldSetBorderBackground(nsDisplayListBuilder* aBuilder,
-                                    nsFieldSetFrame* aFrame)
+  nsDisplayFieldSetBorder(nsDisplayListBuilder* aBuilder,
+                          nsFieldSetFrame* aFrame)
     : nsDisplayItem(aBuilder, aFrame) {
-    MOZ_COUNT_CTOR(nsDisplayFieldSetBorderBackground);
+    MOZ_COUNT_CTOR(nsDisplayFieldSetBorder);
   }
 #ifdef NS_BUILD_REFCNT_LOGGING
-  virtual ~nsDisplayFieldSetBorderBackground() {
-    MOZ_COUNT_DTOR(nsDisplayFieldSetBorderBackground);
+  virtual ~nsDisplayFieldSetBorder() {
+    MOZ_COUNT_DTOR(nsDisplayFieldSetBorder);
   }
 #endif
-  virtual void HitTest(nsDisplayListBuilder* aBuilder, const nsRect& aRect,
-                       HitTestState* aState,
-                       nsTArray<nsIFrame*> *aOutFrames) override;
   virtual void Paint(nsDisplayListBuilder* aBuilder,
                      nsRenderingContext* aCtx) override;
   virtual nsDisplayItemGeometry* AllocateGeometry(nsDisplayListBuilder* aBuilder) override;
@@ -111,38 +104,29 @@ public:
                                          const nsDisplayItemGeometry* aGeometry,
                                          nsRegion *aInvalidRegion) override;
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) override;
-  NS_DISPLAY_DECL_NAME("FieldSetBorderBackground", TYPE_FIELDSET_BORDER_BACKGROUND)
+  NS_DISPLAY_DECL_NAME("FieldSetBorder", TYPE_FIELDSET_BORDER_BACKGROUND)
 };
 
-void nsDisplayFieldSetBorderBackground::HitTest(nsDisplayListBuilder* aBuilder, const nsRect& aRect,
-                                                HitTestState* aState, nsTArray<nsIFrame*> *aOutFrames)
-{
-  // aPt is guaranteed to be in this item's bounds. We do the hit test based on the
-  // frame bounds even though our background doesn't cover the whole frame.
-  // It's not clear whether this is correct.
-  aOutFrames->AppendElement(mFrame);
-}
-
 void
-nsDisplayFieldSetBorderBackground::Paint(nsDisplayListBuilder* aBuilder,
-                                         nsRenderingContext* aCtx)
+nsDisplayFieldSetBorder::Paint(nsDisplayListBuilder* aBuilder,
+                               nsRenderingContext* aCtx)
 {
-  DrawResult result = static_cast<nsFieldSetFrame*>(mFrame)->
+  image::DrawResult result = static_cast<nsFieldSetFrame*>(mFrame)->
     PaintBorder(aBuilder, *aCtx, ToReferenceFrame(), mVisibleRect);
 
   nsDisplayItemGenericImageGeometry::UpdateDrawResult(this, result);
 }
 
 nsDisplayItemGeometry*
-nsDisplayFieldSetBorderBackground::AllocateGeometry(nsDisplayListBuilder* aBuilder)
+nsDisplayFieldSetBorder::AllocateGeometry(nsDisplayListBuilder* aBuilder)
 {
   return new nsDisplayItemGenericImageGeometry(this, aBuilder);
 }
 
 void
-nsDisplayFieldSetBorderBackground::ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
-                                                             const nsDisplayItemGeometry* aGeometry,
-                                                             nsRegion *aInvalidRegion)
+nsDisplayFieldSetBorder::ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
+                                                   const nsDisplayItemGeometry* aGeometry,
+                                                   nsRegion *aInvalidRegion)
 {
   auto geometry =
     static_cast<const nsDisplayItemGenericImageGeometry*>(aGeometry);
@@ -157,8 +141,8 @@ nsDisplayFieldSetBorderBackground::ComputeInvalidationRegion(nsDisplayListBuilde
 }
 
 nsRect
-nsDisplayFieldSetBorderBackground::GetBounds(nsDisplayListBuilder* aBuilder,
-                                             bool* aSnap)
+nsDisplayFieldSetBorder::GetBounds(nsDisplayListBuilder* aBuilder,
+                                   bool* aSnap)
 {
   // Just go ahead and claim our frame's overflow rect as the bounds, because we
   // may have border-image-outset or other features that cause borders to extend
@@ -190,7 +174,7 @@ nsFieldSetFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
       /* aAllowWillPaintBorderOptimization = */ false);
 
     aLists.BorderBackground()->AppendNewToTop(new (aBuilder)
-      nsDisplayFieldSetBorderBackground(aBuilder, this));
+      nsDisplayFieldSetBorder(aBuilder, this));
   
     DisplayOutlineUnconditional(aBuilder, aLists);
 
@@ -224,7 +208,7 @@ nsFieldSetFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   contentDisplayItems.MoveTo(aLists);
 }
 
-DrawResult
+image::DrawResult
 nsFieldSetFrame::PaintBorder(
   nsDisplayListBuilder* aBuilder,
   nsRenderingContext& aRenderingContext,
@@ -640,9 +624,50 @@ nsFieldSetFrame::AccessibleType()
 #endif
 
 nscoord
-nsFieldSetFrame::GetLogicalBaseline(WritingMode aWritingMode) const
+nsFieldSetFrame::GetLogicalBaseline(WritingMode aWM) const
+{
+  switch (StyleDisplay()->mDisplay) {
+    case mozilla::StyleDisplay::Grid:
+    case mozilla::StyleDisplay::InlineGrid:
+    case mozilla::StyleDisplay::Flex:
+    case mozilla::StyleDisplay::InlineFlex:
+      return BaselineBOffset(aWM, BaselineSharingGroup::eFirst,
+                             AlignmentContext::eInline);
+    default:
+      return BSize(aWM) - BaselineBOffset(aWM, BaselineSharingGroup::eLast,
+                                          AlignmentContext::eInline);
+  }
+}
+
+bool
+nsFieldSetFrame::GetVerticalAlignBaseline(WritingMode aWM,
+                                          nscoord* aBaseline) const
 {
   nsIFrame* inner = GetInner();
-  return inner->BStart(aWritingMode, GetParent()->GetSize()) +
-    inner->GetLogicalBaseline(aWritingMode);
+  MOZ_ASSERT(!inner->GetWritingMode().IsOrthogonalTo(aWM));
+  if (!inner->GetVerticalAlignBaseline(aWM, aBaseline)) {
+    return false;
+  }
+  nscoord innerBStart = inner->BStart(aWM, GetSize());
+  *aBaseline += innerBStart;
+  return true;
+}
+
+bool
+nsFieldSetFrame::GetNaturalBaselineBOffset(WritingMode          aWM,
+                                           BaselineSharingGroup aBaselineGroup,
+                                           nscoord*             aBaseline) const
+{
+  nsIFrame* inner = GetInner();
+  MOZ_ASSERT(!inner->GetWritingMode().IsOrthogonalTo(aWM));
+  if (!inner->GetNaturalBaselineBOffset(aWM, aBaselineGroup, aBaseline)) {
+    return false;
+  }
+  nscoord innerBStart = inner->BStart(aWM, GetSize());
+  if (aBaselineGroup == BaselineSharingGroup::eFirst) {
+    *aBaseline += innerBStart;
+  } else {
+    *aBaseline += BSize(aWM) - (innerBStart + inner->BSize(aWM));
+  }
+  return true;
 }

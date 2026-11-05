@@ -526,7 +526,7 @@ MediaEngineWebRTCMicrophoneSource::NotifyPull(MediaStreamGraph *aGraph,
                                               const PrincipalHandle& aPrincipalHandle)
 {
   // Ignore - we push audio data
-  LOG_FRAMES(("NotifyPull, desired = %ld", (int64_t) aDesiredTime));
+  LOG_FRAMES(("NotifyPull, desired = %" PRId64, (int64_t) aDesiredTime));
 }
 
 void
@@ -827,7 +827,7 @@ typedef int16_t sample;
 void
 MediaEngineWebRTCMicrophoneSource::Process(int channel,
                                            webrtc::ProcessingTypes type,
-                                           sample *audio10ms, int length,
+                                           sample *audio10ms, size_t length,
                                            int samplingFreq, bool isStereo)
 {
   MOZ_ASSERT(!PassThrough(), "This should be bypassed when in PassThrough mode.");

@@ -68,11 +68,13 @@ let FrameActor = ActorClassWithSpec(frameSpec, {
       );
       form.environment = envActor.form();
     }
-    form.this = createValueGrip(this.frame.this, threadActor._pausePool,
-      threadActor.objectGrip);
+    if (this.frame.type != "wasmcall") {
+      form.this = createValueGrip(this.frame.this, threadActor._pausePool,
+        threadActor.objectGrip);
+    }
     form.arguments = this._args();
     if (this.frame.script) {
-      var generatedLocation = this.threadActor.sources.getFrameLocation(this.frame);
+      let generatedLocation = this.threadActor.sources.getFrameLocation(this.frame);
       form.where = {
         source: generatedLocation.generatedSourceActor.form(),
         line: generatedLocation.generatedLine,

@@ -18,6 +18,27 @@
 #define ML_INFO             mozilla::LogLevel::Debug
 #define ML_DEBUG            mozilla::LogLevel::Verbose
 
+#ifdef MOZILLA_INTERNAL_API
+#define MOZ_MTLOG_MODULE(n) \
+  static mozilla::LogModule* getLogModule() {   \
+    static mozilla::LazyLogModule log(n);       \
+    return static_cast<mozilla::LogModule*>(log);      \
+  }
+
+#define MOZ_MTLOG(level, b)                                       \
+  do {                                                            \
+    if (MOZ_LOG_TEST(getLogModule(), level)) {                    \
+      std::stringstream str;                                      \
+      str << b;                                                   \
+      MOZ_LOG(getLogModule(), level, ("%s", str.str().c_str()));  \
+    }                                                             \
+  } while(0)
+#else
+// When building mtransport outside of XUL, for example in stand-alone gtests,
+// PR_Logging needs to be used instead of mozilla logging.
+
+#include "prlog.h"
+
 #define MOZ_MTLOG_MODULE(n) \
   static PRLogModuleInfo* getLogModule() {      \
     static PRLogModuleInfo* log;                \
@@ -26,13 +47,13 @@
     return log;                                 \
   }
 
-#define MOZ_MTLOG(level, b) \
-  do {                                                                  \
-    if (MOZ_LOG_TEST(getLogModule(), level)) {                           \
-      std::stringstream str;                                            \
-      str << b;                                                         \
-      MOZ_LOG(getLogModule(), level, ("%s", str.str().c_str()));         \
-    }                                                                   \
+#define MOZ_MTLOG(level, b)                                                         \
+  do {                                                                              \
+    if (PR_LOG_TEST(getLogModule(), (PRLogModuleLevel)level)) {                     \
+      std::stringstream str;                                                        \
+      str << b;                                                                     \
+      PR_LOG(getLogModule(), (PRLogModuleLevel)level, ("%s", str.str().c_str()));   \
+    }                                                                               \
   } while(0)
-
+#endif // MOZILLA_INTERNAL_API
 #endif // logging_h__

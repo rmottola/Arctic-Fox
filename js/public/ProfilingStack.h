@@ -21,7 +21,7 @@ namespace js {
 // A call stack can be specified to the JS engine such that all JS entry/exits
 // to functions push/pop an entry to/from the specified stack.
 //
-// For more detailed information, see vm/SPSProfiler.h.
+// For more detailed information, see vm/GeckoProfiler.h.
 //
 class ProfileEntry
 {
@@ -95,10 +95,10 @@ class ProfileEntry
     static_assert((static_cast<int>(Category::FIRST) & Flags::ALL) == 0,
                   "The category bitflags should not intersect with the other flags!");
 
-    // All of these methods are marked with the 'volatile' keyword because SPS's
-    // representation of the stack is stored such that all ProfileEntry
-    // instances are volatile. These methods would not be available unless they
-    // were marked as volatile as well.
+    // All of these methods are marked with the 'volatile' keyword because the
+    // Gecko Profiler's representation of the stack is stored such that all
+    // ProfileEntry instances are volatile. These methods would not be
+    // available unless they were marked as volatile as well.
 
     bool isCpp() const volatile { return hasFlag(IS_CPP_ENTRY); }
     bool isJs() const volatile { return !isCpp(); }
@@ -161,7 +161,7 @@ class ProfileEntry
         MOZ_ASSERT(!isJs());
         return spOrScript;
     }
-    JSScript* script() const volatile;
+    JS_PUBLIC_API(JSScript*) script() const volatile;
     uint32_t line() const volatile {
         MOZ_ASSERT(!isJs());
         return static_cast<uint32_t>(lineOrPcOffset);
@@ -173,7 +173,7 @@ class ProfileEntry
         return (JSScript*)spOrScript;
     }
 
-    // We can't know the layout of JSScript, so look in vm/SPSProfiler.cpp.
+    // We can't know the layout of JSScript, so look in vm/GeckoProfiler.cpp.
     JS_FRIEND_API(jsbytecode*) pc() const volatile;
     JS_FRIEND_API(void) setPC(jsbytecode* pc) volatile;
 
@@ -191,7 +191,7 @@ class ProfileEntry
 };
 
 JS_FRIEND_API(void)
-SetContextProfilingStack(JSContext* cx, ProfileEntry* stack, uint32_t* size,
+SetContextProfilingStack(JSContext* cx, ProfileEntry* stack, mozilla::Atomic<uint32_t>* size,
                          uint32_t max);
 
 JS_FRIEND_API(void)

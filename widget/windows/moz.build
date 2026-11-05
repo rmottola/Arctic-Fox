@@ -4,6 +4,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files("**"):
+    BUG_COMPONENT = ("Core", "Widget: Win32")
+
 TEST_DIRS += ['tests']
 
 EXPORTS += [
@@ -46,8 +49,6 @@ UNIFIED_SOURCES += [
     'nsNativeDragSource.cpp',
     'nsNativeDragTarget.cpp',
     'nsNativeThemeWin.cpp',
-    'nsScreenManagerWin.cpp',
-    'nsScreenWin.cpp',
     'nsSound.cpp',
     'nsToolkit.cpp',
     'nsUXThemeData.cpp',
@@ -56,6 +57,7 @@ UNIFIED_SOURCES += [
     'nsWindowDbg.cpp',
     'nsWindowGfx.cpp',
     'nsWinGesture.cpp',
+    'ScreenHelperWin.cpp',
     'TaskbarPreview.cpp',
     'TaskbarPreviewButton.cpp',
     'TaskbarTabPreview.cpp',
@@ -100,6 +102,7 @@ LOCAL_INCLUDES += [
     '/layout/xul',
     '/toolkit/xre',
     '/widget',
+    '/widget/headless',
     '/xpcom/base',
 ]
 

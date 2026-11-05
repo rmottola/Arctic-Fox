@@ -336,10 +336,10 @@ RasterImage::LookupFrame(const IntSize& aSize,
                !mAnimationState || mAnimationState->KnownFrameCount() < 1,
                "Animated frames should be locked");
 
-    Decode(requestedSize, aFlags, aPlaybackType);
+    bool ranSync = Decode(requestedSize, aFlags, aPlaybackType);
 
-    // If we can sync decode, we should already have the frame.
-    if (aFlags & FLAG_SYNC_DECODE) {
+    // If we can or did sync decode, we should already have the frame.
+    if (ranSync || (aFlags & FLAG_SYNC_DECODE)) {
       result = LookupFrameInternal(requestedSize, aFlags, aPlaybackType);
     }
   }
@@ -431,7 +431,8 @@ RasterImage::OnSurfaceDiscarded()
 {
   MOZ_ASSERT(mProgressTracker);
 
-  NS_DispatchToMainThread(NewRunnableMethod(mProgressTracker, &ProgressTracker::OnDiscard));
+  NS_DispatchToMainThread(NewRunnableMethod("ProgressTracker::OnDiscard",
+                                            mProgressTracker, &ProgressTracker::OnDiscard));
 }
 
 //******************************************************************************
@@ -612,7 +613,7 @@ RasterImage::GetImageContainer(LayerManager* aManager, uint32_t aFlags)
   }
 
   // |image| holds a reference to a SourceSurface which in turn holds a lock on
-  // the current frame's VolatileBuffer, ensuring that it doesn't get freed as
+  // the current frame's data buffer, ensuring that it doesn't get freed as
   // long as the layer system keeps this ImageContainer alive.
   AutoTArray<ImageContainer::NonOwningImage, 1> imageList;
   imageList.AppendElement(ImageContainer::NonOwningImage(image, TimeStamp(),
@@ -1080,7 +1081,7 @@ RasterImage::RequestDecodeForSize(const IntSize& aSize, uint32_t aFlags)
   return NS_OK;
 }
 
-static void
+static bool
 LaunchDecodingTask(IDecodingTask* aTask,
                    RasterImage* aImage,
                    uint32_t aFlags,
@@ -1093,24 +1094,24 @@ LaunchDecodingTask(IDecodingTask* aTask,
         js::ProfileEntry::Category::GRAPHICS,
         "%s", aImage->GetURIString().get());
       DecodePool::Singleton()->SyncRunIfPossible(aTask);
-      return;
+      return true;
     }
 
     if (aFlags & imgIContainer::FLAG_SYNC_DECODE_IF_FAST) {
       PROFILER_LABEL_PRINTF("DecodePool", "SyncRunIfPreferred",
         js::ProfileEntry::Category::GRAPHICS,
         "%s", aImage->GetURIString().get());
-      DecodePool::Singleton()->SyncRunIfPreferred(aTask);
-      return;
+      return DecodePool::Singleton()->SyncRunIfPreferred(aTask);
     }
   }
 
   // Perform an async decode. We also take this path if we don't have all the
   // source data yet, since sync decoding is impossible in that situation.
   DecodePool::Singleton()->AsyncRun(aTask);
+  return false;
 }
 
-NS_IMETHODIMP
+bool
 RasterImage::Decode(const IntSize& aSize,
                     uint32_t aFlags,
                     PlaybackType aPlaybackType)
@@ -1118,13 +1119,13 @@ RasterImage::Decode(const IntSize& aSize,
   MOZ_ASSERT(NS_IsMainThread());
 
   if (mError) {
-    return NS_ERROR_FAILURE;
+    return false;
   }
 
   // If we don't have a size yet, we can't do any other decoding.
   if (!mHasSize) {
     mWantFullDecode = true;
-    return NS_OK;
+    return false;
   }
 
   // We're about to decode again, which may mean that some of the previous sizes
@@ -1169,14 +1170,13 @@ RasterImage::Decode(const IntSize& aSize,
 
   // Make sure DecoderFactory was able to create a decoder successfully.
   if (!task) {
-    return NS_ERROR_FAILURE;
+    return false;
   }
 
   mDecodeCount++;
 
   // We're ready to decode; start the decoder.
-  LaunchDecodingTask(task, this, aFlags, mHasSourceData);
-  return NS_OK;
+  return LaunchDecodingTask(task, this, aFlags, mHasSourceData);
 }
 
 NS_IMETHODIMP
@@ -1283,7 +1283,8 @@ RasterImage::DrawInternal(DrawableSurface&& aSurface,
                           const IntSize& aSize,
                           const ImageRegion& aRegion,
                           SamplingFilter aSamplingFilter,
-                          uint32_t aFlags)
+                          uint32_t aFlags,
+                          float aOpacity)
 {
   gfxContextMatrixAutoSaveRestore saveMatrix(aContext);
   ImageRegion region(aRegion);
@@ -1302,7 +1303,7 @@ RasterImage::DrawInternal(DrawableSurface&& aSurface,
     couldRedecodeForBetterFrame = CanDownscaleDuringDecode(aSize, aFlags);
   }
 
-  if (!aSurface->Draw(aContext, region, aSamplingFilter, aFlags)) {
+  if (!aSurface->Draw(aContext, region, aSamplingFilter, aFlags, aOpacity)) {
     RecoverFromInvalidFrames(aSize, aFlags);
     return DrawResult::TEMPORARY_ERROR;
   }
@@ -1323,7 +1324,8 @@ RasterImage::Draw(gfxContext* aContext,
                   uint32_t aWhichFrame,
                   SamplingFilter aSamplingFilter,
                   const Maybe<SVGImageContext>& /*aSVGContext - ignored*/,
-                  uint32_t aFlags)
+                  uint32_t aFlags,
+                  float aOpacity)
 {
   if (aWhichFrame > FRAME_MAX_VALUE) {
     return DrawResult::BAD_ARGS;
@@ -1369,7 +1371,7 @@ RasterImage::Draw(gfxContext* aContext,
                                surface->IsFinished();
 
   auto result = DrawInternal(Move(surface), aContext, aSize,
-                             aRegion, aSamplingFilter, flags);
+                             aRegion, aSamplingFilter, flags, aOpacity);
 
   if (shouldRecordTelemetry) {
       TimeDuration drawLatency = TimeStamp::Now() - mDrawStartTime;

@@ -6,7 +6,6 @@
 
 "use strict";
 
-const { Ci } = require("chrome");
 const { KeyCodes } = require("devtools/client/shared/keycodes");
 const { Task } = require("devtools/shared/task");
 
@@ -31,7 +30,7 @@ function getKeyWithEvent(callback, onlySpaceOrReturn) {
                               event.keyCode === KeyCodes.DOM_VK_RETURN;
 
     if (key && filterKeyboardEvent) {
-      callback.call(null, key);
+      callback(key);
     }
   };
 }
@@ -79,6 +78,21 @@ const getFormDataSections = Task.async(function* (headers, uploadHeaders, postDa
 });
 
 /**
+ * Fetch headers full content from actor server
+ *
+ * @param {object} headers - a object presents headers data
+ * @param {function} getString - callback to retrieve a string from a LongStringGrip
+ * @return {object} a headers object with updated content payload
+ */
+const fetchHeaders = Task.async(function* (headers, getString) {
+  for (let { value } of headers.headers) {
+    headers.headers.value = yield getString(value);
+  }
+
+  return headers;
+});
+
+/**
  * Form a data: URI given a mime type, encoding, and some text.
  *
  * @param {string} mimeType - mime type
@@ -90,7 +104,7 @@ const getFormDataSections = Task.async(function* (headers, uploadHeaders, postDa
 function formDataURI(mimeType, encoding, text) {
   if (!encoding) {
     encoding = "base64";
-    text = btoa(text);
+    text = btoa(unescape(encodeURIComponent(text)));
   }
   return "data:" + mimeType + ";" + encoding + "," + text;
 }
@@ -239,42 +253,10 @@ function parseQueryString(query) {
   });
 }
 
-/**
- * Convert a nsIContentPolicy constant to a display string
- */
-const LOAD_CAUSE_STRINGS = {
-  [Ci.nsIContentPolicy.TYPE_INVALID]: "invalid",
-  [Ci.nsIContentPolicy.TYPE_OTHER]: "other",
-  [Ci.nsIContentPolicy.TYPE_SCRIPT]: "script",
-  [Ci.nsIContentPolicy.TYPE_IMAGE]: "img",
-  [Ci.nsIContentPolicy.TYPE_STYLESHEET]: "stylesheet",
-  [Ci.nsIContentPolicy.TYPE_OBJECT]: "object",
-  [Ci.nsIContentPolicy.TYPE_DOCUMENT]: "document",
-  [Ci.nsIContentPolicy.TYPE_SUBDOCUMENT]: "subdocument",
-  [Ci.nsIContentPolicy.TYPE_REFRESH]: "refresh",
-  [Ci.nsIContentPolicy.TYPE_XBL]: "xbl",
-  [Ci.nsIContentPolicy.TYPE_PING]: "ping",
-  [Ci.nsIContentPolicy.TYPE_XMLHTTPREQUEST]: "xhr",
-  [Ci.nsIContentPolicy.TYPE_OBJECT_SUBREQUEST]: "objectSubdoc",
-  [Ci.nsIContentPolicy.TYPE_DTD]: "dtd",
-  [Ci.nsIContentPolicy.TYPE_FONT]: "font",
-  [Ci.nsIContentPolicy.TYPE_MEDIA]: "media",
-  [Ci.nsIContentPolicy.TYPE_WEBSOCKET]: "websocket",
-  [Ci.nsIContentPolicy.TYPE_CSP_REPORT]: "csp",
-  [Ci.nsIContentPolicy.TYPE_XSLT]: "xslt",
-  [Ci.nsIContentPolicy.TYPE_BEACON]: "beacon",
-  [Ci.nsIContentPolicy.TYPE_FETCH]: "fetch",
-  [Ci.nsIContentPolicy.TYPE_IMAGESET]: "imageset",
-  [Ci.nsIContentPolicy.TYPE_WEB_MANIFEST]: "webManifest"
-};
-
-function loadCauseString(causeType) {
-  return LOAD_CAUSE_STRINGS[causeType] || "unknown";
-}
-
 module.exports = {
   getKeyWithEvent,
   getFormDataSections,
+  fetchHeaders,
   formDataURI,
   writeHeaderText,
   decodeUnicodeUrl,
@@ -286,5 +268,4 @@ module.exports = {
   getUrlHost,
   getUrlDetails,
   parseQueryString,
-  loadCauseString,
 };

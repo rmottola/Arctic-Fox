@@ -15,6 +15,7 @@
 #include "mozilla/MemoryChecking.h"
 #include "mozilla/Poison.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/Printf.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/Services.h"
 #include "mozilla/Telemetry.h"
@@ -429,13 +430,13 @@ static void UnexpectedExit() {
  * @param fmt
  *        printf-style format string followed by arguments.
  */
-static void Output(bool isError, const char *fmt, ... )
+static MOZ_FORMAT_PRINTF(2, 3) void Output(bool isError, const char *fmt, ... )
 {
   va_list ap;
   va_start(ap, fmt);
 
 #if defined(XP_WIN) && !MOZ_WINCONSOLE
-  char *msg = PR_vsmprintf(fmt, ap);
+  char *msg = mozilla::Vsmprintf(fmt, ap);
   if (msg)
   {
     UINT flags = MB_OK;
@@ -453,7 +454,7 @@ static void Output(bool isError, const char *fmt, ... )
                         sizeof(wide_msg) / sizeof(wchar_t));
 
     MessageBoxW(nullptr, wide_msg, L"XULRunner", flags);
-    PR_smprintf_free(msg);
+    mozilla::SmprintfFree(msg);
   }
 #else
   vfprintf(stderr, fmt, ap);
@@ -1244,6 +1245,26 @@ nsXULAppInfo::SetMinidumpPath(nsIFile* aMinidumpPath)
 }
 
 NS_IMETHODIMP
+nsXULAppInfo::GetMinidumpForID(const nsAString& aId, nsIFile** aMinidump)
+{
+  if (!CrashReporter::GetMinidumpForID(aId, aMinidump)) {
+    return NS_ERROR_FILE_NOT_FOUND;
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsXULAppInfo::GetExtraFileForID(const nsAString& aId, nsIFile** aExtraFile)
+{
+  if (!CrashReporter::GetExtraFileForID(aId, aExtraFile)) {
+    return NS_ERROR_FILE_NOT_FOUND;
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsXULAppInfo::AnnotateCrashReport(const nsACString& key,
                                   const nsACString& data)
 {
@@ -1632,6 +1653,10 @@ DumpHelp()
   printf("  --console          Start %s with a debugging console.\n", (const char*) gAppData->name);
 #endif
 
+#ifdef MOZ_WIDGET_GTK
+  printf("  --headless         Run without a GUI.\n");
+#endif
+
   // this works, but only after the components have registered.  so if you drop in a new command line handler, --help
   // won't not until the second run.
   // out of the bug, because we ship a component.reg file, it works correctly.
@@ -1926,6 +1951,12 @@ ProfileLockedDialog(nsIFile* aProfileDir, nsIFile* aProfileLocalDir,
 
     if (!killMessage || !killTitle)
       return NS_ERROR_FAILURE;
+
+    if (gfxPlatform::IsHeadless()) {
+      // TODO: make a way to turn off all dialogs when headless.
+      Output(true, "%s\n", NS_LossyConvertUTF16toASCII(killMessage).get());
+      return NS_ERROR_FAILURE;
+    }
 
     nsCOMPtr<nsIPromptService> ps
       (do_GetService(NS_PROMPTSERVICE_CONTRACTID));
@@ -2898,7 +2929,7 @@ static void MOZ_gdk_display_close(GdkDisplay *display)
 #endif
 }
 
-static const char* detectDisplay(void)
+const char* DetectDisplay(void)
 {
   bool tryX11 = false;
   bool tryWayland = false;
@@ -3095,6 +3126,19 @@ XREMain::XRE_mainInit(bool* aExitFlag)
 
   if (ChaosMode::isActive(ChaosFeature::Any)) {
     printf_stderr("*** You are running in chaos test mode. See ChaosMode.h. ***\n");
+  }
+
+  if (CheckArg("headless")) {
+    PR_SetEnv("MOZ_HEADLESS=1");
+  }
+
+  if (gfxPlatform::IsHeadless()) {
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
+    printf_stderr("*** You are running in headless mode.\n");
+#else
+    Output(true, "Error: headless mode is not currently supported on this platform.\n");
+    return 1;
+#endif
   }
 
   nsresult rv;
@@ -3305,9 +3349,7 @@ XREMain::XRE_mainInit(bool* aExitFlag)
 #if defined(MOZ_SANDBOX) && defined(XP_WIN)
   if (mAppData->sandboxBrokerServices) {
     SandboxBroker::Initialize(mAppData->sandboxBrokerServices);
-    Telemetry::Accumulate(Telemetry::SANDBOX_BROKER_INITIALIZED, true);
   } else {
-    Telemetry::Accumulate(Telemetry::SANDBOX_BROKER_INITIALIZED, false);
 #if defined(MOZ_CONTENT_SANDBOX)
     // If we're sandboxing content and we fail to initialize, then crashing here
     // seems like the sensible option.
@@ -3753,31 +3795,38 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
 
 #if defined(MOZ_WIDGET_GTK)
   // display_name is owned by gdk.
-  const char *display_name = gdk_get_display_arg_name();
+  const char *display_name = nullptr;
   bool saveDisplayArg = false;
-  if (display_name) {
-    saveDisplayArg = true;
-  } else {
-    display_name = detectDisplay();
-    if (!display_name) {
-      return 1;
+  if (!gfxPlatform::IsHeadless()) {
+    display_name = gdk_get_display_arg_name();
+    if (display_name) {
+      saveDisplayArg = true;
+    } else {
+      display_name = DetectDisplay();
+      if (!display_name) {
+        return 1;
+      }
     }
   }
 #endif /* MOZ_WIDGET_GTK */
 #ifdef MOZ_X11
   // Init X11 in thread-safe mode. Must be called prior to the first call to XOpenDisplay
   // (called inside gdk_display_open). This is a requirement for off main tread compositing.
-  XInitThreads();
+  if (!gfxPlatform::IsHeadless()) {
+    XInitThreads();
+  }
 #endif
 #if defined(MOZ_WIDGET_GTK)
-  mGdkDisplay = gdk_display_open(display_name);
-  if (!mGdkDisplay) {
-    PR_fprintf(PR_STDERR, "Error: cannot open display: %s\n", display_name);
-    return 1;
+  if (!gfxPlatform::IsHeadless()) {
+    mGdkDisplay = gdk_display_open(display_name);
+    if (!mGdkDisplay) {
+      PR_fprintf(PR_STDERR, "Error: cannot open display: %s\n", display_name);
+      return 1;
+    }
+    gdk_display_manager_set_default_display (gdk_display_manager_get(),
+                                             mGdkDisplay);
   }
-  gdk_display_manager_set_default_display (gdk_display_manager_get(),
-                                           mGdkDisplay);
-  if (GDK_IS_X11_DISPLAY(mGdkDisplay)) {
+  if (!gfxPlatform::IsHeadless() && GDK_IS_X11_DISPLAY(mGdkDisplay)) {
     if (saveDisplayArg) {
       SaveWordToEnv("DISPLAY", nsDependentCString(display_name));
     }
@@ -4170,9 +4219,9 @@ XREMain::XRE_mainRun()
   }
   // Needs to be set after xpcom initialization.
   CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("FramePoisonBase"),
-                                     nsPrintfCString("%.16llx", uint64_t(gMozillaPoisonBase)));
+                                     nsPrintfCString("%.16" PRIu64, uint64_t(gMozillaPoisonBase)));
   CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("FramePoisonSize"),
-                                     nsPrintfCString("%lu", uint32_t(gMozillaPoisonSize)));
+                                     nsPrintfCString("%" PRIu32, uint32_t(gMozillaPoisonSize)));
 
 #ifdef XP_WIN
   PR_CreateThread(PR_USER_THREAD, AnnotateSystemManufacturer_ThreadStart, 0,
@@ -4342,9 +4391,9 @@ XREMain::XRE_mainRun()
   // Ugly details in http://bugzil.la/1175039#c27
   char appFile[MAX_PATH];
   if (GetEnvironmentVariableA("XUL_APP_FILE", appFile, sizeof(appFile))) {
-    char* saved = PR_smprintf("XUL_APP_FILE=%s", appFile);
+    char* saved = mozilla::Smprintf("XUL_APP_FILE=%s", appFile);
     PR_SetEnv(saved);
-    PR_smprintf_free(saved);
+    mozilla::SmprintfFree(saved);
   }
 #endif
 
@@ -4691,7 +4740,9 @@ XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig)
     }
 
 #ifdef MOZ_WIDGET_GTK
-    MOZ_gdk_display_close(mGdkDisplay);
+    if (!gfxPlatform::IsHeadless()) {
+      MOZ_gdk_display_close(mGdkDisplay);
+    }
 #endif
 
     rv = LaunchChild(mNativeApp, true);
@@ -4706,7 +4757,9 @@ XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig)
 #ifdef MOZ_WIDGET_GTK
   // gdk_display_close also calls gdk_display_manager_set_default_display
   // appropriately when necessary.
-  MOZ_gdk_display_close(mGdkDisplay);
+  if (!gfxPlatform::IsHeadless()) {
+    MOZ_gdk_display_close(mGdkDisplay);
+  }
 #endif
 
 #ifdef MOZ_CRASHREPORTER

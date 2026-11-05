@@ -7,7 +7,9 @@
 #include <iostream>
 #include <vector>
 
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/Move.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/SyncRunnable.h"
 #include "VideoConduit.h"
 #include "AudioConduit.h"
@@ -22,8 +24,6 @@
 #include "gmp-video-host.h"
 #include "gmp-video-frame-i420.h"
 #include "gmp-video-frame-encoded.h"
-
-#include "webrtc/video_engine/include/vie_external_codec.h"
 
 namespace mozilla {
 
@@ -105,28 +105,22 @@ WebrtcGmpVideoEncoder::~WebrtcGmpVideoEncoder()
 }
 
 static int
-WebrtcFrameTypeToGmpFrameType(webrtc::VideoFrameType aIn,
+WebrtcFrameTypeToGmpFrameType(webrtc::FrameType aIn,
                               GMPVideoFrameType *aOut)
 {
   MOZ_ASSERT(aOut);
   switch(aIn) {
-    case webrtc::kKeyFrame:
+    case webrtc::kVideoFrameKey:
       *aOut = kGMPKeyFrame;
       break;
-    case webrtc::kDeltaFrame:
+    case webrtc::kVideoFrameDelta:
       *aOut = kGMPDeltaFrame;
       break;
-    case webrtc::kGoldenFrame:
-      *aOut = kGMPGoldenFrame;
-      break;
-    case webrtc::kAltRefFrame:
-      *aOut = kGMPAltRefFrame;
-      break;
-    case webrtc::kSkipFrame:
+    case webrtc::kEmptyFrame:
       *aOut = kGMPSkipFrame;
       break;
     default:
-      MOZ_CRASH("Unexpected VideoFrameType");
+      MOZ_CRASH("Unexpected webrtc::FrameType");
   }
 
   return WEBRTC_VIDEO_CODEC_OK;
@@ -134,24 +128,18 @@ WebrtcFrameTypeToGmpFrameType(webrtc::VideoFrameType aIn,
 
 static int
 GmpFrameTypeToWebrtcFrameType(GMPVideoFrameType aIn,
-                              webrtc::VideoFrameType *aOut)
+                              webrtc::FrameType *aOut)
 {
   MOZ_ASSERT(aOut);
   switch(aIn) {
     case kGMPKeyFrame:
-      *aOut = webrtc::kKeyFrame;
+      *aOut = webrtc::kVideoFrameKey;
       break;
     case kGMPDeltaFrame:
-      *aOut = webrtc::kDeltaFrame;
-      break;
-    case kGMPGoldenFrame:
-      *aOut = webrtc::kGoldenFrame;
-      break;
-    case kGMPAltRefFrame:
-      *aOut = webrtc::kAltRefFrame;
+      *aOut = webrtc::kVideoFrameDelta;
       break;
     case kGMPSkipFrame:
-      *aOut = webrtc::kSkipFrame;
+      *aOut = webrtc::kEmptyFrame;
       break;
     default:
       MOZ_CRASH("Unexpected GMPVideoFrameType");
@@ -327,9 +315,9 @@ WebrtcGmpVideoEncoder::InitEncoderForSize(unsigned short aWidth,
 
 
 int32_t
-WebrtcGmpVideoEncoder::Encode(const webrtc::I420VideoFrame& aInputImage,
+WebrtcGmpVideoEncoder::Encode(const webrtc::VideoFrame& aInputImage,
                               const webrtc::CodecSpecificInfo* aCodecSpecificInfo,
-                              const std::vector<webrtc::VideoFrameType>* aFrameTypes)
+                              const std::vector<webrtc::FrameType>* aFrameTypes)
 {
   MOZ_ASSERT(aInputImage.width() >= 0 && aInputImage.height() >= 0);
   // Would be really nice to avoid this sync dispatch, but it would require a
@@ -375,9 +363,9 @@ WebrtcGmpVideoEncoder::RegetEncoderForResolutionChange(
 }
 
 int32_t
-WebrtcGmpVideoEncoder::Encode_g(const webrtc::I420VideoFrame* aInputImage,
+WebrtcGmpVideoEncoder::Encode_g(const webrtc::VideoFrame* aInputImage,
                                 const webrtc::CodecSpecificInfo* aCodecSpecificInfo,
-                                const std::vector<webrtc::VideoFrameType>* aFrameTypes)
+                                const std::vector<webrtc::FrameType>* aFrameTypes)
 {
   if (!mGMP) {
     // destroyed via Terminate(), failed to init, or just not initted yet
@@ -540,11 +528,11 @@ WebrtcGmpVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
 {
   MutexAutoLock lock(mCallbackMutex);
   if (mCallback) {
-    webrtc::VideoFrameType ft;
+    webrtc::FrameType ft;
     GmpFrameTypeToWebrtcFrameType(aEncodedFrame->FrameType(), &ft);
     uint32_t timestamp = (aEncodedFrame->TimeStamp() * 90ll + 999)/1000;
 
-    LOGD(("GMP Encoded: %llu, type %d, len %d",
+    LOGD(("GMP Encoded: %" PRIu64 ", type %d, len %d",
          aEncodedFrame->TimeStamp(),
          aEncodedFrame->BufferType(),
          aEncodedFrame->Size()));
@@ -871,7 +859,7 @@ WebrtcGmpVideoDecoder::Decode_g(const webrtc::EncodedImage& aInputImage,
   nsTArray<uint8_t> codecSpecificInfo;
   codecSpecificInfo.AppendElements((uint8_t*)&info, sizeof(GMPCodecSpecificInfo));
 
-  LOGD(("GMP Decode: %llu, len %d", frame->TimeStamp(), aInputImage._length));
+  LOGD(("GMP Decode: %" PRIu64 ", len %" PRIuSIZE, frame->TimeStamp(), aInputImage._length));
   nsresult rv = mGMP->Decode(Move(frame),
                              aMissingFrames,
                              codecSpecificInfo,
@@ -939,7 +927,7 @@ WebrtcGmpVideoDecoder::Decoded(GMPVideoi420Frame* aDecodedFrame)
 {
   MutexAutoLock lock(mCallbackMutex);
   if (mCallback) {
-    webrtc::I420VideoFrame image;
+    webrtc::VideoFrame image;
     int ret = image.CreateFrame(aDecodedFrame->Buffer(kGMPYPlane),
                                 aDecodedFrame->Buffer(kGMPUPlane),
                                 aDecodedFrame->Buffer(kGMPVPlane),
@@ -954,7 +942,7 @@ WebrtcGmpVideoDecoder::Decoded(GMPVideoi420Frame* aDecodedFrame)
     image.set_timestamp((aDecodedFrame->Timestamp() * 90ll + 999)/1000); // round up
     image.set_render_time_ms(0);
 
-    LOGD(("GMP Decoded: %llu", aDecodedFrame->Timestamp()));
+    LOGD(("GMP Decoded: %" PRIu64, aDecodedFrame->Timestamp()));
     mCallback->Decoded(image);
   }
   aDecodedFrame->Destroy();

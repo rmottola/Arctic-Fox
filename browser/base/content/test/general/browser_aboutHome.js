@@ -575,9 +575,7 @@ function* withSnippetsMap(setupFn, testFn, testArgs = null) {
           let document = content.document;
           // We're not using Promise-based listeners, because they resolve asynchronously.
           // The snippets test setup code relies on synchronous behaviour here.
-          document.addEventListener("AboutHomeLoadSnippets", function loadSnippets() {
-            document.removeEventListener("AboutHomeLoadSnippets", loadSnippets);
-
+          document.addEventListener("AboutHomeLoadSnippets", function() {
             let updateSnippets;
             if (args.setupFnSource) {
               updateSnippets = eval(`(() => (${args.setupFnSource}))()`);

@@ -38,11 +38,14 @@ fn main() {
     let shaders_file = Path::new(&out_dir).join("shaders.rs");
     let mut glsl_files = vec![];
 
+    println!("cargo:rerun-if-changed=res");
     let res_dir = Path::new("res");
     for entry in read_dir(res_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
+
         if entry.file_name().to_str().unwrap().ends_with(".glsl") {
+            println!("cargo:rerun-if-changed={}", path.display());
             glsl_files.push(path.to_owned());
         }
     }

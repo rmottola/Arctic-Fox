@@ -727,8 +727,9 @@ public:
   #undef STYLE_STRUCT
 
   /** Also forward GetVisitedDependentColor to the style context */
-  nscolor GetVisitedDependentColor(nsCSSPropertyID aProperty)
-    { return mStyleContext->GetVisitedDependentColor(aProperty); }
+  template<typename T, typename S>
+  nscolor GetVisitedDependentColor(T S::* aField)
+    { return mStyleContext->GetVisitedDependentColor(aField); }
 
   /**
    * These methods are to access any additional style contexts that
@@ -1161,7 +1162,7 @@ public:
   /**
    * Get the size, in app units, of the border radii. It returns FALSE iff all
    * returned radii == 0 (so no border radii), TRUE otherwise.
-   * For the aRadii indexes, use the NS_CORNER_* constants in nsStyleConsts.h
+   * For the aRadii indexes, use the enum HalfCorner constants in gfx/2d/Types.h
    * If a side is skipped via aSkipSides, its corners are forced to 0.
    *
    * All corner radii are then adjusted so they do not require more
@@ -1188,7 +1189,7 @@ public:
    * padding box, out to outline box) by reducing radii or increasing
    * nonzero radii as appropriate.
    *
-   * Indices into aRadii are the NS_CORNER_* constants in nsStyleConsts.h
+   * Indices into aRadii are the enum HalfCorner constants in gfx/2d/Types.h
    *
    * Note that InsetBorderRadii is lossy, since it can turn nonzero
    * radii into zero, and OutsetBorderRadii does not inflate zero radii.
@@ -1200,8 +1201,8 @@ public:
 
   /**
    * Fill in border radii for this frame.  Return whether any are nonzero.
-   * Indices into aRadii are the NS_CORNER_* constants in nsStyleConsts.h
-   * aSkipSides is a union of SIDE_BIT_LEFT/RIGHT/TOP/BOTTOM bits that says
+   * Indices into aRadii are the enum HalfCorner constants in gfx/2d/Types.h
+   * aSkipSides is a union of eSideBitsLeft/Right/Top/Bottom bits that says
    * which side(s) to skip.
    *
    * Note: GetMarginBoxBorderRadii() and GetShapeBoxBorderRadii() work only
@@ -1379,7 +1380,7 @@ protected:
    * implementation.
    */
   virtual void OnVisibilityChange(Visibility aNewVisibility,
-                                  Maybe<OnNonvisible> aNonvisibleAction = Nothing());
+                                  const Maybe<OnNonvisible>& aNonvisibleAction = Nothing());
 
 public:
 
@@ -1401,7 +1402,7 @@ public:
    *                          associated with to discard their surfaces if
    *                          possible.
    */
-  void DecApproximateVisibleCount(Maybe<OnNonvisible> aNonvisibleAction = Nothing());
+  void DecApproximateVisibleCount(const Maybe<OnNonvisible>& aNonvisibleAction = Nothing());
   void IncApproximateVisibleCount();
 
 
@@ -2020,11 +2021,29 @@ public:
   };
 
   struct InlinePrefISizeData : public InlineIntrinsicISizeData {
+    typedef mozilla::StyleClear StyleClear;
+
     InlinePrefISizeData()
       : mLineIsEmpty(true)
     {}
 
-    void ForceBreak();
+    /**
+     * Finish the current line and start a new line.
+     *
+     * @param aBreakType controls whether isize of floats are considered
+     * and what floats are kept for the next line:
+     *  * |None| skips handling floats, which means no floats are
+     *    removed, and isizes of floats are not considered either.
+     *  * |Both| takes floats into consideration when computing isize
+     *    of the current line, and removes all floats after that.
+     *  * |Left| and |Right| do the same as |Both| except that they only
+     *    remove floats on the given side, and any floats on the other
+     *    side that are prior to a float on the given side that has a
+     *    'clear' property that clears them.
+     * All other values of StyleClear must be converted to the four
+     * physical values above for this function.
+     */
+    void ForceBreak(StyleClear aBreakType = StyleClear::Both);
 
     // The default implementation for nsIFrame::AddInlinePrefISize.
     void DefaultAddInlinePrefISize(nscoord aISize);

@@ -14,6 +14,7 @@
 
 #include "mozilla/Assertions.h"
 #include "mozilla/Atomics.h"
+#include "mozilla/Attributes.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MacroForEach.h"
 
@@ -169,20 +170,7 @@ public:
   {
   }
 
-  operator LogModule*()
-  {
-    // NB: The use of an atomic makes the reading and assignment of mLog
-    //     thread-safe. There is a small chance that mLog will be set more
-    //     than once, but that's okay as it will be set to the same LogModule
-    //     instance each time. Also note LogModule::Get is thread-safe.
-    LogModule* tmp = mLog;
-    if (MOZ_UNLIKELY(!tmp)) {
-      tmp = LogModule::Get(mLogName);
-      mLog = tmp;
-    }
-
-    return tmp;
-  }
+  operator LogModule*();
 
 private:
   const char* const mLogName;
@@ -203,7 +191,7 @@ inline bool log_test(const PRLogModuleInfo* module, LogLevel level) {
  */
 void log_print(const PRLogModuleInfo* aModule,
                       LogLevel aLevel,
-                      const char* aFmt, ...);
+                      const char* aFmt, ...) MOZ_FORMAT_PRINTF(3, 4);
 
 inline bool log_test(const LogModule* module, LogLevel level) {
   MOZ_ASSERT(level != LogLevel::Disabled);
@@ -212,7 +200,7 @@ inline bool log_test(const LogModule* module, LogLevel level) {
 
 void log_print(const LogModule* aModule,
                LogLevel aLevel,
-               const char* aFmt, ...);
+               const char* aFmt, ...) MOZ_FORMAT_PRINTF(3, 4);
 } // namespace detail
 
 } // namespace mozilla

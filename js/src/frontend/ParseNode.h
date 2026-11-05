@@ -16,7 +16,7 @@ namespace js {
 namespace frontend {
 
 class ParseContext;
-class FullParseHandler;
+class FullParseHandlerBase;
 class FunctionBox;
 class ObjectBox;
 
@@ -54,6 +54,7 @@ class ObjectBox;
     F(TRUE) \
     F(FALSE) \
     F(NULL) \
+    F(RAW_UNDEFINED) \
     F(THIS) \
     F(FUNCTION) \
     F(MODULE) \
@@ -82,6 +83,7 @@ class ObjectBox;
     F(THROW) \
     F(DEBUGGER) \
     F(GENERATOR) \
+    F(INITIALYIELD) \
     F(YIELD) \
     F(YIELD_STAR) \
     F(GENEXP) \
@@ -351,8 +353,7 @@ IsTypeofKind(ParseNodeKind kind)
  * PNK_NEG
  * PNK_VOID,    unary       pn_kid: UNARY expr
  * PNK_NOT,
- * PNK_BITNOT,
- * PNK_AWAIT
+ * PNK_BITNOT
  * PNK_TYPEOFNAME, unary    pn_kid: UNARY expr
  * PNK_TYPEOFEXPR
  * PNK_PREINCREMENT, unary  pn_kid: MEMBER expr
@@ -406,7 +407,8 @@ IsTypeofKind(ParseNodeKind kind)
  * PNK_NUMBER   dval        pn_dval: double value of numeric literal
  * PNK_TRUE,    nullary     pn_op: JSOp bytecode
  * PNK_FALSE,
- * PNK_NULL
+ * PNK_NULL,
+ * PNK_RAW_UNDEFINED
  *
  * PNK_THIS,        unary   pn_kid: '.this' Name if function `this`, else nullptr
  * PNK_SUPERBASE    unary   pn_kid: '.this' Name
@@ -416,8 +418,10 @@ IsTypeofKind(ParseNodeKind kind)
  * PNK_LEXICALSCOPE scope   pn_u.scope.bindings: scope bindings
  *                          pn_u.scope.body: scope body
  * PNK_GENERATOR    nullary
- * PNK_YIELD,       binary  pn_left: expr or null; pn_right: generator object
- * PNK_YIELD_STAR
+ * PNK_INITIALYIELD unary   pn_kid: generator object
+ * PNK_YIELD,       unary   pn_kid: expr or null
+ * PNK_YIELD_STAR,
+ * PNK_AWAIT
  * PNK_ARRAYCOMP    list    pn_count: 1
  *                          pn_head: list of 1 element, which is block
  *                          enclosing for loop(s) and optionally
@@ -606,7 +610,7 @@ class ParseNode
      */
     static ParseNode*
     appendOrCreateList(ParseNodeKind kind, JSOp op, ParseNode* left, ParseNode* right,
-                       FullParseHandler* handler, ParseContext* pc);
+                       FullParseHandlerBase* handler, ParseContext* pc);
 
     inline PropertyName* name() const;
     inline JSAtom* atom() const;
@@ -649,14 +653,12 @@ class ParseNode
         MOZ_ASSERT(pn_arity == PN_CODE && getKind() == PNK_FUNCTION);
         MOZ_ASSERT(isOp(JSOP_LAMBDA) ||        // lambda, genexpr
                    isOp(JSOP_LAMBDA_ARROW) ||  // arrow function
-                   isOp(JSOP_FUNWITHPROTO) ||  // already emitted lambda with needsProto
                    isOp(JSOP_DEFFUN) ||        // non-body-level function statement
                    isOp(JSOP_NOP) ||           // body-level function stmt in global code
                    isOp(JSOP_GETLOCAL) ||      // body-level function stmt in function code
                    isOp(JSOP_GETARG) ||        // body-level function redeclaring formal
                    isOp(JSOP_INITLEXICAL));    // block-level function stmt
-        return !isOp(JSOP_LAMBDA) && !isOp(JSOP_LAMBDA_ARROW) &&
-               !isOp(JSOP_FUNWITHPROTO) && !isOp(JSOP_DEFFUN);
+        return !isOp(JSOP_LAMBDA) && !isOp(JSOP_LAMBDA_ARROW) && !isOp(JSOP_DEFFUN);
     }
 
     /*
@@ -688,7 +690,8 @@ class ParseNode
                isKind(PNK_STRING) ||
                isKind(PNK_TRUE) ||
                isKind(PNK_FALSE) ||
-               isKind(PNK_NULL);
+               isKind(PNK_NULL) ||
+               isKind(PNK_RAW_UNDEFINED);
     }
 
     /* Return true if this node appears in a Directive Prologue. */
@@ -787,7 +790,7 @@ class ParseNode
         ForCopyOnWriteArray
     };
 
-    MOZ_MUST_USE bool getConstantValue(ExclusiveContext* cx, AllowConstantObjects allowObjects,
+    MOZ_MUST_USE bool getConstantValue(JSContext* cx, AllowConstantObjects allowObjects,
                                        MutableHandleValue vp, Value* compare = nullptr,
                                        size_t ncompare = 0, NewObjectKind newKind = TenuredObject);
     inline bool isConstant();
@@ -1143,6 +1146,16 @@ class NullLiteral : public ParseNode
     explicit NullLiteral(const TokenPos& pos) : ParseNode(PNK_NULL, JSOP_NULL, PN_NULLARY, pos) { }
 };
 
+// This is only used internally, currently just for tagged templates.
+// It represents the value 'undefined' (aka `void 0`), like NullLiteral
+// represents the value 'null'.
+class RawUndefinedLiteral : public ParseNode
+{
+  public:
+    explicit RawUndefinedLiteral(const TokenPos& pos)
+      : ParseNode(PNK_RAW_UNDEFINED, JSOP_UNDEFINED, PN_NULLARY, pos) { }
+};
+
 class BooleanLiteral : public ParseNode
 {
   public:
@@ -1233,7 +1246,7 @@ struct CallSiteNode : public ListNode {
         return node.isKind(PNK_CALLSITEOBJ);
     }
 
-    MOZ_MUST_USE bool getRawArrayValue(ExclusiveContext* cx, MutableHandleValue vp) {
+    MOZ_MUST_USE bool getRawArrayValue(JSContext* cx, MutableHandleValue vp) {
         return pn_head->getConstantValue(cx, AllowObjects, vp);
     }
 };
@@ -1298,8 +1311,9 @@ struct ClassNames : public BinaryNode {
 };
 
 struct ClassNode : public TernaryNode {
-    ClassNode(ParseNode* names, ParseNode* heritage, ParseNode* methodsOrBlock)
-      : TernaryNode(PNK_CLASS, JSOP_NOP, names, heritage, methodsOrBlock)
+    ClassNode(ParseNode* names, ParseNode* heritage, ParseNode* methodsOrBlock,
+              const TokenPos& pos)
+      : TernaryNode(PNK_CLASS, JSOP_NOP, names, heritage, methodsOrBlock, pos)
     {
         MOZ_ASSERT_IF(names, names->is<ClassNames>());
         MOZ_ASSERT(methodsOrBlock->is<LexicalScopeNode>() ||
@@ -1340,7 +1354,7 @@ void DumpParseTree(ParseNode* pn, int indent = 0);
 class ParseNodeAllocator
 {
   public:
-    explicit ParseNodeAllocator(ExclusiveContext* cx, LifoAlloc& alloc)
+    explicit ParseNodeAllocator(JSContext* cx, LifoAlloc& alloc)
       : cx(cx), alloc(alloc), freelist(nullptr)
     {}
 
@@ -1350,7 +1364,7 @@ class ParseNodeAllocator
     void prepareNodeForMutation(ParseNode* pn);
 
   private:
-    ExclusiveContext* cx;
+    JSContext* cx;
     LifoAlloc& alloc;
     ParseNode* freelist;
 };
@@ -1363,6 +1377,7 @@ ParseNode::isConstant()
       case PNK_STRING:
       case PNK_TEMPLATE_STRING:
       case PNK_NULL:
+      case PNK_RAW_UNDEFINED:
       case PNK_FALSE:
       case PNK_TRUE:
         return true;

@@ -76,8 +76,7 @@ function testHarnessSteps() {
         ["dom.indexedDB.testing", true],
         ["dom.indexedDB.experimental", true],
         ["dom.archivereader.enabled", true],
-        ["dom.workers.latestJSVersion", true],
-        ["javascript.options.wasm", true]
+        ["dom.workers.latestJSVersion", true]
       ]
     },
     nextTestHarnessStep

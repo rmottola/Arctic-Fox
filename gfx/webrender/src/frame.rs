@@ -3,32 +3,24 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use app_units::Au;
-use euclid::Point3D;
 use fnv::FnvHasher;
-use geometry::ray_intersects_rect;
 use internal_types::{ANGLE_FLOAT_TO_FIXED, AxisDirection};
-use internal_types::{CompositionOp};
 use internal_types::{LowLevelFilterOp};
 use internal_types::{RendererFrame};
-use layer::{Layer, ScrollingState};
+use frame_builder::{FrameBuilder, FrameBuilderConfig};
+use clip_scroll_node::ClipScrollNode;
+use clip_scroll_tree::{ClipScrollTree, ScrollStates};
+use profiler::TextureCacheProfileCounters;
 use resource_cache::ResourceCache;
-use scene::Scene;
-use std::collections::{HashMap, HashSet};
+use scene::{Scene, SceneProperties};
+use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use tiling::{AuxiliaryListsMap, FrameBuilder, FrameBuilderConfig, LayerMap, PrimitiveFlags};
-use webrender_traits::{AuxiliaryLists, PipelineId, Epoch, ScrollPolicy, ScrollLayerId};
-use webrender_traits::{ClipRegion, ColorF, DisplayItem, StackingContext, FilterOp, MixBlendMode};
-use webrender_traits::{ScrollEventPhase, ScrollLayerInfo, ScrollLocation, SpecificDisplayItem, ScrollLayerState};
-use webrender_traits::{LayerRect, LayerPoint, LayerSize};
-use webrender_traits::{ServoScrollRootId, ScrollLayerRect, as_scroll_parent_rect, ScrollLayerPixel};
-use webrender_traits::{WorldPoint, WorldPoint4D};
-use webrender_traits::{LayerToScrollTransform, ScrollToWorldTransform};
-
-#[cfg(target_os = "macos")]
-const CAN_OVERSCROLL: bool = true;
-
-#[cfg(not(target_os = "macos"))]
-const CAN_OVERSCROLL: bool = false;
+use tiling::{AuxiliaryListsMap, CompositeOps, PrimitiveFlags};
+use webrender_traits::{AuxiliaryLists, ClipRegion, ColorF, DisplayItem, Epoch, FilterOp};
+use webrender_traits::{LayerPoint, LayerRect, LayerSize, LayerToScrollTransform, LayoutTransform, TileOffset};
+use webrender_traits::{MixBlendMode, PipelineId, ScrollEventPhase, ScrollLayerId, ScrollLayerState};
+use webrender_traits::{ScrollLocation, ScrollPolicy, ServoScrollRootId, SpecificDisplayItem};
+use webrender_traits::{StackingContext, WorldPoint, ImageDisplayItem, DeviceUintSize};
 
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
 pub struct FrameId(pub u32);
@@ -37,19 +29,16 @@ static DEFAULT_SCROLLBAR_COLOR: ColorF = ColorF { r: 0.3, g: 0.3, b: 0.3, a: 0.6
 
 struct FlattenContext<'a> {
     scene: &'a Scene,
-    pipeline_sizes: &'a mut HashMap<PipelineId, LayerSize>,
     builder: &'a mut FrameBuilder,
+    resource_cache: &'a mut ResourceCache,
 }
 
 // TODO: doc
 pub struct Frame {
-    pub layers: LayerMap,
+    pub clip_scroll_tree: ClipScrollTree,
     pub pipeline_epoch_map: HashMap<PipelineId, Epoch, BuildHasherDefault<FnvHasher>>,
     pub pipeline_auxiliary_lists: AuxiliaryListsMap,
-    pub root_scroll_layer_id: Option<ScrollLayerId>,
-    pending_scroll_offsets: HashMap<(PipelineId, ServoScrollRootId), LayerPoint>,
     id: FrameId,
-    debug: bool,
     frame_builder_config: FrameBuilderConfig,
     frame_builder: Option<FrameBuilder>,
 }
@@ -70,84 +59,71 @@ impl DisplayListHelpers for Vec<DisplayItem> {
 }
 
 trait StackingContextHelpers {
-    fn needs_composition_operation_for_mix_blend_mode(&self) -> bool;
-    fn composition_operations(&self, auxiliary_lists: &AuxiliaryLists) -> Vec<CompositionOp>;
+    fn mix_blend_mode_for_compositing(&self) -> Option<MixBlendMode>;
+    fn filter_ops_for_compositing(&self,
+                                  auxiliary_lists: &AuxiliaryLists,
+                                  properties: &SceneProperties) -> Vec<LowLevelFilterOp>;
 }
 
 impl StackingContextHelpers for StackingContext {
-    fn needs_composition_operation_for_mix_blend_mode(&self) -> bool {
+    fn mix_blend_mode_for_compositing(&self) -> Option<MixBlendMode> {
         match self.mix_blend_mode {
-            MixBlendMode::Normal => false,
-            MixBlendMode::Multiply |
-            MixBlendMode::Screen |
-            MixBlendMode::Overlay |
-            MixBlendMode::Darken |
-            MixBlendMode::Lighten |
-            MixBlendMode::ColorDodge |
-            MixBlendMode::ColorBurn |
-            MixBlendMode::HardLight |
-            MixBlendMode::SoftLight |
-            MixBlendMode::Difference |
-            MixBlendMode::Exclusion |
-            MixBlendMode::Hue |
-            MixBlendMode::Saturation |
-            MixBlendMode::Color |
-            MixBlendMode::Luminosity => true,
+            MixBlendMode::Normal => None,
+            _ => Some(self.mix_blend_mode),
         }
     }
 
-    fn composition_operations(&self, auxiliary_lists: &AuxiliaryLists) -> Vec<CompositionOp> {
-        let mut composition_operations = vec![];
-        if self.needs_composition_operation_for_mix_blend_mode() {
-            composition_operations.push(CompositionOp::MixBlend(self.mix_blend_mode));
-        }
+    fn filter_ops_for_compositing(&self,
+                                  auxiliary_lists: &AuxiliaryLists,
+                                  properties: &SceneProperties) -> Vec<LowLevelFilterOp> {
+        let mut filters = vec![];
         for filter in auxiliary_lists.filters(&self.filters) {
             match *filter {
                 FilterOp::Blur(radius) => {
-                    composition_operations.push(CompositionOp::Filter(LowLevelFilterOp::Blur(
+                    filters.push(LowLevelFilterOp::Blur(
                         radius,
-                        AxisDirection::Horizontal)));
-                    composition_operations.push(CompositionOp::Filter(LowLevelFilterOp::Blur(
+                        AxisDirection::Horizontal));
+                    filters.push(LowLevelFilterOp::Blur(
                         radius,
-                        AxisDirection::Vertical)));
+                        AxisDirection::Vertical));
                 }
                 FilterOp::Brightness(amount) => {
-                    composition_operations.push(CompositionOp::Filter(
-                            LowLevelFilterOp::Brightness(Au::from_f32_px(amount))));
+                    filters.push(
+                            LowLevelFilterOp::Brightness(Au::from_f32_px(amount)));
                 }
                 FilterOp::Contrast(amount) => {
-                    composition_operations.push(CompositionOp::Filter(
-                            LowLevelFilterOp::Contrast(Au::from_f32_px(amount))));
+                    filters.push(
+                            LowLevelFilterOp::Contrast(Au::from_f32_px(amount)));
                 }
                 FilterOp::Grayscale(amount) => {
-                    composition_operations.push(CompositionOp::Filter(
-                            LowLevelFilterOp::Grayscale(Au::from_f32_px(amount))));
+                    filters.push(
+                            LowLevelFilterOp::Grayscale(Au::from_f32_px(amount)));
                 }
                 FilterOp::HueRotate(angle) => {
-                    composition_operations.push(CompositionOp::Filter(
+                    filters.push(
                             LowLevelFilterOp::HueRotate(f32::round(
-                                    angle * ANGLE_FLOAT_TO_FIXED) as i32)));
+                                    angle * ANGLE_FLOAT_TO_FIXED) as i32));
                 }
                 FilterOp::Invert(amount) => {
-                    composition_operations.push(CompositionOp::Filter(
-                            LowLevelFilterOp::Invert(Au::from_f32_px(amount))));
+                    filters.push(
+                            LowLevelFilterOp::Invert(Au::from_f32_px(amount)));
                 }
-                FilterOp::Opacity(amount) => {
-                    composition_operations.push(CompositionOp::Filter(
-                            LowLevelFilterOp::Opacity(Au::from_f32_px(amount))));
+                FilterOp::Opacity(ref value) => {
+                    let amount = properties.resolve_float(value, 1.0);
+                    filters.push(
+                            LowLevelFilterOp::Opacity(Au::from_f32_px(amount)));
                 }
                 FilterOp::Saturate(amount) => {
-                    composition_operations.push(CompositionOp::Filter(
-                            LowLevelFilterOp::Saturate(Au::from_f32_px(amount))));
+                    filters.push(
+                            LowLevelFilterOp::Saturate(Au::from_f32_px(amount)));
                 }
                 FilterOp::Sepia(amount) => {
-                    composition_operations.push(CompositionOp::Filter(
-                            LowLevelFilterOp::Sepia(Au::from_f32_px(amount))));
+                    filters.push(
+                            LowLevelFilterOp::Sepia(Au::from_f32_px(amount)));
                 }
             }
         }
-
-        composition_operations
+        filters
     }
 }
 
@@ -202,264 +178,57 @@ impl<'a> Iterator for DisplayListTraversal<'a> {
 }
 
 impl Frame {
-    pub fn new(debug: bool, config: FrameBuilderConfig) -> Frame {
+    pub fn new(config: FrameBuilderConfig) -> Frame {
         Frame {
             pipeline_epoch_map: HashMap::with_hasher(Default::default()),
             pipeline_auxiliary_lists: HashMap::with_hasher(Default::default()),
-            layers: HashMap::with_hasher(Default::default()),
-            root_scroll_layer_id: None,
-            pending_scroll_offsets: HashMap::new(),
+            clip_scroll_tree: ClipScrollTree::new(),
             id: FrameId(0),
-            debug: debug,
             frame_builder: None,
             frame_builder_config: config,
         }
     }
 
-    pub fn reset(&mut self)
-                 -> HashMap<ScrollLayerId, ScrollingState, BuildHasherDefault<FnvHasher>> {
+    pub fn reset(&mut self) -> ScrollStates {
         self.pipeline_epoch_map.clear();
-
-        // Free any render targets from last frame.
-        // TODO: This should really re-use existing targets here...
-        let mut old_layer_scrolling_states = HashMap::with_hasher(Default::default());
-        for (layer_id, old_layer) in &mut self.layers.drain() {
-            old_layer_scrolling_states.insert(layer_id, old_layer.scrolling);
-        }
 
         // Advance to the next frame.
         self.id.0 += 1;
 
-        old_layer_scrolling_states
+        self.clip_scroll_tree.drain()
     }
 
-    pub fn get_scroll_layer(&self, cursor: &WorldPoint, scroll_layer_id: ScrollLayerId)
-                            -> Option<ScrollLayerId> {
-        self.layers.get(&scroll_layer_id).and_then(|layer| {
-            for child_layer_id in layer.children.iter().rev() {
-                if let Some(layer_id) = self.get_scroll_layer(cursor, *child_layer_id) {
-                    return Some(layer_id);
-                }
-            }
-
-            match scroll_layer_id.info {
-                ScrollLayerInfo::Fixed => {
-                    None
-                }
-                ScrollLayerInfo::Scrollable(..) => {
-                    let inv = layer.world_viewport_transform.inverse().unwrap();
-                    let z0 = -10000.0;
-                    let z1 =  10000.0;
-
-                    let p0 = inv.transform_point4d(&WorldPoint4D::new(cursor.x, cursor.y, z0, 1.0));
-                    let p0 = Point3D::new(p0.x / p0.w,
-                                          p0.y / p0.w,
-                                          p0.z / p0.w);
-                    let p1 = inv.transform_point4d(&WorldPoint4D::new(cursor.x, cursor.y, z1, 1.0));
-                    let p1 = Point3D::new(p1.x / p1.w,
-                                          p1.y / p1.w,
-                                          p1.z / p1.w);
-
-                    let is_unscrollable = layer.content_size.width <= layer.local_viewport_rect.size.width &&
-                        layer.content_size.height <= layer.local_viewport_rect.size.height;
-                    if is_unscrollable {
-                        None
-                    } else {
-                        let result = ray_intersects_rect(p0, p1, layer.local_viewport_rect.to_untyped());
-                        if result {
-                            Some(scroll_layer_id)
-                        } else {
-                            None
-                        }
-                    }
-                }
-            }
-        })
+    pub fn get_scroll_node_state(&self) -> Vec<ScrollLayerState> {
+        self.clip_scroll_tree.get_scroll_node_state()
     }
 
-    pub fn get_scroll_layer_state(&self) -> Vec<ScrollLayerState> {
-        let mut result = vec![];
-        for (scroll_layer_id, scroll_layer) in &self.layers {
-            match scroll_layer_id.info {
-                ScrollLayerInfo::Scrollable(_, servo_scroll_root_id) => {
-                    result.push(ScrollLayerState {
-                        pipeline_id: scroll_layer.pipeline_id,
-                        scroll_root_id: servo_scroll_root_id,
-                        scroll_offset: scroll_layer.scrolling.offset,
-                    })
-                }
-                ScrollLayerInfo::Fixed => {}
-            }
-        }
-        result
+    /// Returns true if any nodes actually changed position or false otherwise.
+    pub fn scroll_nodes(&mut self,
+                        origin: LayerPoint,
+                        pipeline_id: PipelineId,
+                        scroll_root_id: ServoScrollRootId)
+                         -> bool {
+        self.clip_scroll_tree.scroll_nodes(origin, pipeline_id, scroll_root_id)
     }
 
-    /// Returns true if any layers actually changed position or false otherwise.
-    pub fn scroll_layers(&mut self,
-                         origin: LayerPoint,
-                         pipeline_id: PipelineId,
-                         scroll_root_id: ServoScrollRootId)
-                          -> bool {
-        let origin = LayerPoint::new(origin.x.max(0.0), origin.y.max(0.0));
-
-        let mut scrolled_a_layer = false;
-        let mut found_layer = false;
-        for (layer_id, layer) in self.layers.iter_mut() {
-            if layer_id.pipeline_id != pipeline_id {
-                continue;
-            }
-
-            match layer_id.info {
-                ScrollLayerInfo::Scrollable(_, id) if id != scroll_root_id => continue,
-                ScrollLayerInfo::Fixed => continue,
-                _ => {}
-            }
-
-            found_layer = true;
-            scrolled_a_layer |= layer.set_scroll_origin(&origin);
-        }
-
-        if !found_layer {
-            self.pending_scroll_offsets.insert((pipeline_id, scroll_root_id), origin);
-        }
-
-        scrolled_a_layer
-    }
-
-    /// Returns true if any layers actually changed position or false otherwise.
+    /// Returns true if any nodes actually changed position or false otherwise.
     pub fn scroll(&mut self,
                   scroll_location: ScrollLocation,
                   cursor: WorldPoint,
                   phase: ScrollEventPhase)
                   -> bool {
-        let root_scroll_layer_id = match self.root_scroll_layer_id {
-            Some(root_scroll_layer_id) => root_scroll_layer_id,
-            None => return false,
-        };
-
-        let scroll_layer_id = match self.get_scroll_layer(&cursor, root_scroll_layer_id) {
-            Some(scroll_layer_id) => scroll_layer_id,
-            None => return false,
-        };
-
-        let scroll_root_id = match scroll_layer_id.info {
-            ScrollLayerInfo::Scrollable(_, scroll_root_id) => scroll_root_id,
-            ScrollLayerInfo::Fixed => unreachable!("Tried to scroll a fixed position layer."),
-        };
-
-        let mut scrolled_a_layer = false;
-        for (layer_id, layer) in self.layers.iter_mut() {
-            if layer_id.pipeline_id != scroll_layer_id.pipeline_id {
-                continue;
-            }
-
-            match layer_id.info {
-                ScrollLayerInfo::Scrollable(_, id) if id != scroll_root_id => continue,
-                ScrollLayerInfo::Fixed => continue,
-                _ => {}
-            }
-
-            if layer.scrolling.started_bouncing_back && phase == ScrollEventPhase::Move(false) {
-                continue;
-            }
-
-            let mut delta = match scroll_location {
-                ScrollLocation::Delta(delta) => delta,
-                ScrollLocation::Start => {
-                    if layer.scrolling.offset.y.round() <= 0.0 {
-                        // Nothing to do on this layer.
-                        continue;
-                    }
-
-                    layer.scrolling.offset.y = 0.0;
-                    scrolled_a_layer = true;
-                    continue;
-                },
-                ScrollLocation::End => {
-                    let end_pos = layer.local_viewport_rect.size.height
-                                  - layer.content_size.height;
-
-                    if layer.scrolling.offset.y.round() >= end_pos {
-                        // Nothing to do on this layer.
-                        continue;
-                    }
-
-                    layer.scrolling.offset.y = end_pos;
-                    scrolled_a_layer = true;
-                    continue;
-                }
-            };
-
-            let overscroll_amount = layer.overscroll_amount();
-            let overscrolling = CAN_OVERSCROLL && (overscroll_amount.width != 0.0 ||
-                                                   overscroll_amount.height != 0.0);
-            if overscrolling {
-                if overscroll_amount.width != 0.0 {
-                    delta.x /= overscroll_amount.width.abs()
-                }
-                if overscroll_amount.height != 0.0 {
-                    delta.y /= overscroll_amount.height.abs()
-                }
-            }
-
-            let is_unscrollable =
-                layer.content_size.width <= layer.local_viewport_rect.size.width &&
-                layer.content_size.height <= layer.local_viewport_rect.size.height;
-
-            let original_layer_scroll_offset = layer.scrolling.offset;
-
-            if layer.content_size.width > layer.local_viewport_rect.size.width {
-                layer.scrolling.offset.x = layer.scrolling.offset.x + delta.x;
-                if is_unscrollable || !CAN_OVERSCROLL {
-                    layer.scrolling.offset.x = layer.scrolling.offset.x.min(0.0);
-                    layer.scrolling.offset.x =
-                        layer.scrolling.offset.x.max(-layer.content_size.width +
-                                                     layer.local_viewport_rect.size.width);
-                }
-            }
-
-            if layer.content_size.height > layer.local_viewport_rect.size.height {
-                layer.scrolling.offset.y = layer.scrolling.offset.y + delta.y;
-                if is_unscrollable || !CAN_OVERSCROLL {
-                    layer.scrolling.offset.y = layer.scrolling.offset.y.min(0.0);
-                    layer.scrolling.offset.y =
-                        layer.scrolling.offset.y.max(-layer.content_size.height +
-                                                     layer.local_viewport_rect.size.height);
-                }
-            }
-
-            if phase == ScrollEventPhase::Start || phase == ScrollEventPhase::Move(true) {
-                layer.scrolling.started_bouncing_back = false
-            } else if overscrolling &&
-                    ((delta.x < 1.0 && delta.y < 1.0) || phase == ScrollEventPhase::End) {
-                layer.scrolling.started_bouncing_back = true;
-                layer.scrolling.bouncing_back = true
-            }
-
-            layer.scrolling.offset.x = layer.scrolling.offset.x.round();
-            layer.scrolling.offset.y = layer.scrolling.offset.y.round();
-
-            if CAN_OVERSCROLL {
-                layer.stretch_overscroll_spring();
-            }
-
-            scrolled_a_layer = scrolled_a_layer ||
-                layer.scrolling.offset != original_layer_scroll_offset ||
-                layer.scrolling.started_bouncing_back;
-        }
-
-        scrolled_a_layer
+        self.clip_scroll_tree.scroll(scroll_location, cursor, phase,)
     }
 
     pub fn tick_scrolling_bounce_animations(&mut self) {
-        for (_, layer) in &mut self.layers {
-            layer.tick_scrolling_bounce_animation()
-        }
+        self.clip_scroll_tree.tick_scrolling_bounce_animations();
     }
 
-    pub fn create(&mut self,
-                  scene: &Scene,
-                  pipeline_sizes: &mut HashMap<PipelineId, LayerSize>) {
+    pub fn discard_frame_state_for_pipeline(&mut self, pipeline_id: PipelineId) {
+        self.clip_scroll_tree.discard_frame_state_for_pipeline(pipeline_id);
+    }
+
+    pub fn create(&mut self, scene: &Scene, resource_cache: &mut ResourceCache) {
         let root_pipeline_id = match scene.root_pipeline_id {
             Some(root_pipeline_id) => root_pipeline_id,
             None => return,
@@ -476,7 +245,7 @@ impl Frame {
             None => return,
         };
 
-        let old_layer_scrolling_states = self.reset();
+        let old_scrolling_states = self.reset();
         self.pipeline_auxiliary_lists = scene.pipeline_auxiliary_lists.clone();
 
         self.pipeline_epoch_map.insert(root_pipeline_id, root_pipeline.epoch);
@@ -489,78 +258,72 @@ impl Frame {
             }
         };
 
-        let root_scroll_layer_id = ScrollLayerId::root(root_pipeline_id);
-        self.root_scroll_layer_id = Some(root_scroll_layer_id);
+        self.clip_scroll_tree.establish_root(root_pipeline_id,
+                                             &root_pipeline.viewport_size,
+                                             &root_clip.main.size);
 
-        // Insert global position: fixed elements layer
-        debug_assert!(self.layers.is_empty());
-        let root_fixed_layer_id = ScrollLayerId::create_fixed(root_pipeline_id);
-        let root_viewport = LayerRect::new(LayerPoint::zero(), root_pipeline.viewport_size);
-        let layer = Layer::new(&root_viewport,
-                               root_clip.main.size,
-                               &LayerToScrollTransform::identity(),
-                               root_pipeline_id);
-        self.layers.insert(root_fixed_layer_id, layer.clone());
-        self.layers.insert(root_scroll_layer_id, layer);
+        let background_color = root_pipeline.background_color.and_then(|color| {
+            if color.a > 0.0 {
+                Some(color)
+            } else {
+                None
+            }
+        });
 
         let mut frame_builder = FrameBuilder::new(root_pipeline.viewport_size,
-                                                  self.debug,
+                                                  background_color,
                                                   self.frame_builder_config);
 
         {
             let mut context = FlattenContext {
                 scene: scene,
-                pipeline_sizes: pipeline_sizes,
                 builder: &mut frame_builder,
+                resource_cache: resource_cache
             };
 
             let mut traversal = DisplayListTraversal::new_skipping_first(display_list);
+            let reference_frame_id = self.clip_scroll_tree.root_reference_frame_id();
+            let topmost_scroll_layer_id = self.clip_scroll_tree.topmost_scroll_layer_id();
+            debug_assert!(reference_frame_id != topmost_scroll_layer_id);
+
+            let viewport_rect = LayerRect::new(LayerPoint::zero(), root_pipeline.viewport_size);
+            let clip = ClipRegion::simple(&viewport_rect);
+            context.builder.push_clip_scroll_node(reference_frame_id,
+                                                  &clip,
+                                                  &LayerPoint::zero(),
+                                                  &root_pipeline.viewport_size);
+            context.builder.push_clip_scroll_node(topmost_scroll_layer_id,
+                                                  &clip,
+                                                  &LayerPoint::zero(),
+                                                  &root_clip.main.size);
+
             self.flatten_stacking_context(&mut traversal,
                                           root_pipeline_id,
                                           &mut context,
-                                          root_fixed_layer_id,
-                                          root_scroll_layer_id,
+                                          reference_frame_id,
+                                          topmost_scroll_layer_id,
                                           LayerToScrollTransform::identity(),
                                           0,
                                           &root_stacking_context,
                                           root_clip);
+
+            context.builder.pop_clip_scroll_node();
+            context.builder.pop_clip_scroll_node();
         }
 
         self.frame_builder = Some(frame_builder);
-
-        // TODO(gw): These are all independent - can be run through thread pool if it shows up
-        // in the profile!
-        for (scroll_layer_id, layer) in &mut self.layers {
-            let scrolling_state = match old_layer_scrolling_states.get(&scroll_layer_id) {
-                Some(old_scrolling_state) => *old_scrolling_state,
-                None => ScrollingState::new(),
-            };
-
-            layer.finalize(&scrolling_state);
-
-            let scroll_root_id = match scroll_layer_id.info {
-                ScrollLayerInfo::Scrollable(_, scroll_root_id) => scroll_root_id,
-                _ => continue,
-            };
-
-
-            let pipeline_id = scroll_layer_id.pipeline_id;
-            if let Some(pending_offset) =
-                self.pending_scroll_offsets.get_mut(&(pipeline_id, scroll_root_id)) {
-                layer.set_scroll_origin(pending_offset);
-            }
-        }
+        self.clip_scroll_tree.finalize_and_apply_pending_scroll_offsets(old_scrolling_states);
     }
 
     fn flatten_scroll_layer<'a>(&mut self,
                                 traversal: &mut DisplayListTraversal<'a>,
                                 pipeline_id: PipelineId,
                                 context: &mut FlattenContext,
-                                current_fixed_layer_id: ScrollLayerId,
-                                mut current_scroll_layer_id: ScrollLayerId,
+                                current_reference_frame_id: ScrollLayerId,
+                                parent_scroll_layer_id: ScrollLayerId,
                                 layer_relative_transform: LayerToScrollTransform,
                                 level: i32,
-                                clip: &LayerRect,
+                                clip: &ClipRegion,
                                 content_size: &LayerSize,
                                 new_scroll_layer_id: ScrollLayerId) {
         // Avoid doing unnecessary work for empty stacking contexts.
@@ -569,45 +332,33 @@ impl Frame {
             return;
         }
 
-        debug_assert!(!self.layers.contains_key(&new_scroll_layer_id));
-
-        let layer = Layer::new(&clip, *content_size, &layer_relative_transform, pipeline_id);
-        debug_assert!(current_scroll_layer_id != new_scroll_layer_id);
-
-        self.layers
-            .get_mut(&current_scroll_layer_id)
-            .unwrap()
-            .add_child(new_scroll_layer_id);
-
-        self.layers.insert(new_scroll_layer_id, layer);
-        current_scroll_layer_id = new_scroll_layer_id;
-
-        let layer_rect = LayerRect::new(LayerPoint::zero(),
-                                        LayerSize::new(content_size.width + clip.origin.x,
-                                                       content_size.height + clip.origin.y));
-        context.builder.push_layer(layer_rect,
-                                   &ClipRegion::simple(&layer_rect),
-                                   LayerToScrollTransform::identity(),
-                                   pipeline_id,
-                                   current_scroll_layer_id,
-                                   &[]);
+        let clip_rect = clip.main;
+        let node = ClipScrollNode::new(&clip_rect,
+                                       *content_size,
+                                       &layer_relative_transform,
+                                       pipeline_id);
+        self.clip_scroll_tree.add_node(node, new_scroll_layer_id, parent_scroll_layer_id);
+        context.builder.push_clip_scroll_node(new_scroll_layer_id,
+                                              clip,
+                                              &clip_rect.origin,
+                                              &content_size);
 
         self.flatten_items(traversal,
                            pipeline_id,
                            context,
-                           current_fixed_layer_id,
-                           current_scroll_layer_id,
+                           current_reference_frame_id,
+                           new_scroll_layer_id,
                            LayerToScrollTransform::identity(),
                            level);
 
-        context.builder.pop_layer();
+        context.builder.pop_clip_scroll_node();
     }
 
     fn flatten_stacking_context<'a>(&mut self,
                                     traversal: &mut DisplayListTraversal<'a>,
                                     pipeline_id: PipelineId,
                                     context: &mut FlattenContext,
-                                    current_fixed_layer_id: ScrollLayerId,
+                                    current_reference_frame_id: ScrollLayerId,
                                     current_scroll_layer_id: ScrollLayerId,
                                     layer_relative_transform: LayerToScrollTransform,
                                     level: i32,
@@ -623,31 +374,44 @@ impl Frame {
             let auxiliary_lists = self.pipeline_auxiliary_lists
                                       .get(&pipeline_id)
                                       .expect("No auxiliary lists?!");
-            stacking_context.composition_operations(auxiliary_lists)
+            CompositeOps::new(
+                stacking_context.filter_ops_for_compositing(auxiliary_lists, &context.scene.properties),
+                stacking_context.mix_blend_mode_for_compositing())
         };
 
-        // Detect composition operations that will make us invisible.
-        for composition_operation in &composition_operations {
-            match *composition_operation {
-                CompositionOp::Filter(LowLevelFilterOp::Opacity(Au(0))) => {
-                    traversal.skip_current_stacking_context();
-                    return;
-                }
-                _ => {}
-            }
+        if composition_operations.will_make_invisible() {
+            traversal.skip_current_stacking_context();
+            return;
         }
 
-        let transform = layer_relative_transform.pre_translated(stacking_context.bounds.origin.x,
-                                                                stacking_context.bounds.origin.y,
-                                                                0.0)
-                                                .pre_mul(&stacking_context.transform)
-                                                .pre_mul(&stacking_context.perspective);
+        let stacking_context_transform = context.scene
+                                                .properties
+                                                .resolve_layout_transform(&stacking_context.transform);
 
-        // Build world space transform
-        let scroll_layer_id = match stacking_context.scroll_policy {
-            ScrollPolicy::Fixed => current_fixed_layer_id,
+        let mut transform =
+            layer_relative_transform.pre_translated(stacking_context.bounds.origin.x,
+                                                    stacking_context.bounds.origin.y,
+                                                    0.0)
+                                     .pre_mul(&stacking_context_transform)
+                                     .pre_mul(&stacking_context.perspective);
+
+        let mut reference_frame_id = current_reference_frame_id;
+        let mut scroll_layer_id = match stacking_context.scroll_policy {
+            ScrollPolicy::Fixed => current_reference_frame_id,
             ScrollPolicy::Scrollable => current_scroll_layer_id,
         };
+
+        // If we have a transformation, we establish a new reference frame. This means
+        // that fixed position stacking contexts are positioned relative to us.
+        if stacking_context_transform != LayoutTransform::identity() ||
+           stacking_context.perspective != LayoutTransform::identity() {
+            scroll_layer_id = self.clip_scroll_tree.add_reference_frame(clip_region.main,
+                                                                        transform,
+                                                                        pipeline_id,
+                                                                        scroll_layer_id);
+            reference_frame_id = scroll_layer_id;
+            transform = LayerToScrollTransform::identity();
+        }
 
         if level == 0 {
             if let Some(pipeline) = context.scene.pipeline_map.get(&pipeline_id) {
@@ -655,51 +419,49 @@ impl Frame {
 
                     // Adding a dummy layer for this rectangle in order to disable clipping.
                     let no_clip = ClipRegion::simple(&clip_region.main);
-                    context.builder.push_layer(clip_region.main,
-                                               &no_clip,
-                                               transform,
-                                               pipeline_id,
-                                               scroll_layer_id,
-                                               &composition_operations);
+                    context.builder.push_stacking_context(clip_region.main,
+                                                          transform,
+                                                          pipeline_id,
+                                                          scroll_layer_id,
+                                                          CompositeOps::empty());
 
                     //Note: we don't use the original clip region here,
-                    // it's already processed by the layer we just pushed.
+                    // it's already processed by the node we just pushed.
                     context.builder.add_solid_rectangle(&clip_region.main,
                                                         &no_clip,
                                                         &bg_color,
                                                         PrimitiveFlags::None);
 
-                    context.builder.pop_layer();
+                    context.builder.pop_stacking_context();
                 }
             }
         }
 
          // TODO(gw): Int with overflow etc
-        context.builder.push_layer(clip_region.main,
-                                   &clip_region,
-                                   transform,
-                                   pipeline_id,
-                                   scroll_layer_id,
-                                   &composition_operations);
+        context.builder.push_stacking_context(clip_region.main,
+                                              transform,
+                                              pipeline_id,
+                                              scroll_layer_id,
+                                              composition_operations);
 
         self.flatten_items(traversal,
                            pipeline_id,
                            context,
-                           current_fixed_layer_id,
-                           current_scroll_layer_id,
+                           reference_frame_id,
+                           scroll_layer_id,
                            transform,
                            level);
 
         if level == 0 && self.frame_builder_config.enable_scrollbars {
             let scrollbar_rect = LayerRect::new(LayerPoint::zero(), LayerSize::new(10.0, 70.0));
-            context.builder.add_solid_rectangle(&scrollbar_rect,
-                                                &ClipRegion::simple(&scrollbar_rect),
-                                                &DEFAULT_SCROLLBAR_COLOR,
-                                                PrimitiveFlags::Scrollbar(self.root_scroll_layer_id.unwrap(),
-                                                                          4.0));
+            context.builder.add_solid_rectangle(
+                &scrollbar_rect,
+                &ClipRegion::simple(&scrollbar_rect),
+                &DEFAULT_SCROLLBAR_COLOR,
+                PrimitiveFlags::Scrollbar(self.clip_scroll_tree.topmost_scroll_layer_id(), 4.0));
         }
 
-        context.builder.pop_layer();
+        context.builder.pop_stacking_context();
     }
 
     fn flatten_iframe<'a>(&mut self,
@@ -708,7 +470,6 @@ impl Frame {
                           context: &mut FlattenContext,
                           current_scroll_layer_id: ScrollLayerId,
                           layer_relative_transform: LayerToScrollTransform) {
-        context.pipeline_sizes.insert(pipeline_id, bounds.size);
 
         let pipeline = match context.scene.pipeline_map.get(&pipeline_id) {
             Some(pipeline) => pipeline,
@@ -731,40 +492,54 @@ impl Frame {
 
         self.pipeline_epoch_map.insert(pipeline_id, pipeline.epoch);
 
-        let iframe_rect = &LayerRect::new(LayerPoint::zero(), bounds.size);
+        let iframe_rect = LayerRect::new(LayerPoint::zero(), bounds.size);
         let transform = layer_relative_transform.pre_translated(bounds.origin.x,
                                                                 bounds.origin.y,
                                                                 0.0);
+        let iframe_reference_frame_id =
+            self.clip_scroll_tree.add_reference_frame(iframe_rect,
+                                                      transform,
+                                                      pipeline_id,
+                                                      current_scroll_layer_id);
+        let iframe_scroll_layer_id = ScrollLayerId::root_scroll_layer(pipeline_id);
+        let node = ClipScrollNode::new(&LayerRect::new(LayerPoint::zero(), iframe_rect.size),
+                                       iframe_clip.main.size,
+                                       &LayerToScrollTransform::identity(),
+                                       pipeline_id);
+        self.clip_scroll_tree.add_node(node.clone(),
+                                       iframe_scroll_layer_id,
+                                       iframe_reference_frame_id);
 
-        let iframe_fixed_layer_id = ScrollLayerId::create_fixed(pipeline_id);
-        let iframe_scroll_layer_id = ScrollLayerId::root(pipeline_id);
-
-        let layer = Layer::new(iframe_rect,
-                               iframe_clip.main.size,
-                               &transform,
-                               pipeline_id);
-        self.layers.insert(iframe_fixed_layer_id, layer.clone());
-        self.layers.insert(iframe_scroll_layer_id, layer);
-        self.layers.get_mut(&current_scroll_layer_id).unwrap().add_child(iframe_scroll_layer_id);
+        context.builder.push_clip_scroll_node(iframe_reference_frame_id,
+                                              iframe_clip,
+                                              &LayerPoint::zero(),
+                                              &iframe_rect.size);
+        context.builder.push_clip_scroll_node(iframe_scroll_layer_id,
+                                              iframe_clip,
+                                              &LayerPoint::zero(),
+                                              &iframe_clip.main.size);
 
         let mut traversal = DisplayListTraversal::new_skipping_first(display_list);
 
         self.flatten_stacking_context(&mut traversal,
                                       pipeline_id,
                                       context,
-                                      iframe_fixed_layer_id,
+                                      iframe_reference_frame_id,
                                       iframe_scroll_layer_id,
                                       LayerToScrollTransform::identity(),
                                       0,
                                       &iframe_stacking_context,
                                       iframe_clip);
+
+        context.builder.pop_clip_scroll_node();
+        context.builder.pop_clip_scroll_node();
     }
 
     fn flatten_items<'a>(&mut self,
                          traversal: &mut DisplayListTraversal<'a>,
                          pipeline_id: PipelineId,
                          context: &mut FlattenContext,
-                         current_fixed_layer_id: ScrollLayerId,
+                         current_reference_frame_id: ScrollLayerId,
                          current_scroll_layer_id: ScrollLayerId,
                          layer_relative_transform: LayerToScrollTransform,
                          level: i32) {
@@ -775,12 +550,22 @@ impl Frame {
                                                         &item.clip, info.context_id);
                 }
                 SpecificDisplayItem::Image(ref info) => {
-                    context.builder.add_image(item.rect,
-                                              &item.clip,
-                                              &info.stretch_size,
-                                              &info.tile_spacing,
-                                              info.image_key,
-                                              info.image_rendering);
+                    let image = context.resource_cache.get_image_properties(info.image_key);
+                    if let Some(tile_size) = image.tiling {
+                        // The image resource is tiled. We have to generate an image primitive
+                        // for each tile.
+                        let image_size = DeviceUintSize::new(image.descriptor.width, image.descriptor.height);
+                        self.decompose_tiled_image(context, &item, info, image_size, tile_size as u32);
+                    } else {
+                        context.builder.add_image(item.rect,
+                                                  &item.clip,
+                                                  &info.stretch_size,
+                                                  &info.tile_spacing,
+                                                  None,
+                                                  info.image_key,
+                                                  info.image_rendering,
+                                                  None);
+                    }
                 }
                 SpecificDisplayItem::YuvImage(ref info) => {
                     context.builder.add_yuv_image(item.rect,
@@ -797,7 +582,8 @@ impl Frame {
                                              text_info.size,
                                              text_info.blur_radius,
                                              &text_info.color,
-                                             text_info.glyphs);
+                                             text_info.glyphs,
+                                             text_info.glyph_options);
                 }
                 SpecificDisplayItem::Rectangle(ref info) => {
                     context.builder.add_solid_rectangle(&item.rect,
@@ -810,7 +596,18 @@ impl Frame {
                                                  &item.clip,
                                                  info.start_point,
                                                  info.end_point,
-                                                 info.stops);
+                                                 info.stops,
+                                                 info.extend_mode);
+                }
+                SpecificDisplayItem::RadialGradient(ref info) => {
+                    context.builder.add_radial_gradient(item.rect,
+                                                        &item.clip,
+                                                        info.start_center,
+                                                        info.start_radius,
+                                                        info.end_center,
+                                                        info.end_radius,
+                                                        info.stops,
+                                                        info.extend_mode);
                 }
                 SpecificDisplayItem::BoxShadow(ref box_shadow_info) => {
                     context.builder.add_box_shadow(&box_shadow_info.box_bounds,
@@ -829,7 +626,7 @@ impl Frame {
                     self.flatten_stacking_context(traversal,
                                                   pipeline_id,
                                                   context,
-                                                  current_fixed_layer_id,
+                                                  current_reference_frame_id,
                                                   current_scroll_layer_id,
                                                   layer_relative_transform,
                                                   level + 1,
@@ -840,11 +637,11 @@ impl Frame {
                     self.flatten_scroll_layer(traversal,
                                               pipeline_id,
                                               context,
-                                              current_fixed_layer_id,
+                                              current_reference_frame_id,
                                               current_scroll_layer_id,
                                               layer_relative_transform,
                                               level,
-                                              &item.rect,
+                                              &item.clip,
                                               &info.content_size,
                                               info.id);
                 }
@@ -861,113 +658,225 @@ impl Frame {
         }
     }
 
+    fn decompose_tiled_image(&mut self,
+                             context: &mut FlattenContext,
+                             item: &DisplayItem,
+                             info: &ImageDisplayItem,
+                             image_size: DeviceUintSize,
+                             tile_size: u32) {
+        // The image resource is tiled. We have to generate an image primitive
+        // for each tile.
+        // We need to do this because the image is broken up into smaller tiles in the texture
+        // cache and the image shader is not able to work with this type of sparse representation.
+
+        // The tiling logic works as follows:
+        //
+        //  ###################-+  -+
+        //  #    |    |    |//# |   | image size
+        //  #    |    |    |//# |   |
+        //  #----+----+----+--#-+   |  -+ 
+        //  #    |    |    |//# |   |   | regular tile size
+        //  #    |    |    |//# |   |   |
+        //  #----+----+----+--#-+   |  -+-+
+        //  #////|////|////|//# |   |     | "leftover" height
+        //  ################### |  -+  ---+
+        //  #----+----+----+----+
+        //
+        // In the ascii diagram above, a large image is plit into tiles of almost regular size.
+        // The tiles on the right and bottom edges (hatched in the diagram) are smaller than
+        // the regular tiles and are handled separately in the code see leftover_width/height.
+        // each generated image primitive corresponds to a tile in the texture cache, with the
+        // assumption that the smaller tiles with leftover sizes are sized to fit their own
+        // irregular size in the texture cache.
+
+        // TODO(nical) supporting tiled repeated images isn't implemented yet.
+        // One way to implement this is to have another level of decomposition on top of this one,
+        // and generate a set of image primitive per repetition just like we have a primitive
+        // per tile here.
+        //
+        // For the case where we don't tile along an axis, we can still perform the repetition in
+        // the shader (for this particular axis), and it is worth special-casing for this to avoid
+        // generating many primitives.
+        // This can happen with very tall and thin images used as a repeating background.
+        // Apparently web authors do that...
+
+        let mut stretch_size = info.stretch_size;
+
+        let mut repeat_x = false;
+        let mut repeat_y = false;
+
+        if stretch_size.width < item.rect.size.width {
+            if image_size.width < tile_size {
+                // we don't actually tile in this dimmension so repeating can be done in the shader.
+                repeat_x = true;
+            } else {
+                println!("Unimplemented! repeating a tiled image (x axis)");
+                stretch_size.width = item.rect.size.width;
+            }
+        }
+
+        if stretch_size.height < item.rect.size.height {
+                // we don't actually tile in this dimmension so repeating can be done in the shader.
+            if image_size.height < tile_size {
+                repeat_y = true;
+            } else {
+                println!("Unimplemented! repeating a tiled image (y axis)");
+                stretch_size.height = item.rect.size.height;
+            }
+        }
+
+        let tile_size_f32 = tile_size as f32;
+
+        // Note: this rounds down so it excludes the partially filled tiles on the right and
+        // bottom edges (we handle them separately below).
+        let num_tiles_x = (image_size.width / tile_size) as u16;
+        let num_tiles_y = (image_size.height / tile_size) as u16;
+
+        // Ratio between (image space) tile size and image size.
+        let img_dw = tile_size_f32 / (image_size.width as f32);
+        let img_dh = tile_size_f32 / (image_size.height as f32);
+
+        // Strected size of the tile in layout space.
+        let stretched_tile_size = LayerSize::new(
+            img_dw * stretch_size.width,
+            img_dh * stretch_size.height
+        );
+
+        // The size in pixels of the tiles on the right and bottom edges, smaller
+        // than the regular tile size if the image is not a multiple of the tile size.
+        // Zero means the image size is a multiple of the tile size.
+        let leftover = DeviceUintSize::new(image_size.width % tile_size, image_size.height % tile_size);
+
+        for ty in 0..num_tiles_y {
+            for tx in 0..num_tiles_x {
+                self.add_tile_primitive(context, item, info,
+                                        TileOffset::new(tx, ty),
+                                        stretched_tile_size,
+                                        1.0, 1.0,
+                                        repeat_x, repeat_y);
+            }
+            if leftover.width != 0 {
+                // Tiles on the right edge that are smaller than the tile size.
+                self.add_tile_primitive(context, item, info,
+                                        TileOffset::new(num_tiles_x, ty),
+                                        stretched_tile_size,
+                                        (leftover.width as f32) / tile_size_f32,
+                                        1.0,
+                                        repeat_x, repeat_y);
+            }
+        }
+
+        if leftover.height != 0 {
+            for tx in 0..num_tiles_x {
+                // Tiles on the bottom edge that are smaller than the tile size.
+                self.add_tile_primitive(context, item, info,
+                                        TileOffset::new(tx, num_tiles_y),
+                                        stretched_tile_size,
+                                        1.0,
+                                        (leftover.height as f32) / tile_size_f32,
+                                        repeat_x, repeat_y);
+            }
+
+            if leftover.width != 0 {
+                // Finally, the bottom-right tile with a "leftover" size.
+                self.add_tile_primitive(context, item, info,
+                                        TileOffset::new(num_tiles_x, num_tiles_y),
+                                        stretched_tile_size,
+                                        (leftover.width as f32) / tile_size_f32,
+                                        (leftover.height as f32) / tile_size_f32,
+                                        repeat_x, repeat_y);
+            }
+        }
+    }
+
+    fn add_tile_primitive(&mut self,
+                          context: &mut FlattenContext,
+                          item: &DisplayItem,
+                          info: &ImageDisplayItem,
+                          tile_offset: TileOffset,
+                          stretched_tile_size: LayerSize,
+                          tile_ratio_width: f32,
+                          tile_ratio_height: f32,
+                          repeat_x: bool,
+                          repeat_y: bool) {
+        // If the the image is tiled along a given axis, we can't have the shader compute
+        // the image repetition pattern. In this case we base the primitive's rectangle size
+        // on the stretched tile size which effectively cancels the repetion (and repetition
+        // has to be emulated by generating more primitives).
+        // If the image is not tiling along this axis, we can perform the repetition in the
+        // shader. in this case we use the item's size in the primitive (on that particular
+        // axis).
+        // See the repeat_x/y code below.
+
+        let stretched_size = LayerSize::new(
+            stretched_tile_size.width * tile_ratio_width,
+            stretched_tile_size.height * tile_ratio_height,
+        );
+
+        let mut prim_rect = LayerRect::new(
+            item.rect.origin + LayerPoint::new(
+                tile_offset.x as f32 * stretched_tile_size.width,
+                tile_offset.y as f32 * stretched_tile_size.height,
+            ),
+            stretched_size,
+        );
+
+        if repeat_x {
+            assert_eq!(tile_offset.x, 0);
+            prim_rect.size.width = item.rect.size.width;
+        }
+
+        if repeat_y {
+            assert_eq!(tile_offset.y, 0);
+            prim_rect.size.height = item.rect.size.height;
+        }
+
+        // Fix up the primitive's rect if it overflows the original item rect.
+        if let Some(prim_rect) = prim_rect.intersection(&item.rect) {
+            context.builder.add_image(prim_rect,
+                                      &item.clip,
+                                      &stretched_size,
+                                      &info.tile_spacing,
+                                      None,
+                                      info.image_key,
+                                      info.image_rendering,
+                                      Some(tile_offset));
+        }
+    }
+
     pub fn build(&mut self,
                  resource_cache: &mut ResourceCache,
                  auxiliary_lists_map: &AuxiliaryListsMap,
-                 device_pixel_ratio: f32)
+                 device_pixel_ratio: f32,
+                 texture_cache_profile: &mut TextureCacheProfileCounters)
                  -> RendererFrame {
-        self.update_layer_transforms();
+        self.clip_scroll_tree.update_all_node_transforms();
         let frame = self.build_frame(resource_cache,
                                      auxiliary_lists_map,
-                                     device_pixel_ratio);
+                                     device_pixel_ratio,
+                                     texture_cache_profile);
         resource_cache.expire_old_resources(self.id);
         frame
-    }
-
-    fn update_layer_transform(&mut self,
-                              layer_id: ScrollLayerId,
-                              parent_world_transform: &ScrollToWorldTransform,
-                              parent_viewport_rect: &ScrollLayerRect) {
-        // TODO(gw): This is an ugly borrow check workaround to clone these.
-        //           Restructure this to avoid the clones!
-        let (layer_transform_for_children, viewport_rect, layer_children) = {
-            match self.layers.get_mut(&layer_id) {
-                Some(layer) => {
-                    let inv_transform = layer.local_transform.inverse().unwrap();
-                    let parent_viewport_rect_in_local_space = inv_transform.transform_rect(parent_viewport_rect)
-                                                                           .translate(&-layer.scrolling.offset);
-                    let local_viewport_rect = layer.local_viewport_rect
-                                                   .translate(&-layer.scrolling.offset);
-                    let viewport_rect = parent_viewport_rect_in_local_space.intersection(&local_viewport_rect)
-                                                                           .unwrap_or(LayerRect::zero());
-
-                    layer.combined_local_viewport_rect = viewport_rect;
-                    layer.world_viewport_transform = parent_world_transform.pre_mul(&layer.local_transform);
-                    layer.world_content_transform = layer.world_viewport_transform
-                                                         .pre_translated(layer.scrolling.offset.x,
-                                                                         layer.scrolling.offset.y,
-                                                                         0.0);
-
-                    (layer.world_content_transform.with_source::<ScrollLayerPixel>(),
-                     viewport_rect,
-                     layer.children.clone())
-                }
-                None => return,
-            }
-        };
-
-        for child_layer_id in layer_children {
-            self.update_layer_transform(child_layer_id,
-                                        &layer_transform_for_children,
-                                        &as_scroll_parent_rect(&viewport_rect));
-        }
-    }
-
-    fn update_layer_transforms(&mut self) {
-        if let Some(root_scroll_layer_id) = self.root_scroll_layer_id {
-            let root_viewport = self.layers[&root_scroll_layer_id].local_viewport_rect;
-
-            self.update_layer_transform(root_scroll_layer_id,
-                                        &ScrollToWorldTransform::identity(),
-                                        &as_scroll_parent_rect(&root_viewport));
-
-            // Update any fixed layers
-            let mut fixed_layers = Vec::new();
-            for (layer_id, _) in &self.layers {
-                match layer_id.info {
-                    ScrollLayerInfo::Scrollable(..) => {}
-                    ScrollLayerInfo::Fixed => {
-                        fixed_layers.push(*layer_id);
-                    }
-                }
-            }
-
-            for layer_id in fixed_layers {
-                self.update_layer_transform(layer_id,
-                                            &ScrollToWorldTransform::identity(),
-                                            &as_scroll_parent_rect(&root_viewport));
-            }
-        }
     }
 
     fn build_frame(&mut self,
                    resource_cache: &mut ResourceCache,
                    auxiliary_lists_map: &AuxiliaryListsMap,
-                   device_pixel_ratio: f32) -> RendererFrame {
+                   device_pixel_ratio: f32,
+                   texture_cache_profile: &mut TextureCacheProfileCounters)
+                   -> RendererFrame {
         let mut frame_builder = self.frame_builder.take();
         let frame = frame_builder.as_mut().map(|builder|
             builder.build(resource_cache,
                           self.id,
-                          &self.layers,
+                          &self.clip_scroll_tree,
                           auxiliary_lists_map,
-                          device_pixel_ratio)
+                          device_pixel_ratio,
+                          texture_cache_profile)
         );
         self.frame_builder = frame_builder;
 
-        let layers_bouncing_back = self.collect_layers_bouncing_back();
-        RendererFrame::new(self.pipeline_epoch_map.clone(),
-                           layers_bouncing_back,
-                           frame)
-    }
-
-    fn collect_layers_bouncing_back(&self)
-                                    -> HashSet<ScrollLayerId, BuildHasherDefault<FnvHasher>> {
-        let mut layers_bouncing_back = HashSet::with_hasher(Default::default());
-        for (scroll_layer_id, layer) in &self.layers {
-            if layer.scrolling.bouncing_back {
-                layers_bouncing_back.insert(*scroll_layer_id);
-            }
-        }
-        layers_bouncing_back
+        let nodes_bouncing_back = self.clip_scroll_tree.collect_nodes_bouncing_back();
+        RendererFrame::new(self.pipeline_epoch_map.clone(), nodes_bouncing_back, frame)
     }
 }

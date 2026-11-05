@@ -85,7 +85,7 @@
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventStates.h"
-#include "mozilla/Telemetry.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/dom/HTMLObjectElementBinding.h"
 #include "mozilla/dom/HTMLSharedObjectElement.h"
 #include "nsChannelClassifier.h"
@@ -188,7 +188,7 @@ nsAsyncInstantiateEvent::Run()
 class CheckPluginStopEvent : public Runnable {
 public:
   explicit CheckPluginStopEvent(nsObjectLoadingContent* aContent)
-  : mContent(aContent) {}
+  : Runnable("CheckPluginStopEvent"), mContent(aContent) {}
 
   ~CheckPluginStopEvent() override = default;
 
@@ -241,7 +241,8 @@ CheckPluginStopEvent::Run()
       LOG(("OBJLC [%p]: CheckPluginStopEvent - superseded in layout flush",
            this));
       return NS_OK;
-    } else if (content->GetPrimaryFrame()) {
+    }
+    if (content->GetPrimaryFrame()) {
       LOG(("OBJLC [%p]: CheckPluginStopEvent - frame gained in layout flush",
            this));
       objLC->mPendingCheckPluginStopEvent = nullptr;
@@ -642,11 +643,13 @@ nsObjectLoadingContent::UnbindFromTree(bool aDeep, bool aNullParent)
     ///             would keep the docshell around, but trash the frameloader
     UnloadObject();
   }
-  nsIDocument* doc = thisContent->GetComposedDoc();
-  if (doc && doc->IsActive()) {
-    nsCOMPtr<nsIRunnable> ev = new nsSimplePluginEvent(doc,
-                                                       NS_LITERAL_STRING("PluginRemoved"));
-    NS_DispatchToCurrentThread(ev);
+  if (mType == eType_Plugin) {
+    nsIDocument* doc = thisContent->GetComposedDoc();
+    if (doc && doc->IsActive()) {
+      nsCOMPtr<nsIRunnable> ev = new nsSimplePluginEvent(doc,
+                                                         NS_LITERAL_STRING("PluginRemoved"));
+      NS_DispatchToCurrentThread(ev);
+    }
   }
 }
 
@@ -659,7 +662,7 @@ nsObjectLoadingContent::nsObjectLoadingContent()
   , mInstantiating(false)
   , mNetworkCreated(true)
   , mActivated(false)
-  , mContentBlockingDisabled(false)
+  , mContentBlockingEnabled(false)
   , mIsStopping(false)
   , mIsLoading(false)
   , mScriptRequested(false)
@@ -811,7 +814,7 @@ nsObjectLoadingContent::InstantiatePluginInstance(bool aIsLoading)
                                          EmptyString(), &blockState);
       if (blockState == nsIBlocklistService::STATE_OUTDATED) {
         // Fire plugin outdated event if necessary
-        LOG(("OBJLC [%p]: Dispatching plugin outdated event for content %p\n",
+        LOG(("OBJLC [%p]: Dispatching plugin outdated event for content\n",
              this));
         nsCOMPtr<nsIRunnable> ev = new nsSimplePluginEvent(thisContent,
                                                      NS_LITERAL_STRING("PluginOutdated"));
@@ -1040,10 +1043,9 @@ nsObjectLoadingContent::OnStartRequest(nsIRequest *aRequest,
     }
     if (MakePluginListener()) {
       return mFinalListener->OnStartRequest(aRequest, nullptr);
-    } else {
-      NS_NOTREACHED("Failed to create PluginStreamListener, aborting channel");
-      return NS_BINDING_ABORTED;
     }
+    NS_NOTREACHED("Failed to create PluginStreamListener, aborting channel");
+    return NS_BINDING_ABORTED;
   }
 
   // Otherwise we should be state loading, and call LoadObject with the channel
@@ -1059,7 +1061,7 @@ nsObjectLoadingContent::OnStartRequest(nsIRequest *aRequest,
   nsCOMPtr<nsIChannel> chan(do_QueryInterface(aRequest));
   NS_ASSERTION(chan, "Why is our request not a channel?");
 
-  nsresult status;
+  nsresult status = NS_OK;
   bool success = IsSuccessfulRequest(aRequest, &status);
 
   if (status == NS_ERROR_BLOCKED_URI) {
@@ -1073,12 +1075,12 @@ nsObjectLoadingContent::OnStartRequest(nsIRequest *aRequest,
         NS_LITERAL_STRING(" since it was found on an internal Firefox blocklist.");
       console->LogStringMessage(message.get());
     }
-    Telemetry::Accumulate(Telemetry::PLUGIN_BLOCKED_FOR_STABILITY, 1);
+    mContentBlockingEnabled = true;
     return NS_ERROR_FAILURE;
-  } else if (status == NS_ERROR_TRACKING_URI) {
+  }
+  if (status == NS_ERROR_TRACKING_URI) {
+    mContentBlockingEnabled = true;
     return NS_ERROR_FAILURE;
-  } else {
-    mContentBlockingDisabled = true;
   }
 
   if (!success) {
@@ -1474,7 +1476,6 @@ nsObjectLoadingContent::MaybeRewriteYoutubeEmbed(nsIURI* aURI, nsIURI* aBaseURI,
   }
 
   if (uri.Find("enablejsapi=1", true, 0, -1) != kNotFound) {
-    Telemetry::Accumulate(Telemetry::YOUTUBE_NONREWRITABLE_EMBED_SEEN, 1);
     return;
   }
 
@@ -1493,10 +1494,6 @@ nsObjectLoadingContent::MaybeRewriteYoutubeEmbed(nsIURI* aURI, nsIURI* aBaseURI,
       replaceQuery = true;
     }
   }
-
-  // If we've made it this far, we've got a rewritable embed. Log it in
-  // telemetry.
-  Telemetry::Accumulate(Telemetry::YOUTUBE_REWRITABLE_EMBED_SEEN, 1);
 
   // If we're pref'd off, return after telemetry has been logged.
   if (!Preferences::GetBool(kPrefYoutubeRewrite)) {
@@ -2426,7 +2423,8 @@ nsObjectLoadingContent::LoadObject(bool aNotify,
       // If our type remains Loading, we need a channel to proceed
       rv = OpenChannel();
       if (NS_FAILED(rv)) {
-        LOG(("OBJLC [%p]: OpenChannel returned failure (%u)", this, rv));
+        LOG(("OBJLC [%p]: OpenChannel returned failure (%" PRIu32 ")",
+             this, static_cast<uint32_t>(rv)));
       }
     break;
     case eType_Null:
@@ -2592,6 +2590,7 @@ nsObjectLoadingContent::OpenChannel()
   NS_ENSURE_SUCCESS(rv, rv);
   if (inherit) {
     nsCOMPtr<nsILoadInfo> loadinfo = chan->GetLoadInfo();
+    NS_ENSURE_STATE(loadinfo);
     loadinfo->SetPrincipalToInherit(thisContent->NodePrincipal());
   }
 
@@ -2703,7 +2702,7 @@ nsObjectLoadingContent::NotifyStateChanged(ObjectType aOldType,
                                            bool aSync,
                                            bool aNotify)
 {
-  LOG(("OBJLC [%p]: Notifying about state change: (%u, %llx) -> (%u, %llx)"
+  LOG(("OBJLC [%p]: Notifying about state change: (%u, %" PRIx64 ") -> (%u, %" PRIx64 ")"
        " (sync %i, notify %i)", this, aOldType, aOldState.GetInternalValue(),
        mType, ObjectState().GetInternalValue(), aSync, aNotify));
 
@@ -3221,19 +3220,34 @@ nsObjectLoadingContent::GetRunID(SystemCallerGuarantee, ErrorResult& aRv)
 static bool sPrefsInitialized;
 static uint32_t sSessionTimeoutMinutes;
 static uint32_t sPersistentTimeoutDays;
+static bool sBlockURIs;
+
+static void initializeObjectLoadingContentPrefs()
+{
+  if (!sPrefsInitialized) {
+    Preferences::AddUintVarCache(&sSessionTimeoutMinutes,
+                                 "plugin.sessionPermissionNow.intervalInMinutes", 60);
+    Preferences::AddUintVarCache(&sPersistentTimeoutDays,
+                                 "plugin.persistentPermissionAlways.intervalInDays", 90);
+
+    Preferences::AddBoolVarCache(&sBlockURIs, kPrefBlockURIs, false);
+    sPrefsInitialized = true;
+  }
+}
 
 bool
 nsObjectLoadingContent::ShouldBlockContent()
 {
-  if (mContentBlockingDisabled || !mURI)
-    return false;
-
-  if (!IsFlashMIME(mContentType) || !Preferences::GetBool(kPrefBlockURIs)) {
-    mContentBlockingDisabled = true;
-    return false;
+ 
+  if (!sPrefsInitialized) {
+    initializeObjectLoadingContentPrefs();
   }
 
-  return true;
+  if (mContentBlockingEnabled && mURI && IsFlashMIME(mContentType) && sBlockURIs ) {
+    return true;
+  }
+
+  return false;
 }
 
 bool
@@ -3242,11 +3256,7 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
   nsresult rv;
 
   if (!sPrefsInitialized) {
-    Preferences::AddUintVarCache(&sSessionTimeoutMinutes,
-                                 "plugin.sessionPermissionNow.intervalInMinutes", 60);
-    Preferences::AddUintVarCache(&sPersistentTimeoutDays,
-                                 "plugin.persistentPermissionAlways.intervalInDays", 90);
-    sPrefsInitialized = true;
+    initializeObjectLoadingContentPrefs();
   }
 
   if (BrowserTabsRemoteAutostart()) {
@@ -3273,6 +3283,7 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
   // * Assume a default of click-to-play
   // * If globally disabled, per-site permissions cannot override.
   // * If blocklisted, override the reason with the blocklist reason
+  // * Check if the flash blocking status for this page denies flash from loading.
   // * Check per-site permissions and follow those if specified.
   // * Honor per-plugin disabled permission
   // * Blocklisted plugins are forced to CtP
@@ -3308,9 +3319,7 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
     aReason = eFallbackVulnerableNoUpdate;
   }
 
-  // Check the permission manager for permission based on the principal of
-  // the toplevel content.
-
+  // Document and window lookup
   nsCOMPtr<nsIContent> thisContent = do_QueryInterface(static_cast<nsIObjectLoadingContent*>(this));
   MOZ_ASSERT(thisContent);
   nsIDocument* ownerDoc = thisContent->OwnerDoc();
@@ -3324,6 +3333,18 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
   nsCOMPtr<nsIDocument> topDoc = topWindow->GetDoc();
   NS_ENSURE_TRUE(topDoc, false);
 
+  // Check the flash blocking status for this page (this applies to Flash only)
+  nsIDocument::FlashClassification documentClassification = nsIDocument::FlashClassification::Allowed;
+  if (IsFlashMIME(mContentType)) {
+    documentClassification = ownerDoc->DocumentFlashClassification();
+  }
+  if (documentClassification == nsIDocument::FlashClassification::Denied) {
+    aReason = eFallbackSuppressed;
+    return false;
+  }
+
+  // Check the permission manager for permission based on the principal of
+  // the toplevel content.
   nsCOMPtr<nsIPermissionManager> permissionManager = services::GetPermissionManager();
   NS_ENSURE_TRUE(permissionManager, false);
 
@@ -3374,7 +3395,7 @@ nsObjectLoadingContent::ShouldPlay(FallbackType &aReason, bool aIgnoreCurrentTyp
 
   switch (enabledState) {
   case nsIPluginTag::STATE_ENABLED:
-    return true;
+    return documentClassification == nsIDocument::FlashClassification::Allowed;
   case nsIPluginTag::STATE_CLICKTOPLAY:
     return false;
   }
@@ -3402,90 +3423,6 @@ nsObjectLoadingContent::GetContentDocument(nsIPrincipal& aSubjectPrincipal)
   }
 
   return sub_doc;
-}
-
-void
-nsObjectLoadingContent::LegacyCall(JSContext* aCx,
-                                   JS::Handle<JS::Value> aThisVal,
-                                   const Sequence<JS::Value>& aArguments,
-                                   JS::MutableHandle<JS::Value> aRetval,
-                                   ErrorResult& aRv)
-{
-  nsCOMPtr<nsIContent> thisContent =
-    do_QueryInterface(static_cast<nsIImageLoadingContent*>(this));
-  JS::Rooted<JSObject*> obj(aCx, thisContent->GetWrapper());
-  MOZ_ASSERT(obj, "How did we get called?");
-
-  // Make sure we're not dealing with an Xray.  Our DoCall code can't handle
-  // random cross-compartment wrappers, so we're going to have to wrap
-  // everything up into our compartment, but that means we need to check that
-  // this is not an Xray situation by hand.
-  if (!JS_WrapObject(aCx, &obj)) {
-    aRv.Throw(NS_ERROR_UNEXPECTED);
-    return;
-  }
-
-  if (nsDOMClassInfo::ObjectIsNativeWrapper(aCx, obj)) {
-    aRv.Throw(NS_ERROR_NOT_AVAILABLE);
-    return;
-  }
-
-  obj = thisContent->GetWrapper();
-  // Now wrap things up into the compartment of "obj"
-  JSAutoCompartment ac(aCx, obj);
-  JS::AutoValueVector args(aCx);
-  if (!args.append(aArguments.Elements(), aArguments.Length())) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
-    return;
-  }
-
-  for (size_t i = 0; i < args.length(); i++) {
-    if (!JS_WrapValue(aCx, args[i])) {
-      aRv.Throw(NS_ERROR_UNEXPECTED);
-      return;
-    }
-  }
-
-  JS::Rooted<JS::Value> thisVal(aCx, aThisVal);
-  if (!JS_WrapValue(aCx, &thisVal)) {
-    aRv.Throw(NS_ERROR_UNEXPECTED);
-    return;
-  }
-
-  RefPtr<nsNPAPIPluginInstance> pi;
-  nsresult rv = ScriptRequestPluginInstance(aCx, getter_AddRefs(pi));
-  if (NS_FAILED(rv)) {
-    aRv.Throw(rv);
-    return;
-  }
-
-  // if there's no plugin around for this object, throw.
-  if (!pi) {
-    aRv.Throw(NS_ERROR_NOT_AVAILABLE);
-    return;
-  }
-
-  JS::Rooted<JSObject*> pi_obj(aCx);
-  JS::Rooted<JSObject*> pi_proto(aCx);
-
-  rv = GetPluginJSObject(aCx, obj, pi, &pi_obj, &pi_proto);
-  if (NS_FAILED(rv)) {
-    aRv.Throw(rv);
-    return;
-  }
-
-  if (!pi_obj) {
-    aRv.Throw(NS_ERROR_NOT_AVAILABLE);
-    return;
-  }
-
-  bool ok = JS::Call(aCx, thisVal, pi_obj, args, aRetval);
-  if (!ok) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return;
-  }
-
-  Telemetry::Accumulate(Telemetry::PLUGIN_CALLED_DIRECTLY, true);
 }
 
 void

@@ -4,11 +4,30 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* Printf-like functions, with canned variants that malloc their result.  */
+
 #ifndef mozilla_Printf_h
 #define mozilla_Printf_h
 
 /*
-** API for PR printf like routines. Supports the following formats
+** API for PR printf like routines.
+**
+** These exist partly for historical reasons -- initially they were in
+** NSPR, then forked in tree and modified in js/ -- but now the prime
+** motivation is both closer control over the exact formatting (with
+** one exception, see below) and also the ability to control where
+** exactly the generated results are sent.
+**
+** It might seem that this could all be dispensed with in favor of a
+** wrapper around |vsnprintf| -- except that this implementation
+** guarantees that the %s format will accept a NULL pointer, whereas
+** with standard functions this is undefined.
+**
+** This supports the following formats.  It implements a subset of the
+** standard formats; due to the use of MOZ_FORMAT_PRINTF, it is not
+** permissible to extend the standard, aside from relaxing undefined
+** behavior.
+**
 **      %d - decimal
 **      %u - unsigned decimal
 **      %x - unsigned hex
@@ -21,10 +40,13 @@
 **      %Id, %Io, %Iu, %Ix, %IX - size_t versions of above (for Windows compat)
 **           You should use PRI*SIZE macros instead
 **      %s - string
+**      %S, %ls - wide string, that is wchar_t*
 **      %c - character
 **      %p - pointer (deals with machine dependent pointer size)
-**      %f - float
-**      %g - float
+**      %f - float; note that this is actually formatted using the
+**           system's native printf, and so the results may vary
+**      %g - float; note that this is actually formatted using the
+**           system's native printf, and so the results may vary
 */
 
 #include "mozilla/AllocPolicy.h"
@@ -53,7 +75,7 @@ public:
     bool MFBT_API vprint(const char* format, va_list);
 
 protected:
-    MFBT_API PrintfTarget() : mEmitted(0) { }
+    MFBT_API PrintfTarget();
     virtual ~PrintfTarget() { }
 
     /* Subclasses override this.  It is called when more output is
@@ -83,7 +105,7 @@ private:
 
 // Used in the implementation of Smprintf et al.
 template<typename AllocPolicy>
-class MOZ_STACK_CLASS SprintfState final : public mozilla::PrintfTarget, private AllocPolicy
+class MOZ_STACK_CLASS SprintfState final : private mozilla::PrintfTarget, private AllocPolicy
 {
  public:
     explicit SprintfState(char* base)
@@ -95,6 +117,12 @@ class MOZ_STACK_CLASS SprintfState final : public mozilla::PrintfTarget, private
 
     ~SprintfState() {
         this->free_(mBase);
+    }
+
+    bool vprint(const char* format, va_list ap_list) {
+        // The "" here has a single \0 character, which is what we're
+        // trying to append.
+        return mozilla::PrintfTarget::vprint(format, ap_list) && append("", 1);
     }
 
     char* release() {

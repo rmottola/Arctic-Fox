@@ -100,6 +100,19 @@ var PrintUtils = {
     return true;
   },
 
+  getDefaultPrinterName() {
+    try {
+      let PSSVC = Cc["@mozilla.org/gfx/printsettings-service;1"]
+                    .getService(Ci.nsIPrintSettingsService);
+
+      return PSSVC.defaultPrinterName;
+    } catch (e) {
+      Components.utils.reportError(e);
+    }
+
+    return null;
+  },
+
   /**
    * Starts the process of printing the contents of a window.
    *
@@ -108,12 +121,13 @@ var PrintUtils = {
    * @param aBrowser
    *        The <xul:browser> that the nsIDOMWindow for aWindowID belongs to.
    */
-  printWindow: function(aWindowID, aBrowser)
-  {
+  printWindow(aWindowID, aBrowser) {
     let mm = aBrowser.messageManager;
+    let defaultPrinterName = this.getDefaultPrinterName();
     mm.sendAsyncMessage("Printing:Print", {
       windowID: aWindowID,
       simplifiedMode: this._shouldSimplify,
+      defaultPrinterName,
     });
   },
 
@@ -437,8 +451,8 @@ var PrintUtils = {
     var pref = Components.classes["@mozilla.org/preferences-service;1"]
                          .getService(Components.interfaces.nsIPrefBranch);
     if (pref) {
-      gPrintSettingsAreGlobal = pref.getBoolPref("print.use_global_printsettings", false);
-      gSavePrintSettings = pref.getBoolPref("print.save_print_settings", false);
+      gPrintSettingsAreGlobal = pref.getBoolPref("print.use_global_printsettings");
+      gSavePrintSettings = pref.getBoolPref("print.save_print_settings");
     }
 
     var printSettings;
@@ -490,11 +504,13 @@ var PrintUtils = {
     // listener.
     let ppBrowser = this._listener.getPrintPreviewBrowser();
     let mm = ppBrowser.messageManager;
+    let defaultPrinterName = this.getDefaultPrinterName();
 
     let sendEnterPreviewMessage = function(browser, simplified) {
       mm.sendAsyncMessage("Printing:Preview:Enter", {
         windowID: browser.outerWindowID,
         simplifiedMode: simplified,
+        defaultPrinterName,
       });
     };
 

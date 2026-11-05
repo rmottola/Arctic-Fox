@@ -36,9 +36,11 @@ const size_t ChunkShift = 20;
 const size_t ChunkSize = size_t(1) << ChunkShift;
 const size_t ChunkMask = ChunkSize - 1;
 
-const size_t CellShift = 3;
-const size_t CellSize = size_t(1) << CellShift;
-const size_t CellMask = CellSize - 1;
+const size_t CellAlignShift = 3;
+const size_t CellAlignBytes = size_t(1) << CellAlignShift;
+const size_t CellAlignMask = CellAlignBytes - 1;
+
+const size_t CellBytesPerMarkBit = CellAlignBytes;
 
 /* These are magic constants derived from actual offsets in gc/Heap.h. */
 #ifdef JS_GC_SMALL_CHUNK_SIZE
@@ -106,20 +108,13 @@ struct Zone
     JSTracer* const barrierTracer_;     // A pointer to the JSRuntime's |gcMarker|.
 
   public:
-    // Stack GC roots for Rooted GC pointers.
-    js::RootedListHeads stackRoots_;
-    template <typename T> friend class JS::Rooted;
-
     bool needsIncrementalBarrier_;
 
     Zone(JSRuntime* runtime, JSTracer* barrierTracerArg)
       : runtime_(runtime),
         barrierTracer_(barrierTracerArg),
         needsIncrementalBarrier_(false)
-    {
-        for (auto& stackRootPtr : stackRoots_)
-            stackRootPtr = nullptr;
-    }
+    {}
 
     bool needsIncrementalBarrier() const {
         return needsIncrementalBarrier_;
@@ -131,7 +126,7 @@ struct Zone
         return barrierTracer_;
     }
 
-    JSRuntime* runtimeFromMainThread() const {
+    JSRuntime* runtimeFromActiveCooperatingThread() const {
         MOZ_ASSERT(js::CurrentThreadCanAccessRuntime(runtime_));
         return runtime_;
     }
@@ -217,7 +212,11 @@ class JS_FRIEND_API(GCCellPtr)
         return reinterpret_cast<uintptr_t>(asCell());
     }
 
-    bool mayBeOwnedByOtherRuntime() const;
+    MOZ_ALWAYS_INLINE bool mayBeOwnedByOtherRuntime() const {
+        if (is<JSString>() || is<JS::Symbol>())
+            return mayBeOwnedByOtherRuntimeSlow();
+        return false;
+    }
 
   private:
     static uintptr_t checkedCast(void* p, JS::TraceKind traceKind) {
@@ -230,6 +229,8 @@ class JS_FRIEND_API(GCCellPtr)
                       (uintptr_t(traceKind) & OutOfLineTraceKindMask) == OutOfLineTraceKindMask);
         return uintptr_t(p) | (uintptr_t(traceKind) & OutOfLineTraceKindMask);
     }
+
+    bool mayBeOwnedByOtherRuntimeSlow() const;
 
     JS::TraceKind outOfLineKind() const;
 
@@ -280,20 +281,12 @@ GetGCThingMarkBitmap(const uintptr_t addr)
     return reinterpret_cast<uintptr_t*>(bmap_addr);
 }
 
-static MOZ_ALWAYS_INLINE JS::shadow::Runtime*
-GetGCThingRuntime(const uintptr_t addr)
-{
-    MOZ_ASSERT(addr);
-    const uintptr_t rt_addr = (addr & ~ChunkMask) | ChunkRuntimeOffset;
-    return *reinterpret_cast<JS::shadow::Runtime**>(rt_addr);
-}
-
 static MOZ_ALWAYS_INLINE void
 GetGCThingMarkWordAndMask(const uintptr_t addr, uint32_t color,
                           uintptr_t** wordp, uintptr_t* maskp)
 {
     MOZ_ASSERT(addr);
-    const size_t bit = (addr & js::gc::ChunkMask) / js::gc::CellSize + color;
+    const size_t bit = (addr & js::gc::ChunkMask) / js::gc::CellBytesPerMarkBit + color;
     MOZ_ASSERT(bit < js::gc::ChunkMarkBitmapBits);
     uintptr_t* bitmap = GetGCThingMarkBitmap(addr);
     const uintptr_t nbits = sizeof(*bitmap) * CHAR_BIT;
@@ -311,14 +304,32 @@ GetGCThingZone(const uintptr_t addr)
 }
 
 static MOZ_ALWAYS_INLINE bool
-CellIsMarkedGray(const Cell* cell)
+TenuredCellIsMarkedGray(const Cell* cell)
 {
     MOZ_ASSERT(cell);
     MOZ_ASSERT(!js::gc::IsInsideNursery(cell));
+
     uintptr_t* word, mask;
     js::gc::detail::GetGCThingMarkWordAndMask(uintptr_t(cell), js::gc::GRAY, &word, &mask);
     return *word & mask;
 }
+
+static MOZ_ALWAYS_INLINE bool
+CellIsMarkedGray(const Cell* cell)
+{
+    MOZ_ASSERT(cell);
+    if (js::gc::IsInsideNursery(cell))
+        return false;
+    return TenuredCellIsMarkedGray(cell);
+}
+
+extern JS_PUBLIC_API(bool)
+CellIsMarkedGrayIfKnown(const Cell* cell);
+
+#ifdef DEBUG
+extern JS_PUBLIC_API(bool)
+CellIsNotGray(const Cell* cell);
+#endif
 
 } /* namespace detail */
 
@@ -359,11 +370,9 @@ GetObjectZone(JSObject* obj);
 static MOZ_ALWAYS_INLINE bool
 GCThingIsMarkedGray(GCCellPtr thing)
 {
-    if (js::gc::IsInsideNursery(thing.asCell()))
-        return false;
     if (thing.mayBeOwnedByOtherRuntime())
         return false;
-    return js::gc::detail::CellIsMarkedGray(thing.asCell());
+    return js::gc::detail::CellIsMarkedGrayIfKnown(thing.asCell());
 }
 
 extern JS_PUBLIC_API(JS::TraceKind)
@@ -375,14 +384,15 @@ namespace js {
 namespace gc {
 
 static MOZ_ALWAYS_INLINE bool
-IsIncrementalBarrierNeededOnTenuredGCThing(JS::shadow::Runtime* rt, const JS::GCCellPtr thing)
+IsIncrementalBarrierNeededOnTenuredGCThing(const JS::GCCellPtr thing)
 {
     MOZ_ASSERT(thing);
     MOZ_ASSERT(!js::gc::IsInsideNursery(thing.asCell()));
 
-    // TODO: I'd like to assert !isHeapBusy() here but this gets called while we
-    // are tracing the heap, e.g. during memory reporting (see bug 1313318).
-    MOZ_ASSERT(!rt->isHeapCollecting());
+    // TODO: I'd like to assert !CurrentThreadIsHeapBusy() here but this gets
+    // called while we are tracing the heap, e.g. during memory reporting
+    // (see bug 1313318).
+    MOZ_ASSERT(!JS::CurrentThreadIsHeapCollecting());
 
     JS::Zone* zone = JS::GetTenuredGCThingZone(thing);
     return JS::shadow::Zone::asShadowZone(zone)->needsIncrementalBarrier();

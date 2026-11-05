@@ -27,6 +27,8 @@
 # error "Unknown architecture!"
 #endif
 
+#include "wasm/WasmBuiltins.h"
+
 namespace js {
 namespace jit {
 
@@ -84,21 +86,29 @@ void
 MacroAssembler::call(const wasm::CallSiteDesc& desc, const Register reg)
 {
     CodeOffset l = call(reg);
-    append(desc, l, framePushed());
+    append(desc, l);
 }
 
 void
 MacroAssembler::call(const wasm::CallSiteDesc& desc, uint32_t funcDefIndex)
 {
     CodeOffset l = callWithPatch();
-    append(desc, l, framePushed(), funcDefIndex);
+    append(desc, l, funcDefIndex);
 }
 
 void
 MacroAssembler::call(const wasm::CallSiteDesc& desc, wasm::Trap trap)
 {
     CodeOffset l = callWithPatch();
-    append(desc, l, framePushed(), trap);
+    append(desc, l, trap);
+}
+
+void
+MacroAssembler::call(const wasm::CallSiteDesc& desc, wasm::SymbolicAddress imm)
+{
+    MOZ_ASSERT(wasm::NeedsBuiltinThunk(imm), "only for functions which may appear in profiler");
+    call(imm);
+    append(desc, CodeOffset(currentOffset()));
 }
 
 // ===============================================================
@@ -281,9 +291,9 @@ MacroAssembler::PushStubCode()
 }
 
 void
-MacroAssembler::enterExitFrame(const VMFunction* f)
+MacroAssembler::enterExitFrame(Register cxreg, const VMFunction* f)
 {
-    linkExitFrame();
+    linkExitFrame(cxreg);
     // Push the JitCode pointer. (Keep the code alive, when on the stack)
     PushStubCode();
     // Push VMFunction pointer, to mark arguments.
@@ -291,18 +301,18 @@ MacroAssembler::enterExitFrame(const VMFunction* f)
 }
 
 void
-MacroAssembler::enterFakeExitFrame(enum ExitFrameTokenValues token)
+MacroAssembler::enterFakeExitFrame(Register cxreg, enum ExitFrameTokenValues token)
 {
-    linkExitFrame();
+    linkExitFrame(cxreg);
     Push(Imm32(token));
     Push(ImmPtr(nullptr));
 }
 
 void
-MacroAssembler::enterFakeExitFrameForNative(bool isConstructing)
+MacroAssembler::enterFakeExitFrameForNative(Register cxreg, bool isConstructing)
 {
-    enterFakeExitFrame(isConstructing ? ConstructNativeExitFrameLayoutToken
-                                      : CallNativeExitFrameLayoutToken);
+    enterFakeExitFrame(cxreg, isConstructing ? ConstructNativeExitFrameLayoutToken
+                                             : CallNativeExitFrameLayoutToken);
 }
 
 void
@@ -315,6 +325,20 @@ bool
 MacroAssembler::hasSelfReference() const
 {
     return selfReferencePatch_.bound();
+}
+
+// ===============================================================
+// Move instructions
+
+void
+MacroAssembler::moveValue(const ConstantOrRegister& src, const ValueOperand& dest)
+{
+    if (src.constant()) {
+        moveValue(src.value(), dest);
+        return;
+    }
+
+    moveValue(src.reg(), dest);
 }
 
 // ===============================================================
@@ -762,6 +786,16 @@ MacroAssembler::assertStackAlignment(uint32_t alignment, int32_t offset /* = 0 *
     breakpoint();
     bind(&ok);
 #endif
+}
+
+void
+MacroAssembler::storeCallBoolResult(Register reg)
+{
+    if (reg != ReturnReg)
+        mov(ReturnReg, reg);
+    // C++ compilers like to only use the bottom byte for bools, but we
+    // need to maintain the entire register.
+    and32(Imm32(0xFF), reg);
 }
 
 void

@@ -12,6 +12,10 @@
 #include "nsCRTGlue.h"
 #include "mozilla/Base64.h"
 #include "nsISimpleEnumerator.h"
+#include "prio.h"
+#include "nsIConsoleService.h"
+#include "mozIGeckoMediaPluginService.h"
+#include "GMPService.h"
 
 namespace mozilla {
 
@@ -29,16 +33,29 @@ SplitAt(const char* aDelims,
 }
 
 nsCString
-ToBase64(const nsTArray<uint8_t>& aBytes)
+ToHexString(const uint8_t * aBytes, uint32_t aLength)
 {
-  nsAutoCString base64;
-  nsDependentCSubstring raw(reinterpret_cast<const char*>(aBytes.Elements()),
-                            aBytes.Length());
-  nsresult rv = Base64Encode(raw, base64);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return NS_LITERAL_CSTRING("[Base64EncodeFailed]");
+  static const char hex[] = {
+    '0', '1', '2', '3',
+    '4', '5', '6', '7',
+    '8', '9', 'a', 'b',
+    'c', 'd', 'e', 'f'
+  };
+  nsCString str;
+  for (uint32_t i = 0; i < aLength; i++) {
+    char buf[3];
+    buf[0] = hex[aBytes[i] & 0xf0 >> 4];
+    buf[1] = hex[aBytes[i] & 0x0f];
+    buf[2] = 0;
+    str.AppendASCII(buf);
   }
-  return base64;
+  return str;
+}
+
+nsCString
+ToHexString(const nsTArray<uint8_t>& aBytes)
+{
+  return ToHexString(aBytes.Elements(), aBytes.Length());
 }
 
 bool
@@ -201,5 +218,44 @@ HaveGMPFor(const nsCString& aAPI,
   return hasPlugin;
 }
 
+void
+LogToConsole(const nsAString& aMsg)
+{
+  nsCOMPtr<nsIConsoleService> console(
+    do_GetService("@mozilla.org/consoleservice;1"));
+  if (!console) {
+    NS_WARNING("Failed to log message to console.");
+    return;
+  }
+  nsAutoString msg(aMsg);
+  console->LogStringMessage(msg.get());
+}
+
+RefPtr<AbstractThread>
+GetGMPAbstractThread()
+{
+  RefPtr<gmp::GeckoMediaPluginService> service =
+    gmp::GeckoMediaPluginService::GetGeckoMediaPluginService();
+  return service ? service->GetAbstractGMPThread() : nullptr;
+}
+
+static int32_t
+Align16(int32_t aNumber)
+{
+  const uint32_t mask = 15; // Alignment - 1.
+  return (aNumber + mask) & ~mask;
+}
+
+int32_t
+I420FrameBufferSizePadded(int32_t aWidth, int32_t aHeight)
+{
+  if (aWidth <= 0 || aHeight <= 0 || aWidth > MAX_VIDEO_WIDTH ||
+      aHeight > MAX_VIDEO_HEIGHT) {
+    return 0;
+  }
+
+  int32_t ySize = Align16(aWidth) * Align16(aHeight);
+  return ySize + (ySize / 4) * 2;
+}
 
 } // namespace mozilla

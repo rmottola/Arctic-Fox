@@ -4,6 +4,8 @@
 
 XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
                                   "resource:///modules/CustomizableUI.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
+                                  "resource:///modules/E10SUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
                                   "resource://gre/modules/NetUtil.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils",
@@ -30,8 +32,8 @@ const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
 var {
   DefaultWeakMap,
-  EventManager,
   promiseEvent,
+  SingletonEventManager,
 } = ExtensionUtils;
 
 // This file provides some useful code for the |tabs| and |windows|
@@ -49,10 +51,9 @@ function promisePopupShown(popup) {
     if (popup.state == "open") {
       resolve();
     } else {
-      popup.addEventListener("popupshown", function onPopupShown(event) {
-        popup.removeEventListener("popupshown", onPopupShown);
+      popup.addEventListener("popupshown", function(event) {
         resolve();
-      });
+      }, {once: true});
     }
   });
 }
@@ -241,6 +242,7 @@ class BasePopup {
 
     if (this.extension.remote) {
       browser.setAttribute("remote", "true");
+      browser.setAttribute("remoteType", E10SUtils.EXTENSION_REMOTE_TYPE);
     }
 
     // We only need flex sizing for the sake of the slide-in sub-views of the
@@ -676,14 +678,14 @@ ExtensionTabManager.prototype = {
       active: tab.selected,
       pinned: tab.pinned,
       status: TabManager.getStatus(tab),
-      incognito: PrivateBrowsingUtils.isBrowserPrivate(browser),
+      incognito: WindowManager.isBrowserPrivate(browser),
       width: browser.frameLoader.lazyWidth || browser.clientWidth,
       height: browser.frameLoader.lazyHeight || browser.clientHeight,
       audible: tab.soundPlaying,
       mutedInfo,
     };
     if (this.extension.hasPermission("cookies")) {
-      result.cookieStoreId = getCookieStoreIdForTab(result);
+      result.cookieStoreId = getCookieStoreIdForTab(result, tab);
     }
 
     if (this.hasTabPermission(tab)) {
@@ -926,11 +928,13 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
+function memoize(fn) {
+  let weakMap = new DefaultWeakMap(fn);
+  return weakMap.get.bind(weakMap);
+}
+
 // Manages mapping between XUL windows and extension window IDs.
 global.WindowManager = {
-  _windows: new WeakMap(),
-  _nextId: 0,
-
   // Note: These must match the values in windows.json.
   WINDOW_ID_NONE: -1,
   WINDOW_ID_CURRENT: -2,
@@ -968,14 +972,16 @@ global.WindowManager = {
     }
   },
 
-  getId(window) {
-    if (this._windows.has(window)) {
-      return this._windows.get(window);
+  isBrowserPrivate: memoize(browser => {
+    return PrivateBrowsingUtils.isBrowserPrivate(browser);
+  }),
+
+  getId: memoize(window => {
+    if (window instanceof Ci.nsIInterfaceRequestor) {
+      return window.getInterface(Ci.nsIDOMWindowUtils).outerWindowID;
     }
-    let id = this._nextId++;
-    this._windows.set(window, id);
-    return id;
-  },
+    return null;
+  }),
 
   getWindow(id, context) {
     if (id == this.WINDOW_ID_CURRENT) {
@@ -1268,16 +1274,16 @@ global.AllWindowEvents = {
 
 AllWindowEvents.openListener = AllWindowEvents.openListener.bind(AllWindowEvents);
 
-// Subclass of EventManager where we just need to call
+// Subclass of SingletonEventManager where we just need to call
 // add/removeEventListener on each XUL window.
-global.WindowEventManager = function(context, name, event, listener) {
-  EventManager.call(this, context, name, fire => {
-    let listener2 = (...args) => listener(fire, ...args);
-    AllWindowEvents.addListener(event, listener2);
-    return () => {
-      AllWindowEvents.removeListener(event, listener2);
-    };
-  });
+global.WindowEventManager = class extends SingletonEventManager {
+  constructor(context, name, event, listener) {
+    super(context, name, fire => {
+      let listener2 = (...args) => listener(fire, ...args);
+      AllWindowEvents.addListener(event, listener2);
+      return () => {
+        AllWindowEvents.removeListener(event, listener2);
+      };
+    });
+  }
 };
-
-WindowEventManager.prototype = Object.create(EventManager.prototype);

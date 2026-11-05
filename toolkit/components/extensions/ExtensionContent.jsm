@@ -111,6 +111,7 @@ function Script(extension, options, deferred = PromiseUtils.defer()) {
   this.css = this.options.css || [];
   this.remove_css = this.options.remove_css;
   this.match_about_blank = this.options.match_about_blank;
+  this.css_origin = this.options.css_origin;
 
   this.deferred = deferred;
 
@@ -190,8 +191,9 @@ Script.prototype = {
       let winUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
                            .getInterface(Ci.nsIDOMWindowUtils);
 
+      let type = this.css_origin === "user" ? winUtils.USER_SHEET : winUtils.AUTHOR_SHEET;
       for (let url of this.cssURLs) {
-        runSafeSyncWithoutClone(winUtils.removeSheetUsingURIString, url, winUtils.AUTHOR_SHEET);
+        runSafeSyncWithoutClone(winUtils.removeSheetUsingURIString, url, type);
       }
     }
   },
@@ -222,20 +224,16 @@ Script.prototype = {
    *        the injection.
    */
   tryInject(window, sandbox, shouldRun, when) {
-    if (!this.matches(window)) {
-      this.deferred.reject({message: "No matching window"});
-      return;
-    }
-
     if (shouldRun("document_start")) {
-      let winUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
-                           .getInterface(Ci.nsIDOMWindowUtils);
-
       let {cssURLs} = this;
       if (cssURLs.length > 0) {
+        let winUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
+                             .getInterface(Ci.nsIDOMWindowUtils);
+
         let method = this.remove_css ? winUtils.removeSheetUsingURIString : winUtils.loadSheetUsingURIString;
+        let type = this.css_origin === "user" ? winUtils.USER_SHEET : winUtils.AUTHOR_SHEET;
         for (let url of cssURLs) {
-          runSafeSyncWithoutClone(method, url, winUtils.AUTHOR_SHEET);
+          runSafeSyncWithoutClone(method, url, type);
         }
 
         this.deferred.resolve();
@@ -316,10 +314,9 @@ class ContentScriptContextChild extends BaseContext {
     let contentPrincipal = contentWindow.document.nodePrincipal;
     let ssm = Services.scriptSecurityManager;
 
-    // copy origin attributes from the content window origin attributes to
-    // preserve the user context id. overwrite the addonId.
+    // Copy origin attributes from the content window origin attributes to
+    // preserve the user context id.
     let attrs = contentPrincipal.originAttributes;
-    attrs.addonId = this.extension.id;
     let extensionPrincipal = ssm.createCodebasePrincipal(this.extension.baseURI, attrs);
 
     let principal;
@@ -341,6 +338,7 @@ class ContentScriptContextChild extends BaseContext {
       // into the iframe's window, see Bug 1214658 for rationale)
       this.sandbox = Cu.Sandbox(contentWindow, {
         sandboxPrototype: contentWindow,
+        sameZoneAs: contentWindow,
         wantXrays: false,
         isWebExtensionContentScript: true,
       });
@@ -350,12 +348,13 @@ class ContentScriptContextChild extends BaseContext {
       // the tab holding the content page.
       let metadata = {
         "inner-window-id": this.innerWindowID,
-        addonId: attrs.addonId,
+        addonId: extensionPrincipal.addonId,
       };
 
       this.sandbox = Cu.Sandbox(principal, {
         metadata,
         sandboxPrototype: contentWindow,
+        sameZoneAs: contentWindow,
         wantXrays: true,
         isWebExtensionContentScript: true,
         wantExportHelpers: true,
@@ -891,10 +890,7 @@ ExtensionManager = {
       }
 
       case "Extension:FlushJarCache": {
-        let nsIFile = Components.Constructor("@mozilla.org/file/local;1", "nsIFile",
-                                             "initWithPath");
-        let file = new nsIFile(data.path);
-        flushJarCache(file);
+        flushJarCache(data.path);
         Services.cpmm.sendAsyncMessage("Extension:FlushJarCacheComplete");
         break;
       }

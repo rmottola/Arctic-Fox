@@ -77,7 +77,9 @@ bool gfxPlatformGtk::sUseFcFontList = false;
 
 gfxPlatformGtk::gfxPlatformGtk()
 {
-    gtk_init(nullptr, nullptr);
+    if (!gfxPlatform::IsHeadless()) {
+        gtk_init(nullptr, nullptr);
+    }
 
     sUseFcFontList = mozilla::Preferences::GetBool("gfx.font_rendering.fontconfig.fontlist.enabled");
     if (!sUseFcFontList && !sFontconfigUtils) {
@@ -87,7 +89,7 @@ gfxPlatformGtk::gfxPlatformGtk()
     mMaxGenericSubstitutions = UNINITIALIZED_VALUE;
 
 #ifdef MOZ_X11
-    if (XRE_IsParentProcess()) {
+    if (!gfxPlatform::IsHeadless() && XRE_IsParentProcess()) {
       if (GDK_IS_X11_DISPLAY(gdk_display_get_default()) &&
           mozilla::Preferences::GetBool("gfx.xrender.enabled"))
       {
@@ -106,7 +108,7 @@ gfxPlatformGtk::gfxPlatformGtk()
                      contentMask, BackendType::CAIRO);
 
 #ifdef MOZ_X11
-    if (GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+    if (gfxPlatform::IsHeadless() && GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
       mCompositorDisplay = XOpenDisplay(nullptr);
       MOZ_ASSERT(mCompositorDisplay, "Failed to create compositor display!");
     } else {
@@ -385,7 +387,7 @@ gfxPlatformGtk::IsFontFormatSupported(nsIURI *aFontURI, uint32_t aFormatFlags)
 static int32_t sDPI = 0;
 
 int32_t
-gfxPlatformGtk::GetDPI()
+gfxPlatformGtk::GetFontScaleDPI()
 {
     if (!sDPI) {
         // Make sure init is run so we have a resolution
@@ -401,21 +403,22 @@ gfxPlatformGtk::GetDPI()
 }
 
 double
-gfxPlatformGtk::GetDPIScale()
+gfxPlatformGtk::GetFontScaleFactor()
 {
     // Integer scale factors work well with GTK window scaling, image scaling,
     // and pixel alignment, but there is a range where 1 is too small and 2 is
     // too big.  An additional step of 1.5 is added because this is common
     // scale on WINNT and at this ratio the advantages of larger rendering
     // outweigh the disadvantages from scaling and pixel mis-alignment.
-    int32_t dpi = GetDPI();
-    if (dpi < 144) {
+    int32_t dpi = GetFontScaleDPI();
+    if (dpi < 132) {
         return 1.0;
-    } else if (dpi < 168) {
-        return 1.5;
-    } else {
-        return round(dpi/96.0);
     }
+    if (dpi < 168) {
+        return 1.5;
+    }
+    return round(dpi/96.0);
+
 }
 
 bool
@@ -735,8 +738,10 @@ public:
         ScopedXFree<GLXFBConfig> cfgs;
         GLXFBConfig config;
         int visid;
+        bool forWebRender = false;
         if (!gl::GLContextGLX::FindFBConfigForWindow(mXDisplay, screen, root,
-                                                     &cfgs, &config, &visid)) {
+                                                     &cfgs, &config, &visid,
+                                                     forWebRender)) {
           lock.NotifyAll();
           return;
         }
@@ -904,13 +909,6 @@ gfxPlatformGtk::CreateHardwareVsyncSource()
     NS_WARNING("SGI_video_sync unsupported. Falling back to software vsync.");
   }
   return gfxPlatform::CreateHardwareVsyncSource();
-}
-
-bool
-gfxPlatformGtk::SupportsApzTouchInput() const
-{
-  int value = gfxPrefs::TouchEventsEnabled();
-  return value == 1 || value == 2;
 }
 
 #endif

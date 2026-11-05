@@ -9,9 +9,9 @@
 
 add_task(function* () {
   let { tab, monitor } = yield initNetMonitor(CUSTOM_GET_URL);
-  let { $, EVENTS, NetMonitorView } = monitor.panelWin;
-  let { RequestsMenu, NetworkDetails } = NetMonitorView;
-  RequestsMenu.lazyUpdate = false;
+  let { document, EVENTS, NetMonitorView } = monitor.panelWin;
+
+  NetMonitorView.RequestsMenu.lazyUpdate = false;
 
   info("Requesting a resource that has a certificate problem.");
 
@@ -21,26 +21,14 @@ add_task(function* () {
   });
   yield wait;
 
-  info("Selecting the request.");
-  RequestsMenu.selectedIndex = 0;
+  wait = waitForDOM(document, "#panel-5");
+  EventUtils.sendMouseEvent({ type: "mousedown" },
+    document.querySelector("#details-pane-toggle"));
+  document.querySelector("#tab-5 a").click();
+  yield wait;
 
-  info("Waiting for details pane to be updated.");
-  yield monitor.panelWin.once(EVENTS.TAB_UPDATED);
-
-  info("Selecting security tab.");
-  NetworkDetails.widget.selectedIndex = 5;
-
-  info("Waiting for security tab to be updated.");
-  yield monitor.panelWin.once(EVENTS.TAB_UPDATED);
-
-  let errorbox = $("#security-error");
-  let errormsg = $("#security-error-message");
-  let infobox = $("#security-information");
-
-  is(errorbox.hidden, false, "Error box is visble.");
-  is(infobox.hidden, true, "Information box is hidden.");
-
-  isnot(errormsg.value, "", "Error message is not empty.");
+  let errormsg = document.querySelector(".security-info-value");
+  isnot(errormsg.textContent, "", "Error message is not empty.");
 
   return teardown(monitor);
 

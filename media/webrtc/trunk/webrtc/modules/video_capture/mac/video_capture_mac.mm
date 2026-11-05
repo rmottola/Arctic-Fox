@@ -18,8 +18,8 @@
 #include "webrtc/modules/video_capture/device_info_impl.h"
 #include "webrtc/modules/video_capture/video_capture_config.h"
 #include "webrtc/modules/video_capture/video_capture_impl.h"
-#include "webrtc/system_wrappers/interface/ref_count.h"
-#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/system_wrappers/include/ref_count.h"
+#include "webrtc/system_wrappers/include/trace.h"
 
 // 10.4 support must be decided runtime. We will just decide which framework to
 // use at compile time "work" classes. One for QTKit, one for QuickTime
@@ -43,57 +43,29 @@ namespace videocapturemodule
 // static
 bool CheckOSVersion()
 {
-    // Check OSX version
-    OSErr err = noErr;
+    // Check OSX version is at least 10.7 (min for AVFoundation)
+    int major = 0;
+    int minor = 0;
 
-    SInt32 version;
-
-    err = Gestalt(gestaltSystemVersion, &version);
-    if (err != noErr)
-    {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoCapture, 0,
-                     "Could not get OS version");
-        return false;
+    NSString* versionString = [[NSDictionary dictionaryWithContentsOfFile:
+                                @"/System/Library/CoreServices/SystemVersion.plist"] objectForKey:@"ProductVersion"];
+    NSArray* versions = [versionString componentsSeparatedByString:@"."];
+    NSUInteger count = [versions count];
+    if (count > 0) {
+        major = [(NSString *)[versions objectAtIndex:0] integerValue];
+        if (count > 1) {
+            minor = [(NSString *)[versions objectAtIndex:1] integerValue];
+        }
     }
 
-    if (version < 0x00001040) // Older version than Mac OSX 10.4
+    if (major < 10)
     {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoCapture, 0,
-                     "OS version too old: 0x%x", version);
-        return false;
+      return false;
+    }
+    if ((major == 10) && (minor < 7)) {
+      return false;
     }
 
-    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVideoCapture, 0,
-                 "OS version compatible: 0x%x", version);
-
-    return true;
-}
-
-// static
-bool CheckQTVersion()
-{
-    // Check OSX version
-    OSErr err = noErr;
-
-    SInt32 version;
-
-    err = Gestalt(gestaltQuickTime, &version);
-    if (err != noErr)
-    {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoCapture, 0,
-                     "Could not get QuickTime version");
-        return false;
-    }
-
-    if (version < 0x07000000) // QT v. 7.x or newer (QT 5.0.2 0x05020000)
-    {
-        WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoCapture, 0,
-                     "QuickTime version too old: 0x%x", version);
-        return false;
-    }
-
-    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVideoCapture, 0,
-                 "QuickTime version compatible: 0x%x", version);
     return true;
 }
 

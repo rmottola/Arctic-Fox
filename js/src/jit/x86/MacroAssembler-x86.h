@@ -92,38 +92,6 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
     Address ToType(Address base) {
         return ToType(Operand(base)).toAddress();
     }
-    void moveValue(const Value& val, Register type, Register data) {
-        movl(Imm32(val.toNunboxTag()), type);
-        if (val.isGCThing())
-            movl(ImmGCPtr(val.toGCThing()), data);
-        else
-            movl(Imm32(val.toNunboxPayload()), data);
-    }
-    void moveValue(const Value& val, const ValueOperand& dest) {
-        moveValue(val, dest.typeReg(), dest.payloadReg());
-    }
-    void moveValue(const ValueOperand& src, const ValueOperand& dest) {
-        Register s0 = src.typeReg(), d0 = dest.typeReg(),
-                 s1 = src.payloadReg(), d1 = dest.payloadReg();
-
-        // Either one or both of the source registers could be the same as a
-        // destination register.
-        if (s1 == d0) {
-            if (s0 == d1) {
-                // If both are, this is just a swap of two registers.
-                xchgl(d0, d1);
-                return;
-            }
-            // If only one is, copy that source first.
-            mozilla::Swap(s0, s1);
-            mozilla::Swap(d0, d1);
-        }
-
-        if (s0 != d0)
-            movl(s0, d0);
-        if (s1 != d1)
-            movl(s1, d1);
-    }
 
     /////////////////////////////////////////////////////////////////
     // X86/X64-common interface.
@@ -662,15 +630,16 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
         movl(reg, Operand(esp, arg * sizeof(intptr_t)));
     }
 
-    // Note: this function clobbers the source register.
-    void boxDouble(FloatRegister src, const ValueOperand& dest) {
+    void boxDouble(FloatRegister src, const ValueOperand& dest, FloatRegister temp) {
         if (Assembler::HasSSE41()) {
             vmovd(src, dest.payloadReg());
             vpextrd(1, src, dest.typeReg());
         } else {
             vmovd(src, dest.payloadReg());
-            vpsrldq(Imm32(4), src, src);
-            vmovd(src, dest.typeReg());
+            if (src != temp)
+                moveDouble(src, temp);
+            vpsrldq(Imm32(4), temp, temp);
+            vmovd(temp, dest.typeReg());
         }
     }
     void boxNonDouble(JSValueType type, Register src, const ValueOperand& dest) {
@@ -779,8 +748,6 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
 
     void loadConstantDouble(double d, FloatRegister dest);
     void loadConstantFloat32(float f, FloatRegister dest);
-    void loadConstantDouble(wasm::RawF64 d, FloatRegister dest);
-    void loadConstantFloat32(wasm::RawF32 f, FloatRegister dest);
 
     void loadConstantSimd128Int(const SimdConstant& v, FloatRegister dest);
     void loadConstantSimd128Float(const SimdConstant& v, FloatRegister dest);
@@ -846,8 +813,7 @@ class MacroAssemblerX86 : public MacroAssemblerX86Shared
     inline void ensureDouble(const ValueOperand& source, FloatRegister dest, Label* failure);
 
     void loadWasmGlobalPtr(uint32_t globalDataOffset, Register dest) {
-        CodeOffset label = movlWithPatch(PatchedAbsoluteAddress(), dest);
-        append(wasm::GlobalAccess(label, globalDataOffset));
+        loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, globalArea) + globalDataOffset), dest);
     }
     void loadWasmPinnedRegsFromTls() {
         // x86 doesn't have any pinned registers.

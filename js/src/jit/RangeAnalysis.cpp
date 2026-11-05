@@ -16,7 +16,7 @@
 #include "jit/MIRGraph.h"
 #include "js/Conversions.h"
 #include "vm/ArgumentsObject.h"
-#include "vm/TypedArrayCommon.h"
+#include "vm/TypedArrayObject.h"
 
 #include "jsopcodeinlines.h"
 
@@ -1219,8 +1219,14 @@ Range*
 Range::NaNToZero(TempAllocator& alloc, const Range *op)
 {
     Range* copy = new(alloc) Range(*op);
-    if (copy->canBeNaN())
+    if (copy->canBeNaN()) {
         copy->max_exponent_ = Range::IncludesInfinity;
+        if (!copy->canBeZero()) {
+            Range zero;
+            zero.setDoubleSingleton(0);
+            copy->unionWith(&zero);
+        }
+    }
     copy->refineToExcludeNegativeZero();
     return copy;
 }

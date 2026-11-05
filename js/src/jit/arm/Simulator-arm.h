@@ -71,11 +71,9 @@ const uint32_t kVFPRoundingModeMask = 3 << 22;
 typedef int32_t Instr;
 class SimInstruction;
 
+// Per thread simulator state.
 class Simulator
 {
-    friend class Redirection;
-    friend class AutoLockSimulatorCache;
-
   public:
     friend class ArmDebugger;
     enum Register {
@@ -83,6 +81,8 @@ class Simulator
         r0 = 0, r1, r2, r3, r4, r5, r6, r7,
         r8, r9, r10, r11, r12, r13, r14, r15,
         num_registers,
+        fp = 11,
+        ip = 12,
         sp = 13,
         lr = 14,
         pc = 15,
@@ -192,8 +192,9 @@ class Simulator
     template <typename T>
     T get_pc_as() const { return reinterpret_cast<T>(get_pc()); }
 
-    void set_resume_pc(void* value) {
-        resume_pc_ = int32_t(value);
+    void trigger_wasm_interrupt() {
+        MOZ_ASSERT(!wasm_interrupt_);
+        wasm_interrupt_ = true;
     }
 
     void enable_single_stepping(SingleStepCallback cb, void* arg);
@@ -284,8 +285,11 @@ class Simulator
     inline void increaseStopCounter(uint32_t bkpt_code);
     void printStopInfo(uint32_t code);
 
+    // Handle a wasm interrupt triggered by an async signal handler.
+    void handleWasmInterrupt();
+
     // Handle any wasm faults, returning true if the fault was handled.
-    inline bool handleWasmFault(int32_t addr, unsigned numBytes);
+    bool handleWasmFault(int32_t addr, unsigned numBytes);
 
     // Read and write memory.
     inline uint8_t readBU(int32_t addr);
@@ -347,30 +351,7 @@ class Simulator
     // Executes one instruction.
     void instructionDecode(SimInstruction* instr);
 
-  private:
-    // ICache checking.
-    struct ICacheHasher {
-        typedef void* Key;
-        typedef void* Lookup;
-        static HashNumber hash(const Lookup& l);
-        static bool match(const Key& k, const Lookup& l);
-    };
-
   public:
-    typedef HashMap<void*, CachePage*, ICacheHasher, SystemAllocPolicy> ICacheMap;
-
-  public:
-    static bool ICacheCheckingEnabled;
-    static void FlushICache(void* start, size_t size);
-
-    // Jitcode may be rewritten from a signal handler, but is prevented from
-    // calling FlushICache() because the signal may arrive within the critical
-    // area of an AutoLockSimulatorCache. This flag instructs the Simulator
-    // to remove all cache entries the next time it checks, avoiding false negatives.
-    mozilla::Atomic<bool, mozilla::ReleaseAcquire> cacheInvalidatedBySignalHandler_;
-
-    void checkICacheLocked(ICacheMap& i_cache, SimInstruction* instr);
-
     static int64_t StopSimAt;
 
     // For testing the MoveResolver code, a MoveResolver is set up, and
@@ -436,7 +417,8 @@ class Simulator
     bool pc_modified_;
     int64_t icount_;
 
-    int32_t resume_pc_;
+    // wasm async interrupt support
+    bool wasm_interrupt_;
 
     // Debugger input.
     char* lastDebuggerInput_;
@@ -473,37 +455,6 @@ class Simulator
     }
 
   private:
-    // This lock creates a critical section around 'redirection_' and
-    // 'icache_', which are referenced both by the execution engine
-    // and by the off-thread compiler (see Redirection::Get in the cpp file).
-    Mutex cacheLock_;
-#ifdef DEBUG
-    mozilla::Maybe<Thread::Id> cacheLockHolder_;
-#endif
-
-    Redirection* redirection_;
-    ICacheMap icache_;
-
-  public:
-    ICacheMap& icache() {
-        // Technically we need the lock to access the innards of the
-        // icache, not to take its address, but the latter condition
-        // serves as a useful complement to the former.
-        MOZ_ASSERT(cacheLockHolder_.isSome());
-        return icache_;
-    }
-
-    Redirection* redirection() const {
-        MOZ_ASSERT(cacheLockHolder_.isSome());
-        return redirection_;
-    }
-
-    void setRedirection(js::jit::Redirection* redirection) {
-        MOZ_ASSERT(cacheLockHolder_.isSome());
-        redirection_ = redirection;
-    }
-
-  private:
     // Exclusive access monitor
     void exclusiveMonitorSet(uint64_t value);
     uint64_t exclusiveMonitorGetAndClear(bool* held);
@@ -513,13 +464,79 @@ class Simulator
     uint64_t exclusiveMonitor_;
 };
 
-#define JS_CHECK_SIMULATOR_RECURSION_WITH_EXTRA(cx, extra, onerror)             \
-    JS_BEGIN_MACRO                                                              \
-        if (cx->runtime()->simulator()->overRecursedWithExtra(extra)) {         \
-            js::ReportOverRecursed(cx);                                         \
-            onerror;                                                            \
-        }                                                                       \
-    JS_END_MACRO
+// Process wide simulator state.
+class SimulatorProcess
+{
+    friend class Redirection;
+    friend class AutoLockSimulatorCache;
+
+  private:
+    // ICache checking.
+    struct ICacheHasher {
+        typedef void* Key;
+        typedef void* Lookup;
+        static HashNumber hash(const Lookup& l);
+        static bool match(const Key& k, const Lookup& l);
+    };
+
+  public:
+    typedef HashMap<void*, CachePage*, ICacheHasher, SystemAllocPolicy> ICacheMap;
+
+    static mozilla::Atomic<size_t, mozilla::ReleaseAcquire> ICacheCheckingDisableCount;
+    static void FlushICache(void* start, size_t size);
+
+    // Jitcode may be rewritten from a signal handler, but is prevented from
+    // calling FlushICache() because the signal may arrive within the critical
+    // area of an AutoLockSimulatorCache. This flag instructs the Simulator
+    // to remove all cache entries the next time it checks, avoiding false negatives.
+    static mozilla::Atomic<bool, mozilla::ReleaseAcquire> cacheInvalidatedBySignalHandler_;
+
+    static void checkICacheLocked(SimInstruction* instr);
+
+    static bool initialize() {
+        singleton_ = js_new<SimulatorProcess>();
+        return singleton_ && singleton_->init();
+    }
+    static void destroy() {
+        js_delete(singleton_);
+        singleton_ = nullptr;
+    }
+
+    SimulatorProcess();
+    ~SimulatorProcess();
+
+  private:
+    bool init();
+
+    static SimulatorProcess* singleton_;
+
+    // This lock creates a critical section around 'redirection_' and
+    // 'icache_', which are referenced both by the execution engine
+    // and by the off-thread compiler (see Redirection::Get in the cpp file).
+    Mutex cacheLock_;
+
+    Redirection* redirection_;
+    ICacheMap icache_;
+
+  public:
+    static ICacheMap& icache() {
+        // Technically we need the lock to access the innards of the
+        // icache, not to take its address, but the latter condition
+        // serves as a useful complement to the former.
+        MOZ_ASSERT(singleton_->cacheLock_.ownedByCurrentThread());
+        return singleton_->icache_;
+    }
+
+    static Redirection* redirection() {
+        MOZ_ASSERT(singleton_->cacheLock_.ownedByCurrentThread());
+        return singleton_->redirection_;
+    }
+
+    static void setRedirection(js::jit::Redirection* redirection) {
+        MOZ_ASSERT(singleton_->cacheLock_.ownedByCurrentThread());
+        singleton_->redirection_ = redirection;
+    }
+};
 
 } // namespace jit
 } // namespace js

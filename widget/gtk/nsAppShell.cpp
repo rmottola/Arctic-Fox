@@ -21,8 +21,15 @@
 #ifdef MOZ_ENABLE_DBUS
 #include "WakeLockListener.h"
 #endif
+#include "gfxPlatform.h"
+#include "ScreenHelperGTK.h"
+#include "HeadlessScreenHelper.h"
+#include "mozilla/widget/ScreenManager.h"
 
 using mozilla::Unused;
+using mozilla::widget::ScreenHelperGTK;
+using mozilla::widget::HeadlessScreenHelper;
+using mozilla::widget::ScreenManager;
 
 #define NOTIFY_TOKEN 0xFA
 
@@ -38,9 +45,9 @@ static gint
 PollWrapper(GPollFD *ufds, guint nfsd, gint timeout_)
 {
     mozilla::HangMonitor::Suspend();
-    profiler_sleep_start();
+    profiler_thread_sleep();
     gint result = (*sPollFunc)(ufds, nfsd, timeout_);
-    profiler_sleep_end();
+    profiler_thread_wake();
     mozilla::HangMonitor::NotifyActivity();
     return result;
 }
@@ -162,6 +169,15 @@ nsAppShell::Init()
     if (!sPollFunc) {
         sPollFunc = g_main_context_get_poll_func(nullptr);
         g_main_context_set_poll_func(nullptr, &PollWrapper);
+    }
+
+    if (XRE_IsParentProcess()) {
+        ScreenManager& screenManager = ScreenManager::GetSingleton();
+        if (gfxPlatform::IsHeadless()) {
+            screenManager.SetHelper(mozilla::MakeUnique<HeadlessScreenHelper>());
+        } else {
+            screenManager.SetHelper(mozilla::MakeUnique<ScreenHelperGTK>());
+        }
     }
 
 #if MOZ_WIDGET_GTK == 3

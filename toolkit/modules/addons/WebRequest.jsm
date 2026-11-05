@@ -19,8 +19,6 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
-                                  "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUtils",
                                   "resource://gre/modules/BrowserUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ExtensionUtils",
@@ -535,8 +533,8 @@ HttpObserverManager = {
       let loadContext = this.getLoadContext(channel);
       if (!this.errorCheck(channel, loadContext, channelData)) {
         this.runChannelListener(channel, loadContext, "onError",
-                                {error: this.activityErrorsMap.get(lastActivity) ||
-                                        `NS_ERROR_NET_UNKNOWN_${lastActivity}`});
+          {error: this.activityErrorsMap.get(lastActivity) ||
+                  `NS_ERROR_NET_UNKNOWN_${lastActivity}`});
       }
     } else if (lastActivity !== this.GOOD_LAST_ACTIVITY &&
                lastActivity !== nsIHttpActivityObserver.ACTIVITY_SUBTYPE_TRANSACTION_CLOSE) {
@@ -837,14 +835,8 @@ HttpObserverManager = {
 };
 
 var onBeforeRequest = {
-  get allowedOptions() {
-    delete this.allowedOptions;
-    this.allowedOptions = ["blocking"];
-    if (!AppConstants.RELEASE_OR_BETA) {
-      this.allowedOptions.push("requestBody");
-    }
-    return this.allowedOptions;
-  },
+  allowedOptions: ["blocking", "requestBody"],
+
   addListener(callback, filter = null, opt_extraInfoSpec = null) {
     let opts = parseExtra(opt_extraInfoSpec, this.allowedOptions);
     opts.filter = parseFilter(filter);

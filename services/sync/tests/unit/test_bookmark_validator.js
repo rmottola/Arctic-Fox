@@ -10,8 +10,8 @@ function inspectServerRecords(data) {
 
 add_test(function test_isr_rootOnServer() {
   let c = inspectServerRecords([{
-    id: 'places',
-    type: 'folder',
+    id: "places",
+    type: "folder",
     children: [],
   }]);
   ok(c.problemData.rootOnServer);
@@ -119,28 +119,28 @@ add_test(function test_isr_duplicateChildren()  {
 function getDummyServerAndClient() {
   let server = [
     {
-      id: 'menu',
-      parentid: 'places',
-      type: 'folder',
-      parentName: '',
-      title: 'foo',
-      children: ['bbbbbbbbbbbb', 'cccccccccccc']
+      id: "menu",
+      parentid: "places",
+      type: "folder",
+      parentName: "",
+      title: "foo",
+      children: ["bbbbbbbbbbbb", "cccccccccccc"]
     },
     {
-      id: 'bbbbbbbbbbbb',
-      type: 'bookmark',
-      parentid: 'menu',
-      parentName: 'foo',
-      title: 'bar',
-      bmkUri: 'http://baz.com'
+      id: "bbbbbbbbbbbb",
+      type: "bookmark",
+      parentid: "menu",
+      parentName: "foo",
+      title: "bar",
+      bmkUri: "http://baz.com"
     },
     {
-      id: 'cccccccccccc',
-      parentid: 'menu',
-      parentName: 'foo',
-      title: '',
-      type: 'query',
-      bmkUri: 'place:type=6&sort=14&maxResults=10'
+      id: "cccccccccccc",
+      parentid: "menu",
+      parentName: "foo",
+      title: "",
+      type: "query",
+      bmkUri: "place:type=6&sort=14&maxResults=10"
     }
   ];
 
@@ -201,9 +201,9 @@ add_test(function test_cswc_serverMissing() {
   server[0].children.pop();
 
   let c = new BookmarkValidator().compareServerWithClient(server, client).problemData;
-  deepEqual(c.serverMissing, ['cccccccccccc']);
+  deepEqual(c.serverMissing, ["cccccccccccc"]);
   equal(c.clientMissing.length, 0);
-  deepEqual(c.structuralDifferences, [{id: 'menu', differences: ['childGUIDs']}]);
+  deepEqual(c.structuralDifferences, [{id: "menu", differences: ["childGUIDs"]}]);
   run_next_test();
 });
 
@@ -212,29 +212,29 @@ add_test(function test_cswc_clientMissing() {
   client.children[0].children.pop();
 
   let c = new BookmarkValidator().compareServerWithClient(server, client).problemData;
-  deepEqual(c.clientMissing, ['cccccccccccc']);
+  deepEqual(c.clientMissing, ["cccccccccccc"]);
   equal(c.serverMissing.length, 0);
-  deepEqual(c.structuralDifferences, [{id: 'menu', differences: ['childGUIDs']}]);
+  deepEqual(c.structuralDifferences, [{id: "menu", differences: ["childGUIDs"]}]);
   run_next_test();
 });
 
 add_test(function test_cswc_differences() {
   {
     let {server, client} = getDummyServerAndClient();
-    client.children[0].children[0].title = 'asdf';
+    client.children[0].children[0].title = "asdf";
     let c = new BookmarkValidator().compareServerWithClient(server, client).problemData;
     equal(c.clientMissing.length, 0);
     equal(c.serverMissing.length, 0);
-    deepEqual(c.differences, [{id: 'bbbbbbbbbbbb', differences: ['title']}]);
+    deepEqual(c.differences, [{id: "bbbbbbbbbbbb", differences: ["title"]}]);
   }
 
   {
     let {server, client} = getDummyServerAndClient();
-    server[2].type = 'bookmark';
+    server[2].type = "bookmark";
     let c = new BookmarkValidator().compareServerWithClient(server, client).problemData;
     equal(c.clientMissing.length, 0);
     equal(c.serverMissing.length, 0);
-    deepEqual(c.differences, [{id: 'cccccccccccc', differences: ['type']}]);
+    deepEqual(c.differences, [{id: "cccccccccccc", differences: ["type"]}]);
   }
   run_next_test();
 });
@@ -276,19 +276,19 @@ add_test(function test_cswc_serverUnexpected() {
     }]
   });
   server.push({
-    id: 'dddddddddddd',
-    parentid: 'places',
-    parentName: '',
-    title: '',
-    type: 'folder',
-    children: ['eeeeeeeeeeee']
+    id: "dddddddddddd",
+    parentid: "places",
+    parentName: "",
+    title: "",
+    type: "folder",
+    children: ["eeeeeeeeeeee"]
   }, {
-    id: 'eeeeeeeeeeee',
-    parentid: 'dddddddddddd',
-    parentName: '',
-    title: 'History',
-    type: 'query',
-    bmkUri: 'place:type=3&sort=4'
+    id: "eeeeeeeeeeee",
+    parentid: "dddddddddddd",
+    parentName: "",
+    title: "History",
+    type: "query",
+    bmkUri: "place:type=3&sort=4"
   });
 
   let c = new BookmarkValidator().compareServerWithClient(server, client).problemData;

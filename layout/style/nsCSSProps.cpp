@@ -8,9 +8,10 @@
  * values they accept
  */
 
+#include "nsCSSProps.h"
+
 #include "mozilla/ArrayUtils.h"
 
-#include "nsCSSProps.h"
 #include "nsCSSKeywords.h"
 #include "nsLayoutUtils.h"
 #include "nsStyleConsts.h"
@@ -21,7 +22,6 @@
 #include "mozilla/LookAndFeel.h" // for system colors
 
 #include "nsString.h"
-#include "nsStaticAtom.h"
 #include "nsStaticNameTable.h"
 
 #include "mozilla/Preferences.h"
@@ -712,49 +712,6 @@ nsCSSProps::GetStringValue(nsCSSCounterDesc aCounterDesc)
     static nsDependentCString sNullStr("");
     return sNullStr;
   }
-}
-
-#define CSS_PROP(name_, id_, ...) nsICSSProperty* nsCSSProps::id_;
-#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, ...)
-#define CSS_PROP_LIST_INCLUDE_LOGICAL
-#include "nsCSSPropList.h"
-#undef CSS_PROP_LIST_INCLUDE_LOGICAL
-#undef CSS_PROP_SHORTHAND
-#undef CSS_PROP
-
-#define CSS_PROP(name_, id_, ...) NS_STATIC_ATOM_BUFFER(id_##_buffer, #name_)
-#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, ...)
-#define CSS_PROP_LIST_INCLUDE_LOGICAL
-#include "nsCSSPropList.h"
-#undef CSS_PROP_LIST_INCLUDE_LOGICAL
-#undef CSS_PROP_SHORTHAND
-#undef CSS_PROP
-
-static const nsStaticAtom CSSProps_info[] = {
-#define CSS_PROP(name_, id_, ...) \
-  NS_STATIC_ATOM(id_##_buffer, (nsIAtom**)&nsCSSProps::id_),
-#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, __VA_ARGS__)
-#define CSS_PROP_LIST_INCLUDE_LOGICAL
-#include "nsCSSPropList.h"
-#undef CSS_PROP_LIST_INCLUDE_LOGICAL
-#undef CSS_PROP_SHORTHAND
-#undef CSS_PROP
-};
-
-nsICSSProperty* nsCSSProps::gPropertyAtomTable[eCSSProperty_COUNT];
-
-/* static */ void
-nsCSSProps::AddRefAtoms()
-{
-  NS_RegisterStaticAtoms(CSSProps_info);
-#define CSS_PROP(name_, id_, ...) \
-  gPropertyAtomTable[eCSSProperty_##id_] = nsCSSProps::id_;
-#define CSS_PROP_SHORTHAND(name_, id_, ...) CSS_PROP(name_, id_, ...)
-#define CSS_PROP_LIST_INCLUDE_LOGICAL
-#include "nsCSSPropList.h"
-#undef CSS_PROP_LIST_INCLUDE_LOGICAL
-#undef CSS_PROP_SHORTHAND
-#undef CSS_PROP
 }
 
 /***************************************************************************/
@@ -2356,8 +2313,8 @@ const KTableEntry nsCSSProps::kClipPathGeometryBoxKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kShapeRadiusKTable[] = {
-  { eCSSKeyword_closest_side, NS_RADIUS_CLOSEST_SIDE },
-  { eCSSKeyword_farthest_side, NS_RADIUS_FARTHEST_SIDE },
+  { eCSSKeyword_closest_side, StyleShapeRadius::ClosestSide },
+  { eCSSKeyword_farthest_side, StyleShapeRadius::FarthestSide },
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
@@ -2677,10 +2634,10 @@ static const nsCSSPropertyID gBorderRadiusSubpropTable[] = {
 static const nsCSSPropertyID gOutlineRadiusSubpropTable[] = {
   // Code relies on these being in topleft-topright-bottomright-bottomleft
   // order.
-  eCSSProperty__moz_outline_radius_topLeft,
-  eCSSProperty__moz_outline_radius_topRight,
-  eCSSProperty__moz_outline_radius_bottomRight,
-  eCSSProperty__moz_outline_radius_bottomLeft,
+  eCSSProperty__moz_outline_radius_topleft,
+  eCSSProperty__moz_outline_radius_topright,
+  eCSSProperty__moz_outline_radius_bottomright,
+  eCSSProperty__moz_outline_radius_bottomleft,
   eCSSProperty_UNKNOWN
 };
 
@@ -2716,10 +2673,10 @@ static const nsCSSPropertyID gBorderSubpropTable[] = {
   eCSSProperty_border_right_color,
   eCSSProperty_border_bottom_color,
   eCSSProperty_border_left_color,
-  eCSSProperty_border_top_colors,
-  eCSSProperty_border_right_colors,
-  eCSSProperty_border_bottom_colors,
-  eCSSProperty_border_left_colors,
+  eCSSProperty__moz_border_top_colors,
+  eCSSProperty__moz_border_right_colors,
+  eCSSProperty__moz_border_bottom_colors,
+  eCSSProperty__moz_border_left_colors,
   eCSSProperty_border_image_source,
   eCSSProperty_border_image_slice,
   eCSSProperty_border_image_width,
@@ -2760,7 +2717,7 @@ static_assert(eSideTop == 0 && eSideRight == 1 &&
               "box side constants not top/right/bottom/left == 0/1/2/3");
 static const nsCSSPropertyID gBorderColorSubpropTable[] = {
   // Code relies on these being in top-right-bottom-left order.
-  // Code relies on these matching the NS_SIDE_* constants.
+  // Code relies on these matching the enum Side constants.
   eCSSProperty_border_top_color,
   eCSSProperty_border_right_color,
   eCSSProperty_border_bottom_color,

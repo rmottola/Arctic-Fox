@@ -268,10 +268,10 @@ Wrapper::fun_toString(JSContext* cx, HandleObject proxy, unsigned indent) const
 }
 
 bool
-Wrapper::regexp_toShared(JSContext* cx, HandleObject proxy, RegExpGuard* g) const
+Wrapper::regexp_toShared(JSContext* cx, HandleObject proxy, MutableHandleRegExpShared shared) const
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
-    return RegExpToShared(cx, target, g);
+    return RegExpToShared(cx, target, shared);
 }
 
 bool
@@ -312,9 +312,9 @@ Wrapper::New(JSContext* cx, JSObject* obj, const Wrapper* handler,
 }
 
 JSObject*
-Wrapper::Renew(JSContext* cx, JSObject* existing, JSObject* obj, const Wrapper* handler)
+Wrapper::Renew(JSObject* existing, JSObject* obj, const Wrapper* handler)
 {
-    existing->as<ProxyObject>().renew(cx, handler, ObjectValue(*obj));
+    existing->as<ProxyObject>().renew(handler, ObjectValue(*obj));
     return existing;
 }
 
@@ -405,7 +405,7 @@ js::TransparentObjectWrapper(JSContext* cx, HandleObject existing, HandleObject 
 
 ErrorCopier::~ErrorCopier()
 {
-    JSContext* cx = ac->context()->asJSContext();
+    JSContext* cx = ac->context();
 
     // The provenance of Debugger.DebuggeeWouldRun is the topmost locking
     // debugger compartment; it should not be copied around.

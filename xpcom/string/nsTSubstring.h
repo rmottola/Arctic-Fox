@@ -6,11 +6,14 @@
 // IWYU pragma: private, include "nsString.h"
 
 #include "mozilla/Casting.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/IntegerTypeTraits.h"
+#include "mozilla/Span.h"
 
 #ifndef MOZILLA_INTERNAL_API
-#error Cannot use internal string classes without MOZILLA_INTERNAL_API defined. Use the frozen header nsStringAPI.h instead.
+#error "Using XPCOM strings is limited to code linked into libxul."
 #endif
 
 /**
@@ -566,46 +569,54 @@ public:
   }
 
   /**
-   * Append a formatted string to the current string. Uses the format
-   * codes documented in prprf.h
+   * Append a formatted string to the current string. Uses the
+   * standard printf format codes.
    */
-  void AppendPrintf(const char* aFormat, ...);
+  void AppendPrintf(const char* aFormat, ...) MOZ_FORMAT_PRINTF(2, 3);
   void AppendPrintf(const char* aFormat, va_list aAp);
   void AppendInt(int32_t aInteger)
   {
-    AppendPrintf("%d", aInteger);
+    AppendPrintf("%" PRId32, aInteger);
   }
   void AppendInt(int32_t aInteger, int aRadix)
   {
-    const char* fmt = aRadix == 10 ? "%d" : aRadix == 8 ? "%o" : "%x";
-    AppendPrintf(fmt, aInteger);
+    if (aRadix == 10) {
+      AppendPrintf("%" PRId32, aInteger);
+    } else {
+      AppendPrintf(aRadix == 8 ? "%" PRIo32 : "%" PRIx32,
+                   static_cast<uint32_t>(aInteger));
+    }
   }
   void AppendInt(uint32_t aInteger)
   {
-    AppendPrintf("%u", aInteger);
+    AppendPrintf("%" PRIu32, aInteger);
   }
   void AppendInt(uint32_t aInteger, int aRadix)
   {
-    const char* fmt = aRadix == 10 ? "%u" : aRadix == 8 ? "%o" : "%x";
-    AppendPrintf(fmt, aInteger);
+    AppendPrintf(aRadix == 10 ? "%" PRIu32 : aRadix == 8 ? "%" PRIo32 : "%" PRIx32,
+                 aInteger);
   }
   void AppendInt(int64_t aInteger)
   {
-    AppendPrintf("%lld", aInteger);
+    AppendPrintf("%" PRId64, aInteger);
   }
   void AppendInt(int64_t aInteger, int aRadix)
   {
-    const char* fmt = aRadix == 10 ? "%lld" : aRadix == 8 ? "%llo" : "%llx";
-    AppendPrintf(fmt, aInteger);
+    if (aRadix == 10) {
+      AppendPrintf("%" PRId64, aInteger);
+    } else {
+      AppendPrintf(aRadix == 8 ? "%" PRIo64 : "%" PRIx64,
+                   static_cast<uint64_t>(aInteger));
+    }
   }
   void AppendInt(uint64_t aInteger)
   {
-    AppendPrintf("%llu", aInteger);
+    AppendPrintf("%" PRIu64, aInteger);
   }
   void AppendInt(uint64_t aInteger, int aRadix)
   {
-    const char* fmt = aRadix == 10 ? "%llu" : aRadix == 8 ? "%llo" : "%llx";
-    AppendPrintf(fmt, aInteger);
+    AppendPrintf(aRadix == 10 ? "%" PRIu64 : aRadix == 8 ? "%" PRIo64 : "%" PRIx64,
+                 aInteger);
   }
 
   /**
@@ -704,7 +715,7 @@ public:
     Replace(aCutStart, aCutLength, char_traits::sEmptyBuffer, 0);
   }
 
-  nsTSubstringSplitter_CharT Split(const char_type aChar);
+  nsTSubstringSplitter_CharT Split(const char_type aChar) const;
 
   /**
    * buffer sizing
@@ -794,6 +805,68 @@ public:
   }
 #endif
 
+  /**
+   * Span integration
+   */
+
+  operator mozilla::Span<char_type>()
+  {
+    return mozilla::MakeSpan(BeginWriting(), Length());
+  }
+
+  operator mozilla::Span<const char_type>() const
+  {
+    return mozilla::MakeSpan(BeginReading(), Length());
+  }
+
+  void Append(mozilla::Span<const char_type> aSpan)
+  {
+    auto len = aSpan.Length();
+    MOZ_RELEASE_ASSERT(len <= mozilla::MaxValue<size_type>::value);
+    Append(aSpan.Elements(), len);
+  }
+
+  MOZ_MUST_USE bool Append(mozilla::Span<const char_type> aSpan,
+                           const fallible_t& aFallible)
+  {
+    auto len = aSpan.Length();
+    if (len > mozilla::MaxValue<size_type>::value) {
+      return false;
+    }
+    return Append(aSpan.Elements(), len, aFallible);
+  }
+
+#if !defined(CharT_is_PRUnichar)
+  operator mozilla::Span<uint8_t>()
+  {
+    return mozilla::MakeSpan(reinterpret_cast<uint8_t*>(BeginWriting()),
+                             Length());
+  }
+
+  operator mozilla::Span<const uint8_t>() const
+  {
+    return mozilla::MakeSpan(reinterpret_cast<const uint8_t*>(BeginReading()),
+                             Length());
+  }
+
+  void Append(mozilla::Span<const uint8_t> aSpan)
+  {
+    auto len = aSpan.Length();
+    MOZ_RELEASE_ASSERT(len <= mozilla::MaxValue<size_type>::value);
+    Append(reinterpret_cast<const char*>(aSpan.Elements()), len);
+  }
+
+  MOZ_MUST_USE bool Append(mozilla::Span<const uint8_t> aSpan,
+                           const fallible_t& aFallible)
+  {
+    auto len = aSpan.Length();
+    if (len > mozilla::MaxValue<size_type>::value) {
+      return false;
+    }
+    return Append(
+      reinterpret_cast<const char*>(aSpan.Elements()), len, aFallible);
+  }
+#endif
 
   /**
    * string data is never null, but can be marked void.  if true, the
@@ -903,7 +976,6 @@ protected:
 
   friend class nsTObsoleteAStringThunk_CharT;
   friend class nsTSubstringTuple_CharT;
-  friend class nsTSubstringSplitter_CharT;
   friend class nsTPromiseFlatString_CharT;
 
   char_type*  mData;
@@ -1036,8 +1108,6 @@ protected:
   void NS_FASTCALL ReplaceLiteral(index_type aCutStart, size_type aCutLength,
                                   const char_type* aData, size_type aLength);
 
-  static int AppendFunc(void* aArg, const char* aStr, uint32_t aLen);
-
 public:
 
   // NOTE: this method is declared public _only_ for convenience for
@@ -1168,11 +1238,14 @@ operator>(const nsTSubstring_CharT::base_string_type& aLhs,
 // Use nsTSubstring::Split instead.
 class nsTSubstringSplitter_CharT
 {
+  typedef nsTSubstring_CharT::size_type size_type;
+  typedef nsTSubstring_CharT::char_type char_type;
+
   class nsTSubstringSplit_Iter
   {
   public:
     nsTSubstringSplit_Iter(const nsTSubstringSplitter_CharT& aObj,
-                           nsTSubstring_CharT::size_type aPos)
+                           size_type aPos)
       : mObj(aObj)
       , mPos(aPos)
     {
@@ -1183,7 +1256,7 @@ class nsTSubstringSplitter_CharT
       return mPos != other.mPos;
     }
 
-    const nsTSubstring_CharT& operator*() const;
+    const nsTDependentSubstring_CharT& operator*() const;
 
     const nsTSubstringSplit_Iter& operator++()
     {
@@ -1193,48 +1266,17 @@ class nsTSubstringSplitter_CharT
 
   private:
     const nsTSubstringSplitter_CharT& mObj;
-    nsTSubstring_CharT::size_type mPos;
+    size_type mPos;
   };
 
 private:
-  const nsTSubstring_CharT* mStr;
-  mozilla::UniquePtr<nsTSubstring_CharT[]> mArray;
-  nsTSubstring_CharT::size_type mArraySize;
-  const nsTSubstring_CharT::char_type mDelim;
+  const nsTSubstring_CharT* const mStr;
+  mozilla::UniquePtr<nsTDependentSubstring_CharT[]> mArray;
+  size_type mArraySize;
+  const char_type mDelim;
 
 public:
-  nsTSubstringSplitter_CharT(const nsTSubstring_CharT* aStr,
-                             nsTSubstring_CharT::char_type aDelim)
-    : mStr(aStr)
-    , mArray(nullptr)
-    , mDelim(aDelim)
-  {
-    if (mStr->IsEmpty()) {
-      mArraySize = 0;
-      return;
-    }
-
-    nsTSubstring_CharT::size_type delimCount = mStr->CountChar(aDelim);
-    mArraySize = delimCount + 1;
-    mArray.reset(new nsTSubstring_CharT[mArraySize]);
-
-    size_t seenParts = 0;
-    nsTSubstring_CharT::size_type start = 0;
-    do {
-      MOZ_ASSERT(seenParts < mArraySize);
-      int32_t offset = mStr->FindChar(aDelim, start);
-      if (offset != -1) {
-        nsTSubstring_CharT::size_type length =
-          static_cast<nsTSubstring_CharT::size_type>(offset) - start;
-        mArray[seenParts++].Assign(mStr->Data() + start, length);
-        start = static_cast<nsTSubstring_CharT::size_type>(offset) + 1;
-      } else {
-        // Get the remainder
-        mArray[seenParts++].Assign(mStr->Data() + start, mStr->Length() - start);
-        break;
-      }
-    } while (start < mStr->Length());
-  }
+  nsTSubstringSplitter_CharT(const nsTSubstring_CharT* aStr, char_type aDelim);
 
   nsTSubstringSplit_Iter begin() const
   {
@@ -1246,9 +1288,28 @@ public:
     return nsTSubstringSplit_Iter(*this, mArraySize);
   }
 
-  const nsTSubstring_CharT& Get(const nsTSubstring_CharT::size_type index) const
+  const nsTDependentSubstring_CharT& Get(const size_type index) const
   {
     MOZ_ASSERT(index < mArraySize);
     return mArray[index];
   }
 };
+
+/**
+ * Span integration
+ */
+namespace mozilla {
+
+inline Span<CharT>
+MakeSpan(nsTSubstring_CharT& aString)
+{
+  return aString;
+}
+
+inline Span<const CharT>
+MakeSpan(const nsTSubstring_CharT& aString)
+{
+  return aString;
+}
+
+} // namespace mozilla

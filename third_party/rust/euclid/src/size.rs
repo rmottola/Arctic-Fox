@@ -44,7 +44,7 @@ impl<T: fmt::Display, U> fmt::Display for TypedSize2D<T, U> {
 }
 
 impl<T, U> TypedSize2D<T, U> {
-    /// Constructor taing scalar values.
+    /// Constructor taking scalar values.
     pub fn new(width: T, height: T) -> TypedSize2D<T, U> {
         TypedSize2D {
             width: width,
@@ -55,7 +55,7 @@ impl<T, U> TypedSize2D<T, U> {
 }
 
 impl<T: Clone, U> TypedSize2D<T, U> {
-    /// Constructor taing scalar stronlgy typed lengths.
+    /// Constructor taking scalar stronlgy typed lengths.
     pub fn from_lengths(width: Length<T, U>, height: Length<T, U>) -> TypedSize2D<T, U> {
         TypedSize2D::new(width.get(), height.get())
     }
@@ -75,7 +75,7 @@ impl<T: Ceil, U> TypedSize2D<T, U> {
     ///
     /// This behavior is preserved for negative values (unlike the basic cast).
     pub fn ceil(&self) -> Self {
-        TypedSize2D::new(self.height.ceil(), self.width.ceil())
+        TypedSize2D::new(self.width.ceil(), self.height.ceil())
     }
 }
 
@@ -225,6 +225,11 @@ impl<T: NumCast + Copy, Unit> TypedSize2D<T, Unit> {
     pub fn to_i64(&self) -> TypedSize2D<i64, Unit> {
         self.cast().unwrap()
     }
+}
+
+/// Shorthand for TypedSize2D::new(w, h).
+pub fn size2<T, U>(w: T, h: T) -> TypedSize2D<T, U> {
+    TypedSize2D::new(w, h)
 }
 
 #[cfg(test)]

@@ -1232,9 +1232,6 @@ toolbar#nav-bar {
         if self.mozLogs:
             browserEnv["MOZ_LOG"] = MOZ_LOG
 
-        if debugger and not options.slowscript:
-            browserEnv["JS_DISABLE_SLOW_SCRIPT_SIGNALS"] = "1"
-
         # For e10s, our tests default to suppressing the "unsafe CPOW usage"
         # warnings that can plague test logs.
         if not options.enableCPOWWarnings:
@@ -1521,6 +1518,8 @@ class MochitestDesktop(MochitestBase):
     sslTunnel = None
     DEFAULT_TIMEOUT = 60.0
     mediaDevices = None
+
+    patternFiles = {}
 
     # XXX use automation.py for test name to avoid breaking legacy
     # TODO: replace this with 'runtests.py' or 'mochitest' or the like

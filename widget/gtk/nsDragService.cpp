@@ -26,6 +26,7 @@
 #include "nsCRT.h"
 #include "mozilla/BasicEvents.h"
 #include "mozilla/Services.h"
+#include "mozilla/ClearOnShutdown.h"
 
 #include "gfxXlibSurface.h"
 #include "gfxContext.h"
@@ -37,9 +38,10 @@
 #include "nsViewManager.h"
 #include "nsIFrame.h"
 #include "nsGtkUtils.h"
+#include "nsGtkKeyUtils.h"
 #include "mozilla/gfx/2D.h"
 #include "gfxPlatform.h"
-#include "nsScreenGtk.h"
+#include "ScreenHelperGTK.h"
 #include "nsArrayUtils.h"
 
 using namespace mozilla;
@@ -152,13 +154,20 @@ nsDragService::~nsDragService()
 
 NS_IMPL_ISUPPORTS_INHERITED(nsDragService, nsBaseDragService, nsIObserver)
 
-/* static */ nsDragService*
+mozilla::StaticRefPtr<nsDragService> sDragServiceInstance;
+/* static */ already_AddRefed<nsDragService>
 nsDragService::GetInstance()
 {
-    static const nsIID iid = NS_DRAGSERVICE_CID;
-    nsCOMPtr<nsIDragService> dragService = do_GetService(iid);
-    return static_cast<nsDragService*>(dragService.get());
-    // We rely on XPCOM keeping a reference to the service.
+  if (gfxPlatform::IsHeadless()) {
+    return nullptr;
+  }
+  if (!sDragServiceInstance) {
+    sDragServiceInstance = new nsDragService();
+    ClearOnShutdown(&sDragServiceInstance);
+  }
+
+  RefPtr<nsDragService> service = sDragServiceInstance.get();
+  return service.forget();
 }
 
 // nsIObserver
@@ -238,7 +247,7 @@ OnSourceGrabEventAfter(GtkWidget *widget, GdkEvent *event, gpointer user_data)
         // Update the cursor position.  The last of these recorded gets used for
         // the eDragEnd event.
         nsDragService *dragService = static_cast<nsDragService*>(user_data);
-        gint scale = nsScreenGtk::GetGtkMonitorScaleFactor();
+        gint scale = ScreenHelperGTK::GetGTKMonitorScaleFactor();
         auto p = LayoutDeviceIntPoint::Round(event->motion.x_root * scale,
                                              event->motion.y_root * scale);
         dragService->SetDragEndPoint(p);
@@ -504,7 +513,7 @@ nsDragService::SetAlphaPixmap(SourceSurface *aSurface,
         (void (*)(cairo_surface_t*,double,double))
         dlsym(RTLD_DEFAULT, "cairo_surface_set_device_scale");
     if (sCairoSurfaceSetDeviceScalePtr) {
-        gint scale = nsScreenGtk::GetGtkMonitorScaleFactor();
+        gint scale = ScreenHelperGTK::GetGTKMonitorScaleFactor();
         sCairoSurfaceSetDeviceScalePtr(surf, scale, scale);
     }
 
@@ -522,7 +531,7 @@ nsDragService::StartDragSession()
 }
  
 NS_IMETHODIMP
-nsDragService::EndDragSession(bool aDoneDrag)
+nsDragService::EndDragSession(bool aDoneDrag, uint32_t aKeyModifiers)
 {
     MOZ_LOG(sDragLm, LogLevel::Debug, ("nsDragService::EndDragSession %d",
                                    aDoneDrag));
@@ -549,7 +558,7 @@ nsDragService::EndDragSession(bool aDoneDrag)
     // We're done with the drag context.
     mTargetDragContextForRemote = nullptr;
 
-    return nsBaseDragService::EndDragSession(aDoneDrag);
+    return nsBaseDragService::EndDragSession(aDoneDrag, aKeyModifiers);
 }
 
 // nsIDragSession
@@ -778,7 +787,7 @@ nsDragService::GetData(nsITransferable * aTransferable,
             currentFlavor->ToString(getter_Copies(flavorStr));
             GdkAtom gdkFlavor = gdk_atom_intern(flavorStr, FALSE);
             MOZ_LOG(sDragLm, LogLevel::Debug,
-                   ("looking for data in type %s, gdk flavor %ld\n",
+                   ("looking for data in type %s, gdk flavor %p\n",
                    static_cast<const char*>(flavorStr), gdkFlavor));
             bool dataFound = false;
             if (gdkFlavor) {
@@ -1199,7 +1208,7 @@ nsDragService::IsTargetContextList(void)
 void
 nsDragService::GetTargetDragData(GdkAtom aFlavor)
 {
-    MOZ_LOG(sDragLm, LogLevel::Debug, ("getting data flavor %d\n", aFlavor));
+    MOZ_LOG(sDragLm, LogLevel::Debug, ("getting data flavor %p\n", aFlavor));
     MOZ_LOG(sDragLm, LogLevel::Debug, ("mLastWidget is %p and mLastContext is %p\n",
                                    mTargetWidget.get(),
                                    mTargetDragContext.get()));
@@ -1416,7 +1425,7 @@ nsDragService::SourceEndDragSession(GdkDragContext *aContext,
         gint x, y;
         GdkDisplay* display = gdk_display_get_default();
         if (display) {
-            gint scale = nsScreenGtk::GetGtkMonitorScaleFactor();
+            gint scale = ScreenHelperGTK::GetGTKMonitorScaleFactor();
             gdk_display_get_pointer(display, nullptr, &x, &y, nullptr);
             SetDragEndPoint(LayoutDeviceIntPoint(x * scale, y * scale));
         }
@@ -1920,7 +1929,7 @@ nsDragService::RunScheduledTask()
             // The drag that was initiated in a different app. End the drag
             // session, since we're done with it for now (until the user drags
             // back into this app).
-            EndDragSession(false);
+            EndDragSession(false, GetCurrentModifiers());
         }
     }
 
@@ -1942,7 +1951,7 @@ nsDragService::RunScheduledTask()
     if (task == eDragTaskLeave || task == eDragTaskSourceEnd) {
         if (task == eDragTaskSourceEnd) {
             // Dispatch drag end events.
-            EndDragSession(true);
+            EndDragSession(true, GetCurrentModifiers());
         }
 
         // Nothing more to do
@@ -2013,7 +2022,7 @@ nsDragService::RunScheduledTask()
         mTargetWindow = nullptr;
         // Make sure to end the drag session. If this drag started in a
         // different app, we won't get a drag_end signal to end it from.
-        EndDragSession(true);
+        EndDragSession(true, GetCurrentModifiers());
     }
 
     // We're done with the drag context.
@@ -2085,7 +2094,7 @@ nsDragService::DispatchMotionEvents()
 {
     mCanDrop = false;
 
-    FireDragEventAtSource(eDrag);
+    FireDragEventAtSource(eDrag, GetCurrentModifiers());
 
     mTargetWindow->DispatchDragEvent(eDragOver, mTargetWindowPoint,
                                      mTargetTime);
@@ -2106,4 +2115,10 @@ nsDragService::DispatchDropEvent()
     mTargetWindow->DispatchDragEvent(msg, mTargetWindowPoint, mTargetTime);
 
     return mCanDrop;
+}
+
+/* static */ uint32_t
+nsDragService::GetCurrentModifiers()
+{
+  return mozilla::widget::KeymapWrapper::ComputeCurrentKeyModifiers();
 }

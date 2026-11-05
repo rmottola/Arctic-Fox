@@ -13,6 +13,7 @@
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/dom/TypedArray.h"
+#include "mozilla/UniquePtr.h"
 #include "nsCOMPtr.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsHashKeys.h"
@@ -309,19 +310,12 @@ public:
 
   JSObject* GetGlobalJSObject() const;
 
-  AudioChannel MozAudioChannelType() const;
-
-  AudioChannel TestAudioChannelInAudioNodeStream();
-
   void RegisterNode(AudioNode* aNode);
   void UnregisterNode(AudioNode* aNode);
 
   void OnStateChanged(void* aPromise, AudioContextState aNewState);
 
   BasicWaveFormCache* GetBasicWaveFormCache();
-
-  IMPL_EVENT_HANDLER(mozinterruptbegin)
-  IMPL_EVENT_HANDLER(mozinterruptend)
 
   bool CheckClosed(ErrorResult& aRv);
 
@@ -348,7 +342,7 @@ private:
   AudioContextState mAudioContextState;
   RefPtr<AudioDestinationNode> mDestination;
   RefPtr<AudioListener> mListener;
-  nsTArray<RefPtr<WebAudioDecodeJob> > mDecodeJobs;
+  nsTArray<UniquePtr<WebAudioDecodeJob> > mDecodeJobs;
   // This array is used to keep the suspend/resume/close promises alive until
   // they are resolved, so we can safely pass them accross threads.
   nsTArray<RefPtr<Promise>> mPromiseGripArray;

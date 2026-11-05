@@ -335,6 +335,7 @@ NS_EVENT_MESSAGE(eScrolledAreaChanged)
 NS_EVENT_MESSAGE(eTransitionStart)
 NS_EVENT_MESSAGE(eTransitionRun)
 NS_EVENT_MESSAGE(eTransitionEnd)
+NS_EVENT_MESSAGE(eTransitionCancel)
 NS_EVENT_MESSAGE(eAnimationStart)
 NS_EVENT_MESSAGE(eAnimationEnd)
 NS_EVENT_MESSAGE(eAnimationIteration)
@@ -376,6 +377,8 @@ NS_EVENT_MESSAGE(eOrientationChange)
 #endif
 
 // WebVR events
+NS_EVENT_MESSAGE(eVRDisplayActivate)
+NS_EVENT_MESSAGE(eVRDisplayDeactivate)
 NS_EVENT_MESSAGE(eVRDisplayConnect)
 NS_EVENT_MESSAGE(eVRDisplayDisconnect)
 NS_EVENT_MESSAGE(eVRDisplayPresentChange)

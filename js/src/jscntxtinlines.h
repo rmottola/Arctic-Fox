@@ -26,7 +26,7 @@ class CompartmentChecker
     JSCompartment* compartment;
 
   public:
-    explicit CompartmentChecker(ExclusiveContext* cx)
+    explicit CompartmentChecker(JSContext* cx)
       : compartment(cx->compartment())
     {
     }
@@ -68,7 +68,7 @@ class CompartmentChecker
     }
 
     void check(JSObject* obj) {
-        MOZ_ASSERT_IF(obj, IsInsideNursery(obj) || !obj->asTenured().isMarked(gc::GRAY));
+        MOZ_ASSERT(JS::ObjectIsNotGray(obj));
         if (obj)
             check(obj->compartment());
     }
@@ -83,10 +83,38 @@ class CompartmentChecker
         check(handle.get());
     }
 
+    template<typename T>
+    void check(MutableHandle<T> handle) {
+        check(handle.get());
+    }
+
+    template <typename T>
+    void checkAtom(T* thing) {
+        static_assert(mozilla::IsSame<T, JSAtom>::value ||
+                      mozilla::IsSame<T, JS::Symbol>::value,
+                      "Should only be called with JSAtom* or JS::Symbol* argument");
+
+#ifdef DEBUG
+        // Atoms which move across zone boundaries need to be marked in the new
+        // zone, see JS_MarkCrossZoneId.
+        if (compartment) {
+            JSRuntime* rt = compartment->runtimeFromAnyThread();
+            MOZ_ASSERT(rt->gc.atomMarking.atomIsMarked(compartment->zone(), thing));
+        }
+#endif
+    }
+
     void check(JSString* str) {
-        MOZ_ASSERT(!str->isMarked(gc::GRAY));
-        if (!str->isAtom())
+        MOZ_ASSERT(JS::CellIsNotGray(str));
+        if (str->isAtom()) {
+            checkAtom(&str->asAtom());
+        } else {
             checkZone(str->zone());
+        }
+    }
+
+    void check(JS::Symbol* symbol) {
+        checkAtom(symbol);
     }
 
     void check(const js::Value& v) {
@@ -94,6 +122,22 @@ class CompartmentChecker
             check(&v.toObject());
         else if (v.isString())
             check(v.toString());
+        else if (v.isSymbol())
+            check(v.toSymbol());
+    }
+
+    // Check the contents of any container class that supports the C++
+    // iteration protocol, eg GCVector<jsid>.
+    template <typename Container>
+    typename mozilla::EnableIf<
+        mozilla::IsSame<
+            decltype(((Container*)nullptr)->begin()),
+            decltype(((Container*)nullptr)->end())
+        >::value
+    >::Type
+    check(const Container& container) {
+        for (auto i : container)
+            check(i);
     }
 
     void check(const ValueArray& arr) {
@@ -116,10 +160,17 @@ class CompartmentChecker
             check(*p);
     }
 
-    void check(jsid id) {}
+    void check(jsid id) {
+        if (JSID_IS_ATOM(id))
+            checkAtom(JSID_TO_ATOM(id));
+        else if (JSID_IS_SYMBOL(id))
+            checkAtom(JSID_TO_SYMBOL(id));
+        else
+            MOZ_ASSERT(!JSID_IS_GCTHING(id));
+    }
 
     void check(JSScript* script) {
-        MOZ_ASSERT_IF(script, !script->isMarked(gc::GRAY));
+        MOZ_ASSERT(JS::CellIsNotGray(script));
         if (script)
             check(script->compartment());
     }
@@ -146,20 +197,20 @@ class CompartmentChecker
  * Don't perform these checks when called from a finalizer. The checking
  * depends on other objects not having been swept yet.
  */
-#define START_ASSERT_SAME_COMPARTMENT()                                       \
-    if (cx->isJSContext() && cx->asJSContext()->runtime()->isHeapBusy())      \
-        return;                                                               \
+#define START_ASSERT_SAME_COMPARTMENT()                                 \
+    if (JS::CurrentThreadIsHeapBusy())                                  \
+        return;                                                         \
     CompartmentChecker c(cx)
 
 template <class T1> inline void
-releaseAssertSameCompartment(ExclusiveContext* cx, const T1& t1)
+releaseAssertSameCompartment(JSContext* cx, const T1& t1)
 {
     START_ASSERT_SAME_COMPARTMENT();
     c.check(t1);
 }
 
 template <class T1> inline void
-assertSameCompartment(ExclusiveContext* cx, const T1& t1)
+assertSameCompartment(JSContext* cx, const T1& t1)
 {
 #ifdef JS_CRASH_DIAGNOSTICS
     START_ASSERT_SAME_COMPARTMENT();
@@ -168,7 +219,7 @@ assertSameCompartment(ExclusiveContext* cx, const T1& t1)
 }
 
 template <class T1> inline void
-assertSameCompartmentDebugOnly(ExclusiveContext* cx, const T1& t1)
+assertSameCompartmentDebugOnly(JSContext* cx, const T1& t1)
 {
 #if defined(DEBUG) && defined(JS_CRASH_DIAGNOSTICS)
     START_ASSERT_SAME_COMPARTMENT();
@@ -177,7 +228,7 @@ assertSameCompartmentDebugOnly(ExclusiveContext* cx, const T1& t1)
 }
 
 template <class T1, class T2> inline void
-assertSameCompartment(ExclusiveContext* cx, const T1& t1, const T2& t2)
+assertSameCompartment(JSContext* cx, const T1& t1, const T2& t2)
 {
 #ifdef JS_CRASH_DIAGNOSTICS
     START_ASSERT_SAME_COMPARTMENT();
@@ -187,7 +238,7 @@ assertSameCompartment(ExclusiveContext* cx, const T1& t1, const T2& t2)
 }
 
 template <class T1, class T2, class T3> inline void
-assertSameCompartment(ExclusiveContext* cx, const T1& t1, const T2& t2, const T3& t3)
+assertSameCompartment(JSContext* cx, const T1& t1, const T2& t2, const T3& t3)
 {
 #ifdef JS_CRASH_DIAGNOSTICS
     START_ASSERT_SAME_COMPARTMENT();
@@ -198,7 +249,7 @@ assertSameCompartment(ExclusiveContext* cx, const T1& t1, const T2& t2, const T3
 }
 
 template <class T1, class T2, class T3, class T4> inline void
-assertSameCompartment(ExclusiveContext* cx,
+assertSameCompartment(JSContext* cx,
                       const T1& t1, const T2& t2, const T3& t3, const T4& t4)
 {
 #ifdef JS_CRASH_DIAGNOSTICS
@@ -211,7 +262,7 @@ assertSameCompartment(ExclusiveContext* cx,
 }
 
 template <class T1, class T2, class T3, class T4, class T5> inline void
-assertSameCompartment(ExclusiveContext* cx,
+assertSameCompartment(JSContext* cx,
                       const T1& t1, const T2& t2, const T3& t3, const T4& t4, const T5& t5)
 {
 #ifdef JS_CRASH_DIAGNOSTICS
@@ -230,7 +281,8 @@ STATIC_PRECONDITION_ASSUME(ubound(args.argv_) >= argc)
 MOZ_ALWAYS_INLINE bool
 CallJSNative(JSContext* cx, Native native, const CallArgs& args)
 {
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
 #ifdef DEBUG
     bool alreadyThrowing = cx->isExceptionPending();
@@ -304,7 +356,8 @@ MOZ_ALWAYS_INLINE bool
 CallJSGetterOp(JSContext* cx, GetterOp op, HandleObject obj, HandleId id,
                MutableHandleValue vp)
 {
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     assertSameCompartment(cx, obj, id, vp);
     bool ok = op(cx, obj, id, vp);
@@ -317,7 +370,8 @@ MOZ_ALWAYS_INLINE bool
 CallJSSetterOp(JSContext* cx, SetterOp op, HandleObject obj, HandleId id, MutableHandleValue vp,
                ObjectOpResult& result)
 {
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     assertSameCompartment(cx, obj, id, vp);
     return op(cx, obj, id, vp, result);
@@ -327,7 +381,8 @@ inline bool
 CallJSAddPropertyOp(JSContext* cx, JSAddPropertyOp op, HandleObject obj, HandleId id,
                     HandleValue v)
 {
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     assertSameCompartment(cx, obj, id, v);
     return op(cx, obj, id, v);
@@ -337,7 +392,8 @@ inline bool
 CallJSDeletePropertyOp(JSContext* cx, JSDeletePropertyOp op, HandleObject receiver, HandleId id,
                        ObjectOpResult& result)
 {
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     assertSameCompartment(cx, receiver, id);
     if (op)
@@ -345,28 +401,36 @@ CallJSDeletePropertyOp(JSContext* cx, JSDeletePropertyOp op, HandleObject receiv
     return result.succeed();
 }
 
-inline uintptr_t
-GetNativeStackLimit(ExclusiveContext* cx)
+MOZ_ALWAYS_INLINE bool
+CheckForInterrupt(JSContext* cx)
 {
-    StackKind kind;
-    if (cx->isJSContext()) {
-        kind = cx->asJSContext()->runningWithTrustedPrincipals()
-                 ? StackForTrustedScript : StackForUntrustedScript;
-    } else {
-        // For other threads, we just use the trusted stack depth, since it's
-        // unlikely that we'll be mixing trusted and untrusted code together.
-        kind = StackForTrustedScript;
-    }
-    return cx->nativeStackLimit[kind];
-}
-
-inline LifoAlloc&
-ExclusiveContext::typeLifoAlloc()
-{
-    return zone()->types.typeLifoAlloc;
+    MOZ_ASSERT(!cx->isExceptionPending());
+    // Add an inline fast-path since we have to check for interrupts in some hot
+    // C++ loops of library builtins.
+    if (MOZ_UNLIKELY(cx->hasPendingInterrupt()))
+        return cx->handleInterrupt();
+    return true;
 }
 
 }  /* namespace js */
+
+inline js::LifoAlloc&
+JSContext::typeLifoAlloc()
+{
+    return zone()->types.typeLifoAlloc();
+}
+
+inline js::Nursery&
+JSContext::nursery()
+{
+    return runtime()->gc.nursery();
+}
+
+inline void
+JSContext::minorGC(JS::gcreason::Reason reason)
+{
+    runtime()->gc.minorGC(reason);
+}
 
 inline void
 JSContext::setPendingException(const js::Value& v)
@@ -374,37 +438,49 @@ JSContext::setPendingException(const js::Value& v)
     // overRecursed_ is set after the fact by ReportOverRecursed.
     this->overRecursed_ = false;
     this->throwing = true;
-    this->unwrappedException_ = v;
+    this->unwrappedException() = v;
     // We don't use assertSameCompartment here to allow
     // js::SetPendingExceptionCrossContext to work.
     MOZ_ASSERT_IF(v.isObject(), v.toObject().compartment() == compartment());
 }
 
 inline bool
-JSContext::runningWithTrustedPrincipals() const
+JSContext::runningWithTrustedPrincipals()
 {
-    return !compartment() || compartment()->principals() == trustedPrincipals();
+    return !compartment() || compartment()->principals() == runtime()->trustedPrincipals();
 }
 
 inline void
-js::ExclusiveContext::enterCompartment(
+JSContext::enterCompartment(
     JSCompartment* c,
     const js::AutoLockForExclusiveAccess* maybeLock /* = nullptr */)
 {
     enterCompartmentDepth_++;
+
+    if (!c->zone()->isAtomsZone())
+        enterZoneGroup(c->zone()->group());
+
     c->enter();
     setCompartment(c, maybeLock);
 }
 
+template <typename T>
 inline void
-js::ExclusiveContext::enterNullCompartment()
+JSContext::enterCompartmentOf(const T& target)
+{
+    MOZ_ASSERT(JS::CellIsNotGray(target));
+    enterCompartment(target->compartment(), nullptr);
+}
+
+inline void
+JSContext::enterNullCompartment()
 {
     enterCompartmentDepth_++;
     setCompartment(nullptr);
 }
 
 inline void
-js::ExclusiveContext::leaveCompartment(
+JSContext::leaveCompartment(
     JSCompartment* oldCompartment,
     const js::AutoLockForExclusiveAccess* maybeLock /* = nullptr */)
 {
@@ -415,24 +491,21 @@ js::ExclusiveContext::leaveCompartment(
     // compartment.
     JSCompartment* startingCompartment = compartment_;
     setCompartment(oldCompartment, maybeLock);
-    if (startingCompartment)
+    if (startingCompartment) {
         startingCompartment->leave();
+        if (!startingCompartment->zone()->isAtomsZone())
+            leaveZoneGroup(startingCompartment->zone()->group());
+    }
 }
 
 inline void
-js::ExclusiveContext::setCompartment(JSCompartment* comp,
-                                     const AutoLockForExclusiveAccess* maybeLock /* = nullptr */)
+JSContext::setCompartment(JSCompartment* comp,
+                          const js::AutoLockForExclusiveAccess* maybeLock /* = nullptr */)
 {
-    // ExclusiveContexts can only be in the atoms zone or in exclusive zones.
-    MOZ_ASSERT_IF(!isJSContext() && !runtime_->isAtomsCompartment(comp),
-                  comp->zone()->usedByExclusiveThread);
-
-    // Normal JSContexts cannot enter exclusive zones.
-    MOZ_ASSERT_IF(isJSContext() && comp,
-                  !comp->zone()->usedByExclusiveThread);
-
     // Only one thread can be in the atoms compartment at a time.
     MOZ_ASSERT_IF(runtime_->isAtomsCompartment(comp), maybeLock != nullptr);
+    MOZ_ASSERT_IF(runtime_->isAtomsCompartment(comp) || runtime_->isAtomsCompartment(compartment_),
+                  runtime_->currentThreadHasExclusiveAccess());
 
     // Make sure that the atoms compartment has its own zone.
     MOZ_ASSERT_IF(comp && !runtime_->isAtomsCompartment(comp),
@@ -443,9 +516,27 @@ js::ExclusiveContext::setCompartment(JSCompartment* comp,
     MOZ_ASSERT_IF(compartment_, compartment_->hasBeenEntered());
     MOZ_ASSERT_IF(comp, comp->hasBeenEntered());
 
+    // This context must have exclusive access to the zone's group.
+    MOZ_ASSERT_IF(comp && !comp->zone()->isAtomsZone(),
+                  comp->zone()->group()->ownedByCurrentThread());
+
     compartment_ = comp;
     zone_ = comp ? comp->zone() : nullptr;
     arenas_ = zone_ ? &zone_->arenas : nullptr;
+}
+
+inline void
+JSContext::enterZoneGroup(js::ZoneGroup* group)
+{
+    MOZ_ASSERT(this == js::TlsContext.get());
+    group->enter();
+}
+
+inline void
+JSContext::leaveZoneGroup(js::ZoneGroup* group)
+{
+    MOZ_ASSERT(this == js::TlsContext.get());
+    group->leave();
 }
 
 inline JSScript*
@@ -464,14 +555,13 @@ JSContext::currentScript(jsbytecode** ppc,
 
     MOZ_ASSERT(act->cx() == this);
 
+    if (!allowCrossCompartment && act->compartment() != compartment())
+        return nullptr;
+
     if (act->isJit()) {
         JSScript* script = nullptr;
         js::jit::GetPcScript(const_cast<JSContext*>(this), &script, ppc);
-        if (!allowCrossCompartment && script->compartment() != compartment()) {
-            if (ppc)
-                *ppc = nullptr;
-            return nullptr;
-        }
+        MOZ_ASSERT(allowCrossCompartment || script->compartment() == compartment());
         return script;
     }
 
@@ -484,14 +574,20 @@ JSContext::currentScript(jsbytecode** ppc,
     MOZ_ASSERT(!fp->runningInJit());
 
     JSScript* script = fp->script();
-    if (!allowCrossCompartment && script->compartment() != compartment())
-        return nullptr;
+    MOZ_ASSERT(allowCrossCompartment || script->compartment() == compartment());
 
     if (ppc) {
         *ppc = act->asInterpreter()->regs().pc;
         MOZ_ASSERT(script->containsPC(*ppc));
     }
+
     return script;
+}
+
+inline js::RuntimeCaches&
+JSContext::caches()
+{
+    return runtime()->caches();
 }
 
 #endif /* jscntxtinlines_h */

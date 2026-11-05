@@ -1,6 +1,6 @@
 "use strict";
 
-const TEST_URL = 'http://example.com/browser/browser/components/places/tests/browser/pageopeningwindow.html';
+const TEST_URL = "http://example.com/browser/browser/components/places/tests/browser/pageopeningwindow.html";
 
 function makeBookmarkFor(url, keyword) {
   return Promise.all([

@@ -4,10 +4,9 @@
 
 "use strict";
 
-const Ci = Components.interfaces;
-const Cc = Components.classes;
-const Cu = Components.utils;
+const { utils: Cu, interfaces: Ci } = Components;
 
+/* exported init */
 this.EXPORTED_SYMBOLS = ["init"];
 
 let gLoader;
@@ -33,12 +32,10 @@ function setupServer(mm) {
   if (!DebuggerServer.initialized) {
     DebuggerServer.init();
   }
-
-  // In case of apps being loaded in parent process, DebuggerServer is already
-  // initialized, but child specific actors are not registered.
-  // Otherwise, for child process, we need to load actors the first
-  // time we load child.js
-  DebuggerServer.addChildActors();
+  // For browser content toolbox, we do need a regular root actor and all tab
+  // actors, but don't need all the "browser actors" that are only useful when
+  // debugging the parent process via the browser toolbox.
+  DebuggerServer.registerActors({ browser: false, root: true, tab: true });
 
   // Clean up things when the client disconnects
   mm.addMessageListener("debug:content-process-destroy", function onDestroy() {

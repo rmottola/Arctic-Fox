@@ -397,7 +397,6 @@ public:
   }
   void SetScrollableByAPZ(bool aScrollable);
   void SetZoomableByAPZ(bool aZoomable);
-  void SetScrollsClipOnUnscrolledOutOfFlow();
 
   bool UsesContainerScrolling() const;
 
@@ -459,6 +458,8 @@ public:
   bool ShouldSuppressScrollbarRepaints() const {
     return mSuppressScrollbarRepaints;
   }
+
+  bool DragScroll(WidgetEvent* aEvent);
 
   // owning references to the nsIAnonymousContentCreator-built content
   nsCOMPtr<nsIContent> mHScrollbarContent;
@@ -594,8 +595,6 @@ public:
 
   // True if we don't want the scrollbar to repaint itself right now.
   bool mSuppressScrollbarRepaints:1;
-
-  bool mScrollsClipOnUnscrolledOutOfFlow:1;
 
   mozilla::layout::ScrollVelocityQueue mVelocityQueue;
 
@@ -1031,12 +1030,13 @@ public:
   void SetZoomableByAPZ(bool aZoomable) override {
     mHelper.SetZoomableByAPZ(aZoomable);
   }
-  void SetScrollsClipOnUnscrolledOutOfFlow() override {
-    mHelper.SetScrollsClipOnUnscrolledOutOfFlow();
-  }
   
   ScrollSnapInfo GetScrollSnapInfo() const override {
     return mHelper.GetScrollSnapInfo();
+  }
+
+  virtual bool DragScroll(mozilla::WidgetEvent* aEvent) override {
+    return mHelper.DragScroll(aEvent);
   }
 
 #ifdef DEBUG_FRAME_DUMP
@@ -1446,9 +1446,6 @@ public:
   void SetZoomableByAPZ(bool aZoomable) override {
     mHelper.SetZoomableByAPZ(aZoomable);
   }
-  void SetScrollsClipOnUnscrolledOutOfFlow() override {
-    mHelper.SetScrollsClipOnUnscrolledOutOfFlow();
-  }
   virtual bool DecideScrollableLayer(nsDisplayListBuilder* aBuilder,
                                      nsRect* aDirtyRect,
                                      bool aAllowCreateDisplayPort) override {
@@ -1466,6 +1463,10 @@ public:
 
   ScrollSnapInfo GetScrollSnapInfo() const override {
     return mHelper.GetScrollSnapInfo();
+  }
+
+  virtual bool DragScroll(mozilla::WidgetEvent* aEvent) override {
+    return mHelper.DragScroll(aEvent);
   }
 
 #ifdef DEBUG_FRAME_DUMP

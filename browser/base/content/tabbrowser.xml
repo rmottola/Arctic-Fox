@@ -1522,6 +1522,7 @@
         <parameter name="aIsPrerendered"/>
         <body>
           <![CDATA[
+            var aTriggeringPrincipal;
             var aReferrerPolicy;
             var aFromExternal;
             var aRelatedToCurrent;
@@ -1531,36 +1532,40 @@
             var aPreferredRemoteType;
             var aNoReferrer;
             var aUserContextId;
-            var aRelatedBrowser;
+            var aSameProcessAsFrameLoader;
             var aOriginPrincipal;
+            var aOpener;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
               let params = arguments[1];
-              aReferrerURI          = params.referrerURI;
-              aReferrerPolicy       = params.referrerPolicy;
-              aCharset              = params.charset;
-              aPostData             = params.postData;
-              aLoadInBackground     = params.inBackground;
-              aAllowThirdPartyFixup = params.allowThirdPartyFixup;
-              aFromExternal         = params.fromExternal;
-              aRelatedToCurrent     = params.relatedToCurrent;
-              aAllowMixedContent    = params.allowMixedContent;
-              aSkipAnimation        = params.skipAnimation;
-              aForceNotRemote       = params.forceNotRemote;
-              aPreferredRemoteType  = params.preferredRemoteType;
-              aNoReferrer           = params.noReferrer;
-              aUserContextId        = params.userContextId;
-              aRelatedBrowser       = params.relatedBrowser;
-              aOriginPrincipal      = params.originPrincipal;
-              aOpener               = params.opener;
-              aIsPrerendered        = params.isPrerendered;
+              aTriggeringPrincipal      = params.triggeringPrincipal
+              aReferrerURI              = params.referrerURI;
+              aReferrerPolicy           = params.referrerPolicy;
+              aCharset                  = params.charset;
+              aPostData                 = params.postData;
+              aLoadInBackground         = params.inBackground;
+              aAllowThirdPartyFixup     = params.allowThirdPartyFixup;
+              aFromExternal             = params.fromExternal;
+              aRelatedToCurrent         = params.relatedToCurrent;
+              aAllowMixedContent        = params.allowMixedContent;
+              aSkipAnimation            = params.skipAnimation;
+              aForceNotRemote           = params.forceNotRemote;
+              aPreferredRemoteType      = params.preferredRemoteType;
+              aNoReferrer               = params.noReferrer;
+              aUserContextId            = params.userContextId;
+              aSameProcessAsFrameLoader = params.sameProcessAsFrameLoader;
+              aOriginPrincipal          = params.originPrincipal;
+              aOpener                   = params.opener;
+              aIsPrerendered            = params.isPrerendered;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
                          Services.prefs.getBoolPref("browser.tabs.loadInBackground");
             var owner = bgLoad ? null : this.selectedTab;
+
             var tab = this.addTab(aURI, {
+                                  triggeringPrincipal: aTriggeringPrincipal,
                                   referrerURI: aReferrerURI,
                                   referrerPolicy: aReferrerPolicy,
                                   charset: aCharset,
@@ -1576,7 +1581,7 @@
                                   noReferrer: aNoReferrer,
                                   userContextId: aUserContextId,
                                   originPrincipal: aOriginPrincipal,
-                                  relatedBrowser: aRelatedBrowser,
+                                  sameProcessAsFrameLoader: aSameProcessAsFrameLoader,
                                   opener: aOpener,
                                   isPrerendered: aIsPrerendered });
             if (!bgLoad)
@@ -1720,9 +1725,9 @@
             }
 
             // Abort if we're not going to change anything
-            if (isRemote == aShouldBeRemote && !aOptions.newFrameloader && !aOptions.freshProcess &&
-                (!isRemote || aBrowser.getAttribute("remoteType") == aOptions.remoteType) &&
-                !aBrowser.frameLoader.isFreshProcess) {
+            let currentRemoteType = aBrowser.getAttribute("remoteType");
+            if (isRemote == aShouldBeRemote && !aOptions.newFrameloader &&
+                (!isRemote || currentRemoteType == aOptions.remoteType)) {
               return false;
             }
 
@@ -1752,9 +1757,9 @@
             aBrowser.destroy();
 
             // Make sure to restore the original droppedLinkHandler and
-            // relatedBrowser.
+            // sameProcessAsFrameLoader.
             let droppedLinkHandler = aBrowser.droppedLinkHandler;
-            let relatedBrowser = aBrowser.relatedBrowser;
+            let sameProcessAsFrameLoader = aBrowser.sameProcessAsFrameLoader;
 
             // Change the "remote" attribute.
             let parent = aBrowser.parentNode;
@@ -1768,8 +1773,12 @@
             }
 
             // NB: This works with the hack in the browser constructor that
-            // turns this normal property into a field.
-            aBrowser.relatedBrowser = relatedBrowser;
+            // turns this normal property into a field. When switching remote
+            // type copying related browser would stop the switch and the
+            // previously related browser will no longer be relevant.
+            if (!aShouldBeRemote || currentRemoteType == aOptions.remoteType) {
+              aBrowser.sameProcessAsFrameLoader = sameProcessAsFrameLoader;
+            }
 
             if (aOptions.opener) {
               // Set the opener window on the browser, such that when the frame
@@ -1777,17 +1786,7 @@
               aBrowser.presetOpenerWindow(aOptions.opener);
             }
 
-            // Set the freshProcess attribute so that the frameloader knows to
-            // create a new process
-            if (aOptions.freshProcess) {
-              aBrowser.setAttribute("freshProcess", "true");
-            }
-
             parent.appendChild(aBrowser);
-
-            // Remove the freshProcess attribute if we set it, as we don't
-            // want it to apply for the next time the frameloader is created
-            aBrowser.removeAttribute("freshProcess");
 
             aBrowser.userTypedValue = oldUserTypedValue;
             if (hadStartedLoad) {
@@ -1869,15 +1868,23 @@
             if (!gMultiProcessBrowser)
               return this.updateBrowserRemoteness(aBrowser, false);
 
+            // If we're in a LargeAllocation process, we prefer switching back
+            // into a normal content process, as that way we can clean up the
+            // L-A process.
+            let preferredRemoteType = aBrowser.remoteType;
+            if (aBrowser.remoteType == E10SUtils.LARGE_ALLOCATION_REMOTE_TYPE) {
+              preferredRemoteType = E10SUtils.DEFAULT_REMOTE_TYPE;
+            }
+            aOptions.remoteType =
+              E10SUtils.getRemoteTypeForURI(aURL,
+                                            gMultiProcessBrowser,
+                                            preferredRemoteType,
+                                            aOptions.freshProcess);
+
             // If this URL can't load in the current browser then flip it to the
             // correct type.
-            let currentRemoteType = aBrowser.remoteType;
-            aOptions.remoteType =
-              E10SUtils.getRemoteTypeForURI(aURL, gMultiProcessBrowser,
-                                            currentRemoteType);
-            if (currentRemoteType != aOptions.remoteType ||
-                aOptions.freshProcess || aOptions.newFrameloader ||
-                aBrowser.frameLoader.isFreshProcess) {
+            if (aBrowser.remoteType != aOptions.remoteType ||
+                aOptions.newFrameloader) {
               let remote = aOptions.remoteType != E10SUtils.NOT_REMOTE;
               return this.updateBrowserRemoteness(aBrowser, remote, aOptions);
             }
@@ -2019,8 +2026,8 @@
 
             b.setAttribute("autoscrollpopup", this._autoScrollPopup.id);
 
-            if (aParams.relatedBrowser) {
-              b.relatedBrowser = aParams.relatedBrowser;
+            if (aParams.sameProcessAsFrameLoader) {
+              b.sameProcessAsFrameLoader = aParams.sameProcessAsFrameLoader;
             }
 
             // Create the browserStack container
@@ -2101,7 +2108,7 @@
                                              remoteType,
                                              uriIsAboutBlank: uriIsAboutBlank,
                                              userContextId: aParams.userContextId,
-                                             relatedBrowser: aParams.relatedBrowser,
+                                             sameProcessAsFrameLoader: aParams.sameProcessAsFrameLoader,
                                              opener: aParams.opener,
                                              isPrerendered: aParams.isPrerendered});
             }
@@ -2169,6 +2176,7 @@
             "use strict";
 
             const NS_XUL = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+            var aTriggeringPrincipal;
             var aReferrerPolicy;
             var aFromExternal;
             var aRelatedToCurrent;
@@ -2179,7 +2187,7 @@
             var aNoReferrer;
             var aUserContextId;
             var aEventDetail;
-            var aRelatedBrowser;
+            var aSameProcessAsFrameLoader;
             var aOriginPrincipal;
             var aDisallowInheritPrincipal;
             var aOpener;
@@ -2187,6 +2195,7 @@
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
               let params = arguments[1];
+              aTriggeringPrincipal      = params.triggeringPrincipal;
               aReferrerURI              = params.referrerURI;
               aReferrerPolicy           = params.referrerPolicy;
               aCharset                  = params.charset;
@@ -2202,7 +2211,7 @@
               aNoReferrer               = params.noReferrer;
               aUserContextId            = params.userContextId;
               aEventDetail              = params.eventDetail;
-              aRelatedBrowser           = params.relatedBrowser;
+              aSameProcessAsFrameLoader = params.sameProcessAsFrameLoader;
               aOriginPrincipal          = params.originPrincipal;
               aDisallowInheritPrincipal = params.disallowInheritPrincipal;
               aOpener                   = params.opener;
@@ -2280,7 +2289,7 @@
               forceNotRemote: aForceNotRemote,
               preferredRemoteType: aPreferredRemoteType,
               userContextId:  aUserContextId,
-              relatedBrowser: aRelatedBrowser,
+              sameProcessAsFrameLoader: aSameProcessAsFrameLoader,
               opener: aOpener,
               isPrerendered: aIsPrerendered,
             };
@@ -2318,6 +2327,7 @@
               try {
                 b.loadURIWithFlags(aURI, {
                   flags,
+                  triggeringPrincipal: aTriggeringPrincipal,
                   referrerURI: aNoReferrer ? null : aReferrerURI,
                   referrerPolicy: aReferrerPolicy,
                   charset: aCharset,
@@ -2785,7 +2795,7 @@
             // This will unload the document. An unload handler could remove
             // dependant tabs, so it's important that the tabbrowser is now in
             // a consistent state (tab removed, tab positions updated, etc.).
-            browser.parentNode.removeChild(browser);
+            browser.remove();
 
             // Release the browser in case something is erroneously holding a
             // reference to the tab after its removal.
@@ -3511,7 +3521,7 @@
         <parameter name="aEvent"/>
         <body>
           <![CDATA[
-            var direction = window.getComputedStyle(this.parentNode, null).direction;
+            var direction = window.getComputedStyle(this.parentNode).direction;
             if ((direction == "ltr" && aEvent.keyCode == KeyEvent.DOM_VK_RIGHT) ||
                 (direction == "rtl" && aEvent.keyCode == KeyEvent.DOM_VK_LEFT))
               this.moveTabForward();
@@ -4672,10 +4682,10 @@
 
             var offset = 1;
             switch (aEvent.charCode) {
-              case '}'.charCodeAt(0):
+              case "}".charCodeAt(0):
                 offset = -1;
-              case '{'.charCodeAt(0):
-                if (window.getComputedStyle(this, null).direction == "ltr")
+              case "{".charCodeAt(0):
+                if (window.getComputedStyle(this).direction == "ltr")
                   offset *= -1;
                 this.tabContainer.advanceSelectedTab(offset, true);
                 aEvent.preventDefault();
@@ -4935,13 +4945,13 @@
                 relatedToCurrent: true,
                 isPrerendered: true,
               });
-              let partialSHistory = newTab.linkedBrowser.frameLoader.partialSessionHistory;
+              let partialSHistory = newTab.linkedBrowser.frameLoader.partialSHistory;
               groupedSHistory.addPrerenderingPartialSHistory(partialSHistory, data.id);
               break;
             }
 
             case "Prerender:Cancel": {
-              let groupedSHistory = browser.frameLoader.groupedSessionHistory;
+              let groupedSHistory = browser.frameLoader.groupedSHistory;
               if (groupedSHistory) {
                 groupedSHistory.cancelPrerendering(data.id);
               }
@@ -4950,7 +4960,7 @@
 
             case "Prerender:Swap": {
               let frameloader = browser.frameLoader;
-              let groupedSHistory = browser.frameLoader.groupedSessionHistory;
+              let groupedSHistory = browser.frameLoader.groupedSHistory;
               if (groupedSHistory) {
                 groupedSHistory.activatePrerendering(data.id).then(
                   () => frameloader.messageManager.sendAsyncMessage("Prerender:Swapped", data),
@@ -5427,7 +5437,7 @@
         <body><![CDATA[
           if (this._tabMarginLeft === null || this._tabMarginRight === null) {
             let tabMiddle = document.getAnonymousElementByAttribute(aTab, "class", "tab-background-middle");
-            let tabMiddleStyle = window.getComputedStyle(tabMiddle, null);
+            let tabMiddleStyle = window.getComputedStyle(tabMiddle);
             this._tabMarginLeft = parseFloat(tabMiddleStyle.marginLeft);
             this._tabMarginRight = parseFloat(tabMiddleStyle.marginRight);
           }
@@ -6101,7 +6111,7 @@
         <body><![CDATA[
           var tabs = this.childNodes;
           var tab = this._getDragTargetTab(event, isLink);
-          if (window.getComputedStyle(this, null).direction == "ltr") {
+          if (window.getComputedStyle(this).direction == "ltr") {
             for (let i = tab ? tab._tPos : 0; i < tabs.length; i++)
               if (event.screenX < tabs[i].boxObject.screenX + tabs[i].boxObject.width / 2)
                 return i;
@@ -6379,7 +6389,7 @@
           // nothing.
           if (this.tabbrowser._removingTabs.length) {
             let visibleTabs = this.tabbrowser.visibleTabs;
-            let ltr = (window.getComputedStyle(this, null).direction == "ltr");
+            let ltr = (window.getComputedStyle(this).direction == "ltr");
             let lastTab = visibleTabs[visibleTabs.length - 1];
             let endOfTab = lastTab.getBoundingClientRect()[ltr ? "right" : "left"];
             if ((ltr && event.clientX > endOfTab) ||
@@ -6533,7 +6543,7 @@
         event.stopPropagation();
 
         var tabStrip = this.mTabstrip;
-        var ltr = (window.getComputedStyle(this, null).direction == "ltr");
+        var ltr = (window.getComputedStyle(this).direction == "ltr");
 
         // autoscroll the tab strip if we drag over the scroll
         // buttons, even if we aren't dragging a tab, but then
@@ -6931,6 +6941,15 @@
                      must be the ID of the extension which changed it.
       -->
       <field name="muteReason">undefined</field>
+
+      <property name="userContextId" readonly="true">
+        <getter>
+          return this.hasAttribute("usercontextid")
+                   ? parseInt(this.getAttribute("usercontextid"))
+                   : 0;
+        </getter>
+      </property>
+
       <property name="soundPlaying" readonly="true">
         <getter>
           return this.getAttribute("soundplaying") == "true";

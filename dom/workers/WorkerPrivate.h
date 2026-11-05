@@ -140,6 +140,45 @@ public:
   }
 };
 
+class WorkerErrorBase {
+public:
+  nsString mMessage;
+  nsString mFilename;
+  uint32_t mLineNumber;
+  uint32_t mColumnNumber;
+  uint32_t mErrorNumber;
+
+  WorkerErrorBase()
+  : mLineNumber(0),
+    mColumnNumber(0),
+    mErrorNumber(0)
+  { }
+
+  void AssignErrorBase(JSErrorBase* aReport);
+};
+
+class WorkerErrorNote : public WorkerErrorBase {
+public:
+  void AssignErrorNote(JSErrorNotes::Note* aNote);
+};
+
+class WorkerErrorReport : public WorkerErrorBase {
+public:
+  nsString mLine;
+  uint32_t mFlags;
+  JSExnType mExnType;
+  bool mMutedError;
+  nsTArray<WorkerErrorNote> mNotes;
+
+  WorkerErrorReport()
+  : mFlags(0),
+    mExnType(JSEXN_ERR),
+    mMutedError(false)
+  { }
+
+  void AssignErrorReport(JSErrorReport* aReport);
+};
+
 template <class Derived>
 class WorkerPrivateParent : public DOMEventTargetHelper
 {
@@ -249,7 +288,7 @@ private:
 
   void
   PostMessageInternal(JSContext* aCx, JS::Handle<JS::Value> aMessage,
-                      const Optional<Sequence<JS::Value>>& aTransferable,
+                      const Sequence<JSObject*>& aTransferable,
                       ErrorResult& aRv);
 
   nsresult
@@ -352,15 +391,12 @@ public:
   bool
   ModifyBusyCount(bool aIncrease);
 
-  void
-  ForgetOverridenLoadGroup(nsCOMPtr<nsILoadGroup>& aLoadGroupOut);
-
-  void
-  ForgetMainThreadObjects(nsTArray<nsCOMPtr<nsISupports> >& aDoomed);
+  bool
+  ProxyReleaseMainThreadObjects();
 
   void
   PostMessage(JSContext* aCx, JS::Handle<JS::Value> aMessage,
-              const Optional<Sequence<JS::Value>>& aTransferable,
+              const Sequence<JSObject*>& aTransferable,
               ErrorResult& aRv);
 
   void
@@ -397,12 +433,8 @@ public:
 
   void
   BroadcastErrorToSharedWorkers(JSContext* aCx,
-                                const nsAString& aMessage,
-                                const nsAString& aFilename,
-                                const nsAString& aLine,
-                                uint32_t aLineNumber,
-                                uint32_t aColumnNumber,
-                                uint32_t aFlags);
+                                const WorkerErrorReport* aReport,
+                                bool aIsErrorEvent);
 
   void
   WorkerScriptLoaded();
@@ -473,6 +505,12 @@ public:
   IsFromWindow() const
   {
     return mLoadInfo.mFromWindow;
+  }
+
+  nsLoadFlags
+  GetLoadFlags() const
+  {
+    return mLoadInfo.mLoadFlags;
   }
 
   uint64_t
@@ -586,6 +624,11 @@ public:
     return mLoadInfo.mPrincipal;
   }
 
+  const nsAString& Origin() const
+  {
+    return mLoadInfo.mOrigin;
+  }
+
   nsILoadGroup*
   GetLoadGroup() const
   {
@@ -602,8 +645,16 @@ public:
       return mLoadInfo.mPrincipal;
   }
 
-  void
-  SetPrincipal(nsIPrincipal* aPrincipal, nsILoadGroup* aLoadGroup);
+  nsresult
+  SetPrincipalOnMainThread(nsIPrincipal* aPrincipal, nsILoadGroup* aLoadGroup);
+
+  nsresult
+  SetPrincipalFromChannel(nsIChannel* aChannel);
+
+#if defined(DEBUG) || !defined(RELEASE_OR_BETA)
+  bool
+  FinalChannelPrincipalIsValid(nsIChannel* aChannel);
+#endif
 
   bool
   UsesSystemPrincipal() const
@@ -646,6 +697,10 @@ public:
     AssertIsOnMainThread();
     mLoadInfo.mCSP = aCSP;
   }
+
+  nsresult
+  SetCSPFromHeaderValues(const nsACString& aCSPHeaderValue,
+                         const nsACString& aCSPReportOnlyHeaderValue);
 
   net::ReferrerPolicy
   GetReferrerPolicy() const
@@ -844,6 +899,11 @@ public:
   void
   AssertInnerWindowIsCorrect() const
   { }
+#endif
+
+#if defined(DEBUG) || !defined(RELEASE_OR_BETA)
+  bool
+  PrincipalIsValid() const;
 #endif
 };
 
@@ -1118,18 +1178,17 @@ public:
   void
   PostMessageToParent(JSContext* aCx,
                       JS::Handle<JS::Value> aMessage,
-                      const Optional<Sequence<JS::Value>>& aTransferable,
+                      const Sequence<JSObject*>& aTransferable,
                       ErrorResult& aRv)
   {
     PostMessageToParentInternal(aCx, aMessage, aTransferable, aRv);
   }
 
   void
-  PostMessageToParentMessagePort(
-                             JSContext* aCx,
-                             JS::Handle<JS::Value> aMessage,
-                             const Optional<Sequence<JS::Value>>& aTransferable,
-                             ErrorResult& aRv);
+  PostMessageToParentMessagePort(JSContext* aCx,
+                                 JS::Handle<JS::Value> aMessage,
+                                 const Sequence<JSObject*>& aTransferable,
+                                 ErrorResult& aRv);
 
   void
   EnterDebuggerEventLoop();
@@ -1444,7 +1503,7 @@ private:
   void
   PostMessageToParentInternal(JSContext* aCx,
                               JS::Handle<JS::Value> aMessage,
-                              const Optional<Sequence<JS::Value>>& aTransferable,
+                              const Sequence<JSObject*>& aTransferable,
                               ErrorResult& aRv);
 
   void

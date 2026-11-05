@@ -15,13 +15,14 @@
 #include "mozilla/AnimationUtils.h"
 #include "mozilla/EffectSet.h"
 #include "mozilla/LayerAnimationInfo.h"
-#include "mozilla/RestyleManagerHandle.h"
-#include "mozilla/RestyleManagerHandleInlines.h"
+#include "mozilla/RestyleManager.h"
+#include "mozilla/RestyleManagerInlines.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "nsComputedDOMStyle.h" // nsComputedDOMStyle::GetPresShellForContent
 #include "nsCSSPropertyIDSet.h"
 #include "nsCSSProps.h"
 #include "nsIPresShell.h"
+#include "nsIPresShellInlines.h"
 #include "nsLayoutUtils.h"
 #include "nsRuleNode.h" // For nsRuleNode::ComputePropertiesOverridingAnimation
 #include "nsRuleProcessorData.h" // For ElementRuleProcessorData etc.
@@ -125,6 +126,13 @@ FindAnimationsForCompositor(const nsIFrame* aFrame,
     return false;
   }
 
+  // FIXME: Bug 1334036: stylo: Implement off-main-thread animations.
+  if (aFrame->StyleContext()->StyleSource().IsServoComputedValues()) {
+    NS_WARNING("stylo: return false in FindAnimationsForCompositor because "
+               "haven't supported compositor-driven animations yet");
+    return false;
+  }
+
   // First check for newly-started transform animations that should be
   // synchronized with geometric animations. We need to do this before any
   // other early returns (the one above is ok) since we can only check this
@@ -146,11 +154,6 @@ FindAnimationsForCompositor(const nsIFrame* aFrame,
   }
 
   if (aFrame->RefusedAsyncAnimation()) {
-    return false;
-  }
-
-  if (aFrame->StyleContext()->StyleSource().IsServoComputedValues()) {
-    NS_ERROR("stylo: cannot handle compositor-driven animations yet");
     return false;
   }
 
@@ -261,7 +264,7 @@ EffectCompositor::RequestRestyle(dom::Element* aElement,
     if (!elementsToRestyle.Contains(key)) {
       elementsToRestyle.Put(key, false);
     }
-    mPresContext->Document()->SetNeedStyleFlush();
+    mPresContext->PresShell()->SetNeedThrottledAnimationFlush();
   } else {
     // Get() returns 0 if the element is not found. It will also return
     // false if the element is found but does not have a pending restyle.
@@ -273,12 +276,14 @@ EffectCompositor::RequestRestyle(dom::Element* aElement,
   }
 
   if (aRestyleType == RestyleType::Layer) {
-    // Prompt layers to re-sync their animations.
+    // FIXME: Bug 1334036: we call RequestRestyle for both stylo and gecko,
+    // so we should fix this after supporting animations on the compositor.
     if (mPresContext->RestyleManager()->IsServo()) {
-      NS_ERROR("stylo: Servo-backed style system should not be using "
-               "EffectCompositor");
+      NS_WARNING("stylo: RequestRestyle to layer, but Servo-backed style "
+                 "system haven't supported compositor-driven animations yet");
       return;
     }
+    // Prompt layers to re-sync their animations.
     mPresContext->RestyleManager()->AsGecko()->IncrementAnimationGeneration();
     EffectSet* effectSet =
       EffectSet::GetEffectSet(aElement, aPseudoType);
@@ -305,6 +310,13 @@ EffectCompositor::PostRestyleForAnimation(dom::Element* aElement,
   nsRestyleHint hint = aCascadeLevel == CascadeLevel::Transitions ?
                                         eRestyle_CSSTransitions :
                                         eRestyle_CSSAnimations;
+
+  // FIXME: stylo only supports Self and Subtree hints now, so we override it
+  // for stylo if we are not in process of restyling.
+  if (mPresContext->StyleSet()->IsServo() &&
+      !mPresContext->RestyleManager()->IsInStyleRefresh()) {
+    hint = eRestyle_Self | eRestyle_Subtree;
+  }
   mPresContext->PresShell()->RestyleForAnimation(element, hint);
 }
 
@@ -420,7 +432,82 @@ EffectCompositor::GetAnimationRule(dom::Element* aElement,
     return nullptr;
   }
 
-  return effectSet->AnimationRule(aCascadeLevel);
+  return effectSet->AnimationRule(aCascadeLevel).mGecko;
+}
+
+namespace {
+  class EffectCompositeOrderComparator {
+  public:
+    bool Equals(const KeyframeEffectReadOnly* a,
+                const KeyframeEffectReadOnly* b) const
+    {
+      return a == b;
+    }
+
+    bool LessThan(const KeyframeEffectReadOnly* a,
+                  const KeyframeEffectReadOnly* b) const
+    {
+      MOZ_ASSERT(a->GetAnimation() && b->GetAnimation());
+      MOZ_ASSERT(
+        Equals(a, b) ||
+        a->GetAnimation()->HasLowerCompositeOrderThan(*b->GetAnimation()) !=
+          b->GetAnimation()->HasLowerCompositeOrderThan(*a->GetAnimation()));
+      return a->GetAnimation()->HasLowerCompositeOrderThan(*b->GetAnimation());
+    }
+  };
+}
+
+ServoAnimationRule*
+EffectCompositor::GetServoAnimationRule(const dom::Element* aElement,
+                                        CSSPseudoElementType aPseudoType,
+                                        CascadeLevel aCascadeLevel)
+{
+  if (!mPresContext || !mPresContext->IsDynamic()) {
+    // For print or print preview, ignore animations.
+    return nullptr;
+  }
+
+  EffectSet* effectSet = EffectSet::GetEffectSet(aElement, aPseudoType);
+  if (!effectSet) {
+    return nullptr;
+  }
+
+  // Get a list of effects sorted by composite order.
+  nsTArray<KeyframeEffectReadOnly*> sortedEffectList(effectSet->Count());
+  for (KeyframeEffectReadOnly* effect : *effectSet) {
+    sortedEffectList.AppendElement(effect);
+  }
+  sortedEffectList.Sort(EffectCompositeOrderComparator());
+
+  AnimationRule& animRule = effectSet->AnimationRule(aCascadeLevel);
+  animRule.mServo = nullptr;
+
+  // If multiple animations affect the same property, animations with higher
+  // composite order (priority) override or add or animations with lower
+  // priority.
+  // stylo: we don't support animations on compositor now, so propertiesToSkip
+  // is an empty set.
+  const nsCSSPropertyIDSet propertiesToSkip;
+  for (KeyframeEffectReadOnly* effect : sortedEffectList) {
+    effect->GetAnimation()->ComposeStyle(animRule, propertiesToSkip);
+  }
+
+  MOZ_ASSERT(effectSet == EffectSet::GetEffectSet(aElement, aPseudoType),
+             "EffectSet should not change while composing style");
+
+  effectSet->UpdateAnimationRuleRefreshTime(
+    aCascadeLevel, mPresContext->RefreshDriver()->MostRecentRefresh());
+  return animRule.mServo;
+}
+
+void
+EffectCompositor::ClearElementsToRestyle()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  const auto iterEnd = mElementsToRestyle.end();
+  for (auto iter = mElementsToRestyle.begin(); iter != iterEnd; ++iter) {
+    iter->Clear();
+  }
 }
 
 /* static */ dom::Element*
@@ -591,28 +678,6 @@ EffectCompositor::MaybeUpdateCascadeResults(Element* aElement,
   MOZ_ASSERT(!effects->CascadeNeedsUpdate(), "Failed to update cascade state");
 }
 
-namespace {
-  class EffectCompositeOrderComparator {
-  public:
-    bool Equals(const KeyframeEffectReadOnly* a,
-                const KeyframeEffectReadOnly* b) const
-    {
-      return a == b;
-    }
-
-    bool LessThan(const KeyframeEffectReadOnly* a,
-                  const KeyframeEffectReadOnly* b) const
-    {
-      MOZ_ASSERT(a->GetAnimation() && b->GetAnimation());
-      MOZ_ASSERT(
-        Equals(a, b) ||
-        a->GetAnimation()->HasLowerCompositeOrderThan(*b->GetAnimation()) !=
-          b->GetAnimation()->HasLowerCompositeOrderThan(*a->GetAnimation()));
-      return a->GetAnimation()->HasLowerCompositeOrderThan(*b->GetAnimation());
-    }
-  };
-}
-
 /* static */ void
 EffectCompositor::UpdateCascadeResults(Element* aElement,
                                        CSSPseudoElementType aPseudoType,
@@ -685,9 +750,8 @@ EffectCompositor::ComposeAnimationRule(dom::Element* aElement,
   }
   sortedEffectList.Sort(EffectCompositeOrderComparator());
 
-  RefPtr<AnimValuesStyleRule>& animationRule =
-    effects->AnimationRule(aCascadeLevel);
-  animationRule = nullptr;
+  AnimationRule& animRule = effects->AnimationRule(aCascadeLevel);
+  animRule.mGecko = nullptr;
 
   // If multiple animations affect the same property, animations with higher
   // composite order (priority) override or add or animations with lower
@@ -697,7 +761,7 @@ EffectCompositor::ComposeAnimationRule(dom::Element* aElement,
     ? effects->PropertiesForAnimationsLevel().Invert()
     : effects->PropertiesForAnimationsLevel();
   for (KeyframeEffectReadOnly* effect : sortedEffectList) {
-    effect->GetAnimation()->ComposeStyle(animationRule, propertiesToSkip);
+    effect->GetAnimation()->ComposeStyle(animRule, propertiesToSkip);
   }
 
   MOZ_ASSERT(effects == EffectSet::GetEffectSet(aElement, aPseudoType),
@@ -910,8 +974,8 @@ EffectCompositor::GetBaseStyle(nsCSSPropertyID aProperty,
 
   RefPtr<nsStyleContext> styleContextWithoutAnimation =
     aStyleContext->PresContext()->StyleSet()->AsGecko()->
-      ResolveStyleWithoutAnimation(&aElement, aStyleContext,
-                                   eRestyle_AllHintsWithAnimations);
+      ResolveStyleByRemovingAnimation(&aElement, aStyleContext,
+                                      eRestyle_AllHintsWithAnimations);
 
   DebugOnly<bool> success =
     StyleAnimationValue::ExtractComputedValue(aProperty,

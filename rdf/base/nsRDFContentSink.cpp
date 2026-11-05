@@ -257,6 +257,13 @@ static const nsStaticAtom rdf_atoms[] = {
 #undef RDF_ATOM
 };
 
+// static
+void
+nsRDFAtoms::RegisterAtoms()
+{
+    NS_RegisterStaticAtoms(rdf_atoms);
+}
+
 RDFContentSinkImpl::RDFContentSinkImpl()
     : mText(nullptr),
       mTextLength(0),
@@ -287,8 +294,6 @@ RDFContentSinkImpl::RDFContentSinkImpl()
 
         NS_DEFINE_CID(kRDFContainerUtilsCID, NS_RDFCONTAINERUTILS_CID);
         rv = CallGetService(kRDFContainerUtilsCID, &gRDFContainerUtils);
-
-        NS_RegisterStaticAtoms(rdf_atoms);
     }
 }
 
@@ -436,9 +441,9 @@ RDFContentSinkImpl::HandleEndElement(const char16_t *aName)
           nsAutoString tagStr(aName);
           char* tagCStr = ToNewCString(tagStr);
 
-          PR_LogPrint
+          MOZ_LOG(gLog, LogLevel::Warning,
                  ("rdfxml: extra close tag '%s' at line %d",
-                  tagCStr, 0/*XXX fix me */);
+                  tagCStr, 0/*XXX fix me */));
 
           free(tagCStr);
       }

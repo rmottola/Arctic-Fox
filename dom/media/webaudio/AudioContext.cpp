@@ -15,6 +15,7 @@
 #include "mozilla/dom/AnalyserNodeBinding.h"
 #include "mozilla/dom/AudioBufferSourceNodeBinding.h"
 #include "mozilla/dom/AudioContextBinding.h"
+#include "mozilla/dom/BaseAudioContextBinding.h"
 #include "mozilla/dom/BiquadFilterNodeBinding.h"
 #include "mozilla/dom/ChannelMergerNodeBinding.h"
 #include "mozilla/dom/ChannelSplitterNodeBinding.h"
@@ -29,6 +30,7 @@
 #include "mozilla/dom/OfflineAudioContextBinding.h"
 #include "mozilla/dom/OscillatorNodeBinding.h"
 #include "mozilla/dom/PannerNodeBinding.h"
+#include "mozilla/dom/PeriodicWaveBinding.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/StereoPannerNodeBinding.h"
 #include "mozilla/dom/WaveShaperNodeBinding.h"
@@ -284,7 +286,7 @@ AudioContext::CreateBuffer(uint32_t aNumberOfChannels, uint32_t aLength,
     return nullptr;
   }
 
-  return AudioBuffer::Create(this, aNumberOfChannels, aLength,
+  return AudioBuffer::Create(GetOwner(), aNumberOfChannels, aLength,
                              aSampleRate, aRv);
 }
 
@@ -527,12 +529,12 @@ AudioContext::DecodeAudioData(const ArrayBuffer& aBuffer,
   if (aSuccessCallback.WasPassed()) {
     successCallback = &aSuccessCallback.Value();
   }
-  RefPtr<WebAudioDecodeJob> job(
+  UniquePtr<WebAudioDecodeJob> job(
     new WebAudioDecodeJob(contentType, this,
                           promise, successCallback, failureCallback));
   AsyncDecodeWebAudio(contentType.get(), data, length, *job);
   // Transfer the ownership to mDecodeJobs
-  mDecodeJobs.AppendElement(job.forget());
+  mDecodeJobs.AppendElement(Move(job));
 
   return promise.forget();
 }
@@ -540,7 +542,14 @@ AudioContext::DecodeAudioData(const ArrayBuffer& aBuffer,
 void
 AudioContext::RemoveFromDecodeQueue(WebAudioDecodeJob* aDecodeJob)
 {
-  mDecodeJobs.RemoveElement(aDecodeJob);
+  // Since UniquePtr doesn't provide an operator== which allows you to compare
+  // against raw pointers, we need to iterate manually.
+  for (uint32_t i = 0; i < mDecodeJobs.Length(); ++i) {
+    if (mDecodeJobs[i].get() == aDecodeJob) {
+      mDecodeJobs.RemoveElementAt(i);
+      break;
+    }
+  }
 }
 
 void
@@ -995,21 +1004,6 @@ AudioContext::Unmute() const
   if (mDestination) {
     mDestination->Unmute();
   }
-}
-
-AudioChannel
-AudioContext::MozAudioChannelType() const
-{
-  return mDestination->MozAudioChannelType();
-}
-
-AudioChannel
-AudioContext::TestAudioChannelInAudioNodeStream()
-{
-  MediaStream* stream = mDestination->Stream();
-  MOZ_ASSERT(stream);
-
-  return stream->AudioChannelType();
 }
 
 size_t

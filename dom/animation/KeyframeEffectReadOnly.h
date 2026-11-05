@@ -19,9 +19,10 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/ComputedTimingFunction.h"
 #include "mozilla/EffectCompositor.h"
+#include "mozilla/Keyframe.h"
 #include "mozilla/KeyframeEffectParams.h"
-#include "mozilla/ServoBindingTypes.h" // RawServoDeclarationBlock and
-                                       // associated RefPtrTraits
+// RawServoDeclarationBlock and associated RefPtrTraits
+#include "mozilla/ServoBindingTypes.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/dom/AnimationEffectReadOnly.h"
 #include "mozilla/dom/BindingDeclarations.h"
@@ -40,6 +41,7 @@ namespace mozilla {
 class AnimValuesStyleRule;
 enum class CSSPseudoElementType : uint8_t;
 class ErrorResult;
+struct AnimationRule;
 struct TimingParams;
 
 namespace dom {
@@ -53,76 +55,13 @@ enum class CompositeOperation : uint8_t;
 struct AnimationPropertyDetails;
 }
 
-/**
- * A property-value pair specified on a keyframe.
- */
-struct PropertyValuePair
-{
-  nsCSSPropertyID mProperty;
-  // The specified value for the property. For shorthand properties or invalid
-  // property values, we store the specified property value as a token stream
-  // (string).
-  nsCSSValue mValue;
-
-  // The specified value when using the Servo backend. However, even when
-  // using the Servo backend, we still fill in |mValue| in the case where we
-  // fail to parse the value since we use it to store the original string.
-  RefPtr<RawServoDeclarationBlock> mServoDeclarationBlock;
-
-  bool operator==(const PropertyValuePair&) const;
-};
-
-/**
- * A single keyframe.
- *
- * This is the canonical form in which keyframe effects are stored and
- * corresponds closely to the type of objects returned via the getKeyframes()
- * API.
- *
- * Before computing an output animation value, however, we flatten these frames
- * down to a series of per-property value arrays where we also resolve any
- * overlapping shorthands/longhands, convert specified CSS values to computed
- * values, etc.
- *
- * When the target element or style context changes, however, we rebuild these
- * per-property arrays from the original list of keyframes objects. As a result,
- * these objects represent the master definition of the effect's values.
- */
-struct Keyframe
-{
-  Keyframe() = default;
-  Keyframe(const Keyframe& aOther) = default;
-  Keyframe(Keyframe&& aOther)
-  {
-    *this = Move(aOther);
-  }
-
-  Keyframe& operator=(const Keyframe& aOther) = default;
-  Keyframe& operator=(Keyframe&& aOther)
-  {
-    mOffset         = aOther.mOffset;
-    mComputedOffset = aOther.mComputedOffset;
-    mTimingFunction = Move(aOther.mTimingFunction);
-    mComposite      = Move(aOther.mComposite);
-    mPropertyValues = Move(aOther.mPropertyValues);
-    return *this;
-  }
-
-  Maybe<double>                 mOffset;
-  static constexpr double kComputedOffsetNotSet = -1.0;
-  double                        mComputedOffset = kComputedOffsetNotSet;
-  Maybe<ComputedTimingFunction> mTimingFunction; // Nothing() here means
-                                                 // "linear"
-  Maybe<dom::CompositeOperation> mComposite;
-  nsTArray<PropertyValuePair>   mPropertyValues;
-};
-
 struct AnimationPropertySegment
 {
   float mFromKey, mToKey;
   // NOTE: In the case that no keyframe for 0 or 1 offset is specified
   // the unit of mFromValue or mToValue is eUnit_Null.
-  StyleAnimationValue mFromValue, mToValue;
+  AnimationValue mFromValue, mToValue;
+
   Maybe<ComputedTimingFunction> mTimingFunction;
   dom::CompositeOperation mFromComposite = dom::CompositeOperation::Replace;
   dom::CompositeOperation mToComposite = dom::CompositeOperation::Replace;
@@ -288,7 +227,7 @@ public:
   // Updates |aStyleRule| with the animation values produced by this
   // AnimationEffect for the current time except any properties contained
   // in |aPropertiesToSkip|.
-  void ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
+  void ComposeStyle(AnimationRule& aStyleRule,
                     const nsCSSPropertyIDSet& aPropertiesToSkip);
 
   // Composite |aValueToComposite| on |aUnderlyingValue| with
@@ -406,8 +345,19 @@ protected:
   // context. That's because calling GetStyleContextForElement when we are in
   // the process of building a style context may trigger various forms of
   // infinite recursion.
+  already_AddRefed<nsStyleContext> GetTargetStyleContext();
+
+  // Similar to the above but ignoring animation rules. We use this to get base
+  // styles (which don't include animation rules).
   already_AddRefed<nsStyleContext>
-  GetTargetStyleContext();
+  GetTargetStyleContextWithoutAnimation();
+
+  enum AnimationStyle {
+    Skip,
+    Include
+  };
+  template<AnimationStyle aAnimationStyle>
+  already_AddRefed<nsStyleContext> DoGetTargetStyleContext();
 
   // A wrapper for marking cascade update according to the current
   // target and its effectSet.
@@ -423,9 +373,19 @@ protected:
     const StyleAnimationValue& aValueToComposite,
     CompositeOperation aCompositeOperation);
 
+  // Returns underlying style animation value for |aProperty|.
+  StyleAnimationValue GetUnderlyingStyle(
+    nsCSSPropertyID aProperty,
+    const RefPtr<AnimValuesStyleRule>& aAnimationRule);
+
   // Set a bit in mNeedsBaseStyleSet if |aProperty| can be run on the
   // compositor.
   void SetNeedsBaseStyle(nsCSSPropertyID aProperty);
+
+  // Ensure the base styles is available for any properties that can be run on
+  // the compositor and which are not includes in |aPropertiesToSkip|.
+  void EnsureBaseStylesForCompositor(
+    const nsCSSPropertyIDSet& aPropertiesToSkip);
 
   Maybe<OwningAnimationTarget> mTarget;
 
@@ -477,6 +437,9 @@ private:
   static bool IsGeometricProperty(const nsCSSPropertyID aProperty);
 
   static const TimeDuration OverflowRegionRefreshInterval();
+
+  // FIXME: This flag will be removed in bug 1324966.
+  bool mIsComposingStyle = false;
 };
 
 } // namespace dom

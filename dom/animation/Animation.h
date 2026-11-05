@@ -40,7 +40,7 @@ class nsIFrame;
 
 namespace mozilla {
 
-class AnimValuesStyleRule;
+struct AnimationRule;
 
 namespace dom {
 
@@ -279,6 +279,7 @@ public:
   bool IsPlaying() const
   {
     return mPlaybackRate != 0.0 &&
+           mTimeline &&
            (PlayState() == AnimationPlayState::Running ||
             mPendingState == PendingState::PlayPending);
   }
@@ -317,11 +318,21 @@ public:
    * Any properties contained in |aPropertiesToSkip| will not be added or
    * updated in |aStyleRule|.
    */
-  void ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
+  void ComposeStyle(AnimationRule& aStyleRule,
                     const nsCSSPropertyIDSet& aPropertiesToSkip);
 
   void NotifyEffectTimingUpdated();
   void NotifyGeometricAnimationsStartingThisFrame();
+
+  /**
+   * Used by subclasses to synchronously queue a cancel event in situations
+   * where the Animation may have been cancelled.
+   *
+   * We need to do this synchronously because after a CSS animation/transition
+   * is canceled, it will be released by its owning element and may not still
+   * exist when we would normally go to queue events on the next tick.
+   */
+  virtual void MaybeQueueCancelEvent(StickyTimeDuration aActiveTime) {};
 
 protected:
   void SilentlySetCurrentTime(const TimeDuration& aNewCurrentTime);

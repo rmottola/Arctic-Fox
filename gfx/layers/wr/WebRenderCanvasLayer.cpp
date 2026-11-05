@@ -6,10 +6,11 @@
 #include "WebRenderCanvasLayer.h"
 
 #include "AsyncCanvasRenderer.h"
+#include "gfxPrefs.h"
 #include "gfxUtils.h"
 #include "GLContext.h"
 #include "GLScreenBuffer.h"
-#include "LayersLogging.h"
+#include "WebRenderLayersLogging.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/layers/TextureClientSharedSurface.h"
 #include "mozilla/layers/WebRenderBridgeChild.h"
@@ -55,34 +56,63 @@ WebRenderCanvasLayer::RenderLayer()
 
   MOZ_ASSERT(mExternalImageId);
 
-  gfx::Matrix4x4 transform;// = GetTransform();
+  gfx::Matrix4x4 transform = GetTransform();
   const bool needsYFlip = (mOriginPos == gl::OriginPos::BottomLeft);
   if (needsYFlip) {
     transform.PreTranslate(0, mBounds.height, 0).PreScale(1, -1, 1);
   }
   gfx::Rect rect(0, 0, mBounds.width, mBounds.height);
-  rect = RelativeToTransformedVisible(GetTransform().TransformBounds(rect));
+  rect = RelativeToVisible(rect);
 
   gfx::Rect clip;
   if (GetClipRect().isSome()) {
-      clip = RelativeToTransformedVisible(IntRectToRect(GetClipRect().ref().ToUnknownRect()));
+      clip = RelativeToVisible(transform.Inverse().TransformBounds(IntRectToRect(GetClipRect().ref().ToUnknownRect())));
   } else {
       clip = rect;
   }
 
-  if (gfxPrefs::LayersDump()) printf_stderr("CanvasLayer %p using rect:%s clip:%s\n", this, Stringify(rect).c_str(), Stringify(clip).c_str());
+  gfx::Rect relBounds = VisibleBoundsRelativeToParent();
+  if (!transform.IsIdentity()) {
+    // WR will only apply the 'translate' of the transform, so we need to do the scale/rotation manually.
+    gfx::Matrix4x4 boundTransform = transform;
+    boundTransform._41 = 0.0f;
+    boundTransform._42 = 0.0f;
+    boundTransform._43 = 0.0f;
+    relBounds.MoveTo(boundTransform.TransformPoint(relBounds.TopLeft()));
+  }
 
-  gfx::Rect relBounds = TransformedVisibleBoundsRelativeToParent();
   gfx::Rect overflow(0, 0, relBounds.width, relBounds.height);
   Maybe<WrImageMask> mask = buildMaskLayer();
-  WrTextureFilter filter = (mFlags | TextureFlags::USE_NEAREST_FILTER) ? WrTextureFilter::Point : WrTextureFilter::Linear;
+  wr::ImageRendering filter = wr::ToImageRendering(mSamplingFilter);
+  WrMixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetMixBlendMode());
+
+  if (gfxPrefs::LayersDump()) {
+    printf_stderr("CanvasLayer %p using bounds=%s, overflow=%s, transform=%s, rect=%s, clip=%s, texture-filter=%s, mix-blend-mode=%s\n",
+                  this->GetLayer(),
+                  Stringify(relBounds).c_str(),
+                  Stringify(overflow).c_str(),
+                  Stringify(transform).c_str(),
+                  Stringify(rect).c_str(),
+                  Stringify(clip).c_str(),
+                  Stringify(filter).c_str(),
+                  Stringify(mixBlendMode).c_str());
+  }
 
   WrBridge()->AddWebRenderCommand(
-      OpDPPushStackingContext(wr::ToWrRect(relBounds), wr::ToWrRect(overflow), mask, transform, FrameMetrics::NULL_SCROLL_ID));
-  WrBridge()->AddWebRenderCommand(OpDPPushExternalImageId(LayerIntRegion(), wr::ToWrRect(rect), wr::ToWrRect(clip), Nothing(), filter, mExternalImageId));
+      OpDPPushStackingContext(wr::ToWrRect(relBounds),
+                              wr::ToWrRect(overflow),
+                              mask,
+                              1.0f,
+                              GetAnimations(),
+                              transform,
+                              mixBlendMode,
+                              FrameMetrics::NULL_SCROLL_ID));
+  WrImageKey key;
+  key.mNamespace = WrBridge()->GetNamespace();
+  key.mHandle = WrBridge()->GetNextResourceId();
+  WrBridge()->AddWebRenderParentCommand(OpAddExternalImage(mExternalImageId, key));
+  WrBridge()->AddWebRenderCommand(OpDPPushImage(wr::ToWrRect(rect), wr::ToWrRect(clip), Nothing(), filter, key));
   WrBridge()->AddWebRenderCommand(OpDPPopStackingContext());
-
-  if (gfxPrefs::LayersDump()) printf_stderr("CanvasLayer %p using %s as bounds/overflow, %s for transform\n", this, Stringify(relBounds).c_str(), Stringify(transform).c_str());
 }
 
 void

@@ -151,6 +151,23 @@ IsXrayWrapper(JSObject* obj);
 JSObject*
 XrayAwareCalleeGlobal(JSObject* fun);
 
+// A version of XrayAwareCalleeGlobal that can be used from a binding
+// specialized getter.  We need this function because in a specialized getter we
+// don't have a callee JSFunction, so can't use xpc::XrayAwareCalleeGlobal.
+// Instead we do something a bit hacky using our current compartment and "this"
+// value.  Note that for the Xray case thisObj will NOT be in the compartment of
+// "cx".
+//
+// As expected, the outparam "global" need not be same-compartment with either
+// thisObj or cx, though it _will_ be same-compartment with one of them.
+//
+// This function can fail; the return value indicates success or failure.
+bool
+XrayAwareCalleeGlobalForSpecializedGetters(JSContext* cx,
+                                           JS::Handle<JSObject*> thisObj,
+                                           JS::MutableHandle<JSObject*> global);
+
+
 void
 TraceXPCGlobal(JSTracer* trc, JSObject* obj);
 
@@ -204,21 +221,6 @@ xpc_UnmarkSkippableJSHolders();
 // readable string conversions, static methods and members only
 class XPCStringConvert
 {
-    // One-slot cache, because it turns out it's common for web pages to
-    // get the same string a few times in a row.  We get about a 40% cache
-    // hit rate on this cache last it was measured.  We'd get about 70%
-    // hit rate with a hashtable with removal on finalization, but that
-    // would take a lot more machinery.
-    struct ZoneStringCache
-    {
-        // mString owns mBuffer.  mString is a JS thing, so it can only die
-        // during GC.  We clear mString and mBuffer during GC.  As long as
-        // the above holds, mBuffer should not be a dangling pointer, so
-        // using this as a cache key should be safe.
-        void* mBuffer;
-        JSString* mString;
-    };
-
 public:
 
     // If the string shares the readable's buffer, that buffer will
@@ -233,35 +235,15 @@ public:
     StringBufferToJSVal(JSContext* cx, nsStringBuffer* buf, uint32_t length,
                         JS::MutableHandleValue rval, bool* sharedBuffer)
     {
-        JS::Zone* zone = js::GetContextZone(cx);
-        ZoneStringCache* cache = static_cast<ZoneStringCache*>(JS_GetZoneUserData(zone));
-        if (cache && buf == cache->mBuffer) {
-            MOZ_ASSERT(JS::GetStringZone(cache->mString) == zone);
-            JS::MarkStringAsLive(zone, cache->mString);
-            rval.setString(cache->mString);
-            *sharedBuffer = false;
-            return true;
-        }
-
-        JSString* str = JS_NewExternalString(cx,
-                                             static_cast<char16_t*>(buf->Data()),
-                                             length, &sDOMStringFinalizer);
+        JSString* str = JS_NewMaybeExternalString(cx,
+                                                  static_cast<char16_t*>(buf->Data()),
+                                                  length, &sDOMStringFinalizer, sharedBuffer);
         if (!str) {
             return false;
         }
         rval.setString(str);
-        if (!cache) {
-            cache = new ZoneStringCache();
-            JS_SetZoneUserData(zone, cache);
-        }
-        cache->mBuffer = buf;
-        cache->mString = str;
-        *sharedBuffer = true;
         return true;
     }
-
-    static void FreeZoneCache(JS::Zone* zone);
-    static void ClearZoneCache(JS::Zone* zone);
 
     static MOZ_ALWAYS_INLINE bool IsLiteral(JSString* str)
     {
@@ -278,9 +260,9 @@ public:
 private:
     static const JSStringFinalizer sLiteralFinalizer, sDOMStringFinalizer;
 
-    static void FinalizeLiteral(const JSStringFinalizer* fin, char16_t* chars);
+    static void FinalizeLiteral(JS::Zone* zone, const JSStringFinalizer* fin, char16_t* chars);
 
-    static void FinalizeDOMString(const JSStringFinalizer* fin, char16_t* chars);
+    static void FinalizeDOMString(JS::Zone* zone, const JSStringFinalizer* fin, char16_t* chars);
 
     XPCStringConvert() = delete;
 };
@@ -374,6 +356,9 @@ bool StringToJsval(JSContext* cx, mozilla::dom::DOMString& str,
 }
 
 nsIPrincipal* GetCompartmentPrincipal(JSCompartment* compartment);
+
+void NukeAllWrappersForCompartment(JSContext* cx, JSCompartment* compartment,
+                                   js::NukeReferencesToWindow nukeReferencesToWindow = js::NukeWindowReferences);
 
 void SetLocationForGlobal(JSObject* global, const nsACString& location);
 void SetLocationForGlobal(JSObject* global, nsIURI* locationURI);
@@ -507,13 +492,50 @@ AllowCPOWsInAddon(const nsACString& addonId, bool allow);
 bool
 ExtraWarningsForSystemJS();
 
-class ErrorReport {
+class ErrorBase {
+  public:
+    nsString mErrorMsg;
+    nsString mFileName;
+    uint32_t mLineNumber;
+    uint32_t mColumn;
+
+    ErrorBase() : mLineNumber(0)
+                , mColumn(0)
+    {}
+
+    void Init(JSErrorBase* aReport);
+
+    void AppendErrorDetailsTo(nsCString& error);
+};
+
+class ErrorNote : public ErrorBase {
+  public:
+    void Init(JSErrorNotes::Note* aNote);
+
+    // Produce an error event message string from the given JSErrorNotes::Note.
+    // This may produce an empty string if aNote doesn't have a message
+    // attached.
+    static void ErrorNoteToMessageString(JSErrorNotes::Note* aNote,
+                                         nsAString& aString);
+
+    // Log the error note to the stderr.
+    void LogToStderr();
+};
+
+class ErrorReport : public ErrorBase {
   public:
     NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ErrorReport);
 
+    nsTArray<ErrorNote> mNotes;
+
+    nsCString mCategory;
+    nsString mSourceLine;
+    nsString mErrorMsgName;
+    uint64_t mWindowID;
+    uint32_t mFlags;
+    bool mIsMuted;
+
     ErrorReport() : mWindowID(0)
-                  , mLineNumber(0)
-                  , mColumn(0)
                   , mFlags(0)
                   , mIsMuted(false)
     {}
@@ -522,6 +544,7 @@ class ErrorReport {
               bool aIsChrome, uint64_t aWindowID);
     void Init(JSContext* aCx, mozilla::dom::Exception* aException,
               bool aIsChrome, uint64_t aWindowID);
+
     // Log the error report to the console.  Which console will depend on the
     // window id it was initialized with.
     void LogToConsole();
@@ -536,18 +559,8 @@ class ErrorReport {
     static void ErrorReportToMessageString(JSErrorReport* aReport,
                                            nsAString& aString);
 
-  public:
-
-    nsCString mCategory;
-    nsString mErrorMsgName;
-    nsString mErrorMsg;
-    nsString mFileName;
-    nsString mSourceLine;
-    uint64_t mWindowID;
-    uint32_t mLineNumber;
-    uint32_t mColumn;
-    uint32_t mFlags;
-    bool mIsMuted;
+    // Log the error report to the stderr.
+    void LogToStderr();
 
   private:
     ~ErrorReport() {}

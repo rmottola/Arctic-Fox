@@ -309,10 +309,11 @@ StorageManagerBase::DropCache(StorageCache* aCache)
 }
 
 nsresult
-StorageManagerBase::GetStorageInternal(bool aCreate,
+StorageManagerBase::GetStorageInternal(CreateMode aCreateMode,
                                        mozIDOMWindow* aWindow,
                                        nsIPrincipal* aPrincipal,
                                        const nsAString& aDocumentURI,
+                                       bool aPrivate,
                                        nsIDOMStorage** aRetval)
 {
   nsresult rv;
@@ -330,12 +331,12 @@ StorageManagerBase::GetStorageInternal(bool aCreate,
 
   // Get or create a cache for the given scope
   if (!cache) {
-    if (!aCreate) {
+    if (aCreateMode == CreateMode::UseIfExistsNeverCreate) {
       *aRetval = nullptr;
       return NS_OK;
     }
 
-    if (!aRetval) {
+    if (aCreateMode == CreateMode::CreateIfShouldPreload) {
       // This is a demand to just preload the cache, if the scope has
       // no data stored, bypass creation and preload of the cache.
       StorageDBBridge* db = StorageCache::GetDatabase();
@@ -363,7 +364,7 @@ StorageManagerBase::GetStorageInternal(bool aCreate,
     nsCOMPtr<nsPIDOMWindowInner> inner = nsPIDOMWindowInner::From(aWindow);
 
     nsCOMPtr<nsIDOMStorage> storage = new Storage(
-      inner, this, cache, aDocumentURI, aPrincipal);
+      inner, this, cache, aDocumentURI, aPrincipal, aPrivate);
     storage.forget(aRetval);
   }
 
@@ -371,26 +372,32 @@ StorageManagerBase::GetStorageInternal(bool aCreate,
 }
 
 NS_IMETHODIMP
-StorageManagerBase::PrecacheStorage(nsIPrincipal* aPrincipal)
+StorageManagerBase::PrecacheStorage(nsIPrincipal* aPrincipal,
+                                    nsIDOMStorage** aRetval)
 {
-  return GetStorageInternal(true, nullptr, aPrincipal, EmptyString(), nullptr);
+  return GetStorageInternal(CreateMode::CreateIfShouldPreload, nullptr,
+                            aPrincipal, EmptyString(), false, aRetval);
 }
 
 NS_IMETHODIMP
 StorageManagerBase::CreateStorage(mozIDOMWindow* aWindow,
                                   nsIPrincipal* aPrincipal,
                                   const nsAString& aDocumentURI,
+                                  bool aPrivate,
                                   nsIDOMStorage** aRetval)
 {
-  return GetStorageInternal(true, aWindow, aPrincipal, aDocumentURI, aRetval);
+  return GetStorageInternal(CreateMode::CreateAlways, aWindow, aPrincipal,
+                            aDocumentURI, aPrivate, aRetval);
 }
 
 NS_IMETHODIMP
 StorageManagerBase::GetStorage(mozIDOMWindow* aWindow,
                                nsIPrincipal* aPrincipal,
+                               bool aPrivate,
                                nsIDOMStorage** aRetval)
 {
-  return GetStorageInternal(false, aWindow, aPrincipal, EmptyString(), aRetval);
+  return GetStorageInternal(CreateMode::UseIfExistsNeverCreate, aWindow,
+                            aPrincipal, EmptyString(), aPrivate, aRetval);
 }
 
 NS_IMETHODIMP
@@ -470,13 +477,14 @@ StorageManagerBase::CheckStorage(nsIPrincipal* aPrincipal,
 NS_IMETHODIMP
 StorageManagerBase::GetLocalStorageForPrincipal(nsIPrincipal* aPrincipal,
                                                 const nsAString& aDocumentURI,
+                                                bool aPrivate,
                                                 nsIDOMStorage** aRetval)
 {
   if (mType != LocalStorage) {
     return NS_ERROR_UNEXPECTED;
   }
 
-  return CreateStorage(nullptr, aPrincipal, aDocumentURI, aRetval);
+  return CreateStorage(nullptr, aPrincipal, aDocumentURI, aPrivate, aRetval);
 }
 
 void

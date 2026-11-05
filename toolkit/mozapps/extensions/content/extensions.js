@@ -1564,7 +1564,7 @@ function formatDate(aDate) {
   const locale = Cc["@mozilla.org/chrome/chrome-registry;1"]
                  .getService(Ci.nsIXULChromeRegistry)
                  .getSelectedLocale("global", true);
-  const dtOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  const dtOptions = { year: "numeric", month: "long", day: "numeric" };
   return aDate.toLocaleDateString(locale, dtOptions);
 }
 
@@ -2103,7 +2103,7 @@ var gHeader = {
     // If the back-button or any of its parents are hidden then make the buttons
     // visible
     while (node != outerDoc) {
-      var style = outerWin.getComputedStyle(node, "");
+      var style = outerWin.getComputedStyle(node);
       if (style.display == "none")
         return true;
       if (style.visibility != "visible")
@@ -3128,7 +3128,7 @@ var gDetailView = {
     var gridRows = document.querySelectorAll("#detail-grid rows row");
     let first = true;
     for (let gridRow of gridRows) {
-      if (first && window.getComputedStyle(gridRow, null).getPropertyValue("display") != "none") {
+      if (first && window.getComputedStyle(gridRow).getPropertyValue("display") != "none") {
         gridRow.setAttribute("first-row", true);
         first = false;
       } else {
@@ -3366,7 +3366,7 @@ var gDetailView = {
 
       menulist.disabled = !hasActivatePermission;
       menulist.hidden = false;
-      menulist.classList.add('no-auto-hide');
+      menulist.classList.add("no-auto-hide");
     } else {
       menulist.hidden = true;
     }
@@ -3403,10 +3403,9 @@ var gDetailView = {
     // listeners, and promises resolve asynchronously.
     let whenViewLoaded = callback => {
       if (gViewController.displayedView.hasAttribute("loading")) {
-        gDetailView.node.addEventListener("ViewChanged", function viewChangedEventListener() {
-          gDetailView.node.removeEventListener("ViewChanged", viewChangedEventListener);
+        gDetailView.node.addEventListener("ViewChanged", function() {
           callback();
-        });
+        }, {once: true});
       } else {
         callback();
       }
@@ -3430,7 +3429,7 @@ var gDetailView = {
     // removing any child elements. Removing the text nodes ensures any XBL
     // bindings apply properly.
     function stripTextNodes(aNode) {
-      var text = '';
+      var text = "";
       for (var i = 0; i < aNode.childNodes.length; i++) {
         if (aNode.childNodes[i].nodeType != document.ELEMENT_NODE) {
           text += aNode.childNodes[i].textContent;
@@ -3450,10 +3449,9 @@ var gDetailView = {
           this.createOptionsBrowser(rows).then(browser => {
             // Make sure the browser is unloaded as soon as we change views,
             // rather than waiting for the next detail view to load.
-            document.addEventListener("ViewChanged", function viewChangedEventListener() {
-              document.removeEventListener("ViewChanged", viewChangedEventListener);
+            document.addEventListener("ViewChanged", function() {
               browser.remove();
-            });
+            }, {once: true});
 
             finish(browser);
           });
@@ -3488,7 +3486,7 @@ var gDetailView = {
             }
 
             rows.appendChild(setting);
-            var visible = window.getComputedStyle(setting, null).getPropertyValue("display") != "none";
+            var visible = window.getComputedStyle(setting).getPropertyValue("display") != "none";
             if (!firstSetting && visible) {
               setting.setAttribute("first-row", true);
               firstSetting = setting;
@@ -3521,7 +3519,7 @@ var gDetailView = {
     let firstRow = gDetailView.node.querySelector('setting[first-row="true"]');
     if (firstRow) {
       let top = firstRow.boxObject.y;
-      top -= parseInt(window.getComputedStyle(firstRow, null).getPropertyValue("margin-top"));
+      top -= parseInt(window.getComputedStyle(firstRow).getPropertyValue("margin-top"));
 
       let detailViewBoxObject = gDetailView.node.boxObject;
       top -= detailViewBoxObject.y;
@@ -3542,6 +3540,7 @@ var gDetailView = {
     let readyPromise;
     if (remote) {
       browser.setAttribute("remote", "true");
+      browser.setAttribute("remoteType", E10SUtils.EXTENSION_REMOTE_TYPE);
       readyPromise = promiseEvent("XULFrameLoaderCreated", browser);
     } else {
       readyPromise = promiseEvent("load", browser, true);

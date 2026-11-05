@@ -317,7 +317,7 @@ add_task(function* test_experiments_dependencies() {
 
   yield promiseInstallAllFiles([addonFile]);
 
-  let addon = yield new Promise(resolve => AddonManager.getAddonByID("meh@experiment", resolve));
+  let addon = yield AddonManager.getAddonByID("meh@experiment");
 
   deepEqual(addon.dependencies, ["meh@experiments.addons.mozilla.org"],
             "Addon should have the expected dependencies");

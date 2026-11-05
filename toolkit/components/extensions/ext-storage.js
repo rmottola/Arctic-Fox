@@ -6,11 +6,24 @@ XPCOMUtils.defineLazyModuleGetter(this, "ExtensionStorage",
                                   "resource://gre/modules/ExtensionStorage.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ExtensionStorageSync",
                                   "resource://gre/modules/ExtensionStorageSync.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AddonManagerPrivate",
+                                  "resource://gre/modules/AddonManager.jsm");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
-  EventManager,
+  ExtensionError,
+  SingletonEventManager,
 } = ExtensionUtils;
+
+function enforceNoTemporaryAddon(extensionId) {
+  const EXCEPTION_MESSAGE =
+        "The storage API will not work with a temporary addon ID. " +
+        "Please add an explicit addon ID to your manifest. " +
+        "For more information see https://bugzil.la/1323228.";
+  if (AddonManagerPrivate.isTemporaryInstallID(extensionId)) {
+    throw new ExtensionError(EXCEPTION_MESSAGE);
+  }
+}
 
 function storageApiFactory(context) {
   let {extension} = context;
@@ -33,25 +46,29 @@ function storageApiFactory(context) {
 
       sync: {
         get: function(spec) {
+          enforceNoTemporaryAddon(extension.id);
           return ExtensionStorageSync.get(extension, spec, context);
         },
         set: function(items) {
+          enforceNoTemporaryAddon(extension.id);
           return ExtensionStorageSync.set(extension, items, context);
         },
         remove: function(keys) {
+          enforceNoTemporaryAddon(extension.id);
           return ExtensionStorageSync.remove(extension, keys, context);
         },
         clear: function() {
+          enforceNoTemporaryAddon(extension.id);
           return ExtensionStorageSync.clear(extension, context);
         },
       },
 
-      onChanged: new EventManager(context, "storage.onChanged", fire => {
+      onChanged: new SingletonEventManager(context, "storage.onChanged", fire => {
         let listenerLocal = changes => {
-          fire(changes, "local");
+          fire.async(changes, "local");
         };
         let listenerSync = changes => {
-          fire(changes, "sync");
+          fire.async(changes, "sync");
         };
 
         ExtensionStorage.addOnChangedListener(extension.id, listenerLocal);

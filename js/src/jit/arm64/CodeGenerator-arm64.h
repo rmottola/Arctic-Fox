@@ -198,16 +198,11 @@ class CodeGeneratorARM64 : public CodeGeneratorShared
     void visitStoreTypedArrayElementStatic(LStoreTypedArrayElementStatic* ins);
     void visitCompareExchangeTypedArrayElement(LCompareExchangeTypedArrayElement* lir);
     void visitAtomicExchangeTypedArrayElement(LAtomicExchangeTypedArrayElement* lir);
-    void visitWasmCall(LWasmCall* ins);
-    void visitWasmCallI64(LWasmCallI64* ins);
     void visitAsmJSLoadHeap(LAsmJSLoadHeap* ins);
     void visitAsmJSStoreHeap(LAsmJSStoreHeap* ins);
     void visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap* ins);
     void visitAsmJSAtomicBinopHeap(LAsmJSAtomicBinopHeap* ins);
     void visitWasmStackArg(LWasmStackArg* ins);
-
-    void visitWasmLoadGlobalVar(LWasmLoadGlobalVar* ins);
-    void visitWasmStoreGlobalVar(LWasmStoreGlobalVar* ins);
 
     void generateInvalidateEpilogue();
 

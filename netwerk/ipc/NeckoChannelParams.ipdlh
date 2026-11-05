@@ -8,11 +8,10 @@
 include protocol PHttpChannel;
 include protocol PFTPChannel;
 include protocol PRtspChannel;
-include protocol PSendStream;
+include protocol PChildToParentStream;
 include BlobTypes;
 include URIParams;
 include IPCStream;
-include InputStreamParams;
 include PBackgroundSharedTypes;
 
 using mozilla::OriginAttributes from "mozilla/ipc/BackgroundUtils.h";
@@ -33,6 +32,7 @@ struct LoadInfoArgs
   OptionalPrincipalInfo requestingPrincipalInfo;
   PrincipalInfo         triggeringPrincipalInfo;
   OptionalPrincipalInfo principalToInheritInfo;
+  OptionalPrincipalInfo sandboxedLoadingPrincipalInfo;
   uint32_t              securityFlags;
   uint32_t              contentPolicyType;
   uint32_t              tainting;
@@ -104,7 +104,7 @@ struct HttpChannelOpenArgs
   nsCString                   requestMethod;
   OptionalIPCStream           uploadStream;
   bool                        uploadStreamHasHeaders;
-  uint16_t                    priority;
+  int16_t                     priority;
   uint32_t                    classOfService;
   uint8_t                     redirectionLimit;
   bool                        allowPipelining;
@@ -156,7 +156,7 @@ struct FTPChannelOpenArgs
   URIParams                 uri;
   uint64_t                  startPos;
   nsCString                 entityID;
-  OptionalInputStreamParams uploadStream;
+  OptionalIPCStream         uploadStream;
   OptionalLoadInfoArgs      loadInfo;
 };
 

@@ -76,19 +76,17 @@ function openToolbarCustomizationUI(aCallback, aBrowserWin) {
 
   aBrowserWin.gCustomizeMode.enter();
 
-  aBrowserWin.gNavToolbox.addEventListener("customizationready", function UI_loaded() {
-    aBrowserWin.gNavToolbox.removeEventListener("customizationready", UI_loaded);
+  aBrowserWin.gNavToolbox.addEventListener("customizationready", function() {
     executeSoon(function() {
       aCallback(aBrowserWin)
     });
-  });
+  }, {once: true});
 }
 
 function closeToolbarCustomizationUI(aCallback, aBrowserWin) {
-  aBrowserWin.gNavToolbox.addEventListener("aftercustomization", function unloaded() {
-    aBrowserWin.gNavToolbox.removeEventListener("aftercustomization", unloaded);
+  aBrowserWin.gNavToolbox.addEventListener("aftercustomization", function() {
     executeSoon(aCallback);
-  });
+  }, {once: true});
 
   aBrowserWin.gCustomizeMode.exit();
 }
@@ -207,10 +205,9 @@ function resetBlocklist() {
 
 function whenNewWindowLoaded(aOptions, aCallback) {
   let win = OpenBrowserWindow(aOptions);
-  win.addEventListener("load", function onLoad() {
-    win.removeEventListener("load", onLoad);
+  win.addEventListener("load", function() {
     aCallback(win);
-  });
+  }, {once: true});
 }
 
 function promiseWindowClosed(win) {
@@ -236,10 +233,9 @@ function promiseOpenAndLoadWindow(aOptions, aWaitForDelayedStartup = false) {
     }, "browser-delayed-startup-finished", false);
 
   } else {
-    win.addEventListener("load", function onLoad() {
-      win.removeEventListener("load", onLoad);
+    win.addEventListener("load", function() {
       deferred.resolve(win);
-    });
+    }, {once: true});
   }
   return deferred.promise;
 }

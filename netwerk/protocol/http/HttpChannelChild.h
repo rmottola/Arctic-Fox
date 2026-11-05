@@ -126,8 +126,6 @@ protected:
                                              const nsCString& altDataType) override;
   mozilla::ipc::IPCResult RecvOnTransportAndData(const nsresult& channelStatus,
                                                  const nsresult& status,
-                                                 const uint64_t& progress,
-                                                 const uint64_t& progressMax,
                                                  const uint64_t& offset,
                                                  const uint32_t& count,
                                                  const nsCString& data) override;
@@ -155,12 +153,20 @@ protected:
   mozilla::ipc::IPCResult RecvIssueDeprecationWarning(const uint32_t& warning,
                                                       const bool& asError) override;
 
-  mozilla::ipc::IPCResult RecvSetPriority(const uint16_t& aPriority) override;
+  mozilla::ipc::IPCResult RecvSetPriority(const int16_t& aPriority) override;
 
   bool GetAssociatedContentSecurity(nsIAssociatedContentSecurity** res = nullptr);
   virtual void DoNotifyListenerCleanup() override;
 
   NS_IMETHOD GetResponseSynthesized(bool* aSynthesized) override;
+
+private:
+  // this section is for main-thread-only object
+  // all the references need to be proxy released on main thread.
+  nsCOMPtr<nsISupports> mCacheKey;
+
+  // Proxy release all members above on main thread.
+  void ReleaseMainThreadOnlyReferences();
 
 private:
 
@@ -181,6 +187,12 @@ private:
     nsCOMPtr<nsIInputStream> mInput;
     nsAutoPtr<nsHttpResponseHead> mHead;
   };
+
+  // Sets the event target for future IPC messages. Messages will either be
+  // directed to the TabGroup or DocGroup, depending on the LoadInfo associated
+  // with the channel. Should be called when a new channel is being set up,
+  // before the constructor message is sent to the parent.
+  void SetEventTarget();
 
   nsresult ContinueAsyncOpen();
 
@@ -205,6 +217,10 @@ private:
 
   void ForceIntercepted(nsIInputStream* aSynthesizedInput);
 
+  // Try send DeletingChannel message to parent side. Dispatch an async task to
+  // main thread if invoking on non-main thread.
+  void TrySendDeletingChannel();
+
   RequestHeaderTuples mClientSetRequestHeaders;
   nsCOMPtr<nsIChildChannel> mRedirectChannelChild;
   RefPtr<InterceptStreamListener> mInterceptListener;
@@ -216,7 +232,6 @@ private:
   bool mCacheEntryAvailable;
   uint32_t     mCacheExpirationTime;
   nsCString    mCachedCharset;
-  nsCOMPtr<nsISupports> mCacheKey;
 
   nsCString mProtocolVersion;
 
@@ -303,8 +318,6 @@ private:
                          const uint32_t& count);
   void OnTransportAndData(const nsresult& channelStatus,
                           const nsresult& status,
-                          const uint64_t progress,
-                          const uint64_t& progressMax,
                           const uint64_t& offset,
                           const uint32_t& count,
                           const nsCString& data);

@@ -141,14 +141,14 @@ CodeGeneratorX86Shared::visitBitAndAndBranch(LBitAndAndBranch* baab)
         masm.test32(ToRegister(baab->left()), Imm32(ToInt32(baab->right())));
     else
         masm.test32(ToRegister(baab->left()), ToRegister(baab->right()));
-    emitBranch(Assembler::NonZero, baab->ifTrue(), baab->ifFalse());
+    emitBranch(baab->cond(), baab->ifTrue(), baab->ifFalse());
 }
 
 void
 CodeGeneratorX86Shared::emitCompare(MCompare::CompareType type, const LAllocation* left, const LAllocation* right)
 {
 #ifdef JS_CODEGEN_X64
-    if (type == MCompare::Compare_Object) {
+    if (type == MCompare::Compare_Object || type == MCompare::Compare_Symbol) {
         masm.cmpPtr(ToRegister(left), ToOperand(right));
         return;
     }
@@ -2338,6 +2338,26 @@ CodeGeneratorX86Shared::visitRoundF(LRoundF* lir)
 }
 
 void
+CodeGeneratorX86Shared::visitNearbyInt(LNearbyInt* lir)
+{
+    FloatRegister input = ToFloatRegister(lir->input());
+    FloatRegister output = ToFloatRegister(lir->output());
+
+    RoundingMode roundingMode = lir->mir()->roundingMode();
+    masm.vroundsd(Assembler::ToX86RoundingMode(roundingMode), input, output, output);
+}
+
+void
+CodeGeneratorX86Shared::visitNearbyIntF(LNearbyIntF* lir)
+{
+    FloatRegister input = ToFloatRegister(lir->input());
+    FloatRegister output = ToFloatRegister(lir->output());
+
+    RoundingMode roundingMode = lir->mir()->roundingMode();
+    masm.vroundss(Assembler::ToX86RoundingMode(roundingMode), input, output, output);
+}
+
+void
 CodeGeneratorX86Shared::visitGuardShape(LGuardShape* guard)
 {
     Register obj = ToRegister(guard->input());
@@ -2459,7 +2479,8 @@ CodeGeneratorX86Shared::visitFloat32x4ToInt32x4(LFloat32x4ToInt32x4* ins)
 
     masm.convertFloat32x4ToInt32x4(in, out);
 
-    auto* ool = new(alloc()) OutOfLineSimdFloatToIntCheck(temp, in, ins, ins->mir()->trapOffset());
+    auto* ool = new(alloc()) OutOfLineSimdFloatToIntCheck(temp, in, ins,
+                                                          ins->mir()->bytecodeOffset());
     addOutOfLineCode(ool, ins->mir());
 
     static const SimdConstant InvalidResult = SimdConstant::SplatX4(int32_t(-2147483648));
@@ -4576,7 +4597,7 @@ CodeGeneratorX86Shared::visitOutOfLineWasmTruncateCheck(OutOfLineWasmTruncateChe
     MIRType toType = ool->toType();
     Label* oolRejoin = ool->rejoin();
     bool isUnsigned = ool->isUnsigned();
-    wasm::TrapOffset off = ool->trapOffset();
+    wasm::BytecodeOffset off = ool->bytecodeOffset();
 
     if (fromType == MIRType::Float32) {
         if (toType == MIRType::Int32)

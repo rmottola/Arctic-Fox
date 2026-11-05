@@ -272,7 +272,6 @@ AecLogging.prototype.offState = function() {
 AecLogging.prototype.onState = function() {
   this._label = getString("aec_logging_on_state_label");
   try {
-    let file = Services.prefs.getCharPref("media.webrtc.debug.aec_log_dir");
     this._message = getString("aec_logging_on_state_msg");
   } catch (e) {
     this._message = null;
@@ -744,7 +743,7 @@ ICEStats.prototype = {
 
     var type = c.candidateType;
 
-    if (c.type == "localcandidate" && c.candidateType == "relayed") {
+    if (c.type == "local-candidate" && c.candidateType == "relayed") {
       type = `${c.candidateType}-${c.mozLocalTransport}`;
     }
 

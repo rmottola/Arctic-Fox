@@ -32,7 +32,9 @@ class HashableValue
   public:
     struct Hasher {
         typedef HashableValue Lookup;
-        static HashNumber hash(const Lookup& v) { return v.hash(); }
+        static HashNumber hash(const Lookup& v, const mozilla::HashCodeScrambler& hcs) {
+            return v.hash(hcs);
+        }
         static bool match(const HashableValue& k, const Lookup& l) { return k == l; }
         static bool isEmpty(const HashableValue& v) { return v.value.isMagic(JS_HASH_KEY_EMPTY); }
         static void makeEmpty(HashableValue* vp) { vp->value = MagicValue(JS_HASH_KEY_EMPTY); }
@@ -41,7 +43,7 @@ class HashableValue
     HashableValue() : value(UndefinedValue()) {}
 
     MOZ_MUST_USE bool setValue(JSContext* cx, HandleValue v);
-    HashNumber hash() const;
+    HashNumber hash(const mozilla::HashCodeScrambler& hcs) const;
     bool operator==(const HashableValue& other) const;
     HashableValue trace(JSTracer* trc) const;
     Value get() const { return value.get(); }
@@ -51,14 +53,22 @@ class HashableValue
     }
 };
 
-template <>
-class RootedBase<HashableValue> {
+template <typename Wrapper>
+class WrappedPtrOperations<HashableValue, Wrapper>
+{
+  public:
+    Value value() const {
+        return static_cast<const Wrapper*>(this)->get().get();
+    }
+};
+
+template <typename Wrapper>
+class MutableWrappedPtrOperations<HashableValue, Wrapper>
+  : public WrappedPtrOperations<HashableValue, Wrapper>
+{
   public:
     MOZ_MUST_USE bool setValue(JSContext* cx, HandleValue v) {
-        return static_cast<JS::Rooted<HashableValue>*>(this)->get().setValue(cx, v);
-    }
-    Value value() const {
-        return static_cast<const JS::Rooted<HashableValue>*>(this)->get().get();
+        return static_cast<Wrapper*>(this)->get().setValue(cx, v);
     }
 };
 

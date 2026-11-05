@@ -55,7 +55,7 @@ var CompatWarning = {
       if (!Preferences.get("dom.ipc.shims.enabledWarnings", false))
         return;
 
-      let error = Cc['@mozilla.org/scripterror;1'].createInstance(Ci.nsIScriptError);
+      let error = Cc["@mozilla.org/scripterror;1"].createInstance(Ci.nsIScriptError);
       if (!error || !Services.console) {
         // Too late during shutdown to use the nsIConsole
         return;

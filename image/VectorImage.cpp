@@ -750,7 +750,8 @@ VectorImage::GetFrameAtSize(const IntSize& aSize,
   MOZ_ASSERT(context); // already checked the draw target above
 
   auto result = Draw(context, aSize, ImageRegion::Create(aSize),
-                     aWhichFrame, SamplingFilter::POINT, Nothing(), aFlags);
+                     aWhichFrame, SamplingFilter::POINT, Nothing(), aFlags,
+                     1.0);
 
   return result == DrawResult::SUCCESS ? dt->Snapshot() : nullptr;
 }
@@ -776,7 +777,8 @@ struct SVGDrawingParameters
                        SamplingFilter aSamplingFilter,
                        const Maybe<SVGImageContext>& aSVGContext,
                        float aAnimationTime,
-                       uint32_t aFlags)
+                       uint32_t aFlags,
+                       float aOpacity)
     : context(aContext)
     , size(aSize.width, aSize.height)
     , region(aRegion)
@@ -785,11 +787,13 @@ struct SVGDrawingParameters
     , viewportSize(aSize)
     , animationTime(aAnimationTime)
     , flags(aFlags)
-    , opacity(aSVGContext ? aSVGContext->GetGlobalOpacity() : 1.0)
+    , opacity(aSVGContext ? aSVGContext->GetGlobalOpacity() : aOpacity)
   {
     if (aSVGContext) {
-      CSSIntSize sz = aSVGContext->GetViewportSize();
-      viewportSize = nsIntSize(sz.width, sz.height); // XXX losing unit
+      auto sz = aSVGContext->GetViewportSize();
+      if (sz) {
+        viewportSize = nsIntSize(sz->width, sz->height); // XXX losing unit
+      }
     }
   }
 
@@ -812,7 +816,8 @@ VectorImage::Draw(gfxContext* aContext,
                   uint32_t aWhichFrame,
                   SamplingFilter aSamplingFilter,
                   const Maybe<SVGImageContext>& aSVGContext,
-                  uint32_t aFlags)
+                  uint32_t aFlags,
+                  float aOpacity)
 {
   if (aWhichFrame > FRAME_MAX_VALUE) {
     return DrawResult::BAD_ARGS;
@@ -852,9 +857,8 @@ VectorImage::Draw(gfxContext* aContext,
     Maybe<SVGPreserveAspectRatio> aspectRatio =
       Some(SVGPreserveAspectRatio(SVG_PRESERVEASPECTRATIO_NONE,
                                   SVG_MEETORSLICE_UNKNOWN));
-    svgContext =
-      Some(SVGImageContext(aSVGContext->GetViewportSize(),
-                           aspectRatio));
+    svgContext = aSVGContext; // copy
+    svgContext->SetPreserveAspectRatio(aspectRatio);
   } else {
     svgContext = aSVGContext;
   }
@@ -867,7 +871,7 @@ VectorImage::Draw(gfxContext* aContext,
 
 
   SVGDrawingParameters params(aContext, aSize, aRegion, aSamplingFilter,
-                              svgContext, animTime, aFlags);
+                              svgContext, animTime, aFlags, aOpacity);
 
   // If we have an prerasterized version of this image that matches the
   // drawing parameters, use that.
@@ -875,6 +879,13 @@ VectorImage::Draw(gfxContext* aContext,
   if (svgDrawable) {
     Show(svgDrawable, params);
     return DrawResult::SUCCESS;
+  }
+
+  Maybe<AutoSetRestoreSVGContextPaint> autoContextPaint;
+  if (aSVGContext &&
+      aSVGContext->GetContextPaint()) {
+    autoContextPaint.emplace(aSVGContext->GetContextPaint(),
+                             mSVGDocumentWrapper->GetDocument());
   }
 
   // We didn't get a hit in the surface cache, so we'll need to rerasterize.
@@ -990,7 +1001,9 @@ VectorImage::CreateSurfaceAndShow(const SVGDrawingParameters& aParams, BackendTy
                                          GetMaxSizedIntRect());
   } else {
     NotNull<RefPtr<VectorImage>> image = WrapNotNull(this);
-    NS_DispatchToMainThread(NS_NewRunnableFunction([=]() -> void {
+    NS_DispatchToMainThread(NS_NewRunnableFunction(
+                              "ProgressTracker::SyncNotifyProgress",
+                              [=]() -> void {
       RefPtr<ProgressTracker> tracker = image->GetProgressTracker();
       if (tracker) {
         tracker->SyncNotifyProgress(FLAG_FRAME_COMPLETE,

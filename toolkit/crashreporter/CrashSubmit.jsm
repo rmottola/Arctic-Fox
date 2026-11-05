@@ -7,7 +7,7 @@ const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/KeyValueParser.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.importGlobalProperties(['File']);
+Cu.importGlobalProperties(["File"]);
 
 XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
                                   "resource://gre/modules/PromiseUtils.jsm");
@@ -65,18 +65,18 @@ function getL10nStrings() {
   }
   let crstrings = parseINIStrings(path);
   let strings = {
-    'crashid': crstrings.CrashID,
-    'reporturl': crstrings.CrashDetailsURL
+    "crashid": crstrings.CrashID,
+    "reporturl": crstrings.CrashDetailsURL
   };
 
   path = dirSvc.get("XCurProcD", Ci.nsIFile);
   path.append("crashreporter-override.ini");
   if (path.exists()) {
     crstrings = parseINIStrings(path);
-    if ('CrashID' in crstrings)
-      strings['crashid'] = crstrings.CrashID;
-    if ('CrashDetailsURL' in crstrings)
-      strings['reporturl'] = crstrings.CrashDetailsURL;
+    if ("CrashID" in crstrings)
+      strings["crashid"] = crstrings.CrashID;
+    if ("CrashDetailsURL" in crstrings)
+      strings["reporturl"] = crstrings.CrashDetailsURL;
   }
   return strings;
 }
@@ -95,7 +95,7 @@ function getDir(name) {
 function writeFile(dirName, fileName, data) {
   let path = getDir(dirName);
   if (!path.exists())
-    path.create(Ci.nsIFile.DIRECTORY_TYPE, parseInt('0700', 8));
+    path.create(Ci.nsIFile.DIRECTORY_TYPE, parseInt("0700", 8));
   path.append(fileName);
   var fs = Cc["@mozilla.org/network/file-output-stream;1"].
            createInstance(Ci.nsIFileOutputStream);
@@ -174,11 +174,11 @@ function pruneSavedDumps() {
       let matches = extra.leafName.match(/(.+)\.extra$/);
       if (matches) {
         let dump = extra.clone();
-        dump.leafName = matches[1] + '.dmp';
+        dump.leafName = matches[1] + ".dmp";
         dump.remove(false);
 
         let memory = extra.clone();
-        memory.leafName = matches[1] + '.memory.json.gz';
+        memory.leafName = matches[1] + ".memory.json.gz";
         if (memory.exists()) {
           memory.remove(false);
         }
@@ -407,15 +407,15 @@ Submitter.prototype = {
 
     let additionalDumps = [];
     if ("additional_minidumps" in this.extraKeyVals) {
-      let names = this.extraKeyVals.additional_minidumps.split(',');
+      let names = this.extraKeyVals.additional_minidumps.split(",");
       for (let name of names) {
-        let [dump, extra, memory] = getPendingMinidump(this.id + "-" + name);
+        let [dump /* , extra, memory */] = getPendingMinidump(this.id + "-" + name);
         if (!dump.exists()) {
           this.notifyStatus(FAILED);
           this.cleanup();
           return this.deferredSubmit.promise;
         }
-        additionalDumps.push({'name': name, 'dump': dump});
+        additionalDumps.push({"name": name, "dump": dump});
       }
     }
 
@@ -462,16 +462,14 @@ this.CrashSubmit = {
   {
     params = params || {};
     let recordSubmission = false;
-    let submitSuccess = null;
-    let submitError = null;
     let noThrottle = false;
     let extraExtraKeyVals = null;
 
-    if ('recordSubmission' in params)
+    if ("recordSubmission" in params)
       recordSubmission = params.recordSubmission;
-    if ('noThrottle' in params)
+    if ("noThrottle" in params)
       noThrottle = params.noThrottle;
-    if ('extraExtraKeyVals' in params)
+    if ("extraExtraKeyVals" in params)
       extraExtraKeyVals = params.extraExtraKeyVals;
 
     let submitter = new Submitter(id, recordSubmission,
@@ -504,7 +502,7 @@ this.CrashSubmit = {
    */
 
   ignore: function CrashSubmit_ignore(id) {
-    let [dump, extra, mem] = getPendingMinidump(id);
+    let [dump /* , extra, memory */] = getPendingMinidump(id);
     return OS.File.open(dump.path + ".ignore", {create: true},
                         {unixFlags: OS.Constants.libc.O_CREAT})
       .then((file) => { file.close(); });

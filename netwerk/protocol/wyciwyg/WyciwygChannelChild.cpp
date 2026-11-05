@@ -48,13 +48,13 @@ WyciwygChannelChild::WyciwygChannelChild()
   , mIPCOpen(false)
   , mSentAppData(false)
 {
-  LOG(("Creating WyciwygChannelChild @%x\n", this));
+  LOG(("Creating WyciwygChannelChild @%p\n", this));
   mEventQ = new ChannelEventQueue(NS_ISUPPORTS_CAST(nsIWyciwygChannel*, this));
 }
 
 WyciwygChannelChild::~WyciwygChannelChild()
 {
-  LOG(("Destroying WyciwygChannelChild @%x\n", this));
+  LOG(("Destroying WyciwygChannelChild @%p\n", this));
   if (mLoadInfo) {
     NS_ReleaseOnMainThread(mLoadInfo.forget());
   }
@@ -275,8 +275,8 @@ WyciwygChannelChild::RecvOnStopRequest(const nsresult& statusCode)
 void
 WyciwygChannelChild::OnStopRequest(const nsresult& statusCode)
 {
-  LOG(("WyciwygChannelChild::RecvOnStopRequest [this=%p status=%u]\n",
-           this, statusCode));
+  LOG(("WyciwygChannelChild::RecvOnStopRequest [this=%p status=%" PRIu32 "]\n",
+       this, static_cast<uint32_t>(statusCode)));
 
   { // We need to ensure that all IPDL message dispatching occurs
     // before we delete the protocol below
@@ -646,6 +646,7 @@ WyciwygChannelChild::AsyncOpen(nsIStreamListener *aListener, nsISupports *aConte
 
   mozilla::dom::TabChild* tabChild = GetTabChild(this);
   if (MissingRequiredTabChild(tabChild, "wyciwyg")) {
+    mCallbacks = nullptr;
     return NS_ERROR_ILLEGAL_VALUE;
   }
 
@@ -665,7 +666,10 @@ WyciwygChannelChild::AsyncOpen2(nsIStreamListener *aListener)
 {
   nsCOMPtr<nsIStreamListener> listener = aListener;
   nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_FAILED(rv)) {
+    mCallbacks = nullptr;
+    return rv;
+  }
   return AsyncOpen(listener, nullptr);
 }
 

@@ -50,6 +50,9 @@ using mozilla::layers::BorderCorners from "mozilla/layers/LayersTypes.h";
 using mozilla::layers::BorderWidths from "mozilla/layers/LayersTypes.h";
 using mozilla::layers::LayerHandle from "mozilla/layers/LayersTypes.h";
 using mozilla::layers::CompositableHandle from "mozilla/layers/LayersTypes.h";
+using mozilla::layers::ReadLockHandle from "mozilla/layers/LayersTypes.h";
+using mozilla::layers::SimpleLayerAttributes from "mozilla/layers/LayerAttributes.h";
+using mozilla::CrossProcessSemaphoreHandle from "mozilla/ipc/CrossProcessSemaphore.h";
 
 namespace mozilla {
 namespace layers {
@@ -155,13 +158,9 @@ union TransformFunction {
 };
 
 union Animatable {
+  null_t;
   float;
   TransformFunction[];
-};
-
-union BaseAnimationStyle {
-  null_t;
-  Animatable;
 };
 
 struct AnimationSegment {
@@ -231,37 +230,15 @@ struct Animation {
   // animations with a composite mode of additive or accumulate, and only for
   // the first animation in the set (i.e. the animation that is lowest in the
   // stack). In all other cases the value is null_t.
-  BaseAnimationStyle baseStyle;
+  Animatable baseStyle;
 };
 
 // Change a layer's attributes
 struct CommonLayerAttributes {
-  IntRect layerBounds;
   LayerIntRegion visibleRegion;
   EventRegions eventRegions;
-  TransformMatrix transform;
-  bool transformIsPerspective;
-  float postXScale;
-  float postYScale;
-  uint32_t contentFlags;
-  float opacity;
   bool useClipRect;
   ParentLayerIntRect clipRect;
-  MaybeLayerClip scrolledClip;
-  bool isFixedPosition;
-  uint64_t fixedPositionScrollContainerId;
-  LayerPoint fixedPositionAnchor;
-  int32_t fixedPositionSides;
-  bool isStickyPosition;
-  uint64_t stickyScrollContainerId;
-  LayerRect stickyScrollRangeOuter;
-  LayerRect stickyScrollRangeInner;
-  uint64_t scrollbarTargetContainerId;
-  uint32_t scrollbarDirection;
-  float scrollbarThumbRatio;
-  bool isScrollbarContainer;
-  int8_t mixBlendMode;
-  bool forceIsolatedGroup;
   LayerHandle maskLayer;
   LayerHandle[] ancestorMaskLayers;
   // Animated colors will only honored for ColorLayers.
@@ -334,6 +311,11 @@ struct PluginWindowData {
   bool visible;
 };
 
+struct OpSetSimpleLayerAttributes {
+  LayerHandle layer;
+  SimpleLayerAttributes attrs;
+};
+
 struct OpSetLayerAttributes {
   LayerHandle layer;
   LayerAttributes attrs;
@@ -356,10 +338,20 @@ struct ShmemSection {
   size_t size;
 };
 
+struct CrossProcessSemaphoreDescriptor {
+  CrossProcessSemaphoreHandle sem;
+};
+
 union ReadLockDescriptor {
   ShmemSection;
+  CrossProcessSemaphoreDescriptor;
   uintptr_t;
   null_t;
+};
+
+struct ReadLockInit {
+  ReadLockDescriptor sharedLock;
+  ReadLockHandle handle;
 };
 
 union MaybeTexture {
@@ -403,11 +395,6 @@ struct OpUseTiledLayerBuffer {
   SurfaceDescriptorTiles tileLayerDescriptor;
 };
 
-struct OpUseOverlaySource {
-  OverlaySource overlay;
-  IntRect picture;
-};
-
 struct OpPaintTextureRegion {
   ThebesBufferData bufferData;
   nsIntRegion updatedRegion;
@@ -422,7 +409,7 @@ struct OpRemoveTexture {
 
 struct TimedTexture {
   PTexture texture;
-  ReadLockDescriptor sharedLock;
+  ReadLockHandle sharedLock;
   TimeStamp timeStamp;
   IntRect picture;
   uint32_t frameID;
@@ -446,8 +433,8 @@ struct OpUseTexture {
 struct OpUseComponentAlphaTextures {
   PTexture textureOnBlack;
   PTexture textureOnWhite;
-  ReadLockDescriptor sharedLockBlack;
-  ReadLockDescriptor sharedLockWhite;
+  ReadLockHandle sharedLockBlack;
+  ReadLockHandle sharedLockWhite;
 };
 
 union MaybeRegion {
@@ -469,7 +456,6 @@ union CompositableOperationDetail {
 
   OpUseTexture;
   OpUseComponentAlphaTextures;
-  OpUseOverlaySource;
 };
 
 struct CompositableOperation {
@@ -490,7 +476,6 @@ union Edit {
   OpCreateCanvasLayer;
   OpCreateRefLayer;
 
-  OpSetLayerAttributes;
   OpSetDiagnosticTypes;
   OpWindowOverlayChanged;
 
@@ -533,12 +518,6 @@ struct ImageCompositeNotification {
   uint32_t producerID;
 };
 
-// Unit of a "changeset reply".  This is a weird abstraction, probably
-// only to be used for buffer swapping.
-union EditReply {
-  OpContentBufferSwap;
-};
-
 union AsyncParentMessageData {
   OpNotifyNotUsed;
 };
@@ -546,6 +525,9 @@ union AsyncParentMessageData {
 struct TransactionInfo
 {
   Edit[] cset;
+  OpSetSimpleLayerAttributes[] setSimpleAttrs;
+  OpSetLayerAttributes[] setAttrs;
+  CompositableOperation[] paints;
   OpDestroy[] toDestroy;
   uint64_t fwdTransactionId;
   uint64_t id;

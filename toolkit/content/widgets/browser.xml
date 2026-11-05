@@ -135,14 +135,18 @@
               aURI = "about:blank";
 
             var aReferrerPolicy = Components.interfaces.nsIHttpChannel.REFERRER_POLICY_UNSET;
+            var aTriggeringPrincipal;
 
             // Check for loadURIWithFlags(uri, { ... });
             var params = arguments[1];
             if (params && typeof(params) == "object") {
               aFlags = params.flags;
               aReferrerURI = params.referrerURI;
-              if ('referrerPolicy' in params) {
+              if ("referrerPolicy" in params) {
                 aReferrerPolicy = params.referrerPolicy;
+              }
+              if ("triggeringPrincipal" in params) {
+                aTriggeringPrincipal = params.triggeringPrincipal;
               }
               aCharset = params.charset;
               aPostData = params.postData;
@@ -151,7 +155,7 @@
             this._wrapURIChangeCall(() =>
               this.webNavigation.loadURIWithOptions(
                   aURI, aFlags, aReferrerURI, aReferrerPolicy,
-                  aPostData, null, null));
+                  aPostData, null, null, aTriggeringPrincipal));
           ]]>
         </body>
       </method>
@@ -161,8 +165,7 @@
           <![CDATA[
             try {
               this.loadURI(this.homePage);
-            }
-            catch (e) {
+            } catch (e) {
             }
           ]]>
         </body>
@@ -234,16 +237,17 @@
                 readonly="true"/>
 
       <!--
-        Weak reference to the related browser (see
-        nsIBrowser.getRelatedBrowser).
+        Weak reference to an optional frame loader that can be used to influence
+        process selection for this browser.
+        See nsIBrowser.sameProcessAsFrameLoader.
       -->
-      <field name="_relatedBrowser">null</field>
-      <property name="relatedBrowser">
+      <field name="_sameProcessAsFrameLoader">null</field>
+      <property name="sameProcessAsFrameLoader">
         <getter><![CDATA[
-          return this._relatedBrowser && this._relatedBrowser.get();
+          return this._sameProcessAsFrameLoader && this._sameProcessAsFrameLoader.get();
         ]]></getter>
         <setter><![CDATA[
-          this._relatedBrowser = Cu.getWeakReference(val);
+          this._sameProcessAsFrameLoader = Cu.getWeakReference(val);
         ]]></setter>
       </property>
 
@@ -593,7 +597,7 @@
       </property>
 
       <field name="mPrefs" readonly="true">
-        Components.classes['@mozilla.org/preferences-service;1']
+        Components.classes["@mozilla.org/preferences-service;1"]
                   .getService(Components.interfaces.nsIPrefBranch);
       </field>
 
@@ -723,12 +727,6 @@
             let event = document.createEvent("Events");
             event.initEvent("DOMAudioPlaybackStarted", true, false);
             this.dispatchEvent(event);
-            if (this._audioBlocked) {
-              this._audioBlocked = false;
-              event = document.createEvent("Events");
-              event.initEvent("DOMAudioPlaybackBlockStopped", true, false);
-              this.dispatchEvent(event);
-            }
           ]]>
         </body>
       </method>
@@ -743,12 +741,26 @@
         </body>
       </method>
 
-      <method name="audioPlaybackBlocked">
+      <method name="audioPlaybackBlockStarted">
         <body>
           <![CDATA[
             this._audioBlocked = true;
             let event = document.createEvent("Events");
             event.initEvent("DOMAudioPlaybackBlockStarted", true, false);
+            this.dispatchEvent(event);
+          ]]>
+        </body>
+      </method>
+
+      <method name="audioPlaybackBlockStopped">
+        <body>
+          <![CDATA[
+            if (!this._audioBlocked) {
+              return;
+            }
+            this._audioBlocked = false;
+            let event = document.createEvent("Events");
+            event.initEvent("DOMAudioPlaybackBlockStopped", true, false);
             this.dispatchEvent(event);
           ]]>
         </body>
@@ -958,19 +970,20 @@
             Components.utils.reportError(e);
           }
           try {
-            var securityUI = this.securityUI;
+            // Ensures the securityUI is initialized.
+            var securityUI = this.securityUI; // eslint-disable-line no-unused-vars
           }
           catch (e) {
           }
 
-          // XXX tabbrowser.xml sets "relatedBrowser" as a direct property on
-          // some browsers before they are put into a DOM (and get a binding).
-          // This hack makes sure that we hold a weak reference to the other
-          // browser (and go through the proper getter and setter).
-          if (this.hasOwnProperty("relatedBrowser")) {
-            var relatedBrowser = this.relatedBrowser;
-            delete this.relatedBrowser;
-            this.relatedBrowser = relatedBrowser;
+          // tabbrowser.xml sets "sameProcessAsFrameLoader" as a direct property
+          // on some browsers before they are put into a DOM (and get a
+          // binding).  This hack makes sure that we hold a weak reference to
+          // the other browser (and go through the proper getter and setter).
+          if (this.hasOwnProperty("sameProcessAsFrameLoader")) {
+            var sameProcessAsFrameLoader = this.sameProcessAsFrameLoader;
+            delete this.sameProcessAsFrameLoader;
+            this.sameProcessAsFrameLoader = sameProcessAsFrameLoader;
           }
 
           if (!this.isRemoteBrowser) {
@@ -983,7 +996,14 @@
             this.messageManager.addMessageListener("Autoscroll:Cancel", this);
             this.messageManager.addMessageListener("AudioPlayback:Start", this);
             this.messageManager.addMessageListener("AudioPlayback:Stop", this);
-            this.messageManager.addMessageListener("AudioPlayback:Block", this);
+            this.messageManager.addMessageListener("AudioPlayback:BlockStart", this);
+            this.messageManager.addMessageListener("AudioPlayback:BlockStop", this);
+
+            if (this.hasAttribute("selectmenulist")) {
+              this.messageManager.addMessageListener("Forms:ShowDropDown", this);
+              this.messageManager.addMessageListener("Forms:HideDropDown", this);
+            }
+
           }
         ]]>
       </constructor>
@@ -1002,6 +1022,11 @@
       <method name="destroy">
         <body>
           <![CDATA[
+          // Make sure that any open select is closed.
+          if (this._selectParentHelper) {
+            let menulist = document.getElementById(this.getAttribute("selectmenulist"));
+            this._selectParentHelper.hide(menulist, this);
+          }
           if (this.mDestroyed)
             return;
           this.mDestroyed = true;
@@ -1030,7 +1055,7 @@
 
           if (this._autoScrollNeedsCleanup) {
             // we polluted the global scope, so clean it up
-            this._autoScrollPopup.parentNode.removeChild(this._autoScrollPopup);
+            this._autoScrollPopup.remove();
           }
           ]]>
         </body>
@@ -1070,9 +1095,33 @@
             case "AudioPlayback:Stop":
               this.audioPlaybackStopped();
               break;
-            case "AudioPlayback:Block":
-              this.audioPlaybackBlocked();
+            case "AudioPlayback:BlockStart":
+              this.audioPlaybackBlockStarted();
               break;
+            case "AudioPlayback:BlockStop":
+              this.audioPlaybackBlockStopped();
+              break;
+            case "Forms:ShowDropDown": {
+              if (!this._selectParentHelper) {
+                this._selectParentHelper =
+                  Cu.import("resource://gre/modules/SelectParentHelper.jsm", {}).SelectParentHelper;
+              }
+
+              let menulist = document.getElementById(this.getAttribute("selectmenulist"));
+              menulist.menupopup.style.direction = data.direction;
+              this._selectParentHelper.populate(menulist, data.options, data.selectedIndex, this._fullZoom);
+              this._selectParentHelper.open(this, menulist, data.rect, data.isOpenedViaTouch);
+              break;
+            }
+
+            case "Forms:HideDropDown": {
+              if (this._selectParentHelper) {
+                let menulist = document.getElementById(this.getAttribute("selectmenulist"));
+                this._selectParentHelper.hide(menulist, this);
+              }
+              break;
+            }
+
           }
           return undefined;
         ]]></body>
@@ -1594,7 +1643,6 @@
         if (!this.droppedLinkHandler || event.defaultPrevented || this.isRemoteBrowser)
           return;
 
-        let name = { };
         let linkHandler = Components.classes["@mozilla.org/content/dropped-link-handler;1"].
                             getService(Components.interfaces.nsIDroppedLinkHandler);
         try {

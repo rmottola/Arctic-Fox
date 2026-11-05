@@ -519,8 +519,9 @@ nsWebBrowser::GetSameTypeRootTreeItem(nsIDocShellTreeItem** aRootTreeItem)
 
 NS_IMETHODIMP
 nsWebBrowser::FindItemWithName(const nsAString& aName,
-                               nsISupports* aRequestor,
+                               nsIDocShellTreeItem* aRequestor,
                                nsIDocShellTreeItem* aOriginalRequestor,
+                               bool aSkipTabGroup,
                                nsIDocShellTreeItem** aResult)
 {
   NS_ENSURE_STATE(mDocShell);
@@ -528,8 +529,7 @@ nsWebBrowser::FindItemWithName(const nsAString& aName,
                "This should always be set when in this situation");
 
   return mDocShell->FindItemWithName(
-    aName, static_cast<nsIDocShellTreeOwner*>(mDocShellTreeOwner),
-    aOriginalRequestor, aResult);
+    aName, aRequestor, aOriginalRequestor, aSkipTabGroup, aResult);
 }
 
 nsIDocument*
@@ -1385,9 +1385,8 @@ nsWebBrowser::SetPositionAndSize(int32_t aX, int32_t aY,
     // We also need to resize our widget then.
     if (mInternalWidget) {
       doc_x = doc_y = 0;
-      NS_ENSURE_SUCCESS(mInternalWidget->Resize(aX, aY, aCX, aCY,
-                                                !!(aFlags & nsIBaseWindow::eRepaint)),
-                        NS_ERROR_FAILURE);
+      mInternalWidget->Resize(aX, aY, aCX, aCY,
+                              !!(aFlags & nsIBaseWindow::eRepaint));
     }
     // Now reposition/ resize the doc
     NS_ENSURE_SUCCESS(
@@ -1548,7 +1547,8 @@ NS_IMETHODIMP
 nsWebBrowser::SetEnabled(bool aEnabled)
 {
   if (mInternalWidget) {
-    return mInternalWidget->Enable(aEnabled);
+    mInternalWidget->Enable(aEnabled);
+    return NS_OK;
   }
   return NS_ERROR_FAILURE;
 }

@@ -85,8 +85,10 @@ protected:
 
   uint32_t mPeakSize;
   uint32_t mPeakCount;
-  Telemetry::ID mPeakSizeID;
-  Telemetry::ID mPeakCountID;
+  MOZ_INIT_OUTSIDE_CTOR
+  Telemetry::HistogramID mPeakSizeID;
+  MOZ_INIT_OUTSIDE_CTOR
+  Telemetry::HistogramID mPeakCountID;
 
 private:
   RefPtr<HpackDynamicTableReporter> mDynamicReporter;

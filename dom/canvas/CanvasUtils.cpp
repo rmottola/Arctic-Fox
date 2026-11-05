@@ -124,5 +124,11 @@ CoerceDouble(const JS::Value& v, double* d)
     return true;
 }
 
+bool
+HasDrawWindowPrivilege(JSContext* aCx, JSObject* /* unused */)
+{
+  return nsContentUtils::CallerHasPermission(aCx, NS_LITERAL_STRING("<all_urls>"));
+}
+
 } // namespace CanvasUtils
 } // namespace mozilla

@@ -1,5 +1,6 @@
 "use strict";
 
+const {SessionSaver} = Cu.import("resource:///modules/sessionstore/SessionSaver.jsm", {});
 const {TabStateFlusher} = Cu.import("resource:///modules/sessionstore/TabStateFlusher.jsm", {});
 
 /**
@@ -10,10 +11,9 @@ add_task(function* clearURLBarAfterParentProcessURL() {
   let tab = yield new Promise(resolve => {
     gBrowser.selectedTab = gBrowser.addTab("about:preferences");
     let newTabBrowser = gBrowser.getBrowserForTab(gBrowser.selectedTab);
-    newTabBrowser.addEventListener("Initialized", function onInit() {
-      newTabBrowser.removeEventListener("Initialized", onInit, true);
+    newTabBrowser.addEventListener("Initialized", function() {
       resolve(gBrowser.selectedTab);
-    }, true);
+    }, {capture: true, once: true});
   });
   document.getElementById("home-button").click();
   yield BrowserTestUtils.browserLoaded(tab.linkedBrowser);
@@ -30,10 +30,9 @@ add_task(function* clearURLBarAfterParentProcessURLInExistingTab() {
   let tab = yield new Promise(resolve => {
     gBrowser.selectedTab = gBrowser.addTab();
     let newTabBrowser = gBrowser.getBrowserForTab(gBrowser.selectedTab);
-    newTabBrowser.addEventListener("Initialized", function onInit() {
-      newTabBrowser.removeEventListener("Initialized", onInit, true);
+    newTabBrowser.addEventListener("Initialized", function() {
       resolve(gBrowser.selectedTab);
-    }, true);
+    }, {capture: true, once: true});
     newTabBrowser.loadURI("about:preferences");
   });
   document.getElementById("home-button").click();
@@ -83,6 +82,8 @@ add_task(function* dontTemporarilyShowAboutHome() {
   yield TabStateFlusher.flush(win.gBrowser.selectedBrowser);
   yield BrowserTestUtils.closeWindow(win);
   ok(SessionStore.getClosedWindowCount(), "Should have a closed window");
+
+  yield SessionSaver.run();
 
   windowOpenedPromise = BrowserTestUtils.waitForNewWindow();
   win = SessionStore.undoCloseWindow(0);

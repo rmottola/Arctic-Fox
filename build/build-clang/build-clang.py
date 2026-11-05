@@ -15,6 +15,7 @@ import glob
 import errno
 from contextlib import contextmanager
 import sys
+import which
 
 DEBUG = os.getenv("DEBUG")
 
@@ -114,43 +115,30 @@ def mkdir_p(path):
             raise
 
 
-def build_and_use_libgcc(env, clang_dir):
-    with updated_env(env):
-        tempdir = tempfile.mkdtemp()
-        gcc_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "..", "build-gcc")
-        run_in(gcc_dir, ["./build-gcc.sh", tempdir, "libgcc"])
-        run_in(tempdir, ["tar", "-xf", "gcc.tar.xz"])
-        libgcc_dir = glob.glob(os.path.join(tempdir,
-                                            "gcc", "lib", "gcc",
-                                            "x86_64-unknown-linux-gnu",
-                                            "[0-9]*"))[0]
-        clang_lib_dir = os.path.join(clang_dir, "lib", "gcc",
-                                     "x86_64-unknown-linux-gnu",
-                                     os.path.basename(libgcc_dir))
-        mkdir_p(clang_lib_dir)
-        copy_dir_contents(libgcc_dir, clang_lib_dir)
-        libgcc_dir = os.path.join(tempdir, "gcc", "lib64")
-        clang_lib_dir = os.path.join(clang_dir, "lib")
-        copy_dir_contents(libgcc_dir, clang_lib_dir)
-        include_dir = os.path.join(tempdir, "gcc", "include")
-        clang_include_dir = os.path.join(clang_dir, "include")
-        copy_dir_contents(include_dir, clang_include_dir)
-        shutil.rmtree(tempdir)
+def install_libgcc(gcc_dir, clang_dir):
+    out = subprocess.check_output([os.path.join(gcc_dir, "bin", "gcc"),
+                                   '-print-libgcc-file-name'])
+
+    libgcc_dir = os.path.dirname(out.rstrip())
+    clang_lib_dir = os.path.join(clang_dir, "lib", "gcc",
+                                 "x86_64-unknown-linux-gnu",
+                                 os.path.basename(libgcc_dir))
+    mkdir_p(clang_lib_dir)
+    copy_dir_contents(libgcc_dir, clang_lib_dir)
+    libgcc_dir = os.path.join(gcc_dir, "lib64")
+    clang_lib_dir = os.path.join(clang_dir, "lib")
+    copy_dir_contents(libgcc_dir, clang_lib_dir)
+    include_dir = os.path.join(gcc_dir, "include")
+    clang_include_dir = os.path.join(clang_dir, "include")
+    copy_dir_contents(include_dir, clang_include_dir)
 
 
 def svn_co(source_dir, url, directory, revision):
-    run_in(source_dir, ["svn", "co", "-r", revision, url, directory])
+    run_in(source_dir, ["svn", "co", "-q", "-r", revision, url, directory])
 
 
 def svn_update(directory, revision):
-    run_in(directory, ["svn", "update", "-r", revision])
-
-
-def build_one_stage(cc, cxx, src_dir, stage_dir, build_libcxx,
-                    build_type, assertions, python_path):
-    build_one_stage_aux(cc, cxx, src_dir, stage_dir, build_libcxx,
-                        build_type, assertions, python_path)
+    run_in(directory, ["svn", "update", "-q", "-r", revision])
 
 
 def get_platform():
@@ -183,8 +171,8 @@ def is_windows():
     return platform.system() == "Windows"
 
 
-def build_one_stage_aux(cc, cxx, src_dir, stage_dir, build_libcxx,
-                        build_type, assertions, python_path):
+def build_one_stage(cc, cxx, src_dir, stage_dir, build_libcxx,
+                    build_type, assertions, python_path, gcc_dir):
     if not os.path.exists(stage_dir):
         os.mkdir(stage_dir)
 
@@ -196,8 +184,10 @@ def build_one_stage_aux(cc, cxx, src_dir, stage_dir, build_libcxx,
         run_cmake = False
 
     cmake_args = ["-GNinja",
-                  "-DCMAKE_C_COMPILER=%s" % cc,
-                  "-DCMAKE_CXX_COMPILER=%s" % cxx,
+                  "-DCMAKE_C_COMPILER=%s" % cc[0],
+                  "-DCMAKE_CXX_COMPILER=%s" % cxx[0],
+                  "-DCMAKE_C_FLAGS=%s" % ' '.join(cc[1:]),
+                  "-DCMAKE_CXX_FLAGS=%s" % ' '.join(cxx[1:]),
                   "-DCMAKE_BUILD_TYPE=%s" % build_type,
                   "-DLLVM_TARGETS_TO_BUILD=X86;ARM",
                   "-DLLVM_ENABLE_ASSERTIONS=%s" % ("ON" if assertions else "OFF"),
@@ -206,7 +196,29 @@ def build_one_stage_aux(cc, cxx, src_dir, stage_dir, build_libcxx,
                   "-DLLVM_TOOL_LIBCXX_BUILD=%s" % ("ON" if build_libcxx else "OFF"),
                   "-DLIBCXX_LIBCPPABI_VERSION=\"\"",
                   src_dir];
+    if is_windows():
+        cmake_args.insert(-1, "-DLLVM_EXPORT_SYMBOLS_FOR_PLUGINS=ON")
     build_package(build_dir, run_cmake, cmake_args)
+
+    if is_linux():
+        install_libgcc(gcc_dir, inst_dir)
+
+
+def get_compiler(config, key):
+    if key not in config:
+        raise ValueError("Config file needs to set %s" % key)
+
+    f = config[key]
+    if os.path.isabs(f):
+        if not os.path.exists(f):
+            raise ValueError("%s must point to an existing path" % key)
+        return f
+
+    # Assume that we have the name of some program that should be on PATH.
+    try:
+        return which.which(f)
+    except which.WhichError:
+        raise ValueError("%s not found on PATH" % f)
 
 if __name__ == "__main__":
     # The directories end up in the debug info, so the easy way of getting
@@ -224,6 +236,7 @@ if __name__ == "__main__":
     clang_source_dir = source_dir + "/clang"
     compiler_rt_source_dir = source_dir + "/compiler-rt"
     libcxx_source_dir = source_dir + "/libcxx"
+    libcxxabi_source_dir = source_dir + "/libcxxabi"
 
     if is_darwin():
         os.environ['MACOSX_DEPLOYMENT_TARGET'] = '10.7'
@@ -258,6 +271,7 @@ if __name__ == "__main__":
     clang_repo = config["clang_repo"]
     compiler_repo = config["compiler_repo"]
     libcxx_repo = config["libcxx_repo"]
+    libcxxabi_repo = config.get("libcxxabi_repo")
     stages = 3
     if "stages" in config:
         stages = int(config["stages"])
@@ -289,20 +303,8 @@ if __name__ == "__main__":
             raise ValueError("gcc_dir must point to an existing path")
     if is_linux() and gcc_dir is None:
         raise ValueError("Config file needs to set gcc_dir")
-    cc = None
-    if "cc" in config:
-        cc = config["cc"]
-        if not os.path.exists(cc):
-            raise ValueError("cc must point to an existing path")
-    else:
-        raise ValueError("Config file needs to set cc")
-    cxx = None
-    if "cxx" in config:
-        cxx = config["cxx"]
-        if not os.path.exists(cxx):
-            raise ValueError("cxx must point to an existing path")
-    else:
-        raise ValueError("Config file needs to set cxx")
+    cc = get_compiler(config, "cc")
+    cxx = get_compiler(config, "cxx")
 
     if not os.path.exists(source_dir):
         os.makedirs(source_dir)
@@ -310,6 +312,8 @@ if __name__ == "__main__":
         svn_co(source_dir, clang_repo, clang_source_dir, llvm_revision)
         svn_co(source_dir, compiler_repo, compiler_rt_source_dir, llvm_revision)
         svn_co(source_dir, libcxx_repo, libcxx_source_dir, llvm_revision)
+        if libcxxabi_repo:
+            svn_co(source_dir, libcxxabi_repo, libcxxabi_source_dir, llvm_revision)
         for p in config.get("patches", {}).get(get_platform(), []):
             patch(p, source_dir)
     else:
@@ -317,13 +321,17 @@ if __name__ == "__main__":
         svn_update(clang_source_dir, llvm_revision)
         svn_update(compiler_rt_source_dir, llvm_revision)
         svn_update(libcxx_source_dir, llvm_revision)
+        if libcxxabi_repo:
+            svn_update(libcxxabi_source_dir, llvm_revision)
 
     symlinks = [(source_dir + "/clang",
                  llvm_source_dir + "/tools/clang"),
                 (source_dir + "/compiler-rt",
                  llvm_source_dir + "/projects/compiler-rt"),
                 (source_dir + "/libcxx",
-                 llvm_source_dir + "/projects/libcxx")]
+                 llvm_source_dir + "/projects/libcxx"),
+                (source_dir + "/libcxxabi",
+                 llvm_source_dir + "/projects/libcxxabi")]
     for l in symlinks:
         # On Windows, we have to re-copy the whole directory every time.
         if not is_windows() and os.path.islink(l[1]):
@@ -332,7 +340,8 @@ if __name__ == "__main__":
             shutil.rmtree(l[1])
         elif os.path.exists(l[1]):
             os.unlink(l[1])
-        symlink(l[0], l[1])
+        if os.path.exists(l[0]):
+            symlink(l[0], l[1])
 
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
@@ -343,61 +352,54 @@ if __name__ == "__main__":
     final_stage_dir = stage1_dir
 
     if is_darwin():
-        extra_cflags = ""
-        extra_cxxflags = "-stdlib=libc++"
-        extra_cflags2 = ""
-        extra_cxxflags2 = "-stdlib=libc++"
+        extra_cflags = []
+        extra_cxxflags = ["-stdlib=libc++"]
+        extra_cflags2 = []
+        extra_cxxflags2 = ["-stdlib=libc++"]
     elif is_linux():
-        extra_cflags = "-static-libgcc"
-        extra_cxxflags = "-static-libgcc -static-libstdc++"
-        extra_cflags2 = "-fPIC --gcc-toolchain=%s" % gcc_dir
-        extra_cxxflags2 = "-fPIC --gcc-toolchain=%s" % gcc_dir
+        extra_cflags = ["-static-libgcc"]
+        extra_cxxflags = ["-static-libgcc", "-static-libstdc++"]
+        extra_cflags2 = ["-fPIC"]
+        extra_cxxflags2 = ["-fPIC", "-static-libstdc++"]
 
         if os.environ.has_key('LD_LIBRARY_PATH'):
             os.environ['LD_LIBRARY_PATH'] = '%s/lib64/:%s' % (gcc_dir, os.environ['LD_LIBRARY_PATH']);
         else:
             os.environ['LD_LIBRARY_PATH'] = '%s/lib64/' % gcc_dir
     elif is_windows():
-        extra_cflags = ""
-        extra_cxxflags = ""
-        extra_cflags2 = ""
-        extra_cxxflags2 = ""
+        extra_cflags = []
+        extra_cxxflags = []
+        extra_cflags2 = []
+        extra_cxxflags2 = []
 
     build_one_stage(
-        cc + " %s" % extra_cflags,
-        cxx + " %s" % extra_cxxflags,
+        [cc] + extra_cflags,
+        [cxx] + extra_cxxflags,
         llvm_source_dir, stage1_dir, build_libcxx,
-        build_type, assertions, python_path)
+        build_type, assertions, python_path, gcc_dir)
 
     if stages > 1:
         stage2_dir = build_dir + '/stage2'
         stage2_inst_dir = stage2_dir + '/clang'
         final_stage_dir = stage2_dir
         build_one_stage(
-            stage1_inst_dir + "/bin/%s%s %s" %
-                (cc_name, exe_ext, extra_cflags2),
-            stage1_inst_dir + "/bin/%s%s %s" %
-                (cxx_name, exe_ext, extra_cxxflags2),
+            [stage1_inst_dir + "/bin/%s%s" %
+                (cc_name, exe_ext)] + extra_cflags2,
+            [stage1_inst_dir + "/bin/%s%s" %
+                (cxx_name, exe_ext)] + extra_cxxflags2,
             llvm_source_dir, stage2_dir, build_libcxx,
-            build_type, assertions, python_path)
+            build_type, assertions, python_path, gcc_dir)
 
-        if stages > 2:
-            stage3_dir = build_dir + '/stage3'
-            final_stage_dir = stage3_dir
-            build_one_stage(
-                stage2_inst_dir + "/bin/%s%s %s" %
-                    (cc_name, exe_ext, extra_cflags2),
-                stage2_inst_dir + "/bin/%s%s %s" %
-                    (cxx_name, exe_ext, extra_cxxflags2),
-                llvm_source_dir, stage3_dir, build_libcxx,
-                build_type, assertions, python_path)
-
-    if is_linux():
-        final_stage_inst_dir = final_stage_dir + '/clang'
-        build_and_use_libgcc(
-            {"CC": cc + " %s" % extra_cflags,
-             "CXX": cxx + " %s" % extra_cxxflags},
-            final_stage_inst_dir)
+    if stages > 2:
+        stage3_dir = build_dir + '/stage3'
+        final_stage_dir = stage3_dir
+        build_one_stage(
+            [stage2_inst_dir + "/bin/%s%s" %
+                (cc_name, exe_ext)] + extra_cflags2,
+            [stage2_inst_dir + "/bin/%s%s" %
+                (cxx_name, exe_ext)] + extra_cxxflags2,
+            llvm_source_dir, stage3_dir, build_libcxx,
+            build_type, assertions, python_path, gcc_dir)
 
     if is_darwin() or is_windows():
         build_tar_package("tar", "clang.tar.bz2", final_stage_dir, "clang")

@@ -59,6 +59,7 @@
 #include "nsInlineFrame.h"
 #include "nsRubyTextContainerFrame.h"
 #include <algorithm>
+#include "SVGImageContext.h"
 
 using namespace mozilla;
 using namespace mozilla::css;
@@ -633,14 +634,14 @@ nsCSSRendering::ComputePixelRadii(const nscoord *aAppUnitsRadii,
   NS_FOR_CSS_HALF_CORNERS(corner)
     radii[corner] = Float(aAppUnitsRadii[corner]) / aAppUnitsPerPixel;
 
-  (*oBorderRadii)[C_TL] = Size(radii[NS_CORNER_TOP_LEFT_X],
-                               radii[NS_CORNER_TOP_LEFT_Y]);
-  (*oBorderRadii)[C_TR] = Size(radii[NS_CORNER_TOP_RIGHT_X],
-                               radii[NS_CORNER_TOP_RIGHT_Y]);
-  (*oBorderRadii)[C_BR] = Size(radii[NS_CORNER_BOTTOM_RIGHT_X],
-                               radii[NS_CORNER_BOTTOM_RIGHT_Y]);
-  (*oBorderRadii)[C_BL] = Size(radii[NS_CORNER_BOTTOM_LEFT_X],
-                               radii[NS_CORNER_BOTTOM_LEFT_Y]);
+  (*oBorderRadii)[C_TL] = Size(radii[eCornerTopLeftX],
+                               radii[eCornerTopLeftY]);
+  (*oBorderRadii)[C_TR] = Size(radii[eCornerTopRightX],
+                               radii[eCornerTopRightY]);
+  (*oBorderRadii)[C_BR] = Size(radii[eCornerBottomRightX],
+                               radii[eCornerBottomRightY]);
+  (*oBorderRadii)[C_BL] = Size(radii[eCornerBottomLeftX],
+                               radii[eCornerBottomLeftY]);
 }
 
 DrawResult
@@ -669,8 +670,8 @@ nsCSSRendering::PaintBorder(nsPresContext* aPresContext,
   nsStyleBorder newStyleBorder(*styleBorder);
 
   NS_FOR_CSS_SIDES(side) {
-    nscolor color = aStyleContext->GetVisitedDependentColor(
-      nsCSSProps::SubpropertyEntryFor(eCSSProperty_border_color)[side]);
+    nscolor color = aStyleContext->
+      GetVisitedDependentColor(nsStyleBorder::BorderColorFieldFor(side));
     newStyleBorder.mBorderColor[side] = StyleComplexColor::FromColor(color);
   }
   return PaintBorderWithStyleBorder(aPresContext, aRenderingContext, aForFrame,
@@ -701,8 +702,8 @@ nsCSSRendering::CreateBorderRenderer(nsPresContext* aPresContext,
   nsStyleBorder newStyleBorder(*styleBorder);
 
   NS_FOR_CSS_SIDES(side) {
-    nscolor color = aStyleContext->GetVisitedDependentColor(
-      nsCSSProps::SubpropertyEntryFor(eCSSProperty_border_color)[side]);
+    nscolor color = aStyleContext->
+      GetVisitedDependentColor(nsStyleBorder::BorderColorFieldFor(side));
     newStyleBorder.mBorderColor[side] = StyleComplexColor::FromColor(color);
   }
   return CreateBorderRendererWithStyleBorder(aPresContext, aDrawTarget,
@@ -732,8 +733,8 @@ ConstructBorderRenderer(nsPresContext* aPresContext,
   bool quirks = aPresContext->CompatibilityMode() == eCompatibility_NavQuirks;
   nsIFrame* bgFrame = nsCSSRendering::FindNonTransparentBackgroundFrame(aForFrame, quirks);
   nsStyleContext* bgContext = bgFrame->StyleContext();
-  nscolor bgColor =
-    bgContext->GetVisitedDependentColor(eCSSProperty_background_color);
+  nscolor bgColor = bgContext->
+    GetVisitedDependentColor(&nsStyleBackground::mBackgroundColor);
 
   // Compute the outermost boundary of the area that might be painted.
   // Same coordinate space as aBorderArea & aBGClipRect.
@@ -946,13 +947,13 @@ GetOutlineInnerRect(nsIFrame* aFrame)
   return nsRect(nsPoint(0, 0), aFrame->GetSize());
 }
 
-void
-nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
-                             nsRenderingContext& aRenderingContext,
-                             nsIFrame* aForFrame,
-                             const nsRect& aDirtyRect,
-                             const nsRect& aBorderArea,
-                             nsStyleContext* aStyleContext)
+Maybe<nsCSSBorderRenderer>
+nsCSSRendering::CreateBorderRendererForOutline(nsPresContext* aPresContext,
+                                               nsRenderingContext* aRenderingContext,
+                                               nsIFrame* aForFrame,
+                                               const nsRect& aDirtyRect,
+                                               const nsRect& aBorderArea,
+                                               nsStyleContext* aStyleContext)
 {
   nscoord             twipsRadii[8];
 
@@ -966,14 +967,14 @@ nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
 
   if (width == 0 && outlineStyle != NS_STYLE_BORDER_STYLE_AUTO) {
     // Empty outline
-    return;
+    return Nothing();
   }
 
   nsIFrame* bgFrame = nsCSSRendering::FindNonTransparentBackgroundFrame
     (aForFrame, false);
   nsStyleContext* bgContext = bgFrame->StyleContext();
-  nscolor bgColor =
-    bgContext->GetVisitedDependentColor(eCSSProperty_background_color);
+  nscolor bgColor = bgContext->
+    GetVisitedDependentColor(&nsStyleBackground::mBackgroundColor);
 
   nsRect innerRect;
   if (
@@ -995,7 +996,7 @@ nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
   // encroach into the content area.  A safer calculation would be to
   // shorten insideRect by the radius one each side before performing this test.
   if (innerRect.Contains(aDirtyRect))
-    return;
+    return Nothing();
 
   nsRect outerRect = innerRect;
   outerRect.Inflate(width, width);
@@ -1020,14 +1021,14 @@ nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
       nsITheme* theme = aPresContext->GetTheme();
       if (theme && theme->ThemeSupportsWidget(aPresContext, aForFrame,
                                               NS_THEME_FOCUS_OUTLINE)) {
-        theme->DrawWidgetBackground(&aRenderingContext, aForFrame,
+        theme->DrawWidgetBackground(aRenderingContext, aForFrame,
                                     NS_THEME_FOCUS_OUTLINE, innerRect,
                                     aDirtyRect);
-        return;
+        return Nothing();
       }
     }
     if (width == 0) {
-      return; // empty outline
+      return Nothing(); // empty outline
     }
     // http://dev.w3.org/csswg/css-ui/#outline
     // "User agents may treat 'auto' as 'solid'."
@@ -1040,7 +1041,7 @@ nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
   // This handles treating the initial color as 'currentColor'; if we
   // ever want 'invert' back we'll need to do a bit of work here too.
   nscolor outlineColor =
-    aStyleContext->GetVisitedDependentColor(eCSSProperty_outline_color);
+    aStyleContext->GetVisitedDependentColor(&nsStyleOutline::mOutlineColor);
   nscolor outlineColors[4] = { outlineColor,
                                outlineColor,
                                outlineColor,
@@ -1059,11 +1060,10 @@ nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
     document = content->OwnerDoc();
   }
 
-  // start drawing
-
+  DrawTarget* dt = aRenderingContext ? aRenderingContext->GetDrawTarget() : nullptr;
   nsCSSBorderRenderer br(aPresContext,
                          document,
-                         aRenderingContext.GetDrawTarget(),
+                         dt,
                          dirtyRect,
                          oRect,
                          outlineStyles,
@@ -1072,7 +1072,30 @@ nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
                          outlineColors,
                          nullptr,
                          bgColor);
-  br.DrawBorders();
+
+  return Some(br);
+}
+
+void
+nsCSSRendering::PaintOutline(nsPresContext* aPresContext,
+                             nsRenderingContext& aRenderingContext,
+                             nsIFrame* aForFrame,
+                             const nsRect& aDirtyRect,
+                             const nsRect& aBorderArea,
+                             nsStyleContext* aStyleContext)
+{
+  Maybe<nsCSSBorderRenderer> br = CreateBorderRendererForOutline(aPresContext,
+                                                                 &aRenderingContext,
+                                                                 aForFrame,
+                                                                 aDirtyRect,
+                                                                 aBorderArea,
+                                                                 aStyleContext);
+  if (!br) {
+    return;
+  }
+
+  // start drawing
+  br->DrawBorders();
 
   PrintAsStringNewline();
 }
@@ -1367,6 +1390,75 @@ nsCSSRendering::EndFrameTreesLocked()
   }
 }
 
+bool
+nsCSSRendering::HasBoxShadowNativeTheme(nsIFrame* aFrame,
+                                        bool& aMaybeHasBorderRadius)
+{
+  const nsStyleDisplay* styleDisplay = aFrame->StyleDisplay();
+  nsITheme::Transparency transparency;
+  if (aFrame->IsThemed(styleDisplay, &transparency)) {
+    aMaybeHasBorderRadius = false;
+    // For opaque (rectangular) theme widgets we can take the generic
+    // border-box path with border-radius disabled.
+    return transparency != nsITheme::eOpaque;
+  }
+
+  aMaybeHasBorderRadius = true;
+  return false;
+}
+
+gfx::Color
+nsCSSRendering::GetShadowColor(nsCSSShadowItem* aShadow,
+                               nsIFrame* aFrame,
+                               float aOpacity)
+{
+  // Get the shadow color; if not specified, use the foreground color
+  nscolor shadowColor;
+  if (aShadow->mHasColor)
+    shadowColor = aShadow->mColor;
+  else
+    shadowColor = aFrame->StyleColor()->mColor;
+
+  Color color = Color::FromABGR(shadowColor);
+  color.a *= aOpacity;
+  return color;
+}
+
+nsRect
+nsCSSRendering::GetShadowRect(const nsRect aFrameArea,
+                              bool aNativeTheme,
+                              nsIFrame* aForFrame)
+{
+  nsRect frameRect = aNativeTheme ?
+    aForFrame->GetVisualOverflowRectRelativeToSelf() + aFrameArea.TopLeft() :
+    aFrameArea;
+  Sides skipSides = aForFrame->GetSkipSides();
+  frameRect = ::BoxDecorationRectForBorder(aForFrame, frameRect, skipSides);
+
+  // Explicitly do not need to account for the spread radius here
+  // Webrender does it for us or PaintBoxShadow will for non-WR
+  return frameRect;
+}
+
+bool
+nsCSSRendering::GetBorderRadii(const nsRect& aFrameRect,
+                               const nsRect& aBorderRect,
+                               nsIFrame* aFrame,
+                               RectCornerRadii& aOutRadii)
+{
+  const nscoord twipsPerPixel = aFrame->PresContext()->DevPixelsToAppUnits(1);
+  nscoord twipsRadii[8];
+  NS_ASSERTION(aBorderRect.Size() == aFrame->VisualBorderRectRelativeToSelf().Size(),
+              "unexpected size");
+  nsSize sz = aFrameRect.Size();
+  bool hasBorderRadius = aFrame->GetBorderRadii(sz, sz, Sides(), twipsRadii);
+  if (hasBorderRadius) {
+    ComputePixelRadii(twipsRadii, twipsPerPixel, &aOutRadii);
+  }
+
+  return hasBorderRadius;
+}
+
 void
 nsCSSRendering::PaintBoxShadowOuter(nsPresContext* aPresContext,
                                     nsRenderingContext& aRenderingContext,
@@ -1381,25 +1473,11 @@ nsCSSRendering::PaintBoxShadowOuter(nsPresContext* aPresContext,
     return;
 
   bool hasBorderRadius;
-  bool nativeTheme; // mutually exclusive with hasBorderRadius
+  // mutually exclusive with hasBorderRadius
+  bool nativeTheme = HasBoxShadowNativeTheme(aForFrame, hasBorderRadius);
   const nsStyleDisplay* styleDisplay = aForFrame->StyleDisplay();
-  nsITheme::Transparency transparency;
-  if (aForFrame->IsThemed(styleDisplay, &transparency)) {
-    // We don't respect border-radius for native-themed widgets
-    hasBorderRadius = false;
-    // For opaque (rectangular) theme widgets we can take the generic
-    // border-box path with border-radius disabled.
-    nativeTheme = transparency != nsITheme::eOpaque;
-  } else {
-    nativeTheme = false;
-    hasBorderRadius = true; // we'll update this below
-  }
 
-  nsRect frameRect = nativeTheme ?
-    aForFrame->GetVisualOverflowRectRelativeToSelf() + aFrameArea.TopLeft() :
-    aFrameArea;
-  Sides skipSides = aForFrame->GetSkipSides();
-  frameRect = ::BoxDecorationRectForBorder(aForFrame, frameRect, skipSides);
+  nsRect frameRect = GetShadowRect(aFrameArea, nativeTheme, aForFrame);
 
   // Get any border radius, since box-shadow must also have rounded corners if
   // the frame does.
@@ -1463,15 +1541,7 @@ nsCSSRendering::PaintBoxShadowOuter(nsPresContext* aPresContext,
     shadowGfxRectPlusBlur.RoundOut();
     MaybeSnapToDevicePixels(shadowGfxRectPlusBlur, aDrawTarget, true);
 
-    // Set the shadow color; if not specified, use the foreground color
-    nscolor shadowColor;
-    if (shadowItem->mHasColor)
-      shadowColor = shadowItem->mColor;
-    else
-      shadowColor = aForFrame->StyleColor()->mColor;
-
-    Color gfxShadowColor(Color::FromABGR(shadowColor));
-    gfxShadowColor.a *= aOpacity;
+    Color gfxShadowColor = GetShadowColor(shadowItem, aForFrame, aOpacity);
 
     if (nativeTheme) {
       nsContextBoxBlur blurringArea;
@@ -1545,6 +1615,7 @@ nsCSSRendering::PaintBoxShadowOuter(nsPresContext* aPresContext,
 
       // Clip the shadow so that we only get the part that applies to aForFrame.
       nsRect fragmentClip = shadowRectPlusBlur;
+      Sides skipSides = aForFrame->GetSkipSides();
       if (!skipSides.IsEmpty()) {
         if (skipSides.Left()) {
           nscoord xmost = fragmentClip.XMost();
@@ -1606,55 +1677,96 @@ nsCSSRendering::PaintBoxShadowOuter(nsPresContext* aPresContext,
   }
 }
 
-void
-nsCSSRendering::PaintBoxShadowInner(nsPresContext* aPresContext,
-                                    nsRenderingContext& aRenderingContext,
-                                    nsIFrame* aForFrame,
-                                    const nsRect& aFrameArea)
+nsRect
+nsCSSRendering::GetBoxShadowInnerPaddingRect(nsIFrame* aFrame,
+                                             const nsRect& aFrameArea)
 {
-  nsCSSShadowArray* shadows = aForFrame->StyleEffects()->mBoxShadow;
+  Sides skipSides = aFrame->GetSkipSides();
+  nsRect frameRect =
+    ::BoxDecorationRectForBorder(aFrame, aFrameArea, skipSides);
+
+  nsRect paddingRect = frameRect;
+  nsMargin border = aFrame->GetUsedBorder();
+  paddingRect.Deflate(border);
+  return paddingRect;
+}
+
+bool
+nsCSSRendering::CanPaintBoxShadowInner(nsIFrame* aFrame)
+{
+  nsCSSShadowArray* shadows = aFrame->StyleEffects()->mBoxShadow;
   if (!shadows)
-    return;
-  if (aForFrame->IsThemed() && aForFrame->GetContent() &&
-      !nsContentUtils::IsChromeDoc(aForFrame->GetContent()->GetUncomposedDoc())) {
+    return false;
+
+  if (aFrame->IsThemed() && aFrame->GetContent() &&
+      !nsContentUtils::IsChromeDoc(aFrame->GetContent()->GetUncomposedDoc())) {
     // There's no way of getting hold of a shape corresponding to a
     // "padding-box" for native-themed widgets, so just don't draw
     // inner box-shadows for them. But we allow chrome to paint inner
     // box shadows since chrome can be aware of the platform theme.
-    return;
+    return false;
   }
 
-  NS_ASSERTION(aForFrame->GetType() == nsGkAtoms::fieldSetFrame ||
-               aFrameArea.Size() == aForFrame->GetSize(), "unexpected size");
+  return true;
+}
 
-  Sides skipSides = aForFrame->GetSkipSides();
-  nsRect frameRect =
-    ::BoxDecorationRectForBorder(aForFrame, aFrameArea, skipSides);
-  nsRect paddingRect = frameRect;
-  nsMargin border = aForFrame->GetUsedBorder();
-  paddingRect.Deflate(border);
-
+bool
+nsCSSRendering::GetShadowInnerRadii(nsIFrame* aFrame,
+                                    const nsRect& aFrameArea,
+                                    RectCornerRadii& aOutInnerRadii)
+{
   // Get any border radius, since box-shadow must also have rounded corners
   // if the frame does.
   nscoord twipsRadii[8];
+  nsRect frameRect =
+    ::BoxDecorationRectForBorder(aFrame, aFrameArea, aFrame->GetSkipSides());
   nsSize sz = frameRect.Size();
-  bool hasBorderRadius = aForFrame->GetBorderRadii(sz, sz, Sides(), twipsRadii);
-  const nscoord twipsPerPixel = aPresContext->DevPixelsToAppUnits(1);
+  nsMargin border = aFrame->GetUsedBorder();
+  bool hasBorderRadius = aFrame->GetBorderRadii(sz, sz, Sides(), twipsRadii);
+  const nscoord twipsPerPixel = aFrame->PresContext()->DevPixelsToAppUnits(1);
 
-  RectCornerRadii innerRadii;
+  RectCornerRadii borderRadii;
+
+  hasBorderRadius = GetBorderRadii(frameRect, aFrameArea, aFrame, borderRadii);
   if (hasBorderRadius) {
-    RectCornerRadii borderRadii;
-
     ComputePixelRadii(twipsRadii, twipsPerPixel, &borderRadii);
+
     Float borderSizes[4] = {
       Float(border.top / twipsPerPixel),
       Float(border.right / twipsPerPixel),
       Float(border.bottom / twipsPerPixel),
       Float(border.left / twipsPerPixel)
     };
-    nsCSSBorderRenderer::ComputeInnerRadii(borderRadii, borderSizes,
-                                           &innerRadii);
+    nsCSSBorderRenderer::ComputeInnerRadii(borderRadii,
+                                           borderSizes,
+                                           &aOutInnerRadii);
   }
+
+  return hasBorderRadius;
+}
+
+void
+nsCSSRendering::PaintBoxShadowInner(nsPresContext* aPresContext,
+                                    nsRenderingContext& aRenderingContext,
+                                    nsIFrame* aForFrame,
+                                    const nsRect& aFrameArea)
+{
+  if (!CanPaintBoxShadowInner(aForFrame)) {
+    return;
+  }
+
+  nsCSSShadowArray* shadows = aForFrame->StyleEffects()->mBoxShadow;
+  NS_ASSERTION(aForFrame->GetType() == nsGkAtoms::fieldSetFrame ||
+               aFrameArea.Size() == aForFrame->GetSize(), "unexpected size");
+
+  nsRect paddingRect = GetBoxShadowInnerPaddingRect(aForFrame, aFrameArea);
+
+  RectCornerRadii innerRadii;
+  bool hasBorderRadius = GetShadowInnerRadii(aForFrame,
+                                             aFrameArea,
+                                             innerRadii);
+
+  const nscoord twipsPerPixel = aPresContext->DevPixelsToAppUnits(1);
 
   for (uint32_t i = shadows->Length(); i > 0; --i) {
     nsCSSShadowItem* shadowItem = shadows->ShadowAt(i - 1);
@@ -1669,9 +1781,6 @@ nsCSSRendering::PaintBoxShadowInner(nsPresContext* aPresContext,
       nsContextBoxBlur::GetBlurRadiusMargin(blurRadius, twipsPerPixel);
     nsRect shadowPaintRect = paddingRect;
     shadowPaintRect.Inflate(blurMargin);
-
-    Rect shadowPaintGfxRect = NSRectToRect(shadowPaintRect, twipsPerPixel);
-    shadowPaintGfxRect.RoundOut();
 
     // Round the spread radius to device pixels (by truncation).
     // This mostly matches what we do for borders, except that we don't round
@@ -1738,11 +1847,7 @@ nsCSSRendering::PaintBoxShadowInner(nsPresContext* aPresContext,
     Rect shadowGfxRect = NSRectToRect(paddingRect, twipsPerPixel);
     shadowGfxRect.Round();
 
-    // Set the shadow color; if not specified, use the foreground color
-    Color shadowColor = Color::FromABGR(shadowItem->mHasColor ?
-                                          shadowItem->mColor :
-                                          aForFrame->StyleColor()->mColor);
-
+    Color shadowColor = GetShadowColor(shadowItem, aForFrame, 1.0);
     renderContext->Save();
 
     // This clips the outside border radius.
@@ -1777,12 +1882,14 @@ nsCSSRendering::PaintBGParams::ForAllLayers(nsPresContext& aPresCtx,
                                             const nsRect& aDirtyRect,
                                             const nsRect& aBorderArea,
                                             nsIFrame *aFrame,
-                                            uint32_t aPaintFlags)
+                                            uint32_t aPaintFlags,
+                                            float aOpacity)
 {
   MOZ_ASSERT(aFrame);
 
-  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea, aFrame,
-    aPaintFlags, -1, CompositionOp::OP_OVER);
+  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea,
+                       aFrame, aPaintFlags, -1, CompositionOp::OP_OVER,
+                       aOpacity);
 
   return result;
 }
@@ -1796,18 +1903,20 @@ nsCSSRendering::PaintBGParams::ForSingleLayer(nsPresContext& aPresCtx,
                                               nsIFrame *aFrame,
                                               uint32_t aPaintFlags,
                                               int32_t aLayer,
-                                              CompositionOp aCompositionOp)
+                                              CompositionOp aCompositionOp,
+                                              float aOpacity)
 {
   MOZ_ASSERT(aFrame && (aLayer != -1));
 
-  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea, aFrame,
-    aPaintFlags, aLayer, aCompositionOp);
+  PaintBGParams result(aPresCtx, aRenderingCtx, aDirtyRect, aBorderArea,
+                       aFrame, aPaintFlags, aLayer, aCompositionOp,
+                       aOpacity);
 
   return result;
 }
 
 DrawResult
-nsCSSRendering::PaintBackground(const PaintBGParams& aParams)
+nsCSSRendering::PaintStyleImageLayer(const PaintBGParams& aParams)
 {
   PROFILER_LABEL("nsCSSRendering", "PaintBackground",
     js::ProfileEntry::Category::GRAPHICS);
@@ -1834,7 +1943,7 @@ nsCSSRendering::PaintBackground(const PaintBGParams& aParams)
     sc = aParams.frame->StyleContext();
   }
 
-  return PaintBackgroundWithSC(aParams, sc, *aParams.frame->StyleBorder());
+  return PaintStyleImageLayerWithSC(aParams, sc, *aParams.frame->StyleBorder());
 }
 
 static bool
@@ -2239,8 +2348,8 @@ nsCSSRendering::DetermineBackgroundColor(nsPresContext* aPresContext,
   const nsStyleBackground *bg = aStyleContext->StyleBackground();
   nscolor bgColor;
   if (aDrawBackgroundColor) {
-    bgColor =
-      aStyleContext->GetVisitedDependentColor(eCSSProperty_background_color);
+    bgColor = aStyleContext->
+      GetVisitedDependentColor(&nsStyleBackground::mBackgroundColor);
     if (NS_GET_A(bgColor) == 0) {
       aDrawBackgroundColor = false;
     }
@@ -3242,9 +3351,9 @@ DetermineCompositionOp(const nsCSSRendering::PaintBGParams& aParams,
 }
 
 DrawResult
-nsCSSRendering::PaintBackgroundWithSC(const PaintBGParams& aParams,
-                                      nsStyleContext *aBackgroundSC,
-                                      const nsStyleBorder& aBorder)
+nsCSSRendering::PaintStyleImageLayerWithSC(const PaintBGParams& aParams,
+                                           nsStyleContext *aBackgroundSC,
+                                           const nsStyleBorder& aBorder)
 {
   NS_PRECONDITION(aParams.frame,
                   "Frame is expected to be provided to PaintBackground");
@@ -3447,12 +3556,12 @@ nsCSSRendering::PaintBackgroundWithSC(const PaintBGParams& aParams,
           }
 
           result &=
-            state.mImageRenderer.DrawBackground(&aParams.presCtx,
-                                                aParams.renderingCtx,
-                                                state.mDestArea, state.mFillArea,
-                                                state.mAnchor + paintBorderArea.TopLeft(),
-                                                clipState.mDirtyRect,
-                                                state.mRepeatSize);
+            state.mImageRenderer.DrawLayer(&aParams.presCtx,
+                                           aParams.renderingCtx,
+                                           state.mDestArea, state.mFillArea,
+                                           state.mAnchor + paintBorderArea.TopLeft(),
+                                           clipState.mDirtyRect,
+                                           state.mRepeatSize, aParams.opacity);
 
           if (co != CompositionOp::OP_OVER) {
             ctx->SetOp(CompositionOp::OP_OVER);
@@ -3842,26 +3951,14 @@ nsCSSRendering::PrepareImageLayer(nsPresContext* aPresContext,
     *aOutIsTransformedFixed = transformedFixed;
   }
 
-  // For background-attachment:fixed backgrounds, we'll limit the area
+  // For background-attachment:fixed backgrounds, we'll override the area
   // where the background can be drawn to the viewport.
   nsRect bgClipRect = aBGClipRect;
 
-  // Compute the anchor point.
-  //
-  // relative to aBorderArea.TopLeft() (which is where the top-left
-  // of aForFrame's border-box will be rendered)
-  nsPoint imageTopLeft;
-  if (NS_STYLE_IMAGELAYER_ATTACHMENT_FIXED == aLayer.mAttachment && !transformedFixed) {
-    if (aFlags & nsCSSRendering::PAINTBG_TO_WINDOW) {
-      // Clip background-attachment:fixed backgrounds to the viewport, if we're
-      // painting to the screen and not transformed. This avoids triggering
-      // tiling in common cases, without affecting output since drawing is
-      // always clipped to the viewport when we draw to the screen. (But it's
-      // not a pure optimization since it can affect the values of pixels at the
-      // edge of the viewport --- whether they're sampled from a putative "next
-      // tile" or not.)
-      bgClipRect.IntersectRect(bgClipRect, positionArea + aBorderArea.TopLeft());
-    }
+  if (NS_STYLE_IMAGELAYER_ATTACHMENT_FIXED == aLayer.mAttachment &&
+      !transformedFixed &&
+      (aFlags & nsCSSRendering::PAINTBG_TO_WINDOW)) {
+    bgClipRect = positionArea + aBorderArea.TopLeft();
   }
 
   int repeatX = aLayer.mRepeat.mXRepeat;
@@ -3883,6 +3980,12 @@ nsCSSRendering::PrepareImageLayer(nsPresContext* aPresContext,
 
   state.mImageRenderer.SetPreferredSize(intrinsicSize,
                                         imageSize);
+
+  // Compute the anchor point.
+  //
+  // relative to aBorderArea.TopLeft() (which is where the top-left
+  // of aForFrame's border-box will be rendered)
+  nsPoint imageTopLeft;
 
   // Compute the position of the background now that the background's size is
   // determined.
@@ -4056,9 +4159,9 @@ DrawBorderImage(nsPresContext*       aPresContext,
   nsMargin border;
   NS_FOR_CSS_SIDES(s) {
     nsStyleCoord coord = aStyleBorder.mBorderImageSlice.Get(s);
-    int32_t imgDimension = NS_SIDE_IS_VERTICAL(s)
+    int32_t imgDimension = SideIsVertical(s)
                            ? imageSize.width : imageSize.height;
-    nscoord borderDimension = NS_SIDE_IS_VERTICAL(s)
+    nscoord borderDimension = SideIsVertical(s)
                            ? borderImgArea.width : borderImgArea.height;
     double value;
     switch (coord.GetUnit()) {
@@ -5644,7 +5747,8 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
                       const nsRect&        aFill,
                       const nsPoint&       aAnchor,
                       const nsSize&        aRepeatSize,
-                      const CSSIntRect&    aSrc)
+                      const CSSIntRect&    aSrc,
+                      float                aOpacity)
 {
   if (!IsReady()) {
     NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
@@ -5695,7 +5799,7 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
                                            aDest, aFill, aRepeatSize,
                                            aAnchor, aDirtyRect,
                                            ConvertImageRendererToDrawFlags(mFlags),
-                                           mExtendMode);
+                                           mExtendMode, aOpacity);
       break;
     }
     case eStyleImageType_Gradient:
@@ -5719,7 +5823,8 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
         nsLayoutUtils::DrawImage(*ctx,
                                  aPresContext, image,
                                  samplingFilter, aDest, aFill, aAnchor, aDirtyRect,
-                                 ConvertImageRendererToDrawFlags(mFlags));
+                                 ConvertImageRendererToDrawFlags(mFlags),
+                                 aOpacity);
       break;
     }
     case eStyleImageType_Null:
@@ -5785,13 +5890,14 @@ nsImageRenderer::DrawableForElement(const nsRect& aImageRect,
 }
 
 DrawResult
-nsImageRenderer::DrawBackground(nsPresContext*       aPresContext,
-                                nsRenderingContext&  aRenderingContext,
-                                const nsRect&        aDest,
-                                const nsRect&        aFill,
-                                const nsPoint&       aAnchor,
-                                const nsRect&        aDirty,
-                                const nsSize&        aRepeatSize)
+nsImageRenderer::DrawLayer(nsPresContext*       aPresContext,
+                           nsRenderingContext&  aRenderingContext,
+                           const nsRect&        aDest,
+                           const nsRect&        aFill,
+                           const nsPoint&       aAnchor,
+                           const nsRect&        aDirty,
+                           const nsSize&        aRepeatSize,
+                           float                aOpacity)
 {
   if (!IsReady()) {
     NS_NOTREACHED("Ensure PrepareImage() has returned true before calling me");
@@ -5806,7 +5912,8 @@ nsImageRenderer::DrawBackground(nsPresContext*       aPresContext,
               aDirty, aDest, aFill, aAnchor, aRepeatSize,
               CSSIntRect(0, 0,
                          nsPresContext::AppUnitsToIntCSSPixels(mSize.width),
-                         nsPresContext::AppUnitsToIntCSSPixels(mSize.height)));
+                         nsPresContext::AppUnitsToIntCSSPixels(mSize.height)),
+              aOpacity);
 }
 
 /**
@@ -5985,7 +6092,7 @@ nsImageRenderer::DrawBorderImageComponent(nsPresContext*       aPresContext,
                                             subImage,
                                             samplingFilter,
                                             aFill, aDirtyRect,
-                                            nullptr,
+                                            /* no SVGImageContext */ Nothing(),
                                             drawFlags);
     }
 
@@ -5999,7 +6106,7 @@ nsImageRenderer::DrawBorderImageComponent(nsPresContext*       aPresContext,
                                               tile, fillRect, repeatSize,
                                               tile.TopLeft(), aDirtyRect,
                                               drawFlags,
-                                              ExtendMode::CLAMP);
+                                              ExtendMode::CLAMP, 1.0);
   }
 
   nsSize repeatSize(aFill.Size());

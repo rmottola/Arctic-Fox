@@ -9,6 +9,7 @@
 
 #include "nsXPLookAndFeel.h"
 #include "nsLookAndFeel.h"
+#include "HeadlessLookAndFeel.h"
 #include "nsCRT.h"
 #include "nsFont.h"
 #include "mozilla/dom/ContentChild.h"
@@ -251,11 +252,11 @@ bool nsXPLookAndFeel::sUseNativeColors = true;
 bool nsXPLookAndFeel::sUseStandinsForNativeColors = false;
 bool nsXPLookAndFeel::sFindbarModalHighlight = false;
 
-nsLookAndFeel* nsXPLookAndFeel::sInstance = nullptr;
+nsXPLookAndFeel* nsXPLookAndFeel::sInstance = nullptr;
 bool nsXPLookAndFeel::sShutdown = false;
 
 // static
-nsLookAndFeel*
+nsXPLookAndFeel*
 nsXPLookAndFeel::GetInstance()
 {
   if (sInstance) {
@@ -264,7 +265,11 @@ nsXPLookAndFeel::GetInstance()
 
   NS_ENSURE_TRUE(!sShutdown, nullptr);
 
-  sInstance = new nsLookAndFeel();
+  if (gfxPlatform::IsHeadless()) {
+    sInstance = new widget::HeadlessLookAndFeel();
+  } else {
+    sInstance = new nsLookAndFeel();
+  }
   return sInstance;
 }
 
@@ -446,7 +451,9 @@ nsXPLookAndFeel::Init()
   // XXX If we could reorganize the pref names, we should separate the branch
   //     for each types.  Then, we could reduce the unnecessary loop from
   //     nsXPLookAndFeel::OnPrefChanged().
-  Preferences::RegisterCallback(OnPrefChanged, "ui.");
+  Preferences::RegisterPrefixCallback(OnPrefChanged, "ui.");
+  // We really do just want the accessibility.tabfocus pref, not other prefs
+  // that start with that string.
   Preferences::RegisterCallback(OnPrefChanged, "accessibility.tabfocus");
 
   unsigned int i;

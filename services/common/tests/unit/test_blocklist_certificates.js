@@ -3,7 +3,8 @@ const { Constructor: CC } = Components;
 Cu.import("resource://testing-common/httpd.js");
 
 const { OneCRLBlocklistClient } = Cu.import("resource://services-common/blocklist-clients.js");
-const { loadKinto } = Cu.import("resource://services-common/kinto-offline-client.js");
+const { Kinto } = Cu.import("resource://services-common/kinto-offline-client.js");
+const { FirefoxAdapter } = Cu.import("resource://services-common/kinto-storage-adapter.js");
 
 const BinaryInputStream = CC("@mozilla.org/binaryinputstream;1",
   "nsIBinaryInputStream", "setInputStream");
@@ -11,8 +12,6 @@ const BinaryInputStream = CC("@mozilla.org/binaryinputstream;1",
 let server;
 
 // set up what we need to make storage adapters
-const Kinto = loadKinto();
-const FirefoxAdapter = Kinto.adapters.FirefoxAdapter;
 const kintoFilename = "kinto.sqlite";
 
 let kintoClient;
@@ -55,7 +54,7 @@ add_task(function* test_something(){
                              sample.status.statusText);
       // send the headers
       for (let headerLine of sample.sampleHeaders) {
-        let headerElements = headerLine.split(':');
+        let headerElements = headerLine.split(":");
         response.setHeader(headerElements[0], headerElements[1].trimLeft());
       }
       response.setHeader("Date", (new Date()).toUTCString());

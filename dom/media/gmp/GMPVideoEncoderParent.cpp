@@ -16,6 +16,8 @@
 #include "nsThreadUtils.h"
 #include "runnable_utils.h"
 #include "GMPUtils.h"
+#include "mozilla/SystemGroup.h"
+#include "GMPCrashHelper.h"
 
 namespace mozilla {
 

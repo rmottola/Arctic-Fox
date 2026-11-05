@@ -4,6 +4,30 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files('**'):
+    BUG_COMPONENT = ('Core', 'Canvas: 2D')
+
+with Files('TexUnpackBlob.cpp'):
+    BUG_COMPONENT = ('Core', 'Canvas: WebGL')
+
+with Files('WebGL*'):
+    BUG_COMPONENT = ('Core', 'Canvas: WebGL')
+
+with Files('test/webgl-conf/**'):
+    BUG_COMPONENT = ('Core', 'Canvas: WebGL')
+
+with Files('test/webgl-mochitest/**'):
+    BUG_COMPONENT = ('Core', 'Canvas: WebGL')
+
+with Files('test/reftest/webgl*'):
+    BUG_COMPONENT = ('Core', 'Canvas: WebGL')
+
+with Files('test/chrome/*webgl*'):
+    BUG_COMPONENT = ('Core', 'Canvas: WebGL')
+
+with Files('test/crossorigin/*webgl*'):
+    BUG_COMPONENT = ('Core', 'Canvas: WebGL')
+
 TEST_DIRS += [
     'gtest'
 ]
@@ -164,7 +188,7 @@ SOURCES += [
 ]
 
 # Suppress warnings from third-party code.
-if CONFIG['CLANG_CXX']:
+if CONFIG['CLANG_CXX'] or CONFIG['GNU_CXX']:
     SOURCES['MurmurHash3.cpp'].flags += ['-Wno-implicit-fallthrough']
 
 LOCAL_INCLUDES += [
@@ -187,7 +211,7 @@ LOCAL_INCLUDES += [
     '/layout/generic',
     '/layout/style',
     '/layout/xul',
-    '/media/libyuv/include',
+    '/media/libyuv/libyuv/include',
 ]
 
 CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']

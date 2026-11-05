@@ -50,7 +50,7 @@ LoadContext::LoadContext(nsIPrincipal* aPrincipal,
   , mIsNotNull(true)
 #endif
 {
-  mOriginAttributes.Inherit(aPrincipal->OriginAttributesRef());
+  mOriginAttributes = aPrincipal->OriginAttributesRef();
   if (!aOptionalBase) {
     return;
   }

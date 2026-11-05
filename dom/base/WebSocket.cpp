@@ -1431,25 +1431,24 @@ WebSocket::ConstructorCommon(const GlobalObject& aGlobal,
 NS_IMPL_CYCLE_COLLECTION_CLASS(WebSocket)
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(WebSocket)
-  bool isBlack = tmp->IsBlack();
-  if (isBlack || tmp->mKeepingAlive) {
+  bool hasLiveWrapper = tmp->HasKnownLiveWrapper();
+  if (hasLiveWrapper || tmp->mKeepingAlive) {
     if (tmp->mListenerManager) {
       tmp->mListenerManager->MarkForCC();
     }
-    if (!isBlack && tmp->PreservingWrapper()) {
-      // This marks the wrapper black.
-      tmp->GetWrapper();
+    if (!hasLiveWrapper && tmp->PreservingWrapper()) {
+      tmp->MarkWrapperLive();
     }
     return true;
   }
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(WebSocket)
-  return tmp->IsBlack();
+  return tmp->HasKnownLiveWrapper();
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(WebSocket)
-  return tmp->IsBlack();
+  return tmp->HasKnownLiveWrapper();
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(WebSocket,
@@ -2252,6 +2251,7 @@ public:
   }
 
 private:
+  // RawPointer because this proxy keeps alive the holder.
   WebSocketImpl* mWebSocketImpl;
 };
 

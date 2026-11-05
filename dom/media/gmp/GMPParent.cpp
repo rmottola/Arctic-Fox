@@ -11,6 +11,7 @@
 #include "nsIRunnable.h"
 #include "nsIWritablePropertyBag2.h"
 #include "mozIGeckoMediaPluginService.h"
+#include "mozilla/AbstractThread.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/SSE.h"
 #include "mozilla/SyncRunnable.h"
@@ -25,12 +26,11 @@
 #include "MediaPrefs.h"
 #include "VideoUtils.h"
 
-#include "mozilla/dom/CrashReporterParent.h"
-using mozilla::dom::CrashReporterParent;
 using mozilla::ipc::GeckoChildProcessHost;
 
 #ifdef MOZ_CRASHREPORTER
 #include "nsPrintfCString.h"
+#include "mozilla/ipc/CrashReporterHost.h"
 using CrashReporter::AnnotationTable;
 using CrashReporter::GetIDFromMinidump;
 #endif
@@ -176,13 +176,6 @@ GMPParent::LoadProcess()
     }
     LOGD("%s: Opened channel to new child process", __FUNCTION__);
 
-    bool ok = SendSetNodeId(mNodeId);
-    if (!ok) {
-      LOGD("%s: Failed to send node id to child process", __FUNCTION__);
-      return NS_ERROR_FAILURE;
-    }
-    LOGD("%s: Sent node id to child process", __FUNCTION__);
-
 #ifdef XP_WIN
     if (!mLibs.IsEmpty()) {
       bool ok = SendPreloadLibs(mLibs);
@@ -195,8 +188,7 @@ GMPParent::LoadProcess()
 #endif
 
     // Intr call to block initialization on plugin load.
-    ok = CallStartPlugin(mAdapter);
-    if (!ok) {
+    if (!CallStartPlugin(mAdapter)) {
       LOGD("%s: Failed to send start to child process", __FUNCTION__);
       return NS_ERROR_FAILURE;
     }
@@ -464,37 +456,28 @@ GMPParent::EnsureProcessLoaded()
 
 #ifdef MOZ_CRASHREPORTER
 void
-GMPParent::WriteExtraDataForMinidump(CrashReporter::AnnotationTable& notes)
+GMPParent::WriteExtraDataForMinidump()
 {
-  notes.Put(NS_LITERAL_CSTRING("GMPPlugin"), NS_LITERAL_CSTRING("1"));
-  notes.Put(NS_LITERAL_CSTRING("PluginFilename"),
-                               NS_ConvertUTF16toUTF8(mName));
-  notes.Put(NS_LITERAL_CSTRING("PluginName"), mDisplayName);
-  notes.Put(NS_LITERAL_CSTRING("PluginVersion"), mVersion);
+  mCrashReporter->AddNote(NS_LITERAL_CSTRING("GMPPlugin"), NS_LITERAL_CSTRING("1"));
+  mCrashReporter->AddNote(NS_LITERAL_CSTRING("PluginFilename"), NS_ConvertUTF16toUTF8(mName));
+  mCrashReporter->AddNote(NS_LITERAL_CSTRING("PluginName"), mDisplayName);
+  mCrashReporter->AddNote(NS_LITERAL_CSTRING("PluginVersion"), mVersion);
 }
 
-void
+bool
 GMPParent::GetCrashID(nsString& aResult)
 {
-  CrashReporterParent* cr =
-    static_cast<CrashReporterParent*>(LoneManagedOrNullAsserts(ManagedPCrashReporterParent()));
-  if (NS_WARN_IF(!cr)) {
-    return;
+  if (!mCrashReporter) {
+    return false;
   }
 
-  AnnotationTable notes(4);
-  WriteExtraDataForMinidump(notes);
-  nsCOMPtr<nsIFile> dumpFile;
-  TakeMinidump(getter_AddRefs(dumpFile), nullptr);
-  if (!dumpFile) {
-    NS_WARNING("GMP crash without crash report");
-    aResult = mName;
-    aResult += '-';
-    AppendUTF8toUTF16(mVersion, aResult);
-    return;
+  WriteExtraDataForMinidump();
+  if (!mCrashReporter->GenerateCrashReport(OtherPid())) {
+    return false;
   }
-  GetIDFromMinidump(dumpFile, aResult);
-  cr->GenerateCrashReportForMinidump(dumpFile, &notes);
+
+  aResult = mCrashReporter->MinidumpID();
+  return true;
 }
 
 static void
@@ -526,7 +509,12 @@ GMPParent::ActorDestroy(ActorDestroyReason aWhy)
     Telemetry::Accumulate(Telemetry::SUBPROCESS_ABNORMAL_ABORT,
                           NS_LITERAL_CSTRING("gmplugin"), 1);
     nsString dumpID;
-    GetCrashID(dumpID);
+    if (!GetCrashID(dumpID)) {
+      NS_WARNING("GMP crash without crash report");
+      dumpID = mName;
+      dumpID += '-';
+      AppendUTF8toUTF16(mVersion, dumpID);
+    }
 
     // NotifyObservers is mainthread-only
     NS_DispatchToMainThread(WrapRunnableNM(&GMPNotifyObservers,
@@ -551,22 +539,16 @@ GMPParent::ActorDestroy(ActorDestroyReason aWhy)
   }
 }
 
-mozilla::dom::PCrashReporterParent*
-GMPParent::AllocPCrashReporterParent(const NativeThreadId& aThread)
+mozilla::ipc::IPCResult
+GMPParent::RecvInitCrashReporter(Shmem&& aShmem, const NativeThreadId& aThreadId)
 {
-#ifndef MOZ_CRASHREPORTER
-  MOZ_ASSERT(false, "Should only be sent if crash reporting is enabled.");
+#ifdef MOZ_CRASHREPORTER
+  mCrashReporter = MakeUnique<ipc::CrashReporterHost>(
+    GeckoProcessType_GMPlugin,
+    aShmem,
+    aThreadId);
 #endif
-  CrashReporterParent* cr = new CrashReporterParent();
-  cr->SetChildData(aThread, GeckoProcessType_GMPlugin);
-  return cr;
-}
-
-bool
-GMPParent::DeallocPCrashReporterParent(PCrashReporterParent* aCrashReporter)
-{
-  delete aCrashReporter;
-  return true;
+  return IPC_OK();
 }
 
 PGMPStorageParent*
@@ -743,6 +725,7 @@ GMPParent::ReadChromiumManifestFile(nsIFile* aFile)
 
   // DOM JSON parsing needs to run on the main thread.
   return InvokeAsync<nsString&&>(
+    // Non DocGroup-version of AbstractThread::MainThread for the task in parent.
     AbstractThread::MainThread(), this, __func__,
     &GMPParent::ParseChromiumManifest, NS_ConvertUTF8toUTF16(json));
 }
@@ -769,22 +752,59 @@ GMPParent::ParseChromiumManifest(const nsAString& aJSON)
   mDescription = NS_ConvertUTF16toUTF8(m.mDescription);
   mVersion = NS_ConvertUTF16toUTF8(m.mVersion);
 
-  GMPCapability video(NS_LITERAL_CSTRING(GMP_API_VIDEO_DECODER));
-  video.mAPITags.AppendElement(NS_LITERAL_CSTRING("h264"));
-  video.mAPITags.AppendElement(NS_LITERAL_CSTRING("vp8"));
-  video.mAPITags.AppendElement(NS_LITERAL_CSTRING("vp9"));
-  video.mAPITags.AppendElement(kEMEKeySystemWidevine);
-  mCapabilities.AppendElement(Move(video));
+  nsCString kEMEKeySystem;
 
-  GMPCapability decrypt(NS_LITERAL_CSTRING(GMP_API_DECRYPTOR));
-  decrypt.mAPITags.AppendElement(kEMEKeySystemWidevine);
-  mCapabilities.AppendElement(Move(decrypt));
-
-  MOZ_ASSERT(mName.EqualsLiteral("widevinecdm"));
-  mAdapter = NS_LITERAL_STRING("widevine");
-#ifdef XP_WIN
-  mLibs = NS_LITERAL_CSTRING("dxva2.dll");
+  // We hard code a few of the settings because they can't be stored in the
+  // widevine manifest without making our API different to widevine's.
+  if (mDisplayName.EqualsASCII("clearkey")) {
+    kEMEKeySystem = kEMEKeySystemClearkey;
+#if XP_WIN
+    mLibs = NS_LITERAL_CSTRING("dxva2.dll, msmpeg2vdec.dll, evr.dll, mfh264dec.dll, mfplat.dll");
 #endif
+  } else if (mDisplayName.EqualsASCII("WidevineCdm")) {
+    kEMEKeySystem = kEMEKeySystemWidevine;
+#if XP_WIN
+    mLibs = NS_LITERAL_CSTRING("dxva2.dll");
+#endif
+  } else {
+    return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+  }
+
+  GMPCapability video;
+
+  nsCString codecsString = NS_ConvertUTF16toUTF8(m.mX_cdm_codecs);
+  nsTArray<nsCString> codecs;
+  SplitAt(",", codecsString, codecs);
+
+  for (const nsCString& chromiumCodec : codecs) {
+    nsCString codec;
+    if (chromiumCodec.EqualsASCII("vp8")) {
+      codec = NS_LITERAL_CSTRING("vp8");
+    } else if (chromiumCodec.EqualsASCII("vp9.0")) {
+      codec = NS_LITERAL_CSTRING("vp9");
+    } else if (chromiumCodec.EqualsASCII("avc1")) {
+      codec = NS_LITERAL_CSTRING("h264");
+    } else {
+      return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+    }
+
+    video.mAPITags.AppendElement(codec);
+  }
+
+  video.mAPITags.AppendElement(kEMEKeySystem);
+
+  if (MediaPrefs::EMEChromiumAPIEnabled()) {
+    video.mAPIName = NS_LITERAL_CSTRING(CHROMIUM_CDM_API);
+    mAdapter = NS_LITERAL_STRING("chromium");
+  } else {
+    video.mAPIName = NS_LITERAL_CSTRING(GMP_API_VIDEO_DECODER);
+    mAdapter = NS_LITERAL_STRING("widevine");
+
+    GMPCapability decrypt(NS_LITERAL_CSTRING(GMP_API_DECRYPTOR));
+    decrypt.mAPITags.AppendElement(kEMEKeySystem);
+    mCapabilities.AppendElement(Move(decrypt));
+  }
+  mCapabilities.AppendElement(Move(video));
 
   return GenericPromise::CreateAndResolve(true, __func__);
 }

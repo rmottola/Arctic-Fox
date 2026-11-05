@@ -1,8 +1,10 @@
-load(libdir + "wasm.js");
-
-// Single-step profiling currently only works in the ARM simulator
-if (!getBuildConfiguration()["arm-simulator"])
+try {
+    enableSingleStepProfiling();
+    disableSingleStepProfiling();
+} catch(e) {
+    // Single step profiling not supported here.
     quit();
+}
 
 const Module = WebAssembly.Module;
 const Instance = WebAssembly.Instance;
@@ -11,10 +13,11 @@ const Table = WebAssembly.Table;
 function normalize(stack)
 {
     var wasmFrameTypes = [
-        {re:/^entry trampoline \(in asm.js\)$/,             sub:">"},
-        {re:/^wasm-function\[(\d+)\] \(.*\)$/,              sub:"$1"},
-        {re:/^(fast|slow) FFI trampoline \(in asm.js\)$/,   sub:"<"},
-        {re:/ \(in asm.js\)$/,                              sub:""}
+        {re:/^entry trampoline \(in wasm\)$/,                        sub:">"},
+        {re:/^wasm-function\[(\d+)\] \(.*\)$/,                       sub:"$1"},
+        {re:/^(fast|slow) FFI trampoline (to native )?\(in wasm\)$/, sub:"<"},
+        {re:/^call to[ asm.js]? native (.*) \(in wasm\)$/,           sub:"$1"},
+        {re:/ \(in wasm\)$/,                                         sub:""}
     ];
 
     var framesIn = stack.split(',');
@@ -64,14 +67,14 @@ function assertEqStacks(got, expect)
 
 function test(code, importObj, expect)
 {
-    enableSPSProfiling();
+    enableGeckoProfiling();
 
     var f = wasmEvalText(code, importObj).exports[""];
     enableSingleStepProfiling();
     f();
     assertEqStacks(disableSingleStepProfiling(), expect);
 
-    disableSPSProfiling();
+    disableGeckoProfiling();
 }
 
 test(
@@ -111,14 +114,76 @@ test(
 {"":{foo:()=>{}}},
 ["", ">", "1,>", "0,1,>", "<,0,1,>", "0,1,>", "1,>", ">", ""]);
 
+test(`(module
+    (import $f32 "Math" "sin" (param f32) (result f32))
+    (func (export "") (param f32) (result f32)
+        get_local 0
+        call $f32
+    )
+)`,
+this,
+["", ">", "1,>", "<,1,>", "1,>", ">", ""]);
+
+if (getBuildConfiguration()["arm-simulator"]) {
+    // On ARM, some int64 operations are calls to C++.
+    for (let op of ['div_s', 'rem_s', 'div_u', 'rem_u']) {
+        test(`(module
+            (func (export "") (param i32) (result i32)
+                get_local 0
+                i64.extend_s/i32
+                i64.const 0x1a2b3c4d5e6f
+                i64.${op}
+                i32.wrap/i64
+            )
+        )`,
+        this,
+        ["", ">", "0,>", "<,0,>", `i64.${op},0,>`, "<,0,>", "0,>", ">", ""]);
+    }
+}
+
+// current_memory is a callout.
+test(`(module
+    (memory 1)
+    (func (export "") (result i32)
+         current_memory
+    )
+)`,
+this,
+["", ">", "0,>", "<,0,>", "current_memory,0,>", "<,0,>", "0,>", ">", ""]);
+
+// grow_memory is a callout.
+test(`(module
+    (memory 1)
+    (func (export "") (result i32)
+         i32.const 1
+         grow_memory
+    )
+)`,
+this,
+["", ">", "0,>", "<,0,>", "grow_memory,0,>", "<,0,>", "0,>", ">", ""]);
+
+// A few math builtins.
+for (let type of ['f32', 'f64']) {
+    for (let func of ['ceil', 'floor', 'nearest', 'trunc']) {
+        test(`(module
+            (func (export "") (param ${type}) (result ${type})
+                get_local 0
+                ${type}.${func}
+            )
+        )`,
+        this,
+        ["", ">", "0,>", "<,0,>", `${type}.${func},0,>`, "<,0,>", "0,>", ">", ""]);
+    }
+}
+
 function testError(code, error, expect)
 {
-    enableSPSProfiling();
+    enableGeckoProfiling();
     var f = wasmEvalText(code).exports[""];
     enableSingleStepProfiling();
     assertThrowsInstanceOf(f, error);
     assertEqStacks(disableSingleStepProfiling(), expect);
-    disableSPSProfiling();
+    disableGeckoProfiling();
 }
 
 testError(
@@ -127,7 +192,7 @@ testError(
     (func (export "") (call $foo))
 )`,
 WebAssembly.RuntimeError,
-["", ">", "1,>", "0,1,>", "trap handling,0,1,>", "inline stub,0,1,>", ""]);
+["", ">", "1,>", "0,1,>", "interstitial,0,1,>", "trap handling,0,1,>", ""]);
 
 testError(
 `(module
@@ -142,7 +207,7 @@ WebAssembly.RuntimeError,
 // Technically we have this one *one-instruction* interval where
 // the caller is lost (the stack with "1,>"). It's annoying to fix and shouldn't
 // mess up profiles in practice so we ignore it.
-["", ">", "0,>", "1,0,>", "1,>", "trap handling,0,>", "inline stub,0,>", ""]);
+["", ">", "0,>", "1,0,>", "1,>", "trap handling,0,>", ""]);
 
 (function() {
     var e = wasmEvalText(`
@@ -158,32 +223,32 @@ WebAssembly.RuntimeError,
     assertEq(e.tbl.get(0)(), 42);
     assertEq(e.tbl.get(1)(), 13);
 
-    enableSPSProfiling();
+    enableGeckoProfiling();
     enableSingleStepProfiling();
     assertEq(e.tbl.get(0)(), 42);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "0,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
 
     assertEq(e.foo(), 42);
     assertEq(e.tbl.get(0)(), 42);
     assertEq(e.tbl.get(1)(), 13);
 
-    enableSPSProfiling();
+    enableGeckoProfiling();
     enableSingleStepProfiling();
     assertEq(e.tbl.get(1)(), 13);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "1,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
 
     assertEq(e.tbl.get(0)(), 42);
     assertEq(e.tbl.get(1)(), 13);
     assertEq(e.foo(), 42);
 
-    enableSPSProfiling();
+    enableGeckoProfiling();
     enableSingleStepProfiling();
     assertEq(e.foo(), 42);
     assertEq(e.tbl.get(1)(), 13);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "0,>", ">", "", ">", "1,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
 
     var e2 = wasmEvalText(`
     (module
@@ -195,23 +260,23 @@ WebAssembly.RuntimeError,
         (export "baz" $baz)
     )`, {a:{b:e.tbl}}).exports;
 
-    enableSPSProfiling();
+    enableGeckoProfiling();
     enableSingleStepProfiling();
     assertEq(e2.baz(0), 42);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "1,>", "0,1,>", "1,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
 
-    enableSPSProfiling();
+    enableGeckoProfiling();
     enableSingleStepProfiling();
     assertEq(e2.baz(1), 13);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "1,>", "1,1,>", "1,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
 
-    enableSPSProfiling();
+    enableGeckoProfiling();
     enableSingleStepProfiling();
     assertEq(e2.baz(2), 99);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "1,>", "0,1,>", "1,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
 })();
 
 (function() {
@@ -228,20 +293,20 @@ WebAssembly.RuntimeError,
     // Instantiate while not active:
     var e1 = new Instance(m1).exports;
     var e2 = new Instance(m2, {a:e1}).exports;
-    enableSPSProfiling();
+    enableGeckoProfiling();
     enableSingleStepProfiling();
     assertEq(e2.bar(), 42);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "1,>", "0,1,>", "1,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
     assertEq(e2.bar(), 42);
 
     // Instantiate while active:
-    enableSPSProfiling();
+    enableGeckoProfiling();
     var e3 = new Instance(m1).exports;
     var e4 = new Instance(m2, {a:e3}).exports;
     enableSingleStepProfiling();
     assertEq(e4.bar(), 42);
     assertEqStacks(disableSingleStepProfiling(), ["", ">", "1,>", "0,1,>", "1,>", ">", ""]);
-    disableSPSProfiling();
+    disableGeckoProfiling();
     assertEq(e4.bar(), 42);
 })();

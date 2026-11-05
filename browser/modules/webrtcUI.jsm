@@ -264,7 +264,7 @@ function getHost(uri, href) {
   let host;
   try {
     if (!uri) {
-      uri = Services.io.newURI(href, null, null);
+      uri = Services.io.newURI(href);
     }
     host = uri.host;
   } catch (ex) {}
@@ -286,7 +286,7 @@ function prompt(aBrowser, aRequest) {
   let {audioDevices: audioDevices, videoDevices: videoDevices,
        sharingScreen: sharingScreen, sharingAudio: sharingAudio,
        requestTypes: requestTypes} = aRequest;
-  let uri = Services.io.newURI(aRequest.documentURI, null, null);
+  let uri = Services.io.newURI(aRequest.documentURI);
   let host = getHost(uri);
   let chromeDoc = aBrowser.ownerDocument;
   let chromeWin = chromeDoc.defaultView;
@@ -346,13 +346,14 @@ function prompt(aBrowser, aRequest) {
     secondaryActions.unshift({
       label: stringBundle.getString("getUserMedia.always.label"),
       accessKey: stringBundle.getString("getUserMedia.always.accesskey"),
-      callback: function () {
-        mainAction.callback(true);
+      callback: function (aState) {
+        mainAction.callback(aState, true);
       }
     });
   }
 
   let options = {
+    persistent: true,
     eventCallback: function(aTopic, aNewBrowser) {
       if (aTopic == "swapping")
         return true;
@@ -524,7 +525,7 @@ function prompt(aBrowser, aRequest) {
           addDeviceToList(micMenupopup, stringBundle.getString("getUserMedia.noAudio.label"), "-1");
       }
 
-      this.mainAction.callback = function(aRemember) {
+      this.mainAction.callback = function(aState, aRemember) {
         let allowedDevices = [];
         let perms = Services.perms;
         if (videoDevices.length) {
@@ -914,7 +915,7 @@ function updateBrowserSpecificIndicator(aBrowser, aState) {
     accessKey: stringBundle.getString("getUserMedia.stopSharing.accesskey"),
     callback: function () {
       let uris = aBrowser._devicePermissionURIs || [];
-      uris = uris.concat(Services.io.newURI(aState.documentURI, null, null));
+      uris = uris.concat(Services.io.newURI(aState.documentURI));
       let perms = Services.perms;
       for (let uri of uris) {
         if (aState.camera &&

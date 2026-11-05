@@ -147,7 +147,6 @@ class ImageClient;
 class ImageCompositeNotification;
 class ImageContainer;
 class ImageContainerChild;
-class PImageContainerChild;
 class SharedPlanarYCbCrImage;
 class PlanarYCbCrImage;
 class TextureClient;
@@ -583,8 +582,6 @@ public:
 
   void NotifyComposite(const ImageCompositeNotification& aNotification);
 
-  PImageContainerChild* GetPImageContainerChild();
-
   ImageContainerListener* GetImageContainerListener()
   {
     return mNotifyCompositeListener;
@@ -609,7 +606,7 @@ private:
   // calling this function!
   void EnsureActiveImage();
 
-  void EnsureImageClient(bool aCreate);
+  void EnsureImageClient();
 
   // ReentrantMonitor to protect thread safe access to the "current
   // image", and any other state which is shared between threads.
@@ -649,6 +646,7 @@ private:
   // asynchronusly using the ImageBridge IPDL protocol.
   RefPtr<ImageClient> mImageClient;
 
+  bool mIsAsync;
   CompositableHandle mAsyncContainerHandle;
 
   nsTArray<FrameID> mFrameIDsNotYetComposited;

@@ -15,7 +15,7 @@
 #include "nsIDocumentObserver.h"         // for typedef (nsUpdateType)
 #include "nsILoadGroup.h"                // for member (in nsCOMPtr)
 #include "nsINode.h"                     // for base class
-#include "nsIPrincipal.h"
+#include "nsIParser.h"
 #include "nsIScriptGlobalObject.h"       // for member (in nsCOMPtr)
 #include "nsIServiceManager.h"
 #include "nsIUUIDGenerator.h"
@@ -34,7 +34,7 @@
 #include "nsClassHashtable.h"
 #include "prclist.h"
 #include "mozilla/CORSMode.h"
-#include "mozilla/dom/Dispatcher.h"
+#include "mozilla/dom/DispatcherTrait.h"
 #include "mozilla/LinkedList.h"
 #include "mozilla/StyleBackendType.h"
 #include "mozilla/StyleSheet.h"
@@ -103,6 +103,7 @@ class nsIGlobalObject;
 struct nsCSSSelectorList;
 
 namespace mozilla {
+class AbstractThread;
 class CSSStyleSheet;
 class ErrorResult;
 class EventStates;
@@ -358,6 +359,8 @@ public:
    * Set referrer policy and upgrade-insecure-requests flags
    */
   virtual void ApplySettingsFromCSP(bool aSpeculative) = 0;
+
+  virtual already_AddRefed<nsIParser> CreatorParserOrNull() = 0;
 
   /**
    * Return the referrer policy of the document. Return "default" if there's no
@@ -630,6 +633,15 @@ public:
     mIsInitialDocumentInWindow = aIsInitialDocument;
   }
 
+  /**
+   * Normally we assert if a runnable labeled with one DocGroup touches data
+   * from another DocGroup. Calling IgnoreDocGroupMismatches() on a document
+   * means that we can touch that document from any DocGroup without asserting.
+   */
+  void IgnoreDocGroupMismatches()
+  {
+    mIgnoreDocGroupMismatches = true;
+  }
 
   /**
    * Get the bidi options for this document.
@@ -877,6 +889,9 @@ public:
   void SetParentDocument(nsIDocument* aParent)
   {
     mParentDocument = aParent;
+    if (aParent) {
+      mIgnoreDocGroupMismatches = aParent->mIgnoreDocGroupMismatches;
+    }
   }
 
   /**
@@ -2506,20 +2521,6 @@ public:
 
   bool IsSyntheticDocument() const { return mIsSyntheticDocument; }
 
-  void SetNeedLayoutFlush() {
-    mNeedLayoutFlush = true;
-    if (mDisplayDocument) {
-      mDisplayDocument->SetNeedLayoutFlush();
-    }
-  }
-
-  void SetNeedStyleFlush() {
-    mNeedStyleFlush = true;
-    if (mDisplayDocument) {
-      mDisplayDocument->SetNeedStyleFlush();
-    }
-  }
-
   // Note: nsIDocument is a sub-class of nsINode, which has a
   // SizeOfExcludingThis function.  However, because nsIDocument objects can
   // only appear at the top of the DOM tree, we have a specialized measurement
@@ -2653,7 +2654,9 @@ public:
     ImportNode(nsINode& aNode, bool aDeep, mozilla::ErrorResult& rv) const;
   nsINode* AdoptNode(nsINode& aNode, mozilla::ErrorResult& rv);
   already_AddRefed<mozilla::dom::Event>
-    CreateEvent(const nsAString& aEventType, mozilla::ErrorResult& rv) const;
+    CreateEvent(const nsAString& aEventType,
+                mozilla::dom::CallerType aCallerType,
+                mozilla::ErrorResult& rv) const;
   already_AddRefed<nsRange> CreateRange(mozilla::ErrorResult& rv);
   already_AddRefed<mozilla::dom::NodeIterator>
     CreateNodeIterator(nsINode& aRoot, uint32_t aWhatToShow,
@@ -2806,6 +2809,9 @@ public:
 
   void ObsoleteSheet(const nsAString& aSheetURI, mozilla::ErrorResult& rv);
 
+  already_AddRefed<mozilla::dom::Promise> BlockParsing(mozilla::OwningNonNull<mozilla::dom::Promise> aPromise,
+                                                       mozilla::ErrorResult& aRv);
+
   already_AddRefed<nsIURI> GetMozDocumentURIIfNotForErrorPages();
 
   // ParentNode
@@ -2845,7 +2851,7 @@ public:
     }
   }
 
-  gfxUserFontSet* GetUserFontSet();
+  gfxUserFontSet* GetUserFontSet(bool aFlushUserFontSet = true);
   void FlushUserFontSet();
   void RebuildUserFontSet(); // asynchronously
   mozilla::dom::FontFaceSet* GetFonts() { return mFontFaceSet; }
@@ -2905,11 +2911,14 @@ public:
 
   // Dispatch a runnable related to the document.
   virtual nsresult Dispatch(const char* aName,
-                            mozilla::dom::TaskCategory aCategory,
+                            mozilla::TaskCategory aCategory,
                             already_AddRefed<nsIRunnable>&& aRunnable) override;
 
-  virtual already_AddRefed<nsIEventTarget>
-  EventTargetFor(mozilla::dom::TaskCategory aCategory) const override;
+  virtual nsIEventTarget*
+  EventTargetFor(mozilla::TaskCategory aCategory) const override;
+
+  virtual mozilla::AbstractThread*
+  AbstractMainThreadFor(mozilla::TaskCategory aCategory) override;
 
   // The URLs passed to these functions should match what
   // JS::DescribeScriptedCaller() returns, since these APIs are used to
@@ -2918,6 +2927,17 @@ public:
   bool IsScriptTracking(const nsACString& aURL) const;
 
   bool PrerenderHref(nsIURI* aHref);
+
+  // For more information on Flash classification, see
+  // toolkit/components/url-classifier/flash-block-lists.rst
+  enum class FlashClassification {
+    Unclassified,   // Denotes a classification that has not yet been computed.
+                    // Allows for lazy classification.
+    Unknown,        // Site is not on the whitelist or blacklist
+    Allowed,        // Site is on the Flash whitelist
+    Denied          // Site is on the Flash blacklist
+  };
+  virtual FlashClassification DocumentFlashClassification() = 0;
 
 protected:
   bool GetUseCounter(mozilla::UseCounter aUseCounter)
@@ -3078,6 +3098,8 @@ protected:
   // document in it.
   bool mIsInitialDocumentInWindow : 1;
 
+  bool mIgnoreDocGroupMismatches : 1;
+
   // True if we're loaded as data and therefor has any dangerous stuff, such
   // as scripts and plugins, disabled.
   bool mLoadedAsData : 1;
@@ -3138,12 +3160,6 @@ protected:
 
   // True if this document has links whose state needs updating
   bool mHasLinksToUpdate : 1;
-
-  // True if a layout flush might not be a no-op
-  bool mNeedLayoutFlush : 1;
-
-  // True if a style flush might not be a no-op
-  bool mNeedStyleFlush : 1;
 
   // True if a DOMMutationObserver is perhaps attached to a node in the document.
   bool mMayHaveDOMMutationObservers : 1;
@@ -3211,9 +3227,6 @@ protected:
 
   // Do we currently have an event posted to call FlushUserFontSet?
   bool mPostedFlushUserFontSet : 1;
-
-  // True is document has ever been in a foreground window.
-  bool mEverInForeground : 1;
 
   // Compatibility mode
   nsCompatibility mCompatMode;

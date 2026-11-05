@@ -119,6 +119,11 @@ s! {
         pub l_onoff: ::c_int,
         pub l_linger: ::c_int,
     }
+
+    pub struct sigval {
+        // Actually a union of an int and a void*
+        pub sival_ptr: *mut ::c_void
+    }
 }
 
 pub const SIG_DFL: sighandler_t = 0 as sighandler_t;
@@ -205,7 +210,8 @@ cfg_if! {
         // cargo build, don't pull in anything extra as the libstd  dep
         // already pulls in all libs.
     } else if #[cfg(any(all(target_env = "musl", not(target_arch = "mips"))))] {
-        #[link(name = "c", kind = "static")]
+        #[link(name = "c", kind = "static", cfg(target_feature = "crt-static"))]
+        #[link(name = "c", cfg(not(target_feature = "crt-static")))]
         extern {}
     } else if #[cfg(target_os = "emscripten")] {
         #[link(name = "c")]
@@ -227,6 +233,10 @@ cfg_if! {
     } else if #[cfg(target_os = "haiku")] {
         #[link(name = "root")]
         #[link(name = "network")]
+        extern {}
+    } else if #[cfg(target_os = "fuchsia")] {
+        #[link(name = "c")]
+        #[link(name = "mxio")]
         extern {}
     } else {
         #[link(name = "c")]
@@ -356,6 +366,7 @@ extern {
     pub fn access(path: *const c_char, amode: ::c_int) -> ::c_int;
     pub fn alarm(seconds: ::c_uint) -> ::c_uint;
     pub fn chdir(dir: *const c_char) -> ::c_int;
+    pub fn fchdir(dirfd: ::c_int) -> ::c_int;
     pub fn chown(path: *const c_char, uid: uid_t,
                  gid: gid_t) -> ::c_int;
     #[cfg_attr(all(target_os = "macos", target_arch = "x86"),
@@ -367,6 +378,12 @@ extern {
     pub fn close(fd: ::c_int) -> ::c_int;
     pub fn dup(fd: ::c_int) -> ::c_int;
     pub fn dup2(src: ::c_int, dst: ::c_int) -> ::c_int;
+    pub fn execl(path: *const c_char,
+                 arg0: *const c_char, ...) -> ::c_int;
+    pub fn execle(path: *const ::c_char,
+                  arg0: *const ::c_char, ...) -> ::c_int;
+    pub fn execlp(file: *const ::c_char,
+                  arg0: *const ::c_char, ...) -> ::c_int;
     pub fn execv(prog: *const c_char,
                  argv: *const *const c_char) -> ::c_int;
     pub fn execve(prog: *const c_char, argv: *const *const c_char,
@@ -421,6 +438,7 @@ extern {
     pub fn nanosleep(rqtp: *const timespec,
                      rmtp: *mut timespec) -> ::c_int;
     pub fn tcgetpgrp(fd: ::c_int) -> pid_t;
+    pub fn tcsetpgrp(fd: ::c_int, pgrp: ::pid_t) -> ::c_int;
     pub fn ttyname(fd: ::c_int) -> *mut c_char;
     pub fn unlink(c: *const c_char) -> ::c_int;
     #[cfg_attr(all(target_os = "macos", target_arch = "x86"),
@@ -833,12 +851,18 @@ extern {
     #[cfg_attr(all(target_os = "macos", target_arch = "x86"),
                link_name = "nice$UNIX2003")]
     pub fn nice(incr: ::c_int) -> ::c_int;
+
+    pub fn grantpt(fd: ::c_int) -> ::c_int;
+    pub fn posix_openpt(flags: ::c_int) -> ::c_int;
+    pub fn ptsname(fd: ::c_int) -> *mut ::c_char;
+    pub fn unlockpt(fd: ::c_int) -> ::c_int;
 }
 
 cfg_if! {
     if #[cfg(any(target_os = "linux",
                  target_os = "android",
-                 target_os = "emscripten"))] {
+                 target_os = "emscripten",
+                 target_os = "fuchsia"))] {
         mod notbsd;
         pub use self::notbsd::*;
     } else if #[cfg(any(target_os = "macos",

@@ -36,6 +36,7 @@ const MessageContainer = createClass({
     serviceContainer: PropTypes.object.isRequired,
     autoscroll: PropTypes.bool.isRequired,
     indent: PropTypes.number.isRequired,
+    tableData: PropTypes.object,
   },
 
   getDefaultProps: function () {
@@ -49,7 +50,10 @@ const MessageContainer = createClass({
     const repeatChanged = this.props.message.repeat !== nextProps.message.repeat;
     const openChanged = this.props.open !== nextProps.open;
     const tableDataChanged = this.props.tableData !== nextProps.tableData;
-    return repeatChanged || openChanged || tableDataChanged;
+    const responseChanged = this.props.message.response !== nextProps.message.response;
+    const totalTimeChanged = this.props.message.totalTime !== nextProps.message.totalTime;
+    return repeatChanged || openChanged || tableDataChanged || responseChanged ||
+      totalTimeChanged;
   },
 
   render() {

@@ -64,7 +64,7 @@ AddonPolicyService.prototype = {
    */
   getGeneratedBackgroundPageUrl(aAddonId) {
     let cb = this.backgroundPageUrlCallbacks.get(aAddonId);
-    return cb && cb(aAddonId) || '';
+    return cb && cb(aAddonId) || "";
   },
 
   /*
@@ -85,9 +85,9 @@ AddonPolicyService.prototype = {
    *
    * @see nsIAddonPolicyService.addonMayLoadURI
    */
-  addonMayLoadURI(aAddonId, aURI) {
+  addonMayLoadURI(aAddonId, aURI, aExplicit = false) {
     let cb = this.mayLoadURICallbacks.get(aAddonId);
-    return cb ? cb(aURI) : false;
+    return cb ? cb(aURI, aExplicit) : false;
   },
 
   /*

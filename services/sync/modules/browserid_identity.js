@@ -32,7 +32,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "BulkKeyBundle",
 XPCOMUtils.defineLazyModuleGetter(this, "fxAccounts",
                                   "resource://gre/modules/FxAccounts.jsm");
 
-XPCOMUtils.defineLazyGetter(this, 'log', function() {
+XPCOMUtils.defineLazyGetter(this, "log", function() {
   let log = Log.repository.getLogger("Sync.BrowserIDManager");
   log.level = Log.Level[Svc.Prefs.get("log.logger.identity")] || Log.Level.Error;
   return log;
@@ -45,6 +45,7 @@ Cu.import("resource://gre/modules/FxAccountsCommon.js", fxAccountsCommon);
 const OBSERVER_TOPICS = [
   fxAccountsCommon.ONLOGIN_NOTIFICATION,
   fxAccountsCommon.ONLOGOUT_NOTIFICATION,
+  fxAccountsCommon.ON_ACCOUNT_STATE_CHANGE_NOTIFICATION,
 ];
 
 const PREF_SYNC_SHOW_CUSTOMIZATION = "services.sync-setup.ui.showCustomizationDialog";
@@ -114,10 +115,19 @@ this.BrowserIDManager.prototype = {
   },
 
   hashedUID() {
-    if (!this._token) {
-      throw new Error("hashedUID: Don't have token");
+    if (!this._hashedUID) {
+      throw new Error("hashedUID: Don't seem to have previously seen a token");
     }
-    return this._token.hashed_fxa_uid
+    return this._hashedUID;
+  },
+
+  // Return a hashed version of a deviceID, suitable for telemetry.
+  hashedDeviceID(deviceID) {
+    let uid = this.hashedUID();
+    // Combine the raw device id with the metrics uid to create a stable
+    // unique identifier that can't be mapped back to the user's FxA
+    // identity without knowing the metrics HMAC key.
+    return Utils.sha256(deviceID + uid);
   },
 
   deviceID() {
@@ -247,6 +257,11 @@ this.BrowserIDManager.prototype = {
         return this._fetchTokenForUser();
       }).then(token => {
         this._token = token;
+        if (token) {
+          // We may not have a token if the master-password is locked - but we
+          // still treat this as "success" so we don't prompt for re-authentication.
+          this._hashedUID = token.hashed_fxa_uid; // see _ensureValidToken for why we do this...
+        }
         this._shouldHaveSyncKeyBundle = true; // and we should actually have one...
         this.whenReadyToAuthenticate.resolve();
         this._log.info("Background fetch for key bundle done");
@@ -320,6 +335,13 @@ this.BrowserIDManager.prototype = {
       Weave.Service.startOver();
       // startOver will cause this instance to be thrown away, so there's
       // nothing else to do.
+      break;
+
+    case fxAccountsCommon.ON_ACCOUNT_STATE_CHANGE_NOTIFICATION:
+      // throw away token and fetch a new one
+      this.resetCredentials();
+      this._ensureValidToken().catch(err =>
+        this._log.error("Error while fetching a new token", err));
       break;
     }
   },
@@ -416,6 +438,7 @@ this.BrowserIDManager.prototype = {
   resetCredentials: function() {
     this.resetSyncKey();
     this._token = null;
+    this._hashedUID = null;
     // The cluster URL comes from the token, so resetting it to empty will
     // force Sync to not accidentally use a value from an earlier token.
     Weave.Service.clusterURL = null;
@@ -676,12 +699,26 @@ this.BrowserIDManager.prototype = {
       this._log.debug("_ensureValidToken already has one");
       return Promise.resolve();
     }
+    const notifyStateChanged =
+      () => Services.obs.notifyObservers(null, "weave:service:login:change");
     // reset this._token as a safety net to reduce the possibility of us
     // repeatedly attempting to use an invalid token if _fetchTokenForUser throws.
     this._token = null;
     return this._fetchTokenForUser().then(
       token => {
         this._token = token;
+        // we store the hashed UID from the token so that if we see a transient
+        // error fetching a new token we still know the "most recent" hashed
+        // UID for telemetry.
+        if (token) {
+          // We may not have a token if the master-password is locked.
+          this._hashedUID = token.hashed_fxa_uid;
+        }
+        notifyStateChanged();
+      },
+      error => {
+        notifyStateChanged();
+        throw error
       }
     );
   },

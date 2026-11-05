@@ -521,7 +521,13 @@
           if (telemetrySearchDetails && telemetrySearchDetails.index == -1) {
             telemetrySearchDetails = null;
           }
-          BrowserSearch.recordSearchInTelemetry(engine, "searchbar", telemetrySearchDetails);
+          // If we hit here, we come either from a one-off, a plain search or a suggestion.
+          const details = {
+            isOneOff: false,
+            isSuggestion: (!false && telemetrySearchDetails),
+            selection: telemetrySearchDetails
+          };
+          BrowserSearch.recordSearchInTelemetry(engine, "searchbar", details);
           // null parameter below specifies HTML response for search
           let params = {
             postData: submission.postData,
@@ -576,7 +582,9 @@
       <![CDATA[
         // Speculatively connect to the current engine's search URI (and
         // suggest URI, if different) to reduce request latency
-        this.currentEngine.speculativeConnect({window: window});
+        this.currentEngine.speculativeConnect({window,
+                                               originAttributes: gBrowser.contentPrincipal
+                                                                         .originAttributes});
 
         if (this._ignoreFocus) {
           // This window has been re-focused, don't show the suggestions

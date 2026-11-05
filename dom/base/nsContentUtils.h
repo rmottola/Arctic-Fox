@@ -503,6 +503,12 @@ public:
   // aWindow can be either outer or inner window.
   static bool CanCallerAccess(nsPIDOMWindowInner* aWindow);
 
+  // Check if the principal is chrome or an addon with the permission.
+  static bool PrincipalHasPermission(nsIPrincipal* aPrincipal, const nsAString& aPerm);
+
+  // Check if the JS caller is chrome or an addon with the permission.
+  static bool CallerHasPermission(JSContext* aCx, const nsAString& aPerm);
+
   /**
    * GetDocumentFromCaller gets its document by looking at the last called
    * function and finding the document that the function itself relates to.
@@ -541,6 +547,10 @@ public:
   {
     return sSecurityManager;
   }
+
+  // Returns the subject principal from the JSContext. May only be called
+  // from the main thread and assumes an existing compartment.
+  static nsIPrincipal* SubjectPrincipal(JSContext* aCx);
 
   // Returns the subject principal. Guaranteed to return non-null. May only
   // be called when nsContentUtils is initialized.
@@ -786,11 +796,13 @@ public:
   static bool IsDraggableLink(const nsIContent* aContent);
 
   /**
-   * Convenience method to create a new nodeinfo that differs only by name
-   * from aNodeInfo.
+   * Convenience method to create a new nodeinfo that differs only by prefix and
+   * name from aNodeInfo. The new nodeinfo's name is set to aName, and prefix is
+   * set to null.
    */
-  static nsresult NameChanged(mozilla::dom::NodeInfo* aNodeInfo, nsIAtom* aName,
-                              mozilla::dom::NodeInfo** aResult);
+  static nsresult QNameChanged(mozilla::dom::NodeInfo* aNodeInfo,
+                               nsIAtom* aName,
+                               mozilla::dom::NodeInfo** aResult);
 
   /**
    * Returns the appropriate event argument names for the specified
@@ -890,6 +902,37 @@ public:
                                               uint32_t aColumnNumber = 0,
                                               MissingErrorLocationMode aLocationMode
                                                 = eUSE_CALLING_LOCATION);
+
+  /**
+   * Report a non-localized error message to the error console base on the
+   * innerWindowID.
+   *   @param aErrorText the error message
+   *   @param aErrorFlags See nsIScriptError.
+   *   @param aCategory Name of module reporting error.
+   *   @param [aInnerWindowID] Inner window ID for document which triggered the
+   *          message.
+   *   @param [aURI=nullptr] (Optional) URI of resource containing error.
+   *   @param [aSourceLine=EmptyString()] (Optional) The text of the line that
+              contains the error (may be empty).
+   *   @param [aLineNumber=0] (Optional) Line number within resource
+              containing error.
+   *   @param [aColumnNumber=0] (Optional) Column number within resource
+              containing error.
+              If aURI is null, then aDocument->GetDocumentURI() is used.
+   *   @param [aLocationMode] (Optional) Specifies the behavior if
+              error location information is omitted.
+   */
+  static nsresult ReportToConsoleByWindowID(const nsAString& aErrorText,
+                                            uint32_t aErrorFlags,
+                                            const nsACString& aCategory,
+                                            uint64_t aInnerWindowID,
+                                            nsIURI* aURI = nullptr,
+                                            const nsAFlatString& aSourceLine
+                                              = EmptyString(),
+                                            uint32_t aLineNumber = 0,
+                                            uint32_t aColumnNumber = 0,
+                                            MissingErrorLocationMode aLocationMode
+                                              = eUSE_CALLING_LOCATION);
 
   /**
    * Report a localized error message to the error console.
@@ -1535,12 +1578,12 @@ public:
   static bool IsSystemPrincipal(nsIPrincipal* aPrincipal);
 
   /**
-   * Returns true if aPrincipal is an nsExpandedPrincipal.
+   * Returns true if aPrincipal is an ExpandedPrincipal.
    */
   static bool IsExpandedPrincipal(nsIPrincipal* aPrincipal);
 
   /**
-   * Returns true if aPrincipal is the system or an nsExpandedPrincipal.
+   * Returns true if aPrincipal is the system or an ExpandedPrincipal.
    */
   static bool IsSystemOrExpandedPrincipal(nsIPrincipal* aPrincipal)
   {
@@ -2066,23 +2109,6 @@ public:
   static bool IsFrameTimingEnabled();
 
   /*
-   * Returns true if URL setters should percent encode the Hash/Ref segment
-   * and getters should return the percent decoded value of the segment
-   */
-  static bool EncodeDecodeURLHash()
-  {
-    return sEncodeDecodeURLHash;
-  }
-
-  /*
-   * Returns true if URL getters should percent decode the value of the segment
-   */
-  static bool GettersDecodeURLHash()
-  {
-    return sGettersDecodeURLHash && sEncodeDecodeURLHash;
-  }
-
-  /*
    * Returns true if the browser should attempt to prevent the given caller type
    * from collecting distinctive information about the browser that could
    * be used to "fingerprint" and track the user across websites.
@@ -2454,9 +2480,14 @@ public:
   static bool IsForbiddenResponseHeader(const nsACString& aHeader);
 
   /**
-   * Returns the inner window ID for the window associated with a request,
+   * Returns the inner window ID for the window associated with a request.
    */
   static uint64_t GetInnerWindowID(nsIRequest* aRequest);
+
+  /**
+   * Returns the inner window ID for the window associated with a load group.
+   */
+  static uint64_t GetInnerWindowID(nsILoadGroup* aLoadGroup);
 
   /**
    * If the hostname for aURI is an IPv6 it encloses it in brackets,
@@ -2586,6 +2617,7 @@ public:
                                  bool aIgnoreRootScrollFrame,
                                  float aPressure,
                                  unsigned short aInputSourceArg,
+                                 uint32_t aIdentifier,
                                  bool aToWindow,
                                  bool *aPreventDefault,
                                  bool aIsDOMEventSynthesized,
@@ -2742,6 +2774,24 @@ public:
       nsIDocument* aDocument,
       nsTArray<nsIContent*>& aElements);
 
+  /**
+   * Returns the content policy type that should be used for loading images
+   * for displaying in the UI.  The sources of such images can be <xul:image>,
+   * <xul:menuitem> on OSX where we load the image through nsMenuItemIconX, etc.
+   */
+  static void
+  GetContentPolicyTypeForUIImageLoading(nsIContent* aLoadingNode,
+                                        nsIPrincipal** aLoadingPrincipal,
+                                        nsContentPolicyType& aContentPolicyType);
+
+  static nsresult
+  CreateJSValueFromSequenceOfObject(JSContext* aCx,
+                                    const mozilla::dom::Sequence<JSObject*>& aTransfer,
+                                    JS::MutableHandle<JS::Value> aValue);
+
+  static bool
+  IsWebComponentsEnabled() { return sIsWebComponentsEnabled; }
+
 private:
   static bool InitializeEventTable();
 
@@ -2847,8 +2897,7 @@ private:
   static bool sIsUserTimingLoggingEnabled;
   static bool sIsFrameTimingPrefEnabled;
   static bool sIsExperimentalAutocompleteEnabled;
-  static bool sEncodeDecodeURLHash;
-  static bool sGettersDecodeURLHash;
+  static bool sIsWebComponentsEnabled;
   static bool sPrivacyResistFingerprinting;
   static bool sSendPerformanceTimingNotifications;
   static bool sUseActivityCursor;

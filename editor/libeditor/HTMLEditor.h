@@ -104,7 +104,6 @@ public:
   Element* GetSelectionContainer();
 
   // TextEditor overrides
-  NS_IMETHOD GetIsDocumentEditable(bool* aIsDocumentEditable) override;
   NS_IMETHOD BeginningOfDocument() override;
   virtual nsresult HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent) override;
   virtual already_AddRefed<nsIContent> GetFocusedContent() override;
@@ -114,7 +113,7 @@ public:
   virtual Element* GetEditorRoot() override;
   virtual already_AddRefed<nsIContent> FindSelectionRoot(
                                          nsINode *aNode) override;
-  virtual bool IsAcceptableInputEvent(nsIDOMEvent* aEvent) override;
+  virtual bool IsAcceptableInputEvent(WidgetGUIEvent* aGUIEvent) override;
   virtual already_AddRefed<nsIContent> GetInputEventTargetContent() override;
   virtual bool IsEditable(nsINode* aNode) override;
   using EditorBase::IsEditable;
@@ -266,7 +265,7 @@ public:
                                   int32_t* outOffset = 0);
 
   // Overrides of EditorBase interface methods
-  nsresult EndUpdateViewBatch() override;
+  virtual nsresult EndUpdateViewBatch() override;
 
   NS_IMETHOD Init(nsIDOMDocument* aDoc, nsIContent* aRoot,
                   nsISelectionController* aSelCon, uint32_t aFlags,
@@ -667,12 +666,12 @@ protected:
                                     nsIDOMNode *aDestinationNode,
                                     int32_t aDestinationOffset,
                                     bool aDoDeleteSelection);
-  nsresult InsertFromDataTransfer(dom::DataTransfer* aDataTransfer,
-                                  int32_t aIndex,
-                                  nsIDOMDocument* aSourceDoc,
-                                  nsIDOMNode* aDestinationNode,
-                                  int32_t aDestOffset,
-                                  bool aDoDeleteSelection) override;
+  virtual nsresult InsertFromDataTransfer(dom::DataTransfer* aDataTransfer,
+                                          int32_t aIndex,
+                                          nsIDOMDocument* aSourceDoc,
+                                          nsIDOMNode* aDestinationNode,
+                                          int32_t aDestOffset,
+                                          bool aDoDeleteSelection) override;
   bool HavePrivateHTMLFlavor(nsIClipboard* clipboard );
   nsresult ParseCFHTML(nsCString& aCfhtml, char16_t** aStuffToPaste,
                        char16_t** aCfcontext);
@@ -739,11 +738,6 @@ protected:
   void NormalizeEOLInsertPosition(nsINode* firstNodeToInsert,
                                   nsCOMPtr<nsIDOMNode>* insertParentNode,
                                   int32_t* insertOffset);
-
-  /**
-   * Small utility routine to test the eEditorReadonly bit.
-   */
-  bool IsModifiable();
 
   /**
    * Helpers for block transformations.

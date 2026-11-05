@@ -152,10 +152,10 @@ function* doTest(aBrowser) {
     let URLSuffix = "?r=" + arg.randomSuffix;
 
     // Create the audio and video elements.
-    let audio = content.document.createElement('audio');
-    let video = content.document.createElement('video');
-    let audioSource = content.document.createElement('source');
-    let audioTrack = content.document.createElement('track');
+    let audio = content.document.createElement("audio");
+    let video = content.document.createElement("video");
+    let audioSource = content.document.createElement("source");
+    let audioTrack = content.document.createElement("track");
 
     // Assign attributes for the audio element.
     audioSource.setAttribute("src", audioURL + URLSuffix);

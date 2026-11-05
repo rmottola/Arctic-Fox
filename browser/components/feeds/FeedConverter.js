@@ -252,7 +252,7 @@ FeedConverter.prototype = {
         feedService.addFeedResult(result);
 
         // Now load the actual XUL document.
-        let aboutFeedsURI = ios.newURI("about:feeds", null, null);
+        let aboutFeedsURI = ios.newURI("about:feeds");
         chromeChannel = ios.newChannelFromURIWithLoadInfo(aboutFeedsURI, loadInfo);
         chromeChannel.originalURI = result.uri;
 
@@ -549,13 +549,13 @@ GenericProtocolHandler.prototype = {
 };
 
 function FeedProtocolHandler() {
-  this._init('feed');
+  this._init("feed");
 }
 FeedProtocolHandler.prototype = new GenericProtocolHandler();
 FeedProtocolHandler.prototype.classID = Components.ID("{4f91ef2e-57ba-472e-ab7a-b4999e42d6c0}");
 
 function PodCastProtocolHandler() {
-  this._init('pcast');
+  this._init("pcast");
 }
 PodCastProtocolHandler.prototype = new GenericProtocolHandler();
 PodCastProtocolHandler.prototype.classID = Components.ID("{1c31ed79-accd-4b94-b517-06e0c81999d5}");

@@ -67,6 +67,7 @@ TextEncoder::Encode(JSContext* aCx,
 
   if (NS_FAILED(rv)) {
     aRv.Throw(rv);
+    return;
   }
   aRetval.set(outView);
 }
@@ -75,6 +76,16 @@ void
 TextEncoder::GetEncoding(nsAString& aEncoding)
 {
   aEncoding.AssignLiteral("utf-8");
+}
+
+void
+TextEncoder::Foo(const GlobalObject&)
+{
+  NS_NAMED_LITERAL_STRING(str, "{\"a\":5, \"b\": 7}");
+  for (int i = 0; i < 5000; ++i) {
+    FoopySticks f;
+    f.Init(str);
+  }
 }
 
 } // namespace dom

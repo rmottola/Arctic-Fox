@@ -10,6 +10,7 @@
 #include "mozilla/Move.h"
 #include "mozilla/RangedArray.h"
 #include "mozilla/ServoBindings.h"
+#include "mozilla/ServoBindingTypes.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/TimingParams.h"
 #include "mozilla/dom/BaseKeyframeTypesBinding.h" // For FastBaseKeyframe etc.
@@ -22,6 +23,7 @@
 #include "nsCSSPropertyIDSet.h"
 #include "nsCSSProps.h"
 #include "nsCSSPseudoElements.h" // For CSSPseudoElementType
+#include "nsStyleContext.h"
 #include "nsTArray.h"
 #include <algorithm> // For std::stable_sort
 
@@ -269,7 +271,8 @@ struct AdditionalProperty
 struct KeyframeValueEntry
 {
   nsCSSPropertyID mProperty;
-  StyleAnimationValue mValue;
+  AnimationValue mValue;
+
   float mOffset;
   Maybe<ComputedTimingFunction> mTimingFunction;
   dom::CompositeOperation mComposite;
@@ -469,8 +472,8 @@ KeyframeUtils::GetKeyframesFromObject(JSContext* aCx,
   if ((!AnimationUtils::IsCoreAPIEnabled() ||
        aDocument->IsStyledByServo()) &&
       RequiresAdditiveAnimation(keyframes, aDocument)) {
-    aRv.Throw(NS_ERROR_DOM_ANIM_MISSING_PROPS_ERR);
     keyframes.Clear();
+    aRv.Throw(NS_ERROR_DOM_ANIM_MISSING_PROPS_ERR);
   }
 
   return keyframes;
@@ -600,6 +603,16 @@ KeyframeUtils::GetComputedKeyframeValues(const nsTArray<Keyframe>& aKeyframes,
   const size_t len = aKeyframes.Length();
   nsTArray<ComputedKeyframeValues> result(len);
 
+  const ServoComputedValues* currentStyle = nullptr;
+  const ServoComputedValues* parentStyle = nullptr;
+
+  if (styleBackend == StyleBackendType::Servo) {
+    currentStyle = aStyleContext->StyleSource().AsServoComputedValues();
+    if (aStyleContext->GetParent()) {
+      parentStyle = aStyleContext->GetParent()->StyleSource().AsServoComputedValues();
+    }
+  }
+
   for (const Keyframe& frame : aKeyframes) {
     nsCSSPropertyIDSet propertiesOnThisKeyframe;
     ComputedKeyframeValues* computedValues = result.AppendElement();
@@ -624,6 +637,11 @@ KeyframeUtils::GetComputedKeyframeValues(const nsTArray<Keyframe>& aKeyframes,
               *pair.mServoDeclarationBlock, values)) {
           continue;
         }
+        Servo_AnimationValues_Populate(&values,
+                                       pair.mServoDeclarationBlock,
+                                       currentStyle,
+                                       parentStyle,
+                                       aStyleContext->PresContext());
       } else {
         // For shorthands, we store the string as a token stream so we need to
         // extract that first.
@@ -653,8 +671,8 @@ KeyframeUtils::GetComputedKeyframeValues(const nsTArray<Keyframe>& aKeyframes,
         if (propertiesOnThisKeyframe.HasProperty(value.mProperty)) {
           continue;
         }
-        computedValues->AppendElement(value);
         propertiesOnThisKeyframe.AddProperty(value.mProperty);
+        computedValues->AppendElement(Move(value));
       }
     }
   }
@@ -747,8 +765,8 @@ GetKeyframeListFromKeyframeSequence(JSContext* aCx,
   // Convert the object in aIterator to a sequence of keyframes producing
   // an array of Keyframe objects.
   if (!ConvertKeyframeSequence(aCx, aDocument, aIterator, aResult)) {
-    aRv.Throw(NS_ERROR_FAILURE);
     aResult.Clear();
+    aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
 
@@ -814,10 +832,7 @@ ConvertKeyframeSequence(JSContext* aCx,
     }
 
     if (keyframeDict.mComposite.WasPassed()) {
-      // FIXME: Bug 1311620: We don't support additive animation yet.
-      if (keyframeDict.mComposite.Value() != dom::CompositeOperation::Add) {
-        keyframe->mComposite.emplace(keyframeDict.mComposite.Value());
-      }
+      keyframe->mComposite.emplace(keyframeDict.mComposite.Value());
     }
 
     ErrorResult rv;
@@ -1374,13 +1389,13 @@ BuildSegmentsFromValueEntries(nsTArray<KeyframeValueEntry>& aEntries,
     // Now generate the segment.
     AnimationPropertySegment* segment =
       animationProperty->mSegments.AppendElement();
-    segment->mFromKey   = aEntries[i].mOffset;
-    segment->mToKey     = aEntries[j].mOffset;
-    segment->mFromValue = aEntries[i].mValue;
-    segment->mToValue   = aEntries[j].mValue;
+    segment->mFromKey        = aEntries[i].mOffset;
+    segment->mToKey          = aEntries[j].mOffset;
+    segment->mFromValue      = aEntries[i].mValue;
+    segment->mToValue        = aEntries[j].mValue;
     segment->mTimingFunction = aEntries[i].mTimingFunction;
-    segment->mFromComposite = aEntries[i].mComposite;
-    segment->mToComposite = aEntries[j].mComposite;
+    segment->mFromComposite  = aEntries[i].mComposite;
+    segment->mToComposite    = aEntries[j].mComposite;
 
     i = j;
   }
@@ -1419,10 +1434,7 @@ GetKeyframeListFromPropertyIndexedKeyframe(JSContext* aCx,
 
   Maybe<dom::CompositeOperation> composite;
   if (keyframeDict.mComposite.WasPassed()) {
-    // FIXME: Bug 1311620: We don't support additive animation yet.
-    if (keyframeDict.mComposite.Value() != dom::CompositeOperation::Add) {
-      composite.emplace(keyframeDict.mComposite.Value());
-    }
+    composite.emplace(keyframeDict.mComposite.Value());
   }
 
   Maybe<ComputedTimingFunction> easing =
@@ -1761,8 +1773,8 @@ GetCumulativeDistances(const nsTArray<ComputedKeyframeValues>& aValues,
           double componentDistance = 0.0;
           if (StyleAnimationValue::ComputeDistance(
                 prop,
-                prevPacedValues[propIdx].mValue,
-                pacedValues[propIdx].mValue,
+                prevPacedValues[propIdx].mValue.mGecko,
+                pacedValues[propIdx].mValue.mGecko,
                 aStyleContext,
                 componentDistance)) {
             dist += componentDistance * componentDistance;
@@ -1775,8 +1787,8 @@ GetCumulativeDistances(const nsTArray<ComputedKeyframeValues>& aValues,
         // no distance between the previous paced value and this value.
         Unused <<
           StyleAnimationValue::ComputeDistance(aPacedProperty,
-                                               prevPacedValues[0].mValue,
-                                               pacedValues[0].mValue,
+                                               prevPacedValues[0].mValue.mGecko,
+                                               pacedValues[0].mValue.mGecko,
                                                aStyleContext,
                                                dist);
       }

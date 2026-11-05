@@ -12,16 +12,15 @@
 #include "mozilla/dom/MediaKeySession.h"
 
 #include "mozIGeckoMediaPluginService.h"
-#include "nsContentCID.h"
-#include "nsIConsoleService.h"
 #include "nsPrintfCString.h"
-#include "nsServiceManagerUtils.h"
 #include "nsString.h"
 #include "prenv.h"
 #include "GMPCDMCallbackProxy.h"
 #include "GMPService.h"
 #include "MainThreadUtils.h"
 #include "MediaData.h"
+#include "DecryptJob.h"
+#include "GMPUtils.h"
 
 namespace mozilla {
 
@@ -29,14 +28,15 @@ GMPCDMProxy::GMPCDMProxy(dom::MediaKeys* aKeys,
                          const nsAString& aKeySystem,
                          GMPCrashHelper* aCrashHelper,
                          bool aDistinctiveIdentifierRequired,
-                         bool aPersistentStateRequired)
+                         bool aPersistentStateRequired,
+                         nsIEventTarget* aMainThread)
   : CDMProxy(aKeys,
              aKeySystem,
              aDistinctiveIdentifierRequired,
-             aPersistentStateRequired)
+             aPersistentStateRequired,
+             aMainThread)
   , mCrashHelper(aCrashHelper)
   , mCDM(nullptr)
-  , mDecryptionJobCount(0)
   , mShutdownCalled(false)
   , mDecryptorId(0)
   , mCreatePromiseId(0)
@@ -143,7 +143,7 @@ void GMPCDMProxy::OnSetDecryptorId(uint32_t aId)
     NewRunnableMethod<uint32_t>(this,
                                 &GMPCDMProxy::OnCDMCreated,
                                 mCreatePromiseId));
-  NS_DispatchToMainThread(task);
+  mMainThread->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
 }
 
 class gmp_InitDoneCallback : public GetGMPDecryptorCallback
@@ -328,6 +328,7 @@ GMPCDMProxy::gmp_CreateSession(UniquePtr<CreateSessionData>&& aData)
 
 void
 GMPCDMProxy::LoadSession(PromiseId aPromiseId,
+                         dom::MediaKeySessionType aSessionType,
                          const nsAString& aSessionId)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -499,7 +500,7 @@ GMPCDMProxy::gmp_Shutdown()
   // Abort any pending decrypt jobs, to awaken any clients waiting on a job.
   for (size_t i = 0; i < mDecryptionJobs.Length(); i++) {
     DecryptJob* job = mDecryptionJobs[i];
-    job->PostResult(AbortedErr);
+    job->PostResult(eme::AbortedErr);
   }
   mDecryptionJobs.Clear();
 
@@ -520,7 +521,7 @@ GMPCDMProxy::RejectPromise(PromiseId aId, nsresult aCode,
   } else {
     nsCOMPtr<nsIRunnable> task(new RejectPromiseTask(this, aId, aCode,
                                                      aReason));
-    NS_DispatchToMainThread(task);
+    mMainThread->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
   }
 }
 
@@ -538,7 +539,7 @@ GMPCDMProxy::ResolvePromise(PromiseId aId)
     task = NewRunnableMethod<PromiseId>(this,
                                         &GMPCDMProxy::ResolvePromise,
                                         aId);
-    NS_DispatchToMainThread(task);
+    mMainThread->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
   }
 }
 
@@ -611,7 +612,10 @@ GMPCDMProxy::OnExpirationChange(const nsAString& aSessionId,
   }
   RefPtr<dom::MediaKeySession> session(mKeys->GetSession(aSessionId));
   if (session) {
-    session->SetExpiration(static_cast<double>(aExpiryTime));
+    // Expiry of 0 is interpreted as "never expire". See bug 1345341.
+    double t = (aExpiryTime == 0) ? std::numeric_limits<double>::quiet_NaN()
+                                  : static_cast<double>(aExpiryTime);
+    session->SetExpiration(t);
   }
 }
 
@@ -635,19 +639,6 @@ GMPCDMProxy::OnDecrypted(uint32_t aId,
 {
   MOZ_ASSERT(IsOnOwnerThread());
   gmp_Decrypted(aId, aResult, aDecryptedData);
-}
-
-static void
-LogToConsole(const nsAString& aMsg)
-{
-  nsCOMPtr<nsIConsoleService> console(
-    do_GetService("@mozilla.org/consoleservice;1"));
-  if (!console) {
-    NS_WARNING("Failed to log message to console.");
-    return;
-  }
-  nsAutoString msg(aMsg);
-  console->LogStringMessage(msg.get());
 }
 
 void
@@ -687,7 +678,7 @@ GMPCDMProxy::Capabilites() {
   return mCapabilites;
 }
 
-RefPtr<GMPCDMProxy::DecryptPromise>
+RefPtr<DecryptPromise>
 GMPCDMProxy::Decrypt(MediaRawData* aSample)
 {
   RefPtr<DecryptJob> job(new DecryptJob(aSample));
@@ -705,11 +696,10 @@ GMPCDMProxy::gmp_Decrypt(RefPtr<DecryptJob> aJob)
   MOZ_ASSERT(IsOnOwnerThread());
 
   if (!mCDM) {
-    aJob->PostResult(AbortedErr);
+    aJob->PostResult(eme::AbortedErr);
     return;
   }
 
-  aJob->mId = ++mDecryptionJobCount;
   nsTArray<uint8_t> data;
   data.AppendElements(aJob->mSample->Data(), aJob->mSample->Size());
   mCDM->Decrypt(aJob->mId, aJob->mSample->mCrypto, data);
@@ -740,37 +730,6 @@ GMPCDMProxy::gmp_Decrypted(uint32_t aId,
     NS_WARNING("GMPDecryptorChild returned incorrect job ID");
   }
 #endif
-}
-
-void
-GMPCDMProxy::DecryptJob::PostResult(DecryptStatus aResult)
-{
-  nsTArray<uint8_t> empty;
-  PostResult(aResult, empty);
-}
-
-void
-GMPCDMProxy::DecryptJob::PostResult(DecryptStatus aResult,
-                                    const nsTArray<uint8_t>& aDecryptedData)
-{
-  if (aDecryptedData.Length() != mSample->Size()) {
-    NS_WARNING("CDM returned incorrect number of decrypted bytes");
-  }
-  if (aResult == Ok) {
-    UniquePtr<MediaRawDataWriter> writer(mSample->CreateWriter());
-    PodCopy(writer->Data(),
-            aDecryptedData.Elements(),
-            std::min<size_t>(aDecryptedData.Length(), mSample->Size()));
-  } else if (aResult == NoKeyErr) {
-    NS_WARNING("CDM returned NoKeyErr");
-    // We still have the encrypted sample, so we can re-enqueue it to be
-    // decrypted again once the key is usable again.
-  } else {
-    nsAutoCString str("CDM returned decode failure DecryptStatus=");
-    str.AppendInt(aResult);
-    NS_WARNING(str.get());
-  }
-  mPromise.Resolve(DecryptResult(aResult, mSample), __func__);
 }
 
 void

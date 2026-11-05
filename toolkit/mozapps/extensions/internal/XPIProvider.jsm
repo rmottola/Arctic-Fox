@@ -1004,7 +1004,7 @@ var loadManifestFromWebManifest = Task.async(function*(aUri) {
     let rawManifest = extension.rawManifest;
 
     // As a convenience, allow author to be set if its a string bug 1313567.
-    let creator = typeof(rawManifest.author) === 'string' ? rawManifest.author : null;
+    let creator = typeof(rawManifest.author) === "string" ? rawManifest.author : null;
     let homepageURL = rawManifest.homepage_url;
 
     // Allow developer to override creator and homepage_url.
@@ -1360,6 +1360,8 @@ function defineSyncGUID(aAddon) {
   });
 }
 
+const TEMPORARY_ADDON_SUFFIX = "@temporary-addon";
+
 // Generate a unique ID based on the path to this temporary add-on location.
 function generateTemporaryInstallID(aFile) {
   const hasher = Cc["@mozilla.org/security/hash;1"]
@@ -1370,7 +1372,7 @@ function generateTemporaryInstallID(aFile) {
   const sess = TEMP_INSTALL_ID_GEN_SESSION;
   hasher.update(sess, sess.length);
   hasher.update(data, data.length);
-  let id = `${getHashStringForCrypto(hasher)}@temporary-addon`;
+  let id = `${getHashStringForCrypto(hasher)}${TEMPORARY_ADDON_SUFFIX}`;
   logger.info(`Generated temp id ${id} (${sess.join("")}) for ${aFile.path}`);
   return id;
 }
@@ -1682,7 +1684,7 @@ function flushChromeCaches() {
  */
 function getTemporaryFile() {
   let file = FileUtils.getDir(KEY_TEMPDIR, []);
-  let random = Math.random().toString(36).replace(/0./, '').substr(-3);
+  let random = Math.random().toString(36).replace(/0./, "").substr(-3);
   file.append("tmp-" + random + ".xpi");
   file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, FileUtils.PERMS_FILE);
 
@@ -2120,16 +2122,16 @@ function XPIState(saved) {
 }
 
 XPIState.prototype = {
-  fields: [['d', 'descriptor'],
-           ['e', 'enabled'],
-           ['v', 'version'],
-           ['st', 'scanTime'],
-           ['mt', 'manifestTime']],
+  fields: [["d", "descriptor"],
+           ["e", "enabled"],
+           ["v", "version"],
+           ["st", "scanTime"],
+           ["mt", "manifestTime"]],
   /**
    * Return the last modified time, based on enabled/disabled
    */
   get mtime() {
-    if (!this.enabled && ('manifestTime' in this) && this.manifestTime > this.scanTime) {
+    if (!this.enabled && ("manifestTime" in this) && this.manifestTime > this.scanTime) {
       return this.manifestTime;
     }
     return this.scanTime;
@@ -2155,8 +2157,8 @@ XPIState.prototype = {
     let changed = false;
     let scanStarted = Cu.now();
     // For an unknown or enabled add-on, we do a full recursive scan.
-    if (!('scanTime' in this) || this.enabled) {
-      logger.debug('getModTime: Recursive scan of ' + aId);
+    if (!("scanTime" in this) || this.enabled) {
+      logger.debug("getModTime: Recursive scan of " + aId);
       let [modFile, modTime, items] = recursiveLastModifiedTime(aFile);
       XPIProvider._mostRecentlyModifiedFile[aId] = modFile;
       XPIProvider.setTelemetry(aId, "scan_items", items);
@@ -3965,6 +3967,11 @@ this.XPIProvider = {
     return true;
   },
 
+  // Identify temporary install IDs.
+  isTemporaryInstallID: function(id) {
+    return id.endsWith(TEMPORARY_ADDON_SUFFIX);
+  },
+
   /**
    * Called to get an AddonInstall to download and install an add-on from a URL.
    *
@@ -4466,9 +4473,8 @@ this.XPIProvider = {
         this.importPermissions();
       }
       return;
-    }
-    else if (aTopic == NOTIFICATION_TOOLBOXPROCESS_LOADED) {
-      Services.obs.removeObserver(this, NOTIFICATION_TOOLBOXPROCESS_LOADED, false);
+    } else if (aTopic == NOTIFICATION_TOOLBOXPROCESS_LOADED) {
+      Services.obs.removeObserver(this, NOTIFICATION_TOOLBOXPROCESS_LOADED);
       this._toolboxProcessLoaded = true;
       BrowserToolboxProcess.on("connectionchange",
                                this.onDebugConnectionChange.bind(this));

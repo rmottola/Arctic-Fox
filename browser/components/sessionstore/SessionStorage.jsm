@@ -74,7 +74,14 @@ var SessionStorageInternal = {
 
       // Get the origin of the current history entry
       // and use that as a key for the per-principal storage data.
-      let origin = principal.origin;
+      let origin;
+      try {
+        // The origin getter may throw for about:blank iframes as of bug 1340710,
+        // but we should ignore them anyway.
+        origin = principal.origin;
+      } catch (e) {
+        return;
+      }
       if (visitedOrigins.has(origin)) {
         // Don't read a host twice.
         return;
@@ -109,7 +116,7 @@ var SessionStorageInternal = {
 
       try {
         let attrs = aDocShell.getOriginAttributes();
-        let originURI = Services.io.newURI(origin, null, null);
+        let originURI = Services.io.newURI(origin);
         principal = Services.scriptSecurityManager.createCodebasePrincipal(originURI, attrs);
       } catch (e) {
         console.error(e);
@@ -122,7 +129,7 @@ var SessionStorageInternal = {
       // There is no need to pass documentURI, it's only used to fill documentURI property of
       // domstorage event, which in this case has no consumer. Prevention of events in case
       // of missing documentURI will be solved in a followup bug to bug 600307.
-      let storage = storageManager.createStorage(window, principal, "");
+      let storage = storageManager.createStorage(window, principal, "", aDocShell.usePrivateBrowsing);
 
       for (let key of Object.keys(data)) {
         try {

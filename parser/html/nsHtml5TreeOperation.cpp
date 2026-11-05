@@ -633,7 +633,8 @@ nsHtml5TreeOperation::MarkMalformedIfScript(nsIContent* aNode)
 
 nsresult
 nsHtml5TreeOperation::Perform(nsHtml5TreeOpExecutor* aBuilder,
-                              nsIContent** aScriptElement)
+                              nsIContent** aScriptElement,
+                              bool* aInterrupted)
 {
   switch(mOpCode) {
     case eTreeOpUninitialized: {
@@ -662,7 +663,10 @@ nsHtml5TreeOperation::Perform(nsHtml5TreeOpExecutor* aBuilder,
     }
     case eTreeOpAppendToDocument: {
       nsIContent* node = *(mOne.node);
-      return AppendToDocument(node, aBuilder);
+      nsresult rv = AppendToDocument(node, aBuilder);
+
+      aBuilder->PauseDocUpdate(aInterrupted);
+      return rv;
     }
     case eTreeOpAddAttributes: {
       nsIContent* node = *(mOne.node);
@@ -984,7 +988,7 @@ nsHtml5TreeOperation::Perform(nsHtml5TreeOpExecutor* aBuilder,
       return NS_OK;
     }
     case eTreeOpStartLayout: {
-      aBuilder->StartLayout(); // this causes a notification flush anyway
+      aBuilder->StartLayout(aInterrupted); // this causes a notification flush anyway
       return NS_OK;
     }
     default: {

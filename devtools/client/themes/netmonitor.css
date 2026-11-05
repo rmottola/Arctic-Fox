@@ -1,7 +1,14 @@
-/* vim:set ts=2 sw=2 sts=2 et: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@import "resource://devtools/client/shared/components/tree/tree-view.css";
+@import "resource://devtools/client/shared/components/tabs/tabs.css";
+@import "resource://devtools/client/shared/components/tabs/tabbar.css";
+
+* {
+  box-sizing: border-box;
+}
 
 #toolbar-labels {
   overflow: hidden;
@@ -19,6 +26,11 @@
   flex: 0 0 auto;
   flex-wrap: nowrap;
   align-items: center;
+}
+
+#details-pane {
+  /* Make details-pane's width adjustable by splitter */
+  min-width: 50px;
 }
 
 /**
@@ -280,6 +292,11 @@
 
 .theme-firebug .requests-menu-header-button[data-sorted] {
   background-color: #AAC3DC;
+}
+
+:root[platform="linux"].theme-firebug .requests-menu-header-button[data-sorted] {
+  background-color: #FAC8AF !important;
+  color: inherit !important;
 }
 
 .theme-firebug .requests-menu-header:hover:active {
@@ -659,10 +676,6 @@
   color: var(--theme-selection-color);
 }
 
-#headers-tabpanel {
-  background-color: var(--theme-toolbar-background);
-}
-
 .theme-firebug .variables-view-scope:focus > .title {
   color: var(--theme-body-color);
 }
@@ -691,101 +704,77 @@
 
 /* Headers tabpanel */
 
-#headers-summary-status,
-#headers-summary-version {
-  padding-bottom: 2px;
-}
-
-#headers-summary-size {
-  padding-top: 2px;
-}
-
-#headers-summary-resend {
-  margin-top: -10px;
-  margin-inline-end: 6px;
-}
-
-#toggle-raw-headers {
-  margin-top: -10px;
-  margin-inline-end: 6px;
-}
-
-.raw-response-textarea {
-  height: 50vh;
+.headers-overview {
+  background: var(--theme-toolbar-background);
 }
 
 /* Response tabpanel */
 
-#response-content-info-header {
+.response-error-header {
   margin: 0;
   padding: 3px 8px;
   background-color: var(--theme-highlight-red);
   color: var(--theme-selection-color);
 }
 
-#response-content-image-box {
-  padding-top: 10px;
-  padding-bottom: 10px;
+.response-image-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+  padding: 10px;
 }
 
-#response-content-image {
+.response-image {
   background: #fff;
   border: 1px dashed GrayText;
   margin-bottom: 10px;
-}
-
-/* Preview tabpanel */
-
-#preview-tabpanel {
-  background: #fff;
-}
-
-#response-preview {
-  display: -moz-box;
-  -moz-box-flex: 1;
+  max-width: 300px;
+  max-height: 100px;
 }
 
 /* Timings tabpanel */
 
-#timings-tabpanel .tabpanel-summary-container {
+.timings-container {
   display: flex;
 }
 
-#timings-tabpanel .tabpanel-summary-label {
+.timings-label {
   width: 10em;
 }
 
-#timings-tabpanel .requests-menu-timings-container {
+.requests-menu-timings-container {
   display: flex;
   flex: 1;
   align-items: center;
 }
 
-#timings-tabpanel .requests-menu-timings-offset {
+.requests-menu-timings-offset {
   transition: width 0.2s ease-out;
 }
 
-#timings-tabpanel .requests-menu-timings-box {
+.requests-menu-timings-box {
   border: none;
   min-width: 1px;
   transition: width 0.2s ease-out;
 }
 
-.theme-firebug #timings-tabpanel .requests-menu-timings-total {
+.theme-firebug .requests-menu-timings-total {
   color: var(--theme-body-color);
 }
 
 /* Security tabpanel */
-.security-info-section {
-  padding-inline-start: 1em;
+
+/* Overwrite tree-view cell colon `:` for security panel and tree section */
+.security-panel .treeTable .treeLabelCell::after,
+.treeTable .tree-section .treeLabelCell::after {
+  content: "";
 }
 
-.theme-dark #security-error-message {
-  color: var(--theme-selection-color);
-}
-
-#security-tabpanel {
-  overflow: auto;
+/* Layout additional warning icon in tree value cell  */
+.security-info-value {
+  display: flex;
 }
 
 .security-warning-icon {
@@ -855,6 +844,10 @@
 }
 
 /* Performance analysis view */
+
+#network-statistics-view {
+  display: -moz-box;
+}
 
 #network-statistics-toolbar {
   border: none;
@@ -1084,12 +1077,228 @@
   }
 }
 
+.textbox-input {
+  text-overflow: ellipsis;
+  border: none;
+  background: none;
+  color: inherit;
+  width: 100%;
+}
+
+.treeTable .textbox-input:focus {
+  outline: 0;
+  box-shadow: var(--theme-focus-box-shadow-textbox);
+}
+
+.panel-container,
+.properties-view {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  height: 100%;
+}
+
+.properties-view .searchbox-section {
+  flex: 0 1 auto;
+}
+
+.properties-view .devtools-searchbox {
+  padding: 0;
+}
+
+.properties-view .devtools-searchbox input {
+  margin: 1px 3px;
+}
+
+.tree-container {
+  position: relative;
+  height: 100%;
+}
+
+/* Make treeTable fill parent element and scrollable */
+.tree-container .treeTable {
+  position: absolute;
+  display: block;
+  overflow-y: auto;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/* Apply flex to table tbody in order to fill available vertical space */
+.tree-container .treeTable tbody {
+  display: flex;
+  flex-direction: column;
+  /* Apply flex to table will create an anonymous table element outside of tbody
+   * See also http://stackoverflow.com/a/30851678
+   * Therefore, we set height with this magic number in order to remove the
+   * redundant scrollbar when source editor appears.
+   */
+  height: calc(100% - 4px);
+}
+
+.tree-container .treeTable tr {
+  display: block;
+}
+
+/* Make right td fill available horizontal space */
+.tree-container .treeTable td:last-child {
+  width: 100%;
+}
+
+/* If there is a source editor shows up in the last row of TreeView,
+ * it should occupy the available vertical space.
+ */
+.tree-container .treeTable .editor-row-container,
+.tree-container .treeTable tr:last-child td[colspan="2"] {
+  display: block;
+  height: 100%;
+}
+
+.properties-view .devtools-searchbox,
+.tree-container .treeTable .tree-section {
+  width: 100%;
+  background-color: var(--theme-toolbar-background);
+}
+
+.tree-container .treeTable tr.tree-section:not(:first-child) td:not([class=""]) {
+  border-top: 1px solid var(--theme-splitter-color);
+}
+
+.properties-view .devtools-searchbox,
+.tree-container .treeTable tr.tree-section:not(:last-child) td:not([class=""]) {
+  border-bottom: 1px solid var(--theme-splitter-color);
+}
+
+.tree-container .treeTable .tree-section > * {
+  vertical-align: middle;
+}
+
+.tree-container .treeTable .treeRow.tree-section > .treeLabelCell > .treeLabel,
+.tree-container .treeTable .treeRow.tree-section > .treeLabelCell > .treeLabel:hover {
+  color: var(--theme-body-color-alt);
+}
+
+.tree-container .treeTable .treeValueCell {
+  /* FIXME: Make value cell can be reduced to shorter width */
+  max-width: 0;
+  padding-inline-end: 5px;
+}
+
+.headers-summary input:not([type="button"]) {
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  margin-inline-end: 2px;
+}
+
+.headers-summary input:not([type="button"]):focus {
+  outline: none;
+  box-shadow: var(--theme-focus-box-shadow-textbox);
+  transition: all 0.2s ease-in-out;
+}
+
+.headers-summary-label,
+.tree-container .objectBox {
+  white-space: nowrap;
+}
+
+.headers-summary,
+.response-summary {
+  display: flex;
+  align-items: center;
+}
+
+.headers-summary .tool-button {
+  border: 1px solid transparent;
+  color: var(--theme-body-color);
+  transition: background 0.05s ease-in-out;
+  margin-inline-end: 6px;
+  padding: 0 5px;
+}
+
+.theme-light .headers-summary .tool-button {
+  background-color: var(--toolbar-tab-hover);
+}
+
+.theme-light .headers-summary .tool-button:hover {
+  background-color: rgba(170, 170, 170, 0.3);
+}
+
+.theme-light .headers-summary .tool-button:hover:active {
+  background-color: var(--toolbar-tab-hover-active);
+}
+
+.theme-dark .headers-summary .tool-button {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.theme-dark .headers-summary .tool-button:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.theme-dark .headers-summary .tool-button:hover:active {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.headers-summary .requests-menu-status-icon {
+  min-width: 10px;
+}
+
+.headers-summary .raw-headers-container {
+  display: flex;
+  width: 100%;
+}
+
+.headers-summary .raw-headers {
+  width: 50%;
+  padding: 0px 4px;
+}
+
+.headers-summary .raw-headers textarea {
+  width: 100%;
+  height: 50vh;
+  font: message-box;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.headers-summary .raw-headers .tabpanel-summary-label {
+  padding: 0 0 4px 0;
+}
+
+.empty-notice {
+  color: var(--theme-body-color-alt);
+  padding: 3px 8px;
+}
+
+.response-summary {
+  display: flex;
+}
+
+.editor-container,
+.editor-mount,
+.panel-container iframe {
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+
 /*
  * FIXME: normal html block element cannot fill outer XUL element
- * This workaround should be removed after sidebar is migrated to react
+ * This workaround should be removed after netmonitor is migrated to react
  */
-#react-timings-tabpanel-hook {
+
+#react-details-panel-hook {
+  display: flex;
+  flex-direction: column;
+}
+
+#network-statistics-charts,
+#primed-cache-chart,
+#empty-cache-chart {
   display: -moz-box;
-  -moz-box-orient: vertical;
   -moz-box-flex: 1;
 }

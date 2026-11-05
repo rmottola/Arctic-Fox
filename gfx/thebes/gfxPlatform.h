@@ -189,6 +189,8 @@ public:
 
     static void InitMoz2DLogging();
 
+    static bool IsHeadless();
+
     /**
      * Create an offscreen surface of the given dimensions
      * and image format.
@@ -635,9 +637,7 @@ public:
     virtual bool SupportsApzWheelInput() const {
       return false;
     }
-    virtual bool SupportsApzTouchInput() const {
-      return false;
-    }
+    bool SupportsApzTouchInput() const;
     bool SupportsApzDragInput() const;
 
     virtual void FlushContentDrawing() {}
@@ -661,6 +661,8 @@ public:
      */
     static bool PerfWarnings();
 
+    static void NotifyGPUProcessDisabled();
+
     void NotifyCompositorCreated(mozilla::layers::LayersBackend aBackend);
     mozilla::layers::LayersBackend GetCompositorBackend() const {
       return mCompositorBackend;
@@ -677,10 +679,6 @@ public:
     // context. These platforms should return true here.
     virtual bool RequiresAcceleratedGLContextForCompositorOGL() const {
       return false;
-    }
-
-    uint64_t GetDeviceCounter() const {
-      return mDeviceCounter;
     }
 
     /**
@@ -833,6 +831,7 @@ private:
 
     void InitCompositorAccelerationPrefs();
     void InitGPUProcessPrefs();
+    void InitWebRenderConfig();
 
     static bool IsDXInterop2Blocked();
 
@@ -865,9 +864,6 @@ private:
 
     int32_t mScreenDepth;
     mozilla::gfx::IntSize mScreenSize;
-
-    // Generation number for devices that ClientLayerManagers might depend on.
-    uint64_t mDeviceCounter;
 
     // An instance of gfxSkipChars which is empty. It is used as the
     // basis for error-case iterators.

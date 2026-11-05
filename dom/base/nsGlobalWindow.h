@@ -102,7 +102,10 @@ struct nsRect;
 
 class nsWindowSizes;
 
+class IdleRequestExecutor;
+
 namespace mozilla {
+class AbstractThread;
 class DOMEventTargetHelper;
 class ThrottledEventQueue;
 namespace dom {
@@ -118,6 +121,10 @@ class Gamepad;
 enum class ImageBitmapFormat : uint8_t;
 class IdleRequest;
 class IdleRequestCallback;
+class IncrementalRunnable;
+#ifdef ENABLE_INTL_API
+class IntlUtils;
+#endif
 class Location;
 class MediaQueryList;
 class MozSelfSupport;
@@ -133,6 +140,7 @@ class TabGroup;
 class Timeout;
 class U2F;
 class VRDisplay;
+enum class VRDisplayEventReason : uint8_t;
 class VREventObserver;
 class WakeLock;
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
@@ -287,6 +295,10 @@ public:
     return static_cast<nsGlobalWindow*>(
                         reinterpret_cast<nsPIDOMWindow<nsISupports>*>(aPIWin));
   }
+  static const nsGlobalWindow* Cast(const nsPIDOMWindowOuter* aPIWin) {
+    return static_cast<const nsGlobalWindow*>(
+                        reinterpret_cast<const nsPIDOMWindow<nsISupports>*>(aPIWin));
+  }
   static nsGlobalWindow* Cast(mozIDOMWindowProxy* aWin) {
     return Cast(nsPIDOMWindowOuter::From(aWin));
   }
@@ -385,16 +397,15 @@ public:
   virtual already_AddRefed<nsISupports> SaveWindowState() override;
   virtual nsresult RestoreWindowState(nsISupports *aState) override;
 
-  virtual void Suspend();
-  virtual void Resume();
+  void Suspend();
+  void Resume();
   virtual bool IsSuspended() const override;
-  virtual void Freeze();
-  virtual void Thaw();
+  void Freeze();
+  void Thaw();
   virtual bool IsFrozen() const override;
-  virtual void SyncStateFromParentWindow();
+  void SyncStateFromParentWindow();
 
   virtual nsresult FireDelayedDOMEvents() override;
-  virtual bool IsRunningTimeout() override;
 
   // Outer windows only.
   virtual bool WouldReuseInnerWindow(nsIDocument* aNewDocument) override;
@@ -444,6 +455,7 @@ public:
   // Inner windows only.
   virtual void SetHasGamepadEventListener(bool aHasGamepad = true) override;
   void NotifyVREventListenerAdded();
+  bool HasUsedVR() const;
   virtual void EventListenerAdded(nsIAtom* aType) override;
 
   // nsIInterfaceRequestor
@@ -755,6 +767,14 @@ public:
   // Called to inform that the set of active VR displays has changed.
   void NotifyActiveVRDisplaysChanged();
 
+  void DispatchVRDisplayActivate(uint32_t aDisplayID,
+                                 mozilla::dom::VRDisplayEventReason aReason);
+  void DispatchVRDisplayDeactivate(uint32_t aDisplayID,
+                                   mozilla::dom::VRDisplayEventReason aReason);
+  void DispatchVRDisplayConnect(uint32_t aDisplayID);
+  void DispatchVRDisplayDisconnect(uint32_t aDisplayID);
+  void DispatchVRDisplayPresentChange(uint32_t aDisplayID);
+
 #define EVENT(name_, id_, type_, struct_)                                     \
   mozilla::dom::EventHandlerNonNull* GetOn##name_()                           \
   {                                                                           \
@@ -911,6 +931,7 @@ public:
 
   // https://w3c.github.io/webappsec-secure-contexts/#dom-window-issecurecontext
   bool IsSecureContext() const;
+  bool IsSecureContextIfOpenerIgnored() const;
 
   void GetSidebar(mozilla::dom::OwningExternalOrWindowProxy& aResult,
                   mozilla::ErrorResult& aRv);
@@ -928,6 +949,14 @@ public:
 
   mozilla::dom::Worklet*
   GetPaintWorklet(mozilla::ErrorResult& aRv);
+
+  void
+  GetAppLocales(nsTArray<nsString>& aLocales);
+
+#ifdef ENABLE_INTL_API
+  mozilla::dom::IntlUtils*
+  GetIntlUtils(mozilla::ErrorResult& aRv);
+#endif
 
 protected:
   bool AlertOrConfirm(bool aAlert, const nsAString& aMessage,
@@ -972,7 +1001,7 @@ public:
                        mozilla::ErrorResult& aError);
   void PostMessageMoz(JSContext* aCx, JS::Handle<JS::Value> aMessage,
                       const nsAString& aTargetOrigin,
-                      const mozilla::dom::Optional<mozilla::dom::Sequence<JS::Value > >& aTransfer,
+                      const mozilla::dom::Sequence<JSObject*>& aTransfer,
                       nsIPrincipal& aSubjectPrincipal,
                       mozilla::ErrorResult& aError);
   int32_t SetTimeout(JSContext* aCx, mozilla::dom::Function& aFunction,
@@ -993,6 +1022,7 @@ public:
                       const mozilla::dom::Sequence<JS::Value>& /* unused */,
                       mozilla::ErrorResult& aError);
   void ClearInterval(int32_t aHandle);
+  void GetOrigin(nsAString& aOrigin);
   void Atob(const nsAString& aAsciiBase64String, nsAString& aBinaryData,
             mozilla::ErrorResult& aError);
   void Btoa(const nsAString& aBinaryData, nsAString& aAsciiBase64String,
@@ -1072,7 +1102,6 @@ public:
   {
     return GetScrollY(aError);
   }
-  void MozRequestOverfill(mozilla::dom::OverfillCallback& aCallback, mozilla::ErrorResult& aError);
   void GetScreenX(JSContext* aCx, JS::MutableHandle<JS::Value> aValue,
                   mozilla::dom::CallerType aCallerType,
                   mozilla::ErrorResult& aError);
@@ -1106,7 +1135,6 @@ public:
                                const mozilla::dom::IdleRequestOptions& aOptions,
                                mozilla::ErrorResult& aError);
   void CancelIdleCallback(uint32_t aHandle);
-
 
 #ifdef MOZ_WEBSPEECH
   mozilla::dom::SpeechSynthesis*
@@ -1185,8 +1213,6 @@ public:
                       nsISupports* aExtraArgument,
                       nsPIDOMWindowOuter** _retval) override;
   nsresult UpdateCommands(const nsAString& anAction, nsISelection* aSel, int16_t aReason) override;
-
-  mozilla::ThrottledEventQueue* GetThrottledEventQueue() override;
 
   already_AddRefed<nsPIDOMWindowOuter>
   GetContentInternal(mozilla::ErrorResult& aError,
@@ -1757,9 +1783,16 @@ private:
 
   void DisconnectEventTargetObjects();
 
+
+  enum class SecureContextFlags {
+    eDefault,
+    eIgnoreOpener
+  };
   // Called only on outer windows to compute the value that will be returned by
   // IsSecureContext() for the inner window that corresponds to aDocument.
-  bool ComputeIsSecureContext(nsIDocument* aDocument);
+  bool ComputeIsSecureContext(nsIDocument* aDocument,
+                              SecureContextFlags aFlags =
+                                SecureContextFlags::eDefault);
 
   // nsPIDOMWindow<T> should be able to see these helper methods.
   friend class nsPIDOMWindow<mozIDOMWindowProxy>;
@@ -1774,11 +1807,28 @@ private:
 public:
   // Dispatch a runnable related to the global.
   virtual nsresult Dispatch(const char* aName,
-                            mozilla::dom::TaskCategory aCategory,
+                            mozilla::TaskCategory aCategory,
                             already_AddRefed<nsIRunnable>&& aRunnable) override;
 
-  virtual already_AddRefed<nsIEventTarget>
-  EventTargetFor(mozilla::dom::TaskCategory aCategory) const override;
+  virtual nsIEventTarget*
+  EventTargetFor(mozilla::TaskCategory aCategory) const override;
+
+  virtual mozilla::AbstractThread*
+  AbstractMainThreadFor(mozilla::TaskCategory aCategory) override;
+
+  void DisableIdleCallbackRequests();
+  uint32_t IdleRequestHandle() const { return mIdleRequestCallbackCounter; }
+  nsresult RunIdleRequest(mozilla::dom::IdleRequest* aRequest,
+                          DOMHighResTimeStamp aDeadline, bool aDidTimeout);
+  nsresult ExecuteIdleRequest(TimeStamp aDeadline);
+  void ScheduleIdleRequestDispatch();
+  void SuspendIdleRequests();
+  void ResumeIdleRequests();
+
+  typedef mozilla::LinkedList<mozilla::dom::IdleRequest> IdleRequests;
+  void InsertIdleCallback(mozilla::dom::IdleRequest* aRequest);
+
+  void RemoveIdleCallback(mozilla::dom::IdleRequest* aRequest);
 
 protected:
   // These members are only used on outer window objects. Make sure
@@ -1793,6 +1843,7 @@ protected:
   bool                          mHavePendingClose : 1;
   bool                          mHadOriginalOpener : 1;
   bool                          mOriginalOpenerWasSecureContext : 1;
+  bool                          mIsSecureContextIfOpenerIgnored : 1;
   bool                          mIsPopupSpam : 1;
 
   // Indicates whether scripts are allowed to close this window.
@@ -1851,6 +1902,8 @@ protected:
   // whether scripts may close the window,
   // even if "dom.allow_scripts_to_close_windows" is false.
   bool                   mAllowScriptsToClose : 1;
+
+  bool mTopLevelOuterContentWindow : 1;
 
   nsCOMPtr<nsIScriptContext>    mContext;
   nsWeakPtr                     mOpener;
@@ -1916,19 +1969,10 @@ protected:
 
   uint32_t mSerial;
 
-  void DisableIdleCallbackRequests();
-  void UnthrottleIdleCallbackRequests();
-
-  void PostThrottledIdleCallback();
-
-  typedef mozilla::LinkedList<mozilla::dom::IdleRequest> IdleRequests;
-  static void InsertIdleCallbackIntoList(mozilla::dom::IdleRequest* aRequest,
-                                         IdleRequests& aList);
-
   // The current idle request callback handle
   uint32_t mIdleRequestCallbackCounter;
   IdleRequests mIdleRequestCallbacks;
-  IdleRequests mThrottledIdleRequestCallbacks;
+  RefPtr<IdleRequestExecutor> mIdleRequestExecutor;
 
 #ifdef DEBUG
   bool mSetOpenerWindowCalled;
@@ -1998,13 +2042,18 @@ protected:
   // The VR Displays for this window
   nsTArray<RefPtr<mozilla::dom::VRDisplay>> mVRDisplays;
 
-  nsAutoPtr<mozilla::dom::VREventObserver> mVREventObserver;
+  RefPtr<mozilla::dom::VREventObserver> mVREventObserver;
+
+#ifdef ENABLE_INTL_API
+  RefPtr<mozilla::dom::IntlUtils> mIntlUtils;
+#endif
 
   friend class nsDOMScriptableHelper;
   friend class nsDOMWindowUtils;
   friend class mozilla::dom::PostMessageEvent;
   friend class DesktopNotification;
   friend class mozilla::dom::TimeoutManager;
+  friend class IdleRequestExecutor;
 
   static WindowByIdTable* sWindowsById;
   static bool sWarnedAboutWindowInternal;

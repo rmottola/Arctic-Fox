@@ -69,7 +69,7 @@ function server_upload(metadata, response) {
     body = "Valid data upload via " + metadata.method;
     response.setStatusLine(metadata.httpVersion, 200, "OK");
   } else {
-    body = "Invalid data upload via " + metadata.method + ': ' + input;
+    body = "Invalid data upload via " + metadata.method + ": " + input;
     response.setStatusLine(metadata.httpVersion, 500, "Internal Server Error");
   }
 
@@ -153,7 +153,7 @@ Observers.add("weave:service:quota:remaining",
               function (subject) { quotaValue = subject; });
 
 function run_test() {
-  logger = Log.repository.getLogger('Test');
+  logger = Log.repository.getLogger("Test");
   Log.repository.rootLogger.addAppender(new Log.DumpAppender());
 
   Svc.Prefs.set("network.numRetries", 1); // speed up test
@@ -493,7 +493,7 @@ add_test(function test_get_no_headers() {
   let res_headers = new AsyncResource(server.baseURI + "/headers");
   res_headers.get(function (error, content) {
     do_check_eq(error, null);
-    do_check_eq(content, '{}');
+    do_check_eq(content, "{}");
     run_next_test();
   });
 });

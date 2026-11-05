@@ -25,7 +25,7 @@ interface nsIDOMDocument;
 [ptr] native PrincipalArray(nsTArray<nsCOMPtr<nsIPrincipal> >);
 [ref] native const_OriginAttributes(const mozilla::OriginAttributes);
 
-[scriptable, builtinclass, uuid(3da7b133-f1a0-4de9-a2bc-5c49014c1077)]
+[scriptable, builtinclass, uuid(f75f502d-79fd-48be-a079-e5a7b8f80c8b)]
 interface nsIPrincipal : nsISerializable
 {
     /**
@@ -94,6 +94,12 @@ interface nsIPrincipal : nsISerializable
      */
     boolean subsumesConsideringDomain(in nsIPrincipal other);
 
+    /**
+     * Same as the subsumesConsideringDomain(), but ignores the first party
+     * domain in its originAttributes.
+     */
+    boolean subsumesConsideringDomainIgnoringFPD(in nsIPrincipal other);
+
     %{C++
     inline bool Subsumes(nsIPrincipal* aOther) {
       bool subsumes = false;
@@ -103,6 +109,11 @@ interface nsIPrincipal : nsISerializable
     inline bool SubsumesConsideringDomain(nsIPrincipal* aOther) {
       bool subsumes = false;
       return NS_SUCCEEDED(SubsumesConsideringDomain(aOther, &subsumes)) && subsumes;
+    }
+
+    inline bool SubsumesConsideringDomainIgnoringFPD(nsIPrincipal* aOther) {
+      bool subsumes = false;
+      return NS_SUCCEEDED(SubsumesConsideringDomainIgnoringFPD(aOther, &subsumes)) && subsumes;
     }
     %}
 
@@ -137,10 +148,11 @@ interface nsIPrincipal : nsISerializable
 
     /**
      * A Content Security Policy associated with this principal.
-     *
      * Use this function to query the associated CSP with this principal.
+     * Please *only* use this function to *set* a CSP when you know exactly what you are doing.
+     * Most likely you want to call ensureCSP instead of setCSP.
      */
-    [noscript] readonly attribute nsIContentSecurityPolicy csp;
+    [noscript] attribute nsIContentSecurityPolicy csp;
 
     /*
      * Use this function to query a CSP associated with this principal.
@@ -339,24 +351,15 @@ interface nsIPrincipal : nsISerializable
      * Returns true iff this is the system principal.
      */
     [infallible] readonly attribute boolean isSystemPrincipal;
-
-    /**
-     * Returns true if this principal's origin is recognized as being on the
-     * whitelist of sites that can use the CSS Unprefixing Service.
-     *
-     * (This interface provides a trivial implementation, just returning false;
-     * subclasses can implement something more complex as-needed.)
-     */
-    [noscript,notxpcom,nostdcall] bool IsOnCSSUnprefixingWhitelist();
 };
 
 /**
- * If nsSystemPrincipal is too risky to use, but we want a principal to access
- * more than one origin, nsExpandedPrincipals letting us define an array of
- * principals it subsumes. So script with an nsExpandedPrincipals will gain
+ * If SystemPrincipal is too risky to use, but we want a principal to access
+ * more than one origin, ExpandedPrincipals letting us define an array of
+ * principals it subsumes. So script with an ExpandedPrincipals will gain
  * same origin access when at least one of its principals it contains gained
- * sameorigin acccess. An nsExpandedPrincipal will be subsumed by the system
- * principal, and by another nsExpandedPrincipal that has all its principals.
+ * sameorigin acccess. An ExpandedPrincipal will be subsumed by the system
+ * principal, and by another ExpandedPrincipal that has all its principals.
  * It is added for jetpack content-scripts to let them interact with the
  * content and a well defined set of other domains, without the risk of
  * leaking out a system principal to the content. See: Bug 734891

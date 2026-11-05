@@ -13,6 +13,7 @@
 #include "mozilla/AutoRestore.h"
 #include "mozilla/AsyncEventDispatcher.h" // For AsyncEventDispatcher
 #include "mozilla/Maybe.h" // For Maybe
+#include "mozilla/AnimationRule.h" // For AnimationRule
 #include "nsAnimationManager.h" // For CSSAnimation
 #include "nsDOMMutationObserver.h" // For nsAutoAnimationMutationBatch
 #include "nsIDocument.h" // For nsIDocument
@@ -230,6 +231,10 @@ Animation::SetTimelineNoUpdate(AnimationTimeline* aTimeline)
     return;
   }
 
+  StickyTimeDuration activeTime = mEffect
+                                  ? mEffect->GetComputedTiming().mActiveTime
+                                  : StickyTimeDuration();
+
   RefPtr<AnimationTimeline> oldTimeline = mTimeline;
   if (oldTimeline) {
     oldTimeline->RemoveAnimation(this);
@@ -240,6 +245,9 @@ Animation::SetTimelineNoUpdate(AnimationTimeline* aTimeline)
     mHoldTime.SetNull();
   }
 
+  if (!aTimeline) {
+    MaybeQueueCancelEvent(activeTime);
+  }
   UpdateTiming(SeekFlag::NoSeek, SyncNotifyFlag::Async);
 }
 
@@ -408,7 +416,9 @@ Animation::GetReady(ErrorResult& aRv)
   }
   if (!mReady) {
     aRv.Throw(NS_ERROR_FAILURE);
-  } else if (PlayState() != AnimationPlayState::Pending) {
+    return nullptr;
+  }
+  if (PlayState() != AnimationPlayState::Pending) {
     mReady->MaybeResolve(this);
   }
   return mReady;
@@ -423,7 +433,9 @@ Animation::GetFinished(ErrorResult& aRv)
   }
   if (!mFinished) {
     aRv.Throw(NS_ERROR_FAILURE);
-  } else if (mFinishedIsResolved) {
+    return nullptr;
+  }
+  if (mFinishedIsResolved) {
     MaybeResolveFinishedPromise();
   }
   return mFinished;
@@ -722,8 +734,10 @@ TimeStamp
 Animation::ElapsedTimeToTimeStamp(
   const StickyTimeDuration& aElapsedTime) const
 {
-  return AnimationTimeToTimeStamp(aElapsedTime +
-                                  mEffect->SpecifiedTiming().mDelay);
+  TimeDuration delay = mEffect
+                       ? mEffect->SpecifiedTiming().mDelay
+                       : TimeDuration();
+  return AnimationTimeToTimeStamp(aElapsedTime + delay);
 }
 
 // https://w3c.github.io/web-animations/#silently-set-the-current-time
@@ -770,6 +784,10 @@ Animation::CancelNoUpdate()
 
   DispatchPlaybackEvent(NS_LITERAL_STRING("cancel"));
 
+  StickyTimeDuration activeTime = mEffect
+                                  ? mEffect->GetComputedTiming().mActiveTime
+                                  : StickyTimeDuration();
+
   mHoldTime.SetNull();
   mStartTime.SetNull();
 
@@ -778,6 +796,7 @@ Animation::CancelNoUpdate()
   if (mTimeline) {
     mTimeline->RemoveAnimation(this);
   }
+  MaybeQueueCancelEvent(activeTime);
 }
 
 bool
@@ -856,6 +875,17 @@ Animation::HasLowerCompositeOrderThan(const Animation& aOther) const
       return thisTransition->HasLowerCompositeOrderThan(*otherTransition);
     }
     if (thisTransition || otherTransition) {
+      // Cancelled transitions no longer have an owning element. To be strictly
+      // correct we should store a strong reference to the owning element
+      // so that if we arrive here while sorting cancel events, we can sort
+      // them in the correct order.
+      //
+      // However, given that cancel events are almost always queued
+      // synchronously in some deterministic manner, we can be fairly sure
+      // that cancel events will be dispatched in a deterministic order
+      // (which is our only hard requirement until specs say otherwise).
+      // Furthermore, we only reach here when we have events with equal
+      // timestamps so this is an edge case we can probably ignore for now.
       return thisTransition;
     }
   }
@@ -891,14 +921,10 @@ Animation::HasLowerCompositeOrderThan(const Animation& aOther) const
 }
 
 void
-Animation::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
+Animation::ComposeStyle(AnimationRule& aStyleRule,
                         const nsCSSPropertyIDSet& aPropertiesToSkip)
 {
   if (!mEffect) {
-    return;
-  }
-
-  if (!IsInEffect()) {
     return;
   }
 

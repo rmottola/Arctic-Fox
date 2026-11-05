@@ -266,6 +266,10 @@ public: /* internal necko use only */
     bool AwaitingCacheCallbacks();
     void SetCouldBeSynthesized();
 
+    // Return true if the latest ODA is invoked by mCachePump.
+    // Should only be called on the same thread as ODA.
+    bool IsReadingFromCache() const { return mIsReadingFromCache; }
+
 private: // used for alternate service validation
     RefPtr<TransactionObserver> mTransactionObserver;
 public:
@@ -460,6 +464,19 @@ private:
     void SetDoNotTrack();
 
 private:
+    // this section is for main-thread-only object
+    // all the references need to be proxy released on main thread.
+    nsCOMPtr<nsIApplicationCache> mApplicationCacheForWrite;
+    // auth specific data
+    nsCOMPtr<nsIHttpChannelAuthProvider> mAuthProvider;
+    nsCOMPtr<nsIURI> mRedirectURI;
+    nsCOMPtr<nsIChannel> mRedirectChannel;
+    nsCOMPtr<nsIChannel> mPreflightChannel;
+
+    // Proxy release all members above on main thread.
+    void ReleaseMainThreadOnlyReferences();
+
+private:
     nsCOMPtr<nsICancelable>           mProxyRequest;
 
     RefPtr<nsInputStreamPump>       mTransactionPump;
@@ -485,10 +502,6 @@ private:
 
     nsCOMPtr<nsICacheEntry> mOfflineCacheEntry;
     uint32_t                          mOfflineCacheLastModifiedTime;
-    nsCOMPtr<nsIApplicationCache>     mApplicationCacheForWrite;
-
-    // auth specific data
-    nsCOMPtr<nsIHttpChannelAuthProvider> mAuthProvider;
 
     mozilla::TimeStamp                mOnStartRequestTimestamp;
 
@@ -514,8 +527,6 @@ private:
     friend class AutoRedirectVetoNotifier;
     friend class HttpAsyncAborter<nsHttpChannel>;
 
-    nsCOMPtr<nsIURI>                  mRedirectURI;
-    nsCOMPtr<nsIChannel>              mRedirectChannel;
     uint32_t                          mRedirectType;
 
     static const uint32_t WAIT_FOR_CACHE_ENTRY = 1;
@@ -574,7 +585,8 @@ private:
     // by chunking, content-length, or h2 end-stream framing
     uint32_t                          mStronglyFramed : 1;
 
-    nsCOMPtr<nsIChannel>              mPreflightChannel;
+    // true if an HTTP transaction is created for the socket thread
+    uint32_t                          mUsedNetwork : 1;
 
     nsTArray<nsContinueRedirectionFunc> mRedirectFuncStack;
 
@@ -596,6 +608,10 @@ private:
     HttpChannelSecurityWarningReporter* mWarningReporter;
 
     RefPtr<ADivertableParentChannel> mParentChannel;
+
+    // True if the channel is reading from cache.
+    Atomic<bool> mIsReadingFromCache;
+
 protected:
     virtual void DoNotifyListenerCleanup() override;
 

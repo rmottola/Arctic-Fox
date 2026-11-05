@@ -359,10 +359,6 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
     void moveValue(const Value& src, const ValueOperand& dest) {
         moveValue(src, dest.valueReg());
     }
-    void moveValue(const ValueOperand& src, const ValueOperand& dest) {
-        if (src.valueReg() != dest.valueReg())
-            movePtr(src.valueReg(), dest.valueReg());
-    }
 
     CodeOffset pushWithPatch(ImmWord imm) {
         vixl::UseScratchRegisterScope temps(this);
@@ -915,12 +911,14 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
     void loadInt32x2(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void loadInt32x3(const Address& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void loadInt32x3(const BaseIndex& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadInt32x4(const Address& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void storeInt32x1(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
     void storeInt32x1(FloatRegister src, const BaseIndex& dest) { MOZ_CRASH("NYI"); }
     void storeInt32x2(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
     void storeInt32x2(FloatRegister src, const BaseIndex& dest) { MOZ_CRASH("NYI"); }
     void storeInt32x3(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
     void storeInt32x3(FloatRegister src, const BaseIndex& dest) { MOZ_CRASH("NYI"); }
+    void storeInt32x4(FloatRegister src, const Address& dest) { MOZ_CRASH("NYI"); }
     void loadAlignedSimd128Int(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void loadAlignedSimd128Int(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void storeAlignedSimd128Int(FloatRegister src, const Address& addr) { MOZ_CRASH("NYI"); }
@@ -932,6 +930,9 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
 
     void loadFloat32x3(const Address& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void loadFloat32x3(const BaseIndex& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void loadFloat32x4(const Address& src, FloatRegister dest) { MOZ_CRASH("NYI"); }
+    void storeFloat32x4(FloatRegister src, const Address& addr) { MOZ_CRASH("NYI"); }
+
     void loadAlignedSimd128Float(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void loadAlignedSimd128Float(const BaseIndex& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }
     void storeAlignedSimd128Float(FloatRegister src, const Address& addr) { MOZ_CRASH("NYI"); }
@@ -1299,7 +1300,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
         MOZ_CRASH("branchNegativeZeroFloat32");
     }
 
-    void boxDouble(FloatRegister src, const ValueOperand& dest) {
+    void boxDouble(FloatRegister src, const ValueOperand& dest, FloatRegister) {
         Fmov(ARMRegister(dest.valueReg(), 64), ARMFPRegister(src, 64));
     }
     void boxNonDouble(JSValueType type, Register src, const ValueOperand& dest) {
@@ -1403,12 +1404,6 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
         convertInt32ToFloat32(operand.valueReg(), dest);
     }
 
-    void loadConstantDouble(wasm::RawF64 d, FloatRegister dest) {
-        loadConstantDouble(d.fp(), dest);
-    }
-    void loadConstantFloat32(wasm::RawF32 f, FloatRegister dest) {
-        loadConstantFloat32(f.fp(), dest);
-    }
     void loadConstantDouble(double d, FloatRegister dest) {
         Fmov(ARMFPRegister(dest, 64), d);
     }
@@ -1867,12 +1862,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
 
     void handleFailureWithHandlerTail(void* handler);
 
-    void profilerEnterFrame(Register framePtr, Register scratch) {
-        AbsoluteAddress activation(GetJitContext()->runtime->addressOfProfilingActivation());
-        loadPtr(activation, scratch);
-        storePtr(framePtr, Address(scratch, JitActivation::offsetOfLastProfilingFrame()));
-        storePtr(ImmPtr(nullptr), Address(scratch, JitActivation::offsetOfLastProfilingCallSite()));
-    }
+    void profilerEnterFrame(Register framePtr, Register scratch);
     void profilerExitFrame() {
         branch(GetJitContext()->runtime->jitRuntime()->getProfilerExitFrameTail());
     }
@@ -2293,12 +2283,10 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
     }
 
     void loadWasmGlobalPtr(uint32_t globalDataOffset, Register dest) {
-        loadPtr(Address(GlobalReg, globalDataOffset - WasmGlobalRegBias), dest);
+        loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, globalArea) + globalDataOffset), dest);
     }
     void loadWasmPinnedRegsFromTls() {
         loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, memoryBase)), HeapReg);
-        loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, globalData)), GlobalReg);
-        adds32(Imm32(WasmGlobalRegBias), GlobalReg);
     }
 
     // Overwrites the payload bits of a dest register containing a Value.
@@ -2315,10 +2303,6 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
     uint32_t currentOffset() const {
         return nextOffset().getOffset();
     }
-
-    struct AutoPrepareForPatching {
-        explicit AutoPrepareForPatching(MacroAssemblerCompat&) {}
-    };
 
   protected:
     bool buildOOLFakeExitFrame(void* fakeReturnAddr) {

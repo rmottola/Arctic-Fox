@@ -531,8 +531,8 @@ void
 nsHttpTransaction::OnTransportStatus(nsITransport* transport,
                                      nsresult status, int64_t progress)
 {
-    LOG(("nsHttpTransaction::OnSocketStatus [this=%p status=%x progress=%lld]\n",
-        this, status, progress));
+    LOG(("nsHttpTransaction::OnSocketStatus [this=%p status=%" PRIx32 " progress=%" PRId64 "]\n",
+         this, static_cast<uint32_t>(status), progress));
 
     if (status == NS_NET_STATUS_CONNECTED_TO ||
         status == NS_NET_STATUS_WAITING_FOR) {
@@ -911,7 +911,8 @@ nsHttpTransaction::WriteSegments(nsAHttpSegmentWriter *writer,
 void
 nsHttpTransaction::Close(nsresult reason)
 {
-    LOG(("nsHttpTransaction::Close [this=%p reason=%x]\n", this, reason));
+    LOG(("nsHttpTransaction::Close [this=%p reason=%" PRIx32 "]\n",
+         this, static_cast<uint32_t>(reason)));
 
     MOZ_ASSERT(PR_GetCurrentThread() == gSocketThread);
     if (reason == NS_BINDING_RETARGETED) {
@@ -1230,8 +1231,8 @@ nsHttpTransaction::RestartInProgress()
     if (!mRestartInProgressVerifier.IsSetup())
         return NS_ERROR_NET_RESET;
 
-    LOG(("Will restart transaction %p and skip first %lld bytes, "
-         "old Content-Length %lld",
+    LOG(("Will restart transaction %p and skip first %" PRId64 " bytes, "
+         "old Content-Length %" PRId64,
          this, mContentRead, mContentLength));
 
     mRestartInProgressVerifier.SetAlreadyProcessed(
@@ -1777,7 +1778,7 @@ nsHttpTransaction::HandleContent(char *buf,
         uint32_t ignore =
             static_cast<uint32_t>(std::min<int64_t>(toReadBeforeRestart, UINT32_MAX));
         ignore = std::min(*contentRead, ignore);
-        LOG(("Due To Restart ignoring %d of remaining %ld",
+        LOG(("Due To Restart ignoring %d of remaining %" PRId64,
              ignore, toReadBeforeRestart));
         *contentRead -= ignore;
         mContentRead += ignore;
@@ -1790,7 +1791,7 @@ nsHttpTransaction::HandleContent(char *buf,
         mContentRead += *contentRead;
     }
 
-    LOG(("nsHttpTransaction::HandleContent [this=%p count=%u read=%u mContentRead=%lld mContentLength=%lld]\n",
+    LOG(("nsHttpTransaction::HandleContent [this=%p count=%u read=%u mContentRead=%" PRId64 " mContentLength=%" PRId64 "]\n",
         this, count, *contentRead, mContentRead, mContentLength));
 
     // Check the size of chunked responses. If we exceed the max pipeline size
@@ -2010,7 +2011,7 @@ nsHttpTransaction::DisableSpdy()
 void
 nsHttpTransaction::CheckForStickyAuthScheme()
 {
-  LOG(("nsHttpTransaction::CheckForStickyAuthScheme this=%p"));
+  LOG(("nsHttpTransaction::CheckForStickyAuthScheme this=%p", this));
 
   MOZ_ASSERT(mHaveAllHeaders);
   MOZ_ASSERT(mResponseHead);

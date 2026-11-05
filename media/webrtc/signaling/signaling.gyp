@@ -76,7 +76,7 @@
         '../../../dom/media',
         '../../../media/mtransport',
         '../trunk',
-        '../../libyuv/include',
+        '../../libyuv/libyuv/include',
         '../../mtransport/third_party/nrappkit/src/util/libekr',
       ],
 
@@ -99,8 +99,6 @@
         './src/media-conduit/AudioConduit.cpp',
         './src/media-conduit/VideoConduit.h',
         './src/media-conduit/VideoConduit.cpp',
-        './src/media-conduit/CodecStatistics.h',
-        './src/media-conduit/CodecStatistics.cpp',
         './src/media-conduit/RunningStat.h',
         # Common
         './src/common/CommonTypes.h',

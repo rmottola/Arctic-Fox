@@ -54,7 +54,7 @@
 
 #define CRASH_IN_CHILD_PROCESS(_msg)                                           \
   do {                                                                         \
-    if (XRE_IsParentProcess()) {                                                     \
+    if (XRE_IsParentProcess()) {                                               \
       MOZ_ASSERT(false, _msg);                                                 \
     } else {                                                                   \
       MOZ_CRASH(_msg);                                                         \
@@ -741,7 +741,8 @@ public:
   OpenMainProcessActorRunnable(already_AddRefed<ChildImpl>&& aChildActor,
                                already_AddRefed<ParentImpl> aParentActor,
                                MessageLoop* aParentMessageLoop)
-  : mActor(aChildActor), mParentActor(aParentActor),
+  : Runnable("ChildImpl::OpenMainProcessActorRunnable"),
+    mActor(aChildActor), mParentActor(aParentActor),
     mParentMessageLoop(aParentMessageLoop)
   {
     AssertIsOnMainThread();
@@ -1326,8 +1327,6 @@ ParentImpl::RequestMessageLoopRunnable::Run()
   AssertIsInMainProcess();
   MOZ_ASSERT(mTargetThread);
 
-  char stackBaseGuess;
-
   if (NS_IsMainThread()) {
     MOZ_ASSERT(mMessageLoop);
 
@@ -1356,8 +1355,6 @@ ParentImpl::RequestMessageLoopRunnable::Run()
 
     return NS_OK;
   }
-
-  profiler_register_thread("IPDL Background", &stackBaseGuess);
 
 #ifdef DEBUG
   {
@@ -1395,8 +1392,6 @@ ParentImpl::ShutdownBackgroundThreadRunnable::Run()
   // was shutting down. In that case we can't assert anything about
   // sBackgroundPRThread and we should not modify it here.
   sBackgroundPRThread.compareExchange(PR_GetCurrentThread(), nullptr);
-
-  profiler_unregister_thread();
 
   return NS_OK;
 }

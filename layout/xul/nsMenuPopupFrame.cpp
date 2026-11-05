@@ -1688,8 +1688,8 @@ nsMenuPopupFrame::GetConstraintRect(const LayoutDeviceIntRect& aAnchorRect,
   return screenRectPixels;
 }
 
-void nsMenuPopupFrame::CanAdjustEdges(int8_t aHorizontalSide,
-                                      int8_t aVerticalSide,
+void nsMenuPopupFrame::CanAdjustEdges(Side aHorizontalSide,
+                                      Side aVerticalSide,
                                       LayoutDeviceIntPoint& aChange)
 {
   int8_t popupAlign(mPopupAlignment);
@@ -2218,6 +2218,13 @@ nsMenuPopupFrame::AttributeChanged(int32_t aNameSpaceID,
           widget->SetTitle(title);
         }
       }
+    }
+  } else if (aAttribute == nsGkAtoms::ignorekeys) {
+    nsXULPopupManager* pm = nsXULPopupManager::GetInstance();
+    if (pm) {
+      nsAutoString ignorekeys;
+      mContent->GetAttr(kNameSpaceID_None, nsGkAtoms::ignorekeys, ignorekeys);
+      pm->UpdateIgnoreKeys(ignorekeys.EqualsLiteral("true"));
     }
   }
 

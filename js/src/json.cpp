@@ -392,9 +392,9 @@ JO(JSContext* cx, HandleObject obj, StringifyContext* scx)
 #ifdef DEBUG
         if (scx->maybeSafely) {
             RootedNativeObject nativeObj(cx, &obj->as<NativeObject>());
-            RootedShape prop(cx);
+            Rooted<PropertyResult> prop(cx);
             NativeLookupOwnPropertyNoResolve(cx, nativeObj, id, &prop);
-            MOZ_ASSERT(prop && prop->isDataDescriptor());
+            MOZ_ASSERT(prop && prop.isNativeProperty() && prop.shape()->isDataDescriptor());
         }
 #endif // DEBUG
         if (!GetProperty(cx, obj, obj, id, &outputValue))
@@ -532,7 +532,8 @@ Str(JSContext* cx, const Value& v, StringifyContext* scx)
     /* Step 11 must be handled by the caller. */
     MOZ_ASSERT(!IsFilteredValue(v));
 
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     /*
      * This method implements the Str algorithm in ES5 15.12.3, but:
@@ -762,7 +763,8 @@ js::Stringify(JSContext* cx, MutableHandleValue vp, JSObject* replacer_, const V
 static bool
 Walk(JSContext* cx, HandleObject holder, HandleId name, HandleValue reviver, MutableHandleValue vp)
 {
-    JS_CHECK_RECURSION(cx, return false);
+    if (!CheckRecursionLimit(cx))
+        return false;
 
     /* Step 1. */
     RootedValue val(cx);
@@ -971,9 +973,9 @@ static const JSFunctionSpec json_static_methods[] = {
 JSObject*
 js::InitJSONClass(JSContext* cx, HandleObject obj)
 {
-    Rooted<GlobalObject*> global(cx, &obj->as<GlobalObject>());
+    Handle<GlobalObject*> global = obj.as<GlobalObject>();
 
-    RootedObject proto(cx, global->getOrCreateObjectPrototype(cx));
+    RootedObject proto(cx, GlobalObject::getOrCreateObjectPrototype(cx, global));
     if (!proto)
         return nullptr;
     RootedObject JSON(cx, NewObjectWithGivenProto(cx, &JSONClass, proto, SingletonObject));

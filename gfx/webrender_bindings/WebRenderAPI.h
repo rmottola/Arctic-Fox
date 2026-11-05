@@ -27,63 +27,79 @@ namespace wr {
 
 class DisplayListBuilder;
 class RendererOGL;
-class NewRenderer;
 class RendererEvent;
+
+
 
 class WebRenderAPI
 {
-NS_INLINE_DECL_REFCOUNTING(WebRenderAPI);
+  NS_INLINE_DECL_REFCOUNTING(WebRenderAPI);
+
 public:
-  /// Compositor thread only.
+  /// This can be called on the compositor thread only.
   static already_AddRefed<WebRenderAPI> Create(bool aEnableProfiler,
                                                layers::CompositorBridgeParentBase* aBridge,
                                                RefPtr<widget::CompositorWidget>&& aWidget);
 
   wr::WindowId GetId() const { return mId; }
 
+  void GenerateFrame();
+
   void SetRootDisplayList(gfx::Color aBgColor,
-                          wr::Epoch aEpoch,
+                          Epoch aEpoch,
                           LayerSize aViewportSize,
-                          DisplayListBuilder& aBuilder);
+                          WrPipelineId pipeline_id,
+                          WrBuiltDisplayListDescriptor dl_descriptor,
+                          uint8_t *dl_data,
+                          size_t dl_size,
+                          WrAuxiliaryListsDescriptor aux_descriptor,
+                          uint8_t *aux_data,
+                          size_t aux_size);
 
   void SetRootPipeline(wr::PipelineId aPipeline);
 
-  wr::ImageKey AddImageBuffer(gfx::IntSize aSize,
-                              uint32_t aStride,
-                              gfx::SurfaceFormat aFormat,
-                              Range<uint8_t> aBytes);
+  void AddImage(wr::ImageKey aKey,
+                const ImageDescriptor& aDescriptor,
+                Range<uint8_t> aBytes);
 
   wr::ImageKey AddExternalImageHandle(gfx::IntSize aSize,
                                       gfx::SurfaceFormat aFormat,
                                       uint64_t aHandle);
 
   void UpdateImageBuffer(wr::ImageKey aKey,
-                         gfx::IntSize aSize,
-                         gfx::SurfaceFormat aFormat,
+                         const ImageDescriptor& aDescriptor,
                          Range<uint8_t> aBytes);
 
   void DeleteImage(wr::ImageKey aKey);
 
-  wr::FontKey AddRawFont(Range<uint8_t> aBytes);
+  void AddRawFont(wr::FontKey aKey, Range<uint8_t> aBytes);
 
   void DeleteFont(wr::FontKey aKey);
 
   void SetProfilerEnabled(bool aEnabled);
 
-  void RunOnRenderThread(UniquePtr<RendererEvent>&& aEvent);
+  void RunOnRenderThread(UniquePtr<RendererEvent> aEvent);
+  void Readback(gfx::IntSize aSize, uint8_t *aBuffer, uint32_t aBufferSize);
+
+  WrIdNamespace GetNamespace();
+  GLint GetMaxTextureSize() const { return mMaxTextureSize; }
+  bool GetUseANGLE() const { return mUseANGLE; }
 
 protected:
-  WebRenderAPI(WrAPI* aRawApi, wr::WindowId aId)
-  : mWrApi(aRawApi)
-  , mId(aId)
+  WebRenderAPI(WrAPI* aRawApi, wr::WindowId aId, GLint aMaxTextureSize, bool aUseANGLE)
+    : mWrApi(aRawApi)
+    , mId(aId)
+    , mMaxTextureSize(aMaxTextureSize)
+    , mUseANGLE(aUseANGLE)
   {}
 
   ~WebRenderAPI();
 
   WrAPI* mWrApi;
   wr::WindowId mId;
+  GLint mMaxTextureSize;
+  bool mUseANGLE;
 
-  friend class NewRenderer;
   friend class DisplayListBuilder;
 };
 
@@ -92,53 +108,89 @@ protected:
 /// instead, so the interface may change a bit.
 class DisplayListBuilder {
 public:
-  DisplayListBuilder(const LayerIntSize& aSize, wr::PipelineId aId);
+  explicit DisplayListBuilder(wr::PipelineId aId);
   DisplayListBuilder(DisplayListBuilder&&) = default;
 
   ~DisplayListBuilder();
 
   void Begin(const LayerIntSize& aSize);
 
-  void End(WebRenderAPI& aApi, wr::Epoch aEpoch);
+  void End();
+  void Finalize(WrBuiltDisplayListDescriptor& dl_descriptor,
+                wr::VecU8& dl_data,
+                WrAuxiliaryListsDescriptor& aux_descriptor,
+                wr::VecU8& aux_data);
 
   void PushStackingContext(const WrRect& aBounds, // TODO: We should work with strongly typed rects
                            const WrRect& aOverflow,
                            const WrImageMask* aMask, // TODO: needs a wrapper.
-                           const gfx::Matrix4x4& aTransform);
+                           const float aOpacity,
+                           const gfx::Matrix4x4& aTransform,
+                           const WrMixBlendMode& aMixBlendMode);
 
   void PopStackingContext();
 
+  void PushScrollLayer(const WrRect& aBounds, // TODO: We should work with strongly typed rects
+                       const WrRect& aOverflow,
+                       const WrImageMask* aMask); // TODO: needs a wrapper.
+
+  void PopScrollLayer();
+
+
   void PushRect(const WrRect& aBounds,
                 const WrRect& aClip,
-                const gfx::Color& aColor);
+                const WrColor& aColor);
+
+  void PushLinearGradient(const WrRect& aBounds,
+                          const WrRect& aClip,
+                          const WrPoint& aStartPoint,
+                          const WrPoint& aEndPoint,
+                          const nsTArray<WrGradientStop>& aStops,
+                          wr::GradientExtendMode aExtendMode);
+
+  void PushRadialGradient(const WrRect& aBounds,
+                          const WrRect& aClip,
+                          const WrPoint& aStartCenter,
+                          const WrPoint& aEndCenter,
+                          float aStartRadius,
+                          float aEndRadius,
+                          const nsTArray<WrGradientStop>& aStops,
+                          wr::GradientExtendMode aExtendMode);
 
   void PushImage(const WrRect& aBounds,
                  const WrRect& aClip,
                  const WrImageMask* aMask,
-                 const WrTextureFilter aFilter,
+                 wr::ImageRendering aFilter,
                  wr::ImageKey aImage);
 
   void PushIFrame(const WrRect& aBounds,
                   const WrRect& aClip,
                   wr::PipelineId aPipeline);
 
-  void PushBorder(const WrRect& bounds,
-                  const WrRect& clip,
-                  const WrBorderSide& top,
-                  const WrBorderSide& right,
-                  const WrBorderSide& bottom,
-                  const WrBorderSide& left,
-                  const WrLayoutSize& top_left_radius,
-                  const WrLayoutSize& top_right_radius,
-                  const WrLayoutSize& bottom_left_radius,
-                  const WrLayoutSize& bottom_right_radius);
+  void PushBorder(const WrRect& aBounds,
+                  const WrRect& aClip,
+                  const WrBorderSide& aTop,
+                  const WrBorderSide& aRight,
+                  const WrBorderSide& aBbottom,
+                  const WrBorderSide& aLeft,
+                  const WrBorderRadius& aRadius);
 
   void PushText(const WrRect& aBounds,
                 const WrRect& aClip,
                 const gfx::Color& aColor,
                 wr::FontKey aFontKey,
-                Range<const WRGlyphInstance> aGlyphBuffer,
+                Range<const WrGlyphInstance> aGlyphBuffer,
                 float aGlyphSize);
+
+  void PushBoxShadow(const WrRect& aRect,
+                     const WrRect& aClip,
+                     const WrRect& aBoxBounds,
+                     const WrPoint& aOffset,
+                     const WrColor& aColor,
+                     const float& aBlurRadius,
+                     const float& aSpreadRadius,
+                     const float& aBorderRadius,
+                     const WrBoxShadowClipMode& aClipMode);
 
   // Try to avoid using this when possible.
   WrState* Raw() { return mWrState; }
@@ -151,7 +203,7 @@ protected:
 Maybe<WrImageFormat>
 SurfaceFormatToWrImageFormat(gfx::SurfaceFormat aFormat);
 
-} // namespace
-} // namespace
+} // namespace wr
+} // namespace mozilla
 
 #endif

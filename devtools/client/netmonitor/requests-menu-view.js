@@ -2,9 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* eslint-disable mozilla/reject-some-requires */
-/* globals window, dumpn, $, gNetwork, EVENTS, Prefs,
-           NetMonitorController, NetMonitorView */
+/* globals window, dumpn, $, gNetwork, NetMonitorController, NetMonitorView */
 
 "use strict";
 
@@ -20,19 +18,20 @@ const { Provider } = require("devtools/client/shared/vendor/react-redux");
 const RequestList = createFactory(require("./components/request-list"));
 const RequestListContextMenu = require("./request-list-context-menu");
 const Actions = require("./actions/index");
+const { Prefs } = require("./prefs");
 
 const {
+  fetchHeaders,
   formDataURI,
-  writeHeaderText,
-  loadCauseString
+  getFormDataSections,
 } = require("./request-utils");
 
 const {
   getActiveFilters,
-  getSortedRequests,
   getDisplayedRequests,
   getRequestById,
-  getSelectedRequest
+  getSelectedRequest,
+  getSortedRequests,
 } = require("./selectors/index");
 
 // ms
@@ -71,8 +70,9 @@ RequestsMenuView.prototype = {
     this.store = store;
 
     this.contextMenu = new RequestListContextMenu();
+    this.contextMenu.initialize(store);
 
-    Prefs.filters.forEach(type => store.dispatch(Actions.toggleFilterType(type)));
+    Prefs.filters.forEach(type => store.dispatch(Actions.toggleRequestFilterType(type)));
 
     // Watch selection changes
     this.store.subscribe(storeWatcher(
@@ -88,15 +88,59 @@ RequestsMenuView.prototype = {
       () => this.onResize()
     ));
 
-    this._onContextPerfCommand = () => NetMonitorView.toggleFrontendMode();
+    // Watch the requestHeaders, requestHeadersFromUploadStream and requestPostData
+    // in order to update formDataSections for composing form data
+    this.store.subscribe(storeWatcher(
+      false,
+      (currentRequest) => {
+        const request = getSelectedRequest(this.store.getState());
+        if (!request) {
+          return {};
+        }
+
+        const isChanged = request.requestHeaders !== currentRequest.requestHeaders ||
+        request.requestHeadersFromUploadStream !==
+        currentRequest.requestHeadersFromUploadStream ||
+        request.requestPostData !== currentRequest.requestPostData;
+
+        if (isChanged) {
+          return {
+            id: request.id,
+            requestHeaders: request.requestHeaders,
+            requestHeadersFromUploadStream: request.requestHeadersFromUploadStream,
+            requestPostData: request.requestPostData,
+          };
+        }
+
+        return currentRequest;
+      },
+      (newRequest) => {
+        const {
+          id,
+          requestHeaders,
+          requestHeadersFromUploadStream,
+          requestPostData,
+        } = newRequest;
+
+        if (requestHeaders && requestHeadersFromUploadStream && requestPostData) {
+          getFormDataSections(
+            requestHeaders,
+            requestHeadersFromUploadStream,
+            requestPostData,
+            gNetwork.getString.bind(gNetwork),
+          ).then((formDataSections) => {
+            this.store.dispatch(Actions.updateRequest(
+              id,
+              { formDataSections },
+              true,
+            ));
+          });
+        }
+      },
+    ));
 
     this.sendCustomRequestEvent = this.sendCustomRequest.bind(this);
     this.closeCustomRequestEvent = this.closeCustomRequest.bind(this);
-    this.cloneSelectedRequestEvent = this.cloneSelectedRequest.bind(this);
-    this.toggleRawHeadersEvent = this.toggleRawHeaders.bind(this);
-
-    $("#toggle-raw-headers")
-      .addEventListener("click", this.toggleRawHeadersEvent);
 
     this._summary = $("#requests-menu-network-summary-button");
     this._summary.setAttribute("label", L10N.getStr("networkMenu.empty"));
@@ -120,17 +164,10 @@ RequestsMenuView.prototype = {
   _onConnect() {
     if (NetMonitorController.supportsCustomRequest) {
       $("#custom-request-send-button")
-        .addEventListener("click", this.sendCustomRequestEvent);
+        .addEventListener("click", this.sendCustomRequestEvent, false);
       $("#custom-request-close-button")
-        .addEventListener("click", this.closeCustomRequestEvent);
-      $("#headers-summary-resend")
-        .addEventListener("click", this.cloneSelectedRequestEvent);
-    } else {
-      $("#headers-summary-resend").hidden = true;
+        .addEventListener("click", this.closeCustomRequestEvent, false);
     }
-
-    $("#network-statistics-back-button")
-      .addEventListener("command", this._onContextPerfCommand);
   },
 
   /**
@@ -143,19 +180,13 @@ RequestsMenuView.prototype = {
 
     // this.flushRequestsTask.disarm();
 
-    $("#network-statistics-back-button")
-      .removeEventListener("command", this._onContextPerfCommand);
     $("#custom-request-send-button")
-      .removeEventListener("click", this.sendCustomRequestEvent);
+      .removeEventListener("click", this.sendCustomRequestEvent, false);
     $("#custom-request-close-button")
-      .removeEventListener("click", this.closeCustomRequestEvent);
-    $("#headers-summary-resend")
-      .removeEventListener("click", this.cloneSelectedRequestEvent);
-    $("#toggle-raw-headers")
-      .removeEventListener("click", this.toggleRawHeadersEvent);
+      .removeEventListener("click", this.closeCustomRequestEvent, false);
 
-    this._splitter.removeEventListener("mouseup", this.onResize);
-    window.removeEventListener("resize", this.onResize);
+    this._splitter.removeEventListener("mouseup", this.onResize, false);
+    window.removeEventListener("resize", this.onResize, false);
 
     this.tooltip.destroy();
 
@@ -184,12 +215,6 @@ RequestsMenuView.prototype = {
     // Convert the received date/time string to a unix timestamp.
     let startedMillis = Date.parse(startedDateTime);
 
-    // Convert the cause from a Ci.nsIContentPolicy constant to a string
-    if (cause) {
-      let type = loadCauseString(cause.type);
-      cause = Object.assign({}, cause, { type });
-    }
-
     const action = Actions.addRequest(
       id,
       {
@@ -199,7 +224,7 @@ RequestsMenuView.prototype = {
         isXHR,
         cause,
         fromCache,
-        fromServiceWorker
+        fromServiceWorker,
       },
       true
     );
@@ -210,25 +235,57 @@ RequestsMenuView.prototype = {
   updateRequest: Task.async(function* (id, data) {
     const action = Actions.updateRequest(id, data, true);
     yield this.store.dispatch(action);
+    let {
+      responseContent,
+      responseCookies,
+      responseHeaders,
+      requestCookies,
+      requestHeaders,
+      requestPostData,
+    } = action.data;
+    let request = getRequestById(this.store.getState(), action.id);
 
-    const { responseContent, requestPostData } = action.data;
+    if (requestHeaders && requestHeaders.headers && requestHeaders.headers.length) {
+      let headers = yield fetchHeaders(
+        requestHeaders, gNetwork.getString.bind(gNetwork));
+      if (headers) {
+        yield this.store.dispatch(Actions.updateRequest(
+          action.id,
+          { requestHeaders: headers },
+          true,
+        ));
+      }
+    }
 
-    // Fetch response data if the response is an image (to display thumbnail)
-    if (responseContent && responseContent.content) {
-      let request = getRequestById(this.store.getState(), action.id);
-      if (request) {
-        let { mimeType } = request;
-        if (mimeType.includes("image/")) {
-          let { text, encoding } = responseContent.content;
-          let responseBody = yield gNetwork.getString(text);
-          const dataUri = formDataURI(mimeType, encoding, responseBody);
-          yield this.store.dispatch(Actions.updateRequest(
-            action.id,
-            { responseContentDataUri: dataUri },
-            true
-          ));
-          window.emit(EVENTS.RESPONSE_IMAGE_THUMBNAIL_DISPLAYED);
-        }
+    if (responseHeaders && responseHeaders.headers && responseHeaders.headers.length) {
+      let headers = yield fetchHeaders(
+        responseHeaders, gNetwork.getString.bind(gNetwork));
+      if (headers) {
+        yield this.store.dispatch(Actions.updateRequest(
+          action.id,
+          { responseHeaders: headers },
+          true,
+        ));
+      }
+    }
+
+    if (request && responseContent && responseContent.content) {
+      let { mimeType } = request;
+      let { text, encoding } = responseContent.content;
+      let response = yield gNetwork.getString(text);
+      let payload = {};
+
+      if (mimeType.includes("image/")) {
+        payload.responseContentDataUri = formDataURI(mimeType, encoding, response);
+      }
+
+      responseContent.content.text = response;
+      payload.responseContent = responseContent;
+
+      yield this.store.dispatch(Actions.updateRequest(action.id, payload, true));
+
+      if (mimeType.includes("image/")) {
+        window.emit(EVENTS.RESPONSE_IMAGE_THUMBNAIL_DISPLAYED);
       }
     }
 
@@ -241,9 +298,57 @@ RequestsMenuView.prototype = {
       const headersSize = headers.reduce((acc, { name, value }) => {
         return acc + name.length + value.length + 2;
       }, 0);
-      yield this.store.dispatch(Actions.updateRequest(action.id, {
-        requestHeadersFromUploadStream: { headers, headersSize }
-      }, true));
+      let payload = {};
+      requestPostData.postData.text = postData;
+      payload.requestPostData = Object.assign({}, requestPostData);
+      payload.requestHeadersFromUploadStream = { headers, headersSize };
+
+      yield this.store.dispatch(Actions.updateRequest(action.id, payload, true));
+    }
+
+    // Fetch request and response cookies long value.
+    // Actor does not provide full sized cookie value when the value is too long
+    // To display values correctly, we need fetch them in each request.
+    if (requestCookies) {
+      let reqCookies = [];
+      // request store cookies in requestCookies or requestCookies.cookies
+      let cookies = requestCookies.cookies ?
+        requestCookies.cookies : requestCookies;
+      // make sure cookies is iterable
+      if (typeof cookies[Symbol.iterator] === "function") {
+        for (let cookie of cookies) {
+          reqCookies.push(Object.assign({}, cookie, {
+            value: yield gNetwork.getString(cookie.value),
+          }));
+        }
+        if (reqCookies.length) {
+          yield this.store.dispatch(Actions.updateRequest(
+            action.id,
+            { requestCookies: reqCookies },
+            true));
+        }
+      }
+    }
+
+    if (responseCookies) {
+      let resCookies = [];
+      // response store cookies in responseCookies or responseCookies.cookies
+      let cookies = responseCookies.cookies ?
+        responseCookies.cookies : responseCookies;
+      // make sure cookies is iterable
+      if (typeof cookies[Symbol.iterator] === "function") {
+        for (let cookie of cookies) {
+          resCookies.push(Object.assign({}, cookie, {
+            value: yield gNetwork.getString(cookie.value),
+          }));
+        }
+        if (resCookies.length) {
+          yield this.store.dispatch(Actions.updateRequest(
+            action.id,
+            { responseCookies: resCookies },
+            true));
+        }
+      }
     }
   }),
 
@@ -299,10 +404,7 @@ RequestsMenuView.prototype = {
    * Updates the sidebar status when something about the selection changes
    */
   onSelectionUpdate(newSelected, oldSelected) {
-    if (newSelected && oldSelected && newSelected.id === oldSelected.id) {
-      // The same item is still selected, its data only got updated
-      NetMonitorView.NetworkDetails.populate(newSelected);
-    } else if (newSelected) {
+    if (newSelected) {
       // Another item just got selected
       NetMonitorView.Sidebar.populate(newSelected);
       NetMonitorView.Sidebar.toggle(true);
@@ -332,28 +434,6 @@ RequestsMenuView.prototype = {
    */
   cloneSelectedRequest() {
     this.store.dispatch(Actions.cloneSelectedRequest());
-  },
-
-  /**
-   * Shows raw request/response headers in textboxes.
-   */
-  toggleRawHeaders: function () {
-    let requestTextarea = $("#raw-request-headers-textarea");
-    let responseTextarea = $("#raw-response-headers-textarea");
-    let rawHeadersHidden = $("#raw-headers").getAttribute("hidden");
-
-    if (rawHeadersHidden) {
-      let selected = getSelectedRequest(this.store.getState());
-      let selectedRequestHeaders = selected.requestHeaders.headers;
-      let selectedResponseHeaders = selected.responseHeaders.headers;
-      requestTextarea.value = writeHeaderText(selectedRequestHeaders);
-      responseTextarea.value = writeHeaderText(selectedResponseHeaders);
-      $("#raw-headers").hidden = false;
-    } else {
-      requestTextarea.value = null;
-      responseTextarea.value = null;
-      $("#raw-headers").hidden = true;
-    }
   },
 
   /**

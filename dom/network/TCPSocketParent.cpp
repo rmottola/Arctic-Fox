@@ -134,6 +134,7 @@ TCPSocketParent::RecvOpenBind(const nsCString& aRemoteHost,
                               const nsCString& aLocalAddr,
                               const uint16_t& aLocalPort,
                               const bool&     aUseSSL,
+                              const bool&     aReuseAddrPort,
                               const bool&     aUseArrayBuffers,
                               const nsCString& aFilter)
 {
@@ -146,13 +147,26 @@ TCPSocketParent::RecvOpenBind(const nsCString& aRemoteHost,
   }
 
   nsCOMPtr<nsISocketTransport> socketTransport;
-  rv = sts->CreateTransport(nullptr, 0,
-                            aRemoteHost, aRemotePort,
-                            nullptr, getter_AddRefs(socketTransport));
+  if (aUseSSL) {
+    const char* socketTypes[1];
+    socketTypes[0] = "ssl";
+    rv = sts->CreateTransport(socketTypes, 1,
+                              aRemoteHost, aRemotePort,
+                              nullptr, getter_AddRefs(socketTransport));
+  } else {
+    rv = sts->CreateTransport(nullptr, 0,
+                              aRemoteHost, aRemotePort,
+                              nullptr, getter_AddRefs(socketTransport));
+  }
+
   if (NS_FAILED(rv)) {
     FireInteralError(this, __LINE__);
     return IPC_OK();
   }
+
+  // in most cases aReuseAddrPort is false, but ICE TCP needs
+  // sockets options set that allow addr/port reuse
+  socketTransport->SetReuseAddrPort(aReuseAddrPort);
 
   PRNetAddr prAddr;
   if (PR_SUCCESS != PR_InitializeNetAddr(PR_IpAddrAny, aLocalPort, &prAddr)) {

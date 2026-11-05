@@ -34,19 +34,20 @@ JSCompartment::unsafeUnbarrieredMaybeGlobal() const
     return *global_.unsafeGet();
 }
 
-js::AutoCompartment::AutoCompartment(ExclusiveContext* cx, JSObject* target,
-                                     js::AutoLockForExclusiveAccess* maybeLock /* = nullptr */)
+template <typename T>
+js::AutoCompartment::AutoCompartment(JSContext* cx, const T& target)
   : cx_(cx),
-    origin_(cx->compartment_),
-    maybeLock_(maybeLock)
+    origin_(cx->compartment()),
+    maybeLock_(nullptr)
 {
-    cx_->enterCompartment(target->compartment(), maybeLock);
+    cx_->enterCompartmentOf(target);
 }
 
-js::AutoCompartment::AutoCompartment(ExclusiveContext* cx, JSCompartment* target,
+// Protected constructor that bypasses assertions in enterCompartmentOf.
+js::AutoCompartment::AutoCompartment(JSContext* cx, JSCompartment* target,
                                      js::AutoLockForExclusiveAccess* maybeLock /* = nullptr */)
   : cx_(cx),
-    origin_(cx_->compartment_),
+    origin_(cx->compartment()),
     maybeLock_(maybeLock)
 {
     cx_->enterCompartment(target, maybeLock);
@@ -57,6 +58,15 @@ js::AutoCompartment::~AutoCompartment()
     cx_->leaveCompartment(origin_, maybeLock_);
 }
 
+js::AutoAtomsCompartment::AutoAtomsCompartment(JSContext* cx,
+                                               js::AutoLockForExclusiveAccess& lock)
+  : AutoCompartment(cx, cx->atomsCompartment(lock), &lock)
+{}
+
+js::AutoCompartmentUnchecked::AutoCompartmentUnchecked(JSContext* cx, JSCompartment* target)
+  : AutoCompartment(cx, target)
+{}
+
 inline bool
 JSCompartment::wrap(JSContext* cx, JS::MutableHandleValue vp)
 {
@@ -66,10 +76,13 @@ JSCompartment::wrap(JSContext* cx, JS::MutableHandleValue vp)
 
     /*
      * Symbols are GC things, but never need to be wrapped or copied because
-     * they are always allocated in the atoms compartment.
+     * they are always allocated in the atoms compartment. They still need to
+     * be marked in the new compartment's zone, however.
      */
-    if (vp.isSymbol())
+    if (vp.isSymbol()) {
+        cx->markAtomValue(vp);
         return true;
+    }
 
     /* Handle strings. */
     if (vp.isString()) {
@@ -103,6 +116,7 @@ JSCompartment::wrap(JSContext* cx, JS::MutableHandleValue vp)
      * that we get the same answer.
      */
 #ifdef DEBUG
+    MOZ_ASSERT(JS::ValueIsNotGray(vp));
     JS::RootedObject cacheResult(cx);
 #endif
     JS::RootedValue v(cx, vp);

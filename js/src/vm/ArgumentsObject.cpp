@@ -16,6 +16,7 @@
 #include "jsobjinlines.h"
 
 #include "gc/Nursery-inl.h"
+#include "vm/NativeObject-inl.h"
 #include "vm/Stack-inl.h"
 
 using namespace js;
@@ -214,7 +215,7 @@ ArgumentsObject::createTemplateObject(JSContext* cx, bool mapped)
                          ? &MappedArgumentsObject::class_
                          : &UnmappedArgumentsObject::class_;
 
-    RootedObject proto(cx, cx->global()->getOrCreateObjectPrototype(cx));
+    RootedObject proto(cx, GlobalObject::getOrCreateObjectPrototype(cx, cx->global()));
     if (!proto)
         return nullptr;
 
@@ -229,7 +230,8 @@ ArgumentsObject::createTemplateObject(JSContext* cx, bool mapped)
 
     AutoSetNewObjectMetadata metadata(cx);
     JSObject* base;
-    JS_TRY_VAR_OR_RETURN_NULL(cx, base, JSObject::create(cx, FINALIZE_KIND, gc::TenuredHeap, shape, group));
+    JS_TRY_VAR_OR_RETURN_NULL(cx, base, NativeObject::create(cx, FINALIZE_KIND, gc::TenuredHeap,
+                                                             shape, group));
 
     ArgumentsObject* obj = &base->as<js::ArgumentsObject>();
     obj->initFixedSlot(ArgumentsObject::DATA_SLOT, PrivateValue(nullptr));
@@ -284,7 +286,8 @@ ArgumentsObject::create(JSContext* cx, HandleFunction callee, unsigned numActual
         AutoSetNewObjectMetadata metadata(cx);
 
         JSObject* base;
-        JS_TRY_VAR_OR_RETURN_NULL(cx, base, JSObject::create(cx, FINALIZE_KIND, gc::DefaultHeap, shape, group));
+        JS_TRY_VAR_OR_RETURN_NULL(cx, base, NativeObject::create(cx, FINALIZE_KIND,
+                                                                 gc::DefaultHeap, shape, group));
         obj = &base->as<ArgumentsObject>();
 
         data =
@@ -732,7 +735,7 @@ UnmappedArgumentsObject::obj_resolve(JSContext* cx, HandleObject obj, HandleId i
         if (argsobj->hasOverriddenLength())
             return true;
     } else {
-        if (!JSID_IS_ATOM(id, cx->names().callee) && !JSID_IS_ATOM(id, cx->names().caller))
+        if (!JSID_IS_ATOM(id, cx->names().callee))
             return true;
 
         attrs = JSPROP_PERMANENT | JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED;
@@ -762,10 +765,6 @@ UnmappedArgumentsObject::obj_enumerate(JSContext* cx, HandleObject obj)
         return false;
 
     id = NameToId(cx->names().callee);
-    if (!HasProperty(cx, argsobj, id, &found))
-        return false;
-
-    id = NameToId(cx->names().caller);
     if (!HasProperty(cx, argsobj, id, &found))
         return false;
 
@@ -807,7 +806,7 @@ ArgumentsObject::objectMovedDuringMinorGC(JSTracer* trc, JSObject* dst, JSObject
     ArgumentsObject* nsrc = &src->as<ArgumentsObject>();
     MOZ_ASSERT(ndst->data() == nsrc->data());
 
-    Nursery& nursery = trc->runtime()->gc.nursery;
+    Nursery& nursery = dst->zone()->group()->nursery();
 
     size_t nbytesTotal = 0;
     if (!nursery.isInside(nsrc->data())) {

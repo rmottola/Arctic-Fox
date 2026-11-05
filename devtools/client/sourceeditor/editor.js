@@ -32,9 +32,9 @@ const RE_JUMP_TO_LINE = /^(\d+):?(\d+)?/;
 const Services = require("Services");
 const promise = require("promise");
 const events = require("devtools/shared/event-emitter");
-const { PrefObserver } = require("devtools/client/styleeditor/utils");
+const { PrefObserver } = require("devtools/client/shared/prefs");
 const { getClientCssProperties } = require("devtools/shared/fronts/css-properties");
-const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
+const KeyShortcuts = require("devtools/client/shared/key-shortcuts");
 
 const {LocalizationHelper} = require("devtools/shared/l10n");
 const L10N = new LocalizationHelper("devtools/client/locales/sourceeditor.properties");
@@ -51,6 +51,10 @@ const CM_STYLES = [
   "chrome://devtools/content/sourceeditor/codemirror/mozilla.css"
 ];
 
+CM_STYLES.push(
+  "chrome://devtools/content/sourceeditor/codemirror/old-debugger.css"
+);
+
 const CM_SCRIPTS = [
   "chrome://devtools/content/sourceeditor/codemirror/codemirror.bundle.js",
 ];
@@ -62,8 +66,7 @@ const CM_IFRAME =
   "    <style>" +
   "      html, body { height: 100%; }" +
   "      body { margin: 0; overflow: hidden; }" +
-  "      .CodeMirror { width: 100%; height: 100% !important; " +
-  "line-height: 1.25 !important;}" +
+  "      .CodeMirror { width: 100% !important; line-height: 1.25 !important; }" +
   "    </style>" +
   CM_STYLES.map(style => "<link rel='stylesheet' href='" + style + "'>").join("\n") +
   "  </head>" +

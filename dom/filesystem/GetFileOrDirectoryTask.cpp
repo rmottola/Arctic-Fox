@@ -7,7 +7,7 @@
 #include "GetFileOrDirectoryTask.h"
 
 #include "js/Value.h"
-#include "mozilla/dom/File.h"
+#include "mozilla/dom/FileBlobImpl.h"
 #include "mozilla/dom/FileSystemBase.h"
 #include "mozilla/dom/FileSystemUtils.h"
 #include "mozilla/dom/PFileSystemParams.h"
@@ -27,14 +27,13 @@ namespace dom {
 /* static */ already_AddRefed<GetFileOrDirectoryTaskChild>
 GetFileOrDirectoryTaskChild::Create(FileSystemBase* aFileSystem,
                                     nsIFile* aTargetPath,
-                                    bool aDirectoryOnly,
                                     ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_IsMainThread(), "Only call on main thread!");
   MOZ_ASSERT(aFileSystem);
 
   RefPtr<GetFileOrDirectoryTaskChild> task =
-    new GetFileOrDirectoryTaskChild(aFileSystem, aTargetPath, aDirectoryOnly);
+    new GetFileOrDirectoryTaskChild(aFileSystem, aTargetPath);
 
   // aTargetPath can be null. In this case SetError will be called.
 
@@ -54,8 +53,7 @@ GetFileOrDirectoryTaskChild::Create(FileSystemBase* aFileSystem,
 }
 
 GetFileOrDirectoryTaskChild::GetFileOrDirectoryTaskChild(FileSystemBase* aFileSystem,
-                                                         nsIFile* aTargetPath,
-                                                         bool aDirectoryOnly)
+                                                         nsIFile* aTargetPath)
   : FileSystemTaskChildBase(aFileSystem)
   , mTargetPath(aTargetPath)
 {
@@ -156,12 +154,6 @@ GetFileOrDirectoryTaskChild::HandlerCallback()
   mPromise = nullptr;
 }
 
-void
-GetFileOrDirectoryTaskChild::GetPermissionAccessType(nsCString& aAccess) const
-{
-  aAccess.AssignLiteral(DIRECTORY_READ_PERMISSION);
-}
-
 /**
  * GetFileOrDirectoryTaskParent
  */
@@ -214,7 +206,7 @@ GetFileOrDirectoryTaskParent::GetSuccessRequestResult(ErrorResult& aRv) const
     return FileSystemDirectoryResponse(path);
   }
 
-  RefPtr<BlobImpl> blobImpl = new BlobImplFile(mTargetPath);
+  RefPtr<BlobImpl> blobImpl = new FileBlobImpl(mTargetPath);
   BlobParent* blobParent =
     BlobParent::GetOrCreate(mRequestParent->Manager(), blobImpl);
   return FileSystemFileResponse(blobParent, nullptr);
@@ -276,12 +268,6 @@ GetFileOrDirectoryTaskParent::IOWork()
   }
 
   return NS_OK;
-}
-
-void
-GetFileOrDirectoryTaskParent::GetPermissionAccessType(nsCString& aAccess) const
-{
-  aAccess.AssignLiteral(DIRECTORY_READ_PERMISSION);
 }
 
 } // namespace dom

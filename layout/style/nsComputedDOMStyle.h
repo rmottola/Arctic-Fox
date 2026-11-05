@@ -89,6 +89,16 @@ public:
                             nsIPresShell* aPresShell,
                             StyleType aStyleType = eAll);
 
+  enum AnimationFlag {
+    eWithAnimation,
+    eWithoutAnimation,
+  };
+  // Similar to the above but ignoring animation rules and with StyleType::eAll.
+  static already_AddRefed<nsStyleContext>
+  GetStyleContextForElementWithoutAnimation(mozilla::dom::Element* aElement,
+                                            nsIAtom* aPseudo,
+                                            nsIPresShell* aPresShell);
+
   static already_AddRefed<nsStyleContext>
   GetStyleContextForElementNoFlush(mozilla::dom::Element* aElement,
                                    nsIAtom* aPseudo,
@@ -144,6 +154,13 @@ private:
   void SetResolvedStyleContext(RefPtr<nsStyleContext>&& aContext);
   void SetFrameStyleContext(nsStyleContext* aContext);
 
+  static already_AddRefed<nsStyleContext>
+  DoGetStyleContextForElementNoFlush(mozilla::dom::Element* aElement,
+                                     nsIAtom* aPseudo,
+                                     nsIPresShell* aPresShell,
+                                     StyleType aStyleType,
+                                     AnimationFlag aAnimationFlag);
+
 #define STYLE_STRUCT(name_, checkdata_cb_)                              \
   const nsStyle##name_ * Style##name_() {                               \
     return mStyleContext->Style##name_();                               \
@@ -152,7 +169,7 @@ private:
 #undef STYLE_STRUCT
 
   already_AddRefed<CSSValue> GetEllipseRadii(const nsStyleCorners& aRadius,
-                                             uint8_t aFullCorner);
+                                             mozilla::Corner aFullCorner);
 
   already_AddRefed<CSSValue> GetOffsetWidthFor(mozilla::Side aSide);
 

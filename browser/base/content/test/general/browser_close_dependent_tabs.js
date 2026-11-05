@@ -7,11 +7,10 @@ add_task(function* () {
   // Wait for a process change and then fulfil the promise.
   function awaitProcessChange(browser) {
     return new Promise(resolve => {
-      browser.addEventListener("BrowserChangedProcess", function bcp(e) {
-        browser.removeEventListener("BrowserChangedProcess", bcp);
+      browser.addEventListener("BrowserChangedProcess", function(e) {
         ok(true, "The browser changed process!");
         resolve();
-      });
+      }, {once: true});
     });
   }
 
@@ -68,8 +67,7 @@ add_task(function* () {
       isPrerendered: true,
     });
     yield BrowserTestUtils.browserLoaded(tab2.linkedBrowser);
-    browser1.frameLoader.appendPartialSessionHistoryAndSwap(
-      tab2.linkedBrowser.frameLoader);
+    browser1.frameLoader.appendPartialSHistoryAndSwap(tab2.linkedBrowser.frameLoader);
     yield awaitProcessChange(browser1);
   });
   yield closed2;

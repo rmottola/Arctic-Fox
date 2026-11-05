@@ -89,6 +89,13 @@ class MarionetteTest(TestingMixin, MercurialScript, BlobUploadMixin, TransferMix
                  "gaiatest's runtests.py rather than Marionette's."
          }
     ], [
+        ["--headless"],
+        {"action": "store_true",
+         "dest": "headless",
+         "default": False,
+         "help": "Run tests in headless mode.",
+        }
+    ], [
         ["--test-manifest"],
         {"action": "store",
          "dest": "test_manifest",

@@ -30,8 +30,12 @@ exports.CssPropertiesActor = ActorClassWithSpec(cssPropertiesSpec, {
   getCSSDatabase() {
     const properties = generateCssProperties();
     const pseudoElements = DOMUtils.getCSSPseudoElementNames();
+    const supportedFeature = {
+      // checking for css-color-4 color function support.
+      "css-color-4-color-function": DOMUtils.isValidCSSColor("rgb(1 1 1 / 100%"),
+    };
 
-    return { properties, pseudoElements };
+    return { properties, pseudoElements, supportedFeature };
   }
 });
 
@@ -64,17 +68,12 @@ function generateCssProperties() {
 
     let subproperties = DOMUtils.getSubpropertiesForCSSProperty(name);
 
-    // In order to maintain any backwards compatible changes when debugging older
-    // clients, take the definition from the static CSS properties database, and fill it
-    // in with the most recent property definition from the server.
-    const clientDefinition = CSS_PROPERTIES[name] || {};
-    const serverDefinition = {
+    properties[name] = {
       isInherited: DOMUtils.isInheritedProperty(name),
       values,
       supports,
       subproperties,
     };
-    properties[name] = Object.assign(clientDefinition, serverDefinition);
   });
 
   return properties;

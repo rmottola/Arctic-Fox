@@ -3,7 +3,7 @@ use super::*;
 /// An item
 ///
 /// The name might be a dummy name in case of anonymous items
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Item {
     pub ident: Ident,
     pub vis: Visibility,
@@ -11,7 +11,7 @@ pub struct Item {
     pub node: ItemKind,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ItemKind {
     /// An`extern crate` item, with optional original crate name.
     ///
@@ -80,8 +80,8 @@ pub enum ItemKind {
     Mac(Mac),
 }
 
-impl From<MacroInput> for Item {
-    fn from(input: MacroInput) -> Item {
+impl From<DeriveInput> for Item {
+    fn from(input: DeriveInput) -> Item {
         Item {
             ident: input.ident,
             vis: input.vis,
@@ -94,7 +94,7 @@ impl From<MacroInput> for Item {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ViewPath {
     /// `foo::bar::baz as quux`
     ///
@@ -110,20 +110,20 @@ pub enum ViewPath {
     List(Path, Vec<PathListItem>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PathListItem {
     pub name: Ident,
     /// renamed in list, e.g. `use foo::{bar as baz};`
     pub rename: Option<Ident>,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Constness {
     Const,
     NotConst,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Defaultness {
     Default,
     Final,
@@ -132,13 +132,13 @@ pub enum Defaultness {
 /// Foreign module declaration.
 ///
 /// E.g. `extern { .. }` or `extern "C" { .. }`
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ForeignMod {
     pub abi: Abi,
     pub items: Vec<ForeignItem>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ForeignItem {
     pub ident: Ident,
     pub attrs: Vec<Attribute>,
@@ -147,7 +147,7 @@ pub struct ForeignItem {
 }
 
 /// An item within an `extern` block
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ForeignItemKind {
     /// A foreign function
     Fn(Box<FnDecl>, Generics),
@@ -159,14 +159,14 @@ pub enum ForeignItemKind {
 /// possibly including a default implementation. A trait item is
 /// either required (meaning it doesn't have an implementation, just a
 /// signature) or provided (meaning it has a default implementation).
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct TraitItem {
     pub ident: Ident,
     pub attrs: Vec<Attribute>,
     pub node: TraitItemKind,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum TraitItemKind {
     Const(Ty, Option<Expr>),
     Method(MethodSig, Option<Block>),
@@ -174,7 +174,7 @@ pub enum TraitItemKind {
     Macro(Mac),
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum ImplPolarity {
     /// `impl Trait for Type`
     Positive,
@@ -182,7 +182,7 @@ pub enum ImplPolarity {
     Negative,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ImplItem {
     pub ident: Ident,
     pub vis: Visibility,
@@ -191,7 +191,7 @@ pub struct ImplItem {
     pub node: ImplItemKind,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ImplItemKind {
     Const(Ty, Expr),
     Method(MethodSig, Block),
@@ -201,7 +201,7 @@ pub enum ImplItemKind {
 
 /// Represents a method's signature in a trait declaration,
 /// or in an implementation.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct MethodSig {
     pub unsafety: Unsafety,
     pub constness: Constness,
@@ -213,7 +213,7 @@ pub struct MethodSig {
 /// Header (not the body) of a function declaration.
 ///
 /// E.g. `fn foo(bar: baz)`
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FnDecl {
     pub inputs: Vec<FnArg>,
     pub output: FunctionRetTy,
@@ -223,7 +223,7 @@ pub struct FnDecl {
 /// An argument in a function header.
 ///
 /// E.g. `bar: usize` as in `fn foo(bar: usize)`
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum FnArg {
     SelfRef(Option<Lifetime>, Mutability),
     SelfValue(Mutability),
@@ -242,8 +242,8 @@ pub mod parsing {
     use generics::parsing::{generics, lifetime, ty_param_bound, where_clause};
     use ident::parsing::ident;
     use mac::parsing::delimited;
-    use macro_input::{Body, MacroInput};
-    use macro_input::parsing::macro_input;
+    use derive::{Body, DeriveInput};
+    use derive::parsing::derive_input;
     use ty::parsing::{abi, mutability, path, ty, unsafety};
 
     named!(pub item -> Item, alt!(
@@ -280,7 +280,7 @@ pub mod parsing {
 
     named!(item_mac -> Item, do_parse!(
         attrs: many0!(outer_attr) >>
-        path: ident >>
+        what: path >>
         punct!("!") >>
         name: option!(ident) >>
         body: delimited >>
@@ -293,7 +293,7 @@ pub mod parsing {
             vis: Visibility::Inherited,
             attrs: attrs,
             node: ItemKind::Mac(Mac {
-                path: path.into(),
+                path: what,
                 tts: vec![TokenTree::Delimited(body)],
             }),
         })
@@ -484,14 +484,14 @@ pub mod parsing {
             lt: option!(lifetime) >>
             mutability: mutability >>
             keyword!("self") >>
-            not!(peek!(punct!(":"))) >>
+            not!(punct!(":")) >>
             (FnArg::SelfRef(lt, mutability))
         )
         |
         do_parse!(
             mutability: mutability >>
             keyword!("self") >>
-            not!(peek!(punct!(":"))) >>
+            not!(punct!(":")) >>
             (FnArg::SelfValue(mutability))
         )
         |
@@ -639,8 +639,8 @@ pub mod parsing {
     ));
 
     named!(item_struct_or_enum -> Item, map!(
-        macro_input,
-        |def: MacroInput| Item {
+        derive_input,
+        |def: DeriveInput| Item {
             ident: def.ident,
             vis: def.vis,
             attrs: def.attrs,
@@ -821,7 +821,7 @@ pub mod parsing {
 
     named!(trait_item_mac -> TraitItem, do_parse!(
         attrs: many0!(outer_attr) >>
-        id: ident >>
+        what: path >>
         punct!("!") >>
         body: delimited >>
         cond!(match body.delim {
@@ -829,10 +829,10 @@ pub mod parsing {
             DelimToken::Brace => false,
         }, punct!(";")) >>
         (TraitItem {
-            ident: id.clone(),
+            ident: Ident::new(""),
             attrs: attrs,
             node: TraitItemKind::Macro(Mac {
-                path: id.into(),
+                path: what,
                 tts: vec![TokenTree::Delimited(body)],
             }),
         })
@@ -848,7 +848,7 @@ pub mod parsing {
                 polarity: impl_polarity >>
                 path: path >>
                 keyword!("for") >>
-                ((polarity, Some(path)))
+                (polarity, Some(path))
             )
             |
             epsilon!() => { |_| (ImplPolarity::Positive, None) }
@@ -976,7 +976,7 @@ pub mod parsing {
 
     named!(impl_item_macro -> ImplItem, do_parse!(
         attrs: many0!(outer_attr) >>
-        id: ident >>
+        what: path >>
         punct!("!") >>
         body: delimited >>
         cond!(match body.delim {
@@ -984,12 +984,12 @@ pub mod parsing {
             DelimToken::Brace => false,
         }, punct!(";")) >>
         (ImplItem {
-            ident: id.clone(),
+            ident: Ident::new(""),
             vis: Visibility::Inherited,
             defaultness: Defaultness::Final,
             attrs: attrs,
             node: ImplItemKind::Macro(Mac {
-                path: id.into(),
+                path: what,
                 tts: vec![TokenTree::Delimited(body)],
             }),
         })

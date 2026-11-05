@@ -151,7 +151,6 @@ nsImageLoadingContent::Notify(imgIRequest* aRequest,
     // Calling Notify on observers can modify the list of observers so make
     // a local copy.
     AutoTArray<nsCOMPtr<imgINotificationObserver>, 2> observers;
-    
     for (ImageObserver* observer = &mObserverList, *next; observer;
          observer = next) {
       next = observer->mNext;
@@ -159,7 +158,7 @@ nsImageLoadingContent::Notify(imgIRequest* aRequest,
         observers.AppendElement(observer->mObserver);
       }
     }
-    
+
     nsAutoScriptBlocker scriptBlocker;
 
     for (auto& observer : observers) {
@@ -1405,11 +1404,11 @@ nsImageLoadingContent::GetRegisteredFlagForRequest(imgIRequest* aRequest)
 {
   if (aRequest == mCurrentRequest) {
     return &mCurrentRequestRegistered;
-  } else if (aRequest == mPendingRequest) {
-    return &mPendingRequestRegistered;
-  } else {
-    return nullptr;
   }
+  if (aRequest == mPendingRequest) {
+    return &mPendingRequestRegistered;
+  }
+  return nullptr;
 }
 
 void

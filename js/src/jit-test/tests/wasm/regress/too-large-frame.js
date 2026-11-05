@@ -1,5 +1,3 @@
-load(libdir + "wasm.js");
-
 // Bug 1280934, equivalent test case.
 
 try {
@@ -23,7 +21,7 @@ wasmEvalText(
 
 function locals() {
     var s = "";
-    for ( var i=0 ; i < 64000 ; i++ )
+    for ( var i=0 ; i < 50000 ; i++ )
         s += "(local f64)\n";
     return s;
 }

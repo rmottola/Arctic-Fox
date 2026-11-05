@@ -79,6 +79,7 @@ CompositorBridgeChild::CompositorBridgeChild(LayerManager *aLayerManager)
   : mLayerManager(aLayerManager)
   , mCanSend(false)
   , mFwdTransactionId(0)
+  , mDeviceResetSequenceNumber(0)
   , mMessageLoop(MessageLoop::current())
   , mSectionAllocator(nullptr)
 {
@@ -374,19 +375,18 @@ CompositorBridgeChild::RecvCompositorUpdated(const uint64_t& aLayersId,
   } else if (aLayersId != 0) {
     // Update gfxPlatform if this is the first time we're seeing this compositor
     // update (we will get an update for each connected tab).
-    static uint64_t sLastSeqNo = 0;
-    if (sLastSeqNo != aSeqNo) {
+    if (mDeviceResetSequenceNumber != aSeqNo) {
       gfxPlatform::GetPlatform()->CompositorUpdated();
-      sLastSeqNo = aSeqNo;
+      mDeviceResetSequenceNumber = aSeqNo;
     }
 
     if (dom::TabChild* child = dom::TabChild::GetFrom(aLayersId)) {
-      child->CompositorUpdated(aNewIdentifier);
+      child->CompositorUpdated(aNewIdentifier, aSeqNo);
     }
     if (!mCanSend) {
       return IPC_OK();
     }
-    SendAcknowledgeCompositorUpdate(aLayersId);
+    SendAcknowledgeCompositorUpdate(aLayersId, aSeqNo);
   }
   return IPC_OK();
 }
@@ -478,18 +478,15 @@ CompositorBridgeChild::RecvUpdatePluginConfigurations(const LayoutDeviceIntPoint
         // by a child window move, and will call invalidate on the plugin
         // parent window which the browser owns. The latter gets picked up in
         // our OnPaint handler and forwarded over to the plugin process async.
-        rv = widget->Resize(aContentOffset.x + bounds.x,
-                            aContentOffset.y + bounds.y,
-                            bounds.width, bounds.height, true);
-        NS_ASSERTION(NS_SUCCEEDED(rv), "widget call failure");
+        widget->Resize(aContentOffset.x + bounds.x,
+                       aContentOffset.y + bounds.y,
+                       bounds.width, bounds.height, true);
       }
 
-      rv = widget->Enable(isVisible);
-      NS_ASSERTION(NS_SUCCEEDED(rv), "widget call failure");
+      widget->Enable(isVisible);
 
       // visible state - updated after clipping, prior to invalidating
-      rv = widget->Show(isVisible);
-      NS_ASSERTION(NS_SUCCEEDED(rv), "widget call failure");
+      widget->Show(isVisible);
 
       // Handle invalidation, this can be costly, avoid if it is not needed.
       if (isVisible) {
@@ -501,8 +498,7 @@ CompositorBridgeChild::RecvUpdatePluginConfigurations(const LayoutDeviceIntPoint
         mozilla::widget::WinUtils::InvalidatePluginAsWorkaround(
           widget, visibleBounds);
 #else
-        rv = widget->Invalidate(visibleBounds);
-        NS_ASSERTION(NS_SUCCEEDED(rv), "widget call failure");
+        widget->Invalidate(visibleBounds);
 #endif
         visiblePluginIds.AppendElement(aPlugins[pluginsIdx].windowId());
       }
@@ -594,23 +590,6 @@ CompositorBridgeChild::RecvDidComposite(const uint64_t& aId, const uint64_t& aTr
 }
 
 mozilla::ipc::IPCResult
-CompositorBridgeChild::RecvOverfill(const uint32_t &aOverfill)
-{
-  for (size_t i = 0; i < mOverfillObservers.Length(); i++) {
-    mOverfillObservers[i]->RunOverfillCallback(aOverfill);
-  }
-  mOverfillObservers.Clear();
-  return IPC_OK();
-}
-
-void
-CompositorBridgeChild::AddOverfillObserver(ClientLayerManager* aLayerManager)
-{
-  MOZ_ASSERT(aLayerManager);
-  mOverfillObservers.AppendElement(aLayerManager);
-}
-
-mozilla::ipc::IPCResult
 CompositorBridgeChild::RecvClearCachedResources(const uint64_t& aId)
 {
   dom::TabChild* child = dom::TabChild::GetFrom(aId);
@@ -674,7 +653,7 @@ CompositorBridgeChild::SharedFrameMetricsData::SharedFrameMetricsData(
   , mAPZCId(aAPZCId)
 {
   mBuffer = new ipc::SharedMemoryBasic;
-  mBuffer->SetHandle(metrics);
+  mBuffer->SetHandle(metrics, ipc::SharedMemory::RightsReadOnly);
   mBuffer->Map(sizeof(FrameMetrics));
   mMutex = new CrossProcessMutex(handle);
   MOZ_COUNT_CTOR(SharedFrameMetricsData);
@@ -692,7 +671,8 @@ CompositorBridgeChild::SharedFrameMetricsData::~SharedFrameMetricsData()
 void
 CompositorBridgeChild::SharedFrameMetricsData::CopyFrameMetrics(FrameMetrics* aFrame)
 {
-  FrameMetrics* frame = static_cast<FrameMetrics*>(mBuffer->memory());
+  const FrameMetrics* frame =
+    static_cast<const FrameMetrics*>(mBuffer->memory());
   MOZ_ASSERT(frame);
   mMutex->Lock();
   *aFrame = *frame;
@@ -702,7 +682,8 @@ CompositorBridgeChild::SharedFrameMetricsData::CopyFrameMetrics(FrameMetrics* aF
 FrameMetrics::ViewID
 CompositorBridgeChild::SharedFrameMetricsData::GetViewID()
 {
-  FrameMetrics* frame = static_cast<FrameMetrics*>(mBuffer->memory());
+  const FrameMetrics* frame =
+    static_cast<const FrameMetrics*>(mBuffer->memory());
   MOZ_ASSERT(frame);
   // Not locking to read of mScrollId since it should not change after being
   // initially set.
@@ -1036,7 +1017,6 @@ CompositorBridgeChild::ClearTexturePool()
 FixedSizeSmallShmemSectionAllocator*
 CompositorBridgeChild::GetTileLockAllocator()
 {
-  MOZ_ASSERT(IPCOpen());
   if (!IPCOpen()) {
     return nullptr;
   }
@@ -1155,7 +1135,7 @@ CompositorBridgeChild::HandleFatalError(const char* aName, const char* aMsg) con
 }
 
 PWebRenderBridgeChild*
-CompositorBridgeChild::AllocPWebRenderBridgeChild(const wr::PipelineId& aPipelineId, TextureFactoryIdentifier*)
+CompositorBridgeChild::AllocPWebRenderBridgeChild(const wr::PipelineId& aPipelineId, TextureFactoryIdentifier*, uint32_t *aIdNamespace)
 {
   WebRenderBridgeChild* child = new WebRenderBridgeChild(aPipelineId);
   child->AddIPDLReference();

@@ -44,6 +44,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsEntityConverter)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsSaveAsCharset)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsUnicodeNormalizer)
 
+NS_DEFINE_NAMED_CID(MOZ_LOCALESERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_LBRK_CID);
 NS_DEFINE_NAMED_CID(NS_WBRK_CID);
 NS_DEFINE_NAMED_CID(NS_SEMANTICUNITSCANNER_CID);
@@ -61,18 +62,16 @@ NS_DEFINE_NAMED_CID(NS_LANGUAGEATOMSERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_PLATFORMCHARSET_CID);
 #ifdef XP_WIN
 NS_DEFINE_NAMED_CID(NS_COLLATION_CID);
-NS_DEFINE_NAMED_CID(NS_DATETIMEFORMAT_CID);
 #endif
 #ifdef USE_UNIX_LOCALE
 NS_DEFINE_NAMED_CID(NS_COLLATION_CID);
-NS_DEFINE_NAMED_CID(NS_DATETIMEFORMAT_CID);
 #endif
 #ifdef USE_MAC_LOCALE
 NS_DEFINE_NAMED_CID(NS_COLLATION_CID);
-NS_DEFINE_NAMED_CID(NS_DATETIMEFORMAT_CID);
 #endif
 
 static const mozilla::Module::CIDEntry kIntlCIDs[] = {
+    { &kMOZ_LOCALESERVICE_CID, false, nullptr, mozilla::intl::LocaleServiceConstructor },
     { &kNS_LBRK_CID, false, nullptr, nsJISx4051LineBreakerConstructor },
     { &kNS_WBRK_CID, false, nullptr, nsSampleWordBreakerConstructor },
     { &kNS_SEMANTICUNITSCANNER_CID, false, nullptr, nsSemanticUnitScannerConstructor },
@@ -90,20 +89,18 @@ static const mozilla::Module::CIDEntry kIntlCIDs[] = {
     { &kNS_PLATFORMCHARSET_CID, false, nullptr, nsPlatformCharsetConstructor },
 #ifdef XP_WIN
     { &kNS_COLLATION_CID, false, nullptr, nsCollationWinConstructor },
-    { &kNS_DATETIMEFORMAT_CID, false, nullptr, nsDateTimeFormatWinConstructor },
 #endif
 #ifdef USE_UNIX_LOCALE
     { &kNS_COLLATION_CID, false, nullptr, nsCollationUnixConstructor },
-    { &kNS_DATETIMEFORMAT_CID, false, nullptr, nsDateTimeFormatUnixConstructor },
 #endif
 #ifdef USE_MAC_LOCALE
     { &kNS_COLLATION_CID, false, nullptr, nsCollationMacUCConstructor },
-    { &kNS_DATETIMEFORMAT_CID, false, nullptr, nsDateTimeFormatMacConstructor },
 #endif
     { nullptr }
 };
 
 static const mozilla::Module::ContractIDEntry kIntlContracts[] = {
+    { MOZ_LOCALESERVICE_CONTRACTID, &kMOZ_LOCALESERVICE_CID },
     { NS_LBRK_CONTRACTID, &kNS_LBRK_CID },
     { NS_WBRK_CONTRACTID, &kNS_WBRK_CID },
     { NS_SEMANTICUNITSCANNER_CONTRACTID, &kNS_SEMANTICUNITSCANNER_CID },
@@ -121,15 +118,12 @@ static const mozilla::Module::ContractIDEntry kIntlContracts[] = {
     { NS_PLATFORMCHARSET_CONTRACTID, &kNS_PLATFORMCHARSET_CID },
 #ifdef XP_WIN
     { NS_COLLATION_CONTRACTID, &kNS_COLLATION_CID },
-    { NS_DATETIMEFORMAT_CONTRACTID, &kNS_DATETIMEFORMAT_CID },
 #endif
 #ifdef USE_UNIX_LOCALE
     { NS_COLLATION_CONTRACTID, &kNS_COLLATION_CID },
-    { NS_DATETIMEFORMAT_CONTRACTID, &kNS_DATETIMEFORMAT_CID },
 #endif
 #ifdef USE_MAC_LOCALE
     { NS_COLLATION_CONTRACTID, &kNS_COLLATION_CID },
-    { NS_DATETIMEFORMAT_CONTRACTID, &kNS_DATETIMEFORMAT_CID },
 #endif
     { nullptr }
 };

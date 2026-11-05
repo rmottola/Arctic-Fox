@@ -38,8 +38,10 @@ typedef uint16_t nsMediaNetworkState;
 typedef uint16_t nsMediaReadyState;
 typedef uint32_t SuspendTypes;
 typedef uint32_t AudibleChangedReasons;
+typedef uint8_t AudibleState;
 
 namespace mozilla {
+class AbstractThread;
 class DecoderDoctorDiagnostics;
 class DOMMediaStream;
 class ErrorResult;
@@ -279,6 +281,8 @@ public:
 
   // called to notify that the principal of the decoder's media resource has changed.
   void NotifyDecoderPrincipalChanged() final override;
+
+  void GetEMEInfo(nsString& aEMEInfo);
 
   // An interface for observing principal changes on the media elements
   // MediaDecoder. This will also be notified if the active CORSMode changes.
@@ -602,9 +606,25 @@ public:
   // data. Used for debugging purposes.
   void GetMozDebugReaderData(nsAString& aString);
 
+  // Returns a promise which will be resolved after collecting debugging
+  // data from decoder/reader/MDSM. Used for debugging purposes.
+  already_AddRefed<Promise> MozRequestDebugInfo(ErrorResult& aRv);
+
   void MozDumpDebugInfo();
 
+  // For use by mochitests. Enabling pref "media.test.video-suspend"
   void SetVisible(bool aVisible);
+
+  // For use by mochitests. Enabling pref "media.test.video-suspend"
+  bool HasSuspendTaint() const;
+
+  // Synchronously, return the next video frame and mark the element unable to
+  // participate in decode suspending.
+  //
+  // This function is synchronous for cases where decoding has been suspended
+  // and JS needs a frame to use in, eg., nsLayoutUtils::SurfaceFromElement()
+  // via drawImage().
+  layers::Image* GetCurrentImage();
 
   already_AddRefed<DOMMediaStream> GetSrcObject() const;
   void SetSrcObject(DOMMediaStream& aValue);
@@ -668,13 +688,6 @@ public:
 
   double MozFragmentEnd();
 
-  AudioChannel MozAudioChannelType() const
-  {
-    return mAudioChannel;
-  }
-
-  void SetMozAudioChannelType(AudioChannel aValue, ErrorResult& aRv);
-
   AudioTrackList* AudioTracks();
 
   VideoTrackList* VideoTracks();
@@ -726,9 +739,6 @@ public:
   // that will soon be gone.
   bool IsBeingDestroyed();
 
-  IMPL_EVENT_HANDLER(mozinterruptbegin)
-  IMPL_EVENT_HANDLER(mozinterruptend)
-
   // These are used for testing only
   float ComputedVolume() const;
   bool ComputedMuted() const;
@@ -746,6 +756,14 @@ public:
     CAPTURE_STREAM,
   };
   void MarkAsContentSource(CallerAPI aAPI);
+
+  nsIDocument* GetDocument() const override;
+
+  void ConstructMediaTracks(const MediaInfo* aInfo) override;
+
+  void RemoveMediaTracks() override;
+
+  already_AddRefed<GMPCrashHelper> CreateGMPCrashHelper() override;
 
 protected:
   virtual ~HTMLMediaElement();
@@ -1163,6 +1181,8 @@ protected:
     return this;
   }
 
+  virtual AbstractThread* AbstractMainThread() const final override;
+
   // Return true if decoding should be paused
   virtual bool GetPaused() final override
   {
@@ -1191,9 +1211,6 @@ protected:
   void ReportEMETelemetry();
 
   void ReportTelemetry();
-
-  // Check the permissions for audiochannel.
-  bool CheckAudioChannelPermissions(const nsAString& aType);
 
   // Seeks to aTime seconds. aSeekType can be Exact to seek to exactly the
   // seek target, or PrevSyncPoint if a quicker but less precise seek is
@@ -1241,7 +1258,7 @@ protected:
   // Open unsupported types media with the external app when the media element
   // triggers play() after loaded fail. eg. preload the data before start play.
   void OpenUnsupportedMediaWithExternalAppIfNeeded() const;
-  
+
   // This method moves the mPendingPlayPromises into a temperate object. So the
   // mPendingPlayPromises is cleared after this method call.
   nsTArray<RefPtr<Promise>> TakePendingPlayPromises();
@@ -1260,9 +1277,15 @@ protected:
 
   already_AddRefed<Promise> CreateDOMPromise(ErrorResult& aRv) const;
 
+  // Pass information for deciding the video decode mode to decoder.
+  void NotifyDecoderActivityChanges() const;
+
   // The current decoder. Load() has been called on this decoder.
   // At most one of mDecoder and mSrcStream can be non-null.
   RefPtr<MediaDecoder> mDecoder;
+
+  // The DocGroup-specific AbstractThread::MainThread() of this HTML element.
+  RefPtr<AbstractThread> mAbstractMainThread;
 
   // Observers listening to changes to the mDecoder principal.
   // Used by streams captured from this element.
@@ -1684,6 +1707,14 @@ private:
   // True if the audio track is not silent.
   bool mIsAudioTrackAudible;
 
+  // True if media element has been marked as 'tainted' and can't
+  // participate in video decoder suspending.
+  bool mHasSuspendTaint;
+
+  // True if audio tracks and video tracks are constructed and added into the
+  // track list, false if all tracks are removed from the track list.
+  bool mMediaTracksConstructed;
+
   Visibility mVisibilityState;
 
   UniquePtr<ErrorSink> mErrorSink;
@@ -1692,7 +1723,7 @@ private:
   // of tab audio indicator, Fennec's media control.
   // Note: mAudioChannelWrapper might be null after GC happened.
   RefPtr<AudioChannelAgentCallback> mAudioChannelWrapper;
-  
+
   // A list of pending play promises. The elements are pushed during the play()
   // method call and are resolved/rejected during further playback steps.
   nsTArray<RefPtr<Promise>> mPendingPlayPromises;
@@ -1704,6 +1735,9 @@ private:
   // already-dispatched pending play promises.
   nsTArray<nsResolveOrRejectPendingPlayPromisesRunner*> mPendingPlayPromisesRunners;
 };
+
+// Check if the context is chrome or has the debugger permission
+bool HasDebuggerPrivilege(JSContext* aCx, JSObject* aObj);
 
 } // namespace dom
 } // namespace mozilla

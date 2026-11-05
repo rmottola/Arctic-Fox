@@ -4,8 +4,22 @@ pub type dev_t = u64;
 pub type blksize_t = ::int32_t;
 pub type fsblkcnt_t = ::uint64_t;
 pub type fsfilcnt_t = ::uint64_t;
+pub type idtype_t = ::c_int;
 
 s! {
+    pub struct aiocb {
+        pub aio_offset: ::off_t,
+        pub aio_buf: *mut ::c_void,
+        pub aio_nbytes: ::size_t,
+        pub aio_fildes: ::c_int,
+        pub aio_lio_opcode: ::c_int,
+        pub aio_reqprio: ::c_int,
+        pub aio_sigevent: ::sigevent,
+        _state: ::c_int,
+        _errno: ::c_int,
+        _retval: ::ssize_t
+    }
+
     pub struct dirent {
         pub d_fileno: ::ino_t,
         pub d_reclen: u16,
@@ -28,6 +42,14 @@ s! {
         __unused6: *mut ::c_void,
         __unused7: *mut ::c_void,
         __unused8: *mut ::c_void,
+    }
+
+    pub struct sigevent {
+        pub sigev_notify: ::c_int,
+        pub sigev_signo: ::c_int,
+        pub sigev_value: ::sigval,
+        __unused1: *mut ::c_void,       //actually a function pointer
+        pub sigev_notify_attributes: *mut ::c_void
     }
 
     pub struct sigset_t {
@@ -549,7 +571,41 @@ pub const KERN_PROC_RGID: ::c_int = 8;
 
 pub const EAI_SYSTEM: ::c_int = 11;
 
+pub const AIO_CANCELED: ::c_int = 1;
+pub const AIO_NOTCANCELED: ::c_int = 2;
+pub const AIO_ALLDONE: ::c_int = 3;
+pub const LIO_NOP: ::c_int = 0;
+pub const LIO_WRITE: ::c_int = 1;
+pub const LIO_READ: ::c_int = 2;
+pub const LIO_WAIT: ::c_int = 1;
+pub const LIO_NOWAIT: ::c_int = 0;
+
+pub const SIGEV_NONE: ::c_int = 0;
+pub const SIGEV_SIGNAL: ::c_int = 1;
+pub const SIGEV_THREAD: ::c_int = 2;
+
+pub const WSTOPPED: ::c_int = 0x00000002; // same as WUNTRACED
+pub const WCONTINUED: ::c_int = 0x00000010;
+pub const WEXITED: ::c_int = 0x000000020;
+pub const WNOWAIT: ::c_int = 0x00010000;
+
+pub const P_ALL: idtype_t = 0;
+pub const P_PID: idtype_t = 1;
+pub const P_PGID: idtype_t = 4;
+
 extern {
+    pub fn aio_read(aiocbp: *mut aiocb) -> ::c_int;
+    pub fn aio_write(aiocbp: *mut aiocb) -> ::c_int;
+    pub fn aio_fsync(op: ::c_int, aiocbp: *mut aiocb) -> ::c_int;
+    pub fn aio_error(aiocbp: *const aiocb) -> ::c_int;
+    pub fn aio_return(aiocbp: *mut aiocb) -> ::ssize_t;
+    #[link_name = "__aio_suspend50"]
+    pub fn aio_suspend(aiocb_list: *const *const aiocb, nitems: ::c_int,
+                       timeout: *const ::timespec) -> ::c_int;
+    pub fn aio_cancel(fd: ::c_int, aiocbp: *mut aiocb) -> ::c_int;
+    pub fn lio_listio(mode: ::c_int, aiocb_list: *const *mut aiocb,
+                      nitems: ::c_int, sevp: *mut sigevent) -> ::c_int;
+
     pub fn lutimes(file: *const ::c_char, times: *const ::timeval) -> ::c_int;
     pub fn getnameinfo(sa: *const ::sockaddr,
                        salen: ::socklen_t,

@@ -39,6 +39,52 @@ function dateToDays(date) {
   return Math.floor(date.getTime() / MILLISECONDS_IN_DAY);
 }
 
+/**
+ * Get a field from the specified object and remove it.
+ *
+ * @param obj {Object} The object holding the field
+ * @param field {String} The name of the field to be parsed and removed
+ *
+ * @returns {String} the field contents as a string, null if none was found
+ */
+function getAndRemoveField(obj, field) {
+  let value = null;
+
+  if (field in obj) {
+    // We split extra files on LF characters but Windows-generated ones might
+    // contain trailing CR characters so trim them here.
+    value = obj[field].trim();
+
+    delete obj[field];
+  }
+
+  return value;
+}
+
+/**
+ * Parse the string stored in the specified field as JSON and then remove the
+ * field from the object.
+ *
+ * @param obj {Object} The object holding the field
+ * @param field {String} The name of the field to be parsed and removed
+ *
+ * @returns {Object} the parsed object, null if none was found
+ */
+function parseAndRemoveField(obj, field) {
+  let value = null;
+
+  if (field in obj) {
+    try {
+      value = JSON.parse(obj[field]);
+    } catch (e) {
+      Cu.reportError(e);
+    }
+
+    delete obj[field];
+  }
+
+  return value;
+}
 
 /**
  * A gateway to crash-related data.
@@ -114,6 +160,9 @@ this.CrashManager = function(options) {
   // Map of crash ID / promise tuples used to track adding new crashes.
   this._crashPromises = new Map();
 
+  // Promise for the crash ping used only for testing.
+  this._pingPromise = null;
+
   // The CrashStore currently attached to this object.
   this._store = null;
 
@@ -174,6 +223,41 @@ this.CrashManager.prototype = Object.freeze({
   // The type of event is unknown.
   EVENT_FILE_ERROR_UNKNOWN_EVENT: "unknown-event",
 
+  // A whitelist of crash annotations which do not contain sensitive data
+  // and are saved in the crash record and sent with Firefox Health Report.
+  ANNOTATION_WHITELIST: [
+    "AsyncShutdownTimeout",
+    "BuildID",
+    "ProductID",
+    "ProductName",
+    "ReleaseChannel",
+    "SecondsSinceLastCrash",
+    "ShutdownProgress",
+    "StartupCrash",
+    "TelemetryEnvironment",
+    "Version",
+    // The following entries are not normal annotations that can be found in
+    // the .extra file but are included in the crash record/FHR:
+    "AvailablePageFile",
+    "AvailablePhysicalMemory",
+    "AvailableVirtualMemory",
+    "BlockedDllList",
+    "BlocklistInitFailed",
+    "ContainsMemoryReport",
+    "CrashTime",
+    "EventLoopNestingLevel",
+    "IsGarbageCollecting",
+    "MozCrashReason",
+    "OOMAllocationSize",
+    "SystemMemoryUsePercentage",
+    "TextureUsage",
+    "TotalPageFile",
+    "TotalPhysicalMemory",
+    "TotalVirtualMemory",
+    "UptimeTS",
+    "User32BeforeBlocklist",
+  ],
+
   /**
    * Obtain a list of all dumps pending upload.
    *
@@ -194,7 +278,7 @@ this.CrashManager.prototype = Object.freeze({
    *
    * @return Promise<Array>
    */
-  pendingDumps: function() {
+  pendingDumps() {
     return this._getDirectoryEntries(this._pendingDumpsDir, this.DUMP_REGEX);
   },
 
@@ -218,7 +302,7 @@ this.CrashManager.prototype = Object.freeze({
    *
    * @return Promise<Array>
    */
-  submittedDumps: function() {
+  submittedDumps() {
     return this._getDirectoryEntries(this._submittedDumpsDir,
                                      this.SUBMITTED_REGEX);
   },
@@ -238,7 +322,7 @@ this.CrashManager.prototype = Object.freeze({
    *
    * @return promise<int> The number of event files that were examined.
    */
-  aggregateEventsFiles: function() {
+  aggregateEventsFiles() {
     if (this._aggregatePromise) {
       return this._aggregatePromise;
     }
@@ -321,7 +405,7 @@ this.CrashManager.prototype = Object.freeze({
    *        (Date) The cutoff point for pruning. Crashes without data newer
    *        than this will be pruned.
    */
-  pruneOldCrashes: function(date) {
+  pruneOldCrashes(date) {
     return Task.spawn(function* () {
       let store = yield this._getStore();
       store.pruneOldCrashes(date);
@@ -332,7 +416,7 @@ this.CrashManager.prototype = Object.freeze({
   /**
    * Run tasks that should be periodically performed.
    */
-  runMaintenanceTasks: function() {
+  runMaintenanceTasks() {
     return Task.spawn(function* () {
       yield this.aggregateEventsFiles();
 
@@ -347,7 +431,7 @@ this.CrashManager.prototype = Object.freeze({
    * @param delay
    *        (integer) Delay in milliseconds when maintenance should occur.
    */
-  scheduleMaintenance: function(delay) {
+  scheduleMaintenance(delay) {
     let deferred = PromiseUtils.defer();
 
     setTimeout(() => {
@@ -371,7 +455,7 @@ this.CrashManager.prototype = Object.freeze({
    *
    * @return promise<null> Resolved when the store has been saved.
    */
-  addCrash: function(processType, crashType, id, date, metadata) {
+  addCrash(processType, crashType, id, date, metadata) {
     let promise = Task.spawn(function* () {
       let store = yield this._getStore();
       if (store.addCrash(processType, crashType, id, date, metadata)) {
@@ -383,6 +467,11 @@ this.CrashManager.prototype = Object.freeze({
       if (deferred) {
         this._crashPromises.delete(id);
         deferred.resolve();
+      }
+
+      // Send a telemetry ping for each content process crash
+      if (processType === this.PROCESS_TYPE_CONTENT) {
+        this._sendCrashPing(id, processType, date, metadata);
       }
     }.bind(this));
 
@@ -488,7 +577,7 @@ this.CrashManager.prototype = Object.freeze({
    *
    * The promise-resolved array is sorted by file mtime, oldest to newest.
    */
-  _getUnprocessedEventsFiles: function() {
+  _getUnprocessedEventsFiles() {
     return Task.spawn(function* () {
       let entries = [];
 
@@ -505,7 +594,7 @@ this.CrashManager.prototype = Object.freeze({
   },
 
   // See docs/crash-events.rst for the file format specification.
-  _processEventFile: function(entry) {
+  _processEventFile(entry) {
     return Task.spawn(function* () {
       let data = yield OS.File.read(entry.path);
       let store = yield this._getStore();
@@ -544,7 +633,57 @@ this.CrashManager.prototype = Object.freeze({
     }.bind(this));
   },
 
-  _handleEventFilePayload: function(store, entry, type, date, payload) {
+  _filterAnnotations(annotations) {
+    let filteredAnnotations = {};
+
+    for (let line in annotations) {
+      if (this.ANNOTATION_WHITELIST.includes(line)) {
+        filteredAnnotations[line] = annotations[line];
+      }
+    }
+
+    return filteredAnnotations;
+  },
+
+  _sendCrashPing(crashId, type, date, metadata = {}) {
+    // If we have a saved environment, use it. Otherwise report
+    // the current environment.
+    let reportMeta = Cu.cloneInto(metadata, myScope);
+    let crashEnvironment = parseAndRemoveField(reportMeta,
+                                               "TelemetryEnvironment");
+    let sessionId = getAndRemoveField(reportMeta, "TelemetrySessionId");
+    let stackTraces = parseAndRemoveField(reportMeta, "StackTraces");
+    let minidumpSha256Hash = getAndRemoveField(reportMeta,
+                                               "MinidumpSha256Hash");
+    // If CrashPingUUID is not present then Telemetry will generate a new UUID
+    let pingId = getAndRemoveField(reportMeta, "CrashPingUUID");
+
+    // Filter the remaining annotations to remove privacy-sensitive ones
+    reportMeta = this._filterAnnotations(reportMeta);
+
+    this._pingPromise = TelemetryController.submitExternalPing("crash",
+      {
+        version: 1,
+        crashDate: date.toISOString().slice(0, 10), // YYYY-MM-DD
+        crashTime: date.toISOString().slice(0, 13) + ":00:00.000Z", // per-hour resolution
+        sessionId,
+        crashId,
+        minidumpSha256Hash,
+        processType: type,
+        stackTraces,
+        metadata: reportMeta,
+        hasCrashEnvironment: (crashEnvironment !== null),
+      },
+      {
+        addClientId: true,
+        addEnvironment: true,
+        overrideEnvironment: crashEnvironment,
+        overridePingId: pingId
+      }
+    );
+  },
+
+  _handleEventFilePayload(store, entry, type, date, payload) {
       // The payload types and formats are documented in docs/crash-events.rst.
       // Do not change the format of an existing type. Instead, invent a new
       // type.
@@ -565,38 +704,7 @@ this.CrashManager.prototype = Object.freeze({
           store.addCrash(this.PROCESS_TYPE_MAIN, this.CRASH_TYPE_CRASH,
                          crashID, date, metadata);
 
-          // If we have a saved environment, use it. Otherwise report
-          // the current environment.
-          let crashEnvironment = null;
-          let sessionId = null;
-          let reportMeta = Cu.cloneInto(metadata, myScope);
-          if ('TelemetryEnvironment' in reportMeta) {
-            try {
-              crashEnvironment = JSON.parse(reportMeta.TelemetryEnvironment);
-            } catch (e) {
-              Cu.reportError(e);
-            }
-            delete reportMeta.TelemetryEnvironment;
-          }
-          if ('TelemetrySessionId' in reportMeta) {
-            sessionId = reportMeta.TelemetrySessionId;
-            delete reportMeta.TelemetrySessionId;
-          }
-          TelemetryController.submitExternalPing("crash",
-            {
-              version: 1,
-              crashDate: date.toISOString().slice(0, 10), // YYYY-MM-DD
-              sessionId: sessionId,
-              metadata: reportMeta,
-              hasCrashEnvironment: (crashEnvironment !== null),
-            },
-            {
-              retentionDays: 180,
-              addClientId: true,
-              addEnvironment: true,
-              overrideEnvironment: crashEnvironment,
-            });
-          break;
+          this._sendCrashPing(crashID, this.PROCESS_TYPE_MAIN, date, metadata);
 
         case "crash.submission.1":
           if (lines.length == 3) {
@@ -820,7 +928,7 @@ CrashStore.prototype = Object.freeze({
    *
    * @return Promise
    */
-  load: function() {
+  load() {
     return Task.spawn(function* () {
       // Loading replaces data.
       this.reset();

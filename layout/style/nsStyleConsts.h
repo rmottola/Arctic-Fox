@@ -16,34 +16,6 @@
 
 namespace mozilla {
 
-#define NS_FOR_CSS_FULL_CORNERS(var_) for (int32_t var_ = 0; var_ < 4; ++var_)
-
-// Indices into "half corner" arrays (nsStyleCorners e.g.)
-#define NS_CORNER_TOP_LEFT_X      0
-#define NS_CORNER_TOP_LEFT_Y      1
-#define NS_CORNER_TOP_RIGHT_X     2
-#define NS_CORNER_TOP_RIGHT_Y     3
-#define NS_CORNER_BOTTOM_RIGHT_X  4
-#define NS_CORNER_BOTTOM_RIGHT_Y  5
-#define NS_CORNER_BOTTOM_LEFT_X   6
-#define NS_CORNER_BOTTOM_LEFT_Y   7
-
-#define NS_FOR_CSS_HALF_CORNERS(var_) for (int32_t var_ = 0; var_ < 8; ++var_)
-
-// The results of these conversion macros are exhaustively checked in
-// nsStyleCoord.cpp.
-// Arguments must not have side effects.
-
-#define NS_HALF_CORNER_IS_X(var_) (!((var_)%2))
-#define NS_HALF_TO_FULL_CORNER(var_) ((var_)/2)
-#define NS_FULL_TO_HALF_CORNER(var_, vert_) ((var_)*2 + !!(vert_))
-
-#define NS_SIDE_IS_VERTICAL(side_) ((side_) % 2)
-#define NS_SIDE_TO_FULL_CORNER(side_, second_) \
-  (((side_) + !!(second_)) % 4)
-#define NS_SIDE_TO_HALF_CORNER(side_, second_, parallel_) \
-  ((((side_) + !!(second_))*2 + ((side_) + !(parallel_))%2) % 8)
-
 // Basic shapes
 enum class StyleBasicShapeType : uint8_t {
   Polygon,
@@ -174,6 +146,12 @@ enum class StyleShapeOutsideShapeBox : uint8_t {
   Margin
 };
 
+// <shape-radius> for <basic-shape>
+enum class StyleShapeRadius : uint8_t {
+  FarthestSide,
+  ClosestSide
+};
+
 // Shape source type
 enum class StyleShapeSourceType : uint8_t {
   None,
@@ -237,9 +215,6 @@ enum class StyleOrient : uint8_t {
   Horizontal,
   Vertical,
 };
-
-#define NS_RADIUS_FARTHEST_SIDE 0
-#define NS_RADIUS_CLOSEST_SIDE  1
 
 // stack-sizing
 #define NS_STYLE_STACK_SIZING_IGNORE         0

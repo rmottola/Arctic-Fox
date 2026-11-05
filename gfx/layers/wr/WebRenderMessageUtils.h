@@ -41,13 +41,15 @@ struct ParamTraits<mozilla::wr::ImageKey>
   static void
   Write(Message* aMsg, const mozilla::wr::ImageKey& aParam)
   {
+    WriteParam(aMsg, aParam.mNamespace);
     WriteParam(aMsg, aParam.mHandle);
   }
 
   static bool
   Read(const Message* aMsg, PickleIterator* aIter, mozilla::wr::ImageKey* aResult)
   {
-    return ReadParam(aMsg, aIter, &aResult->mHandle);
+    return ReadParam(aMsg, aIter, &aResult->mNamespace)
+        && ReadParam(aMsg, aIter, &aResult->mHandle);
   }
 };
 
@@ -57,13 +59,15 @@ struct ParamTraits<mozilla::wr::FontKey>
   static void
   Write(Message* aMsg, const mozilla::wr::FontKey& aParam)
   {
+    WriteParam(aMsg, aParam.mNamespace);
     WriteParam(aMsg, aParam.mHandle);
   }
 
   static bool
   Read(const Message* aMsg, PickleIterator* aIter, mozilla::wr::FontKey* aResult)
   {
-    return ReadParam(aMsg, aIter, &aResult->mHandle);
+    return ReadParam(aMsg, aIter, &aResult->mNamespace)
+        && ReadParam(aMsg, aIter, &aResult->mHandle);
   }
 };
 
@@ -73,13 +77,15 @@ struct ParamTraits<mozilla::wr::PipelineId>
   static void
   Write(Message* aMsg, const mozilla::wr::PipelineId& aParam)
   {
+    WriteParam(aMsg, aParam.mNamespace);
     WriteParam(aMsg, aParam.mHandle);
   }
 
   static bool
   Read(const Message* aMsg, PickleIterator* aIter, mozilla::wr::PipelineId* aResult)
   {
-    return ReadParam(aMsg, aIter, &aResult->mHandle);
+    return ReadParam(aMsg, aIter, &aResult->mNamespace)
+        && ReadParam(aMsg, aIter, &aResult->mHandle);
   }
 };
 
@@ -88,7 +94,7 @@ struct ParamTraits<WrImageFormat>
   : public ContiguousEnumSerializer<
         WrImageFormat,
         WrImageFormat::Invalid,
-        WrImageFormat::RGBAF32>
+        WrImageFormat::Sentinel>
 {
 };
 
@@ -97,7 +103,7 @@ struct ParamTraits<WrBorderStyle>
   : public ContiguousEnumSerializer<
         WrBorderStyle,
         WrBorderStyle::None,
-        WrBorderStyle::Outset>
+        WrBorderStyle::Sentinel>
 {
 };
 
@@ -124,10 +130,10 @@ struct ParamTraits<WrColor>
 };
 
 template<>
-struct ParamTraits<WRGlyphInstance>
+struct ParamTraits<WrGlyphInstance>
 {
   static void
-  Write(Message* aMsg, const WRGlyphInstance& aParam)
+  Write(Message* aMsg, const WrGlyphInstance& aParam)
   {
     WriteParam(aMsg, aParam.index);
     WriteParam(aMsg, aParam.x);
@@ -135,7 +141,7 @@ struct ParamTraits<WRGlyphInstance>
   }
 
   static bool
-  Read(const Message* aMsg, PickleIterator* aIter, WRGlyphInstance* aResult)
+  Read(const Message* aMsg, PickleIterator* aIter, WrGlyphInstance* aResult)
   {
     return ReadParam(aMsg, aIter, &aResult->index)
         && ReadParam(aMsg, aIter, &aResult->x)
@@ -184,6 +190,24 @@ struct ParamTraits<WrGlyphArray>
 };
 
 template<>
+struct ParamTraits<WrGradientStop>
+{
+  static void
+  Write(Message* aMsg, const WrGradientStop& aParam)
+  {
+    WriteParam(aMsg, aParam.offset);
+    WriteParam(aMsg, aParam.color);
+  }
+
+  static bool
+  Read(const Message* aMsg, PickleIterator* aIter, WrGradientStop* aResult)
+  {
+    return ReadParam(aMsg, aIter, &aResult->offset)
+        && ReadParam(aMsg, aIter, &aResult->color);
+  }
+};
+
+template<>
 struct ParamTraits<WrBorderSide>
 {
   static void
@@ -222,6 +246,28 @@ struct ParamTraits<WrLayoutSize>
 };
 
 template<>
+struct ParamTraits<WrBorderRadius>
+{
+  static void
+  Write(Message* aMsg, const WrBorderRadius& aParam)
+  {
+    WriteParam(aMsg, aParam.top_left);
+    WriteParam(aMsg, aParam.top_right);
+    WriteParam(aMsg, aParam.bottom_left);
+    WriteParam(aMsg, aParam.bottom_right);
+  }
+
+  static bool
+  Read(const Message* aMsg, PickleIterator* aIter, WrBorderRadius* aResult)
+  {
+    return ReadParam(aMsg, aIter, &aResult->top_left)
+        && ReadParam(aMsg, aIter, &aResult->top_right)
+        && ReadParam(aMsg, aIter, &aResult->bottom_left)
+        && ReadParam(aMsg, aIter, &aResult->bottom_right);
+  }
+};
+
+template<>
 struct ParamTraits<WrRect>
 {
   static void
@@ -240,6 +286,24 @@ struct ParamTraits<WrRect>
         && ReadParam(aMsg, aIter, &aResult->y)
         && ReadParam(aMsg, aIter, &aResult->width)
         && ReadParam(aMsg, aIter, &aResult->height);
+  }
+};
+
+template<>
+struct ParamTraits<WrPoint>
+{
+  static void
+  Write(Message* aMsg, const WrPoint& aParam)
+  {
+    WriteParam(aMsg, aParam.x);
+    WriteParam(aMsg, aParam.y);
+  }
+
+  static bool
+  Read(const Message* aMsg, PickleIterator* aIter, WrPoint* aResult)
+  {
+    return ReadParam(aMsg, aIter, &aResult->x) &&
+           ReadParam(aMsg, aIter, &aResult->y);
   }
 };
 
@@ -264,11 +328,77 @@ struct ParamTraits<WrImageMask>
 };
 
 template<>
-struct ParamTraits<WrTextureFilter>
+struct ParamTraits<WrBuiltDisplayListDescriptor>
+{
+  static void
+  Write(Message* aMsg, const WrBuiltDisplayListDescriptor& aParam)
+  {
+    WriteParam(aMsg, aParam.display_list_items_size);
+  }
+
+  static bool
+  Read(const Message* aMsg, PickleIterator* aIter, WrBuiltDisplayListDescriptor* aResult)
+  {
+    return ReadParam(aMsg, aIter, &aResult->display_list_items_size);
+  }
+};
+
+template<>
+struct ParamTraits<WrAuxiliaryListsDescriptor>
+{
+  static void
+  Write(Message* aMsg, const WrAuxiliaryListsDescriptor& aParam)
+  {
+    WriteParam(aMsg, aParam.gradient_stops_size);
+    WriteParam(aMsg, aParam.complex_clip_regions_size);
+    WriteParam(aMsg, aParam.filters_size);
+    WriteParam(aMsg, aParam.glyph_instances_size);
+  }
+
+  static bool
+  Read(const Message* aMsg, PickleIterator* aIter, WrAuxiliaryListsDescriptor* aResult)
+  {
+    return ReadParam(aMsg, aIter, &aResult->gradient_stops_size)
+        && ReadParam(aMsg, aIter, &aResult->complex_clip_regions_size)
+        && ReadParam(aMsg, aIter, &aResult->filters_size)
+        && ReadParam(aMsg, aIter, &aResult->glyph_instances_size);
+  }
+};
+
+
+template<>
+struct ParamTraits<WrImageRendering>
   : public ContiguousEnumSerializer<
-        WrTextureFilter,
-        WrTextureFilter::Linear,
-        WrTextureFilter::Sentinel>
+        WrImageRendering,
+        WrImageRendering::Auto,
+        WrImageRendering::Sentinel>
+{
+};
+
+template<>
+struct ParamTraits<WrMixBlendMode>
+  : public ContiguousEnumSerializer<
+        WrMixBlendMode,
+        WrMixBlendMode::Normal,
+        WrMixBlendMode::Sentinel>
+{
+};
+
+template<>
+struct ParamTraits<WrBoxShadowClipMode>
+  : public ContiguousEnumSerializer<
+        WrBoxShadowClipMode,
+        WrBoxShadowClipMode::None,
+        WrBoxShadowClipMode::Sentinel>
+{
+};
+
+template<>
+struct ParamTraits<WrGradientExtendMode>
+  : public ContiguousEnumSerializer<
+        WrGradientExtendMode,
+        WrGradientExtendMode::Clamp,
+        WrGradientExtendMode::Sentinel>
 {
 };
 

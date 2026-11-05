@@ -11,11 +11,9 @@ include protocol PCompositorBridge;
 include protocol PContentBridge;
 include protocol PContentPermissionRequest;
 include protocol PCycleCollectWithLogs;
-include protocol PCrashReporter;
 include protocol PPSMContentDownloader;
 include protocol PExternalHelperApp;
 include protocol PHandlerService;
-include protocol PDeviceStorageRequest;
 include protocol PFileDescriptorSet;
 include protocol PHal;
 include protocol PHeapSnapshotTempFileHelper;
@@ -28,10 +26,10 @@ include protocol PGMPService;
 include protocol PPluginModule;
 include protocol PGMP;
 include protocol PPrinting;
-include protocol PSendStream;
+include protocol PChildToParentStream;
+include protocol PParentToChildStream;
 include protocol POfflineCacheUpdate;
 include protocol PRenderFrame;
-include protocol PScreenManager;
 include protocol PSpeechSynthesis;
 include protocol PStorage;
 include protocol PTestShell;
@@ -46,7 +44,7 @@ include protocol PVideoDecoderManager;
 include protocol PFlyWebPublishedServer;
 include DOMTypes;
 include JavaScriptTypes;
-include InputStreamParams;
+include IPCStream;
 include PTabContext;
 include URIParams;
 include PluginTypes;
@@ -74,6 +72,7 @@ using base::ProcessId from "base/process.h";
 using struct IPC::Permission from "mozilla/net/NeckoMessageUtils.h";
 using class IPC::Principal from "mozilla/dom/PermissionMessageUtils.h";
 using struct mozilla::null_t from "ipc/IPCMessageUtils.h";
+using mozilla::a11y::IHandlerControlHolder from "mozilla/a11y/IPCTypes.h";
 using mozilla::dom::NativeThreadId from "mozilla/dom/TabMessageUtils.h";
 using mozilla::hal::ProcessPriority from "mozilla/HalTypes.h";
 using mozilla::gfx::IntSize from "mozilla/gfx/2D.h";
@@ -91,6 +90,7 @@ using mozilla::Telemetry::Accumulation from "mozilla/TelemetryComms.h";
 using mozilla::Telemetry::KeyedAccumulation from "mozilla/TelemetryComms.h";
 using mozilla::Telemetry::ScalarAction from "mozilla/TelemetryComms.h";
 using mozilla::Telemetry::KeyedScalarAction from "mozilla/TelemetryComms.h";
+using mozilla::Telemetry::ChildEventData from "mozilla/TelemetryComms.h";
 
 union ChromeRegistryItem
 {
@@ -124,120 +124,6 @@ struct FontFamilyListEntry {
     uint8_t  entryType;
 };
 
-struct DeviceStorageFreeSpaceParams
-{
-  nsString type;
-  nsString storageName;
-};
-
-struct DeviceStorageUsedSpaceParams
-{
-  nsString type;
-  nsString storageName;
-};
-
-struct DeviceStorageAvailableParams
-{
-  nsString type;
-  nsString storageName;
-};
-
-struct DeviceStorageStatusParams
-{
-  nsString type;
-  nsString storageName;
-};
-
-struct DeviceStorageFormatParams
-{
-  nsString type;
-  nsString storageName;
-};
-
-struct DeviceStorageMountParams
-{
-  nsString type;
-  nsString storageName;
-};
-
-struct DeviceStorageUnmountParams
-{
-  nsString type;
-  nsString storageName;
-};
-
-struct DeviceStorageAddParams
-{
-  nsString type;
-  nsString storageName;
-  nsString relpath;
-  PBlob blob;
-};
-
-struct DeviceStorageAppendParams
-{
-  nsString type;
-  nsString storageName;
-  nsString relpath;
-  PBlob blob;
-};
-
-struct DeviceStorageCreateFdParams
-{
-  nsString type;
-  nsString storageName;
-  nsString relpath;
-};
-
-struct DeviceStorageGetParams
-{
-  nsString type;
-  nsString storageName;
-  nsString rootDir;
-  nsString relpath;
-};
-
-struct DeviceStorageDeleteParams
-{
-  nsString type;
-  nsString storageName;
-  nsString relpath;
-};
-
-struct DeviceStorageEnumerationParams
-{
-  nsString type;
-  nsString storageName;
-  nsString rootdir;
-  uint64_t since;
-};
-
-union DeviceStorageParams
-{
-  DeviceStorageAddParams;
-  DeviceStorageAppendParams;
-  DeviceStorageCreateFdParams;
-  DeviceStorageGetParams;
-  DeviceStorageDeleteParams;
-  DeviceStorageEnumerationParams;
-  DeviceStorageFreeSpaceParams;
-  DeviceStorageUsedSpaceParams;
-  DeviceStorageAvailableParams;
-  DeviceStorageStatusParams;
-  DeviceStorageFormatParams;
-  DeviceStorageMountParams;
-  DeviceStorageUnmountParams;
-};
-
-struct DeviceStorageLocationInfo {
-  nsString music;
-  nsString pictures;
-  nsString videos;
-  nsString sdcard;
-  nsString apps;
-  nsString crashes;
-};
-
 union PrefValue {
   nsCString;
   int32_t;
@@ -259,6 +145,11 @@ struct DataStorageItem {
   nsCString key;
   nsCString value;
   DataStorageType type;
+};
+
+struct DataStorageEntry {
+  DataStorageItem[] items;
+  nsString filename;
 };
 
 struct ClipboardCapabilities {
@@ -350,6 +241,13 @@ struct GMPCapabilityData
     GMPAPITags[] capabilities;
 };
 
+struct GfxInfoFeatureStatus
+{
+    int32_t feature;
+    int32_t status;
+    nsCString failureId;
+};
+
 struct XPCOMInitData
 {
     bool isOffline;
@@ -364,13 +262,8 @@ struct XPCOMInitData
     FontFamilyListEntry[] fontFamilies;
     OptionalURIParams userContentSheetURL;
     PrefSetting[] prefs;
-};
-
-struct GfxInfoFeatureStatus
-{
-    int32_t feature;
-    int32_t status;
-    nsCString failureId;
+    GfxInfoFeatureStatus[] gfxFeatureStatus;
+    DataStorageEntry[] dataStorage;
 };
 
 /**
@@ -380,14 +273,10 @@ struct GfxInfoFeatureStatus
  */
 nested(upto inside_cpow) sync protocol PContent
 {
-    parent spawns PPluginModule;
-
     manages PBlob;
     manages PBrowser;
     manages PContentPermissionRequest;
-    manages PCrashReporter;
     manages PCycleCollectWithLogs;
-    manages PDeviceStorageRequest;
     manages PPSMContentDownloader;
     manages PExternalHelperApp;
     manages PFileDescriptorSet;
@@ -398,8 +287,8 @@ nested(upto inside_cpow) sync protocol PContent
     manages PNecko;
     manages POfflineCacheUpdate;
     manages PPrinting;
-    manages PSendStream;
-    manages PScreenManager;
+    manages PChildToParentStream;
+    manages PParentToChildStream;
     manages PSpeechSynthesis;
     manages PStorage;
     manages PTestShell;
@@ -565,9 +454,6 @@ child:
     // Notify child that last-pb-context-exited notification was observed
     async LastPrivateDocShellDestroyed();
 
-    async FilePathUpdate(nsString storageType, nsString storageName, nsString filepath,
-                         nsCString reasons);
-
     async NotifyProcessPriorityChanged(ProcessPriority priority);
     async MinimizeMemoryUsage();
 
@@ -607,7 +493,8 @@ child:
     async InvokeDragSession(IPCDataTransfer[] transfers, uint32_t action);
 
     async EndDragSession(bool aDoneDrag, bool aUserCancelled,
-                         LayoutDeviceIntPoint aDragEndPoint);
+                         LayoutDeviceIntPoint aDragEndPoint,
+                         uint32_t aKeyModifiers);
 
     async DomainSetChanged(uint32_t aSetType, uint32_t aChangeType, OptionalURIParams aDomain);
 
@@ -682,7 +569,25 @@ child:
 
     async GMPsChanged(GMPCapabilityData[] capabilities);
 
+
     async FileCreationResponse(nsID aID, FileCreationResult aResult);
+
+    /**
+     * Sending an activate message moves focus to the child.
+     */
+    async Activate(PBrowser aTab);
+
+    async Deactivate(PBrowser aTab);
+
+    async ParentActivated(PBrowser aTab, bool aActivated);
+
+    async PParentToChildStream();
+
+    async ProvideAnonymousTemporaryFile(uint64_t aID, FileDescOrError aFD);
+
+    async SetPermissionsWithKey(nsCString aPermissionKey, Permission[] aPermissions);
+
+    async RefreshScreens(ScreenDetails[] aScreens);
 
 parent:
     async InitBackground(Endpoint<PBackgroundParent> aEndpoint);
@@ -696,20 +601,21 @@ parent:
     async CreateGMPService();
 
     /**
-     * This call connects the content process to a plugin process. While this
-     * call runs, a new PluginModuleParent will be created in the ContentChild
-     * via bridging. The corresponding PluginModuleChild will live in the plugin
-     * process.
+     * This call connects the content process to a plugin process. This call
+     * returns an endpoint for a new PluginModuleParent. The corresponding
+     * PluginModuleChild will be started up in the plugin process.
      */
-    sync LoadPlugin(uint32_t aPluginId) returns (nsresult aResult, uint32_t aRunID);
+    sync LoadPlugin(uint32_t aPluginId)
+        returns (nsresult aResult, uint32_t aRunID, Endpoint<PPluginModuleParent> aEndpoint);
 
     /**
      * This call is used by asynchronous plugin instantiation to notify the
      * content parent that it is now safe to initiate the plugin bridge for
-     * the specified plugin id. When this call returns, the requested bridge
-     * connection has been made.
+     * the specified plugin id. The endpoint for the content process part of the
+     * bridge is returned.
      */
-    sync ConnectPluginBridge(uint32_t aPluginId) returns (nsresult rv);
+    sync ConnectPluginBridge(uint32_t aPluginId)
+        returns (nsresult rv, Endpoint<PPluginModuleParent> aEndpoint);
 
     /**
      * Return the current blocklist state for a particular plugin.
@@ -733,9 +639,8 @@ parent:
     async PJavaScript();
 
     async PRemoteSpellcheckEngine();
-    async PDeviceStorageRequest(DeviceStorageParams params);
 
-    sync PCrashReporter(NativeThreadId tid, uint32_t processType);
+    async InitCrashReporter(Shmem shmem, NativeThreadId tid);
 
     /**
      * Is this token compatible with the provided version?
@@ -781,10 +686,12 @@ parent:
                          uint8_t[] keyHandle)
         returns (uint8_t[] signature);
 
-    sync IsSecureURI(uint32_t type, URIParams uri, uint32_t flags)
+    sync IsSecureURI(uint32_t aType, URIParams aURI, uint32_t aFlags,
+                     OriginAttributes aOriginAttributes)
         returns (bool isSecureURI);
 
-    async AccumulateMixedContentHSTS(URIParams uri, bool active, bool hasHSTSPriming);
+    async AccumulateMixedContentHSTS(URIParams aURI, bool aActive, bool aHasHSTSPriming,
+                                     OriginAttributes aOriginAttributes);
 
     nested(inside_cpow) async PHal();
 
@@ -794,12 +701,7 @@ parent:
 
     async PPrinting();
 
-    async PSendStream();
-
-    nested(inside_sync) sync PScreenManager()
-        returns (uint32_t numberOfScreens,
-                 float systemDefaultScale,
-                 bool success);
+    async PChildToParentStream();
 
     async PSpeechSynthesis();
 
@@ -831,9 +733,6 @@ parent:
     sync GetGfxVars() returns (GfxVarUpdate[] vars);
 
     sync ReadFontList() returns (FontListEntry[] retValue);
-
-    sync ReadDataStorageArray(nsString aFilename)
-      returns (DataStorageItem[] retValue);
 
     sync SyncMessage(nsString aMessage, ClonedMessageData aData,
                      CpowEntry[] aCpows, Principal aPrincipal)
@@ -874,9 +773,6 @@ parent:
                       uint32_t lineNumber, uint32_t colNumber, uint32_t flags,
                       nsCString category);
 
-    // nsIPermissionManager messages
-    sync ReadPermissions() returns (Permission[] permissions);
-
     // Places the items within dataTransfer on the clipboard.
     async SetClipboard(IPCDataTransfer aDataTransfer,
                        bool aIsPrivateData,
@@ -916,13 +812,8 @@ parent:
 
     async AudioChannelChangeDefVolChannel(int32_t aChannel, bool aHidden);
 
-    async FilePathUpdateNotify(nsString aType,
-                               nsString aStorageName,
-                               nsString aFilepath,
-                               nsCString aReason);
-
     sync KeywordToURI(nsCString keyword)
-        returns (nsString providerName, OptionalInputStreamParams postData, OptionalURIParams uri);
+        returns (nsString providerName, OptionalIPCStream postData, OptionalURIParams uri);
 
     sync NotifyKeywordSearchLoading(nsString providerName, nsString keyword);
 
@@ -944,8 +835,6 @@ parent:
                                 nsString pageURL,
                                 bool isAudio,
                                 bool isVideo);
-
-    sync GetGfxInfoFeatureStatus() returns (GfxInfoFeatureStatus[] features);
 
     // Graphics errors
     async GraphicsError(nsCString aError);
@@ -969,6 +858,8 @@ parent:
      * use the newly-invalid surface.
      */
     async BackUpXResources(FileDescriptor aXSocketFd);
+
+    async RequestAnonymousTemporaryFile(uint64_t aID);
 
     sync OpenAnonymousTemporaryFile() returns (FileDescOrError aFD);
 
@@ -1104,12 +995,6 @@ parent:
       OriginAttributes aOpenerOriginAttributes,
       float aFullZoom);
 
-    sync GetDeviceStorageLocation(nsString type)
-        returns (nsString path);
-
-    sync GetDeviceStorageLocations()
-	returns (DeviceStorageLocationInfo info);
-
     sync GetAndroidSystemInfo()
         returns (AndroidSystemInfo info);
 
@@ -1159,7 +1044,8 @@ parent:
 
      async FileCreationRequest(nsID aID, nsString aFullPath, nsString aType,
                                nsString aName, bool lastModifiedPassed,
-                               int64_t lastModified, bool aIsFromNsIFile);
+                               int64_t lastModified, bool aExistenceCheck,
+                               bool aIsFromNsIFile);
 
      async StoreAndBroadcastBlobURLRegistration(nsCString url, PBlob blob,
                                                 Principal principal);
@@ -1169,12 +1055,15 @@ parent:
     /**
      * Messages for communicating child Telemetry to the parent process
      */
-    async AccumulateChildHistogram(Accumulation[] accumulations);
-    async AccumulateChildKeyedHistogram(KeyedAccumulation[] accumulations);
+    async AccumulateChildHistograms(Accumulation[] accumulations);
+    async AccumulateChildKeyedHistograms(KeyedAccumulation[] accumulations);
     async UpdateChildScalars(ScalarAction[] updates);
     async UpdateChildKeyedScalars(KeyedScalarAction[] updates);
+    async RecordChildEvents(ChildEventData[] events);
 
     sync GetA11yContentId() returns (uint32_t aContentId);
+    async A11yHandlerControl(uint32_t aPid,
+                             IHandlerControlHolder aHandlerControl);
 
     async AddMemoryReport(MemoryReport aReport);
     async FinishMemoryReport(uint32_t aGeneration);

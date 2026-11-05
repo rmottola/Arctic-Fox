@@ -191,6 +191,8 @@ namespace jit {
 // Defined in JitFrames.h
 enum ExitFrameTokenValues;
 
+class AutoSaveLiveRegisters;
+
 // The public entrypoint for emitting assembly. Note that a MacroAssembler can
 // use cx->lifoAlloc, so take care not to interleave masm use with other
 // lifoAlloc use if one will be destroyed before the other.
@@ -371,6 +373,9 @@ class MacroAssembler : public MacroAssemblerSpecific
         initWithAllocator();
         armbuffer_.id = 0;
 #endif
+
+        // Disable page protection for WASM.
+        disableProtection();
     }
 
     void constructRoot(JSContext* cx) {
@@ -423,6 +428,12 @@ class MacroAssembler : public MacroAssemblerSpecific
                             DEFINED_ON(arm, arm64, mips32, mips64, x86_shared);
     void PushRegsInMask(LiveGeneralRegisterSet set);
 
+    // Like PushRegsInMask, but instead of pushing the registers, store them to
+    // |dest|. |dest| should point to the end of the reserved space, so the
+    // first register will be stored at |dest.offset - sizeof(register)|.
+    void storeRegsInMask(LiveRegisterSet set, Address dest, Register scratch)
+        DEFINED_ON(arm, arm64, x86_shared);
+
     void PopRegsInMask(LiveRegisterSet set);
     void PopRegsInMask(LiveGeneralRegisterSet set);
     void PopRegsInMaskIgnore(LiveRegisterSet set, LiveRegisterSet ignore)
@@ -436,6 +447,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     void Push(const ImmPtr imm) PER_SHARED_ARCH;
     void Push(const ImmGCPtr ptr) PER_SHARED_ARCH;
     void Push(FloatRegister reg) PER_SHARED_ARCH;
+    void PushFlags() DEFINED_ON(x86_shared);
     void Push(jsid id, Register scratchReg);
     void Push(TypedOrValueRegister v);
     void Push(const ConstantOrRegister& v);
@@ -451,6 +463,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     void Pop(Register reg) PER_SHARED_ARCH;
     void Pop(FloatRegister t) PER_SHARED_ARCH;
     void Pop(const ValueOperand& val) PER_SHARED_ARCH;
+    void PopFlags() DEFINED_ON(x86_shared);
     void popRooted(VMFunction::RootType rootType, Register cellReg, const ValueOperand& valueReg);
 
     // Move the stack pointer based on the requested amount.
@@ -477,11 +490,13 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     CodeOffset call(Register reg) PER_SHARED_ARCH;
     CodeOffset call(Label* label) PER_SHARED_ARCH;
-    void call(const Address& addr) DEFINED_ON(x86_shared);
+    void call(const Address& addr) DEFINED_ON(x86_shared, arm, arm64);
     void call(ImmWord imm) PER_SHARED_ARCH;
     // Call a target native function, which is neither traceable nor movable.
     void call(ImmPtr imm) PER_SHARED_ARCH;
     void call(wasm::SymbolicAddress imm) PER_SHARED_ARCH;
+    inline void call(const wasm::CallSiteDesc& desc, wasm::SymbolicAddress imm);
+
     // Call a target JitCode, which must be traceable, and may be movable.
     void call(JitCode* c) PER_SHARED_ARCH;
 
@@ -518,6 +533,12 @@ class MacroAssembler : public MacroAssemblerSpecific
     static void patchNopToNearJump(uint8_t* jump, uint8_t* target) PER_SHARED_ARCH;
     static void patchNearJumpToNop(uint8_t* jump) PER_SHARED_ARCH;
 
+    // Emit a nop that can be patched to and from a nop and a call with int32
+    // relative displacement.
+    CodeOffset nopPatchableToCall(const wasm::CallSiteDesc& desc) PER_SHARED_ARCH;
+    static void patchNopToCall(uint8_t* callsite, uint8_t* target) PER_SHARED_ARCH;
+    static void patchCallToNop(uint8_t* callsite) PER_SHARED_ARCH;
+
   public:
     // ===============================================================
     // ABI function calls.
@@ -526,6 +547,11 @@ class MacroAssembler : public MacroAssemblerSpecific
     // accruately define the state of the stack, and that the top of the stack
     // was properly aligned. Note that this only supports cdecl.
     void setupAlignedABICall(); // CRASH_ON(arm64)
+
+    // As setupAlignedABICall, but for WebAssembly native ABI calls, which pass
+    // through a builtin thunk that uses the wasm ABI. All the wasm ABI calls
+    // can be native, since we always know the stack alignment a priori.
+    void setupWasmABICall(); // CRASH_ON(arm64)
 
     // Setup an ABI call for when the alignment is not known. This may need a
     // scratch register.
@@ -544,6 +570,9 @@ class MacroAssembler : public MacroAssemblerSpecific
     template <typename T>
     inline void callWithABI(const T& fun, MoveOp::Type result = MoveOp::GENERAL);
 
+    void callWithABI(wasm::BytecodeOffset offset, wasm::SymbolicAddress fun,
+                     MoveOp::Type result = MoveOp::GENERAL);
+
   private:
     // Reinitialize the variables which have to be cleared before making a call
     // with callWithABI.
@@ -554,12 +583,11 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     // Emits a call to a C/C++ function, resolving all argument moves.
     void callWithABINoProfiler(void* fun, MoveOp::Type result);
-    void callWithABINoProfiler(wasm::SymbolicAddress imm, MoveOp::Type result);
     void callWithABINoProfiler(Register fun, MoveOp::Type result) PER_ARCH;
     void callWithABINoProfiler(const Address& fun, MoveOp::Type result) PER_ARCH;
 
     // Restore the stack to its state before the setup function call.
-    void callWithABIPost(uint32_t stackAdjust, MoveOp::Type result) PER_ARCH;
+    void callWithABIPost(uint32_t stackAdjust, MoveOp::Type result, bool callFromWasm = false) PER_ARCH;
 
     // Create the signature to be able to decode the arguments of a native
     // function, when calling a function within the simulator.
@@ -669,22 +697,22 @@ class MacroAssembler : public MacroAssemblerSpecific
     inline bool hasSelfReference() const;
 
     // Push stub code and the VMFunction pointer.
-    inline void enterExitFrame(const VMFunction* f = nullptr);
+    inline void enterExitFrame(Register cxreg, const VMFunction* f = nullptr);
 
     // Push an exit frame token to identify which fake exit frame this footer
     // corresponds to.
-    inline void enterFakeExitFrame(enum ExitFrameTokenValues token);
+    inline void enterFakeExitFrame(Register cxreg, enum ExitFrameTokenValues token);
 
     // Push an exit frame token for a native call.
-    inline void enterFakeExitFrameForNative(bool isConstructing);
+    inline void enterFakeExitFrameForNative(Register cxreg, bool isConstructing);
 
     // Pop ExitFrame footer in addition to the extra frame.
     inline void leaveExitFrame(size_t extraFrame = 0);
 
   private:
-    // Save the top of the stack into PerThreadData::jitTop of the main thread,
+    // Save the top of the stack into JSontext::jitTop of the current thread,
     // which should be the location of the latest exit frame.
-    void linkExitFrame();
+    void linkExitFrame(Register cxreg);
 
     // Patch the value of PushStubCode with the pointer to the finalized code.
     void linkSelfReference(JitCode* code);
@@ -707,6 +735,14 @@ class MacroAssembler : public MacroAssemblerSpecific
     inline void move8SignExtend(Register src, Register dest) PER_SHARED_ARCH;
     inline void move16SignExtend(Register src, Register dest) PER_SHARED_ARCH;
 
+    // Copy a constant, typed-register, or a ValueOperand into a ValueOperand
+    // destination.
+    inline void moveValue(const ConstantOrRegister& src, const ValueOperand& dest);
+    void moveValue(const TypedOrValueRegister& src, const ValueOperand& dest) PER_ARCH;
+    void moveValue(const ValueOperand& src, const ValueOperand& dest) PER_ARCH;
+    void moveValue(const Value& src, const ValueOperand& dest) PER_ARCH;
+
+  public:
     // ===============================================================
     // Logical instructions
 
@@ -766,10 +802,17 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     inline void add64(Register64 src, Register64 dest) PER_ARCH;
     inline void add64(Imm32 imm, Register64 dest) PER_ARCH;
-    inline void add64(Imm64 imm, Register64 dest) DEFINED_ON(x86, x64, arm, mips32, mips64);
+    inline void add64(Imm64 imm, Register64 dest) PER_ARCH;
     inline void add64(const Operand& src, Register64 dest) DEFINED_ON(x64, mips64);
 
     inline void addFloat32(FloatRegister src, FloatRegister dest) PER_SHARED_ARCH;
+
+    // Compute dest=src+imm where `src` and `dest` are pointer registers; `src`
+    // may be SP, and `src` may equal `dest`.  `dest` should not normally be SP,
+    // as stack probes are required for large negative immediates.  The offset
+    // returned from add32ToPtrWithPatch() must be passed to patchAdd32ToPtr().
+    inline CodeOffset add32ToPtrWithPatch(Register src, Register dest) PER_ARCH;
+    inline void patchAdd32ToPtr(CodeOffset offset, Imm32 imm) PER_ARCH;
 
     inline void addDouble(FloatRegister src, FloatRegister dest) PER_SHARED_ARCH;
     inline void addConstantDouble(double d, FloatRegister dest) DEFINED_ON(x86);
@@ -785,7 +828,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     inline void subPtr(const Address& addr, Register dest) DEFINED_ON(mips_shared, arm, arm64, x86, x64);
 
     inline void sub64(Register64 src, Register64 dest) PER_ARCH;
-    inline void sub64(Imm64 imm, Register64 dest) DEFINED_ON(x86, x64, arm, mips32, mips64);
+    inline void sub64(Imm64 imm, Register64 dest) PER_ARCH;
     inline void sub64(const Operand& src, Register64 dest) DEFINED_ON(x64, mips64);
 
     inline void subFloat32(FloatRegister src, FloatRegister dest) PER_SHARED_ARCH;
@@ -900,7 +943,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     inline void rotateLeft64(Imm32 count, Register64 input, Register64 dest) DEFINED_ON(x64);
     inline void rotateLeft64(Register count, Register64 input, Register64 dest) DEFINED_ON(x64);
     inline void rotateLeft64(Imm32 count, Register64 input, Register64 dest, Register temp)
-        DEFINED_ON(x86, x64, arm, mips32, mips64);
+        PER_ARCH;
     inline void rotateLeft64(Register count, Register64 input, Register64 dest, Register temp)
         PER_ARCH;
 
@@ -909,7 +952,7 @@ class MacroAssembler : public MacroAssemblerSpecific
     inline void rotateRight64(Imm32 count, Register64 input, Register64 dest) DEFINED_ON(x64);
     inline void rotateRight64(Register count, Register64 input, Register64 dest) DEFINED_ON(x64);
     inline void rotateRight64(Imm32 count, Register64 input, Register64 dest, Register temp)
-        DEFINED_ON(x86, x64, arm, mips32, mips64);
+        PER_ARCH;
     inline void rotateRight64(Register count, Register64 input, Register64 dest, Register temp)
         PER_ARCH;
 
@@ -988,7 +1031,8 @@ class MacroAssembler : public MacroAssemblerSpecific
     inline void branch64(Condition cond, const Address& lhs, const Address& rhs, Register scratch,
                          Label* label) PER_ARCH;
 
-    inline void branchPtr(Condition cond, Register lhs, Register rhs, Label* label) PER_SHARED_ARCH;
+    template <class L>
+    inline void branchPtr(Condition cond, Register lhs, Register rhs, L label) PER_SHARED_ARCH;
     inline void branchPtr(Condition cond, Register lhs, Imm32 rhs, Label* label) PER_SHARED_ARCH;
     inline void branchPtr(Condition cond, Register lhs, ImmPtr rhs, Label* label) PER_SHARED_ARCH;
     inline void branchPtr(Condition cond, Register lhs, ImmGCPtr rhs, Label* label) PER_SHARED_ARCH;
@@ -1335,14 +1379,15 @@ class MacroAssembler : public MacroAssemblerSpecific
     // ========================================================================
     // wasm support
 
-    // Emit a bounds check against the (dynamically-patched) wasm bounds check
-    // limit, jumping to 'label' if 'cond' holds.
+    // Emit a bounds check against the wasm heap limit, jumping to 'label' if 'cond' holds.
+    // Required when WASM_HUGE_MEMORY is not defined.
     template <class L>
-    inline void wasmBoundsCheck(Condition cond, Register index, L label) PER_ARCH;
+    inline void wasmBoundsCheck(Condition cond, Register index, Register boundsCheckLimit, L label)
+        DEFINED_ON(arm, arm64, mips32, mips64, x86);
 
-    // Called after compilation completes to patch the given limit into the
-    // given instruction's immediate.
-    static inline void wasmPatchBoundsCheck(uint8_t* patchAt, uint32_t limit) PER_ARCH;
+    template <class L>
+    inline void wasmBoundsCheck(Condition cond, Register index, Address boundsCheckLimit, L label)
+        DEFINED_ON(arm, arm64, mips32, mips64, x86);
 
     // On x86, each instruction adds its own wasm::MemoryAccess's to the
     // wasm::MemoryAccessVector (there can be multiple when i64 is involved).
@@ -1353,35 +1398,90 @@ class MacroAssembler : public MacroAssemblerSpecific
     void wasmStore(const wasm::MemoryAccessDesc& access, AnyRegister value, Operand dstAddr) DEFINED_ON(x86, x64);
     void wasmStoreI64(const wasm::MemoryAccessDesc& access, Register64 value, Operand dstAddr) DEFINED_ON(x86);
 
+    // For all the ARM wasmLoad and wasmStore functions, `ptr` MUST equal
+    // `ptrScratch`, and that register will be updated based on conditions
+    // listed below (where it is only mentioned as `ptr`).
+
+    // `ptr` will be updated if access.offset() != 0 or access.type() == Scalar::Int64.
+    void wasmLoad(const wasm::MemoryAccessDesc& access, Register memoryBase, Register ptr,
+                  Register ptrScratch, AnyRegister output)
+        DEFINED_ON(arm);
+    void wasmLoadI64(const wasm::MemoryAccessDesc& access, Register memoryBase, Register ptr,
+                     Register ptrScratch, Register64 output)
+        DEFINED_ON(arm);
+    void wasmStore(const wasm::MemoryAccessDesc& access, AnyRegister value, Register memoryBase,
+                   Register ptr, Register ptrScratch)
+        DEFINED_ON(arm);
+    void wasmStoreI64(const wasm::MemoryAccessDesc& access, Register64 value, Register memoryBase,
+                      Register ptr, Register ptrScratch)
+        DEFINED_ON(arm);
+
+    // `ptr` will always be updated.
+    void wasmUnalignedLoad(const wasm::MemoryAccessDesc& access, Register memoryBase, Register ptr,
+                           Register ptrScratch, Register output, Register tmp)
+        DEFINED_ON(arm);
+
+    // `ptr` will always be updated and `tmp1` is always needed.  `tmp2` is
+    // needed for Float32; `tmp2` and `tmp3` are needed for Float64.  Temps must
+    // be Invalid when they are not needed.
+    void wasmUnalignedLoadFP(const wasm::MemoryAccessDesc& access, Register memoryBase, Register ptr,
+                             Register ptrScratch, FloatRegister output, Register tmp1, Register tmp2,
+                             Register tmp3)
+        DEFINED_ON(arm);
+
+    // `ptr` will always be updated.
+    void wasmUnalignedLoadI64(const wasm::MemoryAccessDesc& access, Register memoryBase, Register ptr,
+                              Register ptrScratch, Register64 output, Register tmp)
+        DEFINED_ON(arm);
+
+    // `ptr` and `value` will always be updated.
+    void wasmUnalignedStore(const wasm::MemoryAccessDesc& access, Register value, Register memoryBase,
+                            Register ptr, Register ptrScratch)
+        DEFINED_ON(arm);
+
+    // `ptr` will always be updated.
+    void wasmUnalignedStoreFP(const wasm::MemoryAccessDesc& access, FloatRegister floatValue,
+                              Register memoryBase, Register ptr, Register ptrScratch, Register tmp)
+        DEFINED_ON(arm);
+
+    // `ptr` will always be updated.
+    void wasmUnalignedStoreI64(const wasm::MemoryAccessDesc& access, Register64 value,
+                               Register memoryBase, Register ptr, Register ptrScratch,
+                               Register tmp)
+        DEFINED_ON(arm);
+
     // wasm specific methods, used in both the wasm baseline compiler and ion.
     void wasmTruncateDoubleToUInt32(FloatRegister input, Register output, Label* oolEntry) DEFINED_ON(x86, x64, arm);
     void wasmTruncateDoubleToInt32(FloatRegister input, Register output, Label* oolEntry) DEFINED_ON(x86_shared, arm);
-    void outOfLineWasmTruncateDoubleToInt32(FloatRegister input, bool isUnsigned, wasm::TrapOffset off, Label* rejoin) DEFINED_ON(x86_shared);
+    void outOfLineWasmTruncateDoubleToInt32(FloatRegister input, bool isUnsigned, wasm::BytecodeOffset off, Label* rejoin) DEFINED_ON(x86_shared);
 
     void wasmTruncateFloat32ToUInt32(FloatRegister input, Register output, Label* oolEntry) DEFINED_ON(x86, x64, arm);
     void wasmTruncateFloat32ToInt32(FloatRegister input, Register output, Label* oolEntry) DEFINED_ON(x86_shared, arm);
-    void outOfLineWasmTruncateFloat32ToInt32(FloatRegister input, bool isUnsigned, wasm::TrapOffset off, Label* rejoin) DEFINED_ON(x86_shared);
+    void outOfLineWasmTruncateFloat32ToInt32(FloatRegister input, bool isUnsigned, wasm::BytecodeOffset off, Label* rejoin) DEFINED_ON(x86_shared);
 
-    void outOfLineWasmTruncateDoubleToInt64(FloatRegister input, bool isUnsigned, wasm::TrapOffset off, Label* rejoin) DEFINED_ON(x86_shared);
-    void outOfLineWasmTruncateFloat32ToInt64(FloatRegister input, bool isUnsigned, wasm::TrapOffset off, Label* rejoin) DEFINED_ON(x86_shared);
+    void outOfLineWasmTruncateDoubleToInt64(FloatRegister input, bool isUnsigned, wasm::BytecodeOffset off, Label* rejoin) DEFINED_ON(x86_shared);
+    void outOfLineWasmTruncateFloat32ToInt64(FloatRegister input, bool isUnsigned, wasm::BytecodeOffset off, Label* rejoin) DEFINED_ON(x86_shared);
 
     // This function takes care of loading the callee's TLS and pinned regs but
     // it is the caller's responsibility to save/restore TLS or pinned regs.
     void wasmCallImport(const wasm::CallSiteDesc& desc, const wasm::CalleeDesc& callee);
 
     // WasmTableCallIndexReg must contain the index of the indirect call.
-    void wasmCallIndirect(const wasm::CallSiteDesc& desc, const wasm::CalleeDesc& callee);
+    void wasmCallIndirect(const wasm::CallSiteDesc& desc, const wasm::CalleeDesc& callee, bool needsBoundsCheck);
 
     // This function takes care of loading the pointer to the current instance
     // as the implicit first argument. It preserves TLS and pinned registers.
     // (TLS & pinned regs are non-volatile registers in the system ABI).
-    void wasmCallBuiltinInstanceMethod(const ABIArg& instanceArg,
+    void wasmCallBuiltinInstanceMethod(const wasm::CallSiteDesc& desc, const ABIArg& instanceArg,
                                        wasm::SymbolicAddress builtin);
 
     // Emit the out-of-line trap code to which trapping jumps/branches are
     // bound. This should be called once per function after all other codegen,
     // including "normal" OutOfLineCode.
     void wasmEmitTrapOutOfLineCode();
+
+    // Assert invariants that should be true within any non-exit-stub wasm code.
+    void wasmAssertNonExitInvariants(Register activation);
 
   public:
     // ========================================================================
@@ -1433,20 +1533,16 @@ class MacroAssembler : public MacroAssemblerSpecific
     void loadStringChars(Register str, Register dest);
     void loadStringChar(Register str, Register index, Register output);
 
-    void loadJSContext(Register dest) {
-        movePtr(ImmPtr(GetJitContext()->runtime->getJSContext()), dest);
-    }
+    void loadJSContext(Register dest);
     void loadJitActivation(Register dest) {
-        loadPtr(AbsoluteAddress(GetJitContext()->runtime->addressOfActivation()), dest);
+        loadJSContext(dest);
+        loadPtr(Address(dest, offsetof(JSContext, activation_)), dest);
     }
-    void loadWasmActivationFromTls(Register dest) {
-        loadPtr(Address(WasmTlsReg, offsetof(wasm::TlsData, cx)), dest);
-        loadPtr(Address(dest, JSContext::offsetOfWasmActivation()), dest);
-    }
-    void loadWasmActivationFromSymbolicAddress(Register dest) {
-        movePtr(wasm::SymbolicAddress::Context, dest);
-        loadPtr(Address(dest, JSContext::offsetOfWasmActivation()), dest);
-    }
+
+    void guardGroupHasUnanalyzedNewScript(Register group, Register scratch, Label* fail);
+
+    void loadWasmActivationFromTls(Register dest);
+    void loadWasmTlsRegFromFrame(Register dest = WasmTlsReg);
 
     template<typename T>
     void loadTypedOrValue(const T& src, TypedOrValueRegister dest) {
@@ -1497,10 +1593,12 @@ class MacroAssembler : public MacroAssemblerSpecific
             storeTypedOrValue(src.reg(), dest);
     }
 
-    void storeCallResult(Register reg) {
+    void storeCallWordResult(Register reg) {
         if (reg != ReturnReg)
             mov(ReturnReg, reg);
     }
+
+    inline void storeCallBoolResult(Register reg);
 
     void storeCallFloatResult(FloatRegister reg) {
         if (reg != ReturnDoubleReg)
@@ -1540,10 +1638,6 @@ class MacroAssembler : public MacroAssemblerSpecific
 
     inline void storeCallResultValue(TypedOrValueRegister dest);
 
-    template <typename T>
-    Register extractString(const T& source, Register scratch) {
-        return extractObject(source, scratch);
-    }
     using MacroAssemblerSpecific::store32;
     void store32(const RegisterOrInt32Constant& key, const Address& dest) {
         if (key.isRegister())
@@ -1635,12 +1729,17 @@ class MacroAssembler : public MacroAssemblerSpecific
     void checkUnboxedArrayCapacity(Register obj, const RegisterOrInt32Constant& index,
                                    Register temp, Label* failure);
 
-    Register extractString(const Address& address, Register scratch) {
-        return extractObject(address, scratch);
+    template <typename T>
+    Register extractString(const T& source, Register scratch) {
+        return extractObject(source, scratch);
     }
-    Register extractString(const ValueOperand& value, Register scratch) {
-        return extractObject(value, scratch);
+
+    template <typename T>
+    Register extractSymbol(const T& source, Register scratch) {
+        return extractObject(source, scratch);
     }
+
+    void debugAssertIsObject(const ValueOperand& val);
 
     using MacroAssemblerSpecific::extractTag;
     Register extractTag(const TypedOrValueRegister& reg, Register scratch) {
@@ -1846,6 +1945,10 @@ class MacroAssembler : public MacroAssemblerSpecific
     void printf(const char* output, Register value);
 
 #ifdef JS_TRACE_LOGGING
+    void loadTraceLogger(Register logger) {
+        loadJSContext(logger);
+        loadPtr(Address(logger, offsetof(JSContext, traceLogger)), logger);
+    }
     void tracelogStartId(Register logger, uint32_t textId, bool force = false);
     void tracelogStartId(Register logger, Register textId);
     void tracelogStartEvent(Register logger, Register event);
@@ -1888,9 +1991,11 @@ class MacroAssembler : public MacroAssemblerSpecific
                                             Label* fail, MIRType outputType);
 
     void outOfLineTruncateSlow(FloatRegister src, Register dest, bool widenFloatToDouble,
-                               bool compilingWasm);
+                               bool compilingWasm, wasm::BytecodeOffset callOffset);
 
     void convertInt32ValueToDouble(const Address& address, Register scratch, Label* done);
+    void convertInt32ValueToDouble(ValueOperand val);
+
     void convertValueToDouble(ValueOperand value, FloatRegister output, Label* fail) {
         convertValueToFloatingPoint(value, output, fail, MIRType::Double);
     }
@@ -2108,6 +2213,8 @@ class MacroAssembler : public MacroAssemblerSpecific
     MOZ_MUST_USE bool icBuildOOLFakeExitFrame(void* fakeReturnAddr, AfterICSaveLive& aic);
     void icRestoreLive(LiveRegisterSet& liveRegs, AfterICSaveLive& aic);
 
+    MOZ_MUST_USE bool icBuildOOLFakeExitFrame(void* fakeReturnAddr, AutoSaveLiveRegisters& save);
+
     // Align the stack pointer based on the number of arguments which are pushed
     // on the stack, such that the JitFrameLayout would be correctly aligned on
     // the JitStackAlignment.
@@ -2198,6 +2305,19 @@ static inline MIRType
 ToMIRType(MIRType t)
 {
     return t;
+}
+
+static inline MIRType
+ToMIRType(ABIArgType argType)
+{
+    switch (argType & ArgType_Mask) {
+      case ArgType_General: return MIRType::Int32;
+      case ArgType_Double:  return MIRType::Double;
+      case ArgType_Float32: return MIRType::Float32;
+      case ArgType_Int64:   return MIRType::Int64;
+      default: break;
+    }
+    MOZ_CRASH("unexpected argType");
 }
 
 template <class VecT>

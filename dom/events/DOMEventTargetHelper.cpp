@@ -52,24 +52,23 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(DOMEventTargetHelper)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(DOMEventTargetHelper)
-  if (tmp->IsBlack() || tmp->IsCertainlyAliveForCC()) {
+  if (tmp->HasKnownLiveWrapper() || tmp->IsCertainlyAliveForCC()) {
     if (tmp->mListenerManager) {
       tmp->mListenerManager->MarkForCC();
     }
-    if (!tmp->IsBlack() && tmp->PreservingWrapper()) {
-      // This marks the wrapper black.
-      tmp->GetWrapper();
+    if (!tmp->HasKnownLiveWrapper() && tmp->PreservingWrapper()) {
+      tmp->MarkWrapperLive();
     }
     return true;
   }
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(DOMEventTargetHelper)
-  return tmp->IsBlackAndDoesNotNeedTracing(tmp);
+  return tmp->HasKnownLiveWrapperAndDoesNotNeedTracing(tmp);
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
 
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(DOMEventTargetHelper)
-  return tmp->IsBlack();
+  return tmp->HasKnownLiveWrapper();
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(DOMEventTargetHelper)
@@ -321,7 +320,7 @@ DOMEventTargetHelper::GetEventHandler(nsIAtom* aType,
 {
   EventHandlerNonNull* handler = GetEventHandler(aType, EmptyString());
   if (handler) {
-    *aValue = JS::ObjectValue(*handler->Callable());
+    *aValue = JS::ObjectOrNullValue(handler->CallableOrNull());
   } else {
     *aValue = JS::NullValue();
   }

@@ -36,21 +36,16 @@ DecodeFunctionBody(Decoder& d, ModuleGenerator& mg, uint32_t funcIndex)
     if (!d.readVarU32(&bodySize))
         return d.fail("expected number of function body bytes");
 
-    if (d.bytesRemain() < bodySize)
-        return d.fail("function body length too big");
-
-    const uint8_t* bodyBegin = d.currentPosition();
     const size_t offsetInModule = d.currentOffset();
+
+    // Skip over the function body; we'll validate it later.
+    const uint8_t* bodyBegin;
+    if (!d.readBytes(bodySize, &bodyBegin))
+        return d.fail("function body length too big");
 
     FunctionGenerator fg;
     if (!mg.startFuncDef(offsetInModule, &fg))
         return false;
-
-    if (!ValidateFunctionBody(mg.env(), funcIndex, d))
-        return false;
-
-    if (d.currentPosition() != bodyBegin + bodySize)
-        return d.fail("function body length mismatch");
 
     if (!fg.bytes().resize(bodySize))
         return false;
@@ -60,15 +55,14 @@ DecodeFunctionBody(Decoder& d, ModuleGenerator& mg, uint32_t funcIndex)
     return mg.finishFuncDef(funcIndex, &fg);
 }
 
-// Section decoding.
 static bool
 DecodeCodeSection(Decoder& d, ModuleGenerator& mg)
 {
-    if (!mg.startFuncDefs())
+    uint32_t sectionStart, sectionSize;
+    if (!d.startSection(SectionId::Code, &mg.mutableEnv(), &sectionStart, &sectionSize, "code"))
         return false;
 
-    uint32_t sectionStart, sectionSize;
-    if (!d.startSection(SectionId::Code, &sectionStart, &sectionSize, "code"))
+    if (!mg.startFuncDefs())
         return false;
 
     if (sectionStart == Decoder::NotStarted) {
@@ -96,75 +90,17 @@ DecodeCodeSection(Decoder& d, ModuleGenerator& mg)
     return mg.finishFuncDefs();
 }
 
-static void
-MaybeDecodeNameSectionBody(Decoder& d, NameInBytecodeVector* pfuncNames)
-{
-    // For simplicity, ignore all failures, even OOM. Failure will simply result
-    // in the names section not being included for this module.
-
-    uint32_t numFuncNames;
-    if (!d.readVarU32(&numFuncNames))
-        return;
-
-    if (numFuncNames > MaxFuncs)
-        return;
-
-    // Use a local vector (and not pfuncNames) since it could result in a
-    // partially initialized result in case of failure in the middle.
-    NameInBytecodeVector funcNames;
-    if (!funcNames.resize(numFuncNames))
-        return;
-
-    for (uint32_t i = 0; i < numFuncNames; i++) {
-        uint32_t numBytes;
-        if (!d.readVarU32(&numBytes))
-            return;
-
-        NameInBytecode name;
-        name.offset = d.currentOffset();
-        name.length = numBytes;
-        funcNames[i] = name;
-
-        if (!d.readBytes(numBytes))
-            return;
-
-        // Skip local names for a function.
-        uint32_t numLocals;
-        if (!d.readVarU32(&numLocals))
-            return;
-        for (uint32_t j = 0; j < numLocals; j++) {
-            uint32_t numBytes;
-            if (!d.readVarU32(&numBytes))
-                return;
-            if (!d.readBytes(numBytes))
-                return;
-        }
-    }
-
-    *pfuncNames = Move(funcNames);
-}
-
-static bool
-DecodeNameSection(Decoder& d, NameInBytecodeVector* funcNames)
-{
-    uint32_t sectionStart, sectionSize;
-    if (!d.startUserDefinedSection(NameSectionName, &sectionStart, &sectionSize))
-        return false;
-    if (sectionStart == Decoder::NotStarted)
-        return true;
-
-    // Once started, user-defined sections do not report validation errors.
-
-    MaybeDecodeNameSectionBody(d, funcNames);
-
-    d.finishUserDefinedSection(sectionStart, sectionSize);
-    return true;
-}
-
 bool
-CompileArgs::initFromContext(ExclusiveContext* cx, ScriptedCaller&& scriptedCaller)
+CompileArgs::initFromContext(JSContext* cx, ScriptedCaller&& scriptedCaller)
 {
     alwaysBaseline = cx->options().wasmAlwaysBaseline();
+
+    // Debug information such as source view or debug traps will require
+    // additional memory and permanently stay in baseline code, so we try to
+    // only enable it when a developer actually cares: when the debugger tab
+    // is open.
+    debugEnabled = cx->compartment()->debuggerObservesAsmJS();
+
     this->scriptedCaller = Move(scriptedCaller);
     return assumptions.initBuildIdFromContext(cx);
 }
@@ -174,7 +110,7 @@ wasm::Compile(const ShareableBytes& bytecode, const CompileArgs& args, UniqueCha
 {
     MOZ_RELEASE_ASSERT(wasm::HaveSignalHandlers());
 
-    Decoder d(bytecode.begin(), bytecode.end(), error);
+    Decoder d(bytecode.bytes, error);
 
     auto env = js::MakeUnique<ModuleEnvironment>();
     if (!env)
@@ -183,27 +119,17 @@ wasm::Compile(const ShareableBytes& bytecode, const CompileArgs& args, UniqueCha
     if (!DecodeModuleEnvironment(d, env.get()))
         return nullptr;
 
-    ModuleGenerator mg;
+    ModuleGenerator mg(error);
     if (!mg.init(Move(env), args))
         return nullptr;
 
     if (!DecodeCodeSection(d, mg))
         return nullptr;
 
-    DataSegmentVector dataSegments;
-    if (!DecodeDataSection(d, mg.env(), &dataSegments))
-        return nullptr;
-
-    NameInBytecodeVector funcNames;
-    if (!DecodeNameSection(d, &funcNames))
-        return nullptr;
-
-    if (!DecodeUnknownSections(d))
+    if (!DecodeModuleTail(d, &mg.mutableEnv()))
         return nullptr;
 
     MOZ_ASSERT(!*error, "unreported error in decoding");
 
-    return mg.finish(bytecode,
-                     Move(dataSegments),
-                     Move(funcNames));
+    return mg.finish(bytecode);
 }

@@ -118,7 +118,8 @@ var StarUI = {
           case KeyEvent.DOM_VK_RETURN:
             if (aEvent.target.classList.contains("expander-up") ||
                 aEvent.target.classList.contains("expander-down") ||
-                aEvent.target.id == "editBMPanel_newFolderButton")  {
+                aEvent.target.id == "editBMPanel_newFolderButton" ||
+                aEvent.target.id == "editBookmarkPanelRemoveButton") {
               // XXX Why is this necessary? The defaultPrevented check should
               //    be enough.
               break;
@@ -149,6 +150,7 @@ var StarUI = {
           if (this._closePanelQuickForTesting) {
             delay /= 10;
           }
+          clearTimeout(this._autoCloseTimer);
           this._autoCloseTimer = setTimeout(() => {
             this.panel.hidePopup();
           }, delay);
@@ -1315,6 +1317,7 @@ var BookmarkingUI = {
     if (event.target != event.currentTarget)
       return;
 
+    this._initMobileBookmarks(document.getElementById("BMB_mobileBookmarks"));
     this._initRecentBookmarks(document.getElementById("BMB_recentBookmarks"),
                               "subviewbutton");
 
@@ -1360,6 +1363,28 @@ var BookmarkingUI = {
 
   RECENTLY_BOOKMARKED_PREF: "browser.bookmarks.showRecentlyBookmarked",
 
+  // Set by sync after syncing bookmarks successfully once.
+  MOBILE_BOOKMARKS_PREF: "browser.bookmarks.showMobileBookmarks",
+
+  _shouldShowMobileBookmarks() {
+    try {
+      return Services.prefs.getBoolPref(this.MOBILE_BOOKMARKS_PREF);
+    } catch (e) {}
+    // No pref set (or invalid pref set), look for a mobile bookmarks left pane query.
+    const organizerQueryAnno = "PlacesOrganizer/OrganizerQuery";
+    const mobileBookmarksAnno = "MobileBookmarks";
+    let shouldShow = PlacesUtils.annotations.getItemsWithAnnotation(organizerQueryAnno, {}).filter(
+      id => PlacesUtils.annotations.getItemAnnotation(id, organizerQueryAnno) == mobileBookmarksAnno
+    ).length > 0;
+    // Sync will change this pref if/when it adds a mobile bookmarks query.
+    Services.prefs.setBoolPref(this.MOBILE_BOOKMARKS_PREF, shouldShow);
+    return shouldShow;
+  },
+
+  _initMobileBookmarks(mobileMenuItem) {
+    mobileMenuItem.hidden = !this._shouldShowMobileBookmarks();
+  },
+
   _initRecentBookmarks(aHeaderItem, aExtraCSSClass) {
     this._populateRecentBookmarks(aHeaderItem, aExtraCSSClass);
 
@@ -1403,7 +1428,7 @@ var BookmarkingUI = {
       if (event.target == event.currentTarget) {
         updatePlacesContextMenu(true);
 
-        Services.prefs.removeObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver, false);
+        Services.prefs.removeObserver(this.RECENTLY_BOOKMARKED_PREF, prefObserver);
         placesContextMenu.removeEventListener("popupshowing", onPlacesContextMenuShowing);
         bookmarksMenu.removeEventListener("popuphidden", onBookmarksMenuHidden);
       }
@@ -1438,6 +1463,10 @@ var BookmarkingUI = {
     options.maxResults = kMaxResults;
     let query = PlacesUtils.history.getNewQuery();
 
+    let sh = Cc["@mozilla.org/network/serialization-helper;1"]
+               .getService(Ci.nsISerializationHelper);
+    let loadingPrincipal = sh.serializeToString(document.nodePrincipal);
+
     let fragment = document.createDocumentFragment();
     let root = PlacesUtils.history.executeQuery(query, options).root;
     root.containerOpen = true;
@@ -1459,6 +1488,7 @@ var BookmarkingUI = {
       if (icon) {
         let iconURL = "moz-anno:favicon:" + icon;
         item.setAttribute("image", iconURL);
+        item.setAttribute("loadingprincipal", loadingPrincipal);
       }
       item._placesNode = node;
       fragment.appendChild(item);
@@ -1668,6 +1698,7 @@ var BookmarkingUI = {
   onMainMenuPopupShowing: function BUI_onMainMenuPopupShowing(event) {
     this._updateBookmarkPageMenuItem();
     PlacesCommandHook.updateBookmarkAllTabsCommand();
+    this._initMobileBookmarks(document.getElementById("menu_mobileBookmarks"));
     this._initRecentBookmarks(document.getElementById("menu_recentBookmarks"));
   },
 
@@ -1684,7 +1715,7 @@ var BookmarkingUI = {
       clearTimeout(this._notificationTimeout);
     }
 
-    if (this.notifier.style.transform == '') {
+    if (this.notifier.style.transform == "") {
       // Get all the relevant nodes and computed style objects
       let dropmarker = document.getAnonymousElementByAttribute(this.button, "anonid", "dropmarker");
       let dropmarkerIcon = document.getAnonymousElementByAttribute(dropmarker, "class", "dropmarker-icon");
@@ -1729,8 +1760,8 @@ var BookmarkingUI = {
       this.dropmarkerNotifier.removeAttribute("notification");
       this.button.removeAttribute("notification");
 
-      this.dropmarkerNotifier.style.transform = '';
-      this.notifier.style.transform = '';
+      this.dropmarkerNotifier.style.transform = "";
+      this.notifier.style.transform = "";
     }, 1000);
   },
 

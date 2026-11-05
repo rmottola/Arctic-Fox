@@ -11,10 +11,10 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Monitor.h"
 #include "mozilla/Move.h"
-#include "mozilla/VolatileBuffer.h"
 #include "gfxDrawable.h"
 #include "imgIContainer.h"
 #include "MainThreadUtils.h"
+#include "nsAutoPtr.h"
 
 namespace mozilla {
 namespace image {
@@ -210,14 +210,14 @@ public:
                           const nsIntRect& aRect,
                           SurfaceFormat aFormat,
                           uint8_t aPaletteDepth = 0,
-                          bool aNonPremult = false);
+                          bool aNonPremult = false,
+                          bool aIsAnimated = false);
 
-  nsresult InitForDecoder(const nsIntSize& aSize,
-                          SurfaceFormat aFormat,
-                          uint8_t aPaletteDepth = 0)
+  nsresult InitForAnimator(const nsIntSize& aSize,
+                           SurfaceFormat aFormat)
   {
     return InitForDecoder(aSize, nsIntRect(0, 0, aSize.width, aSize.height),
-                          aFormat, aPaletteDepth);
+                          aFormat, 0, false, true);
   }
 
 
@@ -257,7 +257,8 @@ public:
   void SetRawAccessOnly();
 
   bool Draw(gfxContext* aContext, const ImageRegion& aRegion,
-            SamplingFilter aSamplingFilter, uint32_t aImageFlags);
+            SamplingFilter aSamplingFilter, uint32_t aImageFlags,
+            float aOpacity);
 
   nsresult ImageUpdated(const nsIntRect& aUpdateRect);
 
@@ -351,7 +352,6 @@ private: // methods
 
   nsresult LockImageData();
   nsresult UnlockImageData();
-  bool     CanOptimizeOpaqueImage();
   nsresult Optimize(gfx::DrawTarget* aTarget);
 
   void AssertImageDataLocked() const;
@@ -395,11 +395,25 @@ private: // data
 
   mutable Monitor mMonitor;
 
-  RefPtr<DataSourceSurface> mImageSurface;
-  RefPtr<SourceSurface> mOptSurface;
+  /**
+   * Surface which contains either a weak or a strong reference to its
+   * underlying data buffer. If it is a weak reference, and there are no strong
+   * references, the buffer may be released due to events such as low memory.
+   */
+  RefPtr<DataSourceSurface> mRawSurface;
 
-  RefPtr<VolatileBuffer> mVBuf;
-  VolatileBufferPtr<uint8_t> mVBufPtr;
+  /**
+   * Refers to the same data as mRawSurface, but when set, it guarantees that
+   * we hold a strong reference to the underlying data buffer.
+   */
+  RefPtr<DataSourceSurface> mLockedSurface;
+
+  /**
+   * Optimized copy of mRawSurface for the DrawTarget that will render it. This
+   * is unused if the DrawTarget is able to render DataSourceSurface buffers
+   * directly.
+   */
+  RefPtr<SourceSurface> mOptSurface;
 
   nsIntRect mDecoded;
 
@@ -414,7 +428,6 @@ private: // data
   Maybe<IntRect> mBlendRect;
   SurfaceFormat  mFormat;
 
-  bool mHasNoAlpha;
   bool mAborted;
   bool mFinished;
   bool mOptimizable;
@@ -451,16 +464,30 @@ private: // data
  */
 class DrawableFrameRef final
 {
+  typedef gfx::DataSourceSurface DataSourceSurface;
+
 public:
   DrawableFrameRef() { }
 
   explicit DrawableFrameRef(imgFrame* aFrame)
     : mFrame(aFrame)
-    , mRef(aFrame->mVBuf)
   {
-    if (mRef.WasBufferPurged()) {
-      mFrame = nullptr;
-      mRef = nullptr;
+    MOZ_ASSERT(aFrame);
+    MonitorAutoLock lock(aFrame->mMonitor);
+
+    // Paletted images won't have a surface so there is no strong reference
+    // to hold on to. Since Draw() and GetSourceSurface() calls will not work
+    // in that case, we should be using RawAccessFrameRef exclusively instead.
+    // See FrameAnimator::GetRawFrame for an example of this behaviour.
+    if (aFrame->mRawSurface) {
+      mRef = new DataSourceSurface::ScopedMap(aFrame->mRawSurface,
+                                              DataSourceSurface::READ_WRITE);
+      if (!mRef->IsMapped()) {
+        mFrame = nullptr;
+        mRef = nullptr;
+      }
+    } else {
+      MOZ_ASSERT(aFrame->mOptSurface || aFrame->GetIsPaletted());
     }
   }
 
@@ -504,7 +531,7 @@ private:
   DrawableFrameRef(const DrawableFrameRef& aOther) = delete;
 
   RefPtr<imgFrame> mFrame;
-  VolatileBufferPtr<uint8_t> mRef;
+  nsAutoPtr<DataSourceSurface::ScopedMap> mRef;
 };
 
 /**

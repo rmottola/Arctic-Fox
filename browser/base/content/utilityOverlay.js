@@ -212,7 +212,7 @@ function openLinkIn(url, where, params) {
   var aPostData             = params.postData;
   var aCharset              = params.charset;
   var aReferrerURI          = params.referrerURI;
-  var aReferrerPolicy       = ('referrerPolicy' in params ?
+  var aReferrerPolicy       = ("referrerPolicy" in params ?
       params.referrerPolicy : Ci.nsIHttpChannel.REFERRER_POLICY_UNSET);
   var aRelatedToCurrent     = params.relatedToCurrent;
   var aAllowMixedContent    = params.allowMixedContent;
@@ -331,7 +331,7 @@ function openLinkIn(url, where, params) {
     loadInBackground = false;
 
     try {
-      uriObj = Services.io.newURI(url, null, null);
+      uriObj = Services.io.newURI(url);
     } catch (e) {}
 
     if (w.gBrowser.getTabForBrowser(targetBrowser).pinned &&
@@ -386,6 +386,7 @@ function openLinkIn(url, where, params) {
     }
 
     targetBrowser.loadURIWithFlags(url, {
+      triggeringPrincipal: aPrincipal,
       flags: flags,
       referrerURI: aNoReferrer ? null : aReferrerURI,
       referrerPolicy: aReferrerPolicy,
@@ -410,6 +411,7 @@ function openLinkIn(url, where, params) {
       noReferrer: aNoReferrer,
       userContextId: aUserContextId,
       originPrincipal: aPrincipal,
+      triggeringPrincipal: aPrincipal,
     });
     targetBrowser = tabUsedForLoad.linkedBrowser;
     break;

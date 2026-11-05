@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-'use strict';
+"use strict";
 
 const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
 
@@ -440,7 +440,7 @@ function getCanApplyUpdates() {
           try {
             // KEY_UPDROOT will fail and throw an exception if
             // appDir is not under the Program Files, so we rely on that
-            let dir = Services.dirsvc.get(KEY_UPDROOT, Ci.nsIFile);
+            Services.dirsvc.get(KEY_UPDROOT, Ci.nsIFile);
             // appDir is under Program Files, so check if the user can elevate
             userCanElevate = Services.appinfo.QueryInterface(Ci.nsIWinAppHelper).
                              userCanElevate;
@@ -934,7 +934,7 @@ function shouldUseService() {
   // This structure is described at:
   // http://msdn.microsoft.com/en-us/library/ms724833%28v=vs.85%29.aspx
   const SZCSDVERSIONLENGTH = 128;
-  const OSVERSIONINFOEXW = new ctypes.StructType('OSVERSIONINFOEXW',
+  const OSVERSIONINFOEXW = new ctypes.StructType("OSVERSIONINFOEXW",
     [
       {dwOSVersionInfoSize: DWORD},
       {dwMajorVersion: DWORD},

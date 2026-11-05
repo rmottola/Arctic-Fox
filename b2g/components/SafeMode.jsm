@@ -45,7 +45,7 @@ this.SafeMode = {
     return new Promise((aResolve, aReject) => {
       let observer = function(aSubject, aTopic, aData) {
         if (Services.prefs.getCharPref(kSafeModePref)) {
-          Services.prefs.removeObserver(kSafeModePref, observer, false);
+          Services.prefs.removeObserver(kSafeModePref, observer);
           aResolve();
         }
       }
@@ -104,7 +104,7 @@ this.SafeMode = {
             break;
           case "mozContentEvent":
             content.removeEventListener("mozContentEvent", handleEvent, true);
-            contentBrowser.parentNode.removeChild(contentBrowser);
+            contentBrowser.remove();
 
             if (e.detail == "safemode-yes")  {
               // Really starting in safe mode, let's disable add-ons first.

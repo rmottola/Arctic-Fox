@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::{self, Display};
 
 #[derive(Debug, Clone, Eq, Hash)]
@@ -12,6 +13,12 @@ impl Ident {
 impl<'a> From<&'a str> for Ident {
     fn from(s: &str) -> Self {
         Ident(s.to_owned())
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Ident {
+    fn from(s: Cow<'a, str>) -> Self {
+        Ident(s.into_owned())
     }
 }
 
@@ -50,8 +57,8 @@ impl<T: ?Sized> PartialEq<T> for Ident
 #[cfg(feature = "parsing")]
 pub mod parsing {
     use super::*;
-    use nom::IResult;
-    use space::skip_whitespace;
+    use synom::IResult;
+    use synom::space::skip_whitespace;
     use unicode_xid::UnicodeXID;
 
     pub fn ident(input: &str) -> IResult<&str, Ident> {
@@ -82,7 +89,7 @@ pub mod parsing {
             _ => return IResult::Error,
         }
 
-        while let Some((i, ch)) = chars.next() {
+        for (i, ch) in chars {
             if !UnicodeXID::is_xid_continue(ch) {
                 return IResult::Done(&input[i..], input[..i].into());
             }

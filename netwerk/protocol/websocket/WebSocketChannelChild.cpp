@@ -11,7 +11,7 @@
 #include "WebSocketChannelChild.h"
 #include "nsITabChild.h"
 #include "nsNetUtil.h"
-#include "mozilla/ipc/InputStreamUtils.h"
+#include "mozilla/ipc/IPCStreamUtils.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/net/ChannelEventQueue.h"
@@ -239,7 +239,8 @@ WebSocketChannelChild::OnStart(const nsCString& aProtocol,
     nsresult rv = mListenerMT->mListener->OnStart(mListenerMT->mContext);
     if (NS_FAILED(rv)) {
       LOG(("WebSocketChannelChild::OnStart "
-           "mListenerMT->mListener->OnStart() failed with error 0x%08x", rv));
+           "mListenerMT->mListener->OnStart() failed with error 0x%08" PRIx32,
+           static_cast<uint32_t>(rv)));
     }
   }
 }
@@ -282,7 +283,8 @@ WebSocketChannelChild::OnStop(const nsresult& aStatusCode)
       mListenerMT->mListener->OnStop(mListenerMT->mContext, aStatusCode);
     if (NS_FAILED(rv)) {
       LOG(("WebSocketChannel::OnStop "
-           "mListenerMT->mListener->OnStop() failed with error 0x%08x", rv));
+           "mListenerMT->mListener->OnStop() failed with error 0x%08" PRIx32,
+           static_cast<uint32_t>(rv)));
     }
   }
 }
@@ -333,7 +335,7 @@ WebSocketChannelChild::OnMessageAvailable(const nsCString& aMsg)
     if (NS_FAILED(rv)) {
       LOG(("WebSocketChannelChild::OnMessageAvailable "
            "mListenerMT->mListener->OnMessageAvailable() "
-           "failed with error 0x%08x", rv));
+           "failed with error 0x%08" PRIx32, static_cast<uint32_t>(rv)));
     }
   }
 }
@@ -360,7 +362,7 @@ WebSocketChannelChild::OnBinaryMessageAvailable(const nsCString& aMsg)
     if (NS_FAILED(rv)) {
       LOG(("WebSocketChannelChild::OnBinaryMessageAvailable "
            "mListenerMT->mListener->OnBinaryMessageAvailable() "
-           "failed with error 0x%08x", rv));
+           "failed with error 0x%08" PRIx32, static_cast<uint32_t>(rv)));
     }
   }
 }
@@ -404,7 +406,7 @@ WebSocketChannelChild::OnAcknowledge(const uint32_t& aSize)
     if (NS_FAILED(rv)) {
       LOG(("WebSocketChannel::OnAcknowledge "
            "mListenerMT->mListener->OnAcknowledge() "
-           "failed with error 0x%08x", rv));
+           "failed with error 0x%08" PRIx32, static_cast<uint32_t>(rv)));
     }
   }
 }
@@ -658,7 +660,7 @@ class BinaryStreamEvent : public Runnable
 {
 public:
   BinaryStreamEvent(WebSocketChannelChild *aChild,
-                    OptionalInputStreamParams *aStream,
+                    nsIInputStream* aStream,
                     uint32_t aLength)
     : mChild(aChild)
     , mStream(aStream)
@@ -673,40 +675,30 @@ public:
     nsresult rv = mChild->SendBinaryStream(mStream, mLength);
     if (NS_FAILED(rv)) {
       LOG(("WebSocketChannelChild::BinaryStreamEvent %p "
-           "SendBinaryStream failed (%08x)\n", this, rv));
+           "SendBinaryStream failed (%08" PRIx32 ")\n", this, static_cast<uint32_t>(rv)));
     }
     return NS_OK;
   }
 private:
-  RefPtr<WebSocketChannelChild>      mChild;
-  nsAutoPtr<OptionalInputStreamParams> mStream;
-  uint32_t                             mLength;
+  RefPtr<WebSocketChannelChild> mChild;
+  nsCOMPtr<nsIInputStream> mStream;
+  uint32_t mLength;
 };
 
 NS_IMETHODIMP
 WebSocketChannelChild::SendBinaryStream(nsIInputStream *aStream,
                                         uint32_t aLength)
 {
-  OptionalInputStreamParams *stream = new OptionalInputStreamParams();
-  nsTArray<mozilla::ipc::FileDescriptor> fds;
-  SerializeInputStream(aStream, *stream, fds);
-
-  MOZ_ASSERT(fds.IsEmpty());
-
   if (!NS_IsMainThread()) {
     MOZ_RELEASE_ASSERT(NS_GetCurrentThread() == mTargetThread);
-    return NS_DispatchToMainThread(new BinaryStreamEvent(this, stream, aLength));
+    return NS_DispatchToMainThread(new BinaryStreamEvent(this, aStream, aLength));
   }
-  return SendBinaryStream(stream, aLength);
-}
 
-nsresult
-WebSocketChannelChild::SendBinaryStream(OptionalInputStreamParams *aStream,
-                                        uint32_t aLength)
-{
   LOG(("WebSocketChannelChild::SendBinaryStream() %p\n", this));
 
-  nsAutoPtr<OptionalInputStreamParams> stream(aStream);
+  AutoIPCStream autoStream;
+  autoStream.Serialize(aStream,
+                       static_cast<mozilla::dom::ContentChild*>(gNeckoChild->Manager()));
 
   {
     MutexAutoLock lock(mMutex);
@@ -715,7 +707,7 @@ WebSocketChannelChild::SendBinaryStream(OptionalInputStreamParams *aStream,
     }
   }
 
-  if (!SendSendBinaryStream(*stream, aLength)) {
+  if (!SendSendBinaryStream(autoStream.TakeValue(), aLength)) {
     return NS_ERROR_UNEXPECTED;
   }
 

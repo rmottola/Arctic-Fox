@@ -101,7 +101,7 @@ IdToObjectMap::has(const ObjectId& id, const JSObject* obj) const
     auto p = table_.lookup(id);
     if (!p)
         return false;
-    return p->value().unbarrieredGet() == obj;
+    return p->value() == obj;
 }
 #endif
 
@@ -236,7 +236,7 @@ bool
 JavaScriptShared::toVariant(JSContext* cx, JS::HandleValue from, JSVariant* to)
 {
     switch (JS_TypeOfValue(cx, from)) {
-      case JSTYPE_VOID:
+      case JSTYPE_UNDEFINED:
         *to = UndefinedVariant();
         return true;
 

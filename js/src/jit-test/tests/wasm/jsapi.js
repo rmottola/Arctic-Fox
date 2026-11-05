@@ -1,5 +1,3 @@
-load(libdir + 'wasm.js');
-
 const WasmPage = 64 * 1024;
 
 const emptyModuleBinary = wasmTextToBinary('(module)');
@@ -17,26 +15,35 @@ assertEq(wasmDesc.configurable, true);
 assertEq(WebAssembly, wasmDesc.value);
 assertEq(String(WebAssembly), "[object WebAssembly]");
 
-// 'WebAssembly.(Compile|Runtime)Error' data property
+// 'WebAssembly.(Compile|Link|Runtime)Error' data property
 const compileErrorDesc = Object.getOwnPropertyDescriptor(WebAssembly, 'CompileError');
+const linkErrorDesc = Object.getOwnPropertyDescriptor(WebAssembly, 'LinkError');
 const runtimeErrorDesc = Object.getOwnPropertyDescriptor(WebAssembly, 'RuntimeError');
 assertEq(typeof compileErrorDesc.value, "function");
+assertEq(typeof linkErrorDesc.value, "function");
 assertEq(typeof runtimeErrorDesc.value, "function");
 assertEq(compileErrorDesc.writable, true);
+assertEq(linkErrorDesc.writable, true);
 assertEq(runtimeErrorDesc.writable, true);
 assertEq(compileErrorDesc.enumerable, false);
+assertEq(linkErrorDesc.enumerable, false);
 assertEq(runtimeErrorDesc.enumerable, false);
 assertEq(compileErrorDesc.configurable, true);
+assertEq(linkErrorDesc.configurable, true);
 assertEq(runtimeErrorDesc.configurable, true);
 
 // 'WebAssembly.(Compile|Runtime)Error' constructor function
 const CompileError = WebAssembly.CompileError;
+const LinkError = WebAssembly.LinkError;
 const RuntimeError = WebAssembly.RuntimeError;
 assertEq(CompileError, compileErrorDesc.value);
+assertEq(LinkError, linkErrorDesc.value);
 assertEq(RuntimeError, runtimeErrorDesc.value);
 assertEq(CompileError.length, 1);
+assertEq(LinkError.length, 1);
 assertEq(RuntimeError.length, 1);
 assertEq(CompileError.name, "CompileError");
+assertEq(LinkError.name, "LinkError");
 assertEq(RuntimeError.name, "RuntimeError");
 
 // 'WebAssembly.(Compile|Runtime)Error' instance objects
@@ -156,6 +163,23 @@ assertEq(arr[2].name, "c");
 assertEq(arr[3].kind, "global");
 assertEq(arr[3].name, "⚡");
 
+// 'WebAssembly.Module.customSections' data property
+const customSectionsDesc = Object.getOwnPropertyDescriptor(Module, 'customSections');
+assertEq(typeof customSectionsDesc.value, "function");
+assertEq(customSectionsDesc.writable, true);
+assertEq(customSectionsDesc.enumerable, false);
+assertEq(customSectionsDesc.configurable, true);
+
+// 'WebAssembly.Module.customSections' method
+const moduleCustomSections = customSectionsDesc.value;
+assertEq(moduleCustomSections.length, 2);
+assertErrorMessage(() => moduleCustomSections(), TypeError, /requires more than 0 arguments/);
+assertErrorMessage(() => moduleCustomSections(undefined), TypeError, /first argument must be a WebAssembly.Module/);
+assertErrorMessage(() => moduleCustomSections({}), TypeError, /first argument must be a WebAssembly.Module/);
+var arr = moduleCustomSections(emptyModule);
+assertEq(arr instanceof Array, true);
+assertEq(arr.length, 0);
+
 // 'WebAssembly.Instance' data property
 const instanceDesc = Object.getOwnPropertyDescriptor(WebAssembly, 'Instance');
 assertEq(typeof instanceDesc.value, "function");
@@ -201,8 +225,21 @@ assertEq(instanceExportsDesc.writable, true);
 assertEq(instanceExportsDesc.enumerable, true);
 assertEq(instanceExportsDesc.configurable, true);
 
+// 'WebAssembly.Instance' 'exports' object
+const exportsObj = exportingInstance.exports;
+assertEq(typeof exportsObj, "object");
+assertEq(Object.isExtensible(exportsObj), false);
+assertEq(Object.getPrototypeOf(exportsObj), null);
+assertEq(Object.keys(exportsObj).join(), "f");
+exportsObj.g = 1;
+assertEq(Object.keys(exportsObj).join(), "f");
+assertErrorMessage(() => Object.setPrototypeOf(exportsObj, {}), TypeError, /can't set prototype of this object/);
+assertEq(Object.getPrototypeOf(exportsObj), null);
+assertErrorMessage(() => Object.defineProperty(exportsObj, 'g', {}), TypeError, /Object is not extensible/);
+assertEq(Object.keys(exportsObj).join(), "f");
+
 // Exported WebAssembly functions
-const f = exportingInstance.exports.f;
+const f = exportsObj.f;
 assertEq(f instanceof Function, true);
 assertEq(f.length, 0);
 assertEq('name' in f, true);

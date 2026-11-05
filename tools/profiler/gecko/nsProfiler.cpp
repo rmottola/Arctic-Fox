@@ -56,17 +56,19 @@ nsProfiler::Observe(nsISupports *aSubject,
                     const char *aTopic,
                     const char16_t *aData)
 {
+  // The profiler's handling of private browsing is as simple as possible: it
+  // is stopped when the first PB window opens, and left stopped when the last
+  // PB window closes.
   if (strcmp(aTopic, "chrome-document-global-created") == 0) {
     nsCOMPtr<nsIInterfaceRequestor> requestor = do_QueryInterface(aSubject);
     nsCOMPtr<nsIWebNavigation> parentWebNav = do_GetInterface(requestor);
     nsCOMPtr<nsILoadContext> loadContext = do_QueryInterface(parentWebNav);
     if (loadContext && loadContext->UsePrivateBrowsing() && !mLockedForPrivateBrowsing) {
       mLockedForPrivateBrowsing = true;
-      profiler_lock();
+      profiler_stop();
     }
   } else if (strcmp(aTopic, "last-pb-context-exited") == 0) {
     mLockedForPrivateBrowsing = false;
-    profiler_unlock();
   }
   return NS_OK;
 }
@@ -280,7 +282,8 @@ nsProfiler::GetStartParams(nsIProfilerStartParams** aRetVal)
 }
 
 NS_IMETHODIMP
-nsProfiler::GetBufferInfo(uint32_t *aCurrentPosition, uint32_t *aTotalSize, uint32_t *aGeneration)
+nsProfiler::GetBufferInfo(uint32_t* aCurrentPosition, uint32_t* aTotalSize,
+                          uint32_t* aGeneration)
 {
   MOZ_ASSERT(aCurrentPosition);
   MOZ_ASSERT(aTotalSize);
@@ -289,20 +292,3 @@ nsProfiler::GetBufferInfo(uint32_t *aCurrentPosition, uint32_t *aTotalSize, uint
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsProfiler::GetProfileGatherer(nsISupports** aRetVal)
-{
-  if (!aRetVal) {
-    return NS_ERROR_INVALID_POINTER;
-  }
-
-  // If we're not profiling, there will be no gatherer.
-  if (!profiler_is_active()) {
-    *aRetVal = nullptr;
-  } else {
-    nsCOMPtr<nsISupports> gatherer;
-    profiler_get_gatherer(getter_AddRefs(gatherer));
-    gatherer.forget(aRetVal);
-  }
-  return NS_OK;
-}

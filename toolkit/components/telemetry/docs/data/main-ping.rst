@@ -44,8 +44,8 @@ Structure:
         subsessionCounter: <unsigned integer>, // the running no. of this subsession since the start of the browser session
         profileSubsessionCounter: <unsigned integer>, // the running no. of all subsessions for the whole profile life time
 
-        sessionStartDate: <ISO date>, // daily precision
-        subsessionStartDate: <ISO date>, // daily precision, ISO date in local time
+        sessionStartDate: <ISO date>, // hourly precision, ISO date in local time
+        subsessionStartDate: <ISO date>, // hourly precision, ISO date in local time
         sessionLength: <integer>, // the session length until now in seconds, monotonic
         subsessionLength: <integer>, // the subsession length in seconds, monotonic
 
@@ -69,8 +69,7 @@ Structure:
       fileIOReports: {...},
       lateWrites: {...},
       addonDetails: {...},
-      addonHistograms: {...},
-      UIMeasurements: [...],
+      UIMeasurements: [...],  // Android only
       slowSQL: {...},
       slowSQLstartup: {...},
     }
@@ -102,19 +101,21 @@ Structure:
 .. code-block:: js
 
     "processes" : {
-      ... other processes ...
+      // ... other processes ...
       "parent": {
         scalars: {...},
         keyedScalars: {...},
+        events: {...},
       },
       "content": {
         scalars: {...},
         keyedScalars: {...},
         histograms: {...},
         keyedHistograms: {...},
+        events: {...},
       },
       "gpu": {
-        ...
+        // ...
       }
     }
 
@@ -126,11 +127,17 @@ This format was adopted in Firefox 51 via bug 1218576.
 
 scalars and keyedScalars
 ~~~~~~~~~~~~~~~~~~~~~~~~
-This section contains the :doc:`../collection/scalars` that are valid for the current platform. Scalars are only submitted if if data was added to them, and are only reported with subsession pings. The record scalars are described in the `Scalars.yaml <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Scalars.yaml>`_ file. The ``info.revision`` field indicates the revision of the file that describes the reported scalars.
+This section contains the :doc:`../collection/scalars` that are valid for the current platform. Scalars are only submitted if data was added to them, and are only reported with subsession pings. The recorded scalars are described in the `Scalars.yaml <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Scalars.yaml>`_ file. The ``info.revision`` field indicates the revision of the file that describes the reported scalars.
+
+events
+~~~~~~
+This section contains the :ref:`eventtelemetry` that are recorded for the current subsession. Events are not always recorded, recording has to be enabled first for the Firefox session.
+
+The recorded events are defined in the `Events.yaml <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Events.yaml>`_. The ``info.revision`` field indicates the revision of the file that describes the reported events.
 
 childPayloads
 -------------
-The Telemetry payloads sent by child processes, recorded on child process shutdown (event ``content-child-shutdown`` observed). They are reduced session payloads, only available with e10s. Among some other things, they don't contain histograms, keyed histograms, addon details, addon histograms, or UI Telemetry.
+The Telemetry payloads sent by child processes, recorded on child process shutdown (event ``content-child-shutdown`` observed). They are reduced session payloads, only available with e10s. Among some other things, they don't contain histograms, keyed histograms, addon details, or UI Telemetry.
 
 Note: Child payloads are not collected and cleared with subsession splits, they are currently only meaningful when analysed from ``saved-session`` or ``main`` pings with ``reason`` set to ``shutdown``.
 
@@ -221,7 +228,7 @@ Integer count of pending pings that are overdue.
 
 histograms
 ----------
-This section contains the histograms that are valid for the current platform. ``Flag`` and ``count`` histograms are always created and submitted, with their default value being respectively ``false`` and ``0``. Other histogram types (`see here <https://developer.mozilla.org/en-US/docs/Mozilla/Performance/Adding_a_new_Telemetry_probe#Choosing_a_Histogram_Type>`_) are not created nor submitted if no data was added to them. The type and format of the reported histograms is described by the ``Histograms.json`` file. Its most recent version is available `here <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Histograms.json>`_. The ``info.revision`` field indicates the revision of the file that describes the reported histograms.
+This section contains the histograms that are valid for the current platform. ``Flag`` and ``count`` histograms are always created and submitted, with their default value being respectively ``false`` and ``0``. Other histogram types (see :ref:`choosing-histogram-type`) are not created nor submitted if no data was added to them. The type and format of the reported histograms is described by the ``Histograms.json`` file. Its most recent version is available `here <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Histograms.json>`_. The ``info.revision`` field indicates the revision of the file that describes the reported histograms.
 
 keyedHistograms
 ---------------
@@ -584,10 +591,6 @@ Structure:
       ...
     }
 
-addonHistograms
----------------
-This section contains the histogram registered by the addons (`see here <https://dxr.mozilla.org/mozilla-central/rev/584870f1cbc5d060a57e147ce249f736956e2b62/toolkit/components/telemetry/nsITelemetry.idl#303>`_). This section is not present if no addon histogram is available.
-
 UITelemetry
 -----------
 See the ``UITelemetry data format`` documentation.
@@ -623,7 +626,7 @@ This section contains the slow SQL statements gathered at startup (until the "se
 
 UIMeasurements
 --------------
-This section contains UI specific telemetry measurements and events. This section is mainly populated with Android-specific data and events (`see here <https://dxr.mozilla.org/mozilla-central/search?q=regexp%3AUITelemetry.%28addEvent|startSession|stopSession%29&redirect=false&case=false>`_).
+This section is Android-only and contains UI specific Telemetry measurements and events (`see here <https://dxr.mozilla.org/mozilla-central/search?q=regexp%3AUITelemetry.%28addEvent|startSession|stopSession%29&redirect=false&case=false>`_).
 
 Structure:
 

@@ -11,13 +11,17 @@
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/ImageDataSerializer.h"
 #include "mozilla/layers/PTextureChild.h"
+#include "mozilla/webrender/WebRenderAPI.h"
 
 namespace mozilla {
 namespace layers {
 
 WebRenderBridgeChild::WebRenderBridgeChild(const wr::PipelineId& aPipelineId)
-  : mIsInTransaction(false)
-  , mSyncTransaction(false)
+  : mReadLockSequenceNumber(0)
+  , mIsInTransaction(false)
+  , mIdNamespace(0)
+  , mResourceId(0)
+  , mPipelineId(aPipelineId)
   , mIPCOpen(false)
   , mDestroyed(false)
 {
@@ -49,37 +53,179 @@ WebRenderBridgeChild::AddWebRenderCommand(const WebRenderCommand& aCmd)
   mCommands.AppendElement(aCmd);
 }
 
+void
+WebRenderBridgeChild::AddWebRenderCommands(const nsTArray<WebRenderCommand>& aCommands)
+{
+  MOZ_ASSERT(mIsInTransaction);
+  mCommands.AppendElements(aCommands);
+}
+
+void
+WebRenderBridgeChild::AddWebRenderParentCommand(const WebRenderParentCommand& aCmd)
+{
+  MOZ_ASSERT(mIsInTransaction);
+  mParentCommands.AppendElement(aCmd);
+}
+
+void
+WebRenderBridgeChild::AddWebRenderParentCommands(const nsTArray<WebRenderParentCommand>& aCommands)
+{
+  MOZ_ASSERT(mIsInTransaction);
+  mParentCommands.AppendElements(aCommands);
+}
+
 bool
 WebRenderBridgeChild::DPBegin(const gfx::IntSize& aSize)
 {
   MOZ_ASSERT(!mDestroyed);
   MOZ_ASSERT(!mIsInTransaction);
-  bool success = false;
-  UpdateFwdTransactionId();
-  this->SendDPBegin(aSize, &success);
-  if (!success) {
-    return false;
-  }
 
+  UpdateFwdTransactionId();
+  this->SendDPBegin(aSize);
   mIsInTransaction = true;
+  mReadLockSequenceNumber = 0;
+  mReadLocks.AppendElement();
   return true;
 }
 
+wr::BuiltDisplayList
+WebRenderBridgeChild::ProcessWebrenderCommands(const gfx::IntSize &aSize,
+                                               InfallibleTArray<WebRenderCommand>& aCommands)
+{
+  wr::DisplayListBuilder builder(mPipelineId);
+  builder.Begin(ViewAs<LayerPixel>(aSize));
+
+  for (InfallibleTArray<WebRenderCommand>::index_type i = 0; i < aCommands.Length(); ++i) {
+    const WebRenderCommand& cmd = aCommands[i];
+
+    switch (cmd.type()) {
+      case WebRenderCommand::TOpDPPushStackingContext: {
+        const OpDPPushStackingContext& op = cmd.get_OpDPPushStackingContext();
+        builder.PushStackingContext(op.bounds(), op.overflow(), op.mask().ptrOr(nullptr), op.opacity(), op.matrix(), op.mixBlendMode());
+        break;
+      }
+      case WebRenderCommand::TOpDPPopStackingContext: {
+        builder.PopStackingContext();
+        break;
+      }
+      case WebRenderCommand::TOpDPPushScrollLayer: {
+        const OpDPPushScrollLayer& op = cmd.get_OpDPPushScrollLayer();
+        builder.PushScrollLayer(op.bounds(), op.overflow(), op.mask().ptrOr(nullptr));
+        break;
+      }
+      case WebRenderCommand::TOpDPPopScrollLayer: {
+        builder.PopScrollLayer();
+        break;
+      }
+      case WebRenderCommand::TOpDPPushRect: {
+        const OpDPPushRect& op = cmd.get_OpDPPushRect();
+        builder.PushRect(op.bounds(), op.clip(), op.color());
+        break;
+      }
+      case WebRenderCommand::TOpDPPushBorder: {
+        const OpDPPushBorder& op = cmd.get_OpDPPushBorder();
+        builder.PushBorder(op.bounds(), op.clip(),
+                           op.top(), op.right(), op.bottom(), op.left(),
+                           op.radius());
+        break;
+      }
+      case WebRenderCommand::TOpDPPushLinearGradient: {
+        const OpDPPushLinearGradient& op = cmd.get_OpDPPushLinearGradient();
+        builder.PushLinearGradient(op.bounds(), op.clip(),
+                                   op.startPoint(), op.endPoint(),
+                                   op.stops(), op.extendMode());
+        break;
+      }
+      case WebRenderCommand::TOpDPPushRadialGradient: {
+        const OpDPPushRadialGradient& op = cmd.get_OpDPPushRadialGradient();
+        builder.PushRadialGradient(op.bounds(), op.clip(),
+                                   op.startCenter(), op.endCenter(),
+                                   op.startRadius(), op.endRadius(),
+                                   op.stops(), op.extendMode());
+        break;
+      }
+      case WebRenderCommand::TOpDPPushImage: {
+        const OpDPPushImage& op = cmd.get_OpDPPushImage();
+        builder.PushImage(op.bounds(), op.clip(),
+                          op.mask().ptrOr(nullptr), op.filter(), wr::ImageKey(op.key()));
+        break;
+      }
+      case WebRenderCommand::TOpDPPushIframe: {
+        const OpDPPushIframe& op = cmd.get_OpDPPushIframe();
+        builder.PushIFrame(op.bounds(), op.clip(), op.pipelineId());
+        break;
+      }
+      case WebRenderCommand::TOpDPPushText: {
+        const OpDPPushText& op = cmd.get_OpDPPushText();
+        const nsTArray<WrGlyphArray>& glyph_array = op.glyph_array();
+
+        for (size_t i = 0; i < glyph_array.Length(); i++) {
+          const nsTArray<WrGlyphInstance>& glyphs = glyph_array[i].glyphs;
+          builder.PushText(op.bounds(),
+                           op.clip(),
+                           glyph_array[i].color,
+                           op.key(),
+                           Range<const WrGlyphInstance>(glyphs.Elements(), glyphs.Length()),
+                           op.glyph_size());
+        }
+
+        break;
+      }
+      case WebRenderCommand::TOpDPPushBoxShadow: {
+        const OpDPPushBoxShadow& op = cmd.get_OpDPPushBoxShadow();
+        builder.PushBoxShadow(op.rect(),
+                              op.clip(),
+                              op.box_bounds(),
+                              op.offset(),
+                              op.color(),
+                              op.blur_radius(),
+                              op.spread_radius(),
+                              op.border_radius(),
+                              op.clip_mode());
+        break;
+      }
+      default:
+        NS_RUNTIMEABORT("not reached");
+    }
+  }
+  builder.End();
+  wr::BuiltDisplayList dl;
+  builder.Finalize(dl.dl_desc, dl.dl, dl.aux_desc, dl.aux);
+  return dl;
+}
+
 void
-WebRenderBridgeChild::DPEnd(bool aIsSync, uint64_t aTransactionId)
+WebRenderBridgeChild::DPEnd(const gfx::IntSize& aSize, bool aIsSync, uint64_t aTransactionId)
 {
   MOZ_ASSERT(!mDestroyed);
   MOZ_ASSERT(mIsInTransaction);
+
+  for (nsTArray<ReadLockInit>& locks : mReadLocks) {
+    if (locks.Length()) {
+      if (!SendInitReadLocks(locks)) {
+        NS_WARNING("WARNING: sending read locks failed!");
+        return;
+      }
+    }
+  }
+
+  wr::BuiltDisplayList dl = ProcessWebrenderCommands(aSize, mCommands);
+  ByteBuffer dlData(Move(dl.dl));
+  ByteBuffer auxData(Move(dl.aux));
+
   if (aIsSync) {
-    this->SendDPSyncEnd(mCommands, mDestroyedActors, GetFwdTransactionId(), aTransactionId);
+    this->SendDPSyncEnd(aSize, mParentCommands, mDestroyedActors, GetFwdTransactionId(), aTransactionId,
+                        dlData, dl.dl_desc, auxData, dl.aux_desc);
   } else {
-    this->SendDPEnd(mCommands, mDestroyedActors, GetFwdTransactionId(), aTransactionId);
+    this->SendDPEnd(aSize, mParentCommands, mDestroyedActors, GetFwdTransactionId(), aTransactionId,
+                    dlData, dl.dl_desc, auxData, dl.aux_desc);
   }
 
   mCommands.Clear();
+  mParentCommands.Clear();
   mDestroyedActors.Clear();
+  mReadLocks.Clear();
   mIsInTransaction = false;
-  mSyncTransaction = false;
 }
 
 uint64_t
@@ -176,16 +322,13 @@ WebRenderBridgeChild::UpdateTextureRegion(CompositableClient* aCompositable,
 }
 
 bool
-WebRenderBridgeChild::AddOpDestroy(const OpDestroy& aOp, bool aSynchronously)
+WebRenderBridgeChild::AddOpDestroy(const OpDestroy& aOp)
 {
   if (!mIsInTransaction) {
     return false;
   }
 
   mDestroyedActors.AppendElement(aOp);
-  if (aSynchronously) {
-    MarkSyncTransaction();
-  }
   return true;
 }
 
@@ -199,15 +342,15 @@ WebRenderBridgeChild::ReleaseCompositable(const CompositableHandle& aHandle)
 }
 
 bool
-WebRenderBridgeChild::DestroyInTransaction(PTextureChild* aTexture, bool aSynchronously)
+WebRenderBridgeChild::DestroyInTransaction(PTextureChild* aTexture)
 {
-  return AddOpDestroy(OpDestroy(aTexture), aSynchronously);
+  return AddOpDestroy(OpDestroy(aTexture));
 }
 
 bool
 WebRenderBridgeChild::DestroyInTransaction(const CompositableHandle& aHandle)
 {
-  return AddOpDestroy(OpDestroy(aHandle), false);
+  return AddOpDestroy(OpDestroy(aHandle));
 }
 
 void
@@ -223,13 +366,10 @@ WebRenderBridgeChild::RemoveTextureFromCompositable(CompositableClient* aComposi
     return;
   }
 
-  AddWebRenderCommand(
+  AddWebRenderParentCommand(
     CompositableOperation(
       aCompositable->GetIPCHandle(),
       OpRemoveTexture(nullptr, aTexture->GetIPDLActor())));
-  if (aTexture->GetFlags() & TextureFlags::DEALLOCATE_CLIENT) {
-    MarkSyncTransaction();
-  }
 }
 
 void
@@ -249,23 +389,21 @@ WebRenderBridgeChild::UseTextures(CompositableClient* aCompositable,
     MOZ_ASSERT(t.mTextureClient->GetIPDLActor());
     MOZ_RELEASE_ASSERT(t.mTextureClient->GetIPDLActor()->GetIPCChannel() == GetIPCChannel());
     ReadLockDescriptor readLock;
-    t.mTextureClient->SerializeReadLock(readLock);
+    ReadLockHandle readLockHandle;
+    if (t.mTextureClient->SerializeReadLock(readLock)) {
+      readLockHandle = ReadLockHandle(++mReadLockSequenceNumber);
+      if (mReadLocks.LastElement().Length() >= GetMaxFileDescriptorsPerMessage()) {
+        mReadLocks.AppendElement();
+      }
+      mReadLocks.LastElement().AppendElement(ReadLockInit(readLock, readLockHandle));
+    }
     textures.AppendElement(TimedTexture(nullptr, t.mTextureClient->GetIPDLActor(),
-                                        readLock,
+                                        readLockHandle,
                                         t.mTimeStamp, t.mPictureRect,
                                         t.mFrameID, t.mProducerID));
-    if ((t.mTextureClient->GetFlags() & TextureFlags::IMMEDIATE_UPLOAD)
-        && t.mTextureClient->HasIntermediateBuffer()) {
-
-      // We use IMMEDIATE_UPLOAD when we want to be sure that the upload cannot
-      // race with updates on the main thread. In this case we want the transaction
-      // to be synchronous.
-
-      MarkSyncTransaction();
-    }
     GetCompositorBridgeChild()->HoldUntilCompositableRefReleasedIfNecessary(t.mTextureClient);
   }
-  AddWebRenderCommand(CompositableOperation(aCompositable->GetIPCHandle(),
+  AddWebRenderParentCommand(CompositableOperation(aCompositable->GetIPCHandle(),
                                             OpUseTexture(textures)));
 }
 

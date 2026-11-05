@@ -351,7 +351,7 @@ Finder.prototype = {
       this._iterator.reset();
   },
 
-  keyPress: function(aEvent) {
+  keyPress(aEvent) {
     let controller = this._getSelectionController(this._getWindow());
 
     switch (aEvent.keyCode) {
@@ -359,7 +359,7 @@ Finder.prototype = {
         if (this._fastFind.foundLink) {
           let view = this._fastFind.foundLink.ownerDocument.defaultView;
           this._fastFind.foundLink.dispatchEvent(new view.MouseEvent("click", {
-            view: view,
+            view,
             cancelable: true,
             bubbles: true,
             ctrlKey: aEvent.ctrlKey,
@@ -391,7 +391,7 @@ Finder.prototype = {
     }
   },
 
-  _notifyMatchesCount: function(result = this._currentMatchesCountResult) {
+  _notifyMatchesCount(result = this._currentMatchesCountResult) {
     // The `_currentFound` property is only used for internal bookkeeping.
     delete result._currentFound;
     result.limit = this.matchesCountLimit;
@@ -407,7 +407,7 @@ Finder.prototype = {
     this._currentMatchesCountResult = null;
   },
 
-  requestMatchesCount: function(aWord, aLinksOnly) {
+  requestMatchesCount(aWord, aLinksOnly) {
     if (this._lastFindResult == Ci.nsITypeAheadFind.FIND_NOTFOUND ||
         this.searchString == "" || !aWord || !this.matchesCountLimit) {
       this._notifyMatchesCount({
@@ -417,7 +417,6 @@ Finder.prototype = {
       return;
     }
 
-    let window = this._getWindow();
     this._currentFoundRange = this._fastFind.getFoundRange();
 
     let params = {
@@ -475,7 +474,7 @@ Finder.prototype = {
     };
   },
 
-  _getWindow: function() {
+  _getWindow() {
     try {
       return this._docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow);
     } catch(e) {
@@ -487,7 +486,7 @@ Finder.prototype = {
    * Get the bounding selection rect in CSS px relative to the origin of the
    * top-level content document.
    */
-  _getResultRect: function() {
+  _getResultRect() {
     let topWin = this._getWindow();
     let win = this._fastFind.currentWindow;
     if (!win)
@@ -525,8 +524,8 @@ Finder.prototype = {
 
     for (let frame = win; frame != topWin; frame = frame.parent) {
       let rect = frame.frameElement.getBoundingClientRect();
-      let left = frame.getComputedStyle(frame.frameElement, "").borderLeftWidth;
-      let top = frame.getComputedStyle(frame.frameElement, "").borderTopWidth;
+      let left = frame.getComputedStyle(frame.frameElement).borderLeftWidth;
+      let top = frame.getComputedStyle(frame.frameElement).borderTopWidth;
       scrollX.value += rect.left + parseInt(left, 10);
       scrollY.value += rect.top + parseInt(top, 10);
     }
@@ -534,7 +533,7 @@ Finder.prototype = {
     return rect.translate(scrollX.value, scrollY.value);
   },
 
-  _outlineLink: function(aDrawOutline) {
+  _outlineLink(aDrawOutline) {
     let foundLink = this._fastFind.foundLink;
 
     // Optimization: We are drawing outlines and we matched
@@ -561,7 +560,7 @@ Finder.prototype = {
     }
   },
 
-  _restoreOriginalOutline: function() {
+  _restoreOriginalOutline() {
     // Removes the outline around the last found link.
     if (this._previousLink) {
       this._previousLink.style.outline = this._tmpOutline;
@@ -570,7 +569,7 @@ Finder.prototype = {
     }
   },
 
-  _getSelectionController: function(aWindow) {
+  _getSelectionController(aWindow) {
     // display: none iframes don't have a selection controller, see bug 493658
     try {
       if (!aWindow.innerWidth || !aWindow.innerHeight)
@@ -594,7 +593,7 @@ Finder.prototype = {
 
   // Start of nsIWebProgressListener implementation.
 
-  onLocationChange: function(aWebProgress, aRequest, aLocation, aFlags) {
+  onLocationChange(aWebProgress, aRequest, aLocation, aFlags) {
     if (!aWebProgress.isTopLevel)
       return;
     // Ignore events that don't change the document.

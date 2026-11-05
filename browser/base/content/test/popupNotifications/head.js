@@ -272,8 +272,7 @@ function triggerSecondaryCommand(popup, index) {
 
   notification.button.focus();
 
-  popup.addEventListener("popupshown", function handle() {
-    popup.removeEventListener("popupshown", handle);
+  popup.addEventListener("popupshown", function() {
     info("Command popup open for notification " + notification.id);
     // Press down until the desired command is selected
     for (let i = 0; i <= index; i++) {
@@ -281,7 +280,7 @@ function triggerSecondaryCommand(popup, index) {
     }
     // Activate
     EventUtils.synthesizeKey("VK_RETURN", {});
-  });
+  }, {once: true});
 
   // One down event to open the popup
   info("Open the popup to trigger secondary command for notification " + notification.id);

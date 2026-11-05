@@ -88,8 +88,19 @@
 // its dereference, and destruction of the real object must all happen
 // on a single thread.  The following macros implement assertions for
 // checking these conditions.
+//
+// We disable this on MinGW. MinGW has two threading models: win32
+// API based, which disables std::thread; and POSIX based which
+// enables it but requires an emulation library (winpthreads).
+// Rather than attempting to switch to pthread emulation at this point,
+// we are disabling the std::thread based assertion checking.
+//
+// In the future, to enable it we could
+// a. have libgcc/stdc++ support win32 threads natively
+// b. switch to POSIX-based threading in MinGW with pthread emulation
+// c. refactor it to not use std::thread
 
-#if defined(DEBUG) || (defined(NIGHTLY_BUILD) && !defined(MOZ_PROFILING))
+#if !defined(__MINGW32__) && (defined(DEBUG) || (defined(NIGHTLY_BUILD) && !defined(MOZ_PROFILING)))
 
 #include <thread>
 #define MOZ_WEAKPTR_DECLARE_THREAD_SAFETY_CHECK \
@@ -101,8 +112,11 @@
     _empty = !p; \
   } while (false)
 #define MOZ_WEAKPTR_ASSERT_THREAD_SAFETY() \
-  MOZ_DIAGNOSTIC_ASSERT(_empty || _owningThread == std::this_thread::get_id(), \
-                        "WeakPtr used on multiple threads")
+  do { \
+    if (!(_empty || _owningThread == std::this_thread::get_id())) { \
+      WeakPtrTraits<T>::AssertSafeToAccessFromNonOwningThread(); \
+    } \
+  } while (false)
 #define MOZ_WEAKPTR_ASSERT_THREAD_SAFETY_DELEGATED(that) \
   (that)->AssertThreadSafety();
 
@@ -128,6 +142,15 @@ template <typename T> class SupportsWeakPtr;
 #else
 #define MOZ_DECLARE_WEAKREFERENCE_TYPENAME(T)
 #endif
+
+template<class T>
+struct WeakPtrTraits
+{
+  static void AssertSafeToAccessFromNonOwningThread()
+  {
+    MOZ_DIAGNOSTIC_ASSERT(false, "WeakPtr accessed from multiple threads");
+  }
+};
 
 namespace detail {
 

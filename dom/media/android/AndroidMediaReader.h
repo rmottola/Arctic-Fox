@@ -47,7 +47,7 @@ public:
   bool DecodeVideoFrame(bool &aKeyframeSkip, int64_t aTimeThreshold) override;
 
   nsresult ReadMetadata(MediaInfo* aInfo, MetadataTags** aTags) override;
-  RefPtr<SeekPromise> Seek(const SeekTarget& aTarget, int64_t aEndTime) override;
+  RefPtr<SeekPromise> Seek(const SeekTarget& aTarget) override;
 
   RefPtr<ShutdownPromise> Shutdown() override;
 

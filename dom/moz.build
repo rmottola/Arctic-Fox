@@ -45,7 +45,6 @@ DIRS += [
     'canvas',
     'commandhandler',
     'crypto',
-    'devicestorage',
     'encoding',
     'events',
     'fetch',
@@ -87,6 +86,7 @@ DIRS += [
     'promise',
     'smil',
     'url',
+    'webauthn',
     'webidl',
     'xbl',
     'xml',
@@ -107,11 +107,6 @@ if CONFIG['OS_ARCH'] == 'WINNT':
 
 if CONFIG['MOZ_SECUREELEMENT']:
     DIRS += ['secureelement']
-
-if CONFIG['MOZ_B2G']:
-    DIRS += [
-        'downloads',
-    ]
 
 DIRS += ['presentation']
 

@@ -3,11 +3,10 @@ const URL = "https://example.com/browser/dom/tests/browser/prerender.html";
 // Wait for a process change and then fulfil the promise.
 function awaitProcessChange(browser) {
   return new Promise(resolve => {
-    browser.addEventListener("BrowserChangedProcess", function bcp(e) {
-      browser.removeEventListener("BrowserChangedProcess", bcp);
+    browser.addEventListener("BrowserChangedProcess", function(e) {
       info("The browser changed process!");
       resolve();
-    });
+    }, {once: true});
   });
 }
 
@@ -82,7 +81,7 @@ add_task(function* () {
        "VisibilityState of formerly prerendered window must be visible");
   });
 
-  let groupedSHistory = tab.linkedBrowser.frameLoader.groupedSessionHistory;
+  let groupedSHistory = tab.linkedBrowser.frameLoader.groupedSHistory;
   is(groupedSHistory.count, 2, "Check total length of grouped shistory.");
   is(gBrowser.tabs.length, 3, "Check number of opened tabs.");
 
@@ -133,14 +132,13 @@ add_task(function* () {
     BrowserTestUtils.browserLoaded(tab.linkedBrowser),
     new Promise(resolve => {
       let seen = false;
-      gBrowser.tabContainer.addEventListener("TabClose", function f() {
-        gBrowser.tabContainer.removeEventListener("TabClose", f);
+      gBrowser.tabContainer.addEventListener("TabClose", function() {
         if (!seen) {
           seen = true;
           info("The tab was closed");
           resolve();
         }
-      });
+      }, {once: true});
     }),
   ]);
 

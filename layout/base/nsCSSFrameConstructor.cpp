@@ -77,11 +77,12 @@
 #include "nsTArray.h"
 #include "nsGenericDOMDataNode.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/ElementInlines.h"
 #include "nsAutoLayoutPhase.h"
 #include "nsStyleStructInlines.h"
 #include "nsPageContentFrame.h"
-#include "mozilla/RestyleManagerHandle.h"
-#include "mozilla/RestyleManagerHandleInlines.h"
+#include "mozilla/RestyleManager.h"
+#include "mozilla/RestyleManagerInlines.h"
 #include "StickyScrollContainer.h"
 #include "nsFieldSetFrame.h"
 #include "nsInlineFrame.h"
@@ -96,6 +97,7 @@
 #include "nsBackdropFrame.h"
 #include "nsTransitionManager.h"
 #include "DetailsFrame.h"
+#include "nsThemeConstants.h"
 
 #ifdef MOZ_XUL
 #include "nsIRootBox.h"
@@ -116,6 +118,7 @@
 #include "nsRuleProcessorData.h"
 #include "nsTextNode.h"
 #include "ActiveLayerTracker.h"
+#include "nsIPresShellInlines.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -136,7 +139,7 @@ NS_NewSVGOuterSVGAnonChildFrame(nsIPresShell* aPresShell, nsStyleContext* aConte
 nsIFrame*
 NS_NewSVGInnerSVGFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
 nsIFrame*
-NS_NewSVGPathGeometryFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
+NS_NewSVGGeometryFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
 nsIFrame*
 NS_NewSVGGFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
 nsIFrame*
@@ -455,7 +458,7 @@ AnyKidsNeedBlockParent(nsIFrame *aFrameList)
 
 // Reparent a frame into a wrapper frame that is a child of its old parent.
 static void
-ReparentFrame(RestyleManagerHandle aRestyleManager,
+ReparentFrame(RestyleManager* aRestyleManager,
               nsContainerFrame* aNewParentFrame,
               nsIFrame* aFrame)
 {
@@ -468,7 +471,7 @@ ReparentFrames(nsCSSFrameConstructor* aFrameConstructor,
                nsContainerFrame* aNewParentFrame,
                const nsFrameList& aFrameList)
 {
-  RestyleManagerHandle restyleManager = aFrameConstructor->RestyleManager();
+  RestyleManager* restyleManager = aFrameConstructor->RestyleManager();
   for (nsFrameList::Enumerator e(aFrameList); !e.AtEnd(); e.Next()) {
     ReparentFrame(restyleManager, aNewParentFrame, e.get());
   }
@@ -1882,16 +1885,16 @@ nsCSSFrameConstructor::CreateGeneratedContentItem(nsFrameConstructorState& aStat
   // stylo: ServoRestyleManager does not handle transitions yet, and when it
   // does it probably won't need to track reframed style contexts to start
   // transitions correctly.
-  if (mozilla::RestyleManager* geckoRM = RestyleManager()->GetAsGecko()) {
-    RestyleManager::ReframingStyleContexts* rsc =
+  if (mozilla::GeckoRestyleManager* geckoRM = RestyleManager()->GetAsGecko()) {
+    GeckoRestyleManager::ReframingStyleContexts* rsc =
       geckoRM->GetReframingStyleContexts();
     if (rsc) {
       nsStyleContext* oldStyleContext = rsc->Get(container, aPseudoElement);
       if (oldStyleContext) {
-        RestyleManager::TryInitiatingTransition(aState.mPresContext,
-                                                container,
-                                                oldStyleContext,
-                                                &pseudoStyleContext);
+        GeckoRestyleManager::TryInitiatingTransition(aState.mPresContext,
+                                                     container,
+                                                     oldStyleContext,
+                                                     &pseudoStyleContext);
       } else {
         aState.mPresContext->TransitionManager()->
           PruneCompletedTransitions(container, aPseudoElement,
@@ -2444,7 +2447,6 @@ nsCSSFrameConstructor::ConstructDocElementFrame(Element*                 aDocEle
   RefPtr<nsStyleContext> styleContext;
   styleContext = mPresShell->StyleSet()->ResolveStyleFor(aDocElement,
                                                          nullptr,
-                                                         ConsumeStyleBehavior::Consume,
                                                          LazyComputeBehavior::Allow);
 
   const nsStyleDisplay* display = styleContext->StyleDisplay();
@@ -2481,7 +2483,6 @@ nsCSSFrameConstructor::ConstructDocElementFrame(Element*                 aDocEle
       // element.)
       styleContext = mPresShell->StyleSet()->ResolveStyleFor(aDocElement,
                                                              nullptr,
-                                                             ConsumeStyleBehavior::Consume,
                                                              LazyComputeBehavior::Allow);
       display = styleContext->StyleDisplay();
     }
@@ -3697,7 +3698,23 @@ nsCSSFrameConstructor::FindInputData(Element* aElement,
   nsCOMPtr<nsIFormControl> control = do_QueryInterface(aElement);
   NS_ASSERTION(control, "input doesn't implement nsIFormControl?");
 
-  return FindDataByInt(control->GetType(), aElement, aStyleContext,
+  auto controlType = control->GetType();
+
+  // Note that Android/Gonk widgets don't have theming support and thus
+  // appearance:none is the same as any other appearance value.
+  // So this chunk doesn't apply there:
+#if !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_GONK)
+  // radio and checkbox inputs with appearance:none should be constructed
+  // by display type.  (Note that we're not checking that appearance is
+  // not (respectively) NS_THEME_RADIO and NS_THEME_CHECKBOX.)
+  if ((controlType == NS_FORM_INPUT_CHECKBOX ||
+       controlType == NS_FORM_INPUT_RADIO) &&
+      aStyleContext->StyleDisplay()->mAppearance == NS_THEME_NONE) {
+    return nullptr;
+  }
+#endif
+
+  return FindDataByInt(controlType, aElement, aStyleContext,
                        sInputData, ArrayLength(sInputData));
 }
 
@@ -4724,6 +4741,15 @@ nsCSSFrameConstructor::FindDisplayData(const nsStyleDisplay* aDisplay,
                              &nsCSSFrameConstructor::ConstructScrollableBlock) };
         return &sScrollableBlockData[caption];
       }
+
+      // If the scrollable frame would have propagated its scrolling to the
+      // viewport, we still want to construct a regular block rather than a
+      // scrollframe so that it paginates correctly, but we don't want to set
+      // the bit on the block that tells it to clip at paint time.
+      if (mPresShell->GetPresContext()->
+            ElementWouldPropagateScrollbarStyles(aElement)) {
+        suppressScrollFrame = false;
+      }
     }
 
     // Handle various non-scrollable blocks.
@@ -5051,13 +5077,11 @@ nsCSSFrameConstructor::ResolveStyleContext(nsStyleContext* aParentStyleContext,
     if (aState) {
       result = styleSet->ResolveStyleFor(aContent->AsElement(),
                                          aParentStyleContext,
-                                         ConsumeStyleBehavior::Consume,
                                          LazyComputeBehavior::Assert,
                                          aState->mTreeMatchContext);
     } else {
       result = styleSet->ResolveStyleFor(aContent->AsElement(),
                                          aParentStyleContext,
-                                         ConsumeStyleBehavior::Consume,
                                          LazyComputeBehavior::Assert);
     }
   } else {
@@ -5070,16 +5094,16 @@ nsCSSFrameConstructor::ResolveStyleContext(nsStyleContext* aParentStyleContext,
   // ServoRestyleManager does not handle transitions yet, and when it does
   // it probably won't need to track reframed style contexts to start
   // transitions correctly.
-  if (mozilla::RestyleManager* geckoRM = RestyleManager()->GetAsGecko()) {
-    RestyleManager::ReframingStyleContexts* rsc =
+  if (mozilla::GeckoRestyleManager* geckoRM = RestyleManager()->GetAsGecko()) {
+    GeckoRestyleManager::ReframingStyleContexts* rsc =
       geckoRM->GetReframingStyleContexts();
     if (rsc) {
       nsStyleContext* oldStyleContext =
         rsc->Get(aContent, CSSPseudoElementType::NotPseudo);
       nsPresContext* presContext = mPresShell->GetPresContext();
       if (oldStyleContext) {
-        RestyleManager::TryInitiatingTransition(presContext, aContent,
-                                                oldStyleContext, &result);
+        GeckoRestyleManager::TryInitiatingTransition(presContext, aContent,
+                                                     oldStyleContext, &result);
       } else if (aContent->IsElement()) {
         presContext->TransitionManager()->
           PruneCompletedTransitions(aContent->AsElement(),
@@ -5497,13 +5521,13 @@ nsCSSFrameConstructor::FindSVGData(Element* aElement,
     SIMPLE_SVG_CREATE(svg, NS_NewSVGInnerSVGFrame),
     SIMPLE_SVG_CREATE(g, NS_NewSVGGFrame),
     SIMPLE_SVG_CREATE(svgSwitch, NS_NewSVGSwitchFrame),
-    SIMPLE_SVG_CREATE(polygon, NS_NewSVGPathGeometryFrame),
-    SIMPLE_SVG_CREATE(polyline, NS_NewSVGPathGeometryFrame),
-    SIMPLE_SVG_CREATE(circle, NS_NewSVGPathGeometryFrame),
-    SIMPLE_SVG_CREATE(ellipse, NS_NewSVGPathGeometryFrame),
-    SIMPLE_SVG_CREATE(line, NS_NewSVGPathGeometryFrame),
-    SIMPLE_SVG_CREATE(rect, NS_NewSVGPathGeometryFrame),
-    SIMPLE_SVG_CREATE(path, NS_NewSVGPathGeometryFrame),
+    SIMPLE_SVG_CREATE(polygon, NS_NewSVGGeometryFrame),
+    SIMPLE_SVG_CREATE(polyline, NS_NewSVGGeometryFrame),
+    SIMPLE_SVG_CREATE(circle, NS_NewSVGGeometryFrame),
+    SIMPLE_SVG_CREATE(ellipse, NS_NewSVGGeometryFrame),
+    SIMPLE_SVG_CREATE(line, NS_NewSVGGeometryFrame),
+    SIMPLE_SVG_CREATE(rect, NS_NewSVGGeometryFrame),
+    SIMPLE_SVG_CREATE(path, NS_NewSVGGeometryFrame),
     SIMPLE_SVG_CREATE(defs, NS_NewSVGContainerFrame),
     SIMPLE_SVG_CREATE(generic_, NS_NewSVGGenericContainerFrame),
     { &nsGkAtoms::foreignObject,
@@ -7031,8 +7055,11 @@ nsCSSFrameConstructor::MaybeConstructLazily(Operation aOperation,
                                             nsIContent* aContainer,
                                             nsIContent* aChild)
 {
+  // XXXmats no lazy frames for display:contents direct descendants yet
+  // (bug 979782).
   if (mPresShell->GetPresContext()->IsChrome() || !aContainer ||
-      aContainer->IsInNativeAnonymousSubtree() || aContainer->IsXULElement()) {
+      aContainer->IsInNativeAnonymousSubtree() || aContainer->IsXULElement() ||
+      GetDisplayContentsStyleFor(aContainer)) {
     return false;
   }
 
@@ -7060,12 +7087,17 @@ nsCSSFrameConstructor::MaybeConstructLazily(Operation aOperation,
 
   // Walk up the tree setting the NODE_DESCENDANTS_NEED_FRAMES bit as we go.
   nsIContent* content = aContainer;
+
 #ifdef DEBUG
   // If we hit a node with no primary frame, or the NODE_NEEDS_FRAME bit set
   // we want to assert, but leaf frames that process their own children and may
   // ignore anonymous children (eg framesets) make this complicated. So we set
   // these two booleans if we encounter these situations and unset them if we
   // hit a node with a leaf frame.
+  //
+  // Also, it's fine if one of the nodes without primary frame is a display:
+  // contents node except if it's the direct ancestor of the children we're
+  // recreating frames for.
   bool noPrimaryFrame = false;
   bool needsFrameBitSet = false;
 #endif
@@ -7075,17 +7107,14 @@ nsCSSFrameConstructor::MaybeConstructLazily(Operation aOperation,
     if (content->GetPrimaryFrame() && content->GetPrimaryFrame()->IsLeaf()) {
       noPrimaryFrame = needsFrameBitSet = false;
     }
-    if (!noPrimaryFrame && !content->GetPrimaryFrame()) {
+    if (!noPrimaryFrame && !content->GetPrimaryFrame() &&
+        !GetDisplayContentsStyleFor(content)) {
       noPrimaryFrame = true;
     }
     if (!needsFrameBitSet && content->HasFlag(NODE_NEEDS_FRAME)) {
       needsFrameBitSet = true;
     }
 #endif
-    // XXXmats no lazy frames for display:contents descendants yet (bug 979782).
-    if (GetDisplayContentsStyleFor(content)) {
-      return false;
-    }
     content->SetFlags(NODE_DESCENDANTS_NEED_FRAMES);
     content = content->GetFlattenedTreeParent();
   }
@@ -7372,30 +7401,37 @@ nsCSSFrameConstructor::ContentAppended(nsIContent*     aContainer,
     return rv;
   }
 
+  // The frame constructor uses this codepath both for bonafide newly-added
+  // content and for RestyleManager-driven frame construction (RECONSTRUCT_FRAME
+  // and lazy frame construction). If we're using the Servo style system, we
+  // want to ensure that styles get resolved in the first case, whereas for the
+  // second case they should have already been resolved if needed.
+  bool isNewlyAddedContentForServo = aContainer->IsStyledByServo() &&
+                                     !RestyleManager()->IsInStyleRefresh();
+
   // See comment in ContentRangeInserted for why this is necessary.
   if (!GetContentInsertionFrameFor(aContainer) &&
       !aContainer->IsActiveChildrenElement()) {
+    // We're punting on frame construction because there's no container frame.
+    // The Servo-backed style system handles this case like the lazy frame
+    // construction case.
+    if (isNewlyAddedContentForServo) {
+      aContainer->AsElement()->NoteDirtyDescendantsForServo();
+    }
     return NS_OK;
   }
 
   if (aAllowLazyConstruction &&
       MaybeConstructLazily(CONTENTAPPEND, aContainer, aFirstNewContent)) {
-    if (aContainer->IsStyledByServo()) {
+    if (isNewlyAddedContentForServo) {
       aContainer->AsElement()->NoteDirtyDescendantsForServo();
     }
     return NS_OK;
   }
 
   // We couldn't construct lazily. Make Servo eagerly traverse the subtree.
-  if (ServoStyleSet* set = mPresShell->StyleSet()->GetAsServo()) {
-    // We use the same codepaths to handle both of the following cases:
-    //   (a) Newly-appended content for which lazy frame construction is disallowed.
-    //   (b) Lazy frame construction driven by the restyle manager.
-    // We need the styles for (a). In the case of (b), the Servo traversal has
-    // already happened, so we don't need to do it again.
-    if (!RestyleManager()->AsBase()->IsInStyleRefresh()) {
-      set->StyleNewChildren(aContainer->AsElement());
-    }
+  if (isNewlyAddedContentForServo) {
+    mPresShell->StyleSet()->AsServo()->StyleNewChildren(aContainer->AsElement());
   }
 
   LAYOUT_PHASE_TEMP_EXIT();
@@ -7823,6 +7859,15 @@ nsCSSFrameConstructor::ContentRangeInserted(nsIContent*            aContainer,
     return rv;
   }
 
+  // The frame constructor uses this codepath both for bonafide newly-added
+  // content and for RestyleManager-driven frame construction (RECONSTRUCT_FRAME
+  // and lazy frame construction). If we're using the Servo style system, we
+  // want to ensure that styles get resolved in the first case, whereas for the
+  // second case they should have already been resolved if needed.
+  bool isNewlyAddedContentForServo = aContainer->IsStyledByServo() &&
+                                     !RestyleManager()->IsInStyleRefresh();
+
+
   // Put 'parentFrame' inside a scope so we don't confuse it with
   // 'insertion.mParentFrame' later.
   {
@@ -7831,6 +7876,12 @@ nsCSSFrameConstructor::ContentRangeInserted(nsIContent*            aContainer,
     // a parent. While its uncommon to change the structure of the default content itself, a label,
     // for example, can be reframed by having its value attribute set or removed.
     if (!parentFrame && !aContainer->IsActiveChildrenElement()) {
+      // We're punting on frame construction because there's no container frame.
+      // The Servo-backed style system handles this case like the lazy frame
+      // construction case.
+      if (isNewlyAddedContentForServo) {
+        aContainer->AsElement()->NoteDirtyDescendantsForServo();
+      }
       return NS_OK;
     }
 
@@ -7840,7 +7891,7 @@ nsCSSFrameConstructor::ContentRangeInserted(nsIContent*            aContainer,
 
     if (aAllowLazyConstruction &&
         MaybeConstructLazily(CONTENTINSERT, aContainer, aStartChild)) {
-      if (aContainer->IsStyledByServo()) {
+      if (isNewlyAddedContentForServo) {
         aContainer->AsElement()->NoteDirtyDescendantsForServo();
       }
       return NS_OK;
@@ -7848,15 +7899,8 @@ nsCSSFrameConstructor::ContentRangeInserted(nsIContent*            aContainer,
   }
 
   // We couldn't construct lazily. Make Servo eagerly traverse the subtree.
-  if (ServoStyleSet* set = mPresShell->StyleSet()->GetAsServo()) {
-    // We use the same codepaths to handle both of the following cases:
-    //   (a) Newly-appended content for which lazy frame construction is disallowed.
-    //   (b) Lazy frame construction driven by the restyle manager.
-    // We need the styles for (a). In the case of (b), the Servo traversal has
-    // already happened, so we don't need to do it again.
-    if (!RestyleManager()->AsBase()->IsInStyleRefresh()) {
-      set->StyleNewChildren(aContainer->AsElement());
-    }
+  if (isNewlyAddedContentForServo) {
+    mPresShell->StyleSet()->AsServo()->StyleNewChildren(aContainer->AsElement());
   }
 
   InsertionPoint insertion;
@@ -9258,8 +9302,13 @@ nsCSSFrameConstructor::GetInsertionPoint(nsIContent* aContainer,
   }
 
   if (!insertionElement) {
-    insertionElement = aContainer;
+    // The FindNested{,Single}InsertionPoint methods return null in the case
+    // that there is a binding with anonymous content but no insertion point.
+    // In that case the element doesn't belong in the flattened tree, and we
+    // don't want to render it.
+    return InsertionPoint();
   }
+
   InsertionPoint insertion(GetContentInsertionFrameFor(insertionElement),
                            insertionElement);
 
@@ -9325,7 +9374,6 @@ nsCSSFrameConstructor::MaybeRecreateFramesForElement(Element* aElement)
   // The parent has a frame, so try resolving a new context.
   RefPtr<nsStyleContext> newContext = mPresShell->StyleSet()->
     ResolveStyleFor(aElement, oldContext->GetParent(),
-                    ConsumeStyleBehavior::Consume,
                     LazyComputeBehavior::Assert);
 
   if (oldDisplay == StyleDisplay::None) {
@@ -12910,4 +12958,20 @@ Iterator::DeleteItemsTo(const Iterator& aEnd)
     mList.AdjustCountsForItem(item, -1);
     delete item;
   } while (*this != aEnd);
+}
+
+void
+nsCSSFrameConstructor::QuotesDirty()
+{
+  NS_PRECONDITION(mUpdateCount != 0, "Instant quote updates are bad news");
+  mQuotesDirty = true;
+  mPresShell->SetNeedLayoutFlush();
+}
+
+void
+nsCSSFrameConstructor::CountersDirty()
+{
+  NS_PRECONDITION(mUpdateCount != 0, "Instant counter updates are bad news");
+  mCountersDirty = true;
+  mPresShell->SetNeedLayoutFlush();
 }

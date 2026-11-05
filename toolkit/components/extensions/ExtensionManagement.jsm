@@ -15,6 +15,8 @@ Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
+                                  "resource:///modules/E10SUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ExtensionUtils",
                                   "resource://gre/modules/ExtensionUtils.jsm");
 
@@ -205,8 +207,8 @@ var Service = {
   // Checks whether a given extension can load this URI (typically via
   // an XML HTTP request). The manifest.json |permissions| directive
   // determines this.
-  checkAddonMayLoad(extension, uri) {
-    return extension.whiteListedHosts.matchesIgnoringPath(uri);
+  checkAddonMayLoad(extension, uri, explicit = false) {
+    return extension.whiteListedHosts.matchesIgnoringPath(uri, explicit);
   },
 
   generateBackgroundPageUrl(extension) {
@@ -228,8 +230,8 @@ var Service = {
   },
 
   // Finds the add-on ID associated with a given moz-extension:// URI.
-  // This is used to set the addonId on the originAttributes for the
-  // nsIPrincipal attached to the URI.
+  // This is used to set the addonId on the for the nsIPrincipal
+  // attached to the URI.
   extensionURIToAddonID(uri) {
     let uuid = uri.host;
     let extension = this.uuidMap.get(uuid);
@@ -240,12 +242,11 @@ var Service = {
 // API Levels Helpers
 
 // Find the add-on associated with this document via the
-// principal's originAttributes. This value is computed by
+// principal's addonId attribute. This value is computed by
 // extensionURIToAddonID, which ensures that we don't inject our
 // API into webAccessibleResources or remote web pages.
 function getAddonIdForWindow(window) {
-  let principal = window.document.nodePrincipal;
-  return principal.originAttributes.addonId;
+  return Cu.getObjectPrincipal(window).addonId;
 }
 
 const API_LEVELS = Object.freeze({
@@ -306,8 +307,10 @@ function getAPILevelForWindow(window, addonId) {
 
 ExtensionManagement = {
   get isExtensionProcess() {
-    return (this.useRemoteWebExtensions ||
-            Services.appinfo.processType === Services.appinfo.PROCESS_TYPE_DEFAULT);
+    if (this.useRemoteWebExtensions) {
+      return Services.appinfo.remoteType === E10SUtils.EXTENSION_REMOTE_TYPE;
+    }
+    return Services.appinfo.processType === Services.appinfo.PROCESS_TYPE_DEFAULT;
   },
 
   startupExtension: Service.startupExtension.bind(Service),

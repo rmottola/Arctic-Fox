@@ -97,7 +97,6 @@ hardware (via AudioStream).
 #include "MediaTimer.h"
 #include "ImageContainer.h"
 #include "SeekJob.h"
-#include "SeekTask.h"
 
 namespace mozilla {
 
@@ -105,6 +104,7 @@ namespace media {
 class MediaSink;
 }
 
+class AbstractThread;
 class AudioSegment;
 class DecodedStream;
 class MediaDecoderReaderWrapper;
@@ -114,14 +114,23 @@ class TaskQueue;
 extern LazyLogModule gMediaDecoderLog;
 extern LazyLogModule gMediaSampleLog;
 
-enum class MediaEventType : int8_t {
+enum class MediaEventType : int8_t
+{
   PlaybackStarted,
   PlaybackStopped,
   PlaybackEnded,
   SeekStarted,
   Invalidate,
   EnterVideoSuspend,
-  ExitVideoSuspend
+  ExitVideoSuspend,
+  StartVideoSuspendTimer,
+  CancelVideoSuspendTimer
+};
+
+enum class VideoDecodeMode : uint8_t
+{
+  Normal,
+  Suspend
 };
 
 /*
@@ -149,11 +158,9 @@ public:
 
   nsresult Init(MediaDecoder* aDecoder);
 
-  void SetMediaDecoderReaderWrapperCallback();
-  void CancelMediaDecoderReaderWrapperCallback();
-
   // Enumeration for the valid decoding states
-  enum State {
+  enum State
+  {
     DECODER_STATE_DECODING_METADATA,
     DECODER_STATE_WAIT_FOR_CDM,
     DECODER_STATE_DORMANT,
@@ -165,7 +172,7 @@ public:
     DECODER_STATE_SHUTDOWN
   };
 
-  void DumpDebugInfo();
+  RefPtr<MediaDecoder::DebugInfoPromise> RequestDebugInfo();
 
   void AddOutputStream(ProcessedMediaStream* aStream, bool aFinishWhenEnded);
   // Remove an output stream added with AddOutputStream.
@@ -182,44 +189,12 @@ public:
 
   RefPtr<ShutdownPromise> BeginShutdown();
 
-  // Notifies the state machine that should minimize the number of samples
-  // decoded we preroll, until playback starts. The first time playback starts
-  // the state machine is free to return to prerolling normally. Note
-  // "prerolling" in this context refers to when we decode and buffer decoded
-  // samples in advance of when they're needed for playback.
-  void DispatchMinimizePrerollUntilPlaybackStarts()
-  {
-    RefPtr<MediaDecoderStateMachine> self = this;
-    nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([self] () -> void
-    {
-      MOZ_ASSERT(self->OnTaskQueue());
-      self->mMinimizePreroll = true;
-
-      // Make sure that this arrives before playback starts, otherwise this won't
-      // have the intended effect.
-      MOZ_DIAGNOSTIC_ASSERT(self->mPlayState == MediaDecoder::PLAY_STATE_LOADING);
-    });
-    OwnerThread()->Dispatch(r.forget());
-  }
-
   // Set the media fragment end time. aEndTime is in microseconds.
   void DispatchSetFragmentEndTime(int64_t aEndTime)
   {
     RefPtr<MediaDecoderStateMachine> self = this;
     nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([self, aEndTime] () {
       self->mFragmentEndTime = aEndTime;
-    });
-    OwnerThread()->Dispatch(r.forget());
-  }
-
-  void DispatchAudioOffloading(bool aAudioOffloading)
-  {
-    RefPtr<MediaDecoderStateMachine> self = this;
-    nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([=] () {
-      if (self->mAudioOffloading != aAudioOffloading) {
-        self->mAudioOffloading = aAudioOffloading;
-        self->ScheduleStateMachine();
-      }
     });
     OwnerThread()->Dispatch(r.forget());
   }
@@ -257,6 +232,9 @@ public:
 
   size_t SizeOfAudioQueue() const;
 
+  // Sets the video decode mode. Used by the suspend-video-decoder feature.
+  void SetVideoDecodeMode(VideoDecodeMode aMode);
+
 private:
   class StateObject;
   class DecodeMetadataState;
@@ -265,6 +243,8 @@ private:
   class DecodingFirstFrameState;
   class DecodingState;
   class SeekingState;
+  class AccurateSeekingState;
+  class NextFrameSeekingState;
   class BufferingState;
   class CompletedState;
   class ShutdownState;
@@ -272,6 +252,8 @@ private:
   static const char* ToStateStr(State aState);
   static const char* ToStr(NextFrameStatus aStatus);
   const char* ToStateStr();
+
+  nsCString GetDebugInfo();
 
   // Functions used by assertions to ensure we're calling things
   // on the appropriate threads.
@@ -326,17 +308,12 @@ private:
   // be held.
   bool IsPlaying() const;
 
-  void OnAudioDecoded(MediaData* aAudio);
-  void OnVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStartTime);
-  void OnNotDecoded(MediaData::Type aType, const MediaResult& aError);
-  void OnAudioWaited(MediaData::Type aType);
-  void OnVideoWaited(MediaData::Type aType);
-  void OnNotWaited(const WaitForDataRejectValue& aRejection);
+  // Resets all states related to decoding and aborts all pending requests
+  // to the decoders.
+  void ResetDecode(TrackSet aTracks = TrackSet(TrackInfo::kAudioTrack,
+                                               TrackInfo::kVideoTrack));
 
-  // Resets all state related to decoding and playback, emptying all buffers
-  // and aborting all pending operations on the decode task queue.
-  void Reset(TrackSet aTracks = TrackSet(TrackInfo::kAudioTrack,
-                                         TrackInfo::kVideoTrack));
+  void SetVideoDecodeModeInternal(VideoDecodeMode aMode);
 
 protected:
   virtual ~MediaDecoderStateMachine();
@@ -347,7 +324,8 @@ protected:
 
   // Inserts MediaData* samples into their respective MediaQueues.
   // aSample must not be null.
-  void Push(MediaData* aSample);
+  void PushAudio(MediaData* aSample);
+  void PushVideo(MediaData* aSample);
 
   void OnAudioPopped(const RefPtr<MediaData>& aSample);
   void OnVideoPopped(const RefPtr<MediaData>& aSample);
@@ -360,14 +338,6 @@ protected:
 
   MediaQueue<MediaData>& AudioQueue() { return mAudioQueue; }
   MediaQueue<MediaData>& VideoQueue() { return mVideoQueue; }
-
-  // True if our buffers of decoded audio are not full, and we should
-  // decode more.
-  bool NeedToDecodeAudio();
-
-  // True if our buffers of decoded video are not full, and we should
-  // decode more.
-  bool NeedToDecodeVideo();
 
   // True if we are low in decoded audio/video data.
   // May not be invoked when mReader->UseBufferingHeuristics() is false.
@@ -456,35 +426,27 @@ protected:
 
   void EnqueueFirstFrameLoadedEvent();
 
-  void DispatchAudioDecodeTaskIfNeeded();
-  void DispatchVideoDecodeTaskIfNeeded();
-
-  // Dispatch a task to decode audio if there is not.
-  void EnsureAudioDecodeTaskQueued();
-
-  // Dispatch a task to decode video if there is not.
-  void EnsureVideoDecodeTaskQueued();
-
   // Start a task to decode audio.
-  // The decoder monitor must be held.
   void RequestAudioData();
 
   // Start a task to decode video.
-  // The decoder monitor must be held.
-  void RequestVideoData();
+  void RequestVideoData(bool aSkipToNextKeyframe,
+                        const media::TimeUnit& aCurrentTime);
 
-  // Re-evaluates the state and determines whether we need to dispatch
-  // events to run the decode, or if not whether we should set the reader
-  // to idle mode. This is threadsafe, and can be called from any thread.
-  // The decoder monitor must be held.
-  void DispatchDecodeTasksIfNeeded();
+  void WaitForData(MediaData::Type aType);
+
+  bool IsRequestingAudioData() const { return mAudioDataRequest.Exists(); }
+  bool IsRequestingVideoData() const { return mVideoDataRequest.Exists(); }
+  bool IsWaitingAudioData() const { return mAudioWaitRequest.Exists(); }
+  bool IsWaitingVideoData() const { return mVideoWaitRequest.Exists(); }
 
   // Returns the "media time". This is the absolute time which the media
   // playback has reached. i.e. this returns values in the range
   // [mStartTime, mEndTime], and mStartTime will not be 0 if the media does
   // not start at 0. Note this is different than the "current playback position",
   // which is in the range [0,duration].
-  int64_t GetMediaTime() const {
+  int64_t GetMediaTime() const
+  {
     MOZ_ASSERT(OnTaskQueue());
     return mCurrentPosition;
   }
@@ -499,9 +461,6 @@ protected:
   int64_t GetDecodedAudioDuration();
 
   void FinishDecodeFirstFrame();
-
-  // Queries our state to see whether the decode has finished for all streams.
-  bool CheckIfDecodeComplete();
 
   // Performs one "cycle" of the state machine.
   void RunStateMachine();
@@ -523,11 +482,8 @@ private:
   void OnMediaSinkAudioError(nsresult aResult);
   void OnMediaSinkVideoError();
 
-  // Return true if the video decoder's decode speed can not catch up the
-  // play time.
-  bool NeedToSkipToNextKeyframe();
-
   void* const mDecoderID;
+  const RefPtr<AbstractThread> mAbstractMainThread;
   const RefPtr<FrameStatistics> mFrameStats;
   const RefPtr<VideoFrameContainer> mVideoFrameContainer;
   const dom::AudioChannel mAudioChannel;
@@ -552,11 +508,13 @@ private:
   // the decoder, state machine, and main threads.
   MediaQueue<MediaData> mVideoQueue;
 
-  State mState = DECODER_STATE_DECODING_METADATA;
-
   UniquePtr<StateObject> mStateObj;
 
-  media::TimeUnit Duration() const { MOZ_ASSERT(OnTaskQueue()); return mDuration.Ref().ref(); }
+  media::TimeUnit Duration() const
+  {
+    MOZ_ASSERT(OnTaskQueue());
+    return mDuration.Ref().ref();
+  }
 
   // Recomputes the canonical duration from various sources.
   void RecomputeDuration();
@@ -577,8 +535,8 @@ private:
   bool IsLogicallyPlaying()
   {
     MOZ_ASSERT(OnTaskQueue());
-    return mPlayState == MediaDecoder::PLAY_STATE_PLAYING ||
-           mNextPlayState == MediaDecoder::PLAY_STATE_PLAYING;
+    return mPlayState == MediaDecoder::PLAY_STATE_PLAYING
+           || mNextPlayState == MediaDecoder::PLAY_STATE_PLAYING;
   }
 
   // Media Fragment end time in microseconds. Access controlled by decoder monitor.
@@ -652,17 +610,18 @@ private:
 
   // Only one of a given pair of ({Audio,Video}DataPromise, WaitForDataPromise)
   // should exist at any given moment.
-
-  MediaEventListener mAudioCallback;
-  MediaEventListener mVideoCallback;
-  MediaEventListener mAudioWaitCallback;
-  MediaEventListener mVideoWaitCallback;
+  using MediaDataPromise = MediaDecoderReader::MediaDataPromise;
+  using WaitForDataPromise = MediaDecoderReader::WaitForDataPromise;
+  MozPromiseRequestHolder<MediaDataPromise> mAudioDataRequest;
+  MozPromiseRequestHolder<MediaDataPromise> mVideoDataRequest;
+  MozPromiseRequestHolder<WaitForDataPromise> mAudioWaitRequest;
+  MozPromiseRequestHolder<WaitForDataPromise> mVideoWaitRequest;
 
   const char* AudioRequestStatus() const;
   const char* VideoRequestStatus() const;
 
   void OnSuspendTimerResolved();
-  void OnSuspendTimerRejected();
+  void CancelSuspendTimer();
 
   // True if we shouldn't play our audio (but still write it to any capturing
   // streams). When this is true, the audio thread will never start again after
@@ -722,6 +681,9 @@ private:
   // Media data resource from the decoder.
   RefPtr<MediaResource> mResource;
 
+  // Track the current video decode mode.
+  VideoDecodeMode mVideoDecodeMode;
+
   // Track the complete & error for audio/video separately
   MozPromiseRequestHolder<GenericPromise> mMediaSinkAudioPromise;
   MozPromiseRequestHolder<GenericPromise> mMediaSinkVideoPromise;
@@ -742,14 +704,12 @@ private:
 
   MediaEventProducer<DecoderDoctorEvent> mOnDecoderDoctorEvent;
 
-  // True if audio is offloading.
-  // Playback will not start when audio is offloading.
-  bool mAudioOffloading;
-
   void OnCDMProxyReady(RefPtr<CDMProxy> aProxy);
   void OnCDMProxyNotReady();
   RefPtr<CDMProxy> mCDMProxy;
   MozPromiseRequestHolder<MediaDecoder::CDMProxyPromise> mCDMProxyPromise;
+
+  const bool mIsMSE;
 
 private:
   // The buffered range. Mirrored from the decoder thread.
@@ -788,8 +748,6 @@ private:
   // Current decoding position in the stream.
   Mirror<int64_t> mDecoderPosition;
 
-  // IsVisible, mirrored from the media decoder.
-  Mirror<bool> mIsVisible;
 
   // Duration of the media. This is guaranteed to be non-null after we finish
   // decoding the first frame.
@@ -816,22 +774,25 @@ private:
 public:
   AbstractCanonical<media::TimeIntervals>* CanonicalBuffered() const;
 
-  AbstractCanonical<media::NullableTimeUnit>* CanonicalDuration() {
+  AbstractCanonical<media::NullableTimeUnit>* CanonicalDuration()
+  {
     return &mDuration;
   }
-  AbstractCanonical<bool>* CanonicalIsShutdown() {
-    return &mIsShutdown;
-  }
-  AbstractCanonical<NextFrameStatus>* CanonicalNextFrameStatus() {
+  AbstractCanonical<bool>* CanonicalIsShutdown() { return &mIsShutdown; }
+  AbstractCanonical<NextFrameStatus>* CanonicalNextFrameStatus()
+  {
     return &mNextFrameStatus;
   }
-  AbstractCanonical<int64_t>* CanonicalCurrentPosition() {
+  AbstractCanonical<int64_t>* CanonicalCurrentPosition()
+  {
     return &mCurrentPosition;
   }
-  AbstractCanonical<int64_t>* CanonicalPlaybackOffset() {
+  AbstractCanonical<int64_t>* CanonicalPlaybackOffset()
+  {
     return &mPlaybackOffset;
   }
-  AbstractCanonical<bool>* CanonicalIsAudioDataAudible() {
+  AbstractCanonical<bool>* CanonicalIsAudioDataAudible()
+  {
     return &mIsAudioDataAudible;
   }
 };

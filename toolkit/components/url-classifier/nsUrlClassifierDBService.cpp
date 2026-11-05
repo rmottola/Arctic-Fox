@@ -36,6 +36,7 @@
 #include "mozilla/ErrorNames.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/SizePrintfMacros.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/Logging.h"
@@ -211,7 +212,7 @@ nsUrlClassifierDBServiceWorker::DoLocalLookup(const nsACString& spec,
   // results that were found than fail.
   mClassifier->Check(spec, tables, gFreshnessGuarantee, *results);
 
-  LOG(("Found %d results.", results->Length()));
+  LOG(("Found %" PRIuSIZE " results.", results->Length()));
   return NS_OK;
 }
 
@@ -268,7 +269,7 @@ nsUrlClassifierDBServiceWorker::DoLookup(const nsACString& spec,
     return rv;
   }
 
-  LOG(("Found %d results.", results->Length()));
+  LOG(("Found %" PRIuSIZE " results.", results->Length()));
 
 
   if (LOG_ENABLED()) {
@@ -594,6 +595,8 @@ nsUrlClassifierDBServiceWorker::FinishStream()
     if (mProtocolParser->ResetRequested()) {
       mClassifier->ResetTables(Classifier::Clear_All, mUpdateTables);
     }
+  } else {
+    mUpdateStatus = NS_ERROR_UC_UPDATE_PROTOCOL_PARSER_ERROR;
   }
 
   mProtocolParser = nullptr;
@@ -604,18 +607,73 @@ nsUrlClassifierDBServiceWorker::FinishStream()
 NS_IMETHODIMP
 nsUrlClassifierDBServiceWorker::FinishUpdate()
 {
+  LOG(("nsUrlClassifierDBServiceWorker::FinishUpdate"));
+
+  MOZ_ASSERT(!NS_IsMainThread(), "nsUrlClassifierDBServiceWorker::FinishUpdate "
+                                 "NUST NOT be on the main thread.");
+
   if (gShuttingDownThread) {
     return NS_ERROR_NOT_INITIALIZED;
   }
 
+  MOZ_ASSERT(!mProtocolParser, "Should have been nulled out in FinishStream() "
+                               "or never created.");
+
   NS_ENSURE_STATE(mUpdateObserver);
 
-  if (NS_SUCCEEDED(mUpdateStatus)) {
-    mUpdateStatus = ApplyUpdate();
-  } else {
+  if (NS_FAILED(mUpdateStatus)) {
     LOG(("nsUrlClassifierDBServiceWorker::FinishUpdate() Not running "
          "ApplyUpdate() since the update has already failed."));
+    return NotifyUpdateObserver(mUpdateStatus);
   }
+
+  if (mTableUpdates.IsEmpty()) {
+    LOG(("Nothing to update. Just notify update observer."));
+    return NotifyUpdateObserver(NS_OK);
+  }
+
+  RefPtr<nsUrlClassifierDBServiceWorker> self = this;
+  nsresult rv = mClassifier->AsyncApplyUpdates(&mTableUpdates,
+                                               [=] (nsresult aRv) -> void {
+#ifdef MOZ_SAFEBROWSING_DUMP_FAILED_UPDATES
+    if (NS_FAILED(aRv) &&
+        NS_ERROR_OUT_OF_MEMORY != aRv &&
+        NS_ERROR_UC_UPDATE_SHUTDOWNING != aRv) {
+      self->mClassifier->DumpRawTableUpdates(mRawTableUpdates);
+    }
+    // Invalidate the raw table updates.
+    self->mRawTableUpdates = EmptyCString();
+#endif
+
+    self->NotifyUpdateObserver(aRv);
+  });
+
+  if (NS_FAILED(rv)) {
+    LOG(("Failed to start async update. Notify immediately."));
+    NotifyUpdateObserver(rv);
+  }
+
+  return rv;
+}
+
+nsresult
+nsUrlClassifierDBServiceWorker::NotifyUpdateObserver(nsresult aUpdateStatus)
+{
+  MOZ_ASSERT(!NS_IsMainThread(), "nsUrlClassifierDBServiceWorker::NotifyUpdateObserver "
+                                 "NUST NOT be on the main thread.");
+
+  LOG(("nsUrlClassifierDBServiceWorker::NotifyUpdateObserver"));
+
+  // We've either
+  //  1) failed starting a download stream
+  //  2) succeeded in starting a download stream but failed to obtain
+  //     table updates
+  //  3) succeeded in obtaining table updates but failed to build new
+  //     tables.
+  //  4) succeeded in building new tables but failed to take them.
+  //  5) succeeded in taking new tables.
+
+  mUpdateStatus = aUpdateStatus;
 
   nsCOMPtr<nsIUrlClassifierUtils> urlUtil =
     do_GetService(NS_URLCLASSIFIERUTILS_CONTRACTID);
@@ -635,48 +693,36 @@ nsUrlClassifierDBServiceWorker::FinishUpdate()
 
   mMissCache.Clear();
 
+  // Null out mUpdateObserver before notifying so that BeginUpdate()
+  // becomes available prior to callback.
+  nsCOMPtr<nsIUrlClassifierUpdateObserver> updateObserver = nullptr;
+  updateObserver.swap(mUpdateObserver);
+
   if (NS_SUCCEEDED(mUpdateStatus)) {
     LOG(("Notifying success: %d", mUpdateWaitSec));
-    mUpdateObserver->UpdateSuccess(mUpdateWaitSec);
+    updateObserver->UpdateSuccess(mUpdateWaitSec);
   } else if (NS_ERROR_NOT_IMPLEMENTED == mUpdateStatus) {
     LOG(("Treating NS_ERROR_NOT_IMPLEMENTED a successful update "
          "but still mark it spoiled."));
-    mUpdateObserver->UpdateSuccess(0);
+    updateObserver->UpdateSuccess(0);
     mClassifier->ResetTables(Classifier::Clear_Cache, mUpdateTables);
   } else {
     if (LOG_ENABLED()) {
       nsAutoCString errorName;
       mozilla::GetErrorName(mUpdateStatus, errorName);
-      LOG(("Notifying error: %s (%d)", errorName.get(), mUpdateStatus));
+      LOG(("Notifying error: %s (%" PRIu32 ")", errorName.get(),
+           static_cast<uint32_t>(mUpdateStatus)));
     }
 
-    mUpdateObserver->UpdateError(mUpdateStatus);
+    updateObserver->UpdateError(mUpdateStatus);
     /*
      * mark the tables as spoiled(clear cache in LookupCache), we don't want to
      * block hosts longer than normal because our update failed
     */
     mClassifier->ResetTables(Classifier::Clear_Cache, mUpdateTables);
   }
-  mUpdateObserver = nullptr;
 
   return NS_OK;
-}
-
-nsresult
-nsUrlClassifierDBServiceWorker::ApplyUpdate()
-{
-  LOG(("nsUrlClassifierDBServiceWorker::ApplyUpdate()"));
-  nsresult rv = mClassifier->ApplyUpdates(&mTableUpdates);
-
-#ifdef MOZ_SAFEBROWSING_DUMP_FAILED_UPDATES
-  if (NS_FAILED(rv) && NS_ERROR_OUT_OF_MEMORY != rv) {
-    mClassifier->DumpRawTableUpdates(mRawTableUpdates);
-  }
-  // Invalidate the raw table updates.
-  mRawTableUpdates = EmptyCString();
-#endif
-
-  return rv;
 }
 
 NS_IMETHODIMP
@@ -751,6 +797,16 @@ nsUrlClassifierDBServiceWorker::CancelUpdate()
   }
 
   return NS_OK;
+}
+
+void
+nsUrlClassifierDBServiceWorker::FlushAndDisableAsyncUpdate()
+{
+  LOG(("nsUrlClassifierDBServiceWorker::FlushAndDisableAsyncUpdate()"));
+
+  if (mClassifier) {
+    mClassifier->FlushAndDisableAsyncUpdate();
+  }
 }
 
 // Allows the main thread to delete the connection which may be in
@@ -842,7 +898,7 @@ nsUrlClassifierDBServiceWorker::CacheCompletions(CacheResultArray *results)
 nsresult
 nsUrlClassifierDBServiceWorker::CacheMisses(PrefixArray *results)
 {
-  LOG(("nsUrlClassifierDBServiceWorker::CacheMisses [%p] %d",
+  LOG(("nsUrlClassifierDBServiceWorker::CacheMisses [%p] %" PRIuSIZE,
        this, results->Length()));
 
   // Ownership is transferred in to us
@@ -1115,7 +1171,7 @@ nsUrlClassifierLookupCallback::HandleResults()
   MOZ_ASSERT(mPendingCompletions == 0, "HandleResults() should never be "
              "called while there are pending completions");
 
-  LOG(("nsUrlClassifierLookupCallback::HandleResults [%p, %u results]",
+  LOG(("nsUrlClassifierLookupCallback::HandleResults [%p, %" PRIuSIZE " results]",
        this, mResults->Length()));
 
   nsTArray<nsCString> tables;
@@ -1131,12 +1187,12 @@ nsUrlClassifierLookupCallback::HandleResults()
            result.PartialHashHex().get(), result.mTableName.get()));
       continue;
     } else if (!result.Confirmed()) {
-      LOG(("Skipping result %X from table %s (not confirmed)",
+      LOG(("Skipping result %s from table %s (not confirmed)",
            result.PartialHashHex().get(), result.mTableName.get()));
       continue;
     }
 
-    LOG(("Confirmed result %X from table %s",
+    LOG(("Confirmed result %s from table %s",
          result.PartialHashHex().get(), result.mTableName.get()));
 
     if (tables.IndexOf(result.mTableName) == nsTArray<nsCString>::NoIndex) {
@@ -1737,6 +1793,32 @@ nsUrlClassifierDBService::BeginUpdate(nsIUrlClassifierUpdateObserver *observer,
     LOG(("Already updating, not available"));
     return NS_ERROR_NOT_AVAILABLE;
   }
+  if (mWorker->IsBusyUpdating()) {
+    // |mInUpdate| used to work well because "notifying update observer"
+    // is synchronously done in Worker::FinishUpdate(). Even if the
+    // update observer hasn't been notified at this point, we can still
+    // dispatch BeginUpdate() since it will NOT be run until the
+    // previous Worker::FinishUpdate() returns.
+    //
+    // However, some tasks in Worker::FinishUpdate() have been moved to
+    // another thread. The update observer will NOT be notified when
+    // Worker::FinishUpdate() returns. If we only check |mInUpdate|,
+    // the following sequence might happen on worker thread:
+    //
+    // Worker::FinishUpdate() // for update 1
+    // Worker::BeginUpdate()  // for update 2
+    // Worker::NotifyUpdateObserver() // for update 1
+    //
+    // So, we have to find out a way to reject BeginUpdate() right here
+    // if the previous update observer hasn't been notified.
+    //
+    // Directly probing the worker's state is the most lightweight solution.
+    // No lock is required since Worker::BeginUpdate() and
+    // Worker::NotifyUpdateObserver() are by nature mutual exclusive.
+    // (both run on worker thread.)
+    LOG(("The previous update observer hasn't been notified."));
+    return NS_ERROR_NOT_AVAILABLE;
+  }
 
   mInUpdate = true;
 
@@ -1797,6 +1879,11 @@ nsUrlClassifierDBService::ResetDatabase()
 {
   NS_ENSURE_TRUE(gDbBackgroundThread, NS_ERROR_NOT_INITIALIZED);
 
+  if (mWorker->IsBusyUpdating()) {
+    LOG(("Failed to ResetDatabase because of the unfinished update."));
+    return NS_ERROR_FAILURE;
+  }
+
   return mWorkerProxy->ResetDatabase();
 }
 
@@ -1804,6 +1891,11 @@ NS_IMETHODIMP
 nsUrlClassifierDBService::ReloadDatabase()
 {
   NS_ENSURE_TRUE(gDbBackgroundThread, NS_ERROR_NOT_INITIALIZED);
+
+  if (mWorker->IsBusyUpdating()) {
+    LOG(("Failed to ReloadDatabase because of the unfinished update."));
+    return NS_ERROR_FAILURE;
+  }
 
   return mWorkerProxy->ReloadDatabase();
 }
@@ -1881,17 +1973,11 @@ nsUrlClassifierDBService::Observe(nsISupports *aSubject, const char *aTopic,
         CONFIRM_AGE_DEFAULT_SEC);
     }
   } else if (!strcmp(aTopic, "quit-application")) {
-    Shutdown();
+    // Tell the update thread to finish as soon as possible.
+    gShuttingDownThread = true;
   } else if (!strcmp(aTopic, "profile-before-change")) {
-    // Unit test does not receive "quit-application",
-    // need call shutdown in this case
+    gShuttingDownThread = true;
     Shutdown();
-    LOG(("joining background thread"));
-    mWorkerProxy = nullptr;
-    nsIThread *backgroundThread = gDbBackgroundThread;
-    gDbBackgroundThread = nullptr;
-    backgroundThread->Shutdown();
-    NS_RELEASE(backgroundThread);
   } else {
     return NS_ERROR_UNEXPECTED;
   }
@@ -1906,10 +1992,9 @@ nsUrlClassifierDBService::Shutdown()
   LOG(("shutting down db service\n"));
   MOZ_ASSERT(XRE_IsParentProcess());
 
-  if (!gDbBackgroundThread || gShuttingDownThread)
+  if (!gDbBackgroundThread) {
     return NS_OK;
-
-  gShuttingDownThread = true;
+  }
 
   Telemetry::AutoTimer<Telemetry::URLCLASSIFIER_SHUTDOWN_TIME> timer;
 
@@ -1931,14 +2016,45 @@ nsUrlClassifierDBService::Shutdown()
     prefs->RemoveObserver(CONFIRM_AGE_PREF, this);
   }
 
-  DebugOnly<nsresult> rv;
-  // First close the db connection.
-  if (mWorker) {
-    rv = mWorkerProxy->CancelUpdate();
-    NS_ASSERTION(NS_SUCCEEDED(rv), "failed to post cancel update event");
+  // 1. Synchronize with worker thread and update thread by
+  //    *synchronously* dispatching an event to worker thread
+  //    for shutting down the update thread. The reason not
+  //    shutting down update thread directly from main thread
+  //    is to avoid racing for Classifier::mUpdateThread
+  //    between main thread and the worker thread. (Both threads
+  //    would access Classifier::mUpdateThread.)
+  using Worker = nsUrlClassifierDBServiceWorker;
+  RefPtr<nsIRunnable> r =
+    NewRunnableMethod(mWorker, &Worker::FlushAndDisableAsyncUpdate);
+  SyncRunnable::DispatchToThread(gDbBackgroundThread, r);
 
-    rv = mWorkerProxy->CloseDb();
-    NS_ASSERTION(NS_SUCCEEDED(rv), "failed to post close db event");
+  // At this point the update thread has been shut down and
+  // the worker thread should only have at most one event,
+  // which is the callback event.
+
+  // 2. Send CancelUpdate() event to notify the dangling update.
+  //    (i.e. BeginUpdate is called but FinishUpdate is not.)
+  //    and CloseDb() to clear mClassifier. They will be the last two
+  //    events on the worker thread in the shutdown process.
+  DebugOnly<nsresult> rv;
+  rv = mWorkerProxy->CancelUpdate();
+  MOZ_ASSERT(NS_SUCCEEDED(rv), "failed to post 'cancel update' event");
+  rv = mWorkerProxy->CloseDb();
+  MOZ_ASSERT(NS_SUCCEEDED(rv), "failed to post 'close db' event");
+  mWorkerProxy = nullptr;
+
+  // 3. Invalidate XPCOM APIs by nulling out gDbBackgroundThread
+  //    since every API checks gDbBackgroundThread first. This has
+  //    to be done before calling nsIThread.shutdown because it
+  //    will cause the pending events on the joining thread to
+  //    be processed.
+  nsIThread *backgroundThread = nullptr;
+  Swap(backgroundThread, gDbBackgroundThread);
+
+  // 4. Wait until the worker thread is down.
+  if (backgroundThread) {
+    backgroundThread->Shutdown();
+    NS_RELEASE(backgroundThread);
   }
   return NS_OK;
 }

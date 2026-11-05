@@ -35,6 +35,7 @@
 #include "nsIObserver.h"
 #include "nsIObserverService.h"
 #include "nsIScriptNameSpaceManager.h"
+#include "nsIScriptError.h"
 #include "nsISelection.h"
 #include "nsCaret.h"
 #include "nsPlainTextSerializer.h"
@@ -130,9 +131,9 @@ using mozilla::dom::AudioChannelAgent;
 #include "nsTextServicesCID.h"
 
 #include "nsScriptSecurityManager.h"
-#include "nsPrincipal.h"
-#include "nsSystemPrincipal.h"
-#include "nsNullPrincipal.h"
+#include "ContentPrincipal.h"
+#include "SystemPrincipal.h"
+#include "NullPrincipal.h"
 #include "nsNetCID.h"
 #ifndef MOZ_WIDGET_GONK
 #if defined(MOZ_WIDGET_ANDROID)
@@ -209,6 +210,8 @@ static void Shutdown();
 
 #include "mozilla/dom/PresentationDeviceManager.h"
 #include "mozilla/dom/PresentationTCPSessionTransport.h"
+
+#include "nsScriptError.h"
 
 #include "mozilla/TextInputProcessor.h"
 
@@ -591,16 +594,18 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsCSPContext)
 NS_GENERIC_FACTORY_CONSTRUCTOR(CSPService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMixedContentBlocker)
 
-NS_GENERIC_FACTORY_CONSTRUCTOR(nsPrincipal)
-NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(nsSystemPrincipal,
+NS_GENERIC_FACTORY_CONSTRUCTOR(ContentPrincipal)
+NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(SystemPrincipal,
     nsScriptSecurityManager::SystemPrincipalSingletonConstructor)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsNullPrincipal, Init)
+NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(NullPrincipal, Init)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsStructuredCloneContainer)
 
 NS_GENERIC_FACTORY_CONSTRUCTOR(OSFileConstantsService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(UDPSocketChild)
 
 NS_GENERIC_FACTORY_SINGLETON_CONSTRUCTOR(GeckoMediaPluginService, GeckoMediaPluginService::GetGeckoMediaPluginService)
+
+NS_GENERIC_FACTORY_CONSTRUCTOR(nsScriptError)
 
 #ifdef ACCESSIBILITY
 #include "xpcAccessibilityService.h"
@@ -780,6 +785,8 @@ NS_DEFINE_NAMED_CID(TEXT_INPUT_PROCESSOR_CID);
 #ifdef MOZ_B2G
 NS_DEFINE_NAMED_CID(NS_HARDWARE_KEY_HANDLER_CID);
 #endif
+
+NS_DEFINE_NAMED_CID(NS_SCRIPTERROR_CID);
 
 static nsresult
 CreateWindowCommandTableConstructor(nsISupports *aOuter,
@@ -1024,9 +1031,9 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kNS_PARENTPROCESSMESSAGEMANAGER_CID, false, nullptr, CreateParentMessageManager },
   { &kNS_CHILDPROCESSMESSAGEMANAGER_CID, false, nullptr, CreateChildMessageManager },
   { &kNS_SCRIPTSECURITYMANAGER_CID, false, nullptr, Construct_nsIScriptSecurityManager },
-  { &kNS_PRINCIPAL_CID, false, nullptr, nsPrincipalConstructor },
-  { &kNS_SYSTEMPRINCIPAL_CID, false, nullptr, nsSystemPrincipalConstructor },
-  { &kNS_NULLPRINCIPAL_CID, false, nullptr, nsNullPrincipalConstructor },
+  { &kNS_PRINCIPAL_CID, false, nullptr, ContentPrincipalConstructor },
+  { &kNS_SYSTEMPRINCIPAL_CID, false, nullptr, SystemPrincipalConstructor },
+  { &kNS_NULLPRINCIPAL_CID, false, nullptr, NullPrincipalConstructor },
   { &kNS_DEVICE_SENSORS_CID, false, nullptr, nsDeviceSensorsConstructor },
 #ifndef MOZ_WIDGET_GONK
 #if defined(ANDROID)
@@ -1052,6 +1059,7 @@ static const mozilla::Module::CIDEntry kLayoutCIDs[] = {
   { &kPRESENTATION_DEVICE_MANAGER_CID, false, nullptr, PresentationDeviceManagerConstructor },
   { &kPRESENTATION_TCP_SESSION_TRANSPORT_CID, false, nullptr, PresentationTCPSessionTransportConstructor },
   { &kTEXT_INPUT_PROCESSOR_CID, false, nullptr, TextInputProcessorConstructor },
+  { &kNS_SCRIPTERROR_CID, false, nullptr, nsScriptErrorConstructor },
   { nullptr }
 };
 
@@ -1199,6 +1207,7 @@ static const mozilla::Module::ContractIDEntry kLayoutContracts[] = {
 #ifdef MOZ_B2G
   { NS_HARDWARE_KEY_HANDLER_CONTRACTID, &kNS_HARDWARE_KEY_HANDLER_CID },
 #endif
+  { NS_SCRIPTERROR_CONTRACTID, &kNS_SCRIPTERROR_CID },
   { nullptr }
 };
 

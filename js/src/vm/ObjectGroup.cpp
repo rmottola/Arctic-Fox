@@ -10,12 +10,14 @@
 #include "jshashutil.h"
 #include "jsobj.h"
 
+#include "builtin/DataViewObject.h"
 #include "gc/Marking.h"
 #include "gc/Policy.h"
 #include "gc/StoreBuffer.h"
 #include "gc/Zone.h"
 #include "js/CharacterEncoding.h"
 #include "vm/ArrayObject.h"
+#include "vm/Shape.h"
 #include "vm/TaggedProto.h"
 #include "vm/UnboxedObject.h"
 
@@ -187,7 +189,7 @@ ObjectGroup::useSingletonForNewObject(JSContext* cx, JSScript* script, jsbytecod
      * Sub2 lets us continue to distinguish the two subclasses and any extra
      * properties added to those prototype objects.
      */
-    if (script->isGenerator())
+    if (script->isStarGenerator() || script->isLegacyGenerator() || script->isAsync())
         return false;
     if (JSOp(*pc) != JSOP_NEW)
         return false;
@@ -252,7 +254,7 @@ ObjectGroup::useSingletonForAllocationSite(JSScript* script, jsbytecode* pc, con
 /////////////////////////////////////////////////////////////////////
 
 bool
-JSObject::shouldSplicePrototype(JSContext* cx)
+JSObject::shouldSplicePrototype()
 {
     /*
      * During bootstrapping, if inference is enabled we need to make sure not
@@ -265,33 +267,36 @@ JSObject::shouldSplicePrototype(JSContext* cx)
     return isSingleton();
 }
 
-bool
-JSObject::splicePrototype(JSContext* cx, const Class* clasp, Handle<TaggedProto> proto)
+/* static */ bool
+JSObject::splicePrototype(JSContext* cx, HandleObject obj, const Class* clasp,
+                          Handle<TaggedProto> proto)
 {
-    MOZ_ASSERT(cx->compartment() == compartment());
-
-    RootedObject self(cx, this);
+    MOZ_ASSERT(cx->compartment() == obj->compartment());
 
     /*
      * For singleton groups representing only a single JSObject, the proto
      * can be rearranged as needed without destroying type information for
      * the old or new types.
      */
-    MOZ_ASSERT(self->isSingleton());
+    MOZ_ASSERT(obj->isSingleton());
 
     // Windows may not appear on prototype chains.
     MOZ_ASSERT_IF(proto.isObject(), !IsWindow(proto.toObject()));
 
-    if (proto.isObject() && !proto.toObject()->setDelegate(cx))
-        return false;
+    if (proto.isObject()) {
+        RootedObject protoObj(cx, proto.toObject());
+        if (!JSObject::setDelegate(cx, protoObj))
+            return false;
+    }
 
     // Force type instantiation when splicing lazy group.
-    RootedObjectGroup group(cx, self->getGroup(cx));
+    RootedObjectGroup group(cx, JSObject::getGroup(cx, obj));
     if (!group)
         return false;
     RootedObjectGroup protoGroup(cx, nullptr);
     if (proto.isObject()) {
-        protoGroup = proto.toObject()->getGroup(cx);
+        RootedObject protoObj(cx, proto.toObject());
+        protoGroup = JSObject::getGroup(cx, protoObj);
         if (!protoGroup)
             return false;
     }
@@ -349,7 +354,7 @@ JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
 JSObject::setNewGroupUnknown(JSContext* cx, const js::Class* clasp, JS::HandleObject obj)
 {
     ObjectGroup::setDefaultNewGroupUnknown(cx, clasp, obj);
-    return obj->setFlags(cx, BaseShape::NEW_GROUP_UNKNOWN);
+    return JSObject::setFlags(cx, obj, BaseShape::NEW_GROUP_UNKNOWN);
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -418,7 +423,7 @@ struct ObjectGroupCompartment::NewEntry
     }
 
     static inline bool match(const ObjectGroupCompartment::NewEntry& key, const Lookup& lookup) {
-        TaggedProto proto = key.group.unbarrieredGet()->proto().unbarrieredGet();
+        TaggedProto proto = key.group.unbarrieredGet()->proto();
         JSObject* assoc = key.associated;
         MOZ_ASSERT(proto.hasUniqueId());
         MOZ_ASSERT_IF(assoc, assoc->zone()->hasUniqueId(assoc));
@@ -463,8 +468,22 @@ class ObjectGroupCompartment::NewTable : public JS::WeakCache<js::GCHashSet<NewE
     explicit NewTable(Zone* zone) : Base(zone, Table()) {}
 };
 
+MOZ_ALWAYS_INLINE ObjectGroup*
+ObjectGroupCompartment::DefaultNewGroupCache::lookup(const Class* clasp, TaggedProto proto,
+                                                     JSObject* associated)
+{
+    if (group_ &&
+        associated_ == associated &&
+        group_->proto() == proto &&
+        (!clasp || group_->clasp() == clasp))
+    {
+        return group_;
+    }
+    return nullptr;
+}
+
 /* static */ ObjectGroup*
-ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
+ObjectGroup::defaultNewGroup(JSContext* cx, const Class* clasp,
                              TaggedProto proto, JSObject* associated)
 {
     MOZ_ASSERT_IF(associated, proto.isObject());
@@ -474,20 +493,6 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
     // function. The group starts out as a plain object but might mutate into an
     // unboxed plain object.
     MOZ_ASSERT_IF(!clasp, !!associated);
-
-    AutoEnterAnalysis enter(cx);
-
-    ObjectGroupCompartment::NewTable*& table = cx->compartment()->objectGroups.defaultNewTable;
-
-    if (!table) {
-        table = cx->new_<ObjectGroupCompartment::NewTable>(cx->zone());
-        if (!table || !table->init()) {
-            js_delete(table);
-            table = nullptr;
-            ReportOutOfMemory(cx);
-            return nullptr;
-        }
-    }
 
     if (associated && !associated->is<TypeDescr>()) {
         MOZ_ASSERT(!clasp);
@@ -509,9 +514,28 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
             clasp = &PlainObject::class_;
     }
 
+    ObjectGroupCompartment& groups = cx->compartment()->objectGroups;
+
+    if (ObjectGroup* group = groups.defaultNewGroupCache.lookup(clasp, proto, associated))
+        return group;
+
+    AutoEnterAnalysis enter(cx);
+
+    ObjectGroupCompartment::NewTable*& table = groups.defaultNewTable;
+
+    if (!table) {
+        table = cx->new_<ObjectGroupCompartment::NewTable>(cx->zone());
+        if (!table || !table->init()) {
+            js_delete(table);
+            table = nullptr;
+            ReportOutOfMemory(cx);
+            return nullptr;
+        }
+    }
+
     if (proto.isObject() && !proto.toObject()->isDelegate()) {
         RootedObject protoObj(cx, proto.toObject());
-        if (!protoObj->setDelegate(cx))
+        if (!JSObject::setDelegate(cx, protoObj))
             return nullptr;
 
         // Objects which are prototypes of one another should be singletons, so
@@ -519,7 +543,7 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         // this group change to plain objects, to avoid issues with other types
         // of singletons like typed arrays.
         if (protoObj->is<PlainObject>() && !protoObj->isSingleton()) {
-            if (!JSObject::changeToSingleton(cx->asJSContext(), protoObj))
+            if (!JSObject::changeToSingleton(cx, protoObj))
                 return nullptr;
         }
     }
@@ -532,6 +556,7 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         MOZ_ASSERT_IF(!clasp, group->clasp() == &PlainObject::class_ ||
                               group->clasp() == &UnboxedPlainObject::class_);
         MOZ_ASSERT(group->proto() == proto);
+        groups.defaultNewGroupCache.put(group, associated);
         return group;
     }
 
@@ -552,7 +577,7 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
 
     if (associated) {
         if (associated->is<JSFunction>()) {
-            if (!TypeNewScript::make(cx->asJSContext(), group, &associated->as<JSFunction>()))
+            if (!TypeNewScript::make(cx, group, &associated->as<JSFunction>()))
                 return nullptr;
         } else {
             group->setTypeDescr(&associated->as<TypeDescr>());
@@ -578,11 +603,12 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         AddTypePropertyId(cx, group, nullptr, NameToId(names.columnNumber), TypeSet::Int32Type());
     }
 
+    groups.defaultNewGroupCache.put(group, associated);
     return group;
 }
 
 /* static */ ObjectGroup*
-ObjectGroup::lazySingletonGroup(ExclusiveContext* cx, const Class* clasp, TaggedProto proto)
+ObjectGroup::lazySingletonGroup(JSContext* cx, const Class* clasp, TaggedProto proto)
 {
     MOZ_ASSERT_IF(proto.isObject(), cx->compartment() == proto.toObject()->compartment());
 
@@ -774,7 +800,7 @@ GetValueTypeForTable(const Value& v)
 }
 
 /* static */ JSObject*
-ObjectGroup::newArrayObject(ExclusiveContext* cx,
+ObjectGroup::newArrayObject(JSContext* cx,
                             const Value* vp, size_t length,
                             NewObjectKind newKind, NewArrayKind arrayKind)
 {
@@ -893,7 +919,7 @@ ObjectGroup::newArrayObject(ExclusiveContext* cx,
 
 // Try to change the group of |source| to match that of |target|.
 static bool
-GiveObjectGroup(ExclusiveContext* cx, JSObject* source, JSObject* target)
+GiveObjectGroup(JSContext* cx, JSObject* source, JSObject* target)
 {
     MOZ_ASSERT(source->group() != target->group());
 
@@ -963,7 +989,7 @@ SameGroup(JSObject* first, JSObject* second)
 // of the old element. If this isn't possible, the groups for all old elements
 // are mutated to fit that of the new element.
 bool
-js::CombineArrayElementTypes(ExclusiveContext* cx, JSObject* newObj,
+js::CombineArrayElementTypes(JSContext* cx, JSObject* newObj,
                              const Value* compare, size_t ncompare)
 {
     if (!ncompare || !compare[0].isObject())
@@ -1000,7 +1026,7 @@ js::CombineArrayElementTypes(ExclusiveContext* cx, JSObject* newObj,
 // turn have arrays as their own properties, try to ensure that a consistent
 // group is given to each array held by the same property of the plain objects.
 bool
-js::CombinePlainObjectPropertyTypes(ExclusiveContext* cx, JSObject* newObj,
+js::CombinePlainObjectPropertyTypes(JSContext* cx, JSObject* newObj,
                                     const Value* compare, size_t ncompare)
 {
     if (!ncompare || !compare[0].isObject())
@@ -1174,7 +1200,7 @@ CanShareObjectGroup(IdValuePair* properties, size_t nproperties)
 }
 
 static bool
-AddPlainObjectProperties(ExclusiveContext* cx, HandlePlainObject obj,
+AddPlainObjectProperties(JSContext* cx, HandlePlainObject obj,
                          IdValuePair* properties, size_t nproperties)
 {
     RootedId propid(cx);
@@ -1191,7 +1217,7 @@ AddPlainObjectProperties(ExclusiveContext* cx, HandlePlainObject obj,
 }
 
 PlainObject*
-js::NewPlainObjectWithProperties(ExclusiveContext* cx, IdValuePair* properties, size_t nproperties,
+js::NewPlainObjectWithProperties(JSContext* cx, IdValuePair* properties, size_t nproperties,
                                  NewObjectKind newKind)
 {
     gc::AllocKind allocKind = gc::GetGCObjectKind(nproperties);
@@ -1202,7 +1228,7 @@ js::NewPlainObjectWithProperties(ExclusiveContext* cx, IdValuePair* properties, 
 }
 
 /* static */ JSObject*
-ObjectGroup::newPlainObject(ExclusiveContext* cx, IdValuePair* properties, size_t nproperties,
+ObjectGroup::newPlainObject(JSContext* cx, IdValuePair* properties, size_t nproperties,
                             NewObjectKind newKind)
 {
     // Watch for simple cases where we don't try to reuse plain object groups.
@@ -1678,6 +1704,7 @@ ObjectGroupCompartment::removeDefaultNewGroup(const Class* clasp, TaggedProto pr
     MOZ_RELEASE_ASSERT(p);
 
     defaultNewTable->get().remove(p);
+    defaultNewGroupCache.purge();
 }
 
 void
@@ -1689,6 +1716,7 @@ ObjectGroupCompartment::replaceDefaultNewGroup(const Class* clasp, TaggedProto p
     auto p = defaultNewTable->lookup(lookup);
     MOZ_RELEASE_ASSERT(p);
     defaultNewTable->get().remove(p);
+    defaultNewGroupCache.purge();
     {
         AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!defaultNewTable->putNew(lookup, NewEntry(group, associated)))
@@ -1698,7 +1726,7 @@ ObjectGroupCompartment::replaceDefaultNewGroup(const Class* clasp, TaggedProto p
 
 /* static */
 ObjectGroup*
-ObjectGroupCompartment::makeGroup(ExclusiveContext* cx, const Class* clasp,
+ObjectGroupCompartment::makeGroup(JSContext* cx, const Class* clasp,
                                   Handle<TaggedProto> proto,
                                   ObjectGroupFlags initialFlags /* = 0 */)
 {
@@ -1767,6 +1795,7 @@ ObjectGroupCompartment::clearTables()
         defaultNewTable->clear();
     if (lazyTable && lazyTable->initialized())
         lazyTable->clear();
+    defaultNewGroupCache.purge();
 }
 
 /* static */ bool

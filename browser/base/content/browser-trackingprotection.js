@@ -99,8 +99,7 @@ let TrackingProtection = {
     // nsChannelClassifier::ShouldEnableTrackingProtection.
     // Any scheme turned into https is correct.
     let normalizedUrl = Services.io.newURI(
-      "https://" + gBrowser.selectedBrowser.currentURI.hostPort,
-      null, null);
+      "https://" + gBrowser.selectedBrowser.currentURI.hostPort);
 
     // Add the current host in the 'trackingprotection' consumer of
     // the permission manager using a normalized URI. This effectively
@@ -119,8 +118,7 @@ let TrackingProtection = {
     // of the permission manager. This effectively removes this host
     // from the tracking protection allowlist.
     let normalizedUrl = Services.io.newURI(
-      "https://" + gBrowser.selectedBrowser.currentURI.hostPort,
-      null, null);
+      "https://" + gBrowser.selectedBrowser.currentURI.hostPort);
 
     Services.perms.remove(normalizedUrl,
       "trackingprotection");

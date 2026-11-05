@@ -61,6 +61,7 @@ public:
 
   void lock();
   void unlock();
+  bool ownedByCurrentThread() const;
 
 private:
   const MutexId id_;

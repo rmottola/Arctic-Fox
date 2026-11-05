@@ -4,23 +4,24 @@
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use frame::Frame;
+use frame_builder::FrameBuilderConfig;
 use internal_types::{FontTemplate, GLContextHandleWrapper, GLContextWrapper};
 use internal_types::{SourceTexture, ResultMsg, RendererFrame};
-use profiler::BackendProfileCounters;
-use record;
+use profiler::{BackendProfileCounters, TextureCacheProfileCounters};
+use record::ApiRecordingReceiver;
 use resource_cache::ResourceCache;
 use scene::Scene;
 use std::collections::HashMap;
-use std::fs;
 use std::io::{Cursor, Read};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use texture_cache::TextureCache;
+use thread_profiler::register_thread_with_profiler;
+use threadpool::ThreadPool;
 use webrender_traits::{ApiMsg, AuxiliaryLists, BuiltDisplayList, IdNamespace, ImageData};
-use webrender_traits::{RenderNotifier, RenderDispatcher, WebGLCommand, WebGLContextId};
+use webrender_traits::{PipelineId, RenderNotifier, RenderDispatcher, WebGLCommand, WebGLContextId};
 use webrender_traits::channel::{PayloadHelperMethods, PayloadReceiver, PayloadSender, MsgReceiver};
-use webrender_traits::{VRCompositorCommand, VRCompositorHandler};
-use tiling::FrameBuilderConfig;
+use webrender_traits::{BlobImageRenderer, VRCompositorCommand, VRCompositorHandler};
 use offscreen_gl_context::GLContextDispatcher;
 
 /// The render backend is responsible for transforming high level display lists into
@@ -45,7 +46,7 @@ pub struct RenderBackend {
     webrender_context_handle: Option<GLContextHandleWrapper>,
     webgl_contexts: HashMap<WebGLContextId, GLContextWrapper>,
     current_bound_webgl_context_id: Option<WebGLContextId>,
-    enable_recording: bool,
+    recorder: Option<Box<ApiRecordingReceiver>>,
     main_thread_dispatcher: Arc<Mutex<Option<Box<RenderDispatcher>>>>,
 
     next_webgl_id: usize,
@@ -61,16 +62,18 @@ impl RenderBackend {
                device_pixel_ratio: f32,
                texture_cache: TextureCache,
                enable_aa: bool,
+               workers: Arc<Mutex<ThreadPool>>,
                notifier: Arc<Mutex<Option<Box<RenderNotifier>>>>,
                webrender_context_handle: Option<GLContextHandleWrapper>,
                config: FrameBuilderConfig,
-               debug: bool,
-               enable_recording:bool,
+               recorder: Option<Box<ApiRecordingReceiver>>,
                main_thread_dispatcher: Arc<Mutex<Option<Box<RenderDispatcher>>>>,
+               blob_image_renderer: Option<Box<BlobImageRenderer>>,
                vr_compositor_handler: Arc<Mutex<Option<Box<VRCompositorHandler>>>>) -> RenderBackend {
 
-        let resource_cache = ResourceCache::new(texture_cache,
-                                                enable_aa);
+        let resource_cache = ResourceCache::new(texture_cache, workers, blob_image_renderer, enable_aa);
+
+        register_thread_with_profiler("Backend".to_string());
 
         RenderBackend {
             api_rx: api_rx,
@@ -80,32 +83,29 @@ impl RenderBackend {
             device_pixel_ratio: device_pixel_ratio,
             resource_cache: resource_cache,
             scene: Scene::new(),
-            frame: Frame::new(debug, config),
+            frame: Frame::new(config),
             next_namespace_id: IdNamespace(1),
             notifier: notifier,
             webrender_context_handle: webrender_context_handle,
             webgl_contexts: HashMap::new(),
             current_bound_webgl_context_id: None,
-            enable_recording:enable_recording,
+            recorder: recorder,
             main_thread_dispatcher: main_thread_dispatcher,
             next_webgl_id: 0,
             vr_compositor_handler: vr_compositor_handler
         }
     }
 
-    pub fn run(&mut self) {
-        let mut profile_counters = BackendProfileCounters::new();
+    pub fn run(&mut self, mut profile_counters: BackendProfileCounters) {
         let mut frame_counter: u32 = 0;
-        if self.enable_recording {
-            fs::create_dir("record").ok();
-        }
 
         loop {
             let msg = self.api_rx.recv();
+            profile_scope!("handle_msg");
             match msg {
                 Ok(msg) => {
-                    if self.enable_recording {
-                        record::write_msg(frame_counter, &msg);
+                    if let Some(ref mut r) = self.recorder {
+                        r.write_msg(frame_counter, &msg);
                     }
                     match msg {
                         ApiMsg::AddRawFont(id, bytes) => {
@@ -125,23 +125,14 @@ impl RenderBackend {
                             };
                             tx.send(glyph_dimensions).unwrap();
                         }
-                        ApiMsg::AddImage(id, width, height, stride, format, data) => {
+                        ApiMsg::AddImage(id, descriptor, data, tiling) => {
                             if let ImageData::Raw(ref bytes) = data {
                                 profile_counters.image_templates.inc(bytes.len());
                             }
-                            self.resource_cache.add_image_template(id,
-                                                                   width,
-                                                                   height,
-                                                                   stride,
-                                                                   format,
-                                                                   data);
+                            self.resource_cache.add_image_template(id, descriptor, data, tiling);
                         }
-                        ApiMsg::UpdateImage(id, width, height, format, bytes) => {
-                            self.resource_cache.update_image_template(id,
-                                                                      width,
-                                                                      height,
-                                                                      format,
-                                                                      bytes);
+                        ApiMsg::UpdateImage(id, descriptor, bytes) => {
+                            self.resource_cache.update_image_template(id, descriptor, bytes);
                         }
                         ApiMsg::DeleteImage(id) => {
                             self.resource_cache.delete_image_template(id);
@@ -159,7 +150,9 @@ impl RenderBackend {
                                                    pipeline_id,
                                                    viewport_size,
                                                    display_list_descriptor,
-                                                   auxiliary_lists_descriptor) => {
+                                                   auxiliary_lists_descriptor,
+                                                   preserve_frame_state) => {
+                            profile_scope!("SetRootDisplayList");
                             let mut leftover_auxiliary_data = vec![];
                             let mut auxiliary_data;
                             loop {
@@ -177,8 +170,8 @@ impl RenderBackend {
                             for leftover_auxiliary_data in leftover_auxiliary_data {
                                 self.payload_tx.send_vec(leftover_auxiliary_data).unwrap()
                             }
-                            if self.enable_recording {
-                                record::write_payload(frame_counter, &auxiliary_data);
+                            if let Some(ref mut r) = self.recorder {
+                                r.write_payload(frame_counter, &auxiliary_data);
                             }
 
                             let mut auxiliary_data = Cursor::new(&mut auxiliary_data[4..]);
@@ -188,7 +181,6 @@ impl RenderBackend {
                             let built_display_list =
                                 BuiltDisplayList::from_data(built_display_list_data,
                                                             display_list_descriptor);
-
                             let mut auxiliary_lists_data =
                                 vec![0; auxiliary_lists_descriptor.size()];
                             auxiliary_data.read_exact(&mut auxiliary_lists_data[..]).unwrap();
@@ -196,43 +188,40 @@ impl RenderBackend {
                                 AuxiliaryLists::from_data(auxiliary_lists_data,
                                                           auxiliary_lists_descriptor);
 
-                            let frame = profile_counters.total_time.profile(|| {
-                                self.scene.set_root_display_list(pipeline_id,
-                                                                 epoch,
-                                                                 built_display_list,
-                                                                 background_color,
-                                                                 viewport_size,
-                                                                 auxiliary_lists);
-
-                                self.build_scene();
-                                self.render()
-                            });
-
-                            if self.scene.root_pipeline_id.is_some() {
-                                self.publish_frame_and_notify_compositor(frame, &mut profile_counters);
-                                frame_counter += 1;
+                            if !preserve_frame_state {
+                                self.discard_frame_state_for_pipeline(pipeline_id);
                             }
+
+                            self.scene.set_root_display_list(pipeline_id,
+                                                             epoch,
+                                                             built_display_list,
+                                                             background_color,
+                                                             viewport_size,
+                                                             auxiliary_lists);
+                            self.build_scene();
                         }
                         ApiMsg::SetRootPipeline(pipeline_id) => {
-                            let frame = profile_counters.total_time.profile(|| {
-                                self.scene.set_root_pipeline_id(pipeline_id);
+                            profile_scope!("SetRootPipeline");
+                            self.scene.set_root_pipeline_id(pipeline_id);
 
-                                self.build_scene();
-                                self.render()
-                            });
+                            if self.scene.display_lists.get(&pipeline_id).is_none() {
+                                continue;
+                            }
 
-                            // the root pipeline is guaranteed to be Some() at this point
-                            self.publish_frame_and_notify_compositor(frame, &mut profile_counters);
-                            frame_counter += 1;
+                            self.build_scene();
                         }
                         ApiMsg::Scroll(delta, cursor, move_phase) => {
-                            let frame = profile_counters.total_time.profile(|| {
-                                if self.frame.scroll(delta, cursor, move_phase) {
-                                    Some(self.render())
-                                } else {
-                                    None
-                                }
-                            });
+                            profile_scope!("Scroll");
+                            let frame = {
+                                let counters = &mut profile_counters.texture_cache;
+                                profile_counters.total_time.profile(|| {
+                                    if self.frame.scroll(delta, cursor, move_phase) {
+                                        Some(self.render(counters))
+                                    } else {
+                                        None
+                                    }
+                                })
+                            };
 
                             match frame {
                                 Some(frame) => {
@@ -243,13 +232,17 @@ impl RenderBackend {
                             }
                         }
                         ApiMsg::ScrollLayersWithScrollId(origin, pipeline_id, scroll_root_id) => {
-                            let frame = profile_counters.total_time.profile(|| {
-                                if self.frame.scroll_layers(origin, pipeline_id, scroll_root_id) {
-                                    Some(self.render())
-                                } else {
-                                    None
-                                }
-                            });
+                            profile_scope!("ScrollLayersWithScrollId");
+                            let frame = {
+                                let counters = &mut profile_counters.texture_cache;
+                                profile_counters.total_time.profile(|| {
+                                    if self.frame.scroll_nodes(origin, pipeline_id, scroll_root_id) {
+                                        Some(self.render(counters))
+                                    } else {
+                                        None
+                                    }
+                                })
+                            };
 
                             match frame {
                                 Some(frame) => {
@@ -261,10 +254,14 @@ impl RenderBackend {
 
                         }
                         ApiMsg::TickScrollingBounce => {
-                            let frame = profile_counters.total_time.profile(|| {
-                                self.frame.tick_scrolling_bounce_animations();
-                                self.render()
-                            });
+                            profile_scope!("TickScrollingBounce");
+                            let frame = {
+                                let counters = &mut profile_counters.texture_cache;
+                                profile_counters.total_time.profile(|| {
+                                    self.frame.tick_scrolling_bounce_animations();
+                                    self.render(counters)
+                                })
+                            };
 
                             self.publish_frame_and_notify_compositor(frame, &mut profile_counters);
                         }
@@ -272,7 +269,8 @@ impl RenderBackend {
                             panic!("unused api - remove from webrender_traits");
                         }
                         ApiMsg::GetScrollLayerState(tx) => {
-                            tx.send(self.frame.get_scroll_layer_state())
+                            profile_scope!("GetScrollLayerState");
+                            tx.send(self.frame.get_scroll_node_state())
                               .unwrap()
                         }
                         ApiMsg::RequestWebGLContext(size, attributes, tx) => {
@@ -338,28 +336,70 @@ impl RenderBackend {
                         ApiMsg::VRCompositorCommand(context_id, command) => {
                             self.handle_vr_compositor_command(context_id, command);
                         }
-                        ApiMsg::GenerateFrame => {
-                            let frame = profile_counters.total_time.profile(|| {
-                                self.render()
-                            });
+                        ApiMsg::GenerateFrame(property_bindings) => {
+                            profile_scope!("GenerateFrame");
+
+                            // Ideally, when there are property bindings present,
+                            // we won't need to rebuild the entire frame here.
+                            // However, to avoid conflicts with the ongoing work to
+                            // refactor how scroll roots + transforms work, this
+                            // just rebuilds the frame if there are animated property
+                            // bindings present for now.
+                            // TODO(gw): Once the scrolling / reference frame changes
+                            //           are completed, optimize the internals of
+                            //           animated properties to not require a full
+                            //           rebuild of the frame!
+                            if let Some(property_bindings) = property_bindings {
+                                self.scene.properties.set_properties(property_bindings);
+                                self.build_scene();
+                            }
+
+                            let frame = {
+                                let counters = &mut profile_counters.texture_cache;
+                                profile_counters.total_time.profile(|| {
+                                    self.render(counters)
+                                })
+                            };
                             if self.scene.root_pipeline_id.is_some() {
                                 self.publish_frame_and_notify_compositor(frame, &mut profile_counters);
                                 frame_counter += 1;
                             }
                         }
+                        ApiMsg::ExternalEvent(evt) => {
+                            let notifier = self.notifier.lock();
+                            notifier.unwrap()
+                                    .as_mut()
+                                    .unwrap()
+                                    .external_event(evt);
+                        }
+                        ApiMsg::ShutDown => {
+                            let notifier = self.notifier.lock();
+                            notifier.unwrap()
+                                    .as_mut()
+                                    .unwrap()
+                                    .shut_down();
+                            break;
+                        }
                     }
                 }
                 Err(..) => {
+                    let notifier = self.notifier.lock();
+                    notifier.unwrap()
+                            .as_mut()
+                            .unwrap()
+                            .shut_down();
                     break;
                 }
             }
         }
     }
 
+    fn discard_frame_state_for_pipeline(&mut self, pipeline_id: PipelineId) {
+        self.frame.discard_frame_state_for_pipeline(pipeline_id);
+    }
+
     fn build_scene(&mut self) {
         // Flatten the stacking context hierarchy
-        let mut new_pipeline_sizes = HashMap::new();
-
         if let Some(id) = self.current_bound_webgl_context_id {
             self.webgl_contexts[&id].unbind();
             self.current_bound_webgl_context_id = None;
@@ -378,63 +418,16 @@ impl RenderBackend {
             webgl_context.unbind();
         }
 
-        self.frame.create(&self.scene, &mut new_pipeline_sizes);
-
-        let mut updated_pipeline_sizes = HashMap::new();
-
-        for (pipeline_id, old_size) in self.scene.pipeline_sizes.drain() {
-            let new_size = new_pipeline_sizes.remove(&pipeline_id);
-
-            match new_size {
-                Some(new_size) => {
-                    // Exists in both old and new -> check if size changed
-                    if new_size != old_size {
-                        let mut notifier = self.notifier.lock();
-                        notifier.as_mut()
-                                .unwrap()
-                                .as_mut()
-                                .unwrap()
-                                .pipeline_size_changed(pipeline_id, Some(new_size));
-                    }
-
-                    // Re-insert
-                    updated_pipeline_sizes.insert(pipeline_id, new_size);
-                }
-                None => {
-                    // Was existing, not in current frame anymore
-                        let mut notifier = self.notifier.lock();
-                        notifier.as_mut()
-                                .unwrap()
-                                .as_mut()
-                                .unwrap()
-                                .pipeline_size_changed(pipeline_id, None);
-                }
-            }
-        }
-
-        // Any remaining items are new pipelines
-        for (pipeline_id, new_size) in new_pipeline_sizes.drain() {
-            let mut notifier = self.notifier.lock();
-            notifier.as_mut()
-                    .unwrap()
-                    .as_mut()
-                    .unwrap()
-                    .pipeline_size_changed(pipeline_id, Some(new_size));
-            updated_pipeline_sizes.insert(pipeline_id, new_size);
-        }
-
-        self.scene.pipeline_sizes = updated_pipeline_sizes;
+        self.frame.create(&self.scene, &mut self.resource_cache);
     }
 
-    fn render(&mut self) -> RendererFrame {
+    fn render(&mut self,
+              texture_cache_profile: &mut TextureCacheProfileCounters)
+              -> RendererFrame {
         let frame = self.frame.build(&mut self.resource_cache,
                                      &self.scene.pipeline_auxiliary_lists,
-                                     self.device_pixel_ratio);
-
-        let pending_update = self.resource_cache.pending_updates();
-        if !pending_update.updates.is_empty() {
-            self.result_tx.send(ResultMsg::UpdateTextureCache(pending_update)).unwrap();
-        }
+                                     self.device_pixel_ratio,
+                                     texture_cache_profile);
 
         frame
     }
@@ -442,7 +435,9 @@ impl RenderBackend {
     fn publish_frame(&mut self,
                      frame: RendererFrame,
                      profile_counters: &mut BackendProfileCounters) {
-        let msg = ResultMsg::NewFrame(frame, profile_counters.clone());
+        let pending_update = self.resource_cache.pending_updates();
+        let pending_external_image_update = self.resource_cache.pending_external_image_updates();
+        let msg = ResultMsg::NewFrame(frame, pending_update, pending_external_image_update, profile_counters.clone());
         self.result_tx.send(msg).unwrap();
         profile_counters.reset();
     }
@@ -494,4 +489,3 @@ impl GLContextDispatcher for WebRenderGLDispatcher {
         dispatcher.as_mut().unwrap().as_mut().unwrap().dispatch(f);
     }
 }
-

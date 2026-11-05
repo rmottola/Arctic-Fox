@@ -113,6 +113,10 @@ class GeckoInstance(object):
 
         env = os.environ.copy()
 
+        if self.headless:
+            env["MOZ_HEADLESS"] = "1"
+            env["DISPLAY"] = "77"  # Set a fake display.
+
         # environment variables needed for crashreporting
         # https://developer.mozilla.org/docs/Environment_variables_affecting_crash_reporting
         env.update({ 'MOZ_CRASHREPORTER': '1',

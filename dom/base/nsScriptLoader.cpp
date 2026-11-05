@@ -13,6 +13,7 @@
 #include "prsystem.h"
 #include "jsapi.h"
 #include "jsfriendapi.h"
+#include "js/Utility.h"
 #include "xpcpublic.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsIContent.h"
@@ -1284,9 +1285,9 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest)
     }
   }
 
-  nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(docshell));
   mozilla::net::PredictorLearn(aRequest->mURI, mDocument->GetDocumentURI(),
-      nsINetworkPredictor::LEARN_LOAD_SUBRESOURCE, loadContext);
+                               nsINetworkPredictor::LEARN_LOAD_SUBRESOURCE,
+                               mDocument->NodePrincipal()->OriginAttributesRef());
 
   // Set the initiator type
   nsCOMPtr<nsITimedChannel> timedChannel(do_QueryInterface(httpChannel));
@@ -1748,7 +1749,8 @@ public:
   static void Dispatch(already_AddRefed<NotifyOffThreadScriptLoadCompletedRunnable>&& aSelf) {
     RefPtr<NotifyOffThreadScriptLoadCompletedRunnable> self = aSelf;
     RefPtr<DocGroup> docGroup = self->mDocGroup;
-    docGroup->Dispatch("OffThreadScriptLoader", TaskCategory::Other, self.forget());
+    docGroup->Dispatch("NotifyOffThreadScriptLoadCompletedRunnable",
+                       TaskCategory::Other, self.forget());
   }
 
   NS_DECL_NSIRUNNABLE
@@ -2495,14 +2497,19 @@ nsScriptLoader::OnStreamComplete(nsIIncrementalStreamLoader* aLoader,
     }
     rv = aSRIDataVerifier->Verify(aRequest->mIntegrity, channel, sourceUri,
                                   mReporter);
-    mReporter->FlushConsoleReports(mDocument);
+    if (channelRequest) {
+      mReporter->FlushReportsToConsole(
+        nsContentUtils::GetInnerWindowID(channelRequest));
+    } else {
+      mReporter->FlushConsoleReports(mDocument);
+    }
     if (NS_FAILED(rv)) {
       rv = NS_ERROR_SRI_CORRUPT;
     }
   } else {
     nsCOMPtr<nsILoadInfo> loadInfo = channel->GetLoadInfo();
 
-    if (loadInfo->GetEnforceSRI()) {
+    if (loadInfo && loadInfo->GetEnforceSRI()) {
       MOZ_LOG(SRILogHelper::GetSriLog(), mozilla::LogLevel::Debug,
               ("nsScriptLoader::OnStreamComplete, required SRI not found"));
       nsCOMPtr<nsIContentSecurityPolicy> csp;

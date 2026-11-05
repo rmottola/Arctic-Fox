@@ -26,14 +26,16 @@
 #include "SharedMemoryBasic.h"
 #include "chrome/common/mach_ipc_mac.h"
 
+#include "mozilla/IntegerPrintfMacros.h"
+#include "mozilla/Printf.h"
 #include "mozilla/StaticMutex.h"
 
 #ifdef DEBUG
 #define LOG_ERROR(str, args...)                 \
   PR_BEGIN_MACRO                                \
-  char *msg = PR_smprintf(str, ## args);        \
+  char *msg = mozilla::Smprintf(str, ## args);  \
   NS_WARNING(msg);                              \
-  PR_smprintf_free(msg);                        \
+  mozilla::SmprintfFree(msg);                   \
   PR_END_MACRO
 #else
 #define LOG_ERROR(str, args...) do { /* nothing */ } while(0)
@@ -497,6 +499,7 @@ SharedMemoryBasic::CleanupForPid(pid_t pid)
 SharedMemoryBasic::SharedMemoryBasic()
   : mPort(MACH_PORT_NULL)
   , mMemory(nullptr)
+  , mOpenRights(RightsReadWrite)
 {
 }
 
@@ -507,11 +510,12 @@ SharedMemoryBasic::~SharedMemoryBasic()
 }
 
 bool
-SharedMemoryBasic::SetHandle(const Handle& aHandle)
+SharedMemoryBasic::SetHandle(const Handle& aHandle, OpenRights aRights)
 {
   MOZ_ASSERT(mPort == MACH_PORT_NULL, "already initialized");
 
   mPort = aHandle;
+  mOpenRights = aRights;
   return true;
 }
 
@@ -530,6 +534,8 @@ toVMAddress(void* pointer)
 bool
 SharedMemoryBasic::Create(size_t size)
 {
+  MOZ_ASSERT(mPort == MACH_PORT_NULL, "already initialized");
+
   mach_vm_address_t address;
 
   kern_return_t kr = mach_vm_allocate(mach_task_self(), &address, round_page(size), VM_FLAGS_ANYWHERE);
@@ -572,7 +578,10 @@ SharedMemoryBasic::Map(size_t size)
   kern_return_t kr;
   mach_vm_address_t address = 0;
 
-  vm_prot_t vmProtection = VM_PROT_READ | VM_PROT_WRITE;
+  vm_prot_t vmProtection = VM_PROT_READ;
+  if (mOpenRights == RightsReadWrite) {
+    vmProtection |= VM_PROT_WRITE;
+  }
 
   kr = mach_vm_map(mach_task_self(), &address, round_page(size), 0, VM_FLAGS_ANYWHERE,
                    mPort, 0, false, vmProtection, vmProtection, VM_INHERIT_NONE);
@@ -636,7 +645,7 @@ SharedMemoryBasic::ShareToProcess(base::ProcessId pid,
   mach_port_t id = msg_data->port;
   uint64_t serial_check = msg_data->serial;
   if (serial_check != my_serial) {
-    LOG_ERROR("Serials do not match up: %d vs %d", serial_check, my_serial);
+    LOG_ERROR("Serials do not match up: %" PRIu64 " vs %" PRIu64 "", serial_check, my_serial);
     return false;
   }
   *aNewHandle = id;
@@ -664,6 +673,7 @@ SharedMemoryBasic::CloseHandle()
   if (mPort != MACH_PORT_NULL) {
     mach_port_deallocate(mach_task_self(), mPort);
     mPort = MACH_PORT_NULL;
+    mOpenRights = RightsReadWrite;
   }
 }
 

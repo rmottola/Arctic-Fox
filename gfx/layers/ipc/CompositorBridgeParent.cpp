@@ -31,8 +31,10 @@
 #include "mozilla/gfx/GPUChild.h"       // for GfxPrefValue
 #include "mozilla/gfx/Point.h"          // for IntSize
 #include "mozilla/gfx/Rect.h"          // for IntSize
+#include "mozilla/gfx/gfxVars.h"        // for gfxVars
 #include "VRManager.h"                  // for VRManager
 #include "mozilla/ipc/Transport.h"      // for Transport
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/layers/APZCTreeManager.h"  // for APZCTreeManager
 #include "mozilla/layers/APZCTreeManagerParent.h"  // for APZCTreeManagerParent
 #include "mozilla/layers/APZThreadUtils.h"  // for APZCTreeManager
@@ -52,7 +54,7 @@
 #include "mozilla/layers/PLayerTransactionParent.h"
 #include "mozilla/layers/RemoteContentController.h"
 #include "mozilla/layers/WebRenderBridgeParent.h"
-#include "mozilla/layers/WebRenderCompositorOGL.h"
+#include "mozilla/layers/WebRenderCompositableHolder.h"
 #include "mozilla/layout/RenderFrameParent.h"
 #include "mozilla/webrender/WebRenderAPI.h"
 #include "mozilla/media/MediaSystemResourceService.h" // for MediaSystemResourceService
@@ -79,7 +81,7 @@
 #include "mozilla/HalTypes.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Telemetry.h"
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
 #include "ProfilerMarkers.h"
 #endif
 #include "mozilla/VsyncDispatcher.h"
@@ -186,7 +188,6 @@ CompositorBridgeParent::LayerTreeState::LayerTreeState()
   , mCrossProcessParent(nullptr)
   , mLayerTree(nullptr)
   , mUpdatedPluginDataAvailable(false)
-  , mPendingCompositorUpdates(0)
 {
 }
 
@@ -390,7 +391,7 @@ CompositorBridgeParent::Initialize()
 
   LayerScope::SetPixelScale(mScale.scale);
 
-  if (!gfxPrefs::WebRenderEnabled()) {
+  if (!mOptions.UseWebRender()) {
     mCompositorScheduler = new CompositorVsyncScheduler(this, mWidget);
   }
 }
@@ -897,7 +898,7 @@ CompositorBridgeParent::SetShadowProperties(Layer* aLayer)
 void
 CompositorBridgeParent::CompositeToTarget(DrawTarget* aTarget, const gfx::IntRect* aRect)
 {
-  profiler_tracing("Paint", "Composite", TRACING_INTERVAL_START);
+  GeckoProfilerTracingRAII tracer("Paint", "Composite");
   PROFILER_LABEL("CompositorBridgeParent", "Composite",
     js::ProfileEntry::Category::GRAPHICS);
 
@@ -1006,14 +1007,18 @@ CompositorBridgeParent::CompositeToTarget(DrawTarget* aTarget, const gfx::IntRec
     DidComposite(start, end);
   }
 
-  // We're not really taking advantage of the stored composite-again-time here.
-  // We might be able to skip the next few composites altogether. However,
-  // that's a bit complex to implement and we'll get most of the advantage
-  // by skipping compositing when we detect there's nothing invalid. This is why
-  // we do "composite until" rather than "composite again at".
-  if (!mCompositor->GetCompositeUntilTime().IsNull() ||
-      mLayerManager->DebugOverlayWantsNextFrame()) {
-    ScheduleComposition();
+  if (mCompositor) {
+    // We're not really taking advantage of the stored composite-again-time here.
+    // We might be able to skip the next few composites altogether. However,
+    // that's a bit complex to implement and we'll get most of the advantage
+    // by skipping compositing when we detect there's nothing invalid. This is why
+    // we do "composite until" rather than "composite again at".
+    if (!mCompositor->GetCompositeUntilTime().IsNull() ||
+        mLayerManager->DebugOverlayWantsNextFrame()) {
+      ScheduleComposition();
+    }
+  } else {
+    // TODO(bug 1328602) Figure out what we should do here with the render thread.
   }
 
 #ifdef COMPOSITOR_PERFORMANCE_WARNING
@@ -1035,10 +1040,14 @@ CompositorBridgeParent::CompositeToTarget(DrawTarget* aTarget, const gfx::IntRec
     // Special full-tilt composite mode for performance testing
     ScheduleComposition();
   }
-  mCompositor->SetCompositionTime(TimeStamp());
+
+  if (mCompositor) {
+    mCompositor->SetCompositionTime(TimeStamp());
+  } else {
+    // TODO(bug 1328602) Need an equivalent that works with the rende thread.
+  }
 
   mozilla::Telemetry::AccumulateTimeDelta(mozilla::Telemetry::COMPOSITE_TIME, start);
-  profiler_tracing("Paint", "Composite", TRACING_INTERVAL_END);
 }
 
 mozilla::ipc::IPCResult
@@ -1297,14 +1306,6 @@ mozilla::ipc::IPCResult
 CompositorBridgeParent::RecvGetFrameUniformity(FrameUniformityData* aOutData)
 {
   mCompositionManager->GetFrameUniformity(aOutData);
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
-CompositorBridgeParent::RecvRequestOverfill()
-{
-  uint32_t overfillRatio = mCompositor->GetFillRatio();
-  Unused << SendOverfill(overfillRatio);
   return IPC_OK();
 }
 
@@ -1672,7 +1673,7 @@ CompositorBridgeParent::GetAPZCTreeManager(uint64_t aLayersId)
 static void
 InsertVsyncProfilerMarker(TimeStamp aVsyncTimestamp)
 {
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   VsyncPayload* payload = new VsyncPayload(aVsyncTimestamp);
   PROFILER_MARKER_PAYLOAD("VsyncTimestamp", payload);
@@ -1763,8 +1764,44 @@ void
 CompositorBridgeParent::DidComposite(TimeStamp& aCompositeStart,
                                      TimeStamp& aCompositeEnd)
 {
-  NotifyDidComposite(mPendingTransaction, aCompositeStart, aCompositeEnd);
-  mPendingTransaction = 0;
+  if (mWrBridge) {
+    NotifyDidComposite(mWrBridge->FlushPendingTransactionIds(), aCompositeStart, aCompositeEnd);
+  } else {
+    NotifyDidComposite(mPendingTransaction, aCompositeStart, aCompositeEnd);
+    mPendingTransaction = 0;
+  }
+}
+
+void
+CompositorBridgeParent::NotifyDidCompositeToPipeline(const wr::PipelineId& aPipelineId, const wr::Epoch& aEpoch, TimeStamp& aCompositeStart, TimeStamp& aCompositeEnd)
+{
+  if (mPaused) {
+    return;
+  }
+  MOZ_ASSERT(mWrBridge);
+
+  if (mWrBridge->PipelineId() == aPipelineId) {
+    uint64_t transactionId = mWrBridge->FlushTransactionIdsForEpoch(aEpoch);
+    Unused << SendDidComposite(0, transactionId, aCompositeStart, aCompositeEnd);
+
+    nsTArray<ImageCompositeNotificationInfo> notifications;
+    mWrBridge->ExtractImageCompositeNotifications(&notifications);
+    if (!notifications.IsEmpty()) {
+      Unused << ImageBridgeParent::NotifyImageComposites(notifications);
+    }
+    return;
+  }
+
+  MonitorAutoLock lock(*sIndirectLayerTreesLock);
+  ForEachIndirectLayerTree([&] (LayerTreeState* lts, const uint64_t& aLayersId) -> void {
+    if (lts->mCrossProcessParent &&
+        lts->mWrBridge &&
+        lts->mWrBridge->PipelineId() == aPipelineId) {
+      CrossProcessCompositorBridgeParent* cpcp = lts->mCrossProcessParent;
+      uint64_t transactionId = lts->mWrBridge->FlushTransactionIdsForEpoch(aEpoch);
+      Unused << cpcp->SendDidComposite(aLayersId, transactionId, aCompositeStart, aCompositeEnd);
+    }
+  });
 }
 
 void
@@ -1775,6 +1812,14 @@ CompositorBridgeParent::NotifyDidComposite(uint64_t aTransactionId, TimeStamp& a
   if (mLayerManager) {
     nsTArray<ImageCompositeNotificationInfo> notifications;
     mLayerManager->ExtractImageCompositeNotifications(&notifications);
+    if (!notifications.IsEmpty()) {
+      Unused << ImageBridgeParent::NotifyImageComposites(notifications);
+    }
+  }
+
+  if (mWrBridge) {
+    nsTArray<ImageCompositeNotificationInfo> notifications;
+    mWrBridge->ExtractImageCompositeNotifications(&notifications);
     if (!notifications.IsEmpty()) {
       Unused << ImageBridgeParent::NotifyImageComposites(notifications);
     }
@@ -1868,9 +1913,9 @@ CompositorBridgeParent::ResetCompositorTask(const nsTArray<LayersBackend>& aBack
       Unused << cpcp->SendCompositorUpdated(layersId, newIdentifier.value(), aSeqNo);
 
       if (LayerTransactionParent* ltp = lts->mLayerTree) {
-        ltp->AddPendingCompositorUpdate();
+        ltp->SetPendingCompositorUpdate(aSeqNo);
       }
-      lts->mPendingCompositorUpdates++;
+      lts->mPendingCompositorUpdate = Some(aSeqNo);
     }
   });
 }
@@ -1906,7 +1951,8 @@ CompositorBridgeParent::ResetCompositorImpl(const nsTArray<LayersBackend>& aBack
 
 PWebRenderBridgeParent*
 CompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::PipelineId& aPipelineId,
-                                                    TextureFactoryIdentifier* aTextureFactoryIdentifier)
+                                                    TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                                                    uint32_t* aIdNamespace)
 {
 #ifndef MOZ_ENABLE_WEBRENDER
   // Extra guard since this in the parent process and we don't want a malicious
@@ -1919,16 +1965,15 @@ CompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::PipelineId& aPipel
   MOZ_ASSERT(!mCompositorScheduler);
 
 
-  // TODO(nical) Coming soon...
-  // MOZ_ASSERT(mWidget);
-  // RefPtr<widget::CompositorWidget> widget = mWidget;
-  // RefPtr<WebRenderAPI> wr = WebRenderAPI::Create(gfxPrefs::WebRenderProfilerEnabled(), this, Move(widget));
-  // mWrBridge = new WebRenderBridgeParent(this, aPipelineId, mWidget, Move(wr));
+  MOZ_ASSERT(mWidget);
+  RefPtr<widget::CompositorWidget> widget = mWidget;
+  RefPtr<wr::WebRenderAPI> api = wr::WebRenderAPI::Create(gfxPrefs::WebRenderProfilerEnabled(), this, Move(widget));
+  RefPtr<WebRenderCompositableHolder> holder = new WebRenderCompositableHolder();
+  MOZ_ASSERT(api); // TODO have a fallback
+  api->SetRootPipeline(aPipelineId);
+  mWrBridge = new WebRenderBridgeParent(this, aPipelineId, mWidget, nullptr, Move(api), Move(holder));
+  *aIdNamespace = mWrBridge->GetIdNameSpace();
 
-  RefPtr<gl::GLContext> glc(gl::GLContextProvider::CreateForCompositorWidget(mWidget, true));
-  mCompositor = new WebRenderCompositorOGL(this, glc.get());
-  mWrBridge = new WebRenderBridgeParent(this, aPipelineId,
-        mWidget, glc.get(), nullptr, mCompositor.get());
   mCompositorScheduler = mWrBridge->CompositorScheduler();
   MOZ_ASSERT(mCompositorScheduler);
   mWrBridge.get()->AddRef(); // IPDL reference
@@ -1936,7 +1981,7 @@ CompositorBridgeParent::AllocPWebRenderBridgeParent(const wr::PipelineId& aPipel
   auto pipelineHandle = aPipelineId.mHandle;
   MOZ_ASSERT(sIndirectLayerTrees[pipelineHandle].mWrBridge == nullptr);
   sIndirectLayerTrees[pipelineHandle].mWrBridge = mWrBridge;
-  *aTextureFactoryIdentifier = mCompositor->GetTextureFactoryIdentifier();
+  *aTextureFactoryIdentifier = mWrBridge->GetTextureFactoryIdentifier();
   return mWrBridge;
 }
 

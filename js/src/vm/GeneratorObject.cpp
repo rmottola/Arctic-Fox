@@ -19,12 +19,13 @@ using namespace js;
 JSObject*
 GeneratorObject::create(JSContext* cx, AbstractFramePtr frame)
 {
-    MOZ_ASSERT(frame.script()->isGenerator());
+    MOZ_ASSERT(frame.script()->isStarGenerator() || frame.script()->isLegacyGenerator() ||
+               frame.script()->isAsync());
     MOZ_ASSERT(frame.script()->nfixed() == 0);
 
     Rooted<GlobalObject*> global(cx, cx->global());
     RootedNativeObject obj(cx);
-    if (frame.script()->isStarGenerator()) {
+    if (frame.script()->isStarGenerator() || frame.script()->isAsync()) {
         RootedValue pval(cx);
         RootedObject fun(cx, frame.callee());
         // FIXME: This would be faster if we could avoid doing a lookup to get
@@ -63,10 +64,14 @@ bool
 GeneratorObject::suspend(JSContext* cx, HandleObject obj, AbstractFramePtr frame, jsbytecode* pc,
                          Value* vp, unsigned nvalues)
 {
-    MOZ_ASSERT(*pc == JSOP_INITIALYIELD || *pc == JSOP_YIELD);
+    MOZ_ASSERT(*pc == JSOP_INITIALYIELD || *pc == JSOP_YIELD || *pc == JSOP_AWAIT);
 
     Rooted<GeneratorObject*> genObj(cx, &obj->as<GeneratorObject>());
     MOZ_ASSERT(!genObj->hasExpressionStack());
+    MOZ_ASSERT_IF(*pc == JSOP_AWAIT, genObj->callee().isAsync());
+    MOZ_ASSERT_IF(*pc == JSOP_YIELD,
+                  genObj->callee().isStarGenerator() ||
+                  genObj->callee().isLegacyGenerator());
 
     if (*pc == JSOP_YIELD && genObj->isClosing() && genObj->is<LegacyGeneratorObject>()) {
         RootedValue val(cx, ObjectValue(*frame.callee()));
@@ -74,8 +79,8 @@ GeneratorObject::suspend(JSContext* cx, HandleObject obj, AbstractFramePtr frame
         return false;
     }
 
-    uint32_t yieldIndex = GET_UINT24(pc);
-    genObj->setYieldIndex(yieldIndex);
+    uint32_t yieldAndAwaitIndex = GET_UINT24(pc);
+    genObj->setYieldAndAwaitIndex(yieldAndAwaitIndex);
     genObj->setEnvironmentChain(*frame.environmentChain());
 
     if (nvalues) {
@@ -172,7 +177,7 @@ GeneratorObject::resume(JSContext* cx, InterpreterActivation& activation,
     }
 
     JSScript* script = callee->nonLazyScript();
-    uint32_t offset = script->yieldOffsets()[genObj->yieldIndex()];
+    uint32_t offset = script->yieldAndAwaitOffsets()[genObj->yieldAndAwaitIndex()];
     activation.regs().pc = script->offsetToPC(offset);
 
     // Always push on a value, even if we are raising an exception. In the
@@ -256,7 +261,7 @@ static const JSFunctionSpec legacy_generator_methods[] = {
 static JSObject*
 NewSingletonObjectWithObjectPrototype(JSContext* cx, Handle<GlobalObject*> global)
 {
-    RootedObject proto(cx, global->getOrCreateObjectPrototype(cx));
+    RootedObject proto(cx, GlobalObject::getOrCreateObjectPrototype(cx, global));
     if (!proto)
         return nullptr;
     return NewObjectWithGivenProto<PlainObject>(cx, proto, SingletonObject);
@@ -265,7 +270,7 @@ NewSingletonObjectWithObjectPrototype(JSContext* cx, Handle<GlobalObject*> globa
 JSObject*
 js::NewSingletonObjectWithFunctionPrototype(JSContext* cx, Handle<GlobalObject*> global)
 {
-    RootedObject proto(cx, global->getOrCreateFunctionPrototype(cx));
+    RootedObject proto(cx, GlobalObject::getOrCreateFunctionPrototype(cx, global));
     if (!proto)
         return nullptr;
     return NewObjectWithGivenProto<PlainObject>(cx, proto, SingletonObject);
@@ -278,7 +283,7 @@ GlobalObject::initLegacyGeneratorProto(JSContext* cx, Handle<GlobalObject*> glob
         return true;
 
     RootedObject proto(cx, NewSingletonObjectWithObjectPrototype(cx, global));
-    if (!proto || !proto->setDelegate(cx))
+    if (!proto || !JSObject::setDelegate(cx, proto))
         return false;
     if (!DefinePropertiesAndFunctions(cx, proto, nullptr, legacy_generator_methods))
         return false;
@@ -297,9 +302,9 @@ GlobalObject::initStarGenerators(JSContext* cx, Handle<GlobalObject*> global)
     if (!iteratorProto)
         return false;
 
-    RootedObject genObjectProto(cx, global->createBlankPrototypeInheriting(cx,
-                                                                           &PlainObject::class_,
-                                                                           iteratorProto));
+    RootedObject genObjectProto(cx, GlobalObject::createBlankPrototypeInheriting(cx, global,
+                                                                                 &PlainObject::class_,
+                                                                                 iteratorProto));
     if (!genObjectProto)
         return false;
     if (!DefinePropertiesAndFunctions(cx, genObjectProto, nullptr, star_generator_methods) ||
@@ -309,7 +314,7 @@ GlobalObject::initStarGenerators(JSContext* cx, Handle<GlobalObject*> global)
     }
 
     RootedObject genFunctionProto(cx, NewSingletonObjectWithFunctionPrototype(cx, global));
-    if (!genFunctionProto || !genFunctionProto->setDelegate(cx))
+    if (!genFunctionProto || !JSObject::setDelegate(cx, genFunctionProto))
         return false;
     if (!LinkConstructorAndPrototype(cx, genFunctionProto, genObjectProto, JSPROP_READONLY,
                                      JSPROP_READONLY) ||
@@ -359,13 +364,46 @@ js::CheckStarGeneratorResumptionValue(JSContext* cx, HandleValue v)
 
     // It should have `value` data property, but the type doesn't matter
     JSObject* ignored;
-    Shape* shape;
-    if (!LookupPropertyPure(cx, obj, NameToId(cx->names().value), &ignored, &shape))
+    PropertyResult prop;
+    if (!LookupPropertyPure(cx, obj, NameToId(cx->names().value), &ignored, &prop))
         return false;
-    if (!shape)
+    if (!prop)
         return false;
-    if (!shape->hasDefaultGetter())
+    if (!prop.isNativeProperty())
+        return false;
+    if (!prop.shape()->hasDefaultGetter())
         return false;
 
     return true;
+}
+
+bool
+GeneratorObject::isAfterYield()
+{
+    return isAfterYieldOrAwait(JSOP_YIELD);
+}
+
+bool
+GeneratorObject::isAfterAwait()
+{
+    return isAfterYieldOrAwait(JSOP_AWAIT);
+}
+
+bool
+GeneratorObject::isAfterYieldOrAwait(JSOp op)
+{
+    if (isClosed() || isClosing() || isRunning())
+        return false;
+
+    JSScript* script = callee().nonLazyScript();
+    jsbytecode* code = script->code();
+    uint32_t nextOffset = script->yieldAndAwaitOffsets()[yieldAndAwaitIndex()];
+    if (code[nextOffset] != JSOP_DEBUGAFTERYIELD)
+        return false;
+
+    uint32_t offset = nextOffset - JSOP_YIELD_LENGTH;
+    MOZ_ASSERT(code[offset] == JSOP_INITIALYIELD || code[offset] == JSOP_YIELD ||
+               code[offset] == JSOP_AWAIT);
+
+    return code[offset] == op;
 }

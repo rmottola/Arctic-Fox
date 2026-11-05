@@ -11,6 +11,7 @@ use super::{UnknownUnit, Radians};
 use approxeq::ApproxEq;
 use trig::Trig;
 use point::{TypedPoint2D, TypedPoint3D, TypedPoint4D};
+use rect::TypedRect;
 use matrix2d::TypedMatrix2D;
 use scale_factor::ScaleFactor;
 use num::{One, Zero};
@@ -86,6 +87,30 @@ impl<T, Src, Dst> TypedMatrix4D<T, Src, Dst> {
 
 impl <T, Src, Dst> TypedMatrix4D<T, Src, Dst>
 where T: Copy + Clone +
+         PartialEq +
+         One + Zero {
+    #[inline]
+    pub fn identity() -> TypedMatrix4D<T, Src, Dst> {
+        let (_0, _1): (T, T) = (Zero::zero(), One::one());
+        TypedMatrix4D::row_major(
+            _1, _0, _0, _0,
+            _0, _1, _0, _0,
+            _0, _0, _1, _0,
+            _0, _0, _0, _1
+        )
+    }
+
+    // Intentional not public, because it checks for exact equivalence
+    // while most consumers will probably want some sort of approximate
+    // equivalence to deal with floating-point errors.
+    #[inline]
+    fn is_identity(&self) -> bool {
+        *self == TypedMatrix4D::identity()
+    }
+}
+
+impl <T, Src, Dst> TypedMatrix4D<T, Src, Dst>
+where T: Copy + Clone +
          Add<T, Output=T> +
          Sub<T, Output=T> +
          Mul<T, Output=T> +
@@ -124,17 +149,6 @@ where T: Copy + Clone +
             _0                 , _2 / (top - bottom), _0                , _0,
             _0                 , _0                 , -_2 / (far - near), _0,
             tx                 , ty                 , tz                , _1
-        )
-    }
-
-    #[inline]
-    pub fn identity() -> TypedMatrix4D<T, Src, Dst> {
-        let (_0, _1): (T, T) = (Zero::zero(), One::one());
-        TypedMatrix4D::row_major(
-            _1, _0, _0, _0,
-            _0, _1, _0, _0,
-            _0, _0, _1, _0,
-            _0, _0, _0, _1
         )
     }
 
@@ -193,6 +207,28 @@ where T: Copy + Clone +
             self.m21, self.m22, self.m23, self.m24,
             self.m31, self.m32, self.m33, self.m34,
             self.m41, self.m42, self.m43, self.m44,
+        )
+    }
+
+    /// Drop the units, preserving only the numeric value.
+    #[inline]
+    pub fn to_untyped(&self) -> Matrix4D<T> {
+        Matrix4D::row_major(
+            self.m11, self.m12, self.m13, self.m14,
+            self.m21, self.m22, self.m23, self.m24,
+            self.m31, self.m32, self.m33, self.m34,
+            self.m41, self.m42, self.m43, self.m44,
+        )
+    }
+
+    /// Tag a unitless value with units.
+    #[inline]
+    pub fn from_untyped(m: &Matrix4D<T>) -> Self {
+        TypedMatrix4D::row_major(
+            m.m11, m.m12, m.m13, m.m14,
+            m.m21, m.m22, m.m23, m.m24,
+            m.m31, m.m32, m.m33, m.m34,
+            m.m41, m.m42, m.m43, m.m44,
         )
     }
 
@@ -376,6 +412,17 @@ where T: Copy + Clone +
         TypedPoint4D::new(x, y, z, w)
     }
 
+    /// Returns a rectangle that encompasses the result of transforming the given rectangle by this
+    /// matrix.
+    pub fn transform_rect(&self, rect: &TypedRect<T, Src>) -> TypedRect<T, Dst> {
+        TypedRect::from_points(&[
+            self.transform_point(&rect.origin),
+            self.transform_point(&rect.top_right()),
+            self.transform_point(&rect.bottom_left()),
+            self.transform_point(&rect.bottom_right()),
+        ])
+    }
+
     /// Create a 3d translation matrix
     pub fn create_translation(x: T, y: T, z: T) -> TypedMatrix4D<T, Src, Dst> {
         let (_0, _1): (T, T) = (Zero::zero(), One::one());
@@ -545,9 +592,16 @@ impl<T: Copy, Src, Dst> TypedMatrix4D<T, Src, Dst> {
     }
 }
 
-impl<T: Copy + fmt::Debug, Src, Dst> fmt::Debug for TypedMatrix4D<T, Src, Dst> {
+impl<T, Src, Dst> fmt::Debug for TypedMatrix4D<T, Src, Dst>
+where T: Copy + fmt::Debug +
+         PartialEq +
+         One + Zero {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.to_row_major_array().fmt(f)
+        if self.is_identity() {
+            write!(f, "[I]")
+        } else {
+            self.to_row_major_array().fmt(f)
+        }
     }
 }
 
@@ -759,5 +813,13 @@ mod tests {
         let p1 = m2.pre_mul(&m1).transform_point4d(&p);
         let p2 = m2.transform_point4d(&m1.transform_point4d(&p));
         assert!(p1.approx_eq(&p2));
+    }
+
+    #[test]
+    pub fn test_is_identity() {
+        let m1 = Matrix4D::identity();
+        assert!(m1.is_identity());
+        let m2 = m1.post_translated(0.1, 0.0, 0.0);
+        assert!(!m2.is_identity());
     }
 }

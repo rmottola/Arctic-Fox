@@ -16,11 +16,13 @@
 
 /* loading of CSS style sheets using the network APIs */
 
+#include "mozilla/css/Loader.h"
+
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/IntegerPrintfMacros.h"
 #include "mozilla/LoadInfo.h"
 #include "mozilla/MemoryReporting.h"
 
-#include "mozilla/css/Loader.h"
 #include "mozilla/StyleSheetInlines.h"
 #include "nsIRunnable.h"
 #include "nsIUnicharStreamLoader.h"
@@ -801,7 +803,7 @@ SheetLoadData::OnStreamComplete(nsIUnicharStreamLoader* aLoader,
   }
 
   if (NS_FAILED(aStatus)) {
-    LOG_WARN(("  Load failed: status 0x%x", aStatus));
+    LOG_WARN(("  Load failed: status 0x%" PRIx32, static_cast<uint32_t>(aStatus)));
     // Handle sheet not loading error because source was a tracking URL.
     // We make a note of this sheet node by including it in a dedicated
     // array of blocked tracking nodes under its parent document.
@@ -941,7 +943,7 @@ SheetLoadData::OnStreamComplete(nsIUnicharStreamLoader* aLoader,
   mSheet->GetIntegrity(sriMetadata);
   if (sriMetadata.IsEmpty()) {
     nsCOMPtr<nsILoadInfo> loadInfo = channel->GetLoadInfo();
-    if (loadInfo->GetEnforceSRI()) {
+    if (loadInfo && loadInfo->GetEnforceSRI()) {
       LOG(("  Load was blocked by SRI"));
       MOZ_LOG(gSriPRLog, mozilla::LogLevel::Debug,
               ("css::Loader::OnStreamComplete, required SRI not found"));
@@ -965,7 +967,15 @@ SheetLoadData::OnStreamComplete(nsIUnicharStreamLoader* aLoader,
     }
     nsresult rv = SRICheck::VerifyIntegrity(sriMetadata, aLoader, aBuffer,
                                             sourceUri, mLoader->mReporter);
-    mLoader->mReporter->FlushConsoleReports(mLoader->mDocument);
+
+    nsCOMPtr<nsILoadGroup> loadGroup;
+    channel->GetLoadGroup(getter_AddRefs(loadGroup));
+    if (loadGroup) {
+      mLoader->mReporter->FlushConsoleReports(loadGroup);
+    } else {
+      mLoader->mReporter->FlushConsoleReports(mLoader->mDocument);
+    }
+
     if (NS_FAILED(rv)) {
       LOG(("  Load was blocked by SRI"));
       MOZ_LOG(gSriPRLog, mozilla::LogLevel::Debug,
@@ -1864,7 +1874,7 @@ Loader::DoSheetComplete(SheetLoadData* aLoadData, nsresult aStatus,
   NS_PRECONDITION(aLoadData->mSheet, "Must have a sheet");
   NS_ASSERTION(mSheets, "mLoadingDatas should be initialized by now.");
 
-  LOG(("Load completed, status: 0x%x", aStatus));
+  LOG(("Load completed, status: 0x%" PRIx32, static_cast<uint32_t>(aStatus)));
 
   // Twiddle the hashtables
   if (aLoadData->mURI) {
@@ -2333,6 +2343,20 @@ Loader::LoadSheetSync(nsIURI* aURL,
                                       false, aParsingMode, aUseSystemPrincipal,
                                       nullptr, EmptyCString(),
                                       aSheet, nullptr);
+}
+
+nsresult
+Loader::LoadSheet(nsIURI* aURL,
+                  SheetParsingMode aParsingMode,
+                  bool aUseSystemPrincipal,
+                  nsICSSLoaderObserver* aObserver,
+                  RefPtr<StyleSheet>* aSheet)
+{
+  LOG(("css::Loader::LoadSheet(aURL, aParsingMode, aUseSystemPrincipal, aObserver, aSheet)"));
+  return InternalLoadNonDocumentSheet(aURL,
+                                      false, aParsingMode, aUseSystemPrincipal,
+                                      nullptr, EmptyCString(),
+                                      aSheet, aObserver);
 }
 
 nsresult

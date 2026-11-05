@@ -35,7 +35,7 @@
 #include "TextRenderer.h"               // for TextRenderer
 #include <vector>
 #include "GeckoProfiler.h"              // for GeckoProfiler
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
 #include "ProfilerMarkers.h"            // for ProfilerMarkers
 #endif
 
@@ -80,7 +80,7 @@ DrawLayerInfo(const RenderTargetIntRect& aClipRect,
 static void
 PrintUniformityInfo(Layer* aLayer)
 {
-#ifdef MOZ_ENABLE_PROFILER_SPS
+#ifdef MOZ_GECKO_PROFILER
   if (!profiler_is_active()) {
     return;
   }
@@ -159,7 +159,7 @@ struct PreparedLayer
 {
   PreparedLayer(LayerComposite *aLayer,
                 RenderTargetIntRect aClipRect,
-                Maybe<gfx::Polygon> aGeometry)
+                const Maybe<gfx::Polygon>& aGeometry)
   : mLayer(aLayer), mClipRect(aClipRect), mGeometry(aGeometry) {}
 
   LayerComposite* mLayer;

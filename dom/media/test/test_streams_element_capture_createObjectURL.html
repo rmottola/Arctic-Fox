@@ -49,7 +49,7 @@ function startTest(test, token) {
     if (test.type.match(/^video/)) {
       checkDrawImage(vout);
     }
-    vout.parentNode.removeChild(vout);
+    vout.remove();
     URL.revokeObjectURL(vout.src);
     manager.finished(vout.token);
   }}(test, vout, stream);

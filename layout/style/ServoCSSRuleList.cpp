@@ -24,6 +24,35 @@ ServoCSSRuleList::ServoCSSRuleList(ServoStyleSheet* aStyleSheet,
   //     stylesheet goes away.
 }
 
+// QueryInterface implementation for ServoCSSRuleList
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(ServoCSSRuleList)
+NS_INTERFACE_MAP_END_INHERITING(dom::CSSRuleList)
+
+NS_IMPL_ADDREF_INHERITED(ServoCSSRuleList, dom::CSSRuleList)
+NS_IMPL_RELEASE_INHERITED(ServoCSSRuleList, dom::CSSRuleList)
+
+NS_IMPL_CYCLE_COLLECTION_CLASS(ServoCSSRuleList)
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ServoCSSRuleList)
+  for (uintptr_t& rule : tmp->mRules) {
+    if (rule > kMaxRuleType) {
+      CastToPtr(rule)->Release();
+      // Safest to set it to zero, in case someone else pokes at it
+      // during their own unlinking process.
+      rule = 0;
+    }
+  }
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED(dom::CSSRuleList)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(ServoCSSRuleList,
+                                                  dom::CSSRuleList)
+  tmp->EnumerateInstantiatedRules([&](css::Rule* aRule) {
+    if (!aRule->IsCCLeaf()) {
+      NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb, "mRules[i]");
+      cb.NoteXPCOMChild(aRule);
+    }
+  });
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+
 css::Rule*
 ServoCSSRuleList::GetRule(uint32_t aIndex)
 {
@@ -42,7 +71,8 @@ ServoCSSRuleList::GetRule(uint32_t aIndex)
       case nsIDOMCSSRule::NAMESPACE_RULE:
         // XXX create corresponding rules
       default:
-        MOZ_CRASH("stylo: not implemented yet");
+        NS_ERROR("stylo: not implemented yet");
+        return nullptr;
     }
     ruleObj->SetStyleSheet(mStyleSheet);
     rule = CastToUint(ruleObj.forget().take());
@@ -51,7 +81,7 @@ ServoCSSRuleList::GetRule(uint32_t aIndex)
   return CastToPtr(rule);
 }
 
-nsIDOMCSSRule*
+css::Rule*
 ServoCSSRuleList::IndexedGetter(uint32_t aIndex, bool& aFound)
 {
   if (aIndex >= mRules.Length()) {
@@ -59,10 +89,7 @@ ServoCSSRuleList::IndexedGetter(uint32_t aIndex, bool& aFound)
     return nullptr;
   }
   aFound = true;
-  if (css::Rule* rule = GetRule(aIndex)) {
-    return rule->GetDOMRule();
-  }
-  return nullptr;
+  return GetRule(aIndex);
 }
 
 template<typename Func>
@@ -96,7 +123,7 @@ ServoCSSRuleList::InsertRule(const nsAString& aRule, uint32_t aIndex)
   nsresult rv = Servo_CssRules_InsertRule(mRawRules, mStyleSheet->RawSheet(),
                                           &rule, aIndex, nested, &type);
   if (!NS_FAILED(rv)) {
-    mRules.InsertElementAt(type);
+    mRules.InsertElementAt(aIndex, type);
   }
   return rv;
 }

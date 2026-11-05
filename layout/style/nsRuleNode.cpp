@@ -9,6 +9,8 @@
  * responsible for converting the rules' information into computed style
  */
 
+#include "nsRuleNode.h"
+
 #include <algorithm>
 #include <functional>
 
@@ -26,7 +28,6 @@
 #include "mozilla/TypeTraits.h"
 
 #include "nsAlgorithm.h" // for clamped()
-#include "nsRuleNode.h"
 #include "nscore.h"
 #include "nsIWidget.h"
 #include "nsIPresShell.h"
@@ -1041,10 +1042,11 @@ static bool SetColor(const nsCSSValue& aValue, const nscolor aParentColor,
       LookAndFeel::ColorID colorID = (LookAndFeel::ColorID) intValue;
       bool useStandinsForNativeColors = aPresContext &&
                                         !aPresContext->IsChrome();
-      if (NS_SUCCEEDED(LookAndFeel::GetColor(colorID,
-                                    useStandinsForNativeColors, &aResult))) {
-        result = true;
-      }
+      DebugOnly<nsresult> rv =
+        LookAndFeel::GetColor(colorID, useStandinsForNativeColors, &aResult);
+      MOZ_ASSERT(NS_SUCCEEDED(rv),
+                 "Unknown enum colors should have been rejected by parser");
+      result = true;
     }
     else {
       aResult = NS_RGB(0, 0, 0);
@@ -2346,44 +2348,25 @@ UnsetPropertiesWithoutFlags(const nsStyleStructID aSID,
   }
 }
 
-/**
- * We allocate arrays of CSS values with alloca.  (These arrays are a
- * fixed size per style struct, but we don't want to waste the
- * allocation and construction/destruction costs of the big structs when
- * we're handling much smaller ones.)  Since the lifetime of an alloca
- * allocation is the life of the calling function, the caller must call
- * alloca.  However, to ensure that constructors and destructors are
- * balanced, we do the constructor and destructor calling from this RAII
- * class, AutoCSSValueArray.
- */
-struct AutoCSSValueArray {
-  /**
-   * aStorage must be the result of alloca(aCount * sizeof(nsCSSValue))
-   */
-  AutoCSSValueArray(void* aStorage, size_t aCount) {
-    MOZ_ASSERT(size_t(aStorage) % NS_ALIGNMENT_OF(nsCSSValue) == 0,
-               "bad alignment from alloca");
-    mCount = aCount;
-    // Don't use placement new[], since it might store extra data
-    // for the count (on Windows!).
-    mArray = static_cast<nsCSSValue*>(aStorage);
-    for (size_t i = 0; i < mCount; ++i) {
-      new (KnownNotNull, mArray + i) nsCSSValue();
-    }
+AutoCSSValueArray::AutoCSSValueArray(void* aStorage, size_t aCount)
+{
+  MOZ_ASSERT(size_t(aStorage) % NS_ALIGNMENT_OF(nsCSSValue) == 0,
+             "bad alignment from alloca");
+  mCount = aCount;
+  // Don't use placement new[], since it might store extra data
+  // for the count (on Windows!).
+  mArray = static_cast<nsCSSValue*>(aStorage);
+  for (size_t i = 0; i < mCount; ++i) {
+    new (KnownNotNull, mArray + i) nsCSSValue();
   }
+}
 
-  ~AutoCSSValueArray() {
-    for (size_t i = 0; i < mCount; ++i) {
-      mArray[i].~nsCSSValue();
-    }
+AutoCSSValueArray::~AutoCSSValueArray()
+{
+  for (size_t i = 0; i < mCount; ++i) {
+    mArray[i].~nsCSSValue();
   }
-
-  nsCSSValue* get() { return mArray; }
-
-private:
-  nsCSSValue *mArray;
-  size_t mCount;
-};
+}
 
 /* static */ bool
 nsRuleNode::ResolveVariableReferences(const nsStyleStructID aSID,
@@ -7690,10 +7673,10 @@ nsRuleNode::ComputeBorderData(void* aStartStruct,
   nscolor unused = NS_RGB(0,0,0);
 
   static const nsCSSPropertyID borderColorsProps[] = {
-    eCSSProperty_border_top_colors,
-    eCSSProperty_border_right_colors,
-    eCSSProperty_border_bottom_colors,
-    eCSSProperty_border_left_colors
+    eCSSProperty__moz_border_top_colors,
+    eCSSProperty__moz_border_right_colors,
+    eCSSProperty__moz_border_bottom_colors,
+    eCSSProperty__moz_border_left_colors
   };
 
   NS_FOR_CSS_SIDES(side) {
@@ -7764,8 +7747,8 @@ nsRuleNode::ComputeBorderData(void* aStartStruct,
     const nsCSSPropertyID* subprops =
       nsCSSProps::SubpropertyEntryFor(eCSSProperty_border_radius);
     NS_FOR_CSS_FULL_CORNERS(corner) {
-      int cx = NS_FULL_TO_HALF_CORNER(corner, false);
-      int cy = NS_FULL_TO_HALF_CORNER(corner, true);
+      int cx = FullToHalfCorner(corner, false);
+      int cy = FullToHalfCorner(corner, true);
       const nsCSSValue& radius = *aRuleData->ValueFor(subprops[corner]);
       nsStyleCoord parentX = parentBorder->mBorderRadius.Get(cx);
       nsStyleCoord parentY = parentBorder->mBorderRadius.Get(cy);
@@ -7953,8 +7936,8 @@ nsRuleNode::ComputeOutlineData(void* aStartStruct,
     const nsCSSPropertyID* subprops =
       nsCSSProps::SubpropertyEntryFor(eCSSProperty__moz_outline_radius);
     NS_FOR_CSS_FULL_CORNERS(corner) {
-      int cx = NS_FULL_TO_HALF_CORNER(corner, false);
-      int cy = NS_FULL_TO_HALF_CORNER(corner, true);
+      int cx = FullToHalfCorner(corner, false);
+      int cy = FullToHalfCorner(corner, true);
       const nsCSSValue& radius = *aRuleData->ValueFor(subprops[corner]);
       nsStyleCoord parentX = parentOutline->mOutlineRadius.Get(cx);
       nsStyleCoord parentY = parentOutline->mOutlineRadius.Get(cy);
@@ -9767,7 +9750,7 @@ GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
                                                 aConditions);
         MOZ_ASSERT(didSetRadius, "unexpected radius unit");
       } else {
-        radius.SetIntValue(NS_RADIUS_CLOSEST_SIDE, eStyleUnit_Enumerated);
+        radius.SetEnumValue(StyleShapeRadius::ClosestSide);
       }
       basicShape->Coordinates().AppendElement(radius);
     }
@@ -9815,8 +9798,8 @@ GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
     if (shapeFunction->Item(5).GetUnit() == eCSSUnit_Array) {
       nsCSSValue::Array* radiiArray = shapeFunction->Item(5).GetArrayValue();
       NS_FOR_CSS_FULL_CORNERS(corner) {
-        int cx = NS_FULL_TO_HALF_CORNER(corner, false);
-        int cy = NS_FULL_TO_HALF_CORNER(corner, true);
+        int cx = FullToHalfCorner(corner, false);
+        int cy = FullToHalfCorner(corner, true);
         const nsCSSValue& radius = radiiArray->Item(corner);
         nsStyleCoord coordX, coordY;
         DebugOnly<bool> didSetRadii = SetPairCoords(radius, coordX, coordY,

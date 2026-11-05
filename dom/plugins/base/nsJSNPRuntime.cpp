@@ -723,6 +723,12 @@ GetProperty(JSContext *cx, JSObject *objArg, NPIdentifier npid, JS::MutableHandl
   return ::JS_GetPropertyById(cx, obj, id, rval);
 }
 
+static void
+MarkCrossZoneNPIdentifier(JSContext* cx, NPIdentifier npid)
+{
+  JS_MarkCrossZoneId(cx, NPIdentifierToJSId(npid));
+}
+
 // static
 bool
 nsJSObjWrapper::NP_HasMethod(NPObject *npobj, NPIdentifier id)
@@ -746,6 +752,7 @@ nsJSObjWrapper::NP_HasMethod(NPObject *npobj, NPIdentifier id)
   nsJSObjWrapper *npjsobj = (nsJSObjWrapper *)npobj;
 
   JSAutoCompartment ac(cx, npjsobj->mJSObj);
+  MarkCrossZoneNPIdentifier(cx, id);
 
   AutoJSExceptionSuppressor suppressor(aes, npjsobj);
 
@@ -785,6 +792,7 @@ doInvoke(NPObject *npobj, NPIdentifier method, const NPVariant *args,
 
   JS::Rooted<JSObject*> jsobj(cx, npjsobj->mJSObj);
   JSAutoCompartment ac(cx, jsobj);
+  MarkCrossZoneNPIdentifier(cx, method);
   JS::Rooted<JS::Value> fv(cx);
 
   AutoJSExceptionSuppressor suppressor(aes, npjsobj);
@@ -877,6 +885,7 @@ nsJSObjWrapper::NP_HasProperty(NPObject *npobj, NPIdentifier npid)
   AutoJSExceptionSuppressor suppressor(aes, npjsobj);
   JS::Rooted<JSObject*> jsobj(cx, npjsobj->mJSObj);
   JSAutoCompartment ac(cx, jsobj);
+  MarkCrossZoneNPIdentifier(cx, npid);
 
   NS_ASSERTION(NPIdentifierIsInt(npid) || NPIdentifierIsString(npid),
                "id must be either string or int!\n");
@@ -913,6 +922,7 @@ nsJSObjWrapper::NP_GetProperty(NPObject *npobj, NPIdentifier id,
 
   AutoJSExceptionSuppressor suppressor(aes, npjsobj);
   JSAutoCompartment ac(cx, npjsobj->mJSObj);
+  MarkCrossZoneNPIdentifier(cx, id);
 
   JS::Rooted<JS::Value> v(cx);
   return (GetProperty(cx, npjsobj->mJSObj, id, &v) &&
@@ -949,6 +959,7 @@ nsJSObjWrapper::NP_SetProperty(NPObject *npobj, NPIdentifier npid,
   AutoJSExceptionSuppressor suppressor(aes, npjsobj);
   JS::Rooted<JSObject*> jsObj(cx, npjsobj->mJSObj);
   JSAutoCompartment ac(cx, jsObj);
+  MarkCrossZoneNPIdentifier(cx, npid);
 
   JS::Rooted<JS::Value> v(cx, NPVariantToJSVal(npp, cx, value));
 
@@ -986,6 +997,7 @@ nsJSObjWrapper::NP_RemoveProperty(NPObject *npobj, NPIdentifier npid)
   JS::ObjectOpResult result;
   JS::Rooted<JSObject*> obj(cx, npjsobj->mJSObj);
   JSAutoCompartment ac(cx, obj);
+  MarkCrossZoneNPIdentifier(cx, npid);
 
   NS_ASSERTION(NPIdentifierIsInt(npid) || NPIdentifierIsString(npid),
                "id must be either string or int!\n");
@@ -1748,7 +1760,7 @@ NPObjWrapper_ObjectMoved(JSObject *obj, const JSObject *old)
   auto entry =
     static_cast<NPObjWrapperHashEntry*>(sNPObjWrappers->Search(npobj));
   MOZ_ASSERT(entry && entry->mJSObj);
-  MOZ_ASSERT(entry->mJSObj.unbarrieredGetPtr() == old);
+  MOZ_ASSERT(entry->mJSObj == old);
   entry->mJSObj = obj;
 }
 
@@ -2318,6 +2330,7 @@ nsJSObjWrapper::HasOwnProperty(NPObject *npobj, NPIdentifier npid)
   AutoJSExceptionSuppressor suppressor(aes, npjsobj);
   JS::Rooted<JSObject*> jsobj(cx, npjsobj->mJSObj);
   JSAutoCompartment ac(cx, jsobj);
+  MarkCrossZoneNPIdentifier(cx, npid);
 
   NS_ASSERTION(NPIdentifierIsInt(npid) || NPIdentifierIsString(npid),
                "id must be either string or int!\n");

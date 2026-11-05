@@ -10,7 +10,10 @@
 
 namespace mozilla {
 
+class AbstractThread;
+class GMPCrashHelper;
 class VideoFrameContainer;
+class MediaInfo;
 class MediaResult;
 
 namespace dom {
@@ -43,6 +46,9 @@ public:
   {
     return nullptr;
   }
+
+  // Return an abstract thread on which to run main thread runnables.
+  virtual AbstractThread* AbstractMainThread() const = 0;
 
   // Return true if decoding should be paused
   virtual bool GetPaused() = 0;
@@ -148,6 +154,20 @@ public:
   // Main thread only.
   virtual void DispatchEncrypted(const nsTArray<uint8_t>& aInitData,
                                  const nsAString& aInitDataType) = 0;
+
+  // Return the decoder owner's owner document.
+  virtual nsIDocument* GetDocument() const = 0;
+
+  // Called by the media decoder to create audio/video tracks and add to its
+  // owner's track list.
+  virtual void ConstructMediaTracks(const MediaInfo* aInfo) = 0;
+
+  // Called by the media decoder to removes all audio/video tracks from its
+  // owner's track list.
+  virtual void RemoveMediaTracks() = 0;
+
+  // Called by the media decoder to create a GMPCrashHelper.
+  virtual already_AddRefed<GMPCrashHelper> CreateGMPCrashHelper() = 0;
 };
 
 } // namespace mozilla

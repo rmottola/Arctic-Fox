@@ -513,6 +513,9 @@ protected:
     // String which are included in [mKeyEvent characters] and already handled
     // by InsertText() call(s).
     nsString mInsertedString;
+    // Unique id associated with a keydown / keypress event. It's ok if this
+    // wraps over long periods.
+    uint32_t mUniqueId;
     // Whether keydown event was consumed by web contents or chrome contents.
     bool mKeyDownHandled;
     // Whether keypress event was dispatched for mKeyEvent.
@@ -521,16 +524,24 @@ protected:
     bool mKeyPressHandled;
     // Whether the key event causes other key events via IME or something.
     bool mCausedOtherKeyEvents;
+    // Whether the key event causes composition change or committing
+    // composition.  So, even if InsertText() is called, this may be false
+    // if it dispatches keypress event.
+    bool mCompositionDispatched;
 
-    KeyEventState() : mKeyEvent(nullptr)
+    KeyEventState()
+      : mKeyEvent(nullptr)
+      , mUniqueId(0)
     {
       Clear();
-    }    
+    }
 
-    explicit KeyEventState(NSEvent* aNativeKeyEvent) : mKeyEvent(nullptr)
+    explicit KeyEventState(NSEvent* aNativeKeyEvent, uint32_t aUniqueId = 0)
+      : mKeyEvent(nullptr)
+      , mUniqueId(0)
     {
       Clear();
-      Set(aNativeKeyEvent);
+      Set(aNativeKeyEvent, aUniqueId);
     }
 
     KeyEventState(const KeyEventState &aOther) = delete;
@@ -540,11 +551,12 @@ protected:
       Clear();
     }
 
-    void Set(NSEvent* aNativeKeyEvent)
+    void Set(NSEvent* aNativeKeyEvent, uint32_t aUniqueId = 0)
     {
       NS_PRECONDITION(aNativeKeyEvent, "aNativeKeyEvent must not be NULL");
       Clear();
       mKeyEvent = [aNativeKeyEvent retain];
+      mUniqueId = aUniqueId;
     }
 
     void Clear()
@@ -552,6 +564,7 @@ protected:
       if (mKeyEvent) {
         [mKeyEvent release];
         mKeyEvent = nullptr;
+        mUniqueId = 0;
       }
       mInsertString = nullptr;
       mInsertedString.Truncate();
@@ -559,11 +572,13 @@ protected:
       mKeyPressDispatched = false;
       mKeyPressHandled = false;
       mCausedOtherKeyEvents = false;
+      mCompositionDispatched = false;
     }
 
     bool IsDefaultPrevented() const
     {
-      return mKeyDownHandled || mKeyPressHandled || mCausedOtherKeyEvents;
+      return mKeyDownHandled || mKeyPressHandled || mCausedOtherKeyEvents ||
+             mCompositionDispatched;
     }
 
     bool CanDispatchKeyPressEvent() const
@@ -633,7 +648,7 @@ protected:
   /**
    * PushKeyEvent() adds the current key event to mCurrentKeyEvents.
    */
-  KeyEventState* PushKeyEvent(NSEvent* aNativeKeyEvent)
+  KeyEventState* PushKeyEvent(NSEvent* aNativeKeyEvent, uint32_t aUniqueId = 0)
   {
     uint32_t nestCount = mCurrentKeyEvents.Length();
     for (uint32_t i = 0; i < nestCount; i++) {
@@ -644,10 +659,10 @@ protected:
 
     KeyEventState* keyEvent = nullptr;
     if (nestCount == 0) {
-      mFirstKeyEvent.Set(aNativeKeyEvent);
+      mFirstKeyEvent.Set(aNativeKeyEvent, aUniqueId);
       keyEvent = &mFirstKeyEvent;
     } else {
-      keyEvent = new KeyEventState(aNativeKeyEvent);
+      keyEvent = new KeyEventState(aNativeKeyEvent, aUniqueId);
     }
     return *mCurrentKeyEvents.AppendElement(keyEvent);
   }
@@ -1073,10 +1088,11 @@ public:
    * KeyDown event handler.
    *
    * @param aNativeEvent          A native NSKeyDown event.
-   * @return                      TRUE if the event is consumed by web contents
-   *                              or chrome contents.  Otherwise, FALSE.
+   * @param aUniqueId             A unique ID for the event.
+   * @return                      TRUE if the event is dispatched to web
+   *                              contents or chrome contents. Otherwise, FALSE.
    */
-  bool HandleKeyDownEvent(NSEvent* aNativeEvent);
+  bool HandleKeyDownEvent(NSEvent* aNativeEvent, uint32_t aUniqueId);
 
   /**
    * KeyUp event handler.

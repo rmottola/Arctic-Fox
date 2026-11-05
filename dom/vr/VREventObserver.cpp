@@ -16,7 +16,8 @@ namespace dom {
 using namespace gfx;
 
 /**
- * This class is used by nsGlobalWindow to implement window.onvrdisplayconnected,
+ * This class is used by nsGlobalWindow to implement window.onvrdisplayactivate,
+ * window.onvrdisplaydeactivate, window.onvrdisplayconnected,
  * window.onvrdisplaydisconnected, and window.onvrdisplaypresentchange.
  */
 VREventObserver::VREventObserver(nsGlobalWindow* aGlobalWindow)
@@ -32,6 +33,18 @@ VREventObserver::VREventObserver(nsGlobalWindow* aGlobalWindow)
 
 VREventObserver::~VREventObserver()
 {
+  DisconnectFromOwner();
+}
+
+void
+VREventObserver::DisconnectFromOwner()
+{
+  // In the event that nsGlobalWindow is deallocated, VREventObserver may
+  // still be AddRef'ed elsewhere.  Ensure that we don't UAF by
+  // dereferencing mWindow.
+  mWindow = nullptr;
+
+  // Unregister from VRManagerChild
   VRManagerChild* vmc = VRManagerChild::Get();
   if (vmc) {
     vmc->RemoveListener(this);
@@ -39,39 +52,76 @@ VREventObserver::~VREventObserver()
 }
 
 void
-VREventObserver::NotifyVRDisplayConnect()
+VREventObserver::NotifyVRDisplayMounted(uint32_t aDisplayID)
+{
+  if (mWindow && mWindow->AsInner()->IsCurrentInnerWindow()) {
+    MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
+    mWindow->DispatchVRDisplayActivate(aDisplayID,
+                                       VRDisplayEventReason::Mounted);
+  }
+}
+
+void
+VREventObserver::NotifyVRDisplayNavigation(uint32_t aDisplayID)
+{
+  if (mWindow && mWindow->AsInner()->IsCurrentInnerWindow()) {
+    MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
+    mWindow->DispatchVRDisplayActivate(aDisplayID,
+                                       VRDisplayEventReason::Navigation);
+  }
+}
+
+void
+VREventObserver::NotifyVRDisplayRequested(uint32_t aDisplayID)
+{
+  if (mWindow && mWindow->AsInner()->IsCurrentInnerWindow()) {
+    MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
+    mWindow->DispatchVRDisplayActivate(aDisplayID,
+                                       VRDisplayEventReason::Requested);
+  }
+}
+
+void
+VREventObserver::NotifyVRDisplayUnmounted(uint32_t aDisplayID)
+{
+  if (mWindow && mWindow->AsInner()->IsCurrentInnerWindow()) {
+    MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
+    mWindow->DispatchVRDisplayDeactivate(aDisplayID,
+                                         VRDisplayEventReason::Unmounted);
+  }
+}
+
+void
+VREventObserver::NotifyVRDisplayConnect(uint32_t aDisplayID)
 {
   /**
    * We do not call nsGlobalWindow::NotifyActiveVRDisplaysChanged here, as we
    * can assume that a newly enumerated display is not presenting WebVR
    * content.
    */
-  if (mWindow->AsInner()->IsCurrentInnerWindow()) {
+  if (mWindow && mWindow->AsInner()->IsCurrentInnerWindow()) {
     MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
-    mWindow->GetOuterWindow()->DispatchCustomEvent(
-      NS_LITERAL_STRING("vrdisplayconnected"));
+    mWindow->DispatchVRDisplayConnect(aDisplayID);
   }
 }
 
 void
-VREventObserver::NotifyVRDisplayDisconnect()
+VREventObserver::NotifyVRDisplayDisconnect(uint32_t aDisplayID)
 {
-  if (mWindow->AsInner()->IsCurrentInnerWindow()) {
+  if (mWindow && mWindow->AsInner()->IsCurrentInnerWindow()) {
     mWindow->NotifyActiveVRDisplaysChanged();
     MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
-    mWindow->GetOuterWindow()->DispatchCustomEvent(
-      NS_LITERAL_STRING("vrdisplaydisconnected"));
+    mWindow->DispatchVRDisplayDisconnect(aDisplayID);
   }
 }
 
 void
-VREventObserver::NotifyVRDisplayPresentChange()
+VREventObserver::NotifyVRDisplayPresentChange(uint32_t aDisplayID)
 {
-  if (mWindow->AsInner()->IsCurrentInnerWindow()) {
+  if (mWindow && mWindow->AsInner()->IsCurrentInnerWindow()) {
     mWindow->NotifyActiveVRDisplaysChanged();
     MOZ_ASSERT(nsContentUtils::IsSafeToRunScript());
-    mWindow->GetOuterWindow()->DispatchCustomEvent(
-      NS_LITERAL_STRING("vrdisplaypresentchange"));
+    mWindow->DispatchVRDisplayPresentChange(aDisplayID);
   }
 }
 

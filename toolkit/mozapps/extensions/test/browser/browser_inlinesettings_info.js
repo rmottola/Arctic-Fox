@@ -291,7 +291,7 @@ add_test(function() {
       is(input.tooltipText, profD.path, "Label tooltip should match file chosen");
       is(Services.prefs.getCharPref("extensions.inlinesettings1.file"), profD.path, "File pref should match file chosen");
 
-      MockFilePicker.returnFiles = [curProcD];
+      MockFilePicker.setFiles([curProcD]);
       MockFilePicker.returnValue = Ci.nsIFilePicker.returnCancel;
       EventUtils.synthesizeMouseAtCenter(button, { clickCount: 1 }, gManagerWindow);
       is(MockFilePicker.mode, Ci.nsIFilePicker.modeOpen, "File picker mode should be open file");
@@ -305,7 +305,7 @@ add_test(function() {
       is(input.value, "", "Label value should be empty");
       is(input.tooltipText, "", "Label tooltip should be empty");
 
-      MockFilePicker.returnFiles = [profD];
+      MockFilePicker.setFiles([profD]);
       MockFilePicker.returnValue = Ci.nsIFilePicker.returnOK;
       EventUtils.synthesizeMouseAtCenter(button, { clickCount: 1 }, gManagerWindow);
       is(MockFilePicker.mode, Ci.nsIFilePicker.modeGetFolder, "File picker mode should be directory");
@@ -313,7 +313,7 @@ add_test(function() {
       is(input.tooltipText, profD.path, "Label tooltip should match file chosen");
       is(Services.prefs.getCharPref("extensions.inlinesettings1.directory"), profD.path, "Directory pref should match file chosen");
 
-      MockFilePicker.returnFiles = [curProcD];
+      MockFilePicker.setFiles([curProcD]);
       MockFilePicker.returnValue = Ci.nsIFilePicker.returnCancel;
       EventUtils.synthesizeMouseAtCenter(button, { clickCount: 1 }, gManagerWindow);
       is(MockFilePicker.mode, Ci.nsIFilePicker.modeGetFolder, "File picker mode should be directory");

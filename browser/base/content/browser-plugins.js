@@ -271,6 +271,7 @@ var gPluginHandler = {
 
     let options = {
       dismissed: !showNow,
+      persistent: showNow,
       eventCallback: this._clickToPlayNotificationEventCallback,
       primaryPlugin: primaryPluginPermission,
       pluginData: pluginData,
@@ -403,7 +404,7 @@ var gPluginHandler = {
         appendNotification(message, "plugin-hidden", null,
                            notificationBox.PRIORITY_INFO_HIGH, buttons);
       if (haveInsecure) {
-        n.classList.add('pluginVulnerable');
+        n.classList.add("pluginVulnerable");
       }
     }
 

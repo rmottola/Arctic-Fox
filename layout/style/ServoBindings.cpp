@@ -7,10 +7,11 @@
 #include "mozilla/ServoBindings.h"
 
 #include "ChildIterator.h"
-#include "StyleStructContext.h"
 #include "gfxFontFamilyList.h"
 #include "nsAttrValueInlines.h"
+#include "nsCSSProps.h"
 #include "nsCSSParser.h"
+#include "nsCSSPseudoElements.h"
 #include "nsCSSRuleProcessor.h"
 #include "nsContentUtils.h"
 #include "nsDOMTokenList.h"
@@ -19,7 +20,11 @@
 #include "nsIDocument.h"
 #include "nsIFrame.h"
 #include "nsINode.h"
+#include "nsIPresShell.h"
+#include "nsIPresShellInlines.h"
 #include "nsIPrincipal.h"
+#include "nsMappedAttributes.h"
+#include "nsMediaFeatures.h"
 #include "nsNameSpaceManager.h"
 #include "nsNetUtil.h"
 #include "nsRuleNode.h"
@@ -28,7 +33,10 @@
 #include "nsStyleUtil.h"
 #include "nsTArray.h"
 
+#include "mozilla/EffectCompositor.h"
 #include "mozilla/EventStates.h"
+#include "mozilla/Keyframe.h"
+#include "mozilla/ServoAnimationRule.h"
 #include "mozilla/ServoElementSnapshot.h"
 #include "mozilla/ServoRestyleManager.h"
 #include "mozilla/StyleAnimationValue.h"
@@ -194,6 +202,13 @@ Gecko_IsRootElement(RawGeckoElementBorrowed aElement)
   return aElement->OwnerDoc()->GetRootElement() == aElement;
 }
 
+bool
+Gecko_MatchesElement(CSSPseudoClassType aType,
+                     RawGeckoElementBorrowed aElement)
+{
+  return nsCSSPseudoClasses::MatchesElement(aType, aElement).value();
+}
+
 nsIAtom*
 Gecko_LocalName(RawGeckoElementBorrowed aElement)
 {
@@ -231,6 +246,16 @@ void
 Gecko_UnsetNodeFlags(RawGeckoNodeBorrowed aNode, uint32_t aFlags)
 {
   const_cast<nsINode*>(aNode)->UnsetFlags(aFlags);
+}
+
+void
+Gecko_SetOwnerDocumentNeedsStyleFlush(RawGeckoElementBorrowed aElement)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (nsIPresShell* shell = aElement->OwnerDoc()->GetShell()) {
+    shell->SetNeedStyleFlush();
+  }
 }
 
 nsStyleContext*
@@ -286,25 +311,73 @@ Gecko_DropElementSnapshot(ServoElementSnapshotOwned aSnapshot)
 }
 
 RawServoDeclarationBlockStrongBorrowedOrNull
-Gecko_GetServoDeclarationBlock(RawGeckoElementBorrowed aElement)
+Gecko_GetStyleAttrDeclarationBlock(RawGeckoElementBorrowed aElement)
 {
-  const nsAttrValue* attr = aElement->GetParsedAttr(nsGkAtoms::style);
-  if (!attr || attr->Type() != nsAttrValue::eCSSDeclaration) {
-    return nullptr;
-  }
-  DeclarationBlock* decl = attr->GetCSSDeclarationValue();
+  DeclarationBlock* decl = aElement->GetInlineStyleDeclaration();
   if (!decl) {
     return nullptr;
   }
   if (decl->IsGecko()) {
-    // XXX This can happen at least when script sets style attribute
-    //     since we haven't implemented Element.style for stylo. But
-    //     we may want to turn it into an assertion after that's done.
+    // XXX This can happen when nodes are adopted from a Gecko-style-backend
+    //     document into a Servo-style-backend document.  See bug 1330051.
     NS_WARNING("stylo: requesting a Gecko declaration block?");
     return nullptr;
   }
   return reinterpret_cast<const RawServoDeclarationBlockStrong*>
     (decl->AsServo()->RefRaw());
+}
+
+RawServoDeclarationBlockStrongBorrowedOrNull
+Gecko_GetHTMLPresentationAttrDeclarationBlock(RawGeckoElementBorrowed aElement)
+{
+  static_assert(sizeof(RefPtr<RawServoDeclarationBlock>) ==
+                sizeof(RawServoDeclarationBlockStrong),
+                "RefPtr should just be a pointer");
+  const nsMappedAttributes* attrs = aElement->GetMappedAttributes();
+  if (!attrs) {
+    return nullptr;
+  }
+
+  const RefPtr<RawServoDeclarationBlock>& servo = attrs->GetServoStyle();
+  return reinterpret_cast<const RawServoDeclarationBlockStrong*>(&servo);
+}
+
+RawServoDeclarationBlockStrong
+Gecko_GetAnimationRule(RawGeckoElementBorrowed aElement,
+                       nsIAtom* aPseudoTag,
+                       EffectCompositor::CascadeLevel aCascadeLevel)
+{
+  MOZ_ASSERT(aElement, "Invalid GeckoElement");
+
+  const RawServoDeclarationBlockStrong emptyDeclarationBlock{ nullptr };
+  nsIDocument* doc = aElement->GetComposedDoc();
+  if (!doc || !doc->GetShell()) {
+    return emptyDeclarationBlock;
+  }
+  nsPresContext* presContext = doc->GetShell()->GetPresContext();
+  if (!presContext) {
+    return emptyDeclarationBlock;
+  }
+
+  CSSPseudoElementType pseudoType =
+    aPseudoTag
+    ? nsCSSPseudoElements::GetPseudoType(
+        aPseudoTag,
+        nsCSSProps::EnabledState::eIgnoreEnabledState)
+    : CSSPseudoElementType::NotPseudo;
+  if (pseudoType != CSSPseudoElementType::NotPseudo &&
+      pseudoType != CSSPseudoElementType::before &&
+      pseudoType != CSSPseudoElementType::after) {
+    return emptyDeclarationBlock;
+  }
+
+  ServoAnimationRule* rule =
+    presContext->EffectCompositor()
+               ->GetServoAnimationRule(aElement, pseudoType, aCascadeLevel);
+  if (!rule) {
+    return emptyDeclarationBlock;
+  }
+  return rule->GetValues();
 }
 
 void
@@ -848,9 +921,9 @@ Gecko_ClearPODTArray(void* aArray, size_t aElementSize, size_t aElementAlign)
 }
 
 void
-Gecko_ClearStyleContents(nsStyleContent* aContent)
+Gecko_ClearAndResizeStyleContents(nsStyleContent* aContent, uint32_t aHowMany)
 {
-  aContent->AllocateContents(0);
+  aContent->AllocateContents(aHowMany);
 }
 
 void
@@ -876,6 +949,31 @@ Gecko_EnsureImageLayersLength(nsStyleImageLayers* aLayers, size_t aLen,
   for (size_t i = oldLength; i < aLen; ++i) {
     aLayers->mLayers[i].Initialize(aLayerType);
   }
+}
+
+void
+Gecko_EnsureStyleAnimationArrayLength(void* aArray, size_t aLen)
+{
+  auto base =
+    reinterpret_cast<nsStyleAutoArray<StyleAnimation>*>(aArray);
+
+  base->EnsureLengthAtLeast(aLen);
+}
+
+Keyframe*
+Gecko_AnimationAppendKeyframe(RawGeckoKeyframeListBorrowedMut aKeyframes,
+                              float aOffset,
+                              const nsTimingFunction* aTimingFunction)
+{
+  Keyframe* keyframe = aKeyframes->AppendElement();
+  keyframe->mOffset.emplace(aOffset);
+  if (aTimingFunction &&
+      aTimingFunction->mType != nsTimingFunction::Type::Linear) {
+    keyframe->mTimingFunction.emplace();
+    keyframe->mTimingFunction->Init(*aTimingFunction);
+  }
+
+  return keyframe;
 }
 
 void
@@ -1021,6 +1119,19 @@ Gecko_CSSValue_GetArrayItem(nsCSSValueBorrowedMut aCSSValue, int32_t aIndex)
   return &aCSSValue->GetArrayValue()->Item(aIndex);
 }
 
+
+bool
+Gecko_PropertyId_IsPrefEnabled(nsCSSPropertyID id)
+{
+  return nsCSSProps::IsEnabled(id);
+}
+
+void
+Gecko_CSSValue_Drop(nsCSSValueBorrowedMut aCSSValue)
+{
+  aCSSValue->~nsCSSValue();
+}
+
 void
 Gecko_LoadStyleSheet(css::Loader* aLoader,
                      ServoStyleSheet* aParent,
@@ -1055,14 +1166,21 @@ Gecko_LoadStyleSheet(css::Loader* aLoader,
   aLoader->LoadChildSheet(aParent, uri, media, nullptr, aImportRule, nullptr);
 }
 
+const nsMediaFeature*
+Gecko_GetMediaFeatures()
+{
+  return nsMediaFeatures::features;
+}
+
 NS_IMPL_THREADSAFE_FFI_REFCOUNTING(nsCSSValueSharedList, CSSValueSharedList);
 
 #define STYLE_STRUCT(name, checkdata_cb)                                      \
                                                                               \
 void                                                                          \
-Gecko_Construct_nsStyle##name(nsStyle##name* ptr)                             \
+Gecko_Construct_Default_nsStyle##name(nsStyle##name* ptr,                     \
+                                      const nsPresContext* pres_context)      \
 {                                                                             \
-  new (ptr) nsStyle##name(StyleStructContext::ServoContext());                \
+  new (ptr) nsStyle##name(pres_context);                                      \
 }                                                                             \
                                                                               \
 void                                                                          \
@@ -1076,6 +1194,12 @@ void                                                                          \
 Gecko_Destroy_nsStyle##name(nsStyle##name* ptr)                               \
 {                                                                             \
   ptr->~nsStyle##name();                                                      \
+}
+
+void
+Gecko_Construct_nsStyleVariables(nsStyleVariables* ptr)
+{
+  new (ptr) nsStyleVariables();
 }
 
 #include "nsStyleStructList.h"

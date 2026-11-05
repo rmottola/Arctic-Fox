@@ -315,7 +315,9 @@ nsDOMWindowUtils::Redraw(uint32_t aCount, uint32_t *aDurationOut)
         rootFrame->InvalidateFrame();
 
 #if defined(MOZ_X11) && defined(MOZ_WIDGET_GTK)
-      XSync(GDK_DISPLAY_XDISPLAY(gdk_display_get_default()), False);
+      if (!gfxPlatform::IsHeadless()) {
+        XSync(GDK_DISPLAY_XDISPLAY(gdk_display_get_default()), False);
+      }
 #endif
 
       *aDurationOut = PR_IntervalToMilliseconds(PR_IntervalNow() - iStart);
@@ -643,12 +645,16 @@ nsDOMWindowUtils::SendMouseEvent(const nsAString& aType,
                                  bool aIsDOMEventSynthesized,
                                  bool aIsWidgetEventSynthesized,
                                  int32_t aButtons,
+                                 uint32_t aIdentifier,
                                  uint8_t aOptionalArgCount,
                                  bool *aPreventDefault)
 {
   return SendMouseEventCommon(aType, aX, aY, aButton, aClickCount, aModifiers,
                               aIgnoreRootScrollFrame, aPressure,
-                              aInputSourceArg, false, aPreventDefault,
+                              aInputSourceArg,
+                              aOptionalArgCount >= 7 ?
+                                aIdentifier : DEFAULT_MOUSE_POINTER_ID,
+                              false, aPreventDefault,
                               aOptionalArgCount >= 4 ?
                                 aIsDOMEventSynthesized : true,
                               aOptionalArgCount >= 5 ?
@@ -670,6 +676,7 @@ nsDOMWindowUtils::SendMouseEventToWindow(const nsAString& aType,
                                          bool aIsDOMEventSynthesized,
                                          bool aIsWidgetEventSynthesized,
                                          int32_t aButtons,
+                                         uint32_t aIdentifier,
                                          uint8_t aOptionalArgCount)
 {
   PROFILER_LABEL("nsDOMWindowUtils", "SendMouseEventToWindow",
@@ -677,7 +684,10 @@ nsDOMWindowUtils::SendMouseEventToWindow(const nsAString& aType,
 
   return SendMouseEventCommon(aType, aX, aY, aButton, aClickCount, aModifiers,
                               aIgnoreRootScrollFrame, aPressure,
-                              aInputSourceArg, true, nullptr,
+                              aInputSourceArg,
+                              aOptionalArgCount >= 7 ?
+                                aIdentifier : DEFAULT_MOUSE_POINTER_ID,
+                              true, nullptr,
                               aOptionalArgCount >= 4 ?
                                 aIsDOMEventSynthesized : true,
                               aOptionalArgCount >= 5 ?
@@ -696,6 +706,7 @@ nsDOMWindowUtils::SendMouseEventCommon(const nsAString& aType,
                                        bool aIgnoreRootScrollFrame,
                                        float aPressure,
                                        unsigned short aInputSourceArg,
+                                       uint32_t aPointerId,
                                        bool aToWindow,
                                        bool *aPreventDefault,
                                        bool aIsDOMEventSynthesized,
@@ -705,8 +716,8 @@ nsDOMWindowUtils::SendMouseEventCommon(const nsAString& aType,
   nsCOMPtr<nsIPresShell> presShell = GetPresShell();
   return nsContentUtils::SendMouseEvent(presShell, aType, aX, aY, aButton,
       aButtons, aClickCount, aModifiers, aIgnoreRootScrollFrame, aPressure,
-      aInputSourceArg, aToWindow, aPreventDefault, aIsDOMEventSynthesized,
-      aIsWidgetEventSynthesized);
+      aInputSourceArg, aPointerId, aToWindow, aPreventDefault,
+      aIsDOMEventSynthesized, aIsWidgetEventSynthesized);
 }
 
 NS_IMETHODIMP
@@ -2811,27 +2822,6 @@ nsDOMWindowUtils::GetContainerElement(nsIDOMElement** aResult)
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsDOMWindowUtils::WrapDOMFile(nsIFile *aFile,
-                              nsISupports **aDOMFile)
-{
-  if (!aFile) {
-    return NS_ERROR_FAILURE;
-  }
-
-  nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(mWindow);
-  NS_ENSURE_STATE(window);
-
-  nsPIDOMWindowInner* innerWindow = window->GetCurrentInnerWindow();
-  if (!innerWindow) {
-    return NS_ERROR_FAILURE;
-  }
-
-  nsCOMPtr<nsIDOMBlob> blob = File::CreateFromFile(innerWindow, aFile);
-  blob.forget(aDOMFile);
-  return NS_OK;
-}
-
 #ifdef DEBUG
 static bool
 CheckLeafLayers(Layer* aLayer, const nsIntPoint& aOffset, nsIntRegion* aCoveredRegion)
@@ -3081,8 +3071,7 @@ nsDOMWindowUtils::GetFileReferences(const nsAString& aDatabaseName, int64_t aId,
 
   nsCString origin;
   nsresult rv =
-    quota::QuotaManager::GetInfoFromWindow(window, nullptr, nullptr, &origin,
-                                           nullptr);
+    quota::QuotaManager::GetInfoFromWindow(window, nullptr, nullptr, &origin);
   NS_ENSURE_SUCCESS(rv, rv);
 
   IDBOpenDBOptions options;
@@ -3698,10 +3687,8 @@ nsDOMWindowUtils::GetOMTAStyle(nsIDOMElement* aElement,
     cssValue->GetCssText(text, rv);
     aResult.Assign(text);
     return rv.StealNSResult();
-  } else {
-    aResult.Truncate();
   }
-
+  aResult.Truncate();
   return NS_OK;
 }
 

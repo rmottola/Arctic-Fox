@@ -2,26 +2,26 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* import-globals-from ./netmonitor-controller.js */
 /* eslint-disable mozilla/reject-some-requires */
-/* globals Prefs, setInterval, setTimeout, clearInterval, clearTimeout, btoa */
-/* exported $, $all */
+/* globals $, gStore, NetMonitorController, dumpn */
 
 "use strict";
 
 const { testing: isTesting } = require("devtools/shared/flags");
+const { Task } = require("devtools/shared/task");
 const { ViewHelpers } = require("devtools/client/shared/widgets/view-helpers");
-const { configureStore } = require("./store");
 const { RequestsMenuView } = require("./requests-menu-view");
 const { CustomRequestView } = require("./custom-request-view");
 const { ToolbarView } = require("./toolbar-view");
 const { SidebarView } = require("./sidebar-view");
-const { DetailsView } = require("./details-view");
-const { PerformanceStatisticsView } = require("./performance-statistics-view");
-var {Prefs} = require("./prefs");
-
-// Initialize the global redux variables
-var gStore = configureStore();
+const { StatisticsView } = require("./statistics-view");
+const { ACTIVITY_TYPE } = require("./constants");
+const { Prefs } = require("./prefs");
+const { createFactory } = require("devtools/client/shared/vendor/react");
+const Actions = require("./actions/index");
+const ReactDOM = require("devtools/client/shared/vendor/react-dom");
+const Provider = createFactory(require("devtools/client/shared/vendor/react-redux").Provider);
+const DetailsPanel = createFactory(require("./shared/components/details-panel"));
 
 // ms
 const WDA_DEFAULT_VERIFY_INTERVAL = 50;
@@ -32,12 +32,6 @@ const WDA_DEFAULT_VERIFY_INTERVAL = 50;
 // never gets hit during testing.
 // ms
 const WDA_DEFAULT_GIVE_UP_TIMEOUT = isTesting ? 45000 : 2000;
-
-const DEFAULT_EDITOR_CONFIG = {
-  mode: Editor.modes.text,
-  readOnly: true,
-  lineNumbers: true
-};
 
 /**
  * Object defining the network monitor view components.
@@ -51,9 +45,23 @@ var NetMonitorView = {
 
     this.Toolbar.initialize(gStore);
     this.RequestsMenu.initialize(gStore);
-    this.NetworkDetails.initialize(gStore);
     this.CustomRequest.initialize();
-    this.PerformanceStatistics.initialize(gStore);
+    this.Statistics.initialize(gStore);
+
+    this.detailsPanel = $("#react-details-panel-hook");
+
+    ReactDOM.render(Provider(
+      { store: gStore },
+      DetailsPanel({ toolbox: NetMonitorController._toolbox }),
+    ), this.detailsPanel);
+
+    // Store watcher here is for observing the statisticsOpen state change.
+    // It should be removed once we migrate to react and apply react/redex binding.
+    this.unsubscribeStore = gStore.subscribe(storeWatcher(
+      false,
+      () => gStore.getState().ui.statisticsOpen,
+      this.toggleFrontendMode.bind(this)
+    ));
   },
 
   /**
@@ -63,8 +71,10 @@ var NetMonitorView = {
     this._isDestroyed = true;
     this.Toolbar.destroy();
     this.RequestsMenu.destroy();
-    this.NetworkDetails.destroy();
     this.CustomRequest.destroy();
+    this.Statistics.destroy();
+    ReactDOM.unmountComponentAtNode(this.detailsPanel);
+    this.unsubscribeStore();
 
     this._destroyPanes();
   },
@@ -93,11 +103,6 @@ var NetMonitorView = {
     Prefs.networkDetailsHeight = this._detailsPane.getAttribute("height");
 
     this._detailsPane = null;
-
-    for (let p of this._editorPromises.values()) {
-      let editor = yield p;
-      editor.destroy();
-    }
   }),
 
   /**
@@ -152,10 +157,10 @@ var NetMonitorView = {
    * Toggles between the frontend view modes ("Inspector" vs. "Statistics").
    */
   toggleFrontendMode: function () {
-    if (this.currentFrontendMode != "network-inspector-view") {
-      this.showNetworkInspectorView();
-    } else {
+    if (gStore.getState().ui.statisticsOpen) {
       this.showNetworkStatisticsView();
+    } else {
+      this.showNetworkInspectorView();
     }
   },
 
@@ -174,7 +179,7 @@ var NetMonitorView = {
 
     let controller = NetMonitorController;
     let requestsView = this.RequestsMenu;
-    let statisticsView = this.PerformanceStatistics;
+    let statisticsView = this.Statistics;
 
     Task.spawn(function* () {
       statisticsView.displayPlaceholderCharts();
@@ -194,7 +199,7 @@ var NetMonitorView = {
         console.error(ex);
       }
 
-      const requests = requestsView.store.getState().requests.requests;
+      const requests = requestsView.store.getState().requests.requests.valueSeq();
       statisticsView.createPrimedCacheChart(requests);
       statisticsView.createEmptyCacheChart(requests);
     });
@@ -205,43 +210,9 @@ var NetMonitorView = {
       ACTIVITY_TYPE.RELOAD.WITH_CACHE_DEFAULT);
   },
 
-  /**
-   * Lazily initializes and returns a promise for a Editor instance.
-   *
-   * @param string id
-   *        The id of the editor placeholder node.
-   * @return object
-   *         A promise that is resolved when the editor is available.
-   */
-  editor: function (id) {
-    dumpn("Getting a NetMonitorView editor: " + id);
-
-    if (this._editorPromises.has(id)) {
-      return this._editorPromises.get(id);
-    }
-
-    let deferred = promise.defer();
-    this._editorPromises.set(id, deferred.promise);
-
-    // Initialize the source editor and store the newly created instance
-    // in the ether of a resolved promise's value.
-    let editor = new Editor(DEFAULT_EDITOR_CONFIG);
-    editor.appendTo($(id)).then(() => deferred.resolve(editor));
-
-    return deferred.promise;
-  },
-
   _body: null,
   _detailsPane: null,
-  _editorPromises: new Map()
 };
-
-/**
- * DOM query helper.
- * TODO: Move it into "dom-utils.js" module and "require" it when needed.
- */
-var $ = (selector, target = document) => target.querySelector(selector);
-var $all = (selector, target = document) => target.querySelectorAll(selector);
 
 /**
  * Makes sure certain properties are available on all objects in a data store.
@@ -278,12 +249,26 @@ function whenDataAvailable(dataStore, mandatoryFields) {
   });
 }
 
+// A smart store watcher to notify store changes as necessary
+function storeWatcher(initialValue, reduceValue, onChange) {
+  let currentValue = initialValue;
+
+  return () => {
+    const newValue = reduceValue();
+    if (newValue !== currentValue) {
+      onChange();
+      currentValue = newValue;
+    }
+  };
+}
+
 /**
  * Preliminary setup for the NetMonitorView object.
  */
 NetMonitorView.Toolbar = new ToolbarView();
 NetMonitorView.Sidebar = new SidebarView();
-NetMonitorView.NetworkDetails = new DetailsView();
 NetMonitorView.RequestsMenu = new RequestsMenuView();
 NetMonitorView.CustomRequest = new CustomRequestView();
-NetMonitorView.PerformanceStatistics = new PerformanceStatisticsView();
+NetMonitorView.Statistics = new StatisticsView();
+
+exports.NetMonitorView = NetMonitorView;

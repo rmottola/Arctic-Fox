@@ -28,7 +28,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 
 /* globals processCount */
 
-XPCOMUtils.defineLazyPreferenceGetter(this, "processCount", "dom.ipc.processCount");
+XPCOMUtils.defineLazyPreferenceGetter(this, "processCount", "dom.ipc.processCount.extension");
 
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
@@ -194,13 +194,11 @@ var UninstallObserver = {
       // Clear any IndexedDB storage created by the extension
       let baseURI = NetUtil.newURI(`moz-extension://${uuid}/`);
       let principal = Services.scriptSecurityManager.createCodebasePrincipal(
-        baseURI, {addonId: addon.id}
-      );
+        baseURI, {});
       Services.qms.clearStoragesForPrincipal(principal);
 
       // Clear localStorage created by the extension
-      let attrs = JSON.stringify({addonId: addon.id});
-      Services.obs.notifyObservers(null, "clear-origin-attributes-data", attrs);
+      Services.domStorageManager.getStorage(null, principal).clear();
     }
 
     if (!this.leaveUuid) {
@@ -613,6 +611,8 @@ this.Extension = class extends ExtensionData {
     if (this.remote && processCount !== 1) {
       throw new Error("Out-of-process WebExtensions are not supported with multiple child processes");
     }
+    // This is filled in the first time an extension child is created.
+    this.parentMessageManager = null;
 
     this.id = addonData.id;
     this.baseURI = NetUtil.newURI(this.getURL("")).QueryInterface(Ci.nsIURL);
@@ -630,17 +630,6 @@ this.Extension = class extends ExtensionData {
     this.webAccessibleResources = null;
 
     this.emitter = new EventEmitter();
-  }
-
-  get parentMessageManager() {
-    if (this.remote) {
-      // We currently run extensions in the normal web content process. Since
-      // we currently only support remote extensions in single-child e10s,
-      // child 0 is always the current process, and child 1 is always the
-      // remote extension process.
-      return Services.ppmm.getChildAt(1);
-    }
-    return Services.ppmm.getChildAt(0);
   }
 
   static set browserUpdated(updated) {
@@ -690,8 +679,7 @@ this.Extension = class extends ExtensionData {
   }
 
   createPrincipal(uri = this.baseURI) {
-    return Services.scriptSecurityManager.createCodebasePrincipal(
-      uri, {addonId: this.id});
+    return Services.scriptSecurityManager.createCodebasePrincipal(uri, {});
   }
 
   // Checks that the given URL is a child of our baseURI.
@@ -939,7 +927,7 @@ this.Extension = class extends ExtensionData {
   }
 
   observe(subject, topic, data) {
-    if (topic == "xpcom-shutdown") {
+    if (topic === "xpcom-shutdown") {
       this.cleanupGeneratedFile();
     }
   }

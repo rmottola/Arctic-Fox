@@ -61,6 +61,7 @@
 #include "mozilla/dom/HTMLInputElement.h"
 #include "mozilla/dom/HTMLSharedElement.h"
 #include "mozilla/dom/HTMLSharedObjectElement.h"
+#include "mozilla/Printf.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -2023,7 +2024,7 @@ nsWebBrowserPersist::CalculateUniqueFilename(nsIURI *aURI)
 
             if (base.IsEmpty() || duplicateCounter > 1)
             {
-                char * tmp = PR_smprintf("_%03d", duplicateCounter);
+                char * tmp = mozilla::Smprintf("_%03d", duplicateCounter);
                 NS_ENSURE_TRUE(tmp, NS_ERROR_OUT_OF_MEMORY);
                 if (filename.Length() < kDefaultMaxFilenameLength - 4)
                 {
@@ -2034,7 +2035,7 @@ nsWebBrowserPersist::CalculateUniqueFilename(nsIURI *aURI)
                     base.Mid(tmpBase, 0, base.Length() - 4);
                 }
                 tmpBase.Append(tmp);
-                PR_smprintf_free(tmp);
+                mozilla::SmprintfFree(tmp);
             }
             else
             {
@@ -2548,8 +2549,8 @@ nsWebBrowserPersist::URIData::GetLocalURI(nsIURI *targetBaseURI, nsCString& aSpe
             nsAutoCString rawPathURL(mRelativePathToData);
             rawPathURL.Append(filename);
             
-            nsAutoCString buf;
-            aSpecOut = NS_EscapeURL(rawPathURL, esc_FilePath, buf);
+            rv = NS_EscapeURL(rawPathURL, esc_FilePath, aSpecOut, fallible);
+            NS_ENSURE_SUCCESS(rv, rv);
         } else {
             nsAutoCString rawPathURL;
             
@@ -2568,8 +2569,8 @@ nsWebBrowserPersist::URIData::GetLocalURI(nsIURI *targetBaseURI, nsCString& aSpe
             rv = dataFile->GetRelativePath(parentDir, rawPathURL);
             NS_ENSURE_SUCCESS(rv, rv);
             
-            nsAutoCString buf;
-            aSpecOut = NS_EscapeURL(rawPathURL, esc_FilePath, buf);
+            rv = NS_EscapeURL(rawPathURL, esc_FilePath, aSpecOut, fallible);
+            NS_ENSURE_SUCCESS(rv, rv);
         }
     } else {
         fileAsURI->GetSpec(aSpecOut);

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-'use strict';
+"use strict";
 /* eslint-disable no-undef */
 
 const { classes: Cc, interfaces: Ci, manager: Cm, results: Cr,
@@ -1296,7 +1296,7 @@ function getSpecialFolderDir(aCSIDL) {
                                            ctypes.bool /* BOOL fCreate */);
 
   let aryPath = ctypes.char16_t.array()(260);
-  let rv = SHGetSpecialFolderPath(0, aryPath, aCSIDL, false);
+  SHGetSpecialFolderPath(0, aryPath, aCSIDL, false);
   lib.close();
 
   let path = aryPath.readString(); // Convert the c-string to js-string
