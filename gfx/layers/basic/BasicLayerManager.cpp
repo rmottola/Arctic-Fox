@@ -642,7 +642,6 @@ BasicLayerManager::EndTransactionInternal(DrawPaintedLayerCallback aCallback,
       FlashWidgetUpdateArea(mTarget);
     }
     RecordFrame();
-    PostPresent();
 
     if (!mTransactionIncomplete) {
       // Clear out target if we have a complete transaction.
