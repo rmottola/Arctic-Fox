@@ -3198,7 +3198,6 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
                                      newInnerWindow->GetDocGroup()->GetValidAccessPtr());
   }
 
-  nsJSContext::PokeGC(JS::gcreason::SET_NEW_DOCUMENT, GetWrapperPreserveColor());
   kungFuDeathGrip->DidInitializeContext();
 
   // We wait to fire the debugger hook until the window is all set up and hooked
