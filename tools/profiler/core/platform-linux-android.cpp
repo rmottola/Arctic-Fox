@@ -143,7 +143,8 @@ setup_atfork()
 
 #endif /* !defined(GP_OS_android) */
 
-static void SetSampleContext(TickSample* sample, mcontext_t& mcontext)
+static void
+SetSampleContext(TickSample* sample, mcontext_t& mcontext)
 {
   // Extracting the sample from the context is extremely machine dependent.
 #if defined(GP_ARCH_x86)
@@ -165,42 +166,21 @@ static void SetSampleContext(TickSample* sample, mcontext_t& mcontext)
 }
 
 #if defined(GP_OS_android)
-#define SYS_tgkill __NR_tgkill
+# define SYS_tgkill __NR_tgkill
 #endif
 
-int tgkill(pid_t tgid, pid_t tid, int signalno) {
+int
+tgkill(pid_t tgid, pid_t tid, int signalno)
+{
   return syscall(SYS_tgkill, tgid, tid, signalno);
-}
-
-class PlatformData {
- public:
-  PlatformData()
-  {
-    MOZ_COUNT_CTOR(PlatformData);
-  }
-
-  ~PlatformData()
-  {
-    MOZ_COUNT_DTOR(PlatformData);
-  }
-};
-
-UniquePlatformData
-AllocPlatformData(int aThreadId)
-{
-  return UniquePlatformData(new PlatformData);
-}
-
-void
-PlatformDataDestructor::operator()(PlatformData* aData)
-{
-  delete aData;
 }
 
 static void
 SleepMicro(int aMicroseconds)
 {
-  if (MOZ_UNLIKELY(aMicroseconds >= 1000000)) {
+  aMicroseconds = std::max(0, aMicroseconds);
+
+  if (aMicroseconds >= 1000000) {
     // Use usleep for larger intervals, because the nanosleep
     // code below only supports intervals < 1 second.
     MOZ_ALWAYS_TRUE(!::usleep(aMicroseconds));
@@ -222,10 +202,23 @@ SleepMicro(int aMicroseconds)
   MOZ_ASSERT(!rv, "nanosleep call failed");
 }
 
-// The sampler thread controls sampling and runs whenever the profiler is
-// active. It periodically runs through all registered threads, finds those
-// that should be sampled, then pauses and samples them.
-//
+class PlatformData
+{
+public:
+  explicit PlatformData(int aThreadId)
+  {
+    MOZ_COUNT_CTOR(PlatformData);
+  }
+
+  ~PlatformData()
+  {
+    MOZ_COUNT_DTOR(PlatformData);
+  }
+};
+
+////////////////////////////////////////////////////////////////////////
+// BEGIN SamplerThread target specifics
+
 // The only way to reliably interrupt a Linux thread and inspect its register
 // and stack state is by sending a signal to it, and doing the work inside the
 // signal handler.  But we don't want to run much code inside the signal
@@ -613,10 +606,11 @@ static uint32_t readCSVArray(char* csvList, const char** buffer) {
 // Support some of the env variables reported in ReadProfilerEnvVars, plus some
 // extra stuff.
 static void
-ReadProfilerVars(const char* fileName,
-                 const char** features, uint32_t* featureCount,
-                 const char** threadNames, uint32_t* threadCount) {
-  FILE* file = fopen(fileName, "r");
+ReadProfilerVars(const char* aFileName,
+                 const char** aFeatures, uint32_t* aFeatureCount,
+                 const char** aThreadNames, uint32_t* aThreadCount)
+{
+  FILE* file = fopen(aFileName, "r");
   const int bufferSize = 1024;
   char line[bufferSize];
   char* feature;
@@ -635,9 +629,9 @@ ReadProfilerVars(const char* fileName,
       } else if (strncmp(feature, "MOZ_PROFILER_ENTRIES", bufferSize) == 0) {
         set_profiler_entries(lock, value);
       } else if (strncmp(feature, "MOZ_PROFILER_FEATURES", bufferSize) == 0) {
-        *featureCount = readCSVArray(value, features);
+        *aFeatureCount = readCSVArray(value, aFeatures);
       } else if (strncmp(feature, "threads", bufferSize) == 0) {
-        *threadCount = readCSVArray(value, threadNames);
+        *aThreadCount = readCSVArray(value, aThreadNames);
       }
     }
 
@@ -645,7 +639,9 @@ ReadProfilerVars(const char* fileName,
   }
 }
 
-static void DoStartTask() {
+static void
+DoStartTask()
+{
   uint32_t featureCount = 0;
   uint32_t threadCount = 0;
 
@@ -668,7 +664,9 @@ static void DoStartTask() {
   freeArray(features, featureCount);
 }
 
-static void SigstartHandler(int aSignal, siginfo_t* aInfo, void* aContext) {
+static void
+SigstartHandler(int aSignal, siginfo_t* aInfo, void* aContext)
+{
   class StartTask : public Runnable {
   public:
     NS_IMETHOD Run() override {
@@ -705,7 +703,8 @@ PlatformInit(PS::LockRef aLock)
 
 #endif
 
-void TickSample::PopulateContext(void* aContext)
+void
+TickSample::PopulateContext(void* aContext)
 {
   MOZ_ASSERT(aContext);
   ucontext_t* pContext = reinterpret_cast<ucontext_t*>(aContext);
