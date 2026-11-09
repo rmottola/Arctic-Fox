@@ -65,9 +65,6 @@
 #include "mozilla/PodOperations.h"
 #include "mozilla/DebugOnly.h"
 
-// Memory profile
-#include "nsMemoryReporterManager.h"
-
 #include <string.h>
 #include <list>
 
@@ -148,18 +145,18 @@ SetSampleContext(TickSample* sample, mcontext_t& mcontext)
 {
   // Extracting the sample from the context is extremely machine dependent.
 #if defined(GP_ARCH_x86)
-  sample->pc = reinterpret_cast<Address>(mcontext.gregs[REG_EIP]);
-  sample->sp = reinterpret_cast<Address>(mcontext.gregs[REG_ESP]);
-  sample->fp = reinterpret_cast<Address>(mcontext.gregs[REG_EBP]);
+  sample->mPC = reinterpret_cast<Address>(mcontext.gregs[REG_EIP]);
+  sample->mSP = reinterpret_cast<Address>(mcontext.gregs[REG_ESP]);
+  sample->mFP = reinterpret_cast<Address>(mcontext.gregs[REG_EBP]);
 #elif defined(GP_ARCH_amd64)
-  sample->pc = reinterpret_cast<Address>(mcontext.gregs[REG_RIP]);
-  sample->sp = reinterpret_cast<Address>(mcontext.gregs[REG_RSP]);
-  sample->fp = reinterpret_cast<Address>(mcontext.gregs[REG_RBP]);
+  sample->mPC = reinterpret_cast<Address>(mcontext.gregs[REG_RIP]);
+  sample->mSP = reinterpret_cast<Address>(mcontext.gregs[REG_RSP]);
+  sample->mFP = reinterpret_cast<Address>(mcontext.gregs[REG_RBP]);
 #elif defined(GP_ARCH_arm)
-  sample->pc = reinterpret_cast<Address>(mcontext.arm_pc);
-  sample->sp = reinterpret_cast<Address>(mcontext.arm_sp);
-  sample->fp = reinterpret_cast<Address>(mcontext.arm_fp);
-  sample->lr = reinterpret_cast<Address>(mcontext.arm_lr);
+  sample->mPC = reinterpret_cast<Address>(mcontext.arm_pc);
+  sample->mSP = reinterpret_cast<Address>(mcontext.arm_sp);
+  sample->mFP = reinterpret_cast<Address>(mcontext.arm_fp);
+  sample->mLR = reinterpret_cast<Address>(mcontext.arm_lr);
 #else
 # error "bad platform"
 #endif
@@ -704,14 +701,12 @@ PlatformInit(PS::LockRef aLock)
 #endif
 
 void
-TickSample::PopulateContext(void* aContext)
+TickSample::PopulateContext(ucontext_t* aContext)
 {
   MOZ_ASSERT(aContext);
-  ucontext_t* pContext = reinterpret_cast<ucontext_t*>(aContext);
-  if (!getcontext(pContext)) {
-    context = pContext;
-    SetSampleContext(this,
-                     reinterpret_cast<ucontext_t*>(aContext)->uc_mcontext);
+  if (!getcontext(aContext)) {
+    mContext = aContext;
+    SetSampleContext(this, aContext->uc_mcontext);
   }
 }
 
