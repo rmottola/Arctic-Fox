@@ -990,8 +990,7 @@ Tick(PS::LockRef aLock, ProfileBuffer* aBuffer, TickSample* aSample)
 {
   ThreadInfo& threadInfo = *aSample->mThreadInfo;
 
-  MOZ_ASSERT(threadInfo.LastSample().mThreadId == threadInfo.ThreadId());
-  aBuffer->addTagThreadId(threadInfo.LastSample());
+  aBuffer->addTagThreadId(threadInfo.ThreadId(), &threadInfo.LastSample());
 
   mozilla::TimeDuration delta = aSample->mTimeStamp - gPS->StartTime(aLock);
   aBuffer->addTag(ProfileBufferEntry::Time(delta.ToMilliseconds()));
@@ -1679,7 +1678,8 @@ SamplerThread::Run()
           // cheaper than taking a new sample.
           if (info->Stack()->CanDuplicateLastSampleDueToSleep()) {
             bool dup_ok =
-              gPS->Buffer(lock)->DuplicateLastSample(gPS->StartTime(lock),
+              gPS->Buffer(lock)->DuplicateLastSample(info->ThreadId(),
+                                                     gPS->StartTime(lock),
                                                      info->LastSample());
             if (dup_ok) {
               continue;
