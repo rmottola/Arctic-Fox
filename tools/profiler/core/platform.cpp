@@ -53,16 +53,19 @@
 
 #if defined(MOZ_PROFILING) && \
     (defined(GP_OS_windows) || defined(GP_OS_darwin))
+# define HAVE_NATIVE_UNWIND
 # define USE_NS_STACKWALK
 #endif
 
 // This should also work on ARM Linux, but not tested there yet.
 #if defined(GP_PLAT_arm_android)
+# define HAVE_NATIVE_UNWIND
 # define USE_EHABI_STACKWALK
 # include "EHABIStackWalk.h"
 #endif
 
 #if defined(GP_PLAT_amd64_linux) || defined(GP_PLAT_x86_linux)
+# define HAVE_NATIVE_UNWIND
 # define USE_LUL_STACKWALK
 # include "lul/LulMain.h"
 # include "lul/platform-linux-lul.h"
@@ -1037,16 +1040,14 @@ Tick(PS::LockRef aLock, ProfileBuffer* aBuffer, TickSample* aSample)
 
   NotNull<PseudoStack*> stack = threadInfo.Stack();
 
-#if defined(USE_NS_STACKWALK) || defined(USE_EHABI_STACKWALK) || \
-    defined(USE_LUL_STACKWALK)
+#if defined(HAVE_NATIVE_UNWIND)
   if (gPS->FeatureStackWalk(aLock)) {
     DoNativeBacktrace(aLock, aBuffer, aSample);
-  } else {
+  } else
+#endif
+  {
     DoSampleStackTrace(aLock, aBuffer, aSample);
   }
-#else
-  DoSampleStackTrace(aLock, aBuffer, aSample);
-#endif
 
   // Don't process the PeudoStack's markers if we're synchronously sampling the
   // current thread.
@@ -1526,16 +1527,6 @@ set_profiler_entries(PS::LockRef aLock, const char* aEntries)
   return true;
 }
 
-static bool
-is_native_unwinding_avail()
-{
-# if defined(HAVE_NATIVE_UNWIND)
-  return true;
-#else
-  return false;
-#endif
-}
-
 static void
 profiler_usage(int aExitCode)
 {
@@ -1573,7 +1564,11 @@ profiler_usage(int aExitCode)
     "\n"
     "  This platform %s native unwinding.\n"
     "\n",
-    is_native_unwinding_avail() ? "supports" : "does not support\n"
+#if defined(HAVE_NATIVE_UNWIND)
+    "supports"
+#else
+    "does not support"
+#endif
   );
 
   exit(aExitCode);
@@ -2363,7 +2358,7 @@ profiler_get_features()
   MOZ_RELEASE_ASSERT(gPS);
 
   static const char* features[] = {
-#if defined(MOZ_PROFILING) && defined(HAVE_NATIVE_UNWIND)
+#if defined(HAVE_NATIVE_UNWIND)
     // Walk the C++ stack.
     "stackwalk",
 #endif
@@ -3008,7 +3003,7 @@ profiler_get_backtrace()
 
   TickSample sample(&threadInfo);
 
-#if defined(HAVE_NATIVE_UNWIND) || defined(USE_LUL_STACKWALK)
+#if defined(HAVE_NATIVE_UNWIND)
 #if defined(GP_OS_windows) || defined(GP_OS_linux) || defined(GP_OS_android)
   tick_context_t context;
   sample.PopulateContext(&context);
