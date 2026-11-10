@@ -15,7 +15,6 @@
 #include "nsIScriptGlobalObject.h"
 #include "nsPIDOMWindow.h"
 #include "nsIDocShell.h"
-#include "nsIFrame.h"
 #include "nsIURI.h"
 #include "nsITextToSubURI.h"
 #include "nsError.h"
@@ -218,7 +217,6 @@ nsPrintEngine::nsPrintEngine() :
   mProgressDialogIsShown(false),
   mScreenDPI(115.0f),
   mPagePrintTimer(nullptr),
-  mPageSeqFrame(nullptr),
   mDebugFile(nullptr),
   mLoadCounter(0),
   mDidLoadDataForPrinting(false),
@@ -2519,8 +2517,8 @@ nsPrintEngine::DoPrint(nsPrintObject * aPO)
         return NS_ERROR_FAILURE;
       }
 
-      mPageSeqFrame = pageSequence;
-      mPageSeqFrame->StartPrint(poPresContext, mPrt->mPrintSettings, docTitleStr, docURLStr);
+      mPageSeqFrame = seqFrame;
+      pageSequence->StartPrint(poPresContext, mPrt->mPrintSettings, docTitleStr, docURLStr);
 
       // Schedule Page to Print
       PR_PL(("Scheduling Print of PO: %p (%s) \n", aPO, gFrameTypesStr[aPO->mFrameType]));
@@ -2630,12 +2628,12 @@ nsPrintEngine::HasPrintCallbackCanvas()
 bool
 nsPrintEngine::PrePrintPage()
 {
-  NS_ASSERTION(mPageSeqFrame,  "mPageSeqFrame is null!");
+  NS_ASSERTION(mPageSeqFrame.IsAlive(), "mPageSeqFrame is not alive!");
   NS_ASSERTION(mPrt,           "mPrt is null!");
 
   // Although these should NEVER be nullptr
   // This is added insurance, to make sure we don't crash in optimized builds
-  if (!mPrt || !mPageSeqFrame) {
+  if (!mPrt || !mPageSeqFrame.IsAlive()) {
     return true; // means we are done preparing the page.
   }
 
@@ -2648,7 +2646,8 @@ nsPrintEngine::PrePrintPage()
   // Ask mPageSeqFrame if the page is ready to be printed.
   // If the page doesn't get printed at all, the |done| will be |true|.
   bool done = false;
-  nsresult rv = mPageSeqFrame->PrePrintNextPage(mPagePrintTimer, &done);
+  nsIPageSequenceFrame* pageSeqFrame = do_QueryFrame(mPageSeqFrame.GetFrame());
+  nsresult rv = pageSeqFrame->PrePrintNextPage(mPagePrintTimer, &done);
   if (NS_FAILED(rv)) {
     // ??? ::PrintPage doesn't set |mPrt->mIsAborted = true| if rv != NS_ERROR_ABORT,
     // but I don't really understand why this should be the right thing to do?
@@ -2668,12 +2667,12 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
                          bool&           aInRange)
 {
   NS_ASSERTION(aPO,            "aPO is null!");
-  NS_ASSERTION(mPageSeqFrame,  "mPageSeqFrame is null!");
+  NS_ASSERTION(mPageSeqFrame.IsAlive(), "mPageSeqFrame is not alive!");
   NS_ASSERTION(mPrt,           "mPrt is null!");
 
   // Although these should NEVER be nullptr
   // This is added insurance, to make sure we don't crash in optimized builds
-  if (!mPrt || !aPO || !mPageSeqFrame) {
+  if (!mPrt || !aPO || !mPageSeqFrame.IsAlive()) {
     FirePrintingErrorEvent(NS_ERROR_FAILURE);
     return true; // means we are done printing
   }
@@ -2688,16 +2687,17 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
     return true;
 
   int32_t pageNum, numPages, endPage;
-  mPageSeqFrame->GetCurrentPageNum(&pageNum);
-  mPageSeqFrame->GetNumPages(&numPages);
+  nsIPageSequenceFrame* pageSeqFrame = do_QueryFrame(mPageSeqFrame.GetFrame());
+  pageSeqFrame->GetCurrentPageNum(&pageNum);
+  pageSeqFrame->GetNumPages(&numPages);
 
   bool donePrinting;
   bool isDoingPrintRange;
-  mPageSeqFrame->IsDoingPrintRange(&isDoingPrintRange);
+  pageSeqFrame->IsDoingPrintRange(&isDoingPrintRange);
   if (isDoingPrintRange) {
     int32_t fromPage;
     int32_t toPage;
-    mPageSeqFrame->GetPrintRange(&fromPage, &toPage);
+    pageSeqFrame->GetPrintRange(&fromPage, &toPage);
 
     if (fromPage > numPages) {
       return true;
@@ -2733,7 +2733,7 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
   //
   // When rv == NS_ERROR_ABORT, it means we want out of the
   // print job without displaying any error messages
-  nsresult rv = mPageSeqFrame->PrintNextPage();
+  nsresult rv = pageSeqFrame->PrintNextPage();
   if (NS_FAILED(rv)) {
     if (rv != NS_ERROR_ABORT) {
       FirePrintingErrorEvent(rv);
@@ -2742,7 +2742,7 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
     return true;
   }
 
-  mPageSeqFrame->DoPageEnd();
+  pageSeqFrame->DoPageEnd();
 
   return donePrinting;
 }
@@ -3049,8 +3049,9 @@ nsPrintEngine::DonePrintingPages(nsPrintObject* aPO, nsresult aResult)
   // If there is a pageSeqFrame, make sure there are no more printCanvas active
   // that might call |Notify| on the pagePrintTimer after things are cleaned up
   // and printing was marked as being done.
-  if (mPageSeqFrame) {
-    mPageSeqFrame->ResetPrintCanvasList();
+  if (mPageSeqFrame.IsAlive()) {
+    nsIPageSequenceFrame* pageSeqFrame = do_QueryFrame(mPageSeqFrame.GetFrame());
+    pageSeqFrame->ResetPrintCanvasList();
   }
 
   if (aPO && !mPrt->mIsAborted) {
