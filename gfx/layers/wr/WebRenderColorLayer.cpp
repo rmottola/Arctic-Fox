@@ -14,6 +14,8 @@
 namespace mozilla {
 namespace layers {
 
+using namespace mozilla::gfx;
+
 void
 WebRenderColorLayer::RenderLayer()
 {
