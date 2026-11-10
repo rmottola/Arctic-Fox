@@ -2719,8 +2719,7 @@ moz_gtk_window_paint(GdkDrawable* drawable, GdkRectangle* rect,
 
 gint
 moz_gtk_get_widget_border(WidgetNodeType widget, gint* left, gint* top,
-                          gint* right, gint* bottom, GtkTextDirection direction,
-                          gboolean inhtml)
+                          gint* right, gint* bottom, GtkTextDirection direction)
 {
     GtkWidget* w;
 
@@ -2737,7 +2736,7 @@ moz_gtk_get_widget_border(WidgetNodeType widget, gint* left, gint* top,
 
             /* Don't add this padding in HTML, otherwise the buttons will
                become too big and stuff the layout. */
-            if (!inhtml) {
+            if (1) {
                 moz_gtk_widget_get_focus(gButtonWidget, &interior_focus, &focus_width, &focus_pad);
                 moz_gtk_button_get_inner_border(gButtonWidget, &inner_border);
                 *left += focus_width + focus_pad + inner_border.left;
@@ -2813,7 +2812,7 @@ moz_gtk_get_widget_border(WidgetNodeType widget, gint* left, gint* top,
 
             *left = GTK_CONTAINER(gComboBoxButtonWidget)->border_width;
 
-            if (!inhtml) {
+            if (1) {
                 moz_gtk_widget_get_focus(gComboBoxButtonWidget,
                                          &ignored_interior_focus,
                                          &focus_width, &focus_pad);
