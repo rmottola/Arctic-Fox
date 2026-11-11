@@ -45,6 +45,7 @@ public:
 
   void GenerateFrame();
 
+  void SetWindowParameters(LayoutDeviceIntSize size);
   void SetRootDisplayList(gfx::Color aBgColor,
                           Epoch aEpoch,
                           LayerSize aViewportSize,
