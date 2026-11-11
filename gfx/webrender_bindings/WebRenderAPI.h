@@ -22,6 +22,7 @@ class CompositorWidget;
 
 namespace layers {
 class CompositorBridgeParentBase;
+class WebRenderBridgeParent;
 }
 
 namespace wr {
@@ -29,8 +30,6 @@ namespace wr {
 class DisplayListBuilder;
 class RendererOGL;
 class RendererEvent;
-
-
 
 class WebRenderAPI
 {
@@ -98,6 +97,8 @@ protected:
   {}
 
   ~WebRenderAPI();
+  // Should be used only for shutdown handling
+  void WaitFlushed();
 
   WrAPI* mWrApi;
   wr::WindowId mId;
@@ -105,6 +106,7 @@ protected:
   bool mUseANGLE;
 
   friend class DisplayListBuilder;
+  friend class layers::WebRenderBridgeParent;
 };
 
 /// This is a simple C++ wrapper around WrState defined in the rust bindings.
