@@ -35,6 +35,9 @@ class WebRenderCommand;
 namespace image {
 class ImageRegion;
 } // namespace image
+namespace wr {
+class DisplayListBuilder;
+} // namespace wr
 } // namespace mozilla
 
 class gfxUtils {
@@ -333,7 +336,7 @@ public:
   }
 
   void BuildWebRenderCommands(layers::WebRenderBridgeChild* aChild,
-                              nsTArray<layers::WebRenderCommand>& aCommands,
+                              wr::DisplayListBuilder& aBuilder,
                               const nsTArray<layers::GlyphArray>& aGlyphs,
                               ScaledFont* aFont,
                               const Point& aOffset,
