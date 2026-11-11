@@ -183,22 +183,19 @@ WebRenderPaintedLayer::RenderLayer(wr::DisplayListBuilder& aBuilder)
   mImageContainer->SetCurrentImageInTransaction(image);
   if (!mImageClient->UpdateImage(mImageContainer, /* unused */0)) {
     return;
-   }
- 
-  WrScrollFrameStackingContextGenerator scrollFrames(this);
+  }
 
-  Matrix4x4 transform = GetTransform();
+  gfx::Matrix4x4 transform = GetTransform();
+  gfx::Rect relBounds = GetWrRelBounds();
+  gfx::Rect overflow(0, 0, relBounds.width, relBounds.height);
 
-  // Since we are creating a stacking context below using the visible region of
-  // this layer, we need to make sure the image display item has coordinates
-  // relative to the visible region.
-  Rect rect(0, 0, size.width, size.height);
-  Rect clip = GetWrClipRect(rect);
-  Maybe<WrImageMask> mask = buildMaskLayer();
-  Rect relBounds = GetWrRelBounds();
-  Rect overflow(0, 0, relBounds.width, relBounds.height);
-  WrClipRegion clipRegion = aBuilder.BuildClipRegion(wr::ToWrRect(clip));
-  WrMixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetMixBlendMode());
+  gfx::Rect rect(0, 0, size.width, size.height);
+  gfx::Rect clipRect = GetWrClipRect(rect);
+
+  Maybe<WrImageMask> mask = BuildWrMaskLayer();
+  WrClipRegion clip = aBuilder.BuildClipRegion(wr::ToWrRect(clipRect));
+
+  wr::MixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetMixBlendMode());
 
   DumpLayerInfo("PaintedLayer", rect);
 
@@ -206,6 +203,7 @@ WebRenderPaintedLayer::RenderLayer(wr::DisplayListBuilder& aBuilder)
   key.mNamespace = WrBridge()->GetNamespace();
   key.mHandle = WrBridge()->GetNextResourceId();
   WrBridge()->AddWebRenderParentCommand(OpAddExternalImage(mExternalImageId, key));
+
   aBuilder.PushStackingContext(wr::ToWrRect(relBounds),
                               wr::ToWrRect(overflow),
                               mask.ptrOr(nullptr),
@@ -213,7 +211,7 @@ WebRenderPaintedLayer::RenderLayer(wr::DisplayListBuilder& aBuilder)
                               //GetAnimations(),
                               transform,
                               mixBlendMode);
-  aBuilder.PushImage(wr::ToWrRect(rect), clipRegion, wr::ImageRendering::Auto, key);
+  aBuilder.PushImage(wr::ToWrRect(rect), clip, wr::ImageRendering::Auto, key);
   aBuilder.PopStackingContext();
 }
 
