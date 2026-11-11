@@ -148,18 +148,18 @@ public:
 
 
   void PushRect(const WrRect& aBounds,
-                const WrRect& aClip,
+                const WrClipRegion& aClip,
                 const WrColor& aColor);
 
   void PushLinearGradient(const WrRect& aBounds,
-                          const WrRect& aClip,
+                          const WrClipRegion& aClip,
                           const WrPoint& aStartPoint,
                           const WrPoint& aEndPoint,
                           const nsTArray<WrGradientStop>& aStops,
                           wr::GradientExtendMode aExtendMode);
 
   void PushRadialGradient(const WrRect& aBounds,
-                          const WrRect& aClip,
+                          const WrClipRegion& aClip,
                           const WrPoint& aStartCenter,
                           const WrPoint& aEndCenter,
                           float aStartRadius,
@@ -168,17 +168,16 @@ public:
                           wr::GradientExtendMode aExtendMode);
 
   void PushImage(const WrRect& aBounds,
-                 const WrRect& aClip,
-                 const WrImageMask* aMask,
+                 const WrClipRegion& aClip,
                  wr::ImageRendering aFilter,
                  wr::ImageKey aImage);
 
   void PushIFrame(const WrRect& aBounds,
-                  const WrRect& aClip,
+                  const WrClipRegion& aClip,
                   wr::PipelineId aPipeline);
 
   void PushBorder(const WrRect& aBounds,
-                  const WrRect& aClip,
+                  const WrClipRegion& aClip,
                   const WrBorderSide& aTop,
                   const WrBorderSide& aRight,
                   const WrBorderSide& aBbottom,
@@ -186,14 +185,14 @@ public:
                   const WrBorderRadius& aRadius);
 
   void PushText(const WrRect& aBounds,
-                const WrRect& aClip,
+                const WrClipRegion& aClip,
                 const gfx::Color& aColor,
                 wr::FontKey aFontKey,
                 Range<const WrGlyphInstance> aGlyphBuffer,
                 float aGlyphSize);
 
   void PushBoxShadow(const WrRect& aRect,
-                     const WrRect& aClip,
+                     const WrClipRegion& aClip,
                      const WrRect& aBoxBounds,
                      const WrPoint& aOffset,
                      const WrColor& aColor,

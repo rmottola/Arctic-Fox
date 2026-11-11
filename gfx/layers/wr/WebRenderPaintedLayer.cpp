@@ -197,6 +197,7 @@ WebRenderPaintedLayer::RenderLayer(wr::DisplayListBuilder& aBuilder)
   Maybe<WrImageMask> mask = buildMaskLayer();
   Rect relBounds = GetWrRelBounds();
   Rect overflow(0, 0, relBounds.width, relBounds.height);
+  WrClipRegion clipRegion = aBuilder.BuildClipRegion(wr::ToWrRect(clip));
   WrMixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetMixBlendMode());
 
   DumpLayerInfo("PaintedLayer", rect);
@@ -212,7 +213,7 @@ WebRenderPaintedLayer::RenderLayer(wr::DisplayListBuilder& aBuilder)
                               //GetAnimations(),
                               transform,
                               mixBlendMode);
-  aBuilder.PushImage(wr::ToWrRect(rect), wr::ToWrRect(clip), nullptr, wr::ImageRendering::Auto, key);
+  aBuilder.PushImage(wr::ToWrRect(rect), clipRegion, wr::ImageRendering::Auto, key);
   aBuilder.PopStackingContext();
 }
 
