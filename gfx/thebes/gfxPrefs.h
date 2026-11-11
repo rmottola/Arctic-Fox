@@ -460,6 +460,7 @@ private:
   DECL_GFX_PREF(Live, "layers.advanced.boxshadow-outer-layers", LayersAllowOuterBoxShadow, bool, false);
   DECL_GFX_PREF(Live, "layers.advanced.boxshadow-inset-layers", LayersAllowInsetBoxShadow, bool, false);
   DECL_GFX_PREF(Live, "layers.advanced.outline-layers",        LayersAllowOutlineLayers, bool, false);
+  DECL_GFX_PREF(Live, "layers.advanced.displaybuttonborder-layers", LayersAllowDisplayButtonBorder, bool, false);
   DECL_GFX_PREF(Once, "layers.allow-d3d9-fallback",            LayersAllowD3D9Fallback, bool, false);
   DECL_GFX_PREF(Once, "layers.amd-switchable-gfx.enabled",     LayersAMDSwitchableGfxEnabled, bool, false);
   DECL_GFX_PREF(Once, "layers.async-pan-zoom.enabled",         AsyncPanZoomEnabledDoNotUseDirectly, bool, true);
