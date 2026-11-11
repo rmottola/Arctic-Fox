@@ -1662,22 +1662,6 @@ public:
     for (unsigned int i = 0, n = mRawModules.GetSize(); i != n; i++) {
       const SharedLibrary &info = mRawModules.GetEntry(i);
 
-      nsString basename = info.GetName();
-#if defined(XP_MACOSX) || defined(XP_LINUX)
-      int32_t pos = basename.RFindChar('/');
-      if (pos != kNotFound) {
-        basename.Cut(0, pos + 1);
-      }
-#endif
-
-      nsString debug_basename = info.GetDebugName();
-#if defined(XP_MACOSX) || defined(XP_LINUX)
-      pos = debug_basename.RFindChar('/');
-      if (pos != kNotFound) {
-        debug_basename.Cut(0, pos + 1);
-      }
-#endif
-
       JS::RootedObject moduleObj(cx, JS_NewPlainObject(cx));
       if (!moduleObj) {
         mPromise->MaybeReject(NS_ERROR_FAILURE);
@@ -1685,7 +1669,7 @@ public:
       }
 
       // Module name.
-      JS::RootedString moduleName(cx, JS_NewUCStringCopyZ(cx, basename.get()));
+      JS::RootedString moduleName(cx, JS_NewUCStringCopyZ(cx, info.GetModuleName().get()));
       if (!moduleName || !JS_DefineProperty(cx, moduleObj, "name", moduleName, JSPROP_ENUMERATE)) {
         mPromise->MaybeReject(NS_ERROR_FAILURE);
         return NS_OK;
@@ -1694,8 +1678,8 @@ public:
       // Module debug name.
       JS::RootedValue moduleDebugName(cx);
 
-      if (!debug_basename.IsEmpty()) {
-        JS::RootedString str_moduleDebugName(cx, JS_NewUCStringCopyZ(cx, debug_basename.get()));
+      if (!info.GetDebugName().IsEmpty()) {
+        JS::RootedString str_moduleDebugName(cx, JS_NewUCStringCopyZ(cx, info.GetDebugName().get()));
         if (!str_moduleDebugName) {
           mPromise->MaybeReject(NS_ERROR_FAILURE);
           return NS_OK;
@@ -3186,18 +3170,8 @@ GetStackAndModules(const std::vector<uintptr_t>& aPCs)
 #ifdef MOZ_GECKO_PROFILER
   for (unsigned i = 0, n = rawModules.GetSize(); i != n; ++i) {
     const SharedLibrary &info = rawModules.GetEntry(i);
-    nsString basename = info.GetDebugName();
-#if defined(XP_MACOSX) || defined(XP_LINUX)
-    // We want to use just the basename as the libname, but the
-    // current profiler addon needs the full path name, so we compute the
-    // basename in here.
-    int32_t pos = basename.RFindChar('/');
-    if (pos != kNotFound) {
-      basename.Cut(0, pos + 1);
-    }
-#endif
     mozilla::Telemetry::ProcessedStack::Module module = {
-      basename,
+      info.GetDebugName(),
       info.GetBreakpadId()
     };
     Ret.AddModule(module);
