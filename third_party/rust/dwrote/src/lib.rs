@@ -4,7 +4,6 @@
 
 #![allow(non_upper_case_globals)]
 
-#[cfg(feature = "serde_derive")]
 #[macro_use]
 extern crate serde_derive;
 
@@ -17,10 +16,6 @@ extern crate kernel32;
 extern crate libc;
 extern crate serde;
 
-#[cfg(feature = "serde_codegen")]
-include!(concat!(env!("OUT_DIR"), "/types.rs"));
-
-#[cfg(feature = "serde_derive")]
 include!("types.rs");
 
 use winapi::DWRITE_FACTORY_TYPE_SHARED;
