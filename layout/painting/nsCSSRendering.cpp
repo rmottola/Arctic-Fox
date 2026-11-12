@@ -2047,6 +2047,22 @@ ComputeBoxValue(nsIFrame* aForFrame, StyleGeometryBox aBox)
   return aBox;
 }
 
+bool
+nsCSSRendering::ImageLayerClipState::IsValid() const
+{
+  // mDirtyRectGfx comes from mDirtyRect. If mDirtyRectGfx is not empty,
+  // mDirtyRect can never be empty.
+  if (!mDirtyRectGfx.IsEmpty() && mDirtyRect.IsEmpty()) {
+    return false;
+  }
+
+  if (mHasRoundedCorners == mClippedRadii.IsEmpty()) {
+    return false;
+  }
+
+  return true;
+}
+
 /* static */ void
 nsCSSRendering::GetImageLayerClip(const nsStyleImageLayers::Layer& aLayer,
                                   nsIFrame* aForFrame, const nsStyleBorder& aBorder,
@@ -2056,6 +2072,7 @@ nsCSSRendering::GetImageLayerClip(const nsStyleImageLayers::Layer& aLayer,
 {
   aClipState->mHasRoundedCorners = false;
   aClipState->mHasAdditionalBGClipArea = false;
+  aClipState->mAdditionalBGClipArea.SetEmpty();
   aClipState->mCustomClip = false;
 
   StyleGeometryBox layerClip = ComputeBoxValue(aForFrame, aLayer.mClip);
@@ -2086,6 +2103,7 @@ nsCSSRendering::GetImageLayerClip(const nsStyleImageLayers::Layer& aLayer,
     SetupDirtyRects(aClipState->mBGClipArea, aCallerDirtyRect,
                     aAppUnitsPerPixel, &aClipState->mDirtyRect,
                     &aClipState->mDirtyRectGfx);
+    MOZ_ASSERT(aClipState->IsValid());
     return;
   }
 
@@ -2095,6 +2113,7 @@ nsCSSRendering::GetImageLayerClip(const nsStyleImageLayers::Layer& aLayer,
     SetupDirtyRects(aClipState->mBGClipArea, aCallerDirtyRect,
                     aAppUnitsPerPixel, &aClipState->mDirtyRect,
                     &aClipState->mDirtyRectGfx);
+    MOZ_ASSERT(aClipState->IsValid());
     return;
   }
 
@@ -2203,6 +2222,8 @@ nsCSSRendering::GetImageLayerClip(const nsStyleImageLayers::Layer& aLayer,
 
   SetupDirtyRects(aClipState->mBGClipArea, aCallerDirtyRect, aAppUnitsPerPixel,
                   &aClipState->mDirtyRect, &aClipState->mDirtyRectGfx);
+
+  MOZ_ASSERT(aClipState->IsValid());
 }
 
 static void
