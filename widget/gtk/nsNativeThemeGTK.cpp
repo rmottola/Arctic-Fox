@@ -1467,23 +1467,39 @@ nsNativeThemeGTK::GetMinimumWidgetSize(nsPresContext* aPresContext,
     case NS_THEME_SCROLLBARBUTTON_UP:
     case NS_THEME_SCROLLBARBUTTON_DOWN:
       {
+#if (MOZ_WIDGET_GTK == 3)
         const ScrollbarGTKMetrics* metrics =
           GetScrollbarMetrics(GTK_ORIENTATION_VERTICAL);
 
         aResult->width = metrics->size.button.width;
         aResult->height = metrics->size.button.height;
+#else
+        MozGtkScrollbarMetrics metrics;
+        moz_gtk_get_scrollbar_metrics(&metrics);
+
+        aResult->width = metrics.slider_width;
+        aResult->height = metrics.stepper_size;
+#endif
         *aIsOverridable = false;
       }
       break;
     case NS_THEME_SCROLLBARBUTTON_LEFT:
     case NS_THEME_SCROLLBARBUTTON_RIGHT:
       {
+#if (MOZ_WIDGET_GTK == 3)
         const ScrollbarGTKMetrics* metrics =
           GetScrollbarMetrics(GTK_ORIENTATION_HORIZONTAL);
 
         aResult->width = metrics->size.button.width;
         aResult->height = metrics->size.button.height;
         *aIsOverridable = false;
+#else
+        MozGtkScrollbarMetrics metrics;
+        moz_gtk_get_scrollbar_metrics(&metrics);
+
+        aResult->width = metrics.stepper_size;
+        aResult->height = metrics.slider_width;
+#endif
       }
       break;
     case NS_THEME_SPLITTER:

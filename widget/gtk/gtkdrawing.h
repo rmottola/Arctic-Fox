@@ -42,6 +42,7 @@ typedef struct {
 /**
  * A size in the same GTK pixel units as GtkBorder and GdkRectangle.
  */
+#if (MOZ_WIDGET_GTK == 3)
 struct MozGtkSize {
   gint width;
   gint height;
@@ -66,6 +67,16 @@ typedef struct {
     GtkBorder track;
   } border;
 } ScrollbarGTKMetrics;
+#else
+typedef struct {
+  gint slider_width;
+  gint trough_border;
+  gint stepper_size;
+  gint stepper_spacing;
+  gint min_slider_size;
+} MozGtkScrollbarMetrics;
+#endif
+
 
 typedef enum {
   MOZ_GTK_STEPPER_DOWN        = 1 << 0,
