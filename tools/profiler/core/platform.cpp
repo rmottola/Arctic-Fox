@@ -149,6 +149,7 @@ public:
     , mFeatureJS(false)
     , mFeatureLayersDump(false)
     , mFeatureLeaf(false)
+    , mFeatureMainThreadIO(false)
     , mFeatureMemory(false)
     , mFeaturePrivacy(false)
     , mFeatureRestyle(false)
@@ -191,6 +192,7 @@ public:
   GET_AND_SET(bool, FeatureJS)
   GET_AND_SET(bool, FeatureLayersDump)
   GET_AND_SET(bool, FeatureLeaf)
+  GET_AND_SET(bool, FeatureMainThreadIO)
   GET_AND_SET(bool, FeatureMemory)
   GET_AND_SET(bool, FeaturePrivacy)
   GET_AND_SET(bool, FeatureRestyle)
@@ -266,6 +268,7 @@ private:
   bool mFeatureJS;
   bool mFeatureLayersDump;
   bool mFeatureLeaf;
+  bool mFeatureMainThreadIO;
   bool mFeatureMemory;
   bool mFeaturePrivacy;
   bool mFeatureRestyle;
@@ -2448,6 +2451,7 @@ locked_profiler_start(PS::LockRef aLock, int aEntries, double aInterval,
   gPS->SetFeatureLayersDump(aLock, HAS_FEATURE("layersdump"));
   gPS->SetFeatureLeaf(aLock, HAS_FEATURE("leaf"));
   bool featureMainThreadIO = HAS_FEATURE("mainthreadio");
+  gPS->SetFeatureMainThreadIO(aLock, featureMainThreadIO);
   gPS->SetFeatureMemory(aLock, HAS_FEATURE("memory"));
   gPS->SetFeaturePrivacy(aLock, HAS_FEATURE("privacy"));
   gPS->SetFeatureRestyle(aLock, HAS_FEATURE("restyle"));
@@ -2576,9 +2580,12 @@ locked_profiler_stop(PS::LockRef aLock)
   // We clear things in roughly reverse order to their setting in
   // locked_profiler_start().
 
-  mozilla::IOInterposer::Unregister(mozilla::IOInterposeObserver::OpAll,
-                                    gPS->InterposeObserver(aLock));
-  gPS->SetInterposeObserver(aLock, nullptr);
+  if (gPS->FeatureMainThreadIO(aLock)) {
+    mozilla::IOInterposer::Unregister(mozilla::IOInterposeObserver::OpAll,
+                                      gPS->InterposeObserver(aLock));
+    delete gPS->InterposeObserver(aLock);
+    gPS->SetInterposeObserver(aLock, nullptr);
+  }
 
   // The Stop() call doesn't actually stop Run(); that happens in this
   // function's caller when the sampler thread is destroyed. Stop() just gives
