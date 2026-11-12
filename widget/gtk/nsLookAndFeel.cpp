@@ -1429,6 +1429,7 @@ void
 nsLookAndFeel::RefreshImpl()
 {
     nsXPLookAndFeel::RefreshImpl();
+    moz_gtk_refresh();
 
     mDefaultFontCached = false;
     mButtonFontCached = false;
