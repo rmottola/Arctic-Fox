@@ -4925,7 +4925,7 @@ nsDisplayBoxShadowOuter::GetLayerState(nsDisplayListBuilder* aBuilder,
                                                   LayerManager* aManager,
                                                   const ContainerLayerParameters& aParameters)
 {
-  if (gfxPrefs::LayersAllowOuterBoxShadow()) {
+  if (gfxPrefs::LayersAllowOuterBoxShadow() && CanBuildWebRenderDisplayItems()) {
     return LAYER_ACTIVE;
   }
 
@@ -4938,6 +4938,16 @@ nsDisplayBoxShadowOuter::BuildLayer(nsDisplayListBuilder* aBuilder,
                                     const ContainerLayerParameters& aContainerParameters)
 {
   return BuildDisplayItemLayer(aBuilder, aManager, aContainerParameters);
+}
+
+bool
+nsDisplayBoxShadowOuter::CanBuildWebRenderDisplayItems()
+{
+  bool hasBorderRadius;
+  nsCSSRendering::HasBoxShadowNativeTheme(mFrame, hasBorderRadius);
+  nsCSSShadowArray* shadows = mFrame->StyleEffects()->mBoxShadow;
+
+  return !shadows && !hasBorderRadius;
 }
 
 void
@@ -4955,8 +4965,7 @@ nsDisplayBoxShadowOuter::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilde
   ComputeDisjointRectangles(visible, &rects);
 
   nsCSSShadowArray* shadows = mFrame->StyleEffects()->mBoxShadow;
-  if (!shadows)
-    return;
+  MOZ_ASSERT(shadows);
 
   bool hasBorderRadius;
   bool nativeTheme = nsCSSRendering::HasBoxShadowNativeTheme(mFrame,
@@ -4975,7 +4984,7 @@ nsDisplayBoxShadowOuter::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilde
                                                      borderRect,
                                                      mFrame,
                                                      borderRadii);
-    MOZ_ASSERT(borderRadii.AreRadiiSame(), "WR only supports uniform borders");
+    MOZ_ASSERT(borderRadii.AreRadiiSame());
   }
 
   // Everything here is in app units, change to device units.
