@@ -2062,8 +2062,7 @@ profiler_init(void* aStackTop)
     // indicates that the profiler has initialized successfully.
     gPS = new PS();
 
-    bool ignore;
-    gPS->SetProcessStartTime(lock, mozilla::TimeStamp::ProcessCreation(ignore));
+    gPS->SetProcessStartTime(lock, mozilla::TimeStamp::ProcessCreation());
 
     locked_register_thread(lock, kMainThreadName, aStackTop);
 
