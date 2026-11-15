@@ -6819,7 +6819,7 @@ js::NewCompartment(JSContext* cx, JSPrincipals* principals,
 
     if (group) {
         // Take over ownership of the group while we create the compartment/zone.
-        group->enter();
+        group->enter(cx);
     } else {
         MOZ_ASSERT(!zone);
         group = cx->new_<ZoneGroup>(rt);
@@ -6890,6 +6890,7 @@ js::NewCompartment(JSContext* cx, JSPrincipals* principals,
         if (zoneSpec == JS::SystemZone || zoneSpec == JS::NewZoneInSystemZoneGroup) {
             MOZ_RELEASE_ASSERT(!rt->gc.systemZoneGroup);
             rt->gc.systemZoneGroup = group;
+            group->setUseExclusiveLocking();
         }
     }
 
