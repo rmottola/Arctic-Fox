@@ -9218,8 +9218,15 @@ CodeGenerator::visitIteratorStartO(LIteratorStartO* lir)
     masm.loadObjProto(temp1, temp1);
     masm.branchTestPtr(Assembler::NonZero, temp1, temp1, ool->entry());
 
-    // Write barrier for stores to the iterator. The iterator JSObject is never
-    // nursery allocated. Put this in the whole cell buffer when writing a
+    // Pre-write barrier for store to 'obj'.
+    masm.patchableCallPreBarrier(Address(niTemp, offsetof(NativeIterator, obj)), MIRType::Object);
+
+    // Mark iterator as active.
+    masm.storePtr(obj, Address(niTemp, offsetof(NativeIterator, obj)));
+    masm.or32(Imm32(JSITER_ACTIVE), Address(niTemp, offsetof(NativeIterator, flags)));
+
+    // Post-write barrier for stores to 'obj'. The iterator JSObject is never
+    // nursery allocated. Put this in the whole cell buffer is we wrote a
     // nursery pointer into it.
     {
         Label skipBarrier;
@@ -9233,10 +9240,6 @@ CodeGenerator::visitIteratorStartO(LIteratorStartO* lir)
         restoreVolatile(temps);
         masm.bind(&skipBarrier);
     }
-
-    // Mark iterator as active.
-    masm.storePtr(obj, Address(niTemp, offsetof(NativeIterator, obj)));
-    masm.or32(Imm32(JSITER_ACTIVE), Address(niTemp, offsetof(NativeIterator, flags)));
 
     // Chain onto the active iterator stack.
     masm.loadPtr(AbsoluteAddress(gen->compartment->addressOfEnumerators()), temp1);
