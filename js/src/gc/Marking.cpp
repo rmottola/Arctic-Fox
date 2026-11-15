@@ -3173,8 +3173,8 @@ IsAboutToBeFinalizedInternal(T** thingp)
         return false;
 
     if (IsInsideNursery(thing)) {
-        MOZ_ASSERT(JS::CurrentThreadIsHeapMinorCollecting());
-        return !Nursery::getForwardedPointer(reinterpret_cast<JSObject**>(thingp));
+        return JS::CurrentThreadIsHeapMinorCollecting() &&
+               !Nursery::getForwardedPointer(reinterpret_cast<JSObject**>(thingp));
     }
 
     Zone* zone = thing->asTenured().zoneFromAnyThread();
@@ -3250,6 +3250,13 @@ EdgeNeedsSweep(JS::Heap<T>* thingp)
     return IsAboutToBeFinalizedInternal(ConvertToBase(thingp->unsafeGet()));
 }
 
+template <typename T>
+JS_PUBLIC_API(bool)
+EdgeNeedsSweepUnbarrieredSlow(T* thingp)
+{
+    return IsAboutToBeFinalizedInternal(ConvertToBase(thingp));
+}
+
 // Instantiate a copy of the Tracing templates for each derived type.
 #define INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS(type) \
     template bool IsMarkedUnbarriered<type>(JSRuntime*, type*);                \
@@ -3258,7 +3265,8 @@ EdgeNeedsSweep(JS::Heap<T>* thingp)
     template bool IsAboutToBeFinalized<type>(WriteBarrieredBase<type>*); \
     template bool IsAboutToBeFinalized<type>(ReadBarrieredBase<type>*);
 #define INSTANTIATE_ALL_VALID_HEAP_TRACE_FUNCTIONS(type) \
-    template JS_PUBLIC_API(bool) EdgeNeedsSweep<type>(JS::Heap<type>*);
+    template JS_PUBLIC_API(bool) EdgeNeedsSweep<type>(JS::Heap<type>*); \
+    template JS_PUBLIC_API(bool) EdgeNeedsSweepUnbarrieredSlow<type>(type*);
 FOR_EACH_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS)
 FOR_EACH_PUBLIC_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_HEAP_TRACE_FUNCTIONS)
 FOR_EACH_PUBLIC_TAGGED_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_HEAP_TRACE_FUNCTIONS)
