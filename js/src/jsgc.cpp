@@ -4569,7 +4569,7 @@ GCRuntime::getNextSweepGroup()
         for (GCSweepGroupIter zone(rt); !zone.done(); zone.next()) {
             MOZ_ASSERT(!zone->gcNextGraphComponent);
             MOZ_ASSERT(zone->isGCMarking());
-            zone->setNeedsIncrementalBarrier(false, Zone::UpdateJit);
+            zone->setNeedsIncrementalBarrier(false);
             zone->setGCState(Zone::NoGC);
             zone->gcGrayRoots().clearAndFree();
         }
@@ -5763,7 +5763,7 @@ GCRuntime::resetIncrementalGC(gc::AbortReason reason, AutoLockForExclusiveAccess
 
         for (GCZonesIter zone(rt); !zone.done(); zone.next()) {
             MOZ_ASSERT(zone->isGCMarking());
-            zone->setNeedsIncrementalBarrier(false, Zone::UpdateJit);
+            zone->setNeedsIncrementalBarrier(false);
             zone->setGCState(Zone::NoGC);
         }
 
@@ -5881,7 +5881,7 @@ AutoGCSlice::AutoGCSlice(JSRuntime* rt)
          */
         if (zone->isGCMarking()) {
             MOZ_ASSERT(zone->needsIncrementalBarrier());
-            zone->setNeedsIncrementalBarrier(false, Zone::DontUpdateJit);
+            zone->setNeedsIncrementalBarrier(false);
         } else {
             MOZ_ASSERT(!zone->needsIncrementalBarrier());
         }
@@ -5893,10 +5893,10 @@ AutoGCSlice::~AutoGCSlice()
     /* We can't use GCZonesIter if this is the end of the last slice. */
     for (ZonesIter zone(runtime, WithAtoms); !zone.done(); zone.next()) {
         if (zone->isGCMarking()) {
-            zone->setNeedsIncrementalBarrier(true, Zone::UpdateJit);
+            zone->setNeedsIncrementalBarrier(true);
             zone->arenas.purge();
         } else {
-            zone->setNeedsIncrementalBarrier(false, Zone::UpdateJit);
+            zone->setNeedsIncrementalBarrier(false);
         }
     }
 }
