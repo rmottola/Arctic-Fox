@@ -4550,6 +4550,7 @@ nsDisplayBorder::GetLayerState(nsDisplayListBuilder* aBuilder,
 
   const nsStyleBorder *styleBorder = mFrame->StyleContext()->StyleBorder();
   const nsStyleImage* image = &styleBorder->mBorderImageSource;
+  mBorderRenderer = Nothing();
   mBorderImageRenderer = Nothing();
   if ((!image || image->GetType() != eStyleImageType_Image) && !br) {
     return LAYER_NONE;
@@ -4563,18 +4564,7 @@ nsDisplayBorder::GetLayerState(nsDisplayListBuilder* aBuilder,
       if (hasCompositeColors) {
         return LAYER_NONE;
       }
-
-      NS_FOR_CSS_SIDES(i) {
-        mColors[i] = ToDeviceColor(br->mBorderColors[i]);
-        mWidths[i] = br->mBorderWidths[i];
-        mBorderStyles[i] = br->mBorderStyles[i];
-      }
-
-      NS_FOR_CSS_FULL_CORNERS(corner) {
-        mCorners[corner] = LayerSize(br->mBorderRadii[corner].width, br->mBorderRadii[corner].height);
-      }
-
-      mRect = ViewAs<LayerPixel>(br->mOuterRect);
+      mBorderRenderer = br;
     } else {
       if (styleBorder->mBorderImageRepeatH == NS_STYLE_BORDER_IMAGE_REPEAT_ROUND ||
           styleBorder->mBorderImageRepeatH == NS_STYLE_BORDER_IMAGE_REPEAT_SPACE ||
@@ -4656,28 +4646,6 @@ nsDisplayBorder::BuildLayer(nsDisplayListBuilder* aBuilder,
 }
 
 void
-nsDisplayBorder::CreateBorderWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
-                                               WebRenderDisplayItemLayer* aLayer)
-{
-  nsPoint offset = ToReferenceFrame();
-  Maybe<nsCSSBorderRenderer> br =
-    nsCSSRendering::CreateBorderRenderer(mFrame->PresContext(),
-                                         nullptr,
-                                         mFrame,
-                                         nsRect(),
-                                         nsRect(offset, mFrame->GetSize()),
-                                         mFrame->StyleContext(),
-                                         mFrame->GetSkipSides());
-
-  if (!br) {
-    NS_WARNING("Could not create border renderer during nsDisplayButtonBorder");
-    return;
-  }
-
-  br->CreateWebRenderCommands(aBuilder, aLayer);
-}
-
-void
 nsDisplayBorder::CreateBorderImageWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
                                                     nsTArray<WebRenderParentCommand>& aParentCommands,
                                                     WebRenderDisplayItemLayer* aLayer)
@@ -4746,10 +4714,12 @@ nsDisplayBorder::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
                                          nsTArray<WebRenderParentCommand>& aParentCommands,
                                          WebRenderDisplayItemLayer* aLayer)
 {
+  MOZ_ASSERT(mBorderImageRenderer || mBorderRenderer);
+
   if (mBorderImageRenderer) {
     CreateBorderImageWebRenderCommands(aBuilder, aParentCommands, aLayer);
-  } else {
-    CreateBorderWebRenderCommands(aBuilder, aLayer);
+  } else if (mBorderRenderer) {
+    mBorderRenderer->CreateWebRenderCommands(aBuilder, aLayer);
   }
 }
 
