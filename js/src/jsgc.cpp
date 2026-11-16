@@ -4622,7 +4622,7 @@ IsGrayListObject(JSObject* obj)
 ProxyObject::grayLinkReservedSlot(JSObject* obj)
 {
     MOZ_ASSERT(IsGrayListObject(obj));
-    return 1;
+    return CrossCompartmentWrapperObject::GrayLinkReservedSlot;
 }
 
 #ifdef DEBUG
