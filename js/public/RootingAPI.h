@@ -1050,6 +1050,9 @@ MutableHandle<T>::MutableHandle(PersistentRooted<T>* root)
 JS_PUBLIC_API(void)
 AddPersistentRoot(RootingContext* cx, RootKind kind, PersistentRooted<void*>* root);
 
+JS_PUBLIC_API(void)
+AddPersistentRoot(JSRuntime* rt, RootKind kind, PersistentRooted<void*>* root);
+
 /**
  * A copyable, assignable global GC root type with arbitrary lifetime, an
  * infallible constructor, and automatic unrooting on destruction.
@@ -1099,6 +1102,12 @@ class PersistentRooted : public js::RootedBase<T, PersistentRooted<T>>,
         AddPersistentRoot(cx, kind, reinterpret_cast<JS::PersistentRooted<void*>*>(this));
     }
 
+    void registerWithRootLists(JSRuntime* rt) {
+        MOZ_ASSERT(!initialized());
+        JS::RootKind kind = JS::MapTypeToRootKind<T>::kind;
+        AddPersistentRoot(rt, kind, reinterpret_cast<JS::PersistentRooted<void*>*>(this));
+    }
+
   public:
     using ElementType = T;
 
@@ -1128,6 +1137,19 @@ class PersistentRooted : public js::RootedBase<T, PersistentRooted<T>>,
       : ptr(mozilla::Forward<U>(initial))
     {
         registerWithRootLists(RootingContext::get(cx));
+    }
+
+    explicit PersistentRooted(JSRuntime* rt)
+      : ptr(GCPolicy<T>::initial())
+    {
+        registerWithRootLists(rt);
+    }
+
+    template <typename U>
+    PersistentRooted(JSRuntime* rt, U&& initial)
+      : ptr(mozilla::Forward<U>(initial))
+    {
+        registerWithRootLists(rt);
     }
 
     PersistentRooted(const PersistentRooted& rhs)
