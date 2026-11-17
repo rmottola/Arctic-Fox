@@ -2941,7 +2941,7 @@ XPCJSRuntime::XPCJSRuntime(JSContext* aCx)
 XPCJSRuntime*
 XPCJSRuntime::Get()
 {
-    return nsXPConnect::XPConnect()->GetContext()->Runtime();
+    return nsXPConnect::GetRuntimeInstance();
 }
 
 void
