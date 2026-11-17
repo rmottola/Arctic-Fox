@@ -123,7 +123,7 @@
 #include "nsFontMetrics.h"
 #include "Units.h"
 #include "CanvasUtils.h"
-#include "mozilla/CycleCollectedJSContext.h"
+#include "mozilla/CycleCollectedJSRuntime.h"
 #include "mozilla/StyleSetHandle.h"
 #include "mozilla/StyleSetHandleInlines.h"
 #include "mozilla/layers/CanvasClient.h"
@@ -1755,7 +1755,7 @@ CanvasRenderingContext2D::RegisterAllocation()
 
   JSObject* wrapper = GetWrapperPreserveColor();
   if (wrapper) {
-    CycleCollectedJSContext::Get()->
+    CycleCollectedJSRuntime::Get()->
       AddZoneWaitingForGC(JS::GetObjectZone(wrapper));
   }
 }
