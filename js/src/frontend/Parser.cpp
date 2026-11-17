@@ -1040,8 +1040,7 @@ ParserBase::hasValidSimpleStrictParameterNames()
     if (pc->functionBox()->hasDuplicateParameters)
         return false;
 
-    for (size_t i = 0; i < pc->positionalFormalParameterNames().length(); i++) {
-        JSAtom* name = pc->positionalFormalParameterNames()[i];
+    for (auto* name : pc->positionalFormalParameterNames()) {
         MOZ_ASSERT(name);
         if (!isValidStrictBinding(name->asPropertyName()))
             return false;
