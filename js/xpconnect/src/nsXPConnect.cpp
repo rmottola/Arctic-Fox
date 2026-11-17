@@ -154,14 +154,6 @@ nsXPConnect::ReleaseXPConnectSingleton()
 }
 
 // static
-XPCJSContext*
-nsXPConnect::GetContextInstance()
-{
-    nsXPConnect* xpc = XPConnect();
-    return xpc->GetContext();
-}
-
-// static
 XPCJSRuntime*
 nsXPConnect::GetRuntimeInstance()
 {
