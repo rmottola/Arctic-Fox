@@ -6052,10 +6052,6 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         MOZ_FALLTHROUGH;
 
       case State::Sweep:
-        for (const CooperatingContext& target : rt->cooperatingContexts())
-            AutoGCRooter::traceAllWrappers(target, &marker);
-
-
         if (sweepPhase(budget, lock) == NotFinished)
             break;
 
