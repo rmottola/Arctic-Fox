@@ -3212,7 +3212,9 @@ Debugger::sweepAll(FreeOp* fop)
     JSRuntime* rt = fop->runtime();
 
     for (ZoneGroupsIter group(rt); !group.done(); group.next()) {
-        for (Debugger* dbg : group->debuggerList()) {
+        Debugger* dbg = group->debuggerList().getFirst();
+        while (dbg) {
+            Debugger* next = dbg->getNext();
             if (IsAboutToBeFinalized(&dbg->object)) {
                 /*
                  * dbg is being GC'd. Detach it from its debuggees. The debuggee
@@ -3221,7 +3223,9 @@ Debugger::sweepAll(FreeOp* fop)
                  */
                 for (WeakGlobalObjectSet::Enum e(dbg->debuggees); !e.empty(); e.popFront())
                     dbg->removeDebuggeeGlobal(fop, e.front().unbarrieredGet(), &e);
+                fop->delete_(dbg);
             }
+            dbg = next;
         }
     }
 }
@@ -3263,17 +3267,6 @@ Debugger::findZoneEdges(Zone* zone, js::gc::ZoneComponentFinder& finder)
     }
 }
 
-/* static */ void
-Debugger::finalize(FreeOp* fop, JSObject* obj)
-{
-    MOZ_ASSERT(fop->onActiveCooperatingThread());
-
-    Debugger* dbg = fromJSObject(obj);
-    if (!dbg)
-        return;
-    fop->delete_(dbg);
-}
-
 const ClassOps Debugger::classOps_ = {
     nullptr,    /* addProperty */
     nullptr,    /* delProperty */
@@ -3282,7 +3275,7 @@ const ClassOps Debugger::classOps_ = {
     nullptr,    /* enumerate   */
     nullptr,    /* resolve     */
     nullptr,    /* mayResolve  */
-    Debugger::finalize,
+    nullptr,    /* finalize    */
     nullptr,    /* call        */
     nullptr,    /* hasInstance */
     nullptr,    /* construct   */
@@ -3292,8 +3285,7 @@ const ClassOps Debugger::classOps_ = {
 const Class Debugger::class_ = {
     "Debugger",
     JSCLASS_HAS_PRIVATE |
-    JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_DEBUG_COUNT) |
-    JSCLASS_FOREGROUND_FINALIZE,
+    JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_DEBUG_COUNT),
     &Debugger::classOps_
 };
 
@@ -3896,7 +3888,8 @@ Debugger::construct(JSContext* cx, unsigned argc, Value* vp)
      * Debugger.{Frame,Object,Script,Memory}.prototype in reserved slots. The
      * rest of the reserved slots are for hooks; they default to undefined.
      */
-    RootedNativeObject obj(cx, NewNativeObjectWithGivenProto(cx, &Debugger::class_, proto));
+    RootedNativeObject obj(cx, NewNativeObjectWithGivenProto(cx, &Debugger::class_, proto,
+                                                             TenuredObject));
     if (!obj)
         return false;
     for (unsigned slot = JSSLOT_DEBUG_PROTO_START; slot < JSSLOT_DEBUG_PROTO_STOP; slot++)
