@@ -789,7 +789,7 @@ XPCJSContext::Initialize()
     if (!xpc_LocalizeContext(cx))
         NS_RUNTIMEABORT("xpc_LocalizeContext failed.");
 
-    Runtime()->Initialize();
+    Runtime()->Initialize(cx);
 
     return NS_OK;
 }
