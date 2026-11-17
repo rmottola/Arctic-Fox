@@ -2180,7 +2180,7 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
         c->sweepSavedStacks();
         c->sweepTemplateLiteralMap();
         c->sweepVarNames();
-        c->sweepGlobalObject(fop);
+        c->sweepGlobalObject();
         c->sweepSelfHostingScriptSource();
         c->sweepDebugEnvironments();
         c->sweepJitCompartment(fop);
@@ -4924,6 +4924,7 @@ MAKE_GC_SWEEP_TASK(SweepObjectGroupsTask);
 MAKE_GC_SWEEP_TASK(SweepRegExpsTask);
 MAKE_GC_SWEEP_TASK(SweepMiscTask);
 MAKE_GC_SWEEP_TASK(SweepCompressionTasksTask);
+MAKE_GC_SWEEP_TASK(SweepWeakMapsTask);
 #undef MAKE_GC_SWEEP_TASK
 
 /* virtual */ void
@@ -5002,6 +5003,27 @@ SweepCompressionTasksTask::run()
             HelperThreadState().remove(pending, &i);
             js_delete(task);
         }
+    }
+}
+
+/* virtual */ void
+SweepWeakMapsTask::run()
+{
+    for (GCSweepGroupIter zone(runtime()); !zone.done(); zone.next()) {
+        /* Clear all weakrefs that point to unmarked things. */
+        for (auto edge : zone->gcWeakRefs()) {
+            /* Edges may be present multiple times, so may already be nulled. */
+            if (*edge && IsAboutToBeFinalizedDuringSweep(**edge))
+                *edge = nullptr;
+        }
+        zone->gcWeakRefs().clear();
+
+        /* No need to look up any more weakmap keys from this sweep group. */
+        AutoEnterOOMUnsafeRegion oomUnsafe;
+        if (!zone->gcWeakKeys().clear())
+            oomUnsafe.crash("clearing weak keys in beginSweepingSweepGroup()");
+
+        zone->sweepWeakMaps();
     }
 }
 
@@ -5084,22 +5106,8 @@ GCRuntime::beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock)
     SweepRegExpsTask sweepRegExpsTask(rt);
     SweepMiscTask sweepMiscTask(rt);
     SweepCompressionTasksTask sweepCompressionTasksTask(rt);
+    SweepWeakMapsTask sweepWeakMapsTask(rt);
     WeakCacheTaskVector sweepCacheTasks = PrepareWeakCacheTasks(rt);
-
-    for (GCSweepGroupIter zone(rt); !zone.done(); zone.next()) {
-        /* Clear all weakrefs that point to unmarked things. */
-        for (auto edge : zone->gcWeakRefs()) {
-            /* Edges may be present multiple times, so may already be nulled. */
-            if (*edge && IsAboutToBeFinalizedDuringSweep(**edge))
-                *edge = nullptr;
-        }
-        zone->gcWeakRefs().clear();
-
-        /* No need to look up any more weakmap keys from this sweep group. */
-        AutoEnterOOMUnsafeRegion oomUnsafe;
-        if (!zone->gcWeakKeys().clear())
-            oomUnsafe.crash("clearing weak keys in beginSweepingSweepGroup()");
-    }
 
     {
         gcstats::AutoPhase ap(stats(), gcstats::PHASE_FINALIZE_START);
@@ -5118,6 +5126,10 @@ GCRuntime::beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock)
         callFinalizeCallbacks(&fop, JSFINALIZE_GROUP_START);
     }
 
+    // Detach unreachable debuggers and global objects from each other.
+    // This can modify weakmaps and so must happen before weakmap sweeping.
+    Debugger::sweepAll(&fop);
+
     if (sweepingAtoms) {
         AutoLockHelperThreadState helperLock;
         startTask(sweepAtomsTask, gcstats::PHASE_SWEEP_ATOMS, helperLock);
@@ -5134,6 +5146,7 @@ GCRuntime::beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock)
             startTask(sweepRegExpsTask, gcstats::PHASE_SWEEP_REGEXP, helperLock);
             startTask(sweepMiscTask, gcstats::PHASE_SWEEP_MISC, helperLock);
             startTask(sweepCompressionTasksTask, gcstats::PHASE_SWEEP_MISC, helperLock);
+            startTask(sweepWeakMapsTask, gcstats::PHASE_SWEEP_MISC, helperLock);
             for (auto& task : sweepCacheTasks)
                 startTask(task, gcstats::PHASE_SWEEP_MISC, helperLock);
         }
@@ -5147,14 +5160,13 @@ GCRuntime::beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock)
             js::CancelOffThreadIonCompile(rt, JS::Zone::Sweep);
 
             for (GCCompartmentGroupIter c(rt); !c.done(); c.next()) {
-                c->sweepGlobalObject(&fop);
+                c->sweepGlobalObject();
                 c->sweepDebugEnvironments();
                 c->sweepJitCompartment(&fop);
                 c->sweepTemplateObjects();
             }
 
             for (GCSweepGroupIter zone(rt); !zone.done(); zone.next()) {
-                zone->sweepWeakMaps();
                 if (jit::JitZone* jitZone = zone->jitZone())
                     jitZone->sweep(&fop);
             }
@@ -5164,9 +5176,6 @@ GCRuntime::beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock)
 
             // Collect watch points associated with unreachable objects.
             WatchpointMap::sweepAll(rt);
-
-            // Detach unreachable debuggers and global objects from each other.
-            Debugger::sweepAll(&fop);
 
             // Sweep entries containing about-to-be-finalized JitCode and
             // update relocated TypeSet::Types inside the JitcodeGlobalTable.
@@ -5219,6 +5228,7 @@ GCRuntime::beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock)
         joinTask(sweepRegExpsTask, gcstats::PHASE_SWEEP_REGEXP, helperLock);
         joinTask(sweepMiscTask, gcstats::PHASE_SWEEP_MISC, helperLock);
         joinTask(sweepCompressionTasksTask, gcstats::PHASE_SWEEP_MISC, helperLock);
+        joinTask(sweepWeakMapsTask, gcstats::PHASE_SWEEP_MISC, helperLock);
         for (auto& task : sweepCacheTasks)
             joinTask(task, gcstats::PHASE_SWEEP_MISC, helperLock);
     }
