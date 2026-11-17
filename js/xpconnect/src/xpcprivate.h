@@ -410,7 +410,6 @@ public:
     static void InitTLS();
     static XPCJSContext* NewXPCJSContext(XPCJSContext* aPrimaryContext);
     static XPCJSContext* Get();
-    static XPCJSContext* GetOnly() { return XPCJSContext::Get(); }
 
     XPCJSRuntime* Runtime() const;
 
