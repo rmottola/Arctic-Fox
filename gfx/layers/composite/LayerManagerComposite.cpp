@@ -1415,6 +1415,12 @@ LayerManagerComposite::AsyncPanZoomEnabled() const
   return false;
 }
 
+bool
+LayerManagerComposite::AlwaysScheduleComposite() const
+{
+  return !!(mCompositor->GetDiagnosticTypes() & DiagnosticTypes::FLASH_BORDERS);
+}
+
 nsIntRegion
 LayerComposite::GetFullyRenderedRegion() {
   if (TiledContentHost* tiled = GetCompositableHost() ? GetCompositableHost()->AsTiledContentHost()
