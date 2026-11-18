@@ -468,11 +468,8 @@ private:
                            CSSIntRegion> VisibleRegions;
   VisibleRegions mVisibleRegions;
 
-  UniquePtr<FPSState> mFPS;
-
   bool mInTransaction;
   bool mIsCompositorReady;
-  bool mDebugOverlayWantsNextFrame;
 
   RefPtr<CompositingRenderTarget> mTwoPassTmpTarget;
   RefPtr<TextRenderer> mTextRenderer;

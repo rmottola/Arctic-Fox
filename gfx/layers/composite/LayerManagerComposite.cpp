@@ -138,7 +138,6 @@ HostLayerManager::RecordUpdateTime(float aValue)
   mDiagnostics->RecordUpdateTime(aValue);
 }
 
-
 /**
  * LayerManagerComposite
  */
@@ -555,7 +554,7 @@ LayerManagerComposite::InvalidateDebugOverlay(nsIntRegion& aInvalidRegion, const
   bool drawFrameColorBars = gfxPrefs::CompositorDrawColorBars();
 
   if (drawFps || drawFrameCounter) {
-    aInvalidRegion.Or(aInvalidRegion, nsIntRect(0, 0, 256, 256));
+    aInvalidRegion.Or(aInvalidRegion, nsIntRect(0, 0, 600, 400));
   }
   if (drawFrameColorBars) {
     aInvalidRegion.Or(aInvalidRegion, nsIntRect(0, 0, 10, aBounds.height));
@@ -590,18 +589,14 @@ LayerManagerComposite::RenderDebugOverlay(const IntRect& aBounds)
   bool drawFrameCounter = gfxPrefs::DrawFrameCounter();
   bool drawFrameColorBars = gfxPrefs::CompositorDrawColorBars();
 
-  TimeStamp now = TimeStamp::Now();
-
   if (drawFps) {
-    if (!mFPS) {
-      mFPS = MakeUnique<FPSState>();
-    }
-
     float alpha = 1;
 #ifdef ANDROID
     // Draw a translation delay warning overlay
     int width;
     int border;
+
+    TimeStamp now = TimeStamp::Now();
     if (!mWarnTime.IsNull() && (now - mWarnTime).ToMilliseconds() < kVisualWarningDuration) {
       EffectChain effects;
 
@@ -634,8 +629,13 @@ LayerManagerComposite::RenderDebugOverlay(const IntRect& aBounds)
     }
 #endif
 
-    float fillRatio = mCompositor->GetFillRatio();
-    mFPS->DrawFPS(now, drawFrameColorBars ? 10 : 1, 2, unsigned(fillRatio), mCompositor);
+    std::string text = mDiagnostics->GetFrameOverlayString();
+    mTextRenderer->RenderText(
+      text,
+      IntPoint(2, 5),
+      Matrix4x4(),
+      30,
+      600);
 
     if (mUnusedApzTransformWarning) {
       // If we have an unused APZ transform on this composite, draw a 20x20 red box
@@ -660,11 +660,6 @@ LayerManagerComposite::RenderDebugOverlay(const IntRect& aBounds)
       mDisabledApzWarning = false;
       SetDebugOverlayWantsNextFrame(true);
     }
-
-
-    // Each frame is invalidate by the previous frame for simplicity
-  } else {
-    mFPS = nullptr;
   }
 
   if (drawFrameColorBars) {
@@ -1421,8 +1416,8 @@ LayerManagerComposite::CanUseCanvasLayerForSize(const IntSize &aSize)
 void
 LayerManagerComposite::NotifyShadowTreeTransaction()
 {
-  if (mFPS) {
-    mFPS->NotifyShadowTreeTransaction();
+  if (gfxPrefs::LayersDrawFPS()) {
+    mDiagnostics->AddTxnFrame();
   }
 }
 
