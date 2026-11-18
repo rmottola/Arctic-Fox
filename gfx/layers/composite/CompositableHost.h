@@ -241,6 +241,9 @@ public:
   virtual void BindTextureSource() {}
 
 protected:
+  HostLayerManager* GetLayerManager() const;
+
+protected:
   TextureInfo mTextureInfo;
   AsyncCompositableRef mAsyncRef;
   uint64_t mCompositorID;

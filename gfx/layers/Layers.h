@@ -80,6 +80,7 @@ class AsyncCanvasRenderer;
 class AsyncPanZoomController;
 class BasicLayerManager;
 class ClientLayerManager;
+class HostLayerManager;
 class Layer;
 class LayerMetricsWrapper;
 class PaintedLayer;
@@ -215,6 +216,8 @@ public:
   { return nullptr; }
 
   virtual BasicLayerManager* AsBasicLayerManager()
+  { return nullptr; }
+  virtual HostLayerManager* AsHostLayerManager()
   { return nullptr; }
 
   virtual WebRenderLayerManager* AsWebRenderLayerManager()
