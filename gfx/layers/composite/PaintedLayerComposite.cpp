@@ -130,7 +130,7 @@ PaintedLayerComposite::RenderLayer(const gfx::IntRect& aClipRect,
                      const gfx::IntRect& clipRect) {
     mBuffer->SetPaintWillResample(MayResample());
 
-    mBuffer->Composite(this, effectChain, GetEffectiveOpacity(),
+    mBuffer->Composite(compositor, this, effectChain, GetEffectiveOpacity(),
                        GetEffectiveTransform(), GetSamplingFilter(),
                        clipRect, &visibleRegion, aGeometry);
   });
