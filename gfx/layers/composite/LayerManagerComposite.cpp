@@ -10,6 +10,7 @@
 #include "ColorLayerComposite.h"        // for ColorLayerComposite
 #include "CompositableHost.h"           // for CompositableHost
 #include "ContainerLayerComposite.h"    // for ContainerLayerComposite, etc
+#include "Diagnostics.h"
 #include "FPSCounter.h"                 // for FPSState, FPSCounter
 #include "FrameMetrics.h"               // for FrameMetrics
 #include "GeckoProfiler.h"              // for profiler_set_frame_number, etc
@@ -125,6 +126,19 @@ HostLayerManager::HostLayerManager()
 HostLayerManager::~HostLayerManager()
 {}
 
+void
+HostLayerManager::RecordPaintTimes(const PaintTiming& aTiming)
+{
+  mDiagnostics->RecordPaintTimes(aTiming);
+}
+
+void
+HostLayerManager::RecordUpdateTime(float aValue)
+{
+  mDiagnostics->RecordUpdateTime(aValue);
+}
+
+
 /**
  * LayerManagerComposite
  */
@@ -137,6 +151,7 @@ LayerManagerComposite::LayerManagerComposite(Compositor* aCompositor)
 , mGeometryChanged(true)
 {
   mTextRenderer = new TextRenderer(aCompositor);
+  mDiagnostics = MakeUnique<Diagnostics>();
   MOZ_ASSERT(aCompositor);
 
 #ifdef USE_SKIA
@@ -926,8 +941,21 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
   }
 
   // Render our layers.
-  RootLayer()->Prepare(ViewAs<RenderTargetPixel>(clipRect, PixelCastJustification::RenderTargetIsParentLayerForRoot));
-  RootLayer()->RenderLayer(clipRect.ToUnknownRect(), Nothing());
+  {
+    Diagnostics::Record record;
+    RootLayer()->Prepare(ViewAs<RenderTargetPixel>(clipRect, PixelCastJustification::RenderTargetIsParentLayerForRoot));
+    if (record.Recording()) {
+      mDiagnostics->RecordPrepareTime(record.Duration());
+    }
+  }
+  // Execute draw commands.
+  {
+    Diagnostics::Record record;
+    RootLayer()->RenderLayer(clipRect.ToUnknownRect(), Nothing());
+    if (record.Recording()) {
+      mDiagnostics->RecordCompositeTime(record.Duration());
+    }
+  }
   RootLayer()->Cleanup();
 
   if (!mRegionToClear.IsEmpty()) {

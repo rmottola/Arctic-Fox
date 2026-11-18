@@ -4910,6 +4910,10 @@ class PaintTelemetry
    public:
     explicit AutoRecord(Metric aMetric);
     ~AutoRecord();
+
+    TimeStamp GetStart() const {
+      return mStart;
+    }
    private:
     Metric mMetric;
     mozilla::TimeStamp mStart;
