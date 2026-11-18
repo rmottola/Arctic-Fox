@@ -965,14 +965,5 @@ BasicCompositor::FinishPendingComposite()
   TryToEndRemoteDrawing(/* aForceToEnd */ true);
 }
 
-BasicCompositor*
-AssertBasicCompositor(Compositor* aCompositor)
-{
-  BasicCompositor* compositor = aCompositor ? aCompositor->AsBasicCompositor()
-                                            : nullptr;
-  MOZ_DIAGNOSTIC_ASSERT(!!compositor);
-  return compositor;
-}
-
 } // namespace layers
 } // namespace mozilla
