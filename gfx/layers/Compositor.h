@@ -569,6 +569,21 @@ protected:
                                        gfx::Matrix4x4* aOutTransform,
                                        gfx::Rect* aOutLayerQuad = nullptr);
 
+  virtual void DrawTriangles(const nsTArray<gfx::TexturedTriangle>& aTriangles,
+                             const gfx::Rect& aRect,
+                             const gfx::IntRect& aClipRect,
+                             const EffectChain& aEffectChain,
+                             gfx::Float aOpacity,
+                             const gfx::Matrix4x4& aTransform,
+                             const gfx::Rect& aVisibleRect);
+
+  virtual void DrawPolygon(const gfx::Polygon& aPolygon,
+                           const gfx::Rect& aRect,
+                           const gfx::IntRect& aClipRect,
+                           const EffectChain& aEffectChain,
+                           gfx::Float aOpacity,
+                           const gfx::Matrix4x4& aTransform,
+                           const gfx::Rect& aVisibleRect);
 
   /**
    * Last Composition end time.
