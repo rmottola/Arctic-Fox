@@ -42,20 +42,11 @@ GPUVideoTextureHost::BindTextureSource(CompositableTextureSourceRef& aTexture)
   return mWrappedTextureHost->BindTextureSource(aTexture);
 }
 
-Compositor*
-GPUVideoTextureHost::GetCompositor()
-{
-  if (!mWrappedTextureHost) {
-    return nullptr;
-  }
-  return mWrappedTextureHost->GetCompositor();
-}
-
 void
-GPUVideoTextureHost::SetCompositor(Compositor* aCompositor)
+GPUVideoTextureHost::SetTextureSourceProvider(TextureSourceProvider* aProvider)
 {
   if (mWrappedTextureHost) {
-    mWrappedTextureHost->SetCompositor(aCompositor);
+    mWrappedTextureHost->SetTextureSourceProvider(aProvider);
   }
 }
 

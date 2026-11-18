@@ -259,10 +259,10 @@ ContentHostTexture::SetCompositor(Compositor* aCompositor)
 {
   ContentHostBase::SetCompositor(aCompositor);
   if (mTextureHost) {
-    mTextureHost->SetCompositor(aCompositor);
+    mTextureHost->SetTextureSourceProvider(aCompositor);
   }
   if (mTextureHostOnWhite) {
-    mTextureHostOnWhite->SetCompositor(aCompositor);
+    mTextureHostOnWhite->SetTextureSourceProvider(aCompositor);
   }
 }
 
