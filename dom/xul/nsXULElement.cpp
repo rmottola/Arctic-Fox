@@ -1475,15 +1475,6 @@ nsXULElement::IsAttributeMapped(const nsIAtom* aAttribute) const
     return false;
 }
 
-// Controllers Methods
-NS_IMETHODIMP
-nsXULElement::GetControllers(nsIControllers** aResult)
-{
-    ErrorResult rv;
-    NS_IF_ADDREF(*aResult = GetControllers(rv));
-    return rv.StealNSResult();
-}
-
 nsIControllers*
 nsXULElement::GetControllers(ErrorResult& rv)
 {
