@@ -251,7 +251,7 @@ nsTextControlFrame::EnsureEditorInitialized()
   nsIDocument* doc = mContent->GetComposedDoc();
   NS_ENSURE_TRUE(doc, NS_ERROR_FAILURE);
 
-  nsWeakFrame weakFrame(this);
+  AutoWeakFrame weakFrame(this);
 
   // Flush out content on our document.  Have to do this, because script
   // blockers don't prevent the sink flushing out content and notifying in the
@@ -712,7 +712,7 @@ nsresult nsTextControlFrame::SetFormProperty(nsIAtom* aName, const nsAString& aV
       //      of select all which merely builds a range that selects
       //      all of the content and adds that to the selection.
 
-      nsWeakFrame weakThis = this;
+      AutoWeakFrame weakThis = this;
       SelectAllOrCollapseToEndOfText(true);  // NOTE: can destroy the world
       if (!weakThis.IsAlive()) {
         return NS_OK;
@@ -1203,7 +1203,7 @@ nsTextControlFrame::SetValueChanged(bool aValueChanged)
   NS_ASSERTION(txtCtrl, "Content not a text control element");
 
   if (mUsePlaceholder) {
-    nsWeakFrame weakFrame(this);
+    AutoWeakFrame weakFrame(this);
     txtCtrl->UpdatePlaceholderVisibility(true);
     if (!weakFrame.IsAlive()) {
       return;
@@ -1259,7 +1259,7 @@ nsTextControlFrame::UpdateValueDisplay(bool aNotify,
   // editor, since EnsureEditorInitialized takes care of this.
   if (mUsePlaceholder && !aBeforeEditorInit)
   {
-    nsWeakFrame weakFrame(this);
+    AutoWeakFrame weakFrame(this);
     txtCtrl->UpdatePlaceholderVisibility(aNotify);
     NS_ENSURE_STATE(weakFrame.IsAlive());
   }

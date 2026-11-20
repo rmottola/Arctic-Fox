@@ -115,7 +115,7 @@ static nsITimer* gUserInteractionTimer = nullptr;
 static nsITimerCallback* gUserInteractionTimerCallback = nullptr;
 
 static const double kCursorLoadingTimeout = 1000; // ms
-static nsWeakFrame gLastCursorSourceFrame;
+static AutoWeakFrame gLastCursorSourceFrame;
 static TimeStamp gLastCursorUpdateTime;
 
 static inline int32_t
@@ -267,7 +267,7 @@ int32_t EventStateManager::sUserInputEventDepth = 0;
 bool EventStateManager::sNormalLMouseEventInProcess = false;
 EventStateManager* EventStateManager::sActiveESM = nullptr;
 nsIDocument* EventStateManager::sMouseOverDocument = nullptr;
-nsWeakFrame EventStateManager::sLastDragOverFrame = nullptr;
+AutoWeakFrame EventStateManager::sLastDragOverFrame = nullptr;
 LayoutDeviceIntPoint EventStateManager::sPreLockPoint = LayoutDeviceIntPoint(0, 0);
 LayoutDeviceIntPoint EventStateManager::sLastRefPoint = kInvalidRefPoint;
 CSSIntPoint EventStateManager::sLastScreenPoint = CSSIntPoint(0, 0);
@@ -2273,7 +2273,7 @@ EventStateManager::DispatchLegacyMouseScrollEvents(nsIFrame* aTargetFrame,
   // 3. Horizontal scroll (even if #1 and/or #2 are consumed)
   // 4. Horizontal pixel scroll (even if #3 isn't consumed)
 
-  nsWeakFrame targetFrame(aTargetFrame);
+  AutoWeakFrame targetFrame(aTargetFrame);
 
   MOZ_ASSERT(*aStatus != nsEventStatus_eConsumeNoDefault &&
              !aEvent->DefaultPrevented(),
@@ -2585,7 +2585,7 @@ EventStateManager::DoScrollText(nsIScrollableFrame* aScrollableFrame,
   nsIFrame* scrollFrame = do_QueryFrame(aScrollableFrame);
   MOZ_ASSERT(scrollFrame);
 
-  nsWeakFrame scrollFrameWeak(scrollFrame);
+  AutoWeakFrame scrollFrameWeak(scrollFrame);
   if (!WheelTransaction::WillHandleDefaultAction(aEvent, scrollFrameWeak)) {
     return;
   }
@@ -3965,7 +3965,7 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
   CreateMouseOrPointerWidgetEvent(aMouseEvent, aMessage,
                                   aRelatedContent, dispatchEvent);
 
-  nsWeakFrame previousTarget = mCurrentTarget;
+  AutoWeakFrame previousTarget = mCurrentTarget;
   mCurrentTargetContent = aTargetContent;
 
   nsIFrame* targetFrame = nullptr;
@@ -4525,7 +4525,7 @@ EventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
                                        EventMessage aMessage,
                                        nsIContent* aRelatedTarget,
                                        nsIContent* aTargetContent,
-                                       nsWeakFrame& aTargetFrame)
+                                       AutoWeakFrame& aTargetFrame)
 {
   nsEventStatus status = nsEventStatus_eIgnore;
   WidgetDragEvent event(aDragEvent->IsTrusted(), aMessage, aDragEvent->mWidget);
@@ -4679,7 +4679,7 @@ EventStateManager::InitAndDispatchClickEvent(WidgetMouseEvent* aEvent,
                                              EventMessage aMessage,
                                              nsIPresShell* aPresShell,
                                              nsIContent* aMouseTarget,
-                                             nsWeakFrame aCurrentTarget,
+                                             AutoWeakFrame aCurrentTarget,
                                              bool aNoContentDispatch)
 {
   WidgetMouseEvent event(aEvent->IsTrusted(), aMessage,
@@ -4737,7 +4737,7 @@ EventStateManager::CheckForAndDispatchClick(WidgetMouseEvent* aEvent,
       }
 
       // HandleEvent clears out mCurrentTarget which we might need again
-      nsWeakFrame currentTarget = mCurrentTarget;
+      AutoWeakFrame currentTarget = mCurrentTarget;
       ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseClick,
                                       presShell, mouseContent, currentTarget,
                                       notDispatchToContents);

@@ -122,7 +122,7 @@ public:
     return NS_OK;
   }
 
-  // Let the text editor tell us we're no longer relevant - avoids use of nsWeakFrame
+  // Let the text editor tell us we're no longer relevant - avoids use of AutoWeakFrame
   void Revoke() {
     mFrame = nullptr;
     mTextEditorState = nullptr;
@@ -791,7 +791,7 @@ NS_IMETHODIMP
 nsTextInputListener::NotifySelectionChanged(nsIDOMDocument* aDoc, nsISelection* aSel, int16_t aReason)
 {
   bool collapsed;
-  nsWeakFrame weakFrame = mFrame;
+  AutoWeakFrame weakFrame = mFrame;
 
   if (!aDoc || !aSel || NS_FAILED(aSel->GetIsCollapsed(&collapsed)))
     return NS_OK;
@@ -942,7 +942,7 @@ nsTextInputListener::EditAction()
     return NS_OK;
   }
 
-  nsWeakFrame weakFrame = mFrame;
+  AutoWeakFrame weakFrame = mFrame;
 
   nsITextControlFrame* frameBase = do_QueryFrame(mFrame);
   nsTextControlFrame* frame = static_cast<nsTextControlFrame*> (frameBase);
@@ -2127,7 +2127,7 @@ nsTextEditorState::SetValue(const nsAString& aValue, uint32_t aFlags)
     nsAutoString currentValue;
     mBoundFrame->GetText(currentValue);
 
-    nsWeakFrame weakFrame(mBoundFrame);
+    AutoWeakFrame weakFrame(mBoundFrame);
 
     // this is necessary to avoid infinite recursion
     if (!currentValue.Equals(newValue))

@@ -4858,7 +4858,7 @@ public:
     return NS_OK;
   }
 private:
-  nsWeakFrame mFrame;
+  AutoWeakFrame mFrame;
 };
 
 bool
