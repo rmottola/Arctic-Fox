@@ -4527,15 +4527,11 @@ EventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
                                        nsIContent* aTargetContent,
                                        AutoWeakFrame& aTargetFrame)
 {
+  MOZ_ASSERT(aMessage == eDragLeave || aMessage == eDragExit ||
+             aMessage == eDragEnter);
   nsEventStatus status = nsEventStatus_eIgnore;
   WidgetDragEvent event(aDragEvent->IsTrusted(), aMessage, aDragEvent->mWidget);
-  event.mRefPoint = aDragEvent->mRefPoint;
-  event.mModifiers = aDragEvent->mModifiers;
-  event.buttons = aDragEvent->buttons;
-  event.relatedTarget = aRelatedTarget;
-  event.pointerId = aDragEvent->pointerId;
-  event.inputSource = aDragEvent->inputSource;
-
+  event.AssignDragEventData(*aDragEvent, true);
   mCurrentTargetContent = aTargetContent;
 
   if (aTargetContent != aRelatedTarget) {
@@ -4553,10 +4549,7 @@ EventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
 
     // collect any changes to moz cursor settings stored in the event's
     // data transfer.
-    if (aMessage == eDragLeave || aMessage == eDragExit ||
-        aMessage == eDragEnter) {
-      UpdateDragDataTransfer(&event);
-    }
+    UpdateDragDataTransfer(&event);
   }
 
   // Finally dispatch the event to the frame
