@@ -167,6 +167,7 @@
 #include "LayerTreeInvalidation.h"
 #include "mozilla/css/ImageLoader.h"
 #include "mozilla/dom/DocumentTimeline.h"
+#include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
 #include "nsCanvasFrame.h"
@@ -194,10 +195,7 @@
 #include "mozilla/StyleSheet.h"
 #include "mozilla/StyleSheetInlines.h"
 #include "mozilla/dom/ImageTracker.h"
-
-#ifdef ANDROID
 #include "nsIDocShellTreeOwner.h"
-#endif
 
 #ifdef MOZ_B2G
 #include "nsIHardwareKeyHandler.h"
@@ -4096,8 +4094,8 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
     "Display"
   };
 
-  PROFILER_LABEL_PRINTF("PresShell", "Flush",
-    js::ProfileEntry::Category::GRAPHICS, "(FlushType::%s)",
+  PROFILER_LABEL_DYNAMIC("PresShell", "Flush",
+    js::ProfileEntry::Category::GRAPHICS,
     flushTypeNames[flushType]);
 #endif
 
@@ -6339,8 +6337,29 @@ PresShell::Paint(nsView*        aViewToPaint,
                  const nsRegion& aDirtyRegion,
                  uint32_t        aFlags)
 {
-  PROFILER_LABEL("PresShell", "Paint",
-    js::ProfileEntry::Category::GRAPHICS);
+#ifdef MOZ_GECKO_PROFILER
+  nsIURI* uri = mDocument->GetDocumentURI();
+  nsIDocument* contentRoot = GetPrimaryContentDocument();
+  if (contentRoot) {
+    uri = contentRoot->GetDocumentURI();
+  }
+  nsCString uriString = uri ? uri->GetSpecOrDefault() : NS_LITERAL_CSTRING("N/A");
+  PROFILER_LABEL_DYNAMIC("PresShell", "Paint",
+    js::ProfileEntry::Category::GRAPHICS, Move(uriString));
+#endif
+
+  Maybe<js::AutoAssertNoContentJS> nojs;
+
+  // On Android, Flash can call into content JS during painting, so we can't
+  // assert there. However, we don't rely on this assertion on Android because
+  // we don't paint while JS is running.
+#if !defined(MOZ_WIDGET_ANDROID)
+  if (!(aFlags & nsIPresShell::PAINT_COMPOSITE)) {
+    // We need to allow content JS when the flag is set since we may trigger
+    // MozAfterPaint events in content in those cases.
+    nojs.emplace(dom::danger::GetJSContext());
+  }
+#endif
 
   NS_ASSERTION(!mIsDestroying, "painting a destroyed PresShell");
   NS_ASSERTION(aViewToPaint, "null view");
@@ -7271,7 +7290,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     } else if ((aEvent->mClass == eTouchEventClass) ||
                (aEvent->mClass == eMouseEventClass) ||
                (aEvent->mClass == eWheelEventClass)) {
-      retargetEventDoc = GetTouchEventTargetDocument();
+      retargetEventDoc = GetPrimaryContentDocument();
 #endif
     }
 
@@ -7832,9 +7851,8 @@ PresShell::HandleEvent(nsIFrame* aFrame,
   return rv;
 }
 
-#ifdef ANDROID
 nsIDocument*
-PresShell::GetTouchEventTargetDocument()
+PresShell::GetPrimaryContentDocument()
 {
   nsPresContext* context = GetPresContext();
   if (!context || !context->IsRoot()) {
@@ -7862,7 +7880,6 @@ PresShell::GetTouchEventTargetDocument()
 
   return childDocShell->GetDocument();
 }
-#endif
 
 #ifdef DEBUG
 void
@@ -9129,10 +9146,10 @@ PresShell::DoReflow(nsIFrame* target, bool aInterruptible)
   }
 
 #ifdef MOZ_GECKO_PROFILER
-  nsIURI *uri = mDocument->GetDocumentURI();
-  PROFILER_LABEL_PRINTF("PresShell", "DoReflow",
-    js::ProfileEntry::Category::GRAPHICS, "(%s)",
-    uri ? uri->GetSpecOrDefault().get() : "N/A");
+  nsIURI* uri = mDocument->GetDocumentURI();
+  nsCString uriString = uri ? uri->GetSpecOrDefault() : NS_LITERAL_CSTRING("N/A");
+  PROFILER_LABEL_DYNAMIC("PresShell", "DoReflow",
+    js::ProfileEntry::Category::GRAPHICS, Move(uriString));
 #endif
 
   nsDocShell* docShell = static_cast<nsDocShell*>(GetPresContext()->GetDocShell());

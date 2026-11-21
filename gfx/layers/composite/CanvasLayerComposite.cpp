@@ -64,7 +64,7 @@ CanvasLayerComposite::SetLayerManager(HostLayerManager* aManager)
   LayerComposite::SetLayerManager(aManager);
   mManager = aManager;
   if (mCompositableHost && mCompositor) {
-    mCompositableHost->SetCompositor(mCompositor);
+    mCompositableHost->SetTextureSourceProvider(mCompositor);
   }
 }
 
@@ -98,7 +98,7 @@ CanvasLayerComposite::RenderLayer(const IntRect& aClipRect,
 
   RenderWithAllMasks(this, mCompositor, aClipRect,
                      [&](EffectChain& effectChain, const IntRect& clipRect) {
-    mCompositableHost->Composite(this, effectChain,
+    mCompositableHost->Composite(mCompositor, this, effectChain,
                           GetEffectiveOpacity(),
                           GetEffectiveTransform(),
                           GetSamplingFilter(),

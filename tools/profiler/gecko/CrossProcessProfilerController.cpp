@@ -10,6 +10,7 @@
 #include "nsIProfileSaveEvent.h"
 #include "nsISupports.h"
 #include "nsIObserver.h"
+#include "nsProfiler.h"
 #include "ProfilerControllingProcess.h"
 
 namespace mozilla {
@@ -61,16 +62,13 @@ CrossProcessProfilerController::CrossProcessProfilerController(
   ProfilerControllingProcess* aProcess)
   : mProcess(aProcess)
   , mObserver(new ProfilerObserver(*this))
-  , mIsProfilerActive(false)
 {
-  nsCOMPtr<nsIProfiler> profiler(do_GetService("@mozilla.org/tools/profiler;1"));
-  bool profilerActive = false;
-  DebugOnly<nsresult> rv = profiler->IsActive(&profilerActive);
-  MOZ_ASSERT(NS_SUCCEEDED(rv));
-
-  if (profilerActive) {
+  if (profiler_is_active()) {
+    // If the profiler is already running in this process, start it in the
+    // child process immediately.
     nsCOMPtr<nsIProfilerStartParams> currentProfilerParams;
-    rv = profiler->GetStartParams(getter_AddRefs(currentProfilerParams));
+    nsCOMPtr<nsIProfiler> profiler(do_GetService("@mozilla.org/tools/profiler;1"));
+    DebugOnly<nsresult> rv = profiler->GetStartParams(getter_AddRefs(currentProfilerParams));
     MOZ_ASSERT(NS_SUCCEEDED(rv));
 
     StartProfiler(currentProfilerParams);
@@ -87,8 +85,8 @@ CrossProcessProfilerController::CrossProcessProfilerController(
 
 CrossProcessProfilerController::~CrossProcessProfilerController()
 {
-  if (mIsProfilerActive && !mProfile.IsEmpty()) {
-    profiler_OOP_exit_profile(mProfile);
+  if (!mProfile.IsEmpty()) {
+    nsProfiler::GetOrCreate()->OOPExitProfile(mProfile);
   }
 
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
@@ -116,8 +114,6 @@ CrossProcessProfilerController::StartProfiler(nsIProfilerStartParams* aParams)
   ipcParams.threadFilters() = aParams->GetThreadFilterNames();
 
   mProcess->SendStartProfiler(ipcParams);
-
-  mIsProfilerActive = true;
 }
 
 void
@@ -129,10 +125,8 @@ CrossProcessProfilerController::Observe(nsISupports* aSubject,
     // need to tell the other process that we're interested in its profile,
     // and we tell the gatherer that we've forwarded the request, so that it
     // can keep track of the number of pending profiles.
-    if (mIsProfilerActive) {
-      profiler_will_gather_OOP_profile();
-      mProcess->SendGatherProfile();
-    }
+    nsProfiler::GetOrCreate()->WillGatherOOPProfile();
+    mProcess->SendGatherProfile();
   }
   else if (!strcmp(aTopic, "profiler-subprocess")) {
     // profiler-subprocess is sent once the gatherer knows that all other
@@ -155,7 +149,6 @@ CrossProcessProfilerController::Observe(nsISupports* aSubject,
     StartProfiler(params);
   }
   else if (!strcmp(aTopic, "profiler-stopped")) {
-    mIsProfilerActive = false;
     mProcess->SendStopProfiler();
   }
   else if (!strcmp(aTopic, "profiler-paused")) {
@@ -171,16 +164,13 @@ CrossProcessProfilerController::Observe(nsISupports* aSubject,
 void
 CrossProcessProfilerController::RecvProfile(const nsCString& aProfile)
 {
-  if (NS_WARN_IF(!mIsProfilerActive)) {
-    return;
-  }
   // Store the profile on this object.
   mProfile = aProfile;
   // Tell the gatherer that we've received the profile from this process, but
   // don't actually give it the profile. It will request the profile once all
   // processes have replied, through the "profiler-subprocess" observer
   // notification.
-  profiler_gathered_OOP_profile();
+  nsProfiler::GetOrCreate()->GatheredOOPProfile();
 }
 
 } // namespace mozilla

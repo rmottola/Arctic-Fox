@@ -39,6 +39,35 @@ typedef struct {
   gint32 maxpos;
 } GtkWidgetState;
 
+/**
+ * A size in the same GTK pixel units as GtkBorder and GdkRectangle.
+ */
+#if (MOZ_WIDGET_GTK == 3)
+struct MozGtkSize {
+  gint width;
+  gint height;
+
+  MozGtkSize operator+(const GtkBorder& aBorder) const
+  {
+    gint resultWidth = width + aBorder.left + aBorder.right;
+    gint resultHeight = height + aBorder.top + aBorder.bottom;
+    return {resultWidth, resultHeight};
+  }
+};
+
+typedef struct {
+  bool initialized;
+  struct {
+    MozGtkSize scrollbar;
+    MozGtkSize thumb;
+    MozGtkSize button;
+  } size;
+  struct {
+    GtkBorder scrollbar;
+    GtkBorder track;
+  } border;
+} ScrollbarGTKMetrics;
+#else
 typedef struct {
   gint slider_width;
   gint trough_border;
@@ -46,6 +75,8 @@ typedef struct {
   gint stepper_spacing;
   gint min_slider_size;
 } MozGtkScrollbarMetrics;
+#endif
+
 
 typedef enum {
   MOZ_GTK_STEPPER_DOWN        = 1 << 0,
@@ -142,7 +173,7 @@ typedef enum {
   MOZ_GTK_ENTRY,
   /* Paints a GtkExpander. */
   MOZ_GTK_EXPANDER,
-  /* Paints the text window or gets the style context corresponding to the
+  /* Paints a GtkTextView or gets the style context corresponding to the
      root node of a GtkTextView. */
   MOZ_GTK_TEXT_VIEW,
   /* The "text" window or node of a GtkTextView */
@@ -269,6 +300,11 @@ typedef enum {
 gint moz_gtk_init();
 
 /**
+ * Updates the drawing library when the theme changes.
+ */
+void moz_gtk_refresh();
+
+/**
  * Perform cleanup of the drawing library. You should call this function
  * when your program exits, or you no longer need the library.
  *
@@ -315,15 +351,14 @@ moz_gtk_widget_paint(WidgetNodeType widget, cairo_t *cr,
  * Get the border size of a widget
  * left/right:  [OUT] the widget's left/right border
  * top/bottom:  [OUT] the widget's top/bottom border
- * direction:   the text direction for the widget
- * inhtml:      boolean indicating whether this widget will be drawn as a HTML form control,
- *              in order to workaround a size issue (MOZ_GTK_BUTTON only, ignored otherwise)
+ * direction:   the text direction for the widget.  Callers depend on this
+ *              being used only for MOZ_GTK_DROPDOWN widgets, and cache
+ *              results for other widget types across direction values.
  *
  * returns:    MOZ_GTK_SUCCESS if there was no error, an error code otherwise
  */
 gint moz_gtk_get_widget_border(WidgetNodeType widget, gint* left, gint* top,
-                               gint* right, gint* bottom, GtkTextDirection direction,
-                               gboolean inhtml);
+                               gint* right, gint* bottom, GtkTextDirection direction);
 
 /**
  * Get the border size of a notebook tab
@@ -420,13 +455,10 @@ gint
 moz_gtk_get_scalethumb_metrics(GtkOrientation orient, gint* thumb_length, gint* thumb_height);
 
 /**
- * Get the desired metrics for a GtkScrollbar
- * metrics:          [IN]  struct which will contain the metrics
- *
- * returns:    MOZ_GTK_SUCCESS if there was no error, an error code otherwise
+ * Get the metrics in GTK pixels for a scrollbar.
  */
-gint
-moz_gtk_get_scrollbar_metrics(MozGtkScrollbarMetrics* metrics);
+const ScrollbarGTKMetrics*
+GetScrollbarMetrics(GtkOrientation aOrientation);
 
 /**
  * Get the desired size of a dropdown arrow button
@@ -516,19 +548,6 @@ GtkWidget* moz_gtk_get_scrollbar_widget(void);
  */
 gint
 moz_gtk_get_tab_thickness(WidgetNodeType aNodeType);
-
-/**
- * Get a boolean which indicates whether the theme draws scrollbar buttons.
- * If TRUE, draw scrollbar buttons.
- */
-gboolean moz_gtk_has_scrollbar_buttons(void);
-
-/**
- * Get minimum widget size as sum of margin, padding, border and min-width,
- * min-height.
- */
-void moz_gtk_get_widget_min_size(WidgetNodeType aGtkWidgetType, int* width,
-                                 int* height);
 
 #if (MOZ_WIDGET_GTK == 2)
 #ifdef __cplusplus

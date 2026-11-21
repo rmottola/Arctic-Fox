@@ -557,7 +557,7 @@ XRE_InitChildProcess(int aArgc,
       nsString appId;
       appId.AssignWithConversion(nsDependentCString(appModelUserId));
       // The version string is encased in quotes
-      appId.Trim(NS_LITERAL_CSTRING("\"").get());
+      appId.Trim("\"");
       // Set the id
       SetTaskbarGroupId(appId);
     }
@@ -731,6 +731,12 @@ XRE_InitParentProcess(int aArgc,
   NS_ENSURE_ARG_MIN(aArgc, 1);
   NS_ENSURE_ARG_POINTER(aArgv);
   NS_ENSURE_ARG_POINTER(aArgv[0]);
+
+  // Set main thread before we initialize the profiler
+  NS_SetMainThread();
+
+  char aLocal;
+  GeckoProfilerInitRAII profiler(&aLocal);
 
   ScopedXREEmbed embed;
 

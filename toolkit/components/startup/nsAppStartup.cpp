@@ -458,11 +458,8 @@ nsAppStartup::Quit(uint32_t aMode)
     // No chance of the shutdown being cancelled from here on; tell people
     // we're shutting down for sure while all services are still available.
     if (obsService) {
-      NS_NAMED_LITERAL_STRING(shutdownStr, "shutdown");
-      NS_NAMED_LITERAL_STRING(restartStr, "restart");
       obsService->NotifyObservers(nullptr, "quit-application",
-        (mRestart || mRestartNotSameProfile) ?
-         restartStr.get() : shutdownStr.get());
+        (mRestart || mRestartNotSameProfile) ? u"restart" : u"shutdown");
     }
 
     if (!mRunning) {
@@ -754,7 +751,7 @@ nsAppStartup::GetStartupInfo(JSContext* aCx, JS::MutableHandle<JS::Value> aRetva
   if (procTime.IsNull()) {
     bool error = false;
 
-    procTime = TimeStamp::ProcessCreation(error);
+    procTime = TimeStamp::ProcessCreation(&error);
 
     if (error) {
       Telemetry::Accumulate(Telemetry::STARTUP_MEASUREMENT_ERRORS,

@@ -7,7 +7,7 @@
 
 #include "apz/src/AsyncPanZoomController.h"
 #include "gfxPrefs.h"
-#include "WebRenderLayersLogging.h"
+#include "LayersLogging.h"
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/layers/APZCTreeManager.h"
 #include "mozilla/layers/AsyncCompositionManager.h"
@@ -17,7 +17,6 @@
 #include "mozilla/widget/PlatformWidgetTypes.h"
 #include "nsThreadUtils.h"
 #include "TreeTraversal.h"
-#include "WebRenderBorderLayer.h"
 #include "WebRenderCanvasLayer.h"
 #include "WebRenderColorLayer.h"
 #include "WebRenderContainerLayer.h"
@@ -109,7 +108,7 @@ WebRenderLayer::TransformedVisibleBoundsRelativeToParent()
 }
 
 Maybe<WrImageMask>
-WebRenderLayer::buildMaskLayer() {
+WebRenderLayer::BuildWrMaskLayer() {
   Maybe<WrImageMask> mask = Nothing();
   WrImageMask imageMask;
   Layer* maskLayer = GetLayer()->GetMaskLayer();
@@ -145,56 +144,70 @@ WebRenderLayer::buildMaskLayer() {
   return mask;
 }
 
-
-
-
-WrScrollFrameStackingContextGenerator::WrScrollFrameStackingContextGenerator(
-        WebRenderLayer* aLayer)
-  : mLayer(aLayer)
+gfx::Rect
+WebRenderLayer::GetWrBoundsRect()
 {
-  Matrix4x4 identity;
-  Layer* layer = mLayer->GetLayer();
-  for (size_t i = layer->GetScrollMetadataCount(); i > 0; i--) {
-    const FrameMetrics& fm = layer->GetFrameMetrics(i - 1);
-    if (!fm.IsScrollable()) {
-      continue;
-    }
-    Rect bounds = fm.GetCompositionBounds().ToUnknownRect();
-    Rect overflow = (fm.GetExpandedScrollableRect() * fm.LayersPixelsPerCSSPixel()).ToUnknownRect();
-    Point scrollPos = (fm.GetScrollOffset() * fm.LayersPixelsPerCSSPixel()).ToUnknownPoint();
-    Rect parentBounds = mLayer->ParentStackingContextBounds(i);
-    bounds.MoveBy(-parentBounds.x, -parentBounds.y);
-    // Subtract the MT scroll position from the overflow here so that the WR
-    // scroll offset (which is the APZ async scroll component) always fits in
-    // the available overflow. If we didn't do this and WR did bounds checking
-    // on the scroll offset, we'd fail those checks.
-    overflow.MoveBy(bounds.x - scrollPos.x, bounds.y - scrollPos.y);
-    if (gfxPrefs::LayersDump()) {
-      printf_stderr("Pushing stacking context id %" PRIu64 " with bounds=%s, overflow=%s\n",
-        fm.GetScrollId(), Stringify(bounds).c_str(), Stringify(overflow).c_str());
-    }
-
-/*    mLayer->WrBridge()->AddWebRenderCommand(
-      OpDPPushScrollLayer(wr::ToWrRect(bounds),
-                          wr::ToWrRect(overflow),
-                          Nothing(),
-                          fm.GetScrollId()));*/
-  }
+  LayerIntRect bounds = GetLayer()->GetVisibleRegion().GetBounds();
+  return Rect(0, 0, bounds.width, bounds.height);
 }
 
-WrScrollFrameStackingContextGenerator::~WrScrollFrameStackingContextGenerator()
+gfx::Rect
+WebRenderLayer::GetWrClipRect(gfx::Rect& aRect)
 {
-  Layer* layer = mLayer->GetLayer();
-  for (size_t i = 0; i < layer->GetScrollMetadataCount(); i++) {
-    const FrameMetrics& fm = layer->GetFrameMetrics(i);
-    if (!fm.IsScrollable()) {
-      continue;
-    }
-    if (gfxPrefs::LayersDump()) printf_stderr("Popping stacking context id %" PRIu64"\n", fm.GetScrollId());
-//    mLayer->WrBridge()->AddWebRenderCommand(OpDPPopStackingContext());
+  gfx::Rect clip;
+  Layer* layer = GetLayer();
+  Matrix4x4 transform = layer->GetTransform();
+  if (layer->GetClipRect().isSome()) {
+    clip = RelativeToVisible(transform.Inverse().TransformBounds(
+             IntRectToRect(layer->GetClipRect().ref().ToUnknownRect()))
+           );
+  } else {
+    clip = aRect;
   }
+
+  return clip;
 }
 
+gfx::Rect
+WebRenderLayer::GetWrRelBounds()
+{
+  gfx::Rect relBounds = VisibleBoundsRelativeToParent();
+  gfx::Matrix4x4 transform = GetLayer()->GetTransform();
+  if (!transform.IsIdentity()) {
+    // WR will only apply the 'translate' of the transform, so we need to do the scale/rotation manually.
+    gfx::Matrix4x4 boundTransform = transform;
+    boundTransform._41 = 0.0f;
+    boundTransform._42 = 0.0f;
+    boundTransform._43 = 0.0f;
+    relBounds.MoveTo(boundTransform.TransformPoint(relBounds.TopLeft()));
+  }
+
+  return relBounds;
+}
+
+void
+WebRenderLayer::DumpLayerInfo(const char* aLayerType, gfx::Rect& aRect)
+{
+  if (!gfxPrefs::LayersDump()) {
+    return;
+  }
+
+  Matrix4x4 transform = GetLayer()->GetTransform();
+  Rect clip = GetWrClipRect(aRect);
+  Rect relBounds = GetWrRelBounds();
+  Rect overflow(0, 0, relBounds.width, relBounds.height);
+  WrMixBlendMode mixBlendMode = wr::ToWrMixBlendMode(GetLayer()->GetMixBlendMode());
+
+  printf_stderr("%s %p using bounds=%s, overflow=%s, transform=%s, rect=%s, clip=%s, mix-blend-mode=%s\n",
+                aLayerType,
+                GetLayer(),
+                Stringify(relBounds).c_str(),
+                Stringify(overflow).c_str(),
+                Stringify(transform).c_str(),
+                Stringify(aRect).c_str(),
+                Stringify(clip).c_str(),
+                Stringify(mixBlendMode).c_str());
+}
 
 WebRenderLayerManager::WebRenderLayerManager(nsIWidget* aWidget)
   : mWidget(aWidget)
@@ -217,14 +230,15 @@ WebRenderLayerManager::Initialize(PCompositorBridgeChild* aCBChild,
   MOZ_ASSERT(mWrChild == nullptr);
   MOZ_ASSERT(aTextureFactoryIdentifier);
 
+  LayoutDeviceIntSize size = mWidget->GetClientSize();
   TextureFactoryIdentifier textureFactoryIdentifier;
   uint32_t id_namespace;
   PWebRenderBridgeChild* bridge = aCBChild->SendPWebRenderBridgeConstructor(aLayersId,
+                                                                            size,
                                                                             &textureFactoryIdentifier,
                                                                             &id_namespace);
   MOZ_ASSERT(bridge);
   mWrChild = static_cast<WebRenderBridgeChild*>(bridge);
-  LayoutDeviceIntSize size = mWidget->GetClientSize();
   WrBridge()->SendCreate(size.ToUnknownSize());
   WrBridge()->IdentifyTextureHost(textureFactoryIdentifier);
   WrBridge()->SetNamespace(id_namespace);
@@ -314,12 +328,13 @@ WebRenderLayerManager::EndTransaction(DrawPaintedLayerCallback aCallback,
     return;
   }
 
-  WebRenderLayer::ToWebRenderLayer(mRoot)->RenderLayer();
+  wr::DisplayListBuilder builder(WrBridge()->GetPipeline());
+  WebRenderLayer::ToWebRenderLayer(mRoot)->RenderLayer(builder);
 
   bool sync = mTarget != nullptr;
   mLatestTransactionId = mTransactionIdAllocator->GetTransactionId();
 
-  WrBridge()->DPEnd(size.ToUnknownSize(), sync, mLatestTransactionId);
+  WrBridge()->DPEnd(builder, size.ToUnknownSize(), sync, mLatestTransactionId);
 
   MakeSnapshotIfRequired(size);
 
@@ -344,7 +359,7 @@ WebRenderLayerManager::MakeSnapshotIfRequired(LayoutDeviceIntSize aSize)
                                             SurfaceFormat::B8G8R8A8,
                                             aSize.ToUnknownSize(),
                                             BackendType::SKIA,
-                                            TextureFlags::DEFAULT);
+                                            TextureFlags::SNAPSHOT);
   if (!texture) {
     return;
   }
@@ -549,7 +564,7 @@ WebRenderLayerManager::CreateTextLayer()
 already_AddRefed<BorderLayer>
 WebRenderLayerManager::CreateBorderLayer()
 {
-  return MakeAndAddRef<WebRenderBorderLayer>(this);
+  return nullptr;
 }
 
 already_AddRefed<DisplayItemLayer>

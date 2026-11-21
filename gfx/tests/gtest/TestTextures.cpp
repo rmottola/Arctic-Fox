@@ -147,6 +147,7 @@ void TestTextureClientSurface(TextureClient* texture, gfxImageSurface* surface) 
 
   // host deserialization
   RefPtr<TextureHost> host = CreateBackendIndependentTextureHost(descriptor, nullptr,
+                                                                 LayersBackend::LAYERS_NONE,
                                                                  texture->GetFlags());
 
   ASSERT_TRUE(host.get() != nullptr);
@@ -191,6 +192,7 @@ void TestTextureClientYCbCr(TextureClient* client, PlanarYCbCrData& ycbcrData) {
 
   // host deserialization
   RefPtr<TextureHost> textureHost = CreateBackendIndependentTextureHost(descriptor, nullptr,
+                                                                        LayersBackend::LAYERS_NONE,
                                                                         client->GetFlags());
 
   RefPtr<BufferTextureHost> host = static_cast<BufferTextureHost*>(textureHost.get());

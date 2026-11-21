@@ -80,6 +80,7 @@ class AsyncCanvasRenderer;
 class AsyncPanZoomController;
 class BasicLayerManager;
 class ClientLayerManager;
+class HostLayerManager;
 class Layer;
 class LayerMetricsWrapper;
 class PaintedLayer;
@@ -215,6 +216,8 @@ public:
   { return nullptr; }
 
   virtual BasicLayerManager* AsBasicLayerManager()
+  { return nullptr; }
+  virtual HostLayerManager* AsHostLayerManager()
   { return nullptr; }
 
   virtual WebRenderLayerManager* AsWebRenderLayerManager()
@@ -641,9 +644,6 @@ public:
                                       nsTArray<float>& aFrameIntervals);
 
   void RecordFrame();
-  void PostPresent();
-
-  void BeginTabSwitch();
 
   static bool IsLogEnabled();
   static mozilla::LogModule* GetLog();
@@ -753,8 +753,6 @@ private:
     bool mIsPaused;
   };
   FramesTimingRecording mRecording;
-
-  TimeStamp mTabSwitchStart;
 
 public:
   /*
@@ -2237,6 +2235,12 @@ public:
 
 protected:
   friend class ReadbackProcessor;
+
+  // Note that this is not virtual, and is based on the implementation of
+  // ContainerLayer::RemoveChild, so it should only be called where you would
+  // want to explicitly call the base class implementation of RemoveChild;
+  // e.g., while (mFirstChild) ContainerLayer::RemoveChild(mFirstChild);
+  void RemoveAllChildren();
 
   void DidInsertChild(Layer* aLayer);
   void DidRemoveChild(Layer* aLayer);

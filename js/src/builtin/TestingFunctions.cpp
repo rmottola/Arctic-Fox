@@ -4258,9 +4258,8 @@ static bool
 TimeSinceCreation(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    bool ignore;
-    double when = (mozilla::TimeStamp::Now()
-                   - mozilla::TimeStamp::ProcessCreation(ignore)).ToMilliseconds();
+    double when = (mozilla::TimeStamp::Now() -
+                   mozilla::TimeStamp::ProcessCreation()).ToMilliseconds();
     args.rval().setNumber(when);
     return true;
 }
@@ -4288,6 +4287,17 @@ GetErrorNotes(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     args.rval().setObject(*notesArray);
+    return true;
+}
+
+static bool
+IsConstructor(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() < 1)
+        args.rval().setBoolean(false);
+    else
+        args.rval().setBoolean(IsConstructor(args[0]));
     return true;
 }
 
@@ -4847,6 +4857,10 @@ gc::ZealModeHelpText),
 "TimeSinceCreation()",
 "  Returns the time in milliseconds since process creation.\n"
 "  This uses a clock compatible with the profiler.\n"),
+
+    JS_FN_HELP("isConstructor", IsConstructor, 1, 0,
+"isConstructor(value)",
+"  Returns whether the value is considered IsConstructor.\n"),
 
     JS_FS_HELP_END
 };

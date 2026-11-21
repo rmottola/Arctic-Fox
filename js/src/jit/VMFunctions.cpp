@@ -667,7 +667,9 @@ PostWriteElementBarrier(JSRuntime* rt, JSObject* obj, int32_t index)
 #endif
         )
     {
-        rt->gc.storeBuffer().putSlot(nobj, HeapSlot::Element, index, 1);
+        rt->gc.storeBuffer().putSlot(nobj, HeapSlot::Element,
+                                     nobj->unshiftedIndex(index),
+                                     1);
         return;
     }
 
@@ -1700,14 +1702,20 @@ HasOwnNativeDataProperty(JSContext* cx, JSObject* obj, Value* vp)
 {
     JS::AutoCheckCannotGC nogc;
 
-    if (MOZ_UNLIKELY(!obj->isNative()))
-        return false;
-
     // vp[0] contains the id, result will be stored in vp[1].
     Value idVal = vp[0];
     jsid id;
     if (!ValueToAtomOrSymbol(cx, idVal, &id))
         return false;
+
+    if (!obj->isNative()) {
+        if (obj->is<UnboxedPlainObject>()) {
+            bool res = obj->as<UnboxedPlainObject>().containsUnboxedOrExpandoProperty(cx, id);
+            vp[1].setBoolean(res);
+            return true;
+        }
+        return false;
+    }
 
     NativeObject* nobj = &obj->as<NativeObject>();
     if (nobj->lastProperty()->search(cx, id)) {
@@ -1724,6 +1732,13 @@ HasOwnNativeDataProperty(JSContext* cx, JSObject* obj, Value* vp)
     // Missing property.
     vp[1].setBoolean(false);
     return true;
+}
+
+JSString*
+TypeOfObject(JSObject* obj, JSRuntime* rt)
+{
+    JSType type = js::TypeOfObject(obj);
+    return TypeName(type, *rt->commonNames);
 }
 
 } // namespace jit

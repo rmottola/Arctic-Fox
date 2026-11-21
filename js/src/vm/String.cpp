@@ -208,6 +208,7 @@ JSString::dumpRepresentationHeader(FILE* fp, int indent, const char* subclass) c
     if (flags & ATOM_BIT)               fputs(" ATOM", fp);
     if (isPermanentAtom())              fputs(" PERMANENT", fp);
     if (flags & LATIN1_CHARS_BIT)       fputs(" LATIN1", fp);
+    if (flags & INDEX_VALUE_BIT)        fprintf(fp, " INDEX_VALUE(%u)", getIndexValue());
     fputc('\n', fp);
 }
 
@@ -863,6 +864,9 @@ StaticStrings::init(JSContext* cx)
             HashNumber hash = mozilla::HashString(buffer, 3);
             intStaticTable[i] = s->morphAtomizedStringIntoPermanentAtom(hash);
         }
+
+        // Static string initialization can not race, so allow even without the lock.
+        intStaticTable[i]->maybeInitializeIndex(i, true);
     }
 
     return true;
@@ -929,6 +933,9 @@ AutoStableStringChars::init(JSContext* cx, JSString* s)
 
     MOZ_ASSERT(state_ == Uninitialized);
 
+    if (linearString->isExternal() && !linearString->ensureFlat(cx))
+        return false;
+
     // If the chars are inline then we need to copy them since they may be moved
     // by a compacting GC.
     if (baseIsInline(linearString)) {
@@ -959,6 +966,9 @@ AutoStableStringChars::initTwoByte(JSContext* cx, JSString* s)
 
     if (linearString->hasLatin1Chars())
         return copyAndInflateLatin1Chars(cx, linearString);
+
+    if (linearString->isExternal() && !linearString->ensureFlat(cx))
+        return false;
 
     // If the chars are inline then we need to copy them since they may be moved
     // by a compacting GC.

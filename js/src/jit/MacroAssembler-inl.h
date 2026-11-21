@@ -420,6 +420,27 @@ MacroAssembler::branchIfRope(Register str, Label* label)
 }
 
 void
+MacroAssembler::branchIfRopeOrExternal(Register str, Register temp, Label* label)
+{
+    Address flags(str, JSString::offsetOfFlags());
+    move32(Imm32(JSString::TYPE_FLAGS_MASK), temp);
+    and32(flags, temp);
+
+    static_assert(JSString::ROPE_FLAGS == 0, "Rope type flags must be 0");
+    branchTest32(Assembler::Zero, temp, temp, label);
+
+    branch32(Assembler::Equal, temp, Imm32(JSString::EXTERNAL_FLAGS), label);
+}
+
+void
+MacroAssembler::branchIfNotRope(Register str, Label* label)
+{
+    Address flags(str, JSString::offsetOfFlags());
+    static_assert(JSString::ROPE_FLAGS == 0, "Rope type flags must be 0");
+    branchTest32(Assembler::NonZero, flags, Imm32(JSString::TYPE_FLAGS_MASK), label);
+}
+
+void
 MacroAssembler::branchLatin1String(Register string, Label* label)
 {
     branchTest32(Assembler::NonZero, Address(string, JSString::offsetOfFlags()),
@@ -455,6 +476,20 @@ MacroAssembler::branchIfInterpreted(Register fun, Label* label)
     Address address(fun, JSFunction::offsetOfNargs());
     int32_t bit = IMM32_16ADJ(JSFunction::INTERPRETED);
     branchTest32(Assembler::NonZero, address, Imm32(bit), label);
+}
+
+void
+MacroAssembler::branchIfObjectEmulatesUndefined(Register objReg, Register scratch,
+                                                Label* slowCheck, Label* label)
+{
+    // The branches to out-of-line code here implement a conservative version
+    // of the JSObject::isWrapper test performed in EmulatesUndefined.
+    loadObjClass(objReg, scratch);
+
+    branchTestClassIsProxy(true, scratch, slowCheck);
+
+    Address flags(scratch, Class::offsetOfFlags());
+    branchTest32(Assembler::NonZero, flags, Imm32(JSCLASS_EMULATES_UNDEFINED), label);
 }
 
 void
@@ -503,22 +538,6 @@ void
 MacroAssembler::branchTestObjGroup(Condition cond, Register obj, Register group, Label* label)
 {
     branchPtr(cond, Address(obj, JSObject::offsetOfGroup()), group, label);
-}
-
-void
-MacroAssembler::branchTestObjectTruthy(bool truthy, Register objReg, Register scratch,
-                                       Label* slowCheck, Label* checked)
-{
-    // The branches to out-of-line code here implement a conservative version
-    // of the JSObject::isWrapper test performed in EmulatesUndefined.  If none
-    // of the branches are taken, we can check class flags directly.
-    loadObjClass(objReg, scratch);
-    Address flags(scratch, Class::offsetOfFlags());
-
-    branchTestClassIsProxy(true, scratch, slowCheck);
-
-    Condition cond = truthy ? Assembler::Zero : Assembler::NonZero;
-    branchTest32(cond, flags, Imm32(JSCLASS_EMULATES_UNDEFINED), checked);
 }
 
 void

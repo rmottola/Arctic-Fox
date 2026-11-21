@@ -711,7 +711,7 @@ struct JSCompartment
     void sweepCrossCompartmentWrappers();
     void sweepSavedStacks();
     void sweepTemplateLiteralMap();
-    void sweepGlobalObject(js::FreeOp* fop);
+    void sweepGlobalObject();
     void sweepSelfHostingScriptSource();
     void sweepJitCompartment(js::FreeOp* fop);
     void sweepRegExps();
@@ -719,6 +719,7 @@ struct JSCompartment
     void sweepNativeIterators();
     void sweepTemplateObjects();
     void sweepVarNames();
+    void sweepWatchpoints();
 
     void purge();
     void clearTables();
@@ -939,6 +940,8 @@ struct JSCompartment
         MOZ_ASSERT(!compartmentStats_ && newStats);
         compartmentStats_ = newStats;
     }
+
+    MOZ_ALWAYS_INLINE bool objectMaybeInIteration(JSObject* obj);
 
     // These flags help us to discover if a compartment that shouldn't be alive
     // manages to outlive a GC.

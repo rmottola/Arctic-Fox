@@ -32,7 +32,7 @@ read_procmaps(lul::LUL* aLUL)
   for (size_t i = 0; i < info.GetSize(); i++) {
     const SharedLibrary& lib = info.GetEntry(i);
 
-    std::string nativeName = lib.GetNativeDebugName();
+    std::string nativePath = lib.GetNativeDebugPath();
 
 #   if defined(USE_FAULTY_LIB)
     // We're using faulty.lib.  Use a special-case object mapper.
@@ -46,10 +46,10 @@ read_procmaps(lul::LUL* aLUL)
     // to NotifyAfterMap().
     void*  image = nullptr;
     size_t size  = 0;
-    bool ok = mapper.Map(&image, &size, nativeName);
+    bool ok = mapper.Map(&image, &size, nativePath);
     if (ok && image && size > 0) {
       aLUL->NotifyAfterMap(lib.GetStart(), lib.GetEnd()-lib.GetStart(),
-                           nativeName.c_str(), image);
+                           nativePath.c_str(), image);
     } else if (!ok && lib.GetDebugName().IsEmpty()) {
       // The object has no name and (as a consequence) the mapper
       // failed to map it.  This happens on Linux, where
@@ -73,18 +73,13 @@ read_procmaps(lul::LUL* aLUL)
 # endif
 }
 
-
 // LUL needs a callback for its logging sink.
 void
-logging_sink_for_LUL(const char* str) {
-  // Ignore any trailing \n, since LOG will add one anyway.
-  size_t n = strlen(str);
-  if (n > 0 && str[n-1] == '\n') {
-    char* tmp = strdup(str);
-    tmp[n-1] = 0;
-    LOG(tmp);
-    free(tmp);
-  } else {
-    LOG(str);
-  }
+logging_sink_for_LUL(const char* str)
+{
+  // These are only printed when Verbose logging is enabled (e.g. with
+  // MOZ_LOG="prof:5"). This is because LUL's logging is much more verbose than
+  // the rest of the profiler's logging, which occurs at the Info (3) and Debug
+  // (4) levels.
+  MOZ_LOG(gProfilerLog, mozilla::LogLevel::Verbose, ("[%d] %s", getpid(), str));
 }

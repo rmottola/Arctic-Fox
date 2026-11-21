@@ -551,7 +551,8 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
         // that it makes sense to just treat them like Objects for Xray purposes.
         if (key == JSProto_Object || key == JSProto_Array) {
             return getOwnPropertyFromWrapperIfSafe(cx, wrapper, id, desc);
-        } else if (IsTypedArrayKey(key)) {
+        }
+        if (IsTypedArrayKey(key)) {
             if (IsArrayIndex(GetArrayIndexFromId(cx, id))) {
                 // WebExtensions can't use cloneInto(), so we just let them do
                 // the slow thing to maximize compatibility.
@@ -568,19 +569,19 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
                         desc.object().set(wrapper);
                     }
                     return true;
-                } else {
-                    JS_ReportErrorASCII(cx, "Accessing TypedArray data over Xrays is slow, and forbidden "
-                                        "in order to encourage performant code. To copy TypedArrays "
-                                        "across origin boundaries, consider using Components.utils.cloneInto().");
-                    return false;
                 }
+                JS_ReportErrorASCII(cx, "Accessing TypedArray data over Xrays is slow, and forbidden "
+                                    "in order to encourage performant code. To copy TypedArrays "
+                                    "across origin boundaries, consider using Components.utils.cloneInto().");
+                return false;
             }
         } else if (key == JSProto_Function) {
             if (id == GetJSIDByIndex(cx, XPCJSContext::IDX_LENGTH)) {
                 FillPropertyDescriptor(desc, wrapper, JSPROP_PERMANENT | JSPROP_READONLY,
                                        NumberValue(JS_GetFunctionArity(JS_GetObjectFunction(target))));
                 return true;
-            } else if (id == GetJSIDByIndex(cx, XPCJSContext::IDX_NAME)) {
+            }
+            if (id == GetJSIDByIndex(cx, XPCJSContext::IDX_NAME)) {
                 RootedString fname(cx, JS_GetFunctionId(JS_GetObjectFunction(target)));
                 if (fname)
                     JS_MarkCrossZoneIdValue(cx, StringValue(fname));
@@ -873,7 +874,8 @@ JSXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, unsigned flags
             for (size_t i = 0; i < props.length(); ++i)
                 JS_MarkCrossZoneId(cx, props[i]);
             return true;
-        } else if (IsTypedArrayKey(key)) {
+        }
+        if (IsTypedArrayKey(key)) {
             uint32_t length = JS_GetTypedArrayLength(target);
             // TypedArrays enumerate every indexed property in range, but
             // |length| is a getter that lives on the proto, like it should be.
@@ -1312,14 +1314,14 @@ bool CloneExpandoChain(JSContext* cx, JSObject* dstArg, JSObject* srcArg)
 static JSObject*
 GetHolder(JSObject* obj)
 {
-    return &js::GetProxyExtra(obj, 0).toObject();
+    return &js::GetProxyReservedSlot(obj, 0).toObject();
 }
 
 JSObject*
 XrayTraits::getHolder(JSObject* wrapper)
 {
     MOZ_ASSERT(WrapperFactory::IsXrayWrapper(wrapper));
-    js::Value v = js::GetProxyExtra(wrapper, 0);
+    js::Value v = js::GetProxyReservedSlot(wrapper, 0);
     return v.isObject() ? &v.toObject() : nullptr;
 }
 
@@ -1331,7 +1333,7 @@ XrayTraits::ensureHolder(JSContext* cx, HandleObject wrapper)
         return holder;
     holder = createHolder(cx, wrapper); // virtual trap.
     if (holder)
-        js::SetProxyExtra(wrapper, 0, ObjectValue(*holder));
+        js::SetProxyReservedSlot(wrapper, 0, ObjectValue(*holder));
     return holder;
 }
 
@@ -1400,7 +1402,7 @@ XPCWrappedNativeXrayTraits::resolveNativeProperty(JSContext* cx, HandleObject wr
     }
 
     if (!(iface = ccx.GetInterface()) || !(member = ccx.GetMember())) {
-        if (id != nsXPConnect::GetContextInstance()->GetStringID(XPCJSContext::IDX_TO_STRING))
+        if (id != XPCJSRuntime::Get()->GetStringID(XPCJSContext::IDX_TO_STRING))
             return true;
 
         JSFunction* toString = JS_NewFunction(cx, XrayToString, 0, 0, "toString");

@@ -250,7 +250,6 @@ UNIFIED_SOURCES += [
     'jit/JitFrames.cpp',
     'jit/JitOptions.cpp',
     'jit/JitSpewer.cpp',
-    'jit/JSONPrinter.cpp',
     'jit/JSONSpewer.cpp',
     'jit/LICM.cpp',
     'jit/Linker.cpp',
@@ -337,6 +336,7 @@ UNIFIED_SOURCES += [
     'vm/HelperThreads.cpp',
     'vm/Id.cpp',
     'vm/JSONParser.cpp',
+    'vm/JSONPrinter.cpp',
     'vm/MemoryMetrics.cpp',
     'vm/NativeObject.cpp',
     'vm/ObjectGroup.cpp',
@@ -592,6 +592,19 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
             UNIFIED_SOURCES += [
                 'jit/mips64/Simulator-mips64.cpp'
             ]
+elif CONFIG['JS_CODEGEN_PPC_OSX']:
+    SOURCES += [
+        'jit/ppc/Architecture-ppc.cpp',
+        'jit/ppc/Assembler-ppc.cpp',
+        'jit/ppc/Bailouts-ppc.cpp',
+        'jit/ppc/BaselineCompiler-ppc.cpp',
+        'jit/ppc/BaselineIC-ppc.cpp',
+        'jit/ppc/CodeGenerator-ppc.cpp',
+        'jit/ppc/Lowering-ppc.cpp',
+        'jit/ppc/MacroAssembler-ppc.cpp',
+        'jit/ppc/MoveEmitter-ppc.cpp',
+        'jit/ppc/Trampoline-ppc.cpp',
+    ]
 
 if CONFIG['OS_ARCH'] == 'WINNT':
     SOURCES += [

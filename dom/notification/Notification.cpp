@@ -685,6 +685,11 @@ NotificationTelemetryService::GetInstance()
 nsresult
 NotificationTelemetryService::Init()
 {
+  // Only perform permissions telemetry collection in the parent process.
+  if (!XRE_IsParentProcess()) {
+    return NS_OK;
+  }
+
   nsresult rv = AddPermissionChangeObserver();
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -706,6 +711,9 @@ NotificationTelemetryService::RemovePermissionChangeObserver()
 nsresult
 NotificationTelemetryService::AddPermissionChangeObserver()
 {
+  MOZ_ASSERT(XRE_IsParentProcess(),
+             "AddPermissionChangeObserver may only be called in the parent process");
+
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
   if (!obs) {
     return NS_ERROR_OUT_OF_MEMORY;
@@ -716,6 +724,9 @@ NotificationTelemetryService::AddPermissionChangeObserver()
 void
 NotificationTelemetryService::RecordPermissions()
 {
+  MOZ_ASSERT(XRE_IsParentProcess(),
+             "RecordPermissions may only be called in the parent process");
+
   if (!Telemetry::CanRecordBase() || !Telemetry::CanRecordExtended()) {
     return;
   }

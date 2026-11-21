@@ -77,17 +77,19 @@ ImageHost::UseTextureHost(const nsTArray<TimedTexture>& aTextures)
     SetCurrentTextureHost(mImages[0].mTextureHost);
   }
 
+  HostLayerManager* lm = GetLayerManager();
+
   // Video producers generally send replacement images with the same frameID but
   // slightly different timestamps in order to sync with the audio clock. This
   // means that any CompositeUntil() call we made in Composite() may no longer
   // guarantee that we'll composite until the next frame is ready. Fix that here.
-  if (GetCompositor() && mLastFrameID >= 0) {
+  if (lm && mLastFrameID >= 0) {
     for (size_t i = 0; i < mImages.Length(); ++i) {
       bool frameComesAfter = mImages[i].mFrameID > mLastFrameID ||
                              mImages[i].mProducerID != mLastProducerID;
       if (frameComesAfter && !mImages[i].mTimeStamp.IsNull()) {
-        GetCompositor()->CompositeUntil(mImages[i].mTimeStamp +
-                                        TimeDuration::FromMilliseconds(BIAS_TIME_MS));
+        lm->CompositeUntil(mImages[i].mTimeStamp +
+                           TimeDuration::FromMilliseconds(BIAS_TIME_MS));
         break;
       }
     }
@@ -155,8 +157,8 @@ TimeStamp
 ImageHost::GetCompositionTime() const
 {
   TimeStamp time;
-  if (GetCompositor()) {
-    time = GetCompositor()->GetCompositionTime();
+  if (HostLayerManager* lm = GetLayerManager()) {
+    time = lm->GetCompositionTime();
   }
   return time;
 }
@@ -175,20 +177,19 @@ ImageHost::GetAsTextureHost(IntRect* aPictureRect)
 }
 
 void ImageHost::Attach(Layer* aLayer,
-                       Compositor* aCompositor,
+                       TextureSourceProvider* aProvider,
                        AttachFlags aFlags)
 {
-  CompositableHost::Attach(aLayer, aCompositor, aFlags);
+  CompositableHost::Attach(aLayer, aProvider, aFlags);
   for (auto& img : mImages) {
-    if (GetCompositor()) {
-      img.mTextureHost->SetCompositor(GetCompositor());
-    }
+    img.mTextureHost->SetTextureSourceProvider(aProvider);
     img.mTextureHost->Updated();
   }
 }
 
 void
-ImageHost::Composite(LayerComposite* aLayer,
+ImageHost::Composite(Compositor* aCompositor,
+                     LayerComposite* aLayer,
                      EffectChain& aEffectChain,
                      float aOpacity,
                      const gfx::Matrix4x4& aTransform,
@@ -197,10 +198,8 @@ ImageHost::Composite(LayerComposite* aLayer,
                      const nsIntRegion* aVisibleRegion,
                      const Maybe<gfx::Polygon>& aGeometry)
 {
-  if (!GetCompositor()) {
-    // should only happen when a tab is dragged to another window and
-    // async-video is still sending frames but we haven't attached the
-    // set the new compositor yet.
+  HostLayerManager* lm = GetLayerManager();
+  if (!lm) {
     return;
   }
 
@@ -210,11 +209,11 @@ ImageHost::Composite(LayerComposite* aLayer,
   }
 
   if (uint32_t(imageIndex) + 1 < mImages.Length()) {
-    GetCompositor()->CompositeUntil(mImages[imageIndex + 1].mTimeStamp + TimeDuration::FromMilliseconds(BIAS_TIME_MS));
+    lm->CompositeUntil(mImages[imageIndex + 1].mTimeStamp + TimeDuration::FromMilliseconds(BIAS_TIME_MS));
   }
 
   TimedImage* img = &mImages[imageIndex];
-  img->mTextureHost->SetCompositor(GetCompositor());
+  img->mTextureHost->SetTextureSourceProvider(aCompositor);
   SetCurrentTextureHost(img->mTextureHost);
 
   {
@@ -244,7 +243,7 @@ ImageHost::Composite(LayerComposite* aLayer,
       return;
     }
 
-    if (!GetCompositor()->SupportsEffect(effect->mType)) {
+    if (!aCompositor->SupportsEffect(effect->mType)) {
       return;
     }
 
@@ -261,7 +260,7 @@ ImageHost::Composite(LayerComposite* aLayer,
         info.mImageBridgeProcessId = mAsyncRef.mProcessId;
         info.mNotification = ImageCompositeNotification(
           mAsyncRef.mHandle,
-          img->mTimeStamp, GetCompositor()->GetCompositionTime(),
+          img->mTimeStamp, lm->GetCompositionTime(),
           img->mFrameID, img->mProducerID);
         static_cast<LayerManagerComposite*>(aLayer->GetLayerManager())->
             AppendImageCompositeNotification(info);
@@ -303,15 +302,15 @@ ImageHost::Composite(LayerComposite* aLayer,
           effect->mTextureCoords.y = effect->mTextureCoords.YMost();
           effect->mTextureCoords.height = -effect->mTextureCoords.height;
         }
-        GetCompositor()->DrawGeometry(rect, aClipRect, aEffectChain,
-                                      aOpacity, aTransform, aGeometry);
-        GetCompositor()->DrawDiagnostics(diagnosticFlags | DiagnosticFlags::BIGIMAGE,
-                                         rect, aClipRect, aTransform, mFlashCounter);
+        aCompositor->DrawGeometry(rect, aClipRect, aEffectChain,
+                                  aOpacity, aTransform, aGeometry);
+        aCompositor->DrawDiagnostics(diagnosticFlags | DiagnosticFlags::BIGIMAGE,
+                                     rect, aClipRect, aTransform, mFlashCounter);
       } while (it->NextTile());
       it->EndBigImageIteration();
       // layer border
-      GetCompositor()->DrawDiagnostics(diagnosticFlags, pictureRect,
-                                       aClipRect, aTransform, mFlashCounter);
+      aCompositor->DrawDiagnostics(diagnosticFlags, pictureRect,
+                                   aClipRect, aTransform, mFlashCounter);
     } else {
       IntSize textureSize = mCurrentTextureSource->GetSize();
       effect->mTextureCoords = Rect(Float(img->mPictureRect.x) / textureSize.width,
@@ -324,11 +323,11 @@ ImageHost::Composite(LayerComposite* aLayer,
         effect->mTextureCoords.height = -effect->mTextureCoords.height;
       }
 
-      GetCompositor()->DrawGeometry(pictureRect, aClipRect, aEffectChain,
-                                    aOpacity, aTransform, aGeometry);
-      GetCompositor()->DrawDiagnostics(diagnosticFlags,
-                                       pictureRect, aClipRect,
-                                       aTransform, mFlashCounter);
+      aCompositor->DrawGeometry(pictureRect, aClipRect, aEffectChain,
+                                aOpacity, aTransform, aGeometry);
+      aCompositor->DrawDiagnostics(diagnosticFlags,
+                                   pictureRect, aClipRect,
+                                   aTransform, mFlashCounter);
     }
   }
 
@@ -338,21 +337,21 @@ ImageHost::Composite(LayerComposite* aLayer,
   // during a given composition. This must happen after autoLock's
   // destructor!
   mBias = UpdateBias(
-      GetCompositor()->GetCompositionTime(), mImages[imageIndex].mTimeStamp,
+      lm->GetCompositionTime(), mImages[imageIndex].mTimeStamp,
       uint32_t(imageIndex + 1) < mImages.Length() ?
           mImages[imageIndex + 1].mTimeStamp : TimeStamp(),
       mBias);
 }
 
 void
-ImageHost::SetCompositor(Compositor* aCompositor)
+ImageHost::SetTextureSourceProvider(TextureSourceProvider* aProvider)
 {
-  if (mCompositor != aCompositor) {
+  if (mTextureSourceProvider != aProvider) {
     for (auto& img : mImages) {
-      img.mTextureHost->SetCompositor(aCompositor);
+      img.mTextureHost->SetTextureSourceProvider(aProvider);
     }
   }
-  CompositableHost::SetCompositor(aCompositor);
+  CompositableHost::SetTextureSourceProvider(aProvider);
 }
 
 void

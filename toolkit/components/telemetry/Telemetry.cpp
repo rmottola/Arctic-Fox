@@ -1563,20 +1563,14 @@ CreateJSStackObject(JSContext *cx, const CombinedStacks &stacks) {
     unsigned index = 0;
 
     // Module name
-    JS::Rooted<JSString*> str(cx, JS_NewStringCopyZ(cx, module.mName.c_str()));
-    if (!str) {
-      return nullptr;
-    }
-    if (!JS_DefineElement(cx, moduleInfoArray, index++, str, JSPROP_ENUMERATE)) {
+    JS::Rooted<JSString*> str(cx, JS_NewUCStringCopyZ(cx, module.mName.get()));
+    if (!str || !JS_DefineElement(cx, moduleInfoArray, index++, str, JSPROP_ENUMERATE)) {
       return nullptr;
     }
 
     // Module breakpad identifier
     JS::Rooted<JSString*> id(cx, JS_NewStringCopyZ(cx, module.mBreakpadId.c_str()));
-    if (!id) {
-      return nullptr;
-    }
-    if (!JS_DefineElement(cx, moduleInfoArray, index++, id, JSPROP_ENUMERATE)) {
+    if (!id || !JS_DefineElement(cx, moduleInfoArray, index++, id, JSPROP_ENUMERATE)) {
       return nullptr;
     }
   }
@@ -1668,22 +1662,6 @@ public:
     for (unsigned int i = 0, n = mRawModules.GetSize(); i != n; i++) {
       const SharedLibrary &info = mRawModules.GetEntry(i);
 
-      nsString basename = info.GetName();
-#if defined(XP_MACOSX) || defined(XP_LINUX)
-      int32_t pos = basename.RFindChar('/');
-      if (pos != kNotFound) {
-        basename.Cut(0, pos + 1);
-      }
-#endif
-
-      nsString debug_basename = info.GetDebugName();
-#if defined(XP_MACOSX) || defined(XP_LINUX)
-      pos = debug_basename.RFindChar('/');
-      if (pos != kNotFound) {
-        debug_basename.Cut(0, pos + 1);
-      }
-#endif
-
       JS::RootedObject moduleObj(cx, JS_NewPlainObject(cx));
       if (!moduleObj) {
         mPromise->MaybeReject(NS_ERROR_FAILURE);
@@ -1691,7 +1669,7 @@ public:
       }
 
       // Module name.
-      JS::RootedString moduleName(cx, JS_NewUCStringCopyZ(cx, basename.get()));
+      JS::RootedString moduleName(cx, JS_NewUCStringCopyZ(cx, info.GetModuleName().get()));
       if (!moduleName || !JS_DefineProperty(cx, moduleObj, "name", moduleName, JSPROP_ENUMERATE)) {
         mPromise->MaybeReject(NS_ERROR_FAILURE);
         return NS_OK;
@@ -1700,8 +1678,8 @@ public:
       // Module debug name.
       JS::RootedValue moduleDebugName(cx);
 
-      if (!debug_basename.IsEmpty()) {
-        JS::RootedString str_moduleDebugName(cx, JS_NewUCStringCopyZ(cx, debug_basename.get()));
+      if (!info.GetDebugName().IsEmpty()) {
+        JS::RootedString str_moduleDebugName(cx, JS_NewUCStringCopyZ(cx, info.GetDebugName().get()));
         if (!str_moduleDebugName) {
           mPromise->MaybeReject(NS_ERROR_FAILURE);
           return NS_OK;
@@ -1787,6 +1765,7 @@ public:
 NS_IMETHODIMP
 TelemetryImpl::GetLoadedModules(JSContext *cx, nsISupports** aPromise)
 {
+#if defined(MOZ_GECKO_PROFILER)
   nsIGlobalObject* global = xpc::NativeGlobal(JS::CurrentGlobalOrNull(cx));
   if (NS_WARN_IF(!global)) {
     return NS_ERROR_FAILURE;
@@ -1798,12 +1777,12 @@ TelemetryImpl::GetLoadedModules(JSContext *cx, nsISupports** aPromise)
     return result.StealNSResult();
   }
 
-#if defined(MOZ_GECKO_PROFILER)
   nsCOMPtr<nsIThreadManager> tm = do_GetService(NS_THREADMANAGER_CONTRACTID);
   nsCOMPtr<nsIThread> getModulesThread;
   nsresult rv = tm->NewThread(0, 0, getter_AddRefs(getModulesThread));
   if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
+    promise->MaybeReject(NS_ERROR_FAILURE);
+    return NS_OK;
   }
 
   nsMainThreadPtrHandle<Promise> mainThreadPromise(new nsMainThreadPtrHolder<Promise>(promise));
@@ -1868,7 +1847,7 @@ ReadStack(const char *aFileName, Telemetry::ProcessedStack &aStack)
     }
 
     Telemetry::ProcessedStack::Module module = {
-      moduleName,
+      NS_ConvertUTF8toUTF16(moduleName.c_str()),
       breakpadId
     };
     stack.AddModule(module);
@@ -3191,18 +3170,8 @@ GetStackAndModules(const std::vector<uintptr_t>& aPCs)
 #ifdef MOZ_GECKO_PROFILER
   for (unsigned i = 0, n = rawModules.GetSize(); i != n; ++i) {
     const SharedLibrary &info = rawModules.GetEntry(i);
-    std::string basename = info.GetNativeDebugName();
-#if defined(XP_MACOSX) || defined(XP_LINUX)
-    // We want to use just the basename as the libname, but the
-    // current profiler addon needs the full path name, so we compute the
-    // basename in here.
-    size_t pos = basename.rfind('/');
-    if (pos != std::string::npos) {
-      basename = basename.substr(pos + 1);
-    }
-#endif
     mozilla::Telemetry::ProcessedStack::Module module = {
-      basename,
+      info.GetDebugName(),
       info.GetBreakpadId()
     };
     Ret.AddModule(module);

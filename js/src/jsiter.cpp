@@ -559,6 +559,10 @@ NewPropertyIteratorObject(JSContext* cx, unsigned flags)
 
         PropertyIteratorObject* res = &obj->as<PropertyIteratorObject>();
 
+        // CodeGenerator::visitIteratorStartO assumes the iterator object is not
+        // inside the nursery when deciding whether a barrier is necessary.
+        MOZ_ASSERT(!js::gc::IsInsideNursery(res));
+
         MOZ_ASSERT(res->numFixedSlots() == JSObject::ITER_CLASS_NFIXED_SLOTS);
         return res;
     }
@@ -1422,6 +1426,9 @@ public:
 bool
 js::SuppressDeletedProperty(JSContext* cx, HandleObject obj, jsid id)
 {
+    if (MOZ_LIKELY(!cx->compartment()->objectMaybeInIteration(obj)))
+        return true;
+
     if (JSID_IS_SYMBOL(id))
         return true;
 
@@ -1434,10 +1441,17 @@ js::SuppressDeletedProperty(JSContext* cx, HandleObject obj, jsid id)
 bool
 js::SuppressDeletedElement(JSContext* cx, HandleObject obj, uint32_t index)
 {
+    if (MOZ_LIKELY(!cx->compartment()->objectMaybeInIteration(obj)))
+        return true;
+
     RootedId id(cx);
     if (!IndexToId(cx, index, &id))
         return false;
-    return SuppressDeletedProperty(cx, obj, id);
+
+    Rooted<JSFlatString*> str(cx, IdToString(cx, id));
+    if (!str)
+        return false;
+    return SuppressDeletedPropertyHelper(cx, obj, SingleStringPredicate(str));
 }
 
 bool

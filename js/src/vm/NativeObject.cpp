@@ -8,6 +8,7 @@
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Casting.h"
+#include "mozilla/CheckedInt.h"
 
 #include "jswatchpoint.h"
 
@@ -28,6 +29,7 @@ using namespace js;
 using JS::AutoCheckCannotGC;
 using JS::GenericNaN;
 using mozilla::ArrayLength;
+using mozilla::CheckedInt;
 using mozilla::DebugOnly;
 using mozilla::PodCopy;
 using mozilla::RoundUpPow2;
@@ -111,6 +113,9 @@ ObjectElements::FreezeElements(JSContext* cx, HandleNativeObject obj)
 
     if (obj->hasEmptyElements())
         return true;
+
+    if (obj->getElementsHeader()->numShiftedElements() > 0)
+        obj->moveShiftedElements();
 
     ObjectElements* header = obj->getElementsHeader();
 
@@ -311,7 +316,7 @@ NativeObject::setLastPropertyMakeNonNative(Shape* shape)
     MOZ_ASSERT(shape->numFixedSlots() == 0);
 
     if (hasDynamicElements())
-        js_free(getElementsHeader());
+        js_free(getUnshiftedElementsHeader());
     if (hasDynamicSlots()) {
         js_free(slots_);
         slots_ = nullptr;
@@ -683,6 +688,130 @@ NativeObject::maybeDensifySparseElements(JSContext* cx, HandleNativeObject obj)
     return DenseElementResult::Success;
 }
 
+void
+NativeObject::moveShiftedElements()
+{
+    ObjectElements* header = getElementsHeader();
+    uint32_t numShifted = header->numShiftedElements();
+    MOZ_ASSERT(numShifted > 0);
+
+    uint32_t initLength = header->initializedLength;
+
+    ObjectElements* newHeader = static_cast<ObjectElements*>(getUnshiftedElementsHeader());
+    memmove(newHeader, header, sizeof(ObjectElements));
+
+    newHeader->clearShiftedElements();
+    newHeader->capacity += numShifted;
+    elements_ = newHeader->elements();
+
+    // To move the elements, temporarily update initializedLength to include
+    // the shifted elements.
+    newHeader->initializedLength += numShifted;
+
+    // Move the elements. Initialize to |undefined| to ensure pre-barriers
+    // don't see garbage.
+    for (size_t i = 0; i < numShifted; i++)
+        initDenseElement(i, UndefinedValue());
+    moveDenseElements(0, numShifted, initLength);
+
+    // Restore the initialized length. We use setDenseInitializedLength to
+    // make sure prepareElementRangeForOverwrite is called on the shifted
+    // elements.
+    setDenseInitializedLength(initLength);
+}
+
+void
+NativeObject::maybeMoveShiftedElements()
+{
+    ObjectElements* header = getElementsHeader();
+    MOZ_ASSERT(header->numShiftedElements() > 0);
+
+    // Move the elements if less than a third of the allocated space is in use.
+    if (header->capacity < header->numAllocatedElements() / 3)
+        moveShiftedElements();
+}
+
+bool
+NativeObject::tryUnshiftDenseElements(uint32_t count)
+{
+    MOZ_ASSERT(count > 0);
+
+    ObjectElements* header = getElementsHeader();
+    uint32_t numShifted = header->numShiftedElements();
+
+    if (count > numShifted) {
+        // We need more elements than are easily available. Try to make space
+        // for more elements than we need (and shift the remaining ones) so
+        // that unshifting more elements later will be fast.
+
+        // Don't bother reserving elements if the number of elements is small.
+        // Note that there's no technical reason for using this particular
+        // limit.
+        if (header->initializedLength <= 10 ||
+            header->isCopyOnWrite() ||
+            header->isFrozen() ||
+            header->hasNonwritableArrayLength() ||
+            MOZ_UNLIKELY(count > ObjectElements::MaxShiftedElements))
+        {
+            return false;
+        }
+
+        MOZ_ASSERT(header->capacity >= header->initializedLength);
+        uint32_t unusedCapacity = header->capacity - header->initializedLength;
+
+        // Determine toShift, the number of extra elements we want to make
+        // available.
+        uint32_t toShift = count - numShifted;
+        MOZ_ASSERT(toShift <= ObjectElements::MaxShiftedElements,
+                   "count <= MaxShiftedElements so toShift <= MaxShiftedElements");
+
+        // Give up if we need to allocate more elements.
+        if (toShift > unusedCapacity)
+            return false;
+
+        // Move more elements than we need, so that other unshift calls will be
+        // fast. We just have to make sure we don't exceed unusedCapacity.
+        toShift = Min(toShift + unusedCapacity / 2, unusedCapacity);
+
+        // Ensure |numShifted + toShift| does not exceed MaxShiftedElements.
+        if (numShifted + toShift > ObjectElements::MaxShiftedElements)
+            toShift = ObjectElements::MaxShiftedElements - numShifted;
+
+        MOZ_ASSERT(count <= numShifted + toShift);
+        MOZ_ASSERT(numShifted + toShift <= ObjectElements::MaxShiftedElements);
+        MOZ_ASSERT(toShift <= unusedCapacity);
+
+        // Now move/unshift the elements.
+        uint32_t initLen = header->initializedLength;
+        setDenseInitializedLength(initLen + toShift);
+        for (uint32_t i = 0; i < toShift; i++)
+            initDenseElement(initLen + i, UndefinedValue());
+        moveDenseElements(toShift, 0, initLen);
+
+        // Shift the elements we just prepended.
+        shiftDenseElementsUnchecked(toShift);
+
+        // We can now fall-through to the fast path below.
+        header = getElementsHeader();
+        MOZ_ASSERT(header->numShiftedElements() == numShifted + toShift);
+
+        numShifted = header->numShiftedElements();
+        MOZ_ASSERT(count <= numShifted);
+    }
+
+    elements_ -= count;
+    ObjectElements* newHeader = getElementsHeader();
+    memmove(newHeader, header, sizeof(ObjectElements));
+
+    newHeader->unshiftShiftedElements(count);
+
+    // Initialize to |undefined| to ensure pre-barriers don't see garbage.
+    for (uint32_t i = 0; i < count; i++)
+        initDenseElement(i, UndefinedValue());
+
+    return true;
+}
+
 // Given a requested capacity (in elements) and (potentially) the length of an
 // array for which elements are being allocated, compute an actual allocation
 // amount (in elements).  (Allocation amounts include space for an
@@ -781,6 +910,35 @@ NativeObject::growElements(JSContext* cx, uint32_t reqCapacity)
     if (denseElementsAreCopyOnWrite())
         MOZ_CRASH();
 
+    // If there are shifted elements, consider moving them first. If we don't
+    // move them here, the code below will include the shifted elements in the
+    // resize.
+    uint32_t numShifted = getElementsHeader()->numShiftedElements();
+    if (numShifted > 0) {
+        // If the number of elements is small, it's cheaper to just move them as
+        // it may avoid a malloc/realloc. Note that there's no technical reason
+        // for using this particular value, but it works well in real-world use
+        // cases.
+        static const size_t MaxElementsToMoveEagerly = 20;
+
+        if (getElementsHeader()->initializedLength <= MaxElementsToMoveEagerly)
+            moveShiftedElements();
+        else
+            maybeMoveShiftedElements();
+        if (getDenseCapacity() >= reqCapacity)
+            return true;
+        numShifted = getElementsHeader()->numShiftedElements();
+
+        // If |reqCapacity + numShifted| overflows, we just move all shifted
+        // elements to avoid the problem.
+        CheckedInt<uint32_t> checkedReqCapacity(reqCapacity);
+        checkedReqCapacity += numShifted;
+        if (MOZ_UNLIKELY(!checkedReqCapacity.isValid())) {
+            moveShiftedElements();
+            numShifted = 0;
+        }
+    }
+
     uint32_t oldCapacity = getDenseCapacity();
     MOZ_ASSERT(oldCapacity < reqCapacity);
 
@@ -791,13 +949,17 @@ NativeObject::growElements(JSContext* cx, uint32_t reqCapacity)
         // Preserve the |capacity <= length| invariant for arrays with
         // non-writable length.  See also js::ArraySetLength which initially
         // enforces this requirement.
-        newAllocated = reqCapacity + ObjectElements::VALUES_PER_HEADER;
+        newAllocated = reqCapacity + numShifted + ObjectElements::VALUES_PER_HEADER;
     } else {
-        if (!goodElementsAllocationAmount(cx, reqCapacity, getElementsHeader()->length, &newAllocated))
+        if (!goodElementsAllocationAmount(cx, reqCapacity + numShifted,
+                                          getElementsHeader()->length,
+                                          &newAllocated))
+        {
             return false;
+        }
     }
 
-    uint32_t newCapacity = newAllocated - ObjectElements::VALUES_PER_HEADER;
+    uint32_t newCapacity = newAllocated - ObjectElements::VALUES_PER_HEADER - numShifted;
     MOZ_ASSERT(newCapacity > oldCapacity && newCapacity >= reqCapacity);
 
     // If newCapacity exceeds MAX_DENSE_ELEMENTS_COUNT, the array should become
@@ -806,11 +968,11 @@ NativeObject::growElements(JSContext* cx, uint32_t reqCapacity)
 
     uint32_t initlen = getDenseInitializedLength();
 
-    HeapSlot* oldHeaderSlots = reinterpret_cast<HeapSlot*>(getElementsHeader());
+    HeapSlot* oldHeaderSlots = reinterpret_cast<HeapSlot*>(getUnshiftedElementsHeader());
     HeapSlot* newHeaderSlots;
     if (hasDynamicElements()) {
         MOZ_ASSERT(oldCapacity <= MAX_DENSE_ELEMENTS_COUNT);
-        uint32_t oldAllocated = oldCapacity + ObjectElements::VALUES_PER_HEADER;
+        uint32_t oldAllocated = oldCapacity + ObjectElements::VALUES_PER_HEADER + numShifted;
 
         newHeaderSlots = ReallocateObjectBuffer<HeapSlot>(cx, this, oldHeaderSlots, oldAllocated, newAllocated);
         if (!newHeaderSlots)
@@ -819,12 +981,13 @@ NativeObject::growElements(JSContext* cx, uint32_t reqCapacity)
         newHeaderSlots = AllocateObjectBuffer<HeapSlot>(cx, this, newAllocated);
         if (!newHeaderSlots)
             return false;   // Leave elements at its old size.
-        PodCopy(newHeaderSlots, oldHeaderSlots, ObjectElements::VALUES_PER_HEADER + initlen);
+        PodCopy(newHeaderSlots, oldHeaderSlots,
+                ObjectElements::VALUES_PER_HEADER + initlen + numShifted);
     }
 
     ObjectElements* newheader = reinterpret_cast<ObjectElements*>(newHeaderSlots);
-    newheader->capacity = newCapacity;
-    elements_ = newheader->elements();
+    elements_ = newheader->elements() + numShifted;
+    getElementsHeader()->capacity = newCapacity;
 
     Debug_SetSlotRangeToCrashOnTouch(elements_ + initlen, newCapacity - initlen);
 
@@ -834,9 +997,6 @@ NativeObject::growElements(JSContext* cx, uint32_t reqCapacity)
 void
 NativeObject::shrinkElements(JSContext* cx, uint32_t reqCapacity)
 {
-    uint32_t oldCapacity = getDenseCapacity();
-    MOZ_ASSERT(reqCapacity < oldCapacity);
-
     MOZ_ASSERT(canHaveNonEmptyElements());
     if (denseElementsAreCopyOnWrite())
         MOZ_CRASH();
@@ -844,18 +1004,29 @@ NativeObject::shrinkElements(JSContext* cx, uint32_t reqCapacity)
     if (!hasDynamicElements())
         return;
 
+    // If we have shifted elements, consider moving them.
+    uint32_t numShifted = getElementsHeader()->numShiftedElements();
+    if (numShifted > 0) {
+        maybeMoveShiftedElements();
+        numShifted = getElementsHeader()->numShiftedElements();
+    }
+
+    uint32_t oldCapacity = getDenseCapacity();
+    MOZ_ASSERT(reqCapacity < oldCapacity);
+
     uint32_t newAllocated = 0;
-    MOZ_ALWAYS_TRUE(goodElementsAllocationAmount(cx, reqCapacity, 0, &newAllocated));
+    MOZ_ALWAYS_TRUE(goodElementsAllocationAmount(cx, reqCapacity + numShifted, 0, &newAllocated));
     MOZ_ASSERT(oldCapacity <= MAX_DENSE_ELEMENTS_COUNT);
-    uint32_t oldAllocated = oldCapacity + ObjectElements::VALUES_PER_HEADER;
+
+    uint32_t oldAllocated = oldCapacity + ObjectElements::VALUES_PER_HEADER + numShifted;
     if (newAllocated == oldAllocated)
         return;  // Leave elements at its old size.
 
     MOZ_ASSERT(newAllocated > ObjectElements::VALUES_PER_HEADER);
-    uint32_t newCapacity = newAllocated - ObjectElements::VALUES_PER_HEADER;
+    uint32_t newCapacity = newAllocated - ObjectElements::VALUES_PER_HEADER - numShifted;
     MOZ_ASSERT(newCapacity <= MAX_DENSE_ELEMENTS_COUNT);
 
-    HeapSlot* oldHeaderSlots = reinterpret_cast<HeapSlot*>(getElementsHeader());
+    HeapSlot* oldHeaderSlots = reinterpret_cast<HeapSlot*>(getUnshiftedElementsHeader());
     HeapSlot* newHeaderSlots = ReallocateObjectBuffer<HeapSlot>(cx, this, oldHeaderSlots,
                                                                 oldAllocated, newAllocated);
     if (!newHeaderSlots) {
@@ -864,8 +1035,8 @@ NativeObject::shrinkElements(JSContext* cx, uint32_t reqCapacity)
     }
 
     ObjectElements* newheader = reinterpret_cast<ObjectElements*>(newHeaderSlots);
-    newheader->capacity = newCapacity;
-    elements_ = newheader->elements();
+    elements_ = newheader->elements() + numShifted;
+    getElementsHeader()->capacity = newCapacity;
 }
 
 /* static */ bool

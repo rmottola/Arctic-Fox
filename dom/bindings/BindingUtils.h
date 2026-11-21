@@ -135,7 +135,7 @@ UnwrapDOMObject(JSObject* obj)
   MOZ_ASSERT(IsDOMClass(js::GetObjectClass(obj)),
              "Don't pass non-DOM objects to this function");
 
-  JS::Value val = js::GetReservedOrProxyPrivateSlot(obj, DOM_OBJECT_SLOT);
+  JS::Value val = js::GetReservedSlot(obj, DOM_OBJECT_SLOT);
   return static_cast<T*>(val.toPrivate());
 }
 
@@ -150,7 +150,7 @@ UnwrapPossiblyNotInitializedDOMObject(JSObject* obj)
   MOZ_ASSERT(IsDOMClass(js::GetObjectClass(obj)),
              "Don't pass non-DOM objects to this function");
 
-  JS::Value val = js::GetReservedOrProxyPrivateSlot(obj, DOM_OBJECT_SLOT);
+  JS::Value val = js::GetReservedSlot(obj, DOM_OBJECT_SLOT);
   if (val.isUndefined()) {
     return nullptr;
   }
@@ -1318,18 +1318,20 @@ GetUseXBLScope(const ParentObject& aParentObject)
 
 template<class T>
 inline void
-ClearWrapper(T* p, nsWrapperCache* cache)
+ClearWrapper(T* p, nsWrapperCache* cache, JSObject* obj)
 {
-  cache->ClearWrapper();
+  JS::AutoAssertGCCallback inCallback;
+  cache->ClearWrapper(obj);
 }
 
 template<class T>
 inline void
-ClearWrapper(T* p, void*)
+ClearWrapper(T* p, void*, JSObject* obj)
 {
+  JS::AutoAssertGCCallback inCallback;
   nsWrapperCache* cache;
   CallQueryInterface(p, &cache);
-  ClearWrapper(p, cache);
+  ClearWrapper(p, cache, obj);
 }
 
 template<class T>
@@ -2680,8 +2682,7 @@ public:
   ~BindingJSObjectCreator()
   {
     if (mReflector) {
-      js::SetReservedOrProxyPrivateSlot(mReflector, DOM_OBJECT_SLOT,
-                                        JS::UndefinedValue());
+      js::SetReservedSlot(mReflector, DOM_OBJECT_SLOT, JS::UndefinedValue());
     }
   }
 
@@ -2689,14 +2690,15 @@ public:
   CreateProxyObject(JSContext* aCx, const js::Class* aClass,
                     const DOMProxyHandler* aHandler,
                     JS::Handle<JSObject*> aProto, T* aNative,
+                    JS::Handle<JS::Value> aExpandoValue,
                     JS::MutableHandle<JSObject*> aReflector)
   {
     js::ProxyOptions options;
     options.setClass(aClass);
-    JS::Rooted<JS::Value> proxyPrivateVal(aCx, JS::PrivateValue(aNative));
-    aReflector.set(js::NewProxyObject(aCx, aHandler, proxyPrivateVal, aProto,
+    aReflector.set(js::NewProxyObject(aCx, aHandler, aExpandoValue, aProto,
                                       options));
     if (aReflector) {
+      js::SetProxyReservedSlot(aReflector, DOM_OBJECT_SLOT, JS::PrivateValue(aNative));
       mNative = aNative;
       mReflector = aReflector;
     }

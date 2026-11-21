@@ -577,7 +577,7 @@ public:
 
     static inline JSObject* getSandboxProxy(JS::Handle<JSObject*> proxy)
     {
-        return &js::GetProxyExtra(proxy, SandboxProxySlot).toObject();
+        return &js::GetProxyReservedSlot(proxy, SandboxProxySlot).toObject();
     }
 };
 

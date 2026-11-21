@@ -13,59 +13,52 @@
 #include "ProfileBuffer.h"
 #include "platform.h"
 
-class ThreadInfo {
+class ThreadInfo final
+{
 public:
   ThreadInfo(const char* aName, int aThreadId, bool aIsMainThread,
-             mozilla::NotNull<PseudoStack*> aPseudoStack, void* aStackTop);
+             void* aStackTop);
 
-  virtual ~ThreadInfo();
+  ~ThreadInfo();
 
   const char* Name() const { return mName.get(); }
   int ThreadId() const { return mThreadId; }
 
   bool IsMainThread() const { return mIsMainThread; }
+
   mozilla::NotNull<PseudoStack*> Stack() const { return mPseudoStack; }
 
-  void SetHasProfile() { mHasProfile = true; }
+  void StartProfiling();
+  void StopProfiling();
+  bool IsBeingProfiled() { return mIsBeingProfiled; }
 
   PlatformData* GetPlatformData() const { return mPlatformData.get(); }
   void* StackTop() const { return mStackTop; }
 
-  virtual void SetPendingDelete();
-  bool IsPendingDelete() const { return mPendingDelete; }
-
-  bool CanInvokeJS() const;
-
   size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
 
- private:
+  ProfileBuffer::LastSample& LastSample() { return mLastSample; }
+
+private:
   mozilla::UniqueFreePtr<char> mName;
   int mThreadId;
   const bool mIsMainThread;
 
-  // The thread's PseudoStack. This is an owning pointer iff mIsPendingDelete
-  // is set.
+  // The thread's PseudoStack. This is an owning pointer. It could be an inline
+  // member, but we don't do that because PseudoStack is quite large, and we
+  // have ThreadInfo vectors and so we'd end up wasting a lot of space in those
+  // vectors for excess elements.
   mozilla::NotNull<PseudoStack*> mPseudoStack;
 
   UniquePlatformData mPlatformData;
   void* mStackTop;
 
-  // May be null for the main thread if the profiler was started during startup.
-  nsCOMPtr<nsIThread> mThread;
-
-  // When a thread dies while the profiler is active we keep its ThreadInfo
-  // (and its PseudoStack) around for a while, and put it in a "pending delete"
-  // state. In this state, mPseudoStack is an owning pointer.
-  bool mPendingDelete;
-
   //
   // The following code is only used for threads that are being profiled, i.e.
-  // for which SetHasProfile() has been called.
+  // for which IsBeingProfiled() returns true.
   //
 
 public:
-  bool HasProfile() { return mHasProfile; }
-
   void StreamJSON(ProfileBuffer* aBuffer, SpliceableJSONWriter& aWriter,
                   const mozilla::TimeStamp& aStartTime, double aSinceTime);
 
@@ -74,26 +67,16 @@ public:
   void FlushSamplesAndMarkers(ProfileBuffer* aBuffer,
                               const mozilla::TimeStamp& aStartTime);
 
-  ThreadResponsiveness* GetThreadResponsiveness() { return &mRespInfo; }
-
-  void UpdateThreadResponsiveness() {
-    mRespInfo.Update(mIsMainThread, mThread);
+  // Returns nullptr if this is not the main thread.
+  ThreadResponsiveness* GetThreadResponsiveness()
+  {
+    ThreadResponsiveness* responsiveness = mResponsiveness.ptrOr(nullptr);
+    MOZ_ASSERT(!!responsiveness == mIsMainThread);
+    return responsiveness;
   }
 
-  void StreamSamplesAndMarkers(ProfileBuffer* aBuffer,
-                               SpliceableJSONWriter& aWriter,
-                               const mozilla::TimeStamp& aStartTime,
-                               double aSinceTime,
-                               UniqueStacks& aUniqueStacks);
-
 private:
-  FRIEND_TEST(ThreadProfile, InsertOneTag);
-  FRIEND_TEST(ThreadProfile, InsertOneTagWithTinyBuffer);
-  FRIEND_TEST(ThreadProfile, InsertTagsNoWrap);
-  FRIEND_TEST(ThreadProfile, InsertTagsWrap);
-  FRIEND_TEST(ThreadProfile, MemoryMeasure);
-
-  bool mHasProfile;
+  bool mIsBeingProfiled;
 
   // JS frames in the buffer may require a live JSRuntime to stream (e.g.,
   // stringifying JIT frames). In the case of JSRuntime destruction,
@@ -103,7 +86,23 @@ private:
   mozilla::UniquePtr<char[]> mSavedStreamedMarkers;
   mozilla::Maybe<UniqueStacks> mUniqueStacks;
 
-  ThreadResponsiveness mRespInfo;
+  // This is only used for the main thread.
+  mozilla::Maybe<ThreadResponsiveness> mResponsiveness;
+
+  // When sampling, this holds the generation number and offset in PS::mBuffer
+  // of the most recent sample for this thread.
+  ProfileBuffer::LastSample mLastSample;
 };
+
+void
+StreamSamplesAndMarkers(const char* aName, int aThreadId,
+                        ProfileBuffer* aBuffer,
+                        SpliceableJSONWriter& aWriter,
+                        const mozilla::TimeStamp& aStartTime,
+                        double aSinceTime,
+                        JSContext* aContext,
+                        char* aSavedStreamedSamples,
+                        char* aSavedStreamedMarkers,
+                        UniqueStacks& aUniqueStacks);
 
 #endif

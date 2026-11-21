@@ -15,7 +15,6 @@
 #include "nsIScriptGlobalObject.h"
 #include "nsPIDOMWindow.h"
 #include "nsIDocShell.h"
-#include "nsIFrame.h"
 #include "nsIURI.h"
 #include "nsITextToSubURI.h"
 #include "nsError.h"
@@ -217,11 +216,7 @@ nsPrintEngine::nsPrintEngine() :
   mIsDoingPrintPreview(false),
   mProgressDialogIsShown(false),
   mScreenDPI(115.0f),
-  mPrt(nullptr),
   mPagePrintTimer(nullptr),
-  mPageSeqFrame(nullptr),
-  mPrtPreview(nullptr),
-  mOldPrtPreview(nullptr),
   mDebugFile(nullptr),
   mLoadCounter(0),
   mDidLoadDataForPrinting(false),
@@ -234,6 +229,7 @@ nsPrintEngine::nsPrintEngine() :
 nsPrintEngine::~nsPrintEngine()
 {
   Destroy(); // for insurance
+  DisconnectPagePrintTimer();
 }
 
 //-------------------------------------------------------
@@ -244,23 +240,11 @@ void nsPrintEngine::Destroy()
   }
   mIsDestroying = true;
 
-  if (mPrt) {
-    delete mPrt;
-    mPrt = nullptr;
-  }
+  mPrt = nullptr;
 
 #ifdef NS_PRINT_PREVIEW
-  if (mPrtPreview) {
-    delete mPrtPreview;
-    mPrtPreview = nullptr;
-  }
-
-  // This is insruance
-  if (mOldPrtPreview) {
-    delete mOldPrtPreview;
-    mOldPrtPreview = nullptr;
-  }
-
+  mPrtPreview = nullptr;
+  mOldPrtPreview = nullptr;
 #endif
   mDocViewerPrint = nullptr;
 }
@@ -268,11 +252,7 @@ void nsPrintEngine::Destroy()
 //-------------------------------------------------------
 void nsPrintEngine::DestroyPrintingData()
 {
-  if (mPrt) {
-    nsPrintData* data = mPrt;
-    mPrt = nullptr;
-    delete data;
-  }
+  mPrt = nullptr;
 }
 
 //---------------------------------------------------------------------------------
@@ -415,7 +395,6 @@ nsPrintEngine::CommonPrint(bool                    aIsPrintPreview,
     if (rv != NS_ERROR_ABORT && rv != NS_ERROR_OUT_OF_MEMORY) {
       FirePrintingErrorEvent(rv);
     }
-    delete mPrt;
     mPrt = nullptr;
   }
 
@@ -437,15 +416,15 @@ nsPrintEngine::DoCommonPrint(bool                    aIsPrintPreview,
     mProgressDialogIsShown = pps != nullptr;
 
     if (mIsDoingPrintPreview) {
-      mOldPrtPreview = mPrtPreview;
-      mPrtPreview = nullptr;
+      mOldPrtPreview = Move(mPrtPreview);
     }
   } else {
     mProgressDialogIsShown = false;
   }
 
-  mPrt = new nsPrintData(aIsPrintPreview ? nsPrintData::eIsPrintPreview :
-                                           nsPrintData::eIsPrinting);
+  mPrt = mozilla::MakeUnique<nsPrintData>(aIsPrintPreview
+                                          ? nsPrintData::eIsPrintPreview
+                                          : nsPrintData::eIsPrinting);
   NS_ENSURE_TRUE(mPrt, NS_ERROR_OUT_OF_MEMORY);
 
   // if they don't pass in a PrintSettings, then get the Global PS
@@ -886,9 +865,9 @@ nsPrintEngine::GetPrintPreviewNumPages(int32_t *aPrintPreviewNumPages)
   // When calling this function, the FinishPrintPreview() function might not
   // been called as there are still some 
   if (mPrtPreview) {
-    prt = mPrtPreview;
+    prt = mPrtPreview.get();
   } else {
-    prt = mPrt;
+    prt = mPrt.get();
   }
   if ((!prt) ||
       NS_FAILED(GetSeqFrameAndCountPagesInternal(prt->mPrintObject, seqFrame, *aPrintPreviewNumPages))) {
@@ -1524,7 +1503,7 @@ nsresult nsPrintEngine::CleanupOnFailure(nsresult aResult, bool aIsPrinting)
   /* cleanup... */
   if (mPagePrintTimer) {
     mPagePrintTimer->Stop();
-    NS_RELEASE(mPagePrintTimer);
+    DisconnectPagePrintTimer();
   }
   
   if (aIsPrinting) {
@@ -2538,8 +2517,8 @@ nsPrintEngine::DoPrint(nsPrintObject * aPO)
         return NS_ERROR_FAILURE;
       }
 
-      mPageSeqFrame = pageSequence;
-      mPageSeqFrame->StartPrint(poPresContext, mPrt->mPrintSettings, docTitleStr, docURLStr);
+      mPageSeqFrame = seqFrame;
+      pageSequence->StartPrint(poPresContext, mPrt->mPrintSettings, docTitleStr, docURLStr);
 
       // Schedule Page to Print
       PR_PL(("Scheduling Print of PO: %p (%s) \n", aPO, gFrameTypesStr[aPO->mFrameType]));
@@ -2649,12 +2628,12 @@ nsPrintEngine::HasPrintCallbackCanvas()
 bool
 nsPrintEngine::PrePrintPage()
 {
-  NS_ASSERTION(mPageSeqFrame,  "mPageSeqFrame is null!");
+  NS_ASSERTION(mPageSeqFrame.IsAlive(), "mPageSeqFrame is not alive!");
   NS_ASSERTION(mPrt,           "mPrt is null!");
 
   // Although these should NEVER be nullptr
   // This is added insurance, to make sure we don't crash in optimized builds
-  if (!mPrt || !mPageSeqFrame) {
+  if (!mPrt || !mPageSeqFrame.IsAlive()) {
     return true; // means we are done preparing the page.
   }
 
@@ -2667,7 +2646,8 @@ nsPrintEngine::PrePrintPage()
   // Ask mPageSeqFrame if the page is ready to be printed.
   // If the page doesn't get printed at all, the |done| will be |true|.
   bool done = false;
-  nsresult rv = mPageSeqFrame->PrePrintNextPage(mPagePrintTimer, &done);
+  nsIPageSequenceFrame* pageSeqFrame = do_QueryFrame(mPageSeqFrame.GetFrame());
+  nsresult rv = pageSeqFrame->PrePrintNextPage(mPagePrintTimer, &done);
   if (NS_FAILED(rv)) {
     // ??? ::PrintPage doesn't set |mPrt->mIsAborted = true| if rv != NS_ERROR_ABORT,
     // but I don't really understand why this should be the right thing to do?
@@ -2687,12 +2667,12 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
                          bool&           aInRange)
 {
   NS_ASSERTION(aPO,            "aPO is null!");
-  NS_ASSERTION(mPageSeqFrame,  "mPageSeqFrame is null!");
+  NS_ASSERTION(mPageSeqFrame.IsAlive(), "mPageSeqFrame is not alive!");
   NS_ASSERTION(mPrt,           "mPrt is null!");
 
   // Although these should NEVER be nullptr
   // This is added insurance, to make sure we don't crash in optimized builds
-  if (!mPrt || !aPO || !mPageSeqFrame) {
+  if (!mPrt || !aPO || !mPageSeqFrame.IsAlive()) {
     FirePrintingErrorEvent(NS_ERROR_FAILURE);
     return true; // means we are done printing
   }
@@ -2707,16 +2687,17 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
     return true;
 
   int32_t pageNum, numPages, endPage;
-  mPageSeqFrame->GetCurrentPageNum(&pageNum);
-  mPageSeqFrame->GetNumPages(&numPages);
+  nsIPageSequenceFrame* pageSeqFrame = do_QueryFrame(mPageSeqFrame.GetFrame());
+  pageSeqFrame->GetCurrentPageNum(&pageNum);
+  pageSeqFrame->GetNumPages(&numPages);
 
   bool donePrinting;
   bool isDoingPrintRange;
-  mPageSeqFrame->IsDoingPrintRange(&isDoingPrintRange);
+  pageSeqFrame->IsDoingPrintRange(&isDoingPrintRange);
   if (isDoingPrintRange) {
     int32_t fromPage;
     int32_t toPage;
-    mPageSeqFrame->GetPrintRange(&fromPage, &toPage);
+    pageSeqFrame->GetPrintRange(&fromPage, &toPage);
 
     if (fromPage > numPages) {
       return true;
@@ -2752,7 +2733,7 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
   //
   // When rv == NS_ERROR_ABORT, it means we want out of the
   // print job without displaying any error messages
-  nsresult rv = mPageSeqFrame->PrintNextPage();
+  nsresult rv = pageSeqFrame->PrintNextPage();
   if (NS_FAILED(rv)) {
     if (rv != NS_ERROR_ABORT) {
       FirePrintingErrorEvent(rv);
@@ -2761,7 +2742,7 @@ nsPrintEngine::PrintPage(nsPrintObject*    aPO,
     return true;
   }
 
-  mPageSeqFrame->DoPageEnd();
+  pageSeqFrame->DoPageEnd();
 
   return donePrinting;
 }
@@ -3068,8 +3049,9 @@ nsPrintEngine::DonePrintingPages(nsPrintObject* aPO, nsresult aResult)
   // If there is a pageSeqFrame, make sure there are no more printCanvas active
   // that might call |Notify| on the pagePrintTimer after things are cleaned up
   // and printing was marked as being done.
-  if (mPageSeqFrame) {
-    mPageSeqFrame->ResetPrintCanvasList();
+  if (mPageSeqFrame.IsAlive()) {
+    nsIPageSequenceFrame* pageSeqFrame = do_QueryFrame(mPageSeqFrame.GetFrame());
+    pageSeqFrame->ResetPrintCanvasList();
   }
 
   if (aPO && !mPrt->mIsAborted) {
@@ -3091,7 +3073,7 @@ nsPrintEngine::DonePrintingPages(nsPrintObject* aPO, nsresult aResult)
 
   // Release reference to mPagePrintTimer; the timer object destroys itself
   // after this returns true
-  NS_IF_RELEASE(mPagePrintTimer);
+  DisconnectPagePrintTimer();
 
   return true;
 }
@@ -3375,10 +3357,10 @@ nsPrintEngine::TurnScriptingOn(bool aDoTurnOn)
     return;
   }
 
-  nsPrintData* prt = mPrt;
+  nsPrintData* prt = mPrt.get();
 #ifdef NS_PRINT_PREVIEW
   if (!prt) {
-    prt = mPrtPreview;
+    prt = mPrtPreview.get();
   }
 #endif
   if (!prt) {
@@ -3481,7 +3463,6 @@ nsPrintEngine::FinishPrintPreview()
 
 
   if (mIsDoingPrintPreview && mOldPrtPreview) {
-    delete mOldPrtPreview;
     mOldPrtPreview = nullptr;
   }
 
@@ -3490,8 +3471,7 @@ nsPrintEngine::FinishPrintPreview()
 
   // PrintPreview was built using the mPrt (code reuse)
   // then we assign it over
-  mPrtPreview = mPrt;
-  mPrt        = nullptr;
+  mPrtPreview = Move(mPrt);
 
 #endif // NS_PRINT_PREVIEW
 
@@ -3574,6 +3554,15 @@ nsPrintEngine::FirePrintCompletionEvent()
   nsCOMPtr<nsIRunnable> event = new nsPrintCompletionEvent(mDocViewerPrint);
   if (NS_FAILED(NS_DispatchToCurrentThread(event)))
     NS_WARNING("failed to dispatch print completion event");
+}
+
+void
+nsPrintEngine::DisconnectPagePrintTimer()
+{
+  if (mPagePrintTimer) {
+    mPagePrintTimer->Disconnect();
+    NS_RELEASE(mPagePrintTimer);
+  }
 }
 
 //---------------------------------------------------------------

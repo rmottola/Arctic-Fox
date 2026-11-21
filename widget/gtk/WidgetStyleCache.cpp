@@ -882,7 +882,8 @@ GetCssNodeStyleInternal(WidgetNodeType aNodeType)
                                      GTK_STYLE_CLASS_FRAME);
     case MOZ_GTK_TEXT_VIEW_TEXT:
     case MOZ_GTK_RESIZER:
-      style = CreateChildCSSNode("text", MOZ_GTK_TEXT_VIEW);
+      // TODO - create from CSS node
+      style = GetWidgetStyleWithClass(MOZ_GTK_TEXT_VIEW, GTK_STYLE_CLASS_VIEW);
       if (aNodeType == MOZ_GTK_RESIZER) {
         // The "grip" class provides the correct builtin icon from
         // gtk_render_handle().  The icon is drawn with shaded variants of
@@ -890,11 +891,10 @@ GetCssNodeStyleInternal(WidgetNodeType aNodeType)
         // a transparent resizer.  gtk_render_handle() also uses the
         // background color to draw a background, and so this style otherwise
         // matches MOZ_GTK_TEXT_VIEW_TEXT to match the background with
-        // textarea elements.  GtkTextView creates a separate text window and
-        // so the background should not be transparent.
+        // textarea elements.
         gtk_style_context_add_class(style, GTK_STYLE_CLASS_GRIP);
       }
-      break;
+      return style;
     case MOZ_GTK_FRAME_BORDER:
       style = CreateChildCSSNode("border", MOZ_GTK_FRAME);
       break;
@@ -1025,6 +1025,14 @@ GetWidgetStyleInternal(WidgetNodeType aNodeType)
       GtkStyleContext* style =
         GetWidgetStyleWithClass(MOZ_GTK_TEXT_VIEW, GTK_STYLE_CLASS_VIEW);
       if (aNodeType == MOZ_GTK_RESIZER) {
+        // The "grip" class provides the correct builtin icon from
+        // gtk_render_handle().  The icon is drawn with shaded variants of
+        // the background color, and so a transparent background would lead to
+        // a transparent resizer.  gtk_render_handle() also uses the
+        // background color to draw a background, and so this style otherwise
+        // matches MOZ_GTK_TEXT_VIEW_TEXT to match the background with
+        // textarea elements.  GtkTextView creates a separate text window and
+        // so the background should not be transparent.
         gtk_style_context_add_class(style, GTK_STYLE_CLASS_GRIP);
       }
       return style;

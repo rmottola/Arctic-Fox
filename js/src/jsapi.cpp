@@ -566,6 +566,12 @@ JS_GetParentRuntime(JSContext* cx)
     return cx->runtime()->parentRuntime ? cx->runtime()->parentRuntime : cx->runtime();
 }
 
+JS_PUBLIC_API(JSRuntime*)
+JS_GetRuntime(JSContext* cx)
+{
+    return cx->runtime();
+}
+
 JS_PUBLIC_API(void)
 JS::SetSingleThreadedExecutionCallbacks(JSContext* cx,
                                         BeginSingleThreadedExecutionCallback begin,
@@ -4587,6 +4593,23 @@ JS::CloneAndExecuteScript(JSContext* cx, HandleScript scriptArg,
     return ExecuteScript(cx, globalLexical, script, rval.address());
 }
 
+JS_PUBLIC_API(bool)
+JS::CloneAndExecuteScript(JSContext* cx, JS::AutoObjectVector& envChain,
+                          HandleScript scriptArg,
+                          JS::MutableHandleValue rval)
+{
+    CHECK_REQUEST(cx);
+    RootedScript script(cx, scriptArg);
+    if (script->compartment() != cx->compartment()) {
+        script = CloneGlobalScript(cx, ScopeKind::NonSyntactic, script);
+        if (!script)
+            return false;
+
+        js::Debugger::onNewScript(cx, script);
+    }
+    return ExecuteScript(cx, envChain, script, rval.address());
+}
+
 static const unsigned LARGE_SCRIPT_LENGTH = 500*1024;
 
 static bool
@@ -4852,34 +4875,37 @@ JS_ResetInterruptCallback(JSContext* cx, bool enable)
 JS_PUBLIC_API(void)
 JS::SetGetIncumbentGlobalCallback(JSContext* cx, JSGetIncumbentGlobalCallback callback)
 {
-    cx->runtime()->getIncumbentGlobalCallback = callback;
+    cx->getIncumbentGlobalCallback = callback;
 }
 
 JS_PUBLIC_API(void)
 JS::SetEnqueuePromiseJobCallback(JSContext* cx, JSEnqueuePromiseJobCallback callback,
                                  void* data /* = nullptr */)
 {
-    cx->runtime()->enqueuePromiseJobCallback = callback;
-    cx->runtime()->enqueuePromiseJobCallbackData = data;
+    cx->enqueuePromiseJobCallback = callback;
+    cx->enqueuePromiseJobCallbackData = data;
 }
 
 extern JS_PUBLIC_API(void)
 JS::SetPromiseRejectionTrackerCallback(JSContext* cx, JSPromiseRejectionTrackerCallback callback,
                                        void* data /* = nullptr */)
 {
-    cx->runtime()->promiseRejectionTrackerCallback = callback;
-    cx->runtime()->promiseRejectionTrackerCallbackData = data;
+    cx->promiseRejectionTrackerCallback = callback;
+    cx->promiseRejectionTrackerCallbackData = data;
 }
 
 JS_PUBLIC_API(JSObject*)
 JS::NewPromiseObject(JSContext* cx, HandleObject executor, HandleObject proto /* = nullptr */)
 {
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
-    MOZ_ASSERT(IsCallable(executor));
     AssertHeapIsIdle();
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, executor, proto);
 
+    if (!executor)
+        return PromiseObject::createSkippingExecutor(cx);
+
+    MOZ_ASSERT(IsCallable(executor));
     return PromiseObject::create(cx, executor, proto);
 }
 

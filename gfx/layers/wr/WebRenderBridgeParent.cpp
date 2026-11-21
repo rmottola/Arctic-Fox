@@ -18,6 +18,7 @@
 #include "mozilla/layers/ImageDataSerializer.h"
 #include "mozilla/layers/TextureHost.h"
 #include "mozilla/layers/WebRenderCompositableHolder.h"
+#include "mozilla/layers/WebRenderTextureHost.h"
 #include "mozilla/webrender/RenderThread.h"
 #include "mozilla/widget/CompositorWidget.h"
 
@@ -293,10 +294,31 @@ WebRenderBridgeParent::ProcessWebrenderCommands(const gfx::IntSize &aSize,
     switch (cmd.type()) {
       case WebRenderParentCommand::TOpAddExternalImage: {
         const OpAddExternalImage& op = cmd.get_OpAddExternalImage();
+        wr::ImageKey key = op.key();
         MOZ_ASSERT(mExternalImageIds.Get(op.externalImageId()).get());
 
         RefPtr<CompositableHost> host = mExternalImageIds.Get(op.externalImageId());
         if (!host) {
+          NS_ERROR("CompositableHost does not exist");
+          break;
+        }
+        // XXX select Texture for video in CompositeToTarget().
+        TextureHost* texture = host->GetAsTextureHost();
+        if (!texture) {
+          NS_ERROR("TextureHost does not exist");
+          break;
+        }
+        WebRenderTextureHost* wrTexture = texture->AsWebRenderTextureHost();
+        if (wrTexture) {
+          // XXX handling YUV
+          gfx::SurfaceFormat format =
+            wrTexture->GetFormat() == SurfaceFormat::YUV ? SurfaceFormat::B8G8R8A8 : wrTexture->GetFormat();
+          wr::ImageDescriptor descriptor(wrTexture->GetSize(), wrTexture->GetRGBStride(), format);
+          mApi->AddExternalImageBuffer(key,
+                                       descriptor,
+                                       wrTexture->GetExternalImageKey());
+          mCompositableHolder->HoldExternalImage(aEpoch, texture->AsWebRenderTextureHost());
+          keysToDelete.push_back(key);
           break;
         }
         RefPtr<DataSourceSurface> dSurf = host->GetAsSurface();
@@ -311,7 +333,6 @@ WebRenderBridgeParent::ProcessWebrenderCommands(const gfx::IntSize &aSize,
 
         IntSize size = dSurf->GetSize();
         wr::ImageDescriptor descriptor(size, map.mStride, SurfaceFormat::B8G8R8A8);
-        wr::ImageKey key = op.key();
         auto slice = Range<uint8_t>(map.mData, size.height * map.mStride);
         mApi->AddImage(key, descriptor, slice);
 
@@ -334,6 +355,10 @@ WebRenderBridgeParent::ProcessWebrenderCommands(const gfx::IntSize &aSize,
         break;
       }
     }
+  }
+  if (mWidget) {
+    LayoutDeviceIntSize size = mWidget->GetClientSize();
+    mApi->SetWindowParameters(size);
   }
   mApi->SetRootDisplayList(gfx::Color(0.3f, 0.f, 0.f, 1.f), aEpoch, LayerSize(aSize.width, aSize.height),
                            mPipelineId,
@@ -427,7 +452,6 @@ WebRenderBridgeParent::RecvAddExternalImageId(const uint64_t& aImageId,
     return IPC_OK();
   }
 
-  mCompositableHolder->AddExternalImageId(aImageId, host);
   mExternalImageIds.Put(aImageId, host);
 
   return IPC_OK();
@@ -450,7 +474,6 @@ WebRenderBridgeParent::RecvAddExternalImageIdForCompositable(const uint64_t& aIm
     return IPC_OK();
   }
 
-  mCompositableHolder->AddExternalImageId(aImageId, host);
   mExternalImageIds.Put(aImageId, host);
 
   return IPC_OK();
@@ -464,7 +487,6 @@ WebRenderBridgeParent::RecvRemoveExternalImageId(const uint64_t& aImageId)
   }
   MOZ_ASSERT(mExternalImageIds.Get(aImageId).get());
   mExternalImageIds.Remove(aImageId);
-  mCompositableHolder->RemoveExternalImageId(aImageId);
 
   return IPC_OK();
 }
@@ -530,8 +552,6 @@ WebRenderBridgeParent::FlushPendingTransactionIds()
   return id;
 }
 
-
-
 uint64_t
 WebRenderBridgeParent::FlushTransactionIdsForEpoch(const wr::Epoch& aEpoch)
 {
@@ -544,6 +564,9 @@ WebRenderBridgeParent::FlushTransactionIdsForEpoch(const wr::Epoch& aEpoch)
     }
     mPendingTransactionIds.pop();
   }
+
+  mCompositableHolder->Update(aEpoch);
+
   return id;
 }
 
@@ -571,12 +594,17 @@ WebRenderBridgeParent::ScheduleComposition()
 void
 WebRenderBridgeParent::ClearResources()
 {
-  DeleteOldImages();
-  if (mCompositableHolder) {
-    for (auto iter = mExternalImageIds.Iter(); !iter.Done(); iter.Next()) {
-      uint64_t externalImageId = iter.Key();
-      mCompositableHolder->RemoveExternalImageId(externalImageId);
+  if (mApi) {
+    ++mWrEpoch; // Update webrender epoch
+    mApi->ClearRootDisplayList(wr::NewEpoch(mWrEpoch), mPipelineId);
+    if (!mKeysToDelete.empty()) {
+      // XXX Sync wait.
+      mApi->WaitFlushed();
+      DeleteOldImages();
     }
+  }
+  if (mCompositableHolder) {
+    mCompositableHolder->Destroy();
   }
   mExternalImageIds.Clear();
 

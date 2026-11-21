@@ -39,6 +39,7 @@
 #include "nsINavHistoryService.h"
 #include "nsToolkitCompsCID.h"
 #include "nsIObserverService.h"
+#include "nsPrintfCString.h"
 
 static nsPermissionManager *gPermissionManager = nullptr;
 
@@ -600,6 +601,24 @@ nsPermissionManager::PermissionKey::CreateFromPrincipal(nsIPrincipal* aPrincipal
   if (NS_WARN_IF(NS_FAILED(aResult))) {
     return nullptr;
   }
+
+#ifdef DEBUG
+  // Creating a PermissionsKey to look up a permission if we haven't had those keys
+  // synced down yet is problematic, so we do a check here and emit an assertion if
+  // we see it happening.
+  if (XRE_IsContentProcess()) {
+    nsAutoCString permissionKey;
+    GetKeyForPrincipal(aPrincipal, permissionKey);
+
+    // NOTE: Theoretically an addon could ask for permissions which the process
+    // wouldn't have access to, and we wouldn't want to crash the process in
+    // this case, but our chrome code should never do this. Using NS_ASSERTION
+    // here so that we can test fetching unavaliable permissions in tests.
+    NS_ASSERTION(gPermissionManager->mAvailablePermissionKeys.Contains(permissionKey),
+                 nsPrintfCString("This content process hasn't received the "
+                                 "permissions for %s yet", permissionKey.get()).get());
+  }
+#endif
 
   return new PermissionKey(origin);
 }
@@ -1553,11 +1572,14 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
     IPC::Permission permission(origin, aType, aPermission,
                                aExpireType, aExpireTime);
 
+    nsAutoCString permissionKey;
+    GetKeyForPrincipal(aPrincipal, permissionKey);
+
     nsTArray<ContentParent*> cplist;
     ContentParent::GetAll(cplist);
     for (uint32_t i = 0; i < cplist.Length(); ++i) {
       ContentParent* cp = cplist[i];
-      if (cp->NeedsPermissionsUpdate())
+      if (cp->NeedsPermissionsUpdate(permissionKey))
         Unused << cp->SendAddPermission(permission);
     }
   }
@@ -2202,6 +2224,13 @@ nsPermissionManager::GetPermissionHashKey(nsIPrincipal* aPrincipal,
 
 NS_IMETHODIMP nsPermissionManager::GetEnumerator(nsISimpleEnumerator **aEnum)
 {
+  if (XRE_IsContentProcess()) {
+    NS_WARNING("nsPermissionManager's enumerator is not avaliable in the "
+               "content process, as not all permissions may be avaliable.");
+    *aEnum = nullptr;
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   // roll an nsCOMArray of all our permissions, then hand out an enumerator
   nsCOMArray<nsIPermission> array;
 

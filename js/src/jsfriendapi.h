@@ -364,6 +364,7 @@ extern JS_FRIEND_DATA(const js::ObjectOps) ProxyObjectOps;
         js::Class::NON_NATIVE |                                                         \
             JSCLASS_IS_PROXY |                                                          \
             JSCLASS_DELAY_METADATA_BUILDER |                                            \
+            JSCLASS_HAS_RESERVED_SLOTS(2) |                                             \
             flags,                                                                      \
         &js::ProxyClassOps,                                                             \
         JS_NULL_CLASS_SPEC,                                                             \
@@ -450,9 +451,9 @@ IsAtomsZone(JS::Zone* zone);
 
 struct WeakMapTracer
 {
-    JSContext* context;
+    JSRuntime* runtime;
 
-    explicit WeakMapTracer(JSContext* cx) : context(cx) {}
+    explicit WeakMapTracer(JSRuntime* rt) : runtime(rt) {}
 
     // Weak map tracer callback, called once for every binding of every
     // weak map that was live at the time of the last garbage collection.
@@ -467,10 +468,13 @@ extern JS_FRIEND_API(void)
 TraceWeakMaps(WeakMapTracer* trc);
 
 extern JS_FRIEND_API(bool)
-AreGCGrayBitsValid(JSContext* cx);
+AreGCGrayBitsValid(JSRuntime* rt);
 
 extern JS_FRIEND_API(bool)
 ZoneGlobalsAreAllGray(JS::Zone* zone);
+
+extern JS_FRIEND_API(bool)
+IsObjectZoneSweepingOrCompacting(JSObject* obj);
 
 typedef void
 (*GCThingCallback)(void* closure, JS::GCCellPtr thing);
@@ -501,7 +505,7 @@ IterateGrayObjectsUnderCC(JS::Zone* zone, GCThingCallback cellCallback, void* da
 //
 // This doesn't trace weak maps as these are handled separately.
 extern JS_FRIEND_API(bool)
-CheckGrayMarkingState(JSContext* cx);
+CheckGrayMarkingState(JSRuntime* rt);
 #endif
 
 #ifdef JS_HAS_CTYPES
@@ -718,6 +722,11 @@ GetObjectPrivate(JSObject* obj)
     return *addr;
 }
 
+/**
+ * Get the value stored in an object's reserved slot. This can be used with
+ * both native objects and proxies, but if |obj| is known to be a proxy
+ * GetProxyReservedSlot is a bit more efficient.
+ */
 inline const JS::Value&
 GetReservedSlot(JSObject* obj, size_t slot)
 {
@@ -726,15 +735,20 @@ GetReservedSlot(JSObject* obj, size_t slot)
 }
 
 JS_FRIEND_API(void)
-SetReservedOrProxyPrivateSlotWithBarrier(JSObject* obj, size_t slot, const JS::Value& value);
+SetReservedSlotWithBarrier(JSObject* obj, size_t slot, const JS::Value& value);
 
+/**
+ * Store a value in an object's reserved slot. This can be used with
+ * both native objects and proxies, but if |obj| is known to be a proxy
+ * SetProxyReservedSlot is a bit more efficient.
+ */
 inline void
 SetReservedSlot(JSObject* obj, size_t slot, const JS::Value& value)
 {
     MOZ_ASSERT(slot < JSCLASS_RESERVED_SLOTS(GetObjectClass(obj)));
     shadow::Object* sobj = reinterpret_cast<shadow::Object*>(obj);
     if (sobj->slotRef(slot).isGCThing() || value.isGCThing())
-        SetReservedOrProxyPrivateSlotWithBarrier(obj, slot, value);
+        SetReservedSlotWithBarrier(obj, slot, value);
     else
         sobj->slotRef(slot) = value;
 }
@@ -1285,11 +1299,10 @@ typedef enum DOMProxyShadowsResult {
 typedef DOMProxyShadowsResult
 (* DOMProxyShadowsCheck)(JSContext* cx, JS::HandleObject object, JS::HandleId id);
 JS_FRIEND_API(void)
-SetDOMProxyInformation(const void* domProxyHandlerFamily, uint32_t domProxyExpandoSlot,
+SetDOMProxyInformation(const void* domProxyHandlerFamily,
                        DOMProxyShadowsCheck domProxyShadowsCheck);
 
 const void* GetDOMProxyHandlerFamily();
-uint32_t GetDOMProxyExpandoSlot();
 DOMProxyShadowsCheck GetDOMProxyShadowsCheck();
 inline bool DOMProxyIsShadowing(DOMProxyShadowsResult result) {
     return result == Shadows ||
@@ -2893,6 +2906,9 @@ namespace detail {
 JS_FRIEND_API(bool)
 IsWindowSlow(JSObject* obj);
 
+JS_FRIEND_API(JSObject*)
+ToWindowProxyIfWindowSlow(JSObject* obj);
+
 } // namespace detail
 
 /**
@@ -2918,8 +2934,13 @@ IsWindowProxy(JSObject* obj);
  * wrapper if the page was navigated away from), else return `obj`. This
  * function is infallible and never returns nullptr.
  */
-extern JS_FRIEND_API(JSObject*)
-ToWindowProxyIfWindow(JSObject* obj);
+MOZ_ALWAYS_INLINE JSObject*
+ToWindowProxyIfWindow(JSObject* obj)
+{
+    if (GetObjectClass(obj)->flags & JSCLASS_IS_GLOBAL)
+        return detail::ToWindowProxyIfWindowSlow(obj);
+    return obj;
+}
 
 /**
  * If `obj` is a WindowProxy, get its associated Window (the compartment's
@@ -2934,6 +2955,21 @@ ToWindowIfWindowProxy(JSObject* obj);
 // object.
 extern bool
 AddPluralRulesConstructor(JSContext* cx, JS::Handle<JSObject*> intl);
+
+// Create and add the Intl.MozDateTimeFormat constructor function to the provided
+// object.
+//
+// This custom date/time formatter constructor gives users the ability
+// to specify a custom format pattern. This pattern is passed *directly*
+// to ICU with NO SYNTAX PARSING OR VALIDATION WHATSOEVER. ICU appears to
+// have a a modicum of testing of this, and it won't fall over completely
+// if passed bad input. But the current behavior is entirely under-specified
+// and emphatically not shippable on the web, and it *must* be fixed before
+// this functionality can be exposed in the real world. (There are also some
+// questions about whether the format exposed here is the *right* one to
+// standardize, that will also need to be resolved to ship this.)
+extern bool
+AddMozDateTimeFormatConstructor(JSContext* cx, JS::Handle<JSObject*> intl);
 
 class MOZ_STACK_CLASS JS_FRIEND_API(AutoAssertNoContentJS)
 {
@@ -2959,6 +2995,20 @@ EnableAccessValidation(JSContext* cx, bool enabled);
 // should be made from whichever thread owns |global| at a given time.
 extern JS_FRIEND_API(void)
 SetCompartmentValidAccessPtr(JSContext* cx, JS::HandleObject global, bool* accessp);
+
+// If the JS engine wants to block so that other cooperative threads can run, it
+// will call the yield callback. It may do this if it needs to access a ZoneGroup
+// that is held by another thread (such as the system zone group).
+typedef void
+(* YieldCallback)(JSContext* cx);
+
+extern JS_FRIEND_API(void)
+SetCooperativeYieldCallback(JSContext* cx, YieldCallback callback);
+
+// Returns true if the system zone is available (i.e., if no cooperative contexts
+// are using it now).
+extern JS_FRIEND_API(bool)
+SystemZoneAvailable(JSContext* cx);
 
 } /* namespace js */
 

@@ -126,11 +126,16 @@ SharedLibraryInfo SharedLibraryInfo::GetInfoForSelf()
     if (!EnumProcessModules(hProcess, hMods.get(), modulesNum * sizeof(HMODULE), &modulesSize)) {
       return sharedLibraryInfo;
     }
+    // The list may have shrunk between calls
+    if (modulesSize / sizeof(HMODULE) < modulesNum) {
+      modulesNum = modulesSize / sizeof(HMODULE);
+    }
   }
 
-  for (unsigned int i = 0; i <= modulesNum; i++) {
+  for (unsigned int i = 0; i < modulesNum; i++) {
     nsID pdbSig;
     uint32_t pdbAge;
+    nsAutoString pdbPathStr;
     nsAutoString pdbNameStr;
     char *pdbName = NULL;
     std::string breakpadId;
@@ -145,7 +150,7 @@ SharedLibraryInfo SharedLibraryInfo::GetInfoForSelf()
       continue;
     }
 
-    // Load the module again to make sure that its handle will remain remain
+    // Load the module again to make sure that its handle will remain
     // valid as we attempt to read the PDB information from it.  We load the
     // DLL as a datafile so that if the module actually gets unloaded between
     // the call to EnumProcessModules and the following LoadLibraryEx, we don't
@@ -171,26 +176,31 @@ SharedLibraryInfo SharedLibraryInfo::GetInfoForSelf()
       std::transform(breakpadId.begin(), breakpadId.end(),
         breakpadId.begin(), toupper);
 
-      pdbNameStr = NS_ConvertUTF8toUTF16(pdbName);
+      pdbPathStr = NS_ConvertUTF8toUTF16(pdbName);
+      pdbNameStr = pdbPathStr;
       int32_t pos = pdbNameStr.RFindChar('\\');
       if (pos != kNotFound) {
         pdbNameStr.Cut(0, pos + 1);
       }
     }
 
-    nsAutoString moduleName(modulePath);
-    int32_t pos = moduleName.RFindChar('\\');
+    nsAutoString modulePathStr(modulePath);
+    nsAutoString moduleNameStr = modulePathStr;
+    int32_t pos = moduleNameStr.RFindChar('\\');
     if (pos != kNotFound) {
-      moduleName.Cut(0, pos + 1);
+      moduleNameStr.Cut(0, pos + 1);
     }
 
     SharedLibrary shlib((uintptr_t)module.lpBaseOfDll,
       (uintptr_t)module.lpBaseOfDll + module.SizeOfImage,
       0, // DLLs are always mapped at offset 0 on Windows
       breakpadId,
-      moduleName,
+      moduleNameStr,
+      modulePathStr,
       pdbNameStr,
-      GetVersion(modulePath));
+      pdbPathStr,
+      GetVersion(modulePath),
+      "");
     sharedLibraryInfo.AddSharedLibrary(shlib);
 
     FreeLibrary(handleLock); // ok to free null handles

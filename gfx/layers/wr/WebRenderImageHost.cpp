@@ -4,8 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "WebRenderImageHost.h"
-#include "WebRenderLayersLogging.h"     // for AppendToString
 
+#include "LayersLogging.h"
 #include "mozilla/layers/Compositor.h"  // for Compositor
 #include "mozilla/layers/Effects.h"     // for TexturedEffect, Effect, etc
 #include "mozilla/layers/LayerManagerComposite.h"     // for TexturedEffect, Effect, etc
@@ -102,19 +102,23 @@ WebRenderImageHost::GetCompositionTime() const
 TextureHost*
 WebRenderImageHost::GetAsTextureHost(IntRect* aPictureRect)
 {
-  MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+  TimedImage* img = ChooseImage();
+  if (img) {
+    return img->mTextureHost;
+  }
   return nullptr;
 }
 
 void WebRenderImageHost::Attach(Layer* aLayer,
-                       Compositor* aCompositor,
+                       TextureSourceProvider* aProvider,
                        AttachFlags aFlags)
 {
   MOZ_ASSERT_UNREACHABLE("unexpected to be called");
 }
 
 void
-WebRenderImageHost::Composite(LayerComposite* aLayer,
+WebRenderImageHost::Composite(Compositor* aCompositor,
+                     LayerComposite* aLayer,
                      EffectChain& aEffectChain,
                      float aOpacity,
                      const gfx::Matrix4x4& aTransform,
@@ -127,14 +131,14 @@ WebRenderImageHost::Composite(LayerComposite* aLayer,
 }
 
 void
-WebRenderImageHost::SetCompositor(Compositor* aCompositor)
+WebRenderImageHost::SetTextureSourceProvider(TextureSourceProvider* aProvider)
 {
-  if (mCompositor != aCompositor) {
+  if (mTextureSourceProvider != aProvider) {
     for (auto& img : mImages) {
-      img.mTextureHost->SetCompositor(aCompositor);
+      img.mTextureHost->SetTextureSourceProvider(aProvider);
     }
   }
-  CompositableHost::SetCompositor(aCompositor);
+  CompositableHost::SetTextureSourceProvider(aProvider);
 }
 
 void

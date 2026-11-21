@@ -46,6 +46,7 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/FileCreatorHelper.h"
+#include "mozilla/dom/FileSystemSecurity.h"
 #include "mozilla/dom/ExternalHelperAppParent.h"
 #include "mozilla/dom/GetFilesHelper.h"
 #include "mozilla/dom/GeolocationBinding.h"
@@ -1633,6 +1634,11 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
     mHangMonitorActor = nullptr;
   }
 
+  RefPtr<FileSystemSecurity> fss = FileSystemSecurity::Get();
+  if (fss) {
+    fss->Forget(ChildID());
+  }
+
   if (why == NormalShutdown && !mCalledClose) {
     // If we shut down normally but haven't called Close, assume somebody
     // else called Close on us. In that case, we still need to call
@@ -1998,7 +2004,6 @@ ContentParent::ContentParent(ContentParent* aOpener,
   , mNumDestroyingTabs(0)
   , mIsAvailable(true)
   , mIsAlive(true)
-  , mSendPermissionUpdates(false)
   , mIsForBrowser(!mRemoteType.IsEmpty())
   , mCalledClose(false)
   , mCalledKillHard(false)
@@ -4925,6 +4930,12 @@ ContentParent::EnsurePermissionsByKey(const nsCString& aKey)
 
   Unused << SendSetPermissionsWithKey(aKey, perms);
 #endif
+}
+
+bool
+ContentParent::NeedsPermissionsUpdate(const nsACString& aPermissionKey) const
+{
+  return mActivePermissionKeys.Contains(aPermissionKey);
 }
 
 mozilla::ipc::IPCResult

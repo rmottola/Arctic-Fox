@@ -14,6 +14,8 @@
 
 #include "js/Conversions.h"
 
+#include "vm/String.h"
+
 
 // This macro is should be `one' if current compiler supports builtin functions
 // like __builtin_sadd_overflow.
@@ -244,6 +246,11 @@ IsDefinitelyIndex(const Value& v, uint32_t* indexp)
         return true;
     }
 
+    if (v.isString() && v.toString()->hasIndexValue()) {
+        *indexp = v.toString()->getIndexValue();
+        return true;
+    }
+
     return false;
 }
 
@@ -257,6 +264,9 @@ ToInteger(JSContext* cx, HandleValue v, double* dp)
     }
     if (v.isDouble()) {
         *dp = v.toDouble();
+    } else if (v.isString() && v.toString()->hasIndexValue()) {
+        *dp = v.toString()->getIndexValue();
+        return true;
     } else {
         extern JS_PUBLIC_API(bool) ToNumberSlow(JSContext* cx, HandleValue v, double* dp);
         if (!ToNumberSlow(cx, v, dp))
@@ -278,12 +288,6 @@ ToLength(double argument)
         return MAX_SAFE_INTEGER;
     return len;
 }
-
-/* ES6 7.1.15 ToLength, but clamped to the [0,2^32-2] range.  If the
- * return value is false then *overflow will be true iff the value was
- * not clampable to uint32_t range.
- */
-MOZ_MUST_USE bool ToLengthClamped(JSContext* cx, HandleValue v, uint32_t* out, bool* overflow);
 
 /* Non-standard convert and range check an index value as for SIMD, and Atomics
  * operations, eg ES7 24.2.1.1, DataView's GetViewValue():
@@ -352,8 +356,6 @@ SafeMul(int32_t one, int32_t two, int32_t* res)
     return ores == (int64_t)*res;
 #endif
 }
-
-void FIX_FPU();
 
 } /* namespace js */
 

@@ -33,9 +33,16 @@ typedef Vector<ZoneGroup*, 4, SystemAllocPolicy> ZoneGroupVector;
 using BlackGrayEdgeVector = Vector<TenuredCell*, 0, SystemAllocPolicy>;
 
 class AutoMaybeStartBackgroundAllocation;
-class MarkingValidator;
+template <typename Task> class AutoRunGCSweepTask;
 class AutoTraceSession;
+class MarkingValidator;
 struct MovingTracer;
+
+enum IncrementalProgress
+{
+    NotFinished = 0,
+    Finished
+};
 
 class ChunkPool
 {
@@ -771,6 +778,8 @@ class GCRuntime
 
     bool isShrinkingGC() const { return invocationKind == GC_SHRINK; }
 
+    static bool initializeSweepActions();
+
     void setGrayRootsTracer(JSTraceDataOp traceOp, void* data);
     MOZ_MUST_USE bool addBlackRootsTracer(JSTraceDataOp traceOp, void* data);
     void removeBlackRootsTracer(JSTraceDataOp traceOp, void* data);
@@ -892,12 +901,6 @@ class GCRuntime
     static TenuredCell* refillFreeListInGC(Zone* zone, AllocKind thingKind);
 
   private:
-    enum IncrementalProgress
-    {
-        NotFinished = 0,
-        Finished
-    };
-
     enum IncrementalResult
     {
         Reset = 0,
@@ -979,15 +982,26 @@ class GCRuntime
     void markAllWeakReferences(gcstats::Phase phase);
     void markAllGrayReferences(gcstats::Phase phase);
 
-    void beginSweepPhase(bool lastGC, AutoLockForExclusiveAccess& lock);
-    void groupZonesForSweeping(AutoLockForExclusiveAccess& lock);
+    void beginSweepPhase(JS::gcreason::Reason reason, AutoLockForExclusiveAccess& lock);
+    void groupZonesForSweeping(JS::gcreason::Reason reason, AutoLockForExclusiveAccess& lock);
     MOZ_MUST_USE bool findInterZoneEdges();
     void getNextSweepGroup();
     void endMarkingSweepGroup();
     void beginSweepingSweepGroup(AutoLockForExclusiveAccess& lock);
     bool shouldReleaseObservedTypes();
+    void sweepDebuggerOnMainThread(FreeOp* fop);
+    void sweepJitDataOnMainThread(FreeOp* fop);
     void endSweepingSweepGroup();
-    IncrementalProgress sweepPhase(SliceBudget& sliceBudget, AutoLockForExclusiveAccess& lock);
+    IncrementalProgress performSweepActions(SliceBudget& sliceBudget,
+                                            AutoLockForExclusiveAccess& lock);
+    static IncrementalProgress sweepTypeInformation(GCRuntime* gc, FreeOp* fop, Zone* zone,
+                                                    SliceBudget& budget, AllocKind kind);
+    static IncrementalProgress mergeSweptObjectArenas(GCRuntime* gc, FreeOp* fop, Zone* zone,
+                                                      SliceBudget& budget, AllocKind kind);
+    static IncrementalProgress finalizeAllocKind(GCRuntime* gc, FreeOp* fop, Zone* zone,
+                                                 SliceBudget& budget, AllocKind kind);
+    static IncrementalProgress sweepShapeTree(GCRuntime* gc, FreeOp* fop, Zone* zone,
+                                              SliceBudget& budget, AllocKind kind);
     void endSweepPhase(bool lastGC, AutoLockForExclusiveAccess& lock);
     bool allCCVisibleZonesWereCollected() const;
     void sweepZones(FreeOp* fop, ZoneGroup* group, bool lastGC);
@@ -1206,10 +1220,9 @@ class GCRuntime
      */
     ActiveThreadData<JS::Zone*> sweepGroups;
     ActiveThreadOrGCTaskData<JS::Zone*> currentSweepGroup;
-    ActiveThreadData<bool> sweepingTypes;
-    ActiveThreadData<unsigned> finalizePhase;
+    ActiveThreadData<size_t> sweepPhaseIndex;
     ActiveThreadData<JS::Zone*> sweepZone;
-    ActiveThreadData<AllocKind> sweepKind;
+    ActiveThreadData<size_t> sweepActionIndex;
     ActiveThreadData<bool> abortSweepAfterCurrentGroup;
 
     /*
@@ -1217,6 +1230,7 @@ class GCRuntime
      */
     void startTask(GCParallelTask& task, gcstats::Phase phase, AutoLockHelperThreadState& locked);
     void joinTask(GCParallelTask& task, gcstats::Phase phase, AutoLockHelperThreadState& locked);
+    template <typename Task> friend class AutoRunGCSweepTask;
 
     /*
      * List head of arenas allocated during the sweep phase.
@@ -1433,7 +1447,8 @@ GCRuntime::needZealousGC() {
             hasZealMode(ZealMode::IncrementalRootsThenFinish) ||
             hasZealMode(ZealMode::IncrementalMarkAllThenFinish) ||
             hasZealMode(ZealMode::IncrementalMultipleSlices) ||
-            hasZealMode(ZealMode::Compact))
+            hasZealMode(ZealMode::Compact) ||
+            hasZealMode(ZealMode::IncrementalSweepThenFinish))
         {
             nextScheduled = zealFrequency;
         }

@@ -49,6 +49,7 @@ IonIC::scratchRegisterForEntryJump()
       case CacheKind::BindName:
         return asBindNameIC()->temp();
       case CacheKind::In:
+      case CacheKind::TypeOf:
         MOZ_CRASH("Baseline-specific for now");
       case CacheKind::HasOwn:
         return asHasOwnIC()->output();
@@ -100,19 +101,6 @@ IonIC::trace(JSTracer* trc)
 
         TraceCacheIRStub(trc, stub, stub->stubInfo());
 
-        nextCodeRaw = stub->nextCodeRaw();
-    }
-
-    MOZ_ASSERT(nextCodeRaw == fallbackLabel_.raw());
-}
-
-void
-IonIC::togglePreBarriers(bool enabled, ReprotectCode reprotect)
-{
-    uint8_t* nextCodeRaw = codeRaw_;
-    for (IonICStub* stub = firstStub_; stub; stub = stub->next()) {
-        JitCode* code = JitCode::FromExecutable(nextCodeRaw);
-        code->togglePreBarriers(enabled, reprotect);
         nextCodeRaw = stub->nextCodeRaw();
     }
 

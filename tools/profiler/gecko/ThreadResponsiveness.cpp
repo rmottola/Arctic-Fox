@@ -31,6 +31,8 @@ protected:
   }
 
 public:
+
+  // Can only run on the main thread.
   NS_IMETHOD Run() override
   {
     MonitorAutoLock mon(mMonitor);
@@ -93,20 +95,13 @@ ThreadResponsiveness::~ThreadResponsiveness()
 }
 
 void
-ThreadResponsiveness::Update(bool aIsMainThread, nsIThread* aThread)
+ThreadResponsiveness::Update()
 {
   if (!mActiveTracerEvent) {
-    if (aIsMainThread) {
-      mActiveTracerEvent = new CheckResponsivenessTask();
-      NS_DispatchToMainThread(mActiveTracerEvent);
-    } else if (aThread) {
-      mActiveTracerEvent = new CheckResponsivenessTask();
-      aThread->Dispatch(mActiveTracerEvent, NS_DISPATCH_NORMAL);
-    }
+    mActiveTracerEvent = new CheckResponsivenessTask();
+    NS_DispatchToMainThread(mActiveTracerEvent);
   }
 
-  if (mActiveTracerEvent) {
-    mLastTracerTime = mActiveTracerEvent->GetLastTracerTime();
-  }
+  mLastTracerTime = mActiveTracerEvent->GetLastTracerTime();
 }
 

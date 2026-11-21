@@ -76,12 +76,12 @@ private:
 class ProfilerMarkerTracing : public ProfilerMarkerPayload
 {
 public:
-  ProfilerMarkerTracing(const char* aCategory, TracingMetadata aMetaData);
-  ProfilerMarkerTracing(const char* aCategory, TracingMetadata aMetaData,
+  ProfilerMarkerTracing(const char* aCategory, TracingKind aKind);
+  ProfilerMarkerTracing(const char* aCategory, TracingKind aKind,
                         UniqueProfilerBacktrace aCause);
 
   const char *GetCategory() const { return mCategory; }
-  TracingMetadata GetMetaData() const { return mMetaData; }
+  TracingKind GetKind() const { return mKind; }
 
   virtual void StreamPayload(SpliceableJSONWriter& aWriter,
                              const mozilla::TimeStamp& aStartTime,
@@ -89,7 +89,7 @@ public:
 
 private:
   const char *mCategory;
-  TracingMetadata mMetaData;
+  TracingKind mKind;
 };
 
 class ProfilerMarkerImagePayload : public ProfilerMarkerPayload
@@ -137,6 +137,26 @@ public:
 private:
   nsString mType;
   uint16_t mPhase;
+};
+
+class UserTimingMarkerPayload : public ProfilerMarkerPayload
+{
+public:
+  UserTimingMarkerPayload(const nsAString& aName,
+                          const mozilla::TimeStamp& aStartTime);
+  UserTimingMarkerPayload(const nsAString& aName,
+                          const mozilla::TimeStamp& aStartTime,
+                          const mozilla::TimeStamp& aEndTime);
+  ~UserTimingMarkerPayload();
+
+  virtual void StreamPayload(SpliceableJSONWriter& aWriter,
+                             const mozilla::TimeStamp& aStartTime,
+                             UniqueStacks& aUniqueStacks) override;
+
+private:
+  // Either "mark" or "measure".
+  const char* mEntryType;
+  nsString mName;
 };
 
 /**

@@ -204,6 +204,7 @@ EXPORTS.mozilla.layers += [
     'RenderTrace.h',
     'SourceSurfaceSharedData.h',
     'SourceSurfaceVolatileData.h',
+    'TextureSourceProvider.h',
     'TextureWrapperImage.h',
     'TransactionIdAllocator.h',
     'wr/WebRenderBridgeChild.h',
@@ -214,6 +215,7 @@ EXPORTS.mozilla.layers += [
     'wr/WebRenderLayerManager.h',
     'wr/WebRenderLayersLogging.h',
     'wr/WebRenderMessageUtils.h',
+    'wr/WebRenderTextureHost.h',
 ]
 
 if CONFIG['MOZ_X11']:
@@ -327,6 +329,7 @@ UNIFIED_SOURCES += [
     'composite/CompositableHost.cpp',
     'composite/ContainerLayerComposite.cpp',
     'composite/ContentHost.cpp',
+    'composite/Diagnostics.cpp',
     'composite/FPSCounter.cpp',
     'composite/FrameUniformityData.cpp',
     'composite/GPUVideoTextureHost.cpp',
@@ -388,8 +391,8 @@ UNIFIED_SOURCES += [
     'ShareableCanvasLayer.cpp',
     'SourceSurfaceSharedData.cpp',
     'SourceSurfaceVolatileData.cpp',
+    'TextureSourceProvider.cpp',
     'TextureWrapperImage.cpp',
-    'wr/WebRenderBorderLayer.cpp',
     'wr/WebRenderBridgeChild.cpp',
     'wr/WebRenderBridgeParent.cpp',
     'wr/WebRenderCanvasLayer.cpp',
@@ -403,6 +406,7 @@ UNIFIED_SOURCES += [
     'wr/WebRenderLayersLogging.cpp',
     'wr/WebRenderPaintedLayer.cpp',
     'wr/WebRenderTextLayer.cpp',
+    'wr/WebRenderTextureHost.cpp',
 ]
 
 SOURCES += [

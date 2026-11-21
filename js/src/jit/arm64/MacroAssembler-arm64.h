@@ -1838,10 +1838,6 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
         }
     }
 
-    void writePrebarrierOffset(CodeOffset label) {
-        preBarriers_.writeUnsigned(label.offset());
-    }
-
     void computeEffectiveAddress(const Address& address, Register dest) {
         Add(ARMRegister(dest, 64), ARMRegister(address.base, 64), Operand(address.offset));
     }

@@ -275,7 +275,7 @@ js::Nursery::allocateObject(JSContext* cx, size_t size, size_t numDynamic, const
     /* If we want external slots, add them. */
     HeapSlot* slots = nullptr;
     if (numDynamic) {
-        MOZ_ASSERT(clasp->isNative() || clasp->isProxy());
+        MOZ_ASSERT(clasp->isNative());
         slots = static_cast<HeapSlot*>(allocateBuffer(cx->zone(), numDynamic * sizeof(HeapSlot)));
         if (!slots) {
             /*
@@ -436,11 +436,11 @@ Nursery::setSlotsForwardingPointer(HeapSlot* oldSlots, HeapSlot* newSlots, uint3
 
 void
 Nursery::setElementsForwardingPointer(ObjectElements* oldHeader, ObjectElements* newHeader,
-                                      uint32_t nelems)
+                                      uint32_t capacity)
 {
     // Only use a direct forwarding pointer if there is enough space for one.
     setForwardingPointer(oldHeader->elements(), newHeader->elements(),
-                         nelems > ObjectElements::VALUES_PER_HEADER);
+                         capacity > 0);
 }
 
 #ifdef DEBUG
@@ -501,7 +501,7 @@ FOR_EACH_NURSERY_PROFILE_TIME(PRINT_HEADER)
 js::Nursery::printProfileDurations(const ProfileDurations& times)
 {
     for (auto time : times)
-        fprintf(stderr, " %6.0f", time.ToMicroseconds());
+        fprintf(stderr, " %6" PRIi64, static_cast<int64_t>(time.ToMicroseconds()));
     fprintf(stderr, "\n");
 }
 

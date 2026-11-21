@@ -50,19 +50,18 @@ ProfilerMarkerPayload::streamCommonProps(const char* aMarkerType,
   }
 }
 
-ProfilerMarkerTracing::ProfilerMarkerTracing(const char* aCategory, TracingMetadata aMetaData)
+ProfilerMarkerTracing::ProfilerMarkerTracing(const char* aCategory,
+                                             TracingKind aKind)
   : mCategory(aCategory)
-  , mMetaData(aMetaData)
+  , mKind(aKind)
 {
-  if (aMetaData == TRACING_EVENT_BACKTRACE) {
-    SetStack(profiler_get_backtrace());
-  }
 }
 
-ProfilerMarkerTracing::ProfilerMarkerTracing(const char* aCategory, TracingMetadata aMetaData,
+ProfilerMarkerTracing::ProfilerMarkerTracing(const char* aCategory,
+                                             TracingKind aKind,
                                              UniqueProfilerBacktrace aCause)
   : mCategory(aCategory)
-  , mMetaData(aMetaData)
+  , mKind(aKind)
 {
   if (aCause) {
     SetStack(mozilla::Move(aCause));
@@ -79,12 +78,11 @@ ProfilerMarkerTracing::StreamPayload(SpliceableJSONWriter& aWriter,
   if (GetCategory()) {
     aWriter.StringProperty("category", GetCategory());
   }
-  if (GetMetaData() != TRACING_DEFAULT) {
-    if (GetMetaData() == TRACING_INTERVAL_START) {
-      aWriter.StringProperty("interval", "start");
-    } else if (GetMetaData() == TRACING_INTERVAL_END) {
-      aWriter.StringProperty("interval", "end");
-    }
+
+  if (GetKind() == TRACING_INTERVAL_START) {
+    aWriter.StringProperty("interval", "start");
+  } else if (GetKind() == TRACING_INTERVAL_END) {
+    aWriter.StringProperty("interval", "end");
   }
 }
 
@@ -157,6 +155,37 @@ IOMarkerPayload::StreamPayload(SpliceableJSONWriter& aWriter,
   if (mFilename != nullptr) {
     aWriter.StringProperty("filename", mFilename);
   }
+}
+
+UserTimingMarkerPayload::UserTimingMarkerPayload(const nsAString& aName,
+                                                 const mozilla::TimeStamp& aStartTime)
+  : ProfilerMarkerPayload(aStartTime, aStartTime, nullptr)
+  , mEntryType("mark")
+  , mName(aName)
+{
+}
+
+UserTimingMarkerPayload::UserTimingMarkerPayload(const nsAString& aName,
+                                                 const mozilla::TimeStamp& aStartTime,
+                                                 const mozilla::TimeStamp& aEndTime)
+  : ProfilerMarkerPayload(aStartTime, aEndTime, nullptr)
+  , mEntryType("measure")
+  , mName(aName)
+{
+}
+
+UserTimingMarkerPayload::~UserTimingMarkerPayload()
+{
+}
+
+void
+UserTimingMarkerPayload::StreamPayload(SpliceableJSONWriter& aWriter,
+                                       const TimeStamp& aStartTime,
+                                       UniqueStacks& aUniqueStacks)
+{
+  streamCommonProps("UserTiming", aWriter, aStartTime, aUniqueStacks);
+  aWriter.StringProperty("name", NS_ConvertUTF16toUTF8(mName).get());
+  aWriter.StringProperty("entryType", mEntryType);
 }
 
 DOMEventMarkerPayload::DOMEventMarkerPayload(const nsAString& aType, uint16_t aPhase,

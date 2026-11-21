@@ -48,7 +48,7 @@ Compositor::~Compositor()
 void
 Compositor::Destroy()
 {
-  ReadUnlockTextures();
+  TextureSourceProvider::Destroy();
   FlushPendingNotifyNotUsed();
   mIsDestroyed = true;
 }
@@ -58,50 +58,6 @@ Compositor::EndFrame()
 {
   ReadUnlockTextures();
   mLastCompositionEndTime = TimeStamp::Now();
-}
-
-void
-Compositor::ReadUnlockTextures()
-{
-  for (auto& texture : mUnlockAfterComposition) {
-    texture->ReadUnlock();
-  }
-  mUnlockAfterComposition.Clear();
-}
-
-void
-Compositor::UnlockAfterComposition(TextureHost* aTexture)
-{
-  mUnlockAfterComposition.AppendElement(aTexture);
-}
-
-void
-Compositor::NotifyNotUsedAfterComposition(TextureHost* aTextureHost)
-{
-  MOZ_ASSERT(!mIsDestroyed);
-
-  mNotifyNotUsedAfterComposition.AppendElement(aTextureHost);
-
-  // If Compositor holds many TextureHosts without compositing,
-  // the TextureHosts should be flushed to reduce memory consumption.
-  const int thresholdCount = 5;
-  const double thresholdSec = 2.0f;
-  if (mNotifyNotUsedAfterComposition.Length() > thresholdCount) {
-    TimeDuration duration = mLastCompositionEndTime ? TimeStamp::Now() - mLastCompositionEndTime : TimeDuration();
-    // Check if we could flush
-    if (duration.ToSeconds() > thresholdSec) {
-      FlushPendingNotifyNotUsed();
-    }
-  }
-}
-
-void
-Compositor::FlushPendingNotifyNotUsed()
-{
-  for (auto& textureHost : mNotifyNotUsedAfterComposition) {
-    textureHost->CallNotifyNotUsed();
-  }
-  mNotifyNotUsedAfterComposition.Clear();
 }
 
 /* static */ void
@@ -270,6 +226,10 @@ Compositor::DrawGeometry(const gfx::Rect& aRect,
                          const gfx::Rect& aVisibleRect,
                          const Maybe<gfx::Polygon>& aGeometry)
 {
+  if (aRect.IsEmpty()) {
+    return;
+  }
+
   if (!aGeometry || !SupportsLayerGeometry()) {
     DrawQuad(aRect, aClipRect, aEffectChain,
              aOpacity, aTransform, aVisibleRect);
@@ -283,7 +243,37 @@ Compositor::DrawGeometry(const gfx::Rect& aRect,
 
   const gfx::Polygon clipped = aGeometry->ClipPolygon(aRect);
 
-  for (gfx::Triangle& triangle : clipped.ToTriangles()) {
+  DrawPolygon(clipped, aRect, aClipRect, aEffectChain,
+              aOpacity, aTransform, aVisibleRect);
+}
+
+void
+Compositor::DrawTriangles(const nsTArray<gfx::TexturedTriangle>& aTriangles,
+                          const gfx::Rect& aRect,
+                          const gfx::IntRect& aClipRect,
+                          const EffectChain& aEffectChain,
+                          gfx::Float aOpacity,
+                          const gfx::Matrix4x4& aTransform,
+                          const gfx::Rect& aVisibleRect)
+{
+  for (const gfx::TexturedTriangle& triangle : aTriangles) {
+    DrawTriangle(triangle, aClipRect, aEffectChain,
+                 aOpacity, aTransform, aVisibleRect);
+  }
+}
+
+void
+Compositor::DrawPolygon(const gfx::Polygon& aPolygon,
+                        const gfx::Rect& aRect,
+                        const gfx::IntRect& aClipRect,
+                        const EffectChain& aEffectChain,
+                        gfx::Float aOpacity,
+                        const gfx::Matrix4x4& aTransform,
+                        const gfx::Rect& aVisibleRect)
+{
+  nsTArray<gfx::TexturedTriangle> texturedTriangles;
+
+  for (gfx::Triangle& triangle : aPolygon.ToTriangles()) {
     const gfx::Rect intersection = aRect.Intersect(triangle.BoundingBox());
 
     // Cull invisible triangles.
@@ -311,9 +301,11 @@ Compositor::DrawGeometry(const gfx::Rect& aRect,
                                texturedEffect->mTextureCoords);
     }
 
-    DrawTriangle(texturedTriangle, aClipRect, aEffectChain,
-                 aOpacity, aTransform, aVisibleRect);
+    texturedTriangles.AppendElement(Move(texturedTriangle));
   }
+
+  DrawTriangles(texturedTriangles, aRect, aClipRect, aEffectChain,
+                aOpacity, aTransform, aVisibleRect);
 }
 
 void
@@ -601,6 +593,15 @@ Compositor::IsValid() const
 void
 Compositor::SetDispAcquireFence(Layer* aLayer)
 {
+}
+
+bool
+Compositor::NotifyNotUsedAfterComposition(TextureHost* aTextureHost)
+{
+  if (IsDestroyed() || AsBasicCompositor()) {
+    return false;
+  }
+  return TextureSourceProvider::NotifyNotUsedAfterComposition(aTextureHost);
 }
 
 } // namespace layers

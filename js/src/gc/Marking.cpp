@@ -1821,7 +1821,10 @@ GCMarker::saveValueRanges()
             HeapSlot* vp = obj->getDenseElementsAllowCopyOnWrite();
             if (array.end == vp + obj->getDenseInitializedLength()) {
                 MOZ_ASSERT(array.start >= vp);
-                index = array.start - vp;
+                // Add the number of shifted elements here (and subtract in
+                // restoreValueArray) to ensure shift() calls on the array
+                // are handled correctly.
+                index = obj->unshiftedIndex(array.start - vp);
                 kind = HeapSlot::Element;
             } else {
                 HeapSlot* vp = obj->fixedSlots();
@@ -1863,6 +1866,11 @@ GCMarker::restoreValueArray(const MarkStack::SavedValueArray& array,
             return false;
 
         uint32_t initlen = obj->getDenseInitializedLength();
+
+        // Account for shifted elements.
+        uint32_t numShifted = obj->getElementsHeader()->numShiftedElements();
+        start = (numShifted < start) ? start - numShifted : 0;
+
         HeapSlot* vp = obj->getDenseElementsAllowCopyOnWrite();
         if (start < initlen) {
             *vpp = vp + start;
@@ -2687,8 +2695,11 @@ js::gc::StoreBuffer::SlotsEdge::trace(TenuringTracer& mover) const
 
     if (kind() == ElementKind) {
         int32_t initLen = obj->getDenseInitializedLength();
-        int32_t clampedStart = Min(start_, initLen);
-        int32_t clampedEnd = Min(start_ + count_, initLen);
+        int32_t numShifted = obj->getElementsHeader()->numShiftedElements();
+        int32_t clampedStart = Min(Max(0, start_ - numShifted), initLen);
+        int32_t clampedEnd = Min(Max(0, start_ + count_ - numShifted), initLen);
+        MOZ_ASSERT(clampedStart >= 0);
+        MOZ_ASSERT(clampedStart <= clampedEnd);
         mover.traceSlots(static_cast<HeapSlot*>(obj->getDenseElements() + clampedStart)
                             ->unsafeUnbarrieredForTracing(), clampedEnd - clampedStart);
     } else {
@@ -2963,7 +2974,10 @@ js::TenuringTracer::moveObjectToTenured(JSObject* dst, JSObject* src, AllocKind 
     } else if (src->is<ArgumentsObject>()) {
         tenuredSize += ArgumentsObject::objectMovedDuringMinorGC(this, dst, src);
     } else if (src->is<ProxyObject>()) {
-        tenuredSize += ProxyObject::objectMovedDuringMinorGC(this, dst, src);
+        // Objects in the nursery are never swapped so the proxy must have an
+        // inline ProxyValueArray.
+        MOZ_ASSERT(src->as<ProxyObject>().usingInlineValueArray());
+        dst->as<ProxyObject>().setInlineValueArray();
     } else if (JSObjectMovedOp op = dst->getClass()->extObjectMovedOp()) {
         op(dst, src);
     } else if (src->getClass()->hasFinalize()) {
@@ -3009,30 +3023,35 @@ js::TenuringTracer::moveElementsToTenured(NativeObject* dst, NativeObject* src, 
     if (src->hasEmptyElements() || src->denseElementsAreCopyOnWrite())
         return 0;
 
-    Zone* zone = src->zone();
-    ObjectElements* srcHeader = src->getElementsHeader();
-    ObjectElements* dstHeader;
+    void* srcAllocatedHeader = src->getUnshiftedElementsHeader();
 
     /* TODO Bug 874151: Prefer to put element data inline if we have space. */
-    if (!nursery().isInside(srcHeader)) {
+    if (!nursery().isInside(srcAllocatedHeader)) {
         MOZ_ASSERT(src->elements_ == dst->elements_);
-        nursery().removeMallocedBuffer(srcHeader);
+        nursery().removeMallocedBuffer(srcAllocatedHeader);
         return 0;
     }
 
-    size_t nslots = ObjectElements::VALUES_PER_HEADER + srcHeader->capacity;
+    ObjectElements* srcHeader = src->getElementsHeader();
+
+    // Shifted elements are copied too.
+    uint32_t numShifted = srcHeader->numShiftedElements();
+    size_t nslots = srcHeader->numAllocatedElements();
 
     /* Unlike other objects, Arrays can have fixed elements. */
     if (src->is<ArrayObject>() && nslots <= GetGCKindSlots(dstKind)) {
         dst->as<ArrayObject>().setFixedElements();
-        dstHeader = dst->as<ArrayObject>().getElementsHeader();
-        js_memcpy(dstHeader, srcHeader, nslots * sizeof(HeapSlot));
-        nursery().setElementsForwardingPointer(srcHeader, dstHeader, nslots);
+        js_memcpy(dst->getElementsHeader(), srcAllocatedHeader, nslots * sizeof(HeapSlot));
+        dst->elements_ += numShifted;
+        nursery().setElementsForwardingPointer(srcHeader, dst->getElementsHeader(),
+                                               srcHeader->capacity);
         return nslots * sizeof(HeapSlot);
     }
 
     MOZ_ASSERT(nslots >= 2);
 
+    Zone* zone = src->zone();
+    ObjectElements* dstHeader;
     {
         AutoEnterOOMUnsafeRegion oomUnsafe;
         dstHeader = reinterpret_cast<ObjectElements*>(zone->pod_malloc<HeapSlot>(nslots));
@@ -3042,9 +3061,10 @@ js::TenuringTracer::moveElementsToTenured(NativeObject* dst, NativeObject* src, 
         }
     }
 
-    js_memcpy(dstHeader, srcHeader, nslots * sizeof(HeapSlot));
-    nursery().setElementsForwardingPointer(srcHeader, dstHeader, nslots);
-    dst->elements_ = dstHeader->elements();
+    js_memcpy(dstHeader, srcAllocatedHeader, nslots * sizeof(HeapSlot));
+    dst->elements_ = dstHeader->elements() + numShifted;
+    nursery().setElementsForwardingPointer(srcHeader, dst->getElementsHeader(),
+                                           srcHeader->capacity);
     return nslots * sizeof(HeapSlot);
 }
 
@@ -3156,8 +3176,8 @@ IsAboutToBeFinalizedInternal(T** thingp)
         return false;
 
     if (IsInsideNursery(thing)) {
-        MOZ_ASSERT(JS::CurrentThreadIsHeapMinorCollecting());
-        return !Nursery::getForwardedPointer(reinterpret_cast<JSObject**>(thingp));
+        return JS::CurrentThreadIsHeapMinorCollecting() &&
+               !Nursery::getForwardedPointer(reinterpret_cast<JSObject**>(thingp));
     }
 
     Zone* zone = thing->asTenured().zoneFromAnyThread();
@@ -3233,6 +3253,13 @@ EdgeNeedsSweep(JS::Heap<T>* thingp)
     return IsAboutToBeFinalizedInternal(ConvertToBase(thingp->unsafeGet()));
 }
 
+template <typename T>
+JS_PUBLIC_API(bool)
+EdgeNeedsSweepUnbarrieredSlow(T* thingp)
+{
+    return IsAboutToBeFinalizedInternal(ConvertToBase(thingp));
+}
+
 // Instantiate a copy of the Tracing templates for each derived type.
 #define INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS(type) \
     template bool IsMarkedUnbarriered<type>(JSRuntime*, type*);                \
@@ -3241,7 +3268,8 @@ EdgeNeedsSweep(JS::Heap<T>* thingp)
     template bool IsAboutToBeFinalized<type>(WriteBarrieredBase<type>*); \
     template bool IsAboutToBeFinalized<type>(ReadBarrieredBase<type>*);
 #define INSTANTIATE_ALL_VALID_HEAP_TRACE_FUNCTIONS(type) \
-    template JS_PUBLIC_API(bool) EdgeNeedsSweep<type>(JS::Heap<type>*);
+    template JS_PUBLIC_API(bool) EdgeNeedsSweep<type>(JS::Heap<type>*); \
+    template JS_PUBLIC_API(bool) EdgeNeedsSweepUnbarrieredSlow<type>(type*);
 FOR_EACH_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS)
 FOR_EACH_PUBLIC_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_HEAP_TRACE_FUNCTIONS)
 FOR_EACH_PUBLIC_TAGGED_GC_POINTER_TYPE(INSTANTIATE_ALL_VALID_HEAP_TRACE_FUNCTIONS)

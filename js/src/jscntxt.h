@@ -309,9 +309,25 @@ struct JSContext : public JS::RootingContext,
     friend class js::jit::DebugModeOSRVolatileJitFrameIterator;
     friend void js::ReportOverRecursed(JSContext*, unsigned errorNumber);
 
+    // Returns to the embedding to allow other cooperative threads to run. We
+    // may do this if we need access to a ZoneGroup that is in use by another
+    // thread.
+    void yieldToEmbedding() {
+        (*yieldCallback_)(this);
+    }
+
+    void setYieldCallback(js::YieldCallback callback) {
+        yieldCallback_ = callback;
+    }
+
   private:
     static JS::Error reportedError;
     static JS::OOM reportedOOM;
+
+    // This callback is used to ask the embedding to allow other cooperative
+    // threads to run. We may do this if we need access to a ZoneGroup that is
+    // in use by another thread.
+    js::ThreadLocalData<js::YieldCallback> yieldCallback_;
 
   public:
     inline JS::Result<> boolToResult(bool ok);
@@ -896,6 +912,20 @@ struct JSContext : public JS::RootingContext,
 
     // Like jitStackLimit, but not reset to trigger interrupts.
     js::ThreadLocalData<uintptr_t> jitStackLimitNoInterrupt;
+
+    // Promise callbacks.
+    js::ThreadLocalData<JSGetIncumbentGlobalCallback> getIncumbentGlobalCallback;
+    js::ThreadLocalData<JSEnqueuePromiseJobCallback> enqueuePromiseJobCallback;
+    js::ThreadLocalData<void*> enqueuePromiseJobCallbackData;
+
+    js::ThreadLocalData<JSPromiseRejectionTrackerCallback> promiseRejectionTrackerCallback;
+    js::ThreadLocalData<void*> promiseRejectionTrackerCallbackData;
+
+    JSObject* getIncumbentGlobal(JSContext* cx);
+    bool enqueuePromiseJob(JSContext* cx, js::HandleFunction job, js::HandleObject promise,
+                           js::HandleObject incumbentGlobal);
+    void addUnhandledRejectedPromise(JSContext* cx, js::HandleObject promise);
+    void removeUnhandledRejectedPromise(JSContext* cx, js::HandleObject promise);
 }; /* struct JSContext */
 
 inline JS::Result<>

@@ -207,10 +207,6 @@ BaselineCacheIRCompiler::compile()
         return nullptr;
     }
 
-    // All barriers are emitted off-by-default, enable them if needed.
-    if (cx_->zone()->needsIncrementalBarrier())
-        newStubCode->togglePreBarriers(true, DontReprotect);
-
     return newStubCode;
 }
 
@@ -672,6 +668,32 @@ BaselineCacheIRCompiler::emitCallProxyGetByValueResult()
     return true;
 }
 
+typedef bool (*ProxyHasOwnFn)(JSContext*, HandleObject, HandleValue, MutableHandleValue);
+static const VMFunction ProxyHasOwnInfo = FunctionInfo<ProxyHasOwnFn>(ProxyHasOwn, "ProxyHasOwn");
+
+bool
+BaselineCacheIRCompiler::emitCallProxyHasOwnResult()
+{
+    Register obj = allocator.useRegister(masm, reader.objOperandId());
+    ValueOperand idVal = allocator.useValueRegister(masm, reader.valOperandId());
+
+    AutoScratchRegister scratch(allocator, masm);
+
+    allocator.discardStack(masm);
+
+    AutoStubFrame stubFrame(*this);
+    stubFrame.enter(masm, scratch);
+
+    masm.Push(idVal);
+    masm.Push(obj);
+
+    if (!callVM(masm, ProxyHasOwnInfo))
+        return false;
+
+    stubFrame.leave(masm);
+    return true;
+}
+
 bool
 BaselineCacheIRCompiler::emitLoadUnboxedPropertyResult()
 {
@@ -812,6 +834,17 @@ BaselineCacheIRCompiler::emitLoadEnvironmentDynamicSlotResult()
 
     // Load the value.
     masm.loadValue(slot, output.valueReg());
+    return true;
+}
+
+bool
+BaselineCacheIRCompiler::emitLoadStringResult()
+{
+    AutoOutputRegister output(*this);
+    AutoScratchRegisterMaybeOutput scratch(allocator, masm, output);
+
+    masm.loadPtr(stubAddress(reader.stubOffset()), scratch);
+    masm.tagValue(JSVAL_TYPE_STRING, scratch, output.valueReg());
     return true;
 }
 
@@ -1800,8 +1833,8 @@ BaselineCacheIRCompiler::emitLoadDOMExpandoValueGuardGeneration()
     if (!addFailurePath(&failure))
         return false;
 
-    masm.loadPtr(Address(obj, ProxyObject::offsetOfValues()), scratch);
-    Address expandoAddr(scratch, ProxyObject::offsetOfExtraSlotInValues(GetDOMProxyExpandoSlot()));
+    masm.loadPtr(Address(obj, ProxyObject::offsetOfReservedSlots()), scratch);
+    Address expandoAddr(scratch, detail::ProxyReservedSlots::offsetOfPrivateSlot());
 
     // Load the ExpandoAndGeneration* in the output scratch register and guard
     // it matches the proxy's ExpandoAndGeneration.
@@ -1837,6 +1870,7 @@ BaselineCacheIRCompiler::init(CacheKind kind)
 
     switch (kind) {
       case CacheKind::GetProp:
+      case CacheKind::TypeOf:
         MOZ_ASSERT(numInputs == 1);
         allocator.initInputLocation(0, R0);
         break;
@@ -1902,6 +1936,7 @@ jit::AttachBaselineCacheIRStub(JSContext* cx, const CacheIRWriter& writer,
       case CacheKind::In:
       case CacheKind::HasOwn:
       case CacheKind::BindName:
+      case CacheKind::TypeOf:
         stubDataOffset = sizeof(ICCacheIR_Regular);
         stubKind = CacheIRStubKind::Regular;
         break;

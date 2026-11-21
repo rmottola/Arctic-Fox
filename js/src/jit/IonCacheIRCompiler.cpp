@@ -439,6 +439,7 @@ IonCacheIRCompiler::init()
         break;
       }
       case CacheKind::In:
+      case CacheKind::TypeOf:
         MOZ_CRASH("Invalid cache");
       case CacheKind::HasOwn: {
         IonHasOwnIC* ic = ic_->asHasOwnIC();
@@ -527,10 +528,6 @@ IonCacheIRCompiler::compile()
                                            ImmPtr(newStubCode.get()),
                                            ImmPtr((void*)-1));
     }
-
-    // All barriers are emitted off-by-default, enable them if needed.
-    if (cx_->zone()->needsIncrementalBarrier())
-        newStubCode->togglePreBarriers(true, DontReprotect);
 
     return newStubCode;
 }
@@ -1038,6 +1035,33 @@ IonCacheIRCompiler::emitCallProxyGetByValueResult()
     return true;
 }
 
+typedef bool (*ProxyHasOwnFn)(JSContext*, HandleObject, HandleValue, MutableHandleValue);
+static const VMFunction ProxyHasOwnInfo = FunctionInfo<ProxyHasOwnFn>(ProxyHasOwn, "ProxyHasOwn");
+
+bool
+IonCacheIRCompiler::emitCallProxyHasOwnResult()
+{
+    AutoSaveLiveRegisters save(*this);
+    AutoOutputRegister output(*this);
+
+    Register obj = allocator.useRegister(masm, reader.objOperandId());
+    ValueOperand idVal = allocator.useValueRegister(masm, reader.valOperandId());
+
+    allocator.discardStack(masm);
+
+    prepareVMCall(masm);
+
+    masm.Push(idVal);
+    masm.Push(obj);
+
+    if (!callVM(masm, ProxyHasOwnInfo))
+        return false;
+
+    masm.storeCallResultValue(output);
+    return true;
+}
+
+
 bool
 IonCacheIRCompiler::emitLoadUnboxedPropertyResult()
 {
@@ -1115,6 +1139,13 @@ IonCacheIRCompiler::emitLoadEnvironmentDynamicSlotResult()
     // Load the value.
     masm.loadTypedOrValue(slot, output);
     return true;
+}
+
+
+bool
+IonCacheIRCompiler::emitLoadStringResult()
+{
+    MOZ_CRASH("not used in ion");
 }
 
 static bool
@@ -1956,8 +1987,8 @@ IonCacheIRCompiler::emitLoadDOMExpandoValueGuardGeneration()
     if (!addFailurePath(&failure))
         return false;
 
-    masm.loadPtr(Address(obj, ProxyObject::offsetOfValues()), scratch1);
-    Address expandoAddr(scratch1, ProxyObject::offsetOfExtraSlotInValues(GetDOMProxyExpandoSlot()));
+    masm.loadPtr(Address(obj, ProxyObject::offsetOfReservedSlots()), scratch1);
+    Address expandoAddr(scratch1, detail::ProxyReservedSlots::offsetOfPrivateSlot());
 
     // Guard the ExpandoAndGeneration* matches the proxy's ExpandoAndGeneration.
     masm.loadValue(expandoAddr, output);

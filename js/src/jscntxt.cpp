@@ -1109,7 +1109,7 @@ JSContext::alreadyReportedOOM()
         MOZ_ASSERT(isThrowingOutOfMemory());
     }
 #endif
-    return mozilla::MakeGenericErrorResult(reportedOOM);
+    return mozilla::Err(reportedOOM);
 }
 
 mozilla::GenericErrorResult<JS::Error&>
@@ -1119,7 +1119,7 @@ JSContext::alreadyReportedError()
     if (!helperThread())
         MOZ_ASSERT(isExceptionPending());
 #endif
-    return mozilla::MakeGenericErrorResult(reportedError);
+    return mozilla::Err(reportedError);
 }
 
 JSContext::JSContext(JSRuntime* runtime, const JS::ContextOptions& options)
@@ -1200,7 +1200,12 @@ JSContext::JSContext(JSRuntime* runtime, const JS::ContextOptions& options)
     ionReturnOverride_(MagicValue(JS_ARG_POISON)),
     jitTop(nullptr),
     jitStackLimit(UINTPTR_MAX),
-    jitStackLimitNoInterrupt(UINTPTR_MAX)
+    jitStackLimitNoInterrupt(UINTPTR_MAX),
+    getIncumbentGlobalCallback(nullptr),
+    enqueuePromiseJobCallback(nullptr),
+    enqueuePromiseJobCallbackData(nullptr),
+    promiseRejectionTrackerCallback(nullptr),
+    promiseRejectionTrackerCallbackData(nullptr)
 {
     MOZ_ASSERT(static_cast<JS::RootingContext*>(this) ==
                JS::RootingContext::get(this));
@@ -1443,6 +1448,9 @@ JSContext::findVersion()
 
     if (compartment() && compartment()->behaviors().version() != JSVERSION_UNKNOWN)
         return compartment()->behaviors().version();
+
+    if (!CurrentThreadCanAccessRuntime(runtime()))
+        return JSVERSION_DEFAULT;
 
     return runtime()->defaultVersion();
 }

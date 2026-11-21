@@ -278,6 +278,10 @@ static MOZ_COLD MOZ_NORETURN MOZ_NEVER_INLINE void MOZ_NoReturn(int aLine)
  * arbitrary strings from a potentially compromised process is not without risk.
  * If the string being passed is the result of a printf-style function,
  * consider using MOZ_CRASH_UNSAFE_PRINTF instead.
+ *
+ * @note This macro causes data collection because crash strings are annotated
+ * to crash-stats and are publicly visible. Firefox data stewards must do data
+ * review on usages of this macro.
  */
 #ifndef DEBUG
 MFBT_API MOZ_COLD MOZ_NORETURN MOZ_NEVER_INLINE void
@@ -311,10 +315,13 @@ MOZ_CrashPrintf(const char* aFilename, int aLine, const char* aFormat, ...);
  * 1 and 4 additional arguments. A regular MOZ_CRASH() is preferred wherever
  * possible, as passing arbitrary strings to printf from a potentially
  * compromised process is not without risk.
+ *
+ * @note This macro causes data collection because crash strings are annotated
+ * to crash-stats and are publicly visible. Firefox data stewards must do data
+ * review on usages of this macro.
  */
 #define MOZ_CRASH_UNSAFE_PRINTF(format, ...) \
    do { \
-     MOZ_STATIC_ASSERT_VALID_ARG_COUNT(__VA_ARGS__); \
      static_assert( \
        MOZ_PASTE_PREFIX_AND_ARG_COUNT(, __VA_ARGS__) <= sPrintfMaxArgs, \
        "Only up to 4 additional arguments are allowed!"); \
@@ -364,6 +371,9 @@ MOZ_END_EXTERN_C
  * This can cause user pain, so use it sparingly. If a MOZ_DIAGNOSTIC_ASSERT
  * is firing, it should promptly be converted to a MOZ_ASSERT while the failure
  * is being investigated, rather than letting users suffer.
+ *
+ * MOZ_DIAGNOSTIC_ASSERT_ENABLED is defined when MOZ_DIAGNOSTIC_ASSERT is like
+ * MOZ_RELEASE_ASSERT rather than MOZ_ASSERT.
  */
 
 /*
@@ -446,8 +456,12 @@ struct AssertionConditionType
 
 #ifdef RELEASE_OR_BETA
 #  define MOZ_DIAGNOSTIC_ASSERT MOZ_ASSERT
+#  ifdef DEBUG
+#    define MOZ_DIAGNOSTIC_ASSERT_ENABLED 1
+#  endif
 #else
 #  define MOZ_DIAGNOSTIC_ASSERT MOZ_RELEASE_ASSERT
+#  define MOZ_DIAGNOSTIC_ASSERT_ENABLED 1
 #endif
 
 /*

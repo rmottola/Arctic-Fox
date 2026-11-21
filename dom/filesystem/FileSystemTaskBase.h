@@ -187,6 +187,10 @@ private:
 class FileSystemTaskParentBase : public Runnable
 {
 public:
+  FileSystemTaskParentBase()
+    : Runnable("FileSystemTaskParentBase")
+  {}
+
   /*
    * Start the task. This must be called from the PBackground thread only.
    */
@@ -241,6 +245,9 @@ public:
 
   NS_IMETHOD
   Run() override;
+
+  virtual nsresult
+  GetTargetPath(nsAString& aPath) const = 0;
 
 private:
   /*

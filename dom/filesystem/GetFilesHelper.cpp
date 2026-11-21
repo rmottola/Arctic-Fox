@@ -20,18 +20,23 @@ namespace {
 class ReleaseRunnable final : public Runnable
 {
 public:
+  ReleaseRunnable()
+    : Runnable("ReleaseRunnable")
+  {}
+
   static void
   MaybeReleaseOnMainThread(nsTArray<RefPtr<Promise>>& aPromises,
                            nsTArray<RefPtr<GetFilesCallback>>& aCallbacks,
                            Sequence<RefPtr<File>>& aFiles,
                            already_AddRefed<nsIGlobalObject> aGlobal)
   {
+    nsCOMPtr<nsIGlobalObject> global(aGlobal);
     if (NS_IsMainThread()) {
       return;
     }
 
     RefPtr<ReleaseRunnable> runnable =
-      new ReleaseRunnable(aPromises, aCallbacks, aFiles, Move(aGlobal));
+      new ReleaseRunnable(aPromises, aCallbacks, aFiles, global.forget());
     NS_DispatchToMainThread(runnable);
   }
 
@@ -129,7 +134,8 @@ GetFilesHelper::Create(nsIGlobalObject* aGlobal,
 }
 
 GetFilesHelper::GetFilesHelper(nsIGlobalObject* aGlobal, bool aRecursiveFlag)
-  : GetFilesHelperBase(aRecursiveFlag)
+  : Runnable("GetFilesHelper")
+  , GetFilesHelperBase(aRecursiveFlag)
   , mGlobal(aGlobal)
   , mListingCompleted(false)
   , mErrorResult(NS_OK)
