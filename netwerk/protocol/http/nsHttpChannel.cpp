@@ -4473,7 +4473,7 @@ DoUpdateExpirationTime(nsHttpChannel* aSelf,
                     aExpirationTime = now + timeRemaining;
             }
             else
-                aExpirationTime = now;
+                aExpirationTime = 0;
         }
     }
 
