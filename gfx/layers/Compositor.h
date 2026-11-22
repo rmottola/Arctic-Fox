@@ -135,6 +135,7 @@ class CompositorD3D9;
 class CompositorD3D11;
 class BasicCompositor;
 class TextureReadLock;
+struct GPUStats;
 
 enum SurfaceInitMode
 {
@@ -406,6 +407,12 @@ public:
                           gfx::IntRect* aRenderBoundsOut = nullptr) = 0;
 
   /**
+   * Notification that we've finished issuing draw commands for normal
+   * layers (as opposed to the diagnostic overlay which comes after).
+   */
+  virtual void NormalDrawingDone() {}
+
+  /**
    * Flush the current frame to the screen and tidy up.
    *
    * Derived class overriding this should call Compositor::EndFrame.
@@ -514,16 +521,8 @@ public:
    */
   static void AssertOnCompositorThread();
 
-  size_t GetFillRatio() {
-    float fillRatio = 0;
-    if (mPixelsFilled > 0 && mPixelsPerFrame > 0) {
-      fillRatio = 100.0f * float(mPixelsFilled) / float(mPixelsPerFrame);
-      if (fillRatio > 999.0f) {
-        fillRatio = 999.0f;
-      }
-    }
-    return fillRatio;
-  }
+  // Return statistics for the most recent frame we computed statistics for.
+  virtual void GetFrameStats(GPUStats* aStats);
 
   ScreenRotation GetScreenRotation() const {
     return mScreenRotation;
