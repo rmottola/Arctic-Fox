@@ -240,12 +240,6 @@ ProfileGatherer::OOPExitProfile(const nsACString& aProfile)
     mExitProfiles.RemoveElementAt(0);
   }
   mExitProfiles.AppendElement(aProfile);
-
-  // If a process exited while gathering, we need to make
-  // sure we decrement the counter.
-  if (mGathering) {
-    GatheredOOPProfile();
-  }
 }
 
 NS_IMETHODIMP
