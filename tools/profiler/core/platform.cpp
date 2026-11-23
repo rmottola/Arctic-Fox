@@ -135,7 +135,7 @@ typedef const PSAutoLock& PSLockRef;
 // detailed explanation.
 //
 // The exception to this rule is each thread's PseudoStack object, which is
-// accessible without locking via tlsPseudoStack.
+// accessible without locking via TLSInfo::Stack().
 //
 class CorePS
 {
@@ -515,18 +515,33 @@ uint32_t ActivePS::sNextGeneration = 0;
 // The mutex that guards accesses to CorePS and ActivePS.
 static PSMutex gPSMutex;
 
-// Each thread gets its own PseudoStack on thread creation. ThreadInfo has the
-// owning reference; tlsPseudoStack is a non-owning reference. On thread
-// destruction, tlsPseudoStack is cleared, and the ThreadInfo (along with its
-// PseudoStack) may or may not be destroyed.
-//
-// Non-owning PseudoStack references are also temporarily used by
-// profiler_call_{enter,exit}() pairs. RAII classes ensure these calls are
-// balanced, and they occur on the thread itself, which means they are
-// necessarily bounded by the lifetime of the thread, which ensures they can't
-// be used after the PseudoStack is destroyed.
-//
-static MOZ_THREAD_LOCAL(PseudoStack *) tlsPseudoStack;
+// Each live thread has a ThreadInfo, and we store a reference to it in TLS.
+// This class encapsulates that TLS.
+class TLSInfo
+{
+public:
+  static bool Init(PSLockRef) { return sThreadInfo.init(); }
+
+  // Get the entire ThreadInfo. Accesses are guarded by gPSMutex.
+  static ThreadInfo* Info(PSLockRef) { return sThreadInfo.get(); }
+
+  // Get only the PseudoStack. Accesses are not guarded by gPSMutex.
+  static PseudoStack* Stack()
+  {
+    ThreadInfo* info = sThreadInfo.get();
+    return info ? info->Stack().get() : nullptr;
+  }
+
+  static void SetInfo(PSLockRef, ThreadInfo* aInfo) { sThreadInfo.set(aInfo); }
+
+private:
+  // This is a non-owning reference to the ThreadInfo; CorePS::mLiveThreads is
+  // the owning reference. On thread destruction, this reference is cleared and
+  // the ThreadInfo is destroyed or transferred to CorePS::mDeadThreads.
+  static MOZ_THREAD_LOCAL(ThreadInfo*) sThreadInfo;
+};
+
+MOZ_THREAD_LOCAL(ThreadInfo*) TLSInfo::sThreadInfo;
 
 // The name of the main thread.
 static const char* const kMainThreadName = "GeckoMain";
@@ -2043,13 +2058,15 @@ GeckoProfilerReporter::CollectReports(nsIHandleReportCallback* aHandleReport,
 
 NS_IMPL_ISUPPORTS(GeckoProfilerReporter, nsIMemoryReporter)
 
-// Find the ThreadInfo for the current thread. On success, *aIndexOut is set to
-// the index if it is non-null.
+// Find the ThreadInfo for the current thread. This should only be called in
+// places where TLSInfo can't be used. On success, *aIndexOut is set to the
+// index if it is non-null.
 static ThreadInfo*
 FindLiveThreadInfo(PSLockRef aLock, int* aIndexOut = nullptr)
 {
   // This function runs both on and off the main thread.
 
+  ThreadInfo* ret = nullptr;
   Thread::tid_t id = Thread::GetCurrentId();
   const CorePS::ThreadVector& liveThreads = CorePS::LiveThreads(aLock);
   for (uint32_t i = 0; i < liveThreads.size(); i++) {
@@ -2058,10 +2075,12 @@ FindLiveThreadInfo(PSLockRef aLock, int* aIndexOut = nullptr)
       if (aIndexOut) {
         *aIndexOut = i;
       }
-      return info;
+      ret = info;
+      break;
     }
   }
-  return nullptr;
+
+  return ret;
 }
 
 static void
@@ -2073,15 +2092,15 @@ locked_register_thread(PSLockRef aLock, const char* aName, void* stackTop)
 
   MOZ_RELEASE_ASSERT(!FindLiveThreadInfo(aLock));
 
-  if (!tlsPseudoStack.init()) {
+  if (!TLSInfo::Init(aLock)) {
     return;
   }
 
   ThreadInfo* info = new ThreadInfo(aName, Thread::GetCurrentId(),
                                     NS_IsMainThread(), stackTop);
-  NotNull<PseudoStack*> pseudoStack = info->Stack();
+  TLSInfo::SetInfo(aLock, info);
 
-  tlsPseudoStack.set(pseudoStack.get());
+  NotNull<PseudoStack*> pseudoStack = info->Stack();
 
   if (ActivePS::Exists(aLock) && ActivePS::ShouldProfileThread(aLock, info)) {
     info->StartProfiling();
@@ -2266,9 +2285,9 @@ profiler_shutdown()
 
     CorePS::Destroy(lock);
 
-    // We just destroyed CorePS and the ThreadInfos (and PseudoStacks) it
-    // contains, so we can clear this thread's tlsPseudoStack.
-    tlsPseudoStack.set(nullptr);
+    // We just destroyed CorePS and the ThreadInfos it contains, so we can
+    // clear this thread's TLSInfo.
+    TLSInfo::SetInfo(lock, nullptr);
 
 #ifdef MOZ_TASK_TRACER
     mozilla::tasktracer::ShutdownTaskTracer();
@@ -2787,6 +2806,7 @@ profiler_unregister_thread()
 
   int i;
   ThreadInfo* info = FindLiveThreadInfo(lock, &i);
+  MOZ_RELEASE_ASSERT(info == TLSInfo::Info(lock));
   if (info) {
     DEBUG_LOG("profiler_unregister_thread: %s", info->Name());
     if (ActivePS::Exists(lock) && info->IsBeingProfiled()) {
@@ -2797,20 +2817,20 @@ profiler_unregister_thread()
     CorePS::ThreadVector& liveThreads = CorePS::LiveThreads(lock);
     liveThreads.erase(liveThreads.begin() + i);
 
-    // Whether or not we just destroyed the PseudoStack (via its owning
-    // ThreadInfo), we no longer need to access it via TLS.
-    tlsPseudoStack.set(nullptr);
+    // Whether or not we just destroyed the ThreadInfo or transferred it to the
+    // dead thread vector, we no longer need to access it via TLS.
+    TLSInfo::SetInfo(lock, nullptr);
 
   } else {
-    // There are two ways FindLiveThreadInfo() can fail.
+    // There are two ways FindLiveThreadInfo() might have failed.
     //
-    // - tlsPseudoStack.init() failed in locked_register_thread().
+    // - TLSInfo::Init() failed in locked_register_thread().
     //
     // - We've already called profiler_unregister_thread() for this thread.
     //   (Whether or not it should, this does happen in practice.)
     //
-    // Either way, tlsPseudoStack should be empty.
-    MOZ_RELEASE_ASSERT(!tlsPseudoStack.get());
+    // Either way, TLSInfo should be empty.
+    MOZ_RELEASE_ASSERT(!TLSInfo::Info(lock));
   }
 }
 
@@ -2821,7 +2841,7 @@ profiler_thread_sleep()
 
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return;
   }
@@ -2835,7 +2855,7 @@ profiler_thread_wake()
 
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return;
   }
@@ -2848,7 +2868,7 @@ profiler_thread_is_sleeping()
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return false;
   }
@@ -2863,7 +2883,7 @@ profiler_js_interrupt_callback()
 
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return;
   }
@@ -2897,7 +2917,7 @@ profiler_get_backtrace()
     return nullptr;
   }
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     MOZ_ASSERT(pseudoStack);
     return nullptr;
@@ -2953,7 +2973,7 @@ profiler_get_backtrace_noalloc(char *output, size_t outputSize)
     return;
   }
 
-  PseudoStack *pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return;
   }
@@ -3005,7 +3025,7 @@ locked_profiler_add_marker(PSLockRef aLock, const char* aMarker,
   // aPayload must be freed if we return early.
   mozilla::UniquePtr<ProfilerMarkerPayload> payload(aPayload);
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return;
   }
@@ -3085,7 +3105,7 @@ profiler_get_pseudo_stack()
 {
   // This function runs both on and off the main thread.
 
-  return tlsPseudoStack.get();
+  return TLSInfo::Stack();
 }
 
 void
@@ -3095,7 +3115,7 @@ profiler_set_js_context(JSContext* aCx)
 
   MOZ_ASSERT(aCx);
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return;
   }
@@ -3110,10 +3130,14 @@ profiler_clear_js_context()
 
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
-  if (!pseudoStack) {
+  PSAutoLock lock(gPSMutex);
+
+  ThreadInfo* info = TLSInfo::Info(lock);
+  if (!info) {
     return;
   }
+
+  NotNull<PseudoStack*> pseudoStack = info->Stack();
 
   if (!pseudoStack->mContext) {
     return;
@@ -3122,14 +3146,10 @@ profiler_clear_js_context()
   // On JS shut down, flush the current buffer as stringifying JIT samples
   // requires a live JSContext.
 
-  PSAutoLock lock(gPSMutex);
-
   if (ActivePS::Exists(lock)) {
     ActivePS::SetIsPaused(lock, true);
 
     // Flush this thread's ThreadInfo, if it is being profiled.
-    ThreadInfo* info = FindLiveThreadInfo(lock);
-    MOZ_RELEASE_ASSERT(info);
     if (info->IsBeingProfiled()) {
       info->FlushSamplesAndMarkers(ActivePS::Buffer(lock),
                                    CorePS::ProcessStartTime(lock));
@@ -3144,6 +3164,12 @@ profiler_clear_js_context()
   pseudoStack->mContext = nullptr;
 }
 
+// A short-lived, non-owning PseudoStack reference is created between each
+// profiler_call_enter() / profiler_call_exit() call pair. RAII objects (e.g.
+// SamplerStackFrameRAII) ensure that these calls are balanced. Furthermore,
+// the RAII objects exist within the thread itself, which means they are
+// necessarily bounded by the lifetime of the thread, which ensures that the
+// references held can't be used after the PseudoStack is destroyed.
 void*
 profiler_call_enter(const char* aInfo,
                     js::ProfileEntry::Category aCategory,
@@ -3152,7 +3178,7 @@ profiler_call_enter(const char* aInfo,
 {
   // This function runs both on and off the main thread.
 
-  PseudoStack* pseudoStack = tlsPseudoStack.get();
+  PseudoStack* pseudoStack = TLSInfo::Stack();
   if (!pseudoStack) {
     return pseudoStack;
   }
@@ -3160,7 +3186,8 @@ profiler_call_enter(const char* aInfo,
                     aDynamicString);
 
   // The handle is meant to support future changes but for now it is simply
-  // used to avoid having to call tlsPseudoStack.get() in profiler_call_exit().
+  // used to avoid having to call TLSInfo::Stack() in
+  // profiler_call_exit().
   return pseudoStack;
 }
 
