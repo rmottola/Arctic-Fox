@@ -2364,7 +2364,7 @@ nsHttpChannel::ContinueProcessResponse3(nsresult rv)
 
         if (mApplicationCacheForWrite) {
             // Store response in the offline cache
-            InitOfflineCacheEntry();
+            Unused << InitOfflineCacheEntry();
             CloseOfflineCacheEntry();
         }
         return NS_OK;
