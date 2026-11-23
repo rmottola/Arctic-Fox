@@ -1317,6 +1317,8 @@ nsHttpTransaction::Restart()
         }
     }
 
+    mTransportStatus = NS_OK;
+
     return gHttpHandler->InitiateTransaction(this, mPriority);
 }
 
