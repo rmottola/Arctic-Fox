@@ -126,9 +126,9 @@ TEST(GeckoProfiler, FeaturesAndParams)
 
   // Try all supported features, and filters that match all threads.
   {
-    const char** allSupportedFeatures = profiler_get_features();
+    const char** availableFeatures = profiler_get_available_features();
     int n = 0;
-    while (allSupportedFeatures[n]) {
+    while (availableFeatures[n]) {
       n++;
     }
     // There are 11 features supported on all platforms, and 2 features
@@ -138,8 +138,7 @@ TEST(GeckoProfiler, FeaturesAndParams)
     const char* filters[] = { "" };
 
     profiler_start(88888, 10,
-                   allSupportedFeatures, n,
-                   filters, MOZ_ARRAY_LENGTH(filters));
+                   availableFeatures, n, filters, MOZ_ARRAY_LENGTH(filters));
 
     ASSERT_TRUE(profiler_is_active());
     ASSERT_TRUE(profiler_feature_active("gpu"));
@@ -147,8 +146,7 @@ TEST(GeckoProfiler, FeaturesAndParams)
     ASSERT_TRUE(profiler_feature_active("restyle"));
 
     ActiveParamsCheck(88888, 10,
-                      allSupportedFeatures, n,
-                      filters, MOZ_ARRAY_LENGTH(filters));
+                      availableFeatures, n, filters, MOZ_ARRAY_LENGTH(filters));
 
     // Don't call profiler_stop() here.
   }
