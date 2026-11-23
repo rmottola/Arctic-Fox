@@ -426,7 +426,11 @@ Http2Stream::ParseHttpRequestHeaders(const char *buf,
 
   nsAutoCString authorityHeader;
   nsAutoCString hashkey;
-  head->GetHeader(nsHttp::Host, authorityHeader);
+  nsresult rv = head->GetHeader(nsHttp::Host, authorityHeader);
+  if (NS_FAILED(rv)) {
+    MOZ_ASSERT(false);
+    return rv;
+  }
 
   nsAutoCString requestURI;
   head->RequestURI(requestURI);
@@ -526,7 +530,11 @@ Http2Stream::GenerateOpen()
 
   nsCString compressedData;
   nsAutoCString authorityHeader;
-  head->GetHeader(nsHttp::Host, authorityHeader);
+  nsresult rv = head->GetHeader(nsHttp::Host, authorityHeader);
+  if (NS_FAILED(rv)) {
+    MOZ_ASSERT(false);
+    return rv;
+  }
 
   nsDependentCString scheme(head->IsHTTPS() ? "https" : "http");
   if (head->IsConnect()) {
@@ -550,13 +558,14 @@ Http2Stream::GenerateOpen()
   nsAutoCString path;
   head->Method(method);
   head->Path(path);
-  mSession->Compressor()->EncodeHeaderBlock(mFlatHttpRequestHeaders,
-                                            method,
-                                            path,
-                                            authorityHeader,
-                                            scheme,
-                                            head->IsConnect(),
-                                            compressedData);
+  rv = mSession->Compressor()->EncodeHeaderBlock(mFlatHttpRequestHeaders,
+                                                 method,
+                                                 path,
+                                                 authorityHeader,
+                                                 scheme,
+                                                 head->IsConnect(),
+                                                 compressedData);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   int64_t clVal = mSession->Compressor()->GetParsedContentLength();
   if (clVal != -1) {

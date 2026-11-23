@@ -1904,7 +1904,8 @@ HttpChannelChild::Resume()
       SendResume();
     }
     if (mCallOnResume) {
-      AsyncCall(mCallOnResume);
+      rv = AsyncCall(mCallOnResume);
+      NS_ENSURE_SUCCESS(rv, rv);
       mCallOnResume = nullptr;
     }
   }
