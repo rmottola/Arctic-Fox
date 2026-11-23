@@ -632,7 +632,7 @@ private:
 
     // Determines if it's possible and advisable to race the network request
     // with the cache fetch, and proceeds to do so.
-    nsresult MaybeRaceNetworkWithCache();
+    nsresult MaybeRaceCacheWithNetwork();
 
     nsresult TriggerNetwork(int32_t aTimeout);
     void CancelNetworkRequest(nsresult aStatus);
@@ -647,7 +647,7 @@ private:
     // Will be true if the onCacheEntryAvailable callback is not called by the
     // time we send the network request. This could also be true when we are
     // bypassing the cache.
-    Atomic<bool> mRacingNetAndCache;
+    Atomic<bool> mRaceCacheWithNetwork;
 
 protected:
     virtual void DoNotifyListenerCleanup() override;
