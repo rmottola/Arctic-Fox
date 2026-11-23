@@ -222,7 +222,8 @@ nsHttpTransaction::Init(uint32_t caps,
         if (NS_WARN_IF(NS_FAILED(rv))) {
             return rv;
         }
-        httpChannelInternal->GetInitialRwin(&mInitialRwin);
+        rv = httpChannelInternal->GetInitialRwin(&mInitialRwin);
+        MOZ_ASSERT(NS_SUCCEEDED(rv));
     }
 
     // create transport event sink proxy. it coalesces consecutive
@@ -255,7 +256,8 @@ nsHttpTransaction::Init(uint32_t caps,
     //   field unless the server is known to be HTTP/1.1 compliant.
     if ((requestHead->IsPost() || requestHead->IsPut()) &&
         !requestBody && !requestHead->HasHeader(nsHttp::Transfer_Encoding)) {
-        requestHead->SetHeader(nsHttp::Content_Length, NS_LITERAL_CSTRING("0"));
+        rv = requestHead->SetHeader(nsHttp::Content_Length, NS_LITERAL_CSTRING("0"));
+        MOZ_ASSERT(NS_SUCCEEDED(rv));
     }
 
     // grab a weak reference to the request head
@@ -1161,7 +1163,10 @@ nsHttpTransaction::Restart()
          mConnInfo->CloneAsDirectRoute(getter_AddRefs(ci));
          mConnInfo = ci;
         if (mRequestHead) {
-            mRequestHead->SetHeader(nsHttp::Alternate_Service_Used, NS_LITERAL_CSTRING("0"));
+            DebugOnly<nsresult> rv =
+                mRequestHead->SetHeader(nsHttp::Alternate_Service_Used,
+                                        NS_LITERAL_CSTRING("0"));
+            MOZ_ASSERT(NS_SUCCEEDED(rv));
         }
     }
 

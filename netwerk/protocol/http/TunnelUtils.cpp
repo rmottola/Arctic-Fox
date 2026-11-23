@@ -443,7 +443,8 @@ TLSFilterTransaction::Notify(nsITimer *timer)
   if (timer != mTimer) {
     return NS_ERROR_UNEXPECTED;
   }
-  StartTimerCallback();
+  DebugOnly<nsresult> rv = StartTimerCallback();
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
   return NS_OK;
 }
 
@@ -966,7 +967,9 @@ SpdyConnectTransaction::SpdyConnectTransaction(nsHttpConnectionInfo *ci,
 
   mTimestampSyn = TimeStamp::Now();
   mRequestHead = new nsHttpRequestHead();
-  nsHttpConnection::MakeConnectString(trans, mRequestHead, mConnectString);
+  DebugOnly<nsresult> rv =
+    nsHttpConnection::MakeConnectString(trans, mRequestHead, mConnectString);
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
   mDrivingTransaction = trans;
 }
 
@@ -1014,12 +1017,14 @@ SpdyConnectTransaction::MapStreamToHttpConnection(nsISocketTransport *aTransport
   mTunneledConn->SetTransactionCaps(Caps());
   MOZ_ASSERT(aConnInfo->UsingHttpsProxy());
   TimeDuration rtt = TimeStamp::Now() - mTimestampSyn;
-  mTunneledConn->Init(aConnInfo,
-                      gHttpHandler->ConnMgr()->MaxRequestDelay(),
-                      mTunnelTransport, mTunnelStreamIn, mTunnelStreamOut,
-                      true, callbacks,
-                      PR_MillisecondsToInterval(
-                        static_cast<uint32_t>(rtt.ToMilliseconds())));
+  DebugOnly<nsresult> rv =
+    mTunneledConn->Init(aConnInfo,
+                        gHttpHandler->ConnMgr()->MaxRequestDelay(),
+                        mTunnelTransport, mTunnelStreamIn, mTunnelStreamOut,
+                        true, callbacks,
+                        PR_MillisecondsToInterval(
+                          static_cast<uint32_t>(rtt.ToMilliseconds())));
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
   if (mForcePlainText) {
       mTunneledConn->ForcePlainText();
   } else {
