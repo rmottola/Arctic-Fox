@@ -134,8 +134,8 @@ typedef const PSAutoLock& PSLockRef;
 // this mechanism, but please don't do so without *very* good reason and a
 // detailed explanation.
 //
-// The exception to this rule is each thread's PseudoStack object, which is
-// accessible without locking via TLSInfo::Stack().
+// The exception to this rule is each thread's RacyThreadInfo object, which is
+// accessible without locking via TLSInfo::RacyThreadInfo().
 //
 class CorePS
 {
@@ -525,11 +525,11 @@ public:
   // Get the entire ThreadInfo. Accesses are guarded by gPSMutex.
   static ThreadInfo* Info(PSLockRef) { return sThreadInfo.get(); }
 
-  // Get only the PseudoStack. Accesses are not guarded by gPSMutex.
-  static PseudoStack* Stack()
+  // Get only the RacyThreadInfo. Accesses are not guarded by gPSMutex.
+  static RacyThreadInfo* RacyInfo()
   {
     ThreadInfo* info = sThreadInfo.get();
-    return info ? info->Stack().get() : nullptr;
+    return info ? info->RacyInfo().get() : nullptr;
   }
 
   static void SetInfo(PSLockRef, ThreadInfo* aInfo) { sThreadInfo.set(aInfo); }
@@ -574,7 +574,7 @@ public:
     : mIsSynchronous(false)
     , mTimeStamp(mozilla::TimeStamp::Now())
     , mThreadId(aThreadInfo->ThreadId())
-    , mPseudoStack(aThreadInfo->Stack())
+    , mRacyInfo(aThreadInfo->RacyInfo())
     , mStackTop(aThreadInfo->StackTop())
     , mLastSample(&aThreadInfo->LastSample())
     , mPlatformData(aThreadInfo->GetPlatformData())
@@ -593,11 +593,11 @@ public:
   // This constructor is for synchronous samples, i.e. those performed in
   // response to an explicit sampling request via the API. Synchronous samples
   // are performed on-thread, i.e. the thread samples itself.
-  TickSample(NotNull<PseudoStack*> aPseudoStack, PlatformData* aPlatformData)
+  TickSample(NotNull<RacyThreadInfo*> aRacyInfo, PlatformData* aPlatformData)
     : mIsSynchronous(true)
     , mTimeStamp(mozilla::TimeStamp::Now())
     , mThreadId(Thread::GetCurrentId())
-    , mPseudoStack(aPseudoStack)
+    , mRacyInfo(aRacyInfo)
     , mStackTop(nullptr)
     , mLastSample(nullptr)
     , mPlatformData(aPlatformData)
@@ -623,7 +623,7 @@ public:
 
   const int mThreadId;
 
-  const NotNull<PseudoStack*> mPseudoStack;
+  const NotNull<RacyThreadInfo*> mRacyInfo;
 
   void* const mStackTop;
 
@@ -675,7 +675,8 @@ static const int SAMPLER_MAX_STRING_LENGTH = 128;
 
 static void
 AddPseudoEntry(PSLockRef aLock, ProfileBuffer* aBuffer,
-               volatile js::ProfileEntry& entry, PseudoStack* aPseudoStack)
+               volatile js::ProfileEntry& entry,
+               NotNull<RacyThreadInfo*> aRacyInfo)
 {
   // Pseudo-frames with the BEGIN_PSEUDO_JS flag are just annotations and
   // should not be recorded in the profile.
@@ -710,7 +711,7 @@ AddPseudoEntry(PSLockRef aLock, ProfileBuffer* aBuffer,
         if (!entry.pc()) {
           // The JIT only allows the top-most entry to have a nullptr pc.
           MOZ_ASSERT(&entry ==
-                     &aPseudoStack->mStack[aPseudoStack->stackSize() - 1]);
+                     &aRacyInfo->mStack[aRacyInfo->stackSize() - 1]);
         } else {
           lineno = JS_PCToLineNumber(script, entry.pc());
         }
@@ -770,9 +771,9 @@ static void
 MergeStacksIntoProfile(PSLockRef aLock, ProfileBuffer* aBuffer,
                        const TickSample& aSample, NativeStack& aNativeStack)
 {
-  NotNull<PseudoStack*> pseudoStack = aSample.mPseudoStack;
-  volatile js::ProfileEntry* pseudoFrames = pseudoStack->mStack;
-  uint32_t pseudoCount = pseudoStack->stackSize();
+  NotNull<RacyThreadInfo*> racyInfo = aSample.mRacyInfo;
+  volatile js::ProfileEntry* pseudoFrames = racyInfo->mStack;
+  uint32_t pseudoCount = racyInfo->stackSize();
 
   // Make a copy of the JS stack into a JSFrame array. This is necessary since,
   // like the native stack, the JS stack is iterated youngest-to-oldest and we
@@ -790,8 +791,8 @@ MergeStacksIntoProfile(PSLockRef aLock, ProfileBuffer* aBuffer,
   JS::ProfilingFrameIterator::Frame jsFrames[1000];
 
   // Only walk jit stack if profiling frame iterator is turned on.
-  if (pseudoStack->mContext &&
-      JS::IsProfilingEnabledForContext(pseudoStack->mContext)) {
+  if (racyInfo->mContext &&
+      JS::IsProfilingEnabledForContext(racyInfo->mContext)) {
     AutoWalkJSStack autoWalkJSStack;
     const uint32_t maxFrames = mozilla::ArrayLength(jsFrames);
 
@@ -802,8 +803,7 @@ MergeStacksIntoProfile(PSLockRef aLock, ProfileBuffer* aBuffer,
       registerState.lr = aSample.mLR;
       registerState.fp = aSample.mFP;
 
-      JS::ProfilingFrameIterator jsIter(pseudoStack->mContext,
-                                        registerState,
+      JS::ProfilingFrameIterator jsIter(racyInfo->mContext, registerState,
                                         startBufferGen);
       for (; jsCount < maxFrames && !jsIter.done(); ++jsIter) {
         // See note below regarding 'J' entries.
@@ -899,7 +899,7 @@ MergeStacksIntoProfile(PSLockRef aLock, ProfileBuffer* aBuffer,
     if (pseudoStackAddr > jsStackAddr && pseudoStackAddr > nativeStackAddr) {
       MOZ_ASSERT(pseudoIndex < pseudoCount);
       volatile js::ProfileEntry& pseudoFrame = pseudoFrames[pseudoIndex];
-      AddPseudoEntry(aLock, aBuffer, pseudoFrame, pseudoStack);
+      AddPseudoEntry(aLock, aBuffer, pseudoFrame, racyInfo);
       pseudoIndex++;
       continue;
     }
@@ -952,10 +952,10 @@ MergeStacksIntoProfile(PSLockRef aLock, ProfileBuffer* aBuffer,
   //
   // Do not do this for synchronous samples, which use their own
   // ProfileBuffers instead of the global one in CorePS.
-  if (!aSample.mIsSynchronous && pseudoStack->mContext) {
+  if (!aSample.mIsSynchronous && racyInfo->mContext) {
     MOZ_ASSERT(aBuffer->mGeneration >= startBufferGen);
     uint32_t lapCount = aBuffer->mGeneration - startBufferGen;
-    JS::UpdateJSContextProfilerSampleBufferGen(pseudoStack->mContext,
+    JS::UpdateJSContextProfilerSampleBufferGen(racyInfo->mContext,
                                                aBuffer->mGeneration,
                                                lapCount);
   }
@@ -1034,16 +1034,16 @@ DoNativeBacktrace(PSLockRef aLock, ProfileBuffer* aBuffer,
   const mcontext_t* mcontext =
     &reinterpret_cast<ucontext_t*>(aSample.mContext)->uc_mcontext;
   mcontext_t savedContext;
-  NotNull<PseudoStack*> pseudoStack = aSample.mPseudoStack;
+  NotNull<RacyThreadInfo*> racyInfo = aSample.mRacyInfo;
 
   // The pseudostack contains an "EnterJIT" frame whenever we enter
   // JIT code with profiling enabled; the stack pointer value points
   // the saved registers.  We use this to unwind resume unwinding
   // after encounting JIT code.
-  for (uint32_t i = pseudoStack->stackSize(); i > 0; --i) {
+  for (uint32_t i = racyInfo->stackSize(); i > 0; --i) {
     // The pseudostack grows towards higher indices, so we iterate
     // backwards (from callee to caller).
-    volatile js::ProfileEntry& entry = pseudoStack->mStack[i - 1];
+    volatile js::ProfileEntry& entry = racyInfo->mStack[i - 1];
     if (!entry.isJs() && strcmp(entry.label(), "EnterJIT") == 0) {
       // Found JIT entry frame.  Unwind up to that point (i.e., force
       // the stack walk to stop before the block of saved registers;
@@ -1275,8 +1275,6 @@ Tick(PSLockRef aLock, ProfileBuffer* aBuffer, const TickSample& aSample)
     aSample.mTimeStamp - CorePS::ProcessStartTime(aLock);
   aBuffer->addTag(ProfileBufferEntry::Time(delta.ToMilliseconds()));
 
-  NotNull<PseudoStack*> pseudoStack = aSample.mPseudoStack;
-
 #if defined(HAVE_NATIVE_UNWIND)
   if (ActivePS::FeatureStackWalk(aLock)) {
     DoNativeBacktrace(aLock, aBuffer, aSample);
@@ -1290,7 +1288,7 @@ Tick(PSLockRef aLock, ProfileBuffer* aBuffer, const TickSample& aSample)
   // the current thread.
   if (!aSample.mIsSynchronous) {
     ProfilerMarkerLinkedList* pendingMarkersList =
-      pseudoStack->getPendingMarkers();
+      aSample.mRacyInfo->GetPendingMarkers();
     while (pendingMarkersList && pendingMarkersList->peek()) {
       ProfilerMarker* marker = pendingMarkersList->popHead();
       aBuffer->addStoredMarker(marker);
@@ -1928,7 +1926,7 @@ SamplerThread::Run()
           // If the thread is asleep and has been sampled before in the same
           // sleep episode, find and copy the previous sample, as that's
           // cheaper than taking a new sample.
-          if (info->Stack()->CanDuplicateLastSampleDueToSleep()) {
+          if (info->RacyInfo()->CanDuplicateLastSampleDueToSleep()) {
             bool dup_ok =
               ActivePS::Buffer(lock)->DuplicateLastSample(
                 info->ThreadId(), CorePS::ProcessStartTime(lock),
@@ -2100,15 +2098,15 @@ locked_register_thread(PSLockRef aLock, const char* aName, void* stackTop)
                                     NS_IsMainThread(), stackTop);
   TLSInfo::SetInfo(aLock, info);
 
-  NotNull<PseudoStack*> pseudoStack = info->Stack();
+  NotNull<RacyThreadInfo*> racyInfo = info->RacyInfo();
 
   if (ActivePS::Exists(aLock) && ActivePS::ShouldProfileThread(aLock, info)) {
     info->StartProfiling();
     if (ActivePS::FeatureJS(aLock)) {
-      // This startJSSampling() call is on-thread, so we can poll manually to
+      // This StartJSSampling() call is on-thread, so we can poll manually to
       // start JS sampling immediately.
-      pseudoStack->startJSSampling();
-      pseudoStack->pollJSSampling();
+      racyInfo->StartJSSampling();
+      racyInfo->PollJSSampling();
     }
   }
 
@@ -2522,11 +2520,11 @@ locked_profiler_start(PSLockRef aLock, int aEntries, double aInterval,
     if (ActivePS::ShouldProfileThread(aLock, info)) {
       info->StartProfiling();
       if (ActivePS::FeatureJS(aLock)) {
-        info->Stack()->startJSSampling();
+        info->RacyInfo()->StartJSSampling();
         if (info->ThreadId() == tid) {
           // We can manually poll the current thread so it starts sampling
           // immediately.
-          info->Stack()->pollJSSampling();
+          info->RacyInfo()->PollJSSampling();
         }
       }
     }
@@ -2613,11 +2611,11 @@ locked_profiler_stop(PSLockRef aLock)
     ThreadInfo* info = liveThreads.at(i);
     if (info->IsBeingProfiled()) {
       if (ActivePS::FeatureJS(aLock)) {
-        info->Stack()->stopJSSampling();
+        info->RacyInfo()->StopJSSampling();
         if (info->ThreadId() == tid) {
           // We can manually poll the current thread so it stops profiling
           // immediately.
-          info->Stack()->pollJSSampling();
+          info->RacyInfo()->PollJSSampling();
         }
       }
       info->StopProfiling();
@@ -2801,7 +2799,7 @@ profiler_unregister_thread()
 
   PSAutoLock lock(gPSMutex);
 
-  // We don't call PseudoStack::stopJSSampling() here; there's no point doing
+  // We don't call RacyInfo::StopJSSampling() here; there's no point doing
   // that for a JS thread that is in the process of disappearing.
 
   int i;
@@ -2841,11 +2839,12 @@ profiler_thread_sleep()
 
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
     return;
   }
-  pseudoStack->setSleeping();
+
+  racyInfo->SetSleeping();
 }
 
 void
@@ -2855,11 +2854,12 @@ profiler_thread_wake()
 
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
     return;
   }
-  pseudoStack->setAwake();
+
+  racyInfo->SetAwake();
 }
 
 bool
@@ -2868,11 +2868,11 @@ profiler_thread_is_sleeping()
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
     return false;
   }
-  return pseudoStack->isSleeping();
+  return racyInfo->IsSleeping();
 }
 
 void
@@ -2883,12 +2883,12 @@ profiler_js_interrupt_callback()
 
   MOZ_RELEASE_ASSERT(CorePS::Exists());
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
     return;
   }
 
-  pseudoStack->pollJSSampling();
+  racyInfo->PollJSSampling();
 }
 
 double
@@ -2917,9 +2917,9 @@ profiler_get_backtrace()
     return nullptr;
   }
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
-    MOZ_ASSERT(pseudoStack);
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
+    MOZ_ASSERT(racyInfo);
     return nullptr;
   }
 
@@ -2929,7 +2929,7 @@ profiler_get_backtrace()
 
   UniquePlatformData platformData = AllocPlatformData(tid);
 
-  TickSample sample(WrapNotNull(pseudoStack), platformData.get());
+  TickSample sample(WrapNotNull(racyInfo), platformData.get());
 
 #if defined(HAVE_NATIVE_UNWIND)
 #if defined(GP_OS_windows) || defined(GP_OS_linux) || defined(GP_OS_android)
@@ -2973,15 +2973,15 @@ profiler_get_backtrace_noalloc(char *output, size_t outputSize)
     return;
   }
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
     return;
   }
 
   bool includeDynamicString = !ActivePS::FeaturePrivacy(lock);
 
-  volatile js::ProfileEntry *pseudoFrames = pseudoStack->mStack;
-  uint32_t pseudoCount = pseudoStack->stackSize();
+  volatile js::ProfileEntry* pseudoFrames = racyInfo->mStack;
+  uint32_t pseudoCount = racyInfo->stackSize();
 
   for (uint32_t i = 0; i < pseudoCount; i++) {
     const char* label = pseudoFrames[i].label();
@@ -3025,8 +3025,8 @@ locked_profiler_add_marker(PSLockRef aLock, const char* aMarker,
   // aPayload must be freed if we return early.
   mozilla::UniquePtr<ProfilerMarkerPayload> payload(aPayload);
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
     return;
   }
 
@@ -3034,7 +3034,8 @@ locked_profiler_add_marker(PSLockRef aLock, const char* aMarker,
                             ? payload->GetStartTime()
                             : mozilla::TimeStamp::Now();
   mozilla::TimeDuration delta = origin - CorePS::ProcessStartTime(aLock);
-  pseudoStack->addMarker(aMarker, payload.release(), delta.ToMilliseconds());
+  racyInfo->AddPendingMarker(aMarker, payload.release(),
+                             delta.ToMilliseconds());
 }
 
 void
@@ -3105,7 +3106,7 @@ profiler_get_pseudo_stack()
 {
   // This function runs both on and off the main thread.
 
-  return TLSInfo::Stack();
+  return TLSInfo::RacyInfo();
 }
 
 void
@@ -3115,12 +3116,12 @@ profiler_set_js_context(JSContext* aCx)
 
   MOZ_ASSERT(aCx);
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
-  if (!pseudoStack) {
+  RacyThreadInfo* racyInfo = TLSInfo::RacyInfo();
+  if (!racyInfo) {
     return;
   }
 
-  pseudoStack->setJSContext(aCx);
+  racyInfo->SetJSContext(aCx);
 }
 
 void
@@ -3137,9 +3138,9 @@ profiler_clear_js_context()
     return;
   }
 
-  NotNull<PseudoStack*> pseudoStack = info->Stack();
+  NotNull<RacyThreadInfo*> racyInfo = info->RacyInfo();
 
-  if (!pseudoStack->mContext) {
+  if (!racyInfo->mContext) {
     return;
   }
 
@@ -3158,10 +3159,10 @@ profiler_clear_js_context()
     ActivePS::SetIsPaused(lock, false);
   }
 
-  // We don't call pseudoStack->stopJSSampling() here; there's no point doing
+  // We don't call racyInfo->StopJSSampling() here; there's no point doing
   // that for a JS thread that is in the process of disappearing.
 
-  pseudoStack->mContext = nullptr;
+  racyInfo->mContext = nullptr;
 }
 
 // A short-lived, non-owning PseudoStack reference is created between each
@@ -3178,7 +3179,7 @@ profiler_call_enter(const char* aInfo,
 {
   // This function runs both on and off the main thread.
 
-  PseudoStack* pseudoStack = TLSInfo::Stack();
+  PseudoStack* pseudoStack = TLSInfo::RacyInfo();   // an upcast
   if (!pseudoStack) {
     return pseudoStack;
   }
@@ -3186,8 +3187,7 @@ profiler_call_enter(const char* aInfo,
                     aDynamicString);
 
   // The handle is meant to support future changes but for now it is simply
-  // used to avoid having to call TLSInfo::Stack() in
-  // profiler_call_exit().
+  // used to avoid having to call TLSInfo::RacyInfo() in profiler_call_exit().
   return pseudoStack;
 }
 
