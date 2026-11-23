@@ -249,7 +249,12 @@ nsHttpHandler::~nsHttpHandler()
 
     // make sure the connection manager is shutdown
     if (mConnMgr) {
-        mConnMgr->Shutdown();
+        nsresult rv = mConnMgr->Shutdown();
+        if (NS_FAILED(rv)) {
+            LOG(("nsHttpHandler [this=%p] "
+                 "failed to shutdown connection manager (%08x)\n",
+                 this, static_cast<uint32_t>(rv)));
+        }
         mConnMgr = nullptr;
     }
 
@@ -418,7 +423,11 @@ nsHttpHandler::MakeNewRequestTokenBucket()
     }
     RefPtr<EventTokenBucket> tokenBucket =
         new EventTokenBucket(RequestTokenBucketHz(), RequestTokenBucketBurst());
-    mConnMgr->UpdateRequestTokenBucket(tokenBucket);
+    // NOTE The thread or socket may be gone already.
+    nsresult rv = mConnMgr->UpdateRequestTokenBucket(tokenBucket);
+    if (NS_FAILED(rv)) {
+        LOG(("    failed to update request token bucket\n"));
+    }
 }
 
 nsresult
@@ -955,8 +964,16 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
     if (MULTI_PREF_CHANGED(SECURITY_PREFIX)) {
         LOG(("nsHttpHandler::PrefsChanged Security Pref Changed %s\n", pref));
         if (mConnMgr) {
-            mConnMgr->DoShiftReloadConnectionCleanup(nullptr);
-            mConnMgr->PruneDeadConnections();
+            rv = mConnMgr->DoShiftReloadConnectionCleanup(nullptr);
+            if (NS_FAILED(rv)) {
+                LOG(("nsHttpHandler::PrefsChanged "
+                     "DoShiftReloadConnectionCleanup failed (%08x)\n", static_cast<uint32_t>(rv)));
+            }
+            rv = mConnMgr->PruneDeadConnections();
+            if (NS_FAILED(rv)) {
+                LOG(("nsHttpHandler::PrefsChanged "
+                     "PruneDeadConnections failed (%08x)\n", static_cast<uint32_t>(rv)));
+            }
         }
     }
 
@@ -1039,9 +1056,14 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         rv = prefs->GetIntPref(HTTP_PREF("request.max-start-delay"), &val);
         if (NS_SUCCEEDED(rv)) {
             mMaxRequestDelay = (uint16_t) clamped(val, 0, 0xffff);
-            if (mConnMgr)
-                mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_REQUEST_DELAY,
-                                      mMaxRequestDelay);
+            if (mConnMgr) {
+                rv = mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_REQUEST_DELAY,
+                                           mMaxRequestDelay);
+                if (NS_FAILED(rv)) {
+                    LOG(("nsHttpHandler::PrefsChanged (request.max-start-delay)"
+                         "UpdateParam failed (%08x)\n", static_cast<uint32_t>(rv)));
+                }
+            }
         }
     }
 
@@ -1064,9 +1086,14 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
             mMaxConnections = (uint16_t) clamped((uint32_t)val,
                                                  (uint32_t)1, MaxSocketCount());
 
-            if (mConnMgr)
-                mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_CONNECTIONS,
-                                      mMaxConnections);
+            if (mConnMgr) {
+                rv = mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_CONNECTIONS,
+                                           mMaxConnections);
+                if (NS_FAILED(rv)) {
+                    LOG(("nsHttpHandler::PrefsChanged (max-connections)"
+                         "UpdateParam failed (%08x)\n", static_cast<uint32_t>(rv)));
+                }
+            }
         }
     }
 
@@ -1074,9 +1101,14 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         rv = prefs->GetIntPref(HTTP_PREF("max-persistent-connections-per-server"), &val);
         if (NS_SUCCEEDED(rv)) {
             mMaxPersistentConnectionsPerServer = (uint8_t) clamped(val, 1, 0xff);
-            if (mConnMgr)
-                mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_PERSISTENT_CONNECTIONS_PER_HOST,
-                                      mMaxPersistentConnectionsPerServer);
+            if (mConnMgr) {
+                rv = mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_PERSISTENT_CONNECTIONS_PER_HOST,
+                                           mMaxPersistentConnectionsPerServer);
+                if (NS_FAILED(rv)) {
+                    LOG(("nsHttpHandler::PrefsChanged (max-persistent-connections-per-server)"
+                         "UpdateParam failed (%08x)\n", static_cast<uint32_t>(rv)));
+                }
+            }
         }
     }
 
@@ -1084,9 +1116,14 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         rv = prefs->GetIntPref(HTTP_PREF("max-persistent-connections-per-proxy"), &val);
         if (NS_SUCCEEDED(rv)) {
             mMaxPersistentConnectionsPerProxy = (uint8_t) clamped(val, 1, 0xff);
-            if (mConnMgr)
-                mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_PERSISTENT_CONNECTIONS_PER_PROXY,
-                                      mMaxPersistentConnectionsPerProxy);
+            if (mConnMgr) {
+                rv = mConnMgr->UpdateParam(nsHttpConnectionMgr::MAX_PERSISTENT_CONNECTIONS_PER_PROXY,
+                                           mMaxPersistentConnectionsPerProxy);
+                if (NS_FAILED(rv)) {
+                    LOG(("nsHttpHandler::PrefsChanged (max-persistent-connections-per-proxy)"
+                         "UpdateParam failed (%08x)\n", static_cast<uint32_t>(rv)));
+                }
+            }
         }
     }
 
@@ -2031,8 +2068,8 @@ nsHttpHandler::Observe(nsISupports *subject,
         mHandlerActive = false;
 
         // clear cache of all authentication credentials.
-        mAuthCache.ClearAll();
-        mPrivateAuthCache.ClearAll();
+        Unused << mAuthCache.ClearAll();
+        Unused << mPrivateAuthCache.ClearAll();
         if (mWifiTickler)
             mWifiTickler->Cancel();
 
@@ -2054,16 +2091,28 @@ nsHttpHandler::Observe(nsISupports *subject,
         // initialize connection manager
         InitConnectionMgr();
     } else if (!strcmp(topic, "net:clear-active-logins")) {
-        mAuthCache.ClearAll();
-        mPrivateAuthCache.ClearAll();
+        Unused << mAuthCache.ClearAll();
+        Unused << mPrivateAuthCache.ClearAll();
     } else if (!strcmp(topic, "net:prune-dead-connections")) {
         if (mConnMgr) {
-            mConnMgr->PruneDeadConnections();
+            rv = mConnMgr->PruneDeadConnections();
+            if (NS_FAILED(rv)) {
+                LOG(("    PruneDeadConnections failed (%08x)\n",
+                     static_cast<uint32_t>(rv)));
+            }
         }
     } else if (!strcmp(topic, "net:prune-all-connections")) {
         if (mConnMgr) {
-            mConnMgr->DoShiftReloadConnectionCleanup(nullptr);
-            mConnMgr->PruneDeadConnections();
+            rv = mConnMgr->DoShiftReloadConnectionCleanup(nullptr);
+            if (NS_FAILED(rv)) {
+                LOG(("    DoShiftReloadConnectionCleanup failed (%08x)\n",
+                     static_cast<uint32_t>(rv)));
+            }
+            rv = mConnMgr->PruneDeadConnections();
+            if (NS_FAILED(rv)) {
+                LOG(("    PruneDeadConnections failed (%08x)\n",
+                     static_cast<uint32_t>(rv)));
+            }
         }
 #if 0
     } else if (!strcmp(topic, "net:failed-to-process-uri-content")) {
@@ -2072,7 +2121,7 @@ nsHttpHandler::Observe(nsISupports *subject,
          nsCOMPtr<nsIURI> uri = do_QueryInterface(subject);
 #endif
     } else if (!strcmp(topic, "last-pb-context-exited")) {
-        mPrivateAuthCache.ClearAll();
+        Unused << mPrivateAuthCache.ClearAll();
         if (mConnMgr) {
             mConnMgr->ClearAltServiceMappings();
         }
@@ -2090,15 +2139,27 @@ nsHttpHandler::Observe(nsISupports *subject,
         nsAutoCString converted = NS_ConvertUTF16toUTF8(data);
         if (!strcmp(converted.get(), NS_NETWORK_LINK_DATA_CHANGED)) {
             if (mConnMgr) {
-                mConnMgr->PruneDeadConnections();
-                mConnMgr->VerifyTraffic();
+                rv = mConnMgr->PruneDeadConnections();
+                if (NS_FAILED(rv)) {
+                    LOG(("    PruneDeadConnections failed (%08x)\n",
+                         static_cast<uint32_t>(rv)));
+                }
+                rv = mConnMgr->VerifyTraffic();
+                if (NS_FAILED(rv)) {
+                    LOG(("    VerifyTraffic failed (%08x)\n",
+                         static_cast<uint32_t>(rv)));
+                }
             }
         }
     } else if (!strcmp(topic, "application-background")) {
         // going to the background on android means we should close
         // down idle connections for power conservation
         if (mConnMgr) {
-            mConnMgr->DoShiftReloadConnectionCleanup(nullptr);
+            rv = mConnMgr->DoShiftReloadConnectionCleanup(nullptr);
+            if (NS_FAILED(rv)) {
+                LOG(("    DoShiftReloadConnectionCleanup failed (%08x)\n",
+                     static_cast<uint32_t>(rv)));
+            }
         }
     }
 
@@ -2372,7 +2433,11 @@ nsHttpHandler::ShutdownConnectionManager()
 {
     // ensure connection manager is shutdown
     if (mConnMgr) {
-        mConnMgr->Shutdown();
+        nsresult rv = mConnMgr->Shutdown();
+        if (NS_FAILED(rv)) {
+            LOG(("nsHttpHandler::ShutdownConnectionManager\n"
+                 "    failed to shutdown connection manager\n"));
+        }
     }
 }
 
