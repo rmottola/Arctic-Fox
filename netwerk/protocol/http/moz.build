@@ -83,7 +83,6 @@ UNIFIED_SOURCES += [
     'nsHttpDigestAuth.cpp',
     'nsHttpHeaderArray.cpp',
     'nsHttpNTLMAuth.cpp',
-    'nsHttpPipeline.cpp',
     'nsHttpRequestHead.cpp',
     'nsHttpResponseHead.cpp',
     'nsHttpTransaction.cpp',
