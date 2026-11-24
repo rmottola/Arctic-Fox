@@ -3053,9 +3053,8 @@ XMLHttpRequestMainThread::SetRequestHeader(const nsACString& aName,
   }
 
   // Step 3
-  nsAutoCString value(aValue);
-  static const char kHTTPWhitespace[] = "\n\t\r ";
-  value.Trim(kHTTPWhitespace);
+  nsAutoCString value;
+  NS_TrimHTTPWhitespace(aValue, value);
 
   // Step 4
   if (!NS_IsValidHTTPToken(aName) || !NS_IsReasonableHTTPHeaderValue(value)) {
