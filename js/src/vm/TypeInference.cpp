@@ -2435,6 +2435,27 @@ TemporaryTypeSet::maybeCallable(CompilerConstraintList* constraints)
 }
 
 bool
+TemporaryTypeSet::maybeProxy(CompilerConstraintList* constraints)
+{
+    if (!maybeObject())
+        return false;
+
+    if (unknownObject())
+        return true;
+
+    unsigned count = getObjectCount();
+    for (unsigned i = 0; i < count; i++) {
+        const Class* clasp = getObjectClass(i);
+        if (!clasp)
+            continue;
+        if (clasp->isProxy() || !getObject(i)->hasStableClassAndProto(constraints))
+            return true;
+    }
+
+    return false;
+}
+
+bool
 TemporaryTypeSet::maybeEmulatesUndefined(CompilerConstraintList* constraints)
 {
     if (!maybeObject())
