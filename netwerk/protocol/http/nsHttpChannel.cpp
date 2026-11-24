@@ -2081,6 +2081,11 @@ nsHttpChannel::ContinueProcessResponse1()
         return NS_OK;
     }
 
+    // Check if request was cancelled during http-on-examine-response.
+    if (mCanceled) {
+        return CallOnStartRequest();
+    }
+
     uint32_t httpStatus = mResponseHead->Status();
 
     // Cookies and Alt-Service should not be handled on proxy failure either.
