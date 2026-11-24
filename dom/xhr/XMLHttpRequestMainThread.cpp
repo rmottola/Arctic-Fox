@@ -1014,7 +1014,7 @@ XMLHttpRequestMainThread::GetStatusText(nsACString& aStatusText,
 
   nsCOMPtr<nsIHttpChannel> httpChannel = GetCurrentHttpChannel();
   if (httpChannel) {
-    httpChannel->GetResponseStatusText(aStatusText);
+    Unused << httpChannel->GetResponseStatusText(aStatusText);
   } else {
     aStatusText.AssignLiteral("OK");
   }
@@ -1184,7 +1184,7 @@ XMLHttpRequestMainThread::IsSafeHeader(const nsACString& aHeader,
   nsAutoCString headerVal;
   // The "Access-Control-Expose-Headers" header contains a comma separated
   // list of method names.
-  aHttpChannel->
+  Unused << aHttpChannel->
       GetResponseHeader(NS_LITERAL_CSTRING("Access-Control-Expose-Headers"),
                         headerVal);
   nsCCharSeparatedTokenizer exposeTokens(headerVal, ',');
@@ -1636,7 +1636,8 @@ XMLHttpRequestMainThread::PopulateNetworkInterfaceId()
   if (!channel) {
     return;
   }
-  channel->SetNetworkInterfaceId(mNetworkInterfaceId);
+  DebugOnly<nsresult> rv = channel->SetNetworkInterfaceId(mNetworkInterfaceId);
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
 }
 
 /*
@@ -2025,7 +2026,8 @@ XMLHttpRequestMainThread::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
   nsCOMPtr<nsIHttpChannel> httpChannel(do_QueryInterface(mChannel));
   if (parseBody && httpChannel) {
     nsAutoCString method;
-    httpChannel->GetRequestMethod(method);
+    rv = httpChannel->GetRequestMethod(method);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
     parseBody = !method.EqualsLiteral("HEAD");
   }
 
@@ -2625,7 +2627,8 @@ XMLHttpRequestMainThread::InitiateFetch(nsIInputStream* aUploadStream,
         uploadChannel->SetUploadStream(aUploadStream, aUploadContentType,
                                        mUploadTotal);
         // Reset the method to its original value
-        httpChannel->SetRequestMethod(mRequestMethod);
+        rv = httpChannel->SetRequestMethod(mRequestMethod);
+        MOZ_ASSERT(NS_SUCCEEDED(rv));
       }
     }
   }
@@ -2656,7 +2659,8 @@ XMLHttpRequestMainThread::InitiateFetch(nsIInputStream* aUploadStream,
   nsCOMPtr<nsIHttpChannelInternal>
     internalHttpChannel(do_QueryInterface(mChannel));
   if (internalHttpChannel) {
-    internalHttpChannel->SetResponseTimeoutEnabled(false);
+    rv = internalHttpChannel->SetResponseTimeoutEnabled(false);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
   }
 
   if (!mIsAnon) {
@@ -4112,9 +4116,13 @@ RequestHeaders::ApplyToChannel(nsIHttpChannel* aHttpChannel) const
 {
   for (const RequestHeader& header : mHeaders) {
     if (header.mValue.IsEmpty()) {
-      aHttpChannel->SetEmptyRequestHeader(header.mName);
+      DebugOnly<nsresult> rv =
+        aHttpChannel->SetEmptyRequestHeader(header.mName);
+      MOZ_ASSERT(NS_SUCCEEDED(rv));
     } else {
-      aHttpChannel->SetRequestHeader(header.mName, header.mValue, false);
+      DebugOnly<nsresult> rv =
+        aHttpChannel->SetRequestHeader(header.mName, header.mValue, false);
+      MOZ_ASSERT(NS_SUCCEEDED(rv));
     }
   }
 }
