@@ -2275,8 +2275,9 @@ nsHttpChannel::ContinueProcessResponse2(nsresult rv)
         } else if (NS_FAILED(rv)) {
             LOG(("ProcessAuthentication failed [rv=%" PRIx32 "]\n",
                  static_cast<uint32_t>(rv)));
-            if (mTransaction->ProxyConnectFailed())
+            if (mTransaction && mTransaction->ProxyConnectFailed()) {
                 return ProcessFailedProxyConnect(httpStatus);
+            }
             if (!mAuthRetryPending) {
                 rv = mAuthProvider->CheckForSuperfluousAuth();
                 if (NS_FAILED(rv)) {
