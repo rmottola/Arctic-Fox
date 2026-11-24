@@ -7028,6 +7028,13 @@ nsHttpChannel::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult st
         }
     }
 
+    gIOService->IncrementRequestNumber();
+    if (rcwnStatus == kRaceUsedCache) {
+        gIOService->IncrementCacheWonRequestNumber();
+    } else if (rcwnStatus == kRaceUsedNetwork) {
+        gIOService->IncrementNetWonRequestNumber();
+    }
+
     // Register entry to the Performance resource timing
     mozilla::dom::Performance* documentPerformance = GetPerformance();
     if (documentPerformance) {
