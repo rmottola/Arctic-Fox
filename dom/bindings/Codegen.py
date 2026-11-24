@@ -13582,7 +13582,8 @@ class CGRegisterGlobalNames(CGAbstractMethod):
         currentOffset = 0
         for (name, desc) in getGlobalNames(self.config):
             length = len(name)
-            define += "WebIDLGlobalNameHash::Register(%i, %i, %sBinding::DefineDOMInterface, %s);\n" % (currentOffset, length, desc.name, getCheck(desc))
+            define += "WebIDLGlobalNameHash::Register(%i, %i, %sBinding::DefineDOMInterface, %s, constructors::id::%s);\n" % (
+                currentOffset, length, desc.name, getCheck(desc), desc.name)
             currentOffset += length + 1 # Add trailing null.
         return define
 
@@ -16809,6 +16810,7 @@ class GlobalGenRoots():
                                                             isExposedInWindow=True,
                                                             register=True)]
         defineIncludes.append('mozilla/dom/WebIDLGlobalNameHash.h')
+        defineIncludes.append('mozilla/dom/PrototypeList.h')
         defineIncludes.extend([CGHeaders.getDeclarationFilename(desc.interface)
                                for desc in config.getDescriptors(isNavigatorProperty=True,
                                                                  register=True)])
