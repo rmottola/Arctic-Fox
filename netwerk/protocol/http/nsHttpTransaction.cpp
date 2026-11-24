@@ -133,6 +133,7 @@ nsHttpTransaction::nsHttpTransaction()
     , mReportedResponseHeader(false)
     , mForTakeResponseHead(nullptr)
     , mResponseHeadTaken(false)
+    , mTopLevelOuterContentWindowId(0)
     , mSubmittedRatePacing(false)
     , mPassedRatePacing(false)
     , mSynchronousRatePaceRequest(false)
@@ -185,6 +186,7 @@ nsHttpTransaction::Init(uint32_t caps,
                         nsIEventTarget *target,
                         nsIInterfaceRequestor *callbacks,
                         nsITransportEventSink *eventsink,
+                        uint64_t topLevelOuterContentWindowId,
                         nsIAsyncInputStream **responseBody)
 {
     nsresult rv;
@@ -195,6 +197,8 @@ nsHttpTransaction::Init(uint32_t caps,
     MOZ_ASSERT(requestHead);
     MOZ_ASSERT(target);
     MOZ_ASSERT(NS_IsMainThread());
+
+    mTopLevelOuterContentWindowId = topLevelOuterContentWindowId;
 
     mActivityDistributor = do_GetService(NS_HTTPACTIVITYDISTRIBUTOR_CONTRACTID, &rv);
     if (NS_FAILED(rv)) return rv;

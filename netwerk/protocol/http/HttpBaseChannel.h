@@ -355,6 +355,11 @@ public: /* Necko internal use only... */
       mIsTrackingResource = true;
     }
 
+    void SetTopLevelOuterContentWindowId(uint64_t aTopLevelOuterContentWindowId)
+    {
+      mTopLevelOuterContentWindowId = aTopLevelOuterContentWindowId;
+    }
+
 protected:
   // Handle notifying listener, removing from loadgroup if request failed.
   void     DoNotifyListener();
@@ -583,6 +588,9 @@ protected:
   // ID of the top-level document's inner window this channel is being
   // originated from.
   uint64_t mContentWindowId;
+
+  uint64_t mTopLevelOuterContentWindowId;
+  void EnsureTopLevelOuterContentWindowId();
 
   bool                              mRequireCORSPreflight;
   nsTArray<nsCString>               mUnsafeHeaders;

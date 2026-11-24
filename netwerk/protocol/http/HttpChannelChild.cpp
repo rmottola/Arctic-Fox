@@ -2130,6 +2130,7 @@ HttpChannelChild::ContinueAsyncOpen()
     nsCOMPtr<nsIDocument> document = tabChild->GetDocument();
     if (document) {
       contentWindowId = document->InnerWindowID();
+      mTopLevelOuterContentWindowId = document->OuterWindowID();
     }
   }
   SetTopLevelContentWindowId(contentWindowId);
@@ -2228,6 +2229,7 @@ HttpChannelChild::ContinueAsyncOpen()
   openArgs.channelId().AssignASCII(chid);
 
   openArgs.contentWindowId() = contentWindowId;
+  openArgs.topLevelOuterContentWindowId() = mTopLevelOuterContentWindowId;
 
   if (tabChild && !tabChild->IPCOpen()) {
     return NS_ERROR_FAILURE;
