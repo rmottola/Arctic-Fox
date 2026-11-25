@@ -2897,7 +2897,8 @@ bool
 MayResolveGlobal(const JSAtomState& aNames, jsid aId, JSObject* aMaybeObj);
 
 bool
-EnumerateGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj);
+EnumerateGlobal(JSContext* aCx, JS::HandleObject aObj,
+                JS::AutoIdVector& aProperties, bool aEnumerableOnly);
 
 template <class T>
 struct CreateGlobalOptions
