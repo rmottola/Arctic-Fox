@@ -249,7 +249,7 @@ class JSAPITest
         static const JSClassOps cOps = {
             nullptr, nullptr, nullptr, nullptr,
             nullptr, nullptr, nullptr, nullptr,
-            nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr,
             JS_GlobalObjectTraceHook
         };
         static const JSClass c = {

@@ -1682,6 +1682,7 @@ static const JSClassOps FinalizeCounterClassOps = {
     nullptr, /* getProperty */
     nullptr, /* setProperty */
     nullptr, /* enumerate */
+    nullptr, /* newEnumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     finalize_counter_finalize
@@ -2410,6 +2411,7 @@ static const ClassOps CloneBufferObjectClassOps = {
     nullptr, /* getProperty */
     nullptr, /* setProperty */
     nullptr, /* enumerate */
+    nullptr, /* newEnumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     CloneBufferObject::Finalize

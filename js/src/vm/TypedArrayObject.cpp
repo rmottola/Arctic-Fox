@@ -1948,6 +1948,7 @@ static const ClassOps TypedArrayClassOps = {
     nullptr,                 /* getProperty */
     nullptr,                 /* setProperty */
     nullptr,                 /* enumerate   */
+    nullptr,                 /* newEnumerate */
     nullptr,                 /* resolve     */
     nullptr,                 /* mayResolve  */
     TypedArrayObject::finalize, /* finalize    */

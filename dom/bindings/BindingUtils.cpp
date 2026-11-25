@@ -1986,6 +1986,7 @@ const js::ClassOps sBoringInterfaceObjectClassClassOps = {
     nullptr,               /* getProperty */
     nullptr,               /* setProperty */
     nullptr,               /* enumerate */
+    nullptr,               /* newEnumerate */
     nullptr,               /* resolve */
     nullptr,               /* mayResolve */
     nullptr,               /* finalize */
@@ -2006,7 +2007,6 @@ const js::ObjectOps sInterfaceObjectClassObjectOps = {
   nullptr, /* watch */
   nullptr, /* unwatch */
   nullptr, /* getElements */
-  nullptr, /* enumerate */
   InterfaceObjectToString, /* funToString */
 };
 

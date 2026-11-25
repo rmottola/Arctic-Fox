@@ -538,6 +538,7 @@ ModuleObject::classOps_ = {
     nullptr,        /* getProperty */
     nullptr,        /* setProperty */
     nullptr,        /* enumerate   */
+    nullptr,        /* newEnumerate */
     nullptr,        /* resolve     */
     nullptr,        /* mayResolve  */
     ModuleObject::finalize,

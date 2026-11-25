@@ -483,6 +483,7 @@ const ClassOps WasmModuleObject::classOps_ =
     nullptr, /* getProperty */
     nullptr, /* setProperty */
     nullptr, /* enumerate */
+    nullptr, /* newEnumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     WasmModuleObject::finalize
@@ -863,6 +864,7 @@ const ClassOps WasmInstanceObject::classOps_ =
     nullptr, /* getProperty */
     nullptr, /* setProperty */
     nullptr, /* enumerate */
+    nullptr, /* newEnumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     WasmInstanceObject::finalize,
@@ -1181,6 +1183,7 @@ const ClassOps WasmMemoryObject::classOps_ =
     nullptr, /* getProperty */
     nullptr, /* setProperty */
     nullptr, /* enumerate */
+    nullptr, /* newEnumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     WasmMemoryObject::finalize
@@ -1438,6 +1441,7 @@ const ClassOps WasmTableObject::classOps_ =
     nullptr, /* getProperty */
     nullptr, /* setProperty */
     nullptr, /* enumerate */
+    nullptr, /* newEnumerate */
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     WasmTableObject::finalize,
