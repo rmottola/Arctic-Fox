@@ -457,8 +457,13 @@ moz_gtk_get_scalethumb_metrics(GtkOrientation orient, gint* thumb_length, gint* 
 /**
  * Get the metrics in GTK pixels for a scrollbar.
  */
+#if (MOZ_WIDGET_GTK == 3)
 const ScrollbarGTKMetrics*
-GetScrollbarMetrics(GtkOrientation aOrientation);
+GetScrollbarMetrics(GtkOrientation aOrientation)
+#else
+gint
+moz_gtk_get_scrollbar_metrics(MozGtkScrollbarMetrics* metrics);
+#endif
 
 /**
  * Get the desired size of a dropdown arrow button
@@ -548,6 +553,20 @@ GtkWidget* moz_gtk_get_scrollbar_widget(void);
  */
 gint
 moz_gtk_get_tab_thickness(WidgetNodeType aNodeType);
+
+#if (MOZ_WIDGET_GTK == 2)
+/**
+ * Get a boolean which indicates whether the theme draws scrollbar buttons.
+ * If TRUE, draw scrollbar buttons.
+ */
+gboolean moz_gtk_has_scrollbar_buttons(void);
+/**
+ * Get minimum widget size as sum of margin, padding, border and min-width,
+ * min-height.
+ */
+void moz_gtk_get_widget_min_size(WidgetNodeType aGtkWidgetType, int* width,
+                                 int* height);
+#endif
 
 #if (MOZ_WIDGET_GTK == 2)
 #ifdef __cplusplus

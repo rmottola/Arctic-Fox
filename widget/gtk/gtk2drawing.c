@@ -3005,8 +3005,7 @@ moz_gtk_get_tab_border(gint* left, gint* top, gint* right, gint* bottom,
                        WidgetNodeType widget)
 {
     moz_gtk_get_widget_border(widget, left, top,
-                              right, bottom, direction,
-                              FALSE);
+                              right, bottom, direction);
 
     // Top tabs have no bottom border, bottom tabs have no top border
     if (widget == MOZ_GTK_TAB_BOTTOM) {
