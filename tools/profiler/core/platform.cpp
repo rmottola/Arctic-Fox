@@ -1767,6 +1767,8 @@ NewSamplerThread(PSLockRef aLock, uint32_t aGeneration, double aInterval)
 void
 SamplerThread::Run()
 {
+  PR_SetCurrentThreadName("SamplerThread");
+
   // This will be positive if we are running behind schedule (sampling less
   // frequently than desired) and negative if we are ahead of schedule.
   TimeDuration lastSleepOvershoot = 0;
