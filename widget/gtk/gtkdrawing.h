@@ -459,7 +459,7 @@ moz_gtk_get_scalethumb_metrics(GtkOrientation orient, gint* thumb_length, gint* 
  */
 #if (MOZ_WIDGET_GTK == 3)
 const ScrollbarGTKMetrics*
-GetScrollbarMetrics(GtkOrientation aOrientation)
+GetScrollbarMetrics(GtkOrientation aOrientation);
 #else
 gint
 moz_gtk_get_scrollbar_metrics(MozGtkScrollbarMetrics* metrics);
