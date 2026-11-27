@@ -1482,7 +1482,7 @@ JsepSessionImpl::MakeNegotiatedTrackPair(const SdpMediaSection& remote,
   trackPairOut->mRecvonlySsrc = mRecvonlySsrcs[local.GetLevel()];
 
   if (usingBundle) {
-    trackPairOut->mBundleLevel = Some(transportLevel);
+    trackPairOut->SetBundleLevel(transportLevel);
   }
 
   auto sendTrack = FindTrackByLevel(mLocalTracks, local.GetLevel());
@@ -1505,7 +1505,7 @@ JsepSessionImpl::MakeNegotiatedTrackPair(const SdpMediaSection& remote,
     trackPairOut->mReceiving = recvTrack->mTrack;
 
     if (receiving &&
-        trackPairOut->mBundleLevel.isSome() &&
+        trackPairOut->HasBundleLevel() &&
         recvTrack->mTrack->GetSsrcs().empty() &&
         recvTrack->mTrack->GetMediaType() != SdpMediaSection::kApplication) {
       MOZ_MTLOG(ML_ERROR, "Bundled m-section has no ssrc attributes. "
