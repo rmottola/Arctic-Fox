@@ -2504,11 +2504,8 @@ JsepSessionImpl::GetParsedLocalDescription() const
 {
   if (mPendingLocalDescription) {
     return mPendingLocalDescription.get();
-  } else if (mCurrentLocalDescription) {
-    return mCurrentLocalDescription.get();
   }
-
-  return nullptr;
+  return mCurrentLocalDescription.get();
 }
 
 mozilla::Sdp*
@@ -2516,11 +2513,8 @@ JsepSessionImpl::GetParsedRemoteDescription() const
 {
   if (mPendingRemoteDescription) {
     return mPendingRemoteDescription.get();
-  } else if (mCurrentRemoteDescription) {
-    return mCurrentRemoteDescription.get();
   }
-
-  return nullptr;
+  return mCurrentRemoteDescription.get();
 }
 
 const Sdp*
