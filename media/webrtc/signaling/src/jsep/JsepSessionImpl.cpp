@@ -2296,6 +2296,11 @@ JsepSessionImpl::SetupDefaultRtpExtensions()
 {
   AddAudioRtpExtension("urn:ietf:params:rtp-hdrext:ssrc-audio-level",
                        SdpDirectionAttribute::Direction::kSendonly);
+  AddVideoRtpExtension(
+    "http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time",
+                       SdpDirectionAttribute::Direction::kSendrecv);
+  AddVideoRtpExtension("urn:ietf:params:rtp-hdrext:toffset",
+                       SdpDirectionAttribute::Direction::kSendrecv);
 }
 
 void
