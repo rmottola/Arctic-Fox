@@ -44,6 +44,7 @@ public:
 
   void Init()
     {
+#ifdef MOZILLA_INTERNAL_API
       nsCOMPtr<nsIObserverService> observerService =
         services::GetObserverService();
       if (!observerService)
@@ -51,7 +52,6 @@ public:
 
       nsresult rv = NS_OK;
 
-#ifdef MOZILLA_INTERNAL_API
       rv = observerService->AddObserver(this,
                                         NS_XPCOM_SHUTDOWN_OBSERVER_ID,
                                         false);
@@ -60,8 +60,8 @@ public:
                                         NS_IOSERVICE_OFFLINE_STATUS_TOPIC,
                                         false);
       MOZ_ALWAYS_SUCCEEDS(rv);
-#endif
       (void) rv;
+#endif
     }
 
   NS_IMETHOD Observe(nsISupports* aSubject, const char* aTopic,
@@ -70,6 +70,7 @@ public:
       CSFLogDebug(logTag, "Shutting down PeerConnectionCtx");
       PeerConnectionCtx::Destroy();
 
+#ifdef MOZILLA_INTERNAL_API
       nsCOMPtr<nsIObserverService> observerService =
         services::GetObserverService();
       if (!observerService)
@@ -81,6 +82,7 @@ public:
       rv = observerService->RemoveObserver(this,
                                            NS_XPCOM_SHUTDOWN_OBSERVER_ID);
       MOZ_ALWAYS_SUCCEEDS(rv);
+#endif
 
       // Make sure we're not deleted while still inside ::Observe()
       RefPtr<PeerConnectionCtxObserver> kungFuDeathGrip(this);
@@ -104,12 +106,14 @@ public:
 private:
   virtual ~PeerConnectionCtxObserver()
     {
+#ifdef MOZILLA_INTERNAL_API
       nsCOMPtr<nsIObserverService> observerService =
         services::GetObserverService();
       if (observerService) {
         observerService->RemoveObserver(this, NS_IOSERVICE_OFFLINE_STATUS_TOPIC);
         observerService->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID);
       }
+#endif
     }
 };
 
